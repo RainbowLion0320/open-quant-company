@@ -140,6 +140,18 @@ def main():
 
     print(f"\n⏱️ 扫描完成")
 
+    # 推送通知
+    try:
+        from notify import push_report, format_scan_report
+        failed_moat = sum(1 for r in failed if "护城河" in r.verdict.value)
+        failed_margin = sum(1 for r in failed if "安全边际" in r.verdict.value)
+        body = format_scan_report(passed, n_total, failed_moat, failed_margin)
+        results = push_report("Quant Agent 巴菲特扫描", body)
+        for ch, ok in results.items():
+            print(f"  📤 {ch}: {'✓' if ok else '✗ 未配置或失败'}")
+    except Exception as e:
+        print(f"  ⚠️ 推送失败: {e}")
+
 
 if __name__ == "__main__":
     main()

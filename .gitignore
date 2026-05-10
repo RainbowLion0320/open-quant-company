@@ -23,6 +23,7 @@ tmp/
 # Environment
 .env
 .env.local
+config/notify.yaml
 
 # OS
 .DS_Store
