@@ -1,0 +1,94 @@
+# Quant Agent Configuration
+# 个人A股量化AI - 基于Hermes Agent的量化交易系统
+
+project:
+  name: "quant-agent"
+  version: "0.1.0"
+  phase: 1  # 1=分析助手, 2=信号系统, 3=半自动交易
+
+# ----- 数据源配置 -----
+data:
+  provider: "akshare"
+  cache_dir: "data/cache"
+  cache_days: 1  # 缓存有效期（天）
+  index:
+    shanghai: "sh000001"
+    shenzhen: "sz399001"
+    csi300: "sh000300"
+
+# ----- 巴菲特决策约束层 -----
+buffett:
+  # 安全边际
+  margin_of_safety:
+    dcf_discount_rate: 0.08     # DCF折现率
+    safety_margin_pct: 0.30     # 要求的安全边际（30%）
+    growth_rate_terminal: 0.03  # 永续增长率
+
+  # 护城河
+  moat:
+    min_roe_years: 5            # ROE持续>15%的最少年数
+    min_roe: 0.15               # 最低ROE（消费/制造）
+    min_gross_margin: 0.30      # 最低毛利率（消费/制造）
+    max_debt_equity: 1.5        # 最高负债权益比（消费/制造）
+    # 行业特定参数
+    sectors:
+      bank:
+        min_roe: 0.10           # 银行ROE>10%已属优秀
+        max_debt_equity: 20.0   # 银行天然高杠杆，产权比率可达10+
+        skip_gross_margin: true # 银行无毛利率概念，用净息差/销售净利率替代
+        min_net_margin: 0.20    # 销售净利率 >20%（优秀银行净息差保障）
+      insurance:
+        min_roe: 0.08           # 保险ROE波动大，8%为合理门槛
+        max_debt_equity: 20.0   # 保险也高杠杆
+        skip_gross_margin: true
+        min_net_margin: 0.05    # 保险净利率偏低属正常
+      securities:
+        min_roe: 0.06           # 券商ROE周期性强，6%即可
+        max_debt_equity: 10.0   # 券商杠杆居中
+        skip_gross_margin: true
+        min_net_margin: 0.15
+
+  # 能力圈
+  circle_of_competence:
+    # 初始聚焦行业（可扩展）
+    industries:
+      - "白酒"
+      - "消费"
+      - "医药"
+      - "金融"
+      - "能源"
+
+# ----- 控制论运行机制层 -----
+cybernetics:
+  # 多层递阶结构
+  hierarchy:
+    levels:
+      - name: "市场环境"
+        priority: 1
+        indicators: ["指数趋势", "市场情绪", "资金流向"]
+      - name: "板块轮动"
+        priority: 2
+        indicators: ["行业强度", "板块资金", "政策面"]
+      - name: "个股筛选"
+        priority: 3
+        indicators: ["基本面", "技术面", "估值"]
+
+  # 反馈回路
+  feedback:
+    loop_interval: "daily"      # 日频反馈
+    max_consecutive_losses: 3   # 连续止损后触发审查
+    performance_review_days: 30 # 每月绩效回顾
+
+  # 自适应机制
+  adaptive:
+    market_regime_detection: true
+    param_tuning_frequency: "monthly"
+    volatility_adjustment: true
+
+# ----- 回测配置 -----
+backtest:
+  engine: "backtrader"
+  initial_cash: 1000000        # 初始资金100万
+  commission: 0.0003           # 万三佣金
+  benchmark: "sh000001"         # 基准：上证指数
+  start_date: "2020-01-01"

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Data cache (managed by fetcher.py TTL)
+data/cache/*.parquet
+
+# Temporary / scratch
+tmp/
+*.tmp
+*.log
+*.swp
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Quant-specific
+backtest/results/
+*.html           # backtrader plot outputs
