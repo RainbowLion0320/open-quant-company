@@ -19,105 +19,126 @@ for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy
 os.environ["no_proxy"] = "eastmoney.com,10jqka.com.cn,sina.com.cn,qianlong.com,163.com,qq.com"
 
 st.set_page_config(
-    page_title="Quant Agent · A股量化",
-    page_icon="📊",
+    page_title="Quant Agent",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items=None,
 )
 
 # ============================================================
-# 金融暗黑主题 CSS
+# Linear 风格暗黑金融主题
 # ============================================================
 st.markdown("""
 <style>
     /* 全局 */
-    .stApp { background: #0a0e14; }
-    .main .block-container { padding-top: 1rem; }
+    .stApp { background: #08090a; }
+    .main .block-container { padding-top: 0.8rem; }
 
-    /* 侧边栏 — 窄化 + 深色 */
+    /* 侧边栏 — Linear 风格 */
     [data-testid="stSidebar"] {
-        background: #0c1017;
-        border-right: 1px solid #1a2230;
-        min-width: 180px !important;
-        max-width: 200px !important;
+        background: #0c0d0f;
+        border-right: 1px solid rgba(255,255,255,0.06);
+        min-width: 168px !important;
+        max-width: 172px !important;
     }
     [data-testid="stSidebar"] [data-testid="stSidebarNav"] { display: none; }
-    [data-testid="stSidebar"] .stMarkdown { color: #a0aec0; }
-    [data-testid="stSidebar"] hr { border-color: #1a2230; margin: 0.6rem 0; }
+    [data-testid="stSidebar"] .stMarkdown { display: none; }
+    [data-testid="stSidebar"] hr { display: none; }
+    [data-testid="stSidebar"] .stCaption { display: none; }
+    [data-testid="stSidebar"] .block-container { padding: 1.2rem 0.8rem; }
 
-    /* 侧边栏 — 导航按钮 */
+    /* 侧边栏标题 */
+    [data-testid="stSidebar"]::before {
+        content: "Quant";
+        display: block;
+        padding: 0 0.9rem 0.8rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #f7f8f8;
+        letter-spacing: -0.02em;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        margin-bottom: 0.6rem;
+    }
+
+    /* 导航 — 标签式 */
     div[data-testid="stSidebar"] .stRadio > div {
-        display: flex; flex-direction: column; gap: 2px;
+        display: flex; flex-direction: column; gap: 1px;
+        padding: 0 0.1rem;
     }
     div[data-testid="stSidebar"] .stRadio label {
-        padding: 0.5rem 0.8rem;
-        border-radius: 6px;
-        font-size: 0.82rem;
-        font-weight: 500;
-        color: #7a8ba0 !important;
-        transition: all 0.15s;
+        padding: 0.42rem 0.7rem;
+        border-radius: 4px;
+        font-size: 0.77rem;
+        font-weight: 450;
+        color: #8a8f98 !important;
+        transition: none;
         cursor: pointer;
+        background: transparent;
+        border: none;
+        letter-spacing: -0.01em;
     }
     div[data-testid="stSidebar"] .stRadio label:hover {
-        background: #141c26;
-        color: #cbd5e1 !important;
+        color: #d0d6e0 !important;
+        background: rgba(255,255,255,0.03);
     }
     div[data-testid="stSidebar"] .stRadio label[data-checked="true"] {
-        background: #1a2332;
-        color: #4dabf7 !important;
-        border-left: 3px solid #4dabf7;
-        border-radius: 4px 6px 6px 4px;
-    }
-    div[data-testid="stSidebar"] .stRadio label div[data-testid="stMarkdownContainer"] p {
-        font-size: 0.82rem;
+        color: #f7f8f8 !important;
+        background: rgba(255,255,255,0.06);
+        font-weight: 510;
     }
 
     /* KPI 卡片 */
     .kpi-card {
-        background: linear-gradient(135deg, #111820, #151d28);
-        border: 1px solid #1e2a3a;
-        border-radius: 8px;
-        padding: 1.2rem 1.5rem;
-        margin-bottom: 0.8rem;
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 6px;
+        padding: 1.1rem 1.3rem;
+        margin-bottom: 0.6rem;
     }
-    .kpi-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
-        color: #64748b; margin-bottom: 0.3rem; }
-    .kpi-card .value { font-size: 1.8rem; font-weight: 700; font-family: 'SF Mono','Menlo',monospace; }
-    .kpi-card .sub { font-size: 0.75rem; color: #64748b; margin-top: 0.2rem; }
-    .kpi-green  .value { color: #00d4aa; }  .kpi-green  { border-left: 3px solid #00d4aa; }
-    .kpi-red    .value { color: #ff4d6a; }  .kpi-red    { border-left: 3px solid #ff4d6a; }
-    .kpi-gold   .value { color: #f0b90b; }  .kpi-gold   { border-left: 3px solid #f0b90b; }
-    .kpi-blue   .value { color: #4dabf7; }  .kpi-blue   { border-left: 3px solid #4dabf7; }
+    .kpi-card .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
+        color: #62666d; margin-bottom: 0.4rem; font-weight: 450; }
+    .kpi-card .value { font-size: 1.65rem; font-weight: 590; font-family: 'Inter','SF Mono',monospace;
+        letter-spacing: -0.02em; }
+    .kpi-card .sub { font-size: 0.72rem; color: #8a8f98; margin-top: 0.3rem; }
+    .kpi-green  .value { color: #10b981; }  .kpi-green  { border-left: 2px solid #10b981; }
+    .kpi-red    .value { color: #ef4444; }  .kpi-red    { border-left: 2px solid #ef4444; }
+    .kpi-gold   .value { color: #f59e0b; }  .kpi-gold   { border-left: 2px solid #f59e0b; }
+    .kpi-blue   .value { color: #7170ff; }  .kpi-blue   { border-left: 2px solid #7170ff; }
 
     /* 标题 */
-    h1 { color: #e2e8f0 !important; font-weight: 700 !important; font-size: 1.4rem !important; margin-top: 0 !important; }
-    h3 { color: #cbd5e1 !important; font-size: 1.0rem !important; margin-top: 1.5rem !important; }
+    h1 { color: #f7f8f8 !important; font-weight: 590 !important; font-size: 1.25rem !important;
+         margin-top: 0 !important; letter-spacing: -0.02em; }
+    h3 { color: #d0d6e0 !important; font-size: 0.95rem !important; font-weight: 510;
+         margin-top: 1.2rem !important; }
 
     /* 表格 */
-    [data-testid="stDataFrame"] { border: 1px solid #1e2a3a !important; border-radius: 6px; }
-    [data-testid="stDataFrame"] th { background: #111820 !important; color: #64748b !important;
-        font-size: 0.68rem !important; text-transform: uppercase; letter-spacing: 0.04em; }
-    [data-testid="stDataFrame"] td { color: #cbd5e1 !important; font-size: 0.78rem; }
+    [data-testid="stDataFrame"] { border: 1px solid rgba(255,255,255,0.06) !important; border-radius: 6px; }
+    [data-testid="stDataFrame"] th { background: rgba(255,255,255,0.02) !important; color: #62666d !important;
+        font-size: 0.66rem !important; font-weight: 450; text-transform: uppercase; letter-spacing: 0.03em; }
+    [data-testid="stDataFrame"] td { color: #d0d6e0 !important; font-size: 0.76rem; }
 
     /* 按钮 */
-    .stButton > button { background: #1a2332 !important; border: 1px solid #2a3a50 !important;
-        color: #a0aec0 !important; border-radius: 6px; font-size: 0.78rem; }
-    .stButton > button:hover { border-color: #4dabf7 !important; color: #e2e8f0 !important; }
+    .stButton > button { background: rgba(255,255,255,0.04) !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        color: #d0d6e0 !important; border-radius: 5px; font-size: 0.75rem; }
+    .stButton > button:hover { background: rgba(255,255,255,0.06) !important;
+        border-color: rgba(255,255,255,0.12) !important; color: #f7f8f8 !important; }
 
     /* 分割线 */
-    hr { border-color: #1e2a3a !important; }
+    hr { border-color: rgba(255,255,255,0.06) !important; }
 
     /* header banner */
-    .header-banner { padding: 0.2rem 0; border-bottom: 1px solid #1e2a3a;
-        margin-bottom: 0.8rem; display: flex; justify-content: space-between; align-items: center; }
-    .header-banner .brand { font-size: 0.95rem; color: #e2e8f0; font-weight: 700; }
-    .header-banner .status { font-size: 0.72rem; color: #64748b; }
-    .dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; margin-right: 4px; }
-    .dot-live { background: #00d4aa; }
-
-    /* 降低 radio 间距 */
-    .row-widget.stRadio > div { flex-direction: column; gap: 1px; }
+    .header-banner {
+        padding: 0.15rem 0 0.4rem;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        margin-bottom: 0.6rem;
+        display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .header-banner .brand { font-size: 0.9rem; color: #f7f8f8; font-weight: 590; letter-spacing: -0.02em; }
+    .header-banner .status { font-size: 0.68rem; color: #62666d; }
+    .dot { display: inline-block; width: 4px; height: 4px; border-radius: 50%; margin-right: 3px; }
+    .dot-live { background: #10b981; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -193,25 +214,24 @@ def load_cache_status():
 # ============================================================
 st.markdown(f"""
 <div class="header-banner">
-    <span class="brand">📊 Quant Agent</span>
-    <span class="status"><span class="dot dot-live"></span>Live · {datetime.now().strftime('%H:%M')}</span>
+    <span class="brand">Quant Agent · A股量化</span>
+    <span class="status"><span class="dot dot-live"></span>Live · {datetime.now().strftime('%H:%M')} · 股票池 {TOTAL_ACTIVE}只</span>
+</div>
+<div style="font-size:0.72rem; color:#4a5568; margin-bottom:0.8rem; padding-bottom:0.5rem; border-bottom:1px solid #1a2230;">
+    巴菲特价值投资（决策约束） × 钱学森控制论（运行机制） · 申万一级行业 · Tushare数据
 </div>
 """, unsafe_allow_html=True)
 
 # ============================================================
-# 侧边栏
+# 侧边栏 — 纯导航
 # ============================================================
 with st.sidebar:
-    st.markdown("### 🎯 导航")
-    page = st.radio("", ["📈 市场概览", "🔍 巴菲特筛选", "📊 回测分析", "💾 数据管理"], label_visibility="collapsed")
-    st.markdown("---")
-    st.caption("**架构** 巴菲特价值投资 + 钱学森控制论")
-    st.caption(f"**股票池** 全市场Top500 · {TOTAL_ACTIVE}只")
+    page = st.radio("", ["市场概览", "巴菲特筛选", "回测分析", "数据管理"], label_visibility="collapsed")
 
 # ============================================================
 # 页面1: 市场概览
 # ============================================================
-if page == "📈 市场概览":
+if page == "市场概览":
     snapshot, orch = load_market_data()
     params = orch.get_params()
 
@@ -263,7 +283,7 @@ if page == "📈 市场概览":
 # ============================================================
 # 页面2: 巴菲特筛选
 # ============================================================
-elif page == "🔍 巴菲特筛选":
+elif page == "巴菲特筛选":
     with st.spinner("加载扫描结果..."):
         results = load_buffett_scan()
 
@@ -319,7 +339,7 @@ elif page == "🔍 巴菲特筛选":
 # ============================================================
 # 页面3: 回测分析
 # ============================================================
-elif page == "📊 回测分析":
+elif page == "回测分析":
     bench, stocks = load_backtest_data()
 
     if bench is None:
@@ -369,7 +389,7 @@ elif page == "📊 回测分析":
 # ============================================================
 # 页面4: 数据管理
 # ============================================================
-elif page == "💾 数据管理":
+elif page == "数据管理":
     files = load_cache_status()
     total_size = sum(f["size_kb"] for f in files)
     oldest = max((f["age_h"] for f in files), default=0)
