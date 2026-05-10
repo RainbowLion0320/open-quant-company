@@ -172,7 +172,7 @@ POOL_CSI500: List[Dict] = [
 # ============================================================
 
 # 当前使用的池（默认 top500，可通过环境变量切换）
-ACTIVE_POOL = os.environ.get("QUANT_POOL", "top500")  # top500 | hs300 | csi500 | all
+ACTIVE_POOL = os.environ.get("QUANT_POOL", "all")  # all | top500 | hs300 | csi500
 
 if ACTIVE_POOL == "csi500":
     CIRCLE_STOCKS = sorted(set(s["code"] for s in POOL_CSI500))
