@@ -1,4 +1,5 @@
 # Quant Agent — 维护命令
+PYTHON = /Users/fushao/.hermes/hermes-agent/venv/bin/python3
 
 .PHONY: clean cache-clean pyc-clean dist-clean
 
@@ -30,19 +31,19 @@ dist-clean: clean cache-clean
 
 # 扫描全量股票
 scan:
-	python scripts/scan_all.py
+	$(PYTHON) scripts/scan_all.py
 
 # 回测（默认精选池）
 backtest:
-	python backtest/run_ma_cross.py
+	$(PYTHON) backtest/run_ma_cross.py
 
 # 市场状态检测
 regime:
-	python -c "from cybernetics.orchestrator import QuantOrchestrator; o=QuantOrchestrator(); s=o.detect(); print(f'Regime: {s.regime.value} | {s.index_ma_trend}')"
+	$(PYTHON) -c "from cybernetics.orchestrator import QuantOrchestrator; o=QuantOrchestrator(); s=o.detect(); print(f'Regime: {s.regime.value} | {s.index_ma_trend}')"
 
 # Web 仪表盘
 web:
-	/Users/fushao/Library/Python/3.9/bin/streamlit run web/app.py --server.port 8501
+	$(PYTHON) -m streamlit run web/app.py --server.port 8501
 
 web-stop:
 	pkill -f "streamlit run web/app.py" || true

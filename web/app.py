@@ -43,7 +43,7 @@ def load_market_data():
 @st.cache_data(ttl=3600)
 def load_buffett_scan():
     """加载巴菲特扫描结果"""
-    from data.symbols import CIRCLE_OF_COMPETENCE, SYMBOL_SECTOR, FALLBACK_SECTOR
+    from data.symbols import CIRCLE_OF_COMPETENCE, SYMBOL_SECTOR, FALLBACK_SECTOR, SYMBOL_NAME
     from data.financials import get_buffett_inputs
     from buffett.filters import buffett_filter, Verdict
 
@@ -62,7 +62,7 @@ def load_buffett_scan():
             sector = SYMBOL_SECTOR.get(symbol, FALLBACK_SECTOR)
             inputs = get_buffett_inputs(symbol, current_price=0, industry=industry)
             if inputs and inputs.get("roe_history"):
-                result = buffett_filter(symbol=symbol, name=symbol, **inputs)
+                result = buffett_filter(symbol=symbol, name=SYMBOL_NAME.get(symbol, symbol), **inputs)
                 results.append(result)
         except Exception:
             pass
@@ -220,6 +220,7 @@ elif page == "🔍 巴菲特筛选":
         # 筛选表
         df_results = pd.DataFrame([{
             "代码": r.symbol,
+            "名称": r.name,
             "行业": r.industry,
             "板块": r.sector,
             "判定": r.verdict.value,
