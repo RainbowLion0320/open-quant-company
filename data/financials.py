@@ -4,11 +4,11 @@
 """
 from typing import Tuple, List, Optional
 import pandas as pd
+import numpy as np
 
 from .fetcher import get_financial_indicator, retry_with_backoff
 
-
-# ---- 缓存：避免重复请求 ----
+# ---- 内存缓存 ----
 _financial_cache: dict = {}
 
 
@@ -188,16 +188,14 @@ def extract_latest_revenue(df: pd.DataFrame) -> float:
 def get_buffett_inputs(symbol: str, current_price: float = 0, industry: str = "") -> dict:
     """
     一站式获取巴菲特过滤器所需的全部真实财务参数
-    返回字典可直接解包传给 buffett_filter()
-
-    例:
-        inputs = get_buffett_inputs('600519', current_price=1373, industry='白酒')
-        result = buffett_filter(symbol='600519', name='贵州茅台', **inputs)
+    - 股本: 从新浪日线 outstanding_share 取
+    - FCF: 从同花顺现金流量表计算 (经营现金流 - 购建固定资产)
+    - 增长率: 从近5年净利润增速中位数计算
     """
     from .symbols import SYMBOL_SECTOR, FALLBACK_SECTOR
+    from .fetcher import get_stock_daily
 
     df = get_financial_summary(symbol)
-
     if len(df) == 0:
         return {}
 
@@ -206,21 +204,29 @@ def get_buffett_inputs(symbol: str, current_price: float = 0, industry: str = ""
     nm_history = extract_net_margin_history(df)
     debt_ratio = extract_debt_equity_ratio(df)
     net_profit = extract_latest_net_profit(df)
-    revenue = extract_latest_revenue(df)
 
-    # Determine sector type
+    # 真实股本 — 从新浪日线 outstanding_share 列取
+    shares = 0
+    try:
+        price_df = get_stock_daily(symbol)
+        if price_df is not None and "outstanding_share" in price_df.columns:
+            shares = float(price_df["outstanding_share"].iloc[-1]) / 1e8  # 转为亿股
+    except Exception:
+        pass
+
+    # 真实 FCF — 从同花顺现金流量表计算
+    fcf = _estimate_fcf(symbol, net_profit)
+
+    # 增长预期 — 从近5年净利润增速中位数计算
+    growth = _estimate_growth(df)
+
+    # 板块类型
     sector = SYMBOL_SECTOR.get(symbol, FALLBACK_SECTOR)
-
-    # FCF 估算：简化版 = 净利润 * 0.7（假设自由现金流转化率 70%）
-    fcf = net_profit * 0.7 if net_profit > 0 else 0
-
-    # 股本估算：从行情数据获取总股本（从 AKShare stock_individual_info_em 或近似）
-    shares = 12.56  # 默认值
 
     return {
         "fcf": fcf,
-        "growth_rate": 0.05,  # 保守增长预期
-        "shares_outstanding": shares,
+        "growth_rate": growth,
+        "shares_outstanding": max(shares, 0.1),  # 至少 0.1 亿股防止除零
         "current_price": current_price,
         "roe_history": roe_history,
         "gross_margin_history": gm_history,
@@ -229,3 +235,88 @@ def get_buffett_inputs(symbol: str, current_price: float = 0, industry: str = ""
         "sector": sector,
         "industry": industry,
     }
+
+
+# ---- FCF 估算 ----
+def _estimate_fcf(symbol: str, net_profit_fallback: float = 0) -> float:
+    """
+    从同花顺现金流量表计算真实 FCF
+    FCF = 经营活动现金流净额 - 购建固定资产支付的现金
+    失败时回退到净利润 × 0.7
+    """
+    try:
+        import akshare as ak
+        df = ak.stock_financial_cash_ths(symbol=symbol, indicator="按报告期")
+        if df is None or len(df) == 0:
+            raise ValueError("无现金流数据")
+
+        # 只取最新年报
+        annual = df[df["报告期"].astype(str).str.endswith("-12-31")]
+        if len(annual) == 0:
+            raise ValueError("无年报现金流")
+
+        latest = annual.sort_values("报告期").iloc[-1]
+
+        # 经营活动现金流净额
+        ocf_str = str(latest.get("经营活动产生的现金流量净额", "0"))
+        ocf = _parse_financial_number(ocf_str)
+
+        # 购建固定资产支付的现金
+        capex_cols = [
+            "购建固定资产、无形资产和其他长期资产支付的现金",
+            "购建固定资产、无形资产和其他长期资产收回的现金净额",  # fallback
+        ]
+        capex = 0
+        for col in capex_cols:
+            if col in latest:
+                val = str(latest[col])
+                if val and val != "nan" and val != "False":
+                    capex = _parse_financial_number(val)
+                    break
+
+        fcf = ocf - capex
+        if fcf > 0:
+            return fcf
+    except Exception:
+        pass
+
+    # 回退
+    return net_profit_fallback * 0.7 if net_profit_fallback > 0 else 0
+
+
+def _estimate_growth(df: pd.DataFrame) -> float:
+    """
+    从近5年净利润同比增长率中位数估算增长率
+    保守下限 0.03, 上限 0.12
+    """
+    if "净利润同比增长率" not in df.columns:
+        return 0.05
+
+    annual = df[df["报告期"].astype(str).str.endswith("-12-31")]
+    if len(annual) < 3:
+        return 0.05
+
+    growth_rates = annual["净利润同比增长率"].apply(_parse_pct).tail(5).tolist()
+    growth_rates = [g for g in growth_rates if abs(g) < 1.0]  # 过滤异常值 (>100%)
+    if not growth_rates:
+        return 0.05
+
+    median_growth = np.median(growth_rates)
+    return max(0.03, min(0.12, median_growth))
+
+
+def _parse_financial_number(val: str) -> float:
+    """解析金融数字: '4.35亿' → 4.35, '1.03万亿' → 10300"""
+    val = str(val).replace(",", "").strip()
+    if not val or val in ("nan", "False", "None", ""):
+        return 0.0
+    try:
+        if "万亿" in val:
+            return float(val.replace("万亿", "")) * 10000
+        if "亿" in val:
+            return float(val.replace("亿", ""))
+        if "万" in val:
+            return float(val.replace("万", "")) / 10000
+        return float(val)
+    except ValueError:
+        return 0.0
