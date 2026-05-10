@@ -14,7 +14,6 @@ from .symbols import (
     SYMBOL_NAME,
     SYMBOL_INDUSTRY,
     BENCHMARKS,
-    HS300_CORE,
 )
 from .financials import (
     get_financial_summary,
