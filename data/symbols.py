@@ -121,21 +121,25 @@ def _infer_industry(name: str) -> str:
 
 
 # ============================================================
-# 便捷查询（动态生成，不再手工维护）
+# 便捷查询（基于 Tushare 数据）
 # ============================================================
 
+def _get_industry(code: str) -> str:
+    """从 Tushare 申万二级 → 映射到申万一级"""
+    from .industry import get_sw1
+    return get_sw1(code)
+
+
 def _get_name(code: str) -> str:
+    """从 Tushare 获取公司名称"""
+    from .industry import get_name as _t_name
+    name = _t_name(code)
+    if name and name != code:
+        return name
     for s in ALL_STOCKS_RAW:
         if s["code"] == code:
             return s.get("name", code)
     return code
-
-
-def _get_industry(code: str) -> str:
-    if code in KNOWN_INDUSTRY:
-        return KNOWN_INDUSTRY[code]
-    name = _get_name(code)
-    return _infer_industry(name)
 
 
 SYMBOL_NAME: Dict[str, str] = {}
