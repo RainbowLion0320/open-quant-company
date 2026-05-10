@@ -43,22 +43,17 @@ def load_market_data():
 @st.cache_data(ttl=3600)
 def load_buffett_scan():
     """加载巴菲特扫描结果"""
-    from data.symbols import CIRCLE_OF_COMPETENCE, SYMBOL_SECTOR, FALLBACK_SECTOR, SYMBOL_NAME
+    from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR, SYMBOL_NAME
     from data.financials import get_buffett_inputs
     from buffett.filters import buffett_filter, Verdict
 
     results = []
-    all_symbols = sorted(set().union(*CIRCLE_OF_COMPETENCE.values()))
-    
-    symbol_industry = {}
-    for ind, syms in CIRCLE_OF_COMPETENCE.items():
-        for s in syms:
-            symbol_industry[s] = ind
+    all_symbols = sorted(CIRCLE_STOCKS)
 
     progress = st.progress(0, "加载巴菲特扫描...")
     for i, symbol in enumerate(all_symbols):
         try:
-            industry = symbol_industry[symbol]
+            industry = SYMBOL_INDUSTRY.get(symbol, "未知")
             sector = SYMBOL_SECTOR.get(symbol, FALLBACK_SECTOR)
             inputs = get_buffett_inputs(symbol, current_price=0, industry=industry)
             if inputs and inputs.get("roe_history"):

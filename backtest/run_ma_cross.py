@@ -21,7 +21,7 @@ import pandas as pd
 from datetime import datetime
 
 from data.fetcher import get_stock_daily, get_index_daily
-from data.symbols import CIRCLE_OF_COMPETENCE
+from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY
 from data.financials import get_buffett_inputs
 from buffett.filters import buffett_filter, Verdict
 from cybernetics.orchestrator import QuantOrchestrator
@@ -67,15 +67,12 @@ def fetch_benchmark_data(start="2020-01-01", end=None):
 
 def get_approved_stocks():
     """通过巴菲特过滤器的股票列表"""
-    all_stocks = sorted(set().union(*CIRCLE_OF_COMPETENCE.values()))
+    all_stocks = sorted(CIRCLE_STOCKS)
     approved = []
 
     print("🔍 巴菲特过滤器扫描...")
     for i, symbol in enumerate(all_stocks):
-        industry = "金融" if symbol in ["600036", "601318", "000001", "600030", "601166"] else \
-                   "白酒" if symbol in ["600519", "000858", "000568", "002304", "600809"] else \
-                   "消费" if symbol in ["000333", "002415", "600887", "603288", "600690"] else \
-                   "医药" if symbol in ["600276", "000538", "300760", "603259", "002001"] else "能源"
+        industry = SYMBOL_INDUSTRY.get(symbol, "未知")
 
         try:
             inputs = get_buffett_inputs(symbol, current_price=0, industry=industry)
@@ -176,13 +173,13 @@ if __name__ == "__main__":
         stocks = [s.strip() for s in args.pool.split(",")]
         print(f"📋 自定义股票池: {stocks}")
     elif args.skip_filter:
-        stocks = sorted(set().union(*CIRCLE_OF_COMPETENCE.values()))
+        stocks = sorted(CIRCLE_STOCKS)
         print(f"📋 全量股票池: {len(stocks)} 只 (跳过过滤器)")
     else:
         stocks = get_approved_stocks()
         if not stocks:
             print("⚠️ 没有股票通过巴菲特过滤器，使用全量股票池回退")
-            stocks = sorted(set().union(*CIRCLE_OF_COMPETENCE.values()))
+            stocks = sorted(CIRCLE_STOCKS)
 
     print(f"\n🎯 回测股票: {stocks}")
     run_backtest(stocks, start=args.start, end=args.end, cash=args.cash)

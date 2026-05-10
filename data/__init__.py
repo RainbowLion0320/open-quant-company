@@ -9,7 +9,10 @@ from .fetcher import (
 )
 from .symbols import (
     StockUniverse,
-    CIRCLE_OF_COMPETENCE,
+    CIRCLE_STOCKS,
+    CIRCLE_OF_COMPETENCE_INDUSTRIES,
+    SYMBOL_NAME,
+    SYMBOL_INDUSTRY,
     BENCHMARKS,
     HS300_CORE,
 )

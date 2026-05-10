@@ -11,7 +11,7 @@ for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy
     os.environ.pop(key, None)
 os.environ["no_proxy"] = "eastmoney.com,10jqka.com.cn,sina.com.cn,qianlong.com,163.com,qq.com"
 
-from data.symbols import CIRCLE_OF_COMPETENCE, SYMBOL_SECTOR, FALLBACK_SECTOR, SYMBOL_NAME
+from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR, SYMBOL_NAME, INDUSTRY_STOCKS, CIRCLE_OF_COMPETENCE_INDUSTRIES
 from data.financials import get_buffett_inputs
 from buffett.filters import buffett_filter, Verdict
 
@@ -48,24 +48,18 @@ def get_current_prices(symbols: list) -> dict:
 
 
 def main():
-    # 1. 收集全部标的
-    all_symbols = []
-    symbol_industry = {}
-    for industry, symbols in CIRCLE_OF_COMPETENCE.items():
-        all_symbols.extend(symbols)
-        for s in symbols:
-            symbol_industry[s] = industry
-
-    all_symbols = sorted(set(all_symbols))
+    # 1. 收集全部标的（能力圈内行业的所有股票）
+    all_symbols = sorted(CIRCLE_STOCKS)
     n_total = len(all_symbols)
 
     print("=" * 70)
-    print(f"巴菲特全量扫描 — {n_total}只能力圈内A股")
+    print(f"巴菲特全量扫描 — {n_total}只能力圈内A股（申万行业分类）")
     print("=" * 70)
 
-    print(f"\n股票池: {n_total} 只 ({len(CIRCLE_OF_COMPETENCE)} 个行业)")
-    for ind, syms in CIRCLE_OF_COMPETENCE.items():
-        names = [f"{s} {SYMBOL_NAME.get(s, '')}" for s in syms]
+    print(f"\n股票池: {n_total} 只 ({len(CIRCLE_OF_COMPETENCE_INDUSTRIES)} 个申万行业)")
+    for ind in CIRCLE_OF_COMPETENCE_INDUSTRIES:
+        codes = INDUSTRY_STOCKS.get(ind, [])
+        names = [f"{c} {SYMBOL_NAME.get(c, '')}" for c in codes]
         print(f"  {ind}: {', '.join(names)}")
 
     # 2. 获取行情
@@ -81,7 +75,7 @@ def main():
 
     print(f"\n🔍 巴菲特过滤器扫描...")
     for i, symbol in enumerate(all_symbols):
-        industry = symbol_industry[symbol]
+        industry = SYMBOL_INDUSTRY.get(symbol, "未知")
         price = prices.get(symbol, 0)
         sector = SYMBOL_SECTOR.get(symbol, FALLBACK_SECTOR)
         name = SYMBOL_NAME.get(symbol, symbol)
