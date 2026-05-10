@@ -44,6 +44,12 @@ def market():
             "volume": int(row["volume"]),
         })
 
+    # 加载策略配置
+    import yaml
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "settings.yaml")
+    with open(config_path) as f:
+        cfg = yaml.safe_load(f)
+
     return {
         "regime": snapshot.regime.value,
         "ma_trend": snapshot.index_ma_trend,
@@ -53,14 +59,88 @@ def market():
         "kline": kline,
         "updated": datetime.now().strftime("%H:%M"),
         "pool_size": 1000,
+        "config": {
+            "buffett": cfg["buffett"],
+            "backtest": cfg.get("backtest", {}),
+            "cybernetics": cfg.get("cybernetics", {}),
+        }
     }
 
 
 # ============================================================
-# API: 巴菲特筛选
+# API: 巴菲特筛选 (异步 + 轮询进度)
 # ============================================================
+import threading, uuid
+_scan_jobs = {}
+
+@app.get("/api/buffett/start")
+def buffett_start():
+    """启动扫描，返回 job_id"""
+    job_id = str(uuid.uuid4())[:8]
+    _scan_jobs[job_id] = {"progress": 0, "status": "running", "result": None}
+
+    def _run():
+        from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR, SYMBOL_NAME
+        from data.financials import get_buffett_inputs
+        from buffett.filters import buffett_filter as bf, Verdict
+
+        results = []
+        symbols = list(CIRCLE_STOCKS)
+        total = len(symbols)
+
+        for i, symbol in enumerate(symbols):
+            try:
+                ind = SYMBOL_INDUSTRY.get(symbol, "待分类")
+                sec = SYMBOL_SECTOR.get(symbol, FALLBACK_SECTOR)
+                inputs = get_buffett_inputs(symbol, current_price=0, industry=ind)
+                if not inputs or not inputs.get("roe_history"):
+                    continue
+                r = bf(symbol=symbol, name=SYMBOL_NAME.get(symbol, symbol), **inputs)
+                results.append({
+                    "symbol": r.symbol, "name": r.name, "industry": r.industry,
+                    "verdict": r.verdict.value, "score": r.score,
+                    "roe": round(r.avg_roe_5y * 100, 1),
+                    "gross_margin": round(r.avg_gross_margin_5y * 100, 1) if r.avg_gross_margin_5y > 0 else None,
+                    "net_margin": round(r.avg_net_margin_5y * 100, 1) if r.avg_net_margin_5y > 0 else None,
+                    "de": round(r.debt_equity_ratio, 1),
+                    "safety_margin": round(r.safety_margin_pct * 100, 1),
+                    "dcf_value": round(r.dcf_value, 1),
+                    "sector": r.sector,
+                })
+            except Exception:
+                pass
+            _scan_jobs[job_id]["progress"] = int((i + 1) / total * 100)
+
+        passed = [r for r in results if "✅" in r["verdict"]]
+        failed_moat = len([r for r in results if "护城河" in r["verdict"]])
+        failed_margin = len([r for r in results if "安全边际" in r["verdict"]])
+        results.sort(key=lambda x: -x["score"])
+
+        _scan_jobs[job_id] = {
+            "progress": 100, "status": "done",
+            "result": {
+                "total": len(results), "passed": len(passed),
+                "failed_moat": failed_moat, "failed_margin": failed_margin,
+                "results": results, "updated": datetime.now().strftime("%H:%M"),
+            }
+        }
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"job_id": job_id}
+
+
+@app.get("/api/buffett/progress/{job_id}")
+def buffett_progress(job_id: str):
+    """查询扫描进度"""
+    job = _scan_jobs.get(job_id)
+    if not job:
+        return {"progress": 0, "status": "not_found"}
+    return {"progress": job["progress"], "status": job["status"], "result": job.get("result")}
+
+
 @app.get("/api/buffett")
 def buffett():
+    """兼容旧接口：同步返回（首次加载耗时较长）"""
     from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR, SYMBOL_NAME
     from data.financials import get_buffett_inputs
     from buffett.filters import buffett_filter as bf, Verdict

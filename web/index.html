@@ -61,6 +61,16 @@
   /* 按钮 */
   button.btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#d0d6e0;border-radius:5px;padding:.35rem .8rem;font-size:.7rem;cursor:pointer;font-family:inherit}
   button.btn:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:#f7f8f8}
+  /* 参数面板 */
+  .param-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem;margin-top:.5rem}
+  .param-block{background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.05);border-radius:5px;padding:.7rem .9rem}
+  .param-block h3{font-size:.72rem;font-weight:590;color:#f7f8f8;margin-bottom:.35rem}
+  .param-row{display:flex;justify-content:space-between;padding:.15rem 0;font-size:.68rem;border-bottom:1px solid rgba(255,255,255,.02)}
+  .param-row .pk{color:#62666d}
+  .param-row .pv{color:#d0d6e0;font-weight:510;text-align:right}
+  .param-row .pv.green{color:#10b981}
+  .param-row .pv.gold{color:#f59e0b}
+  .param-row .pv.red{color:#ef4444}
 </style>
 </head>
 <body>
@@ -82,6 +92,7 @@
     <div class="kpi-row" id="kpi-row"></div>
     <h2>上证指数</h2>
     <div id="chart-market" class="chart"></div>
+    <div id="params-panel"></div>
   </div>
 
   <!-- 巴菲特筛选 -->
@@ -167,14 +178,88 @@ async function loadMarket() {
     showlegend: false
   };
   Plotly.newPlot('chart-market', [trace], layout, {displayModeBar: false});
+
+  // 策略参数面板
+  if (d.config) {
+    const c = d.config;
+    const buffett = c.buffett || {};
+    const moat = buffett.moat || {};
+    const margin = buffett.margin_of_safety || {};
+    const sectors = moat.sectors || {};
+
+    document.getElementById('params-panel').innerHTML = `
+      <h2>策略参数</h2>
+      <div class="param-grid">
+        <div class="param-block">
+          <h3>巴菲特护城河</h3>
+          <div class="param-row"><span class="pk">ROE年数</span><span class="pv">≥${moat.min_roe_years}年</span></div>
+          <div class="param-row"><span class="pk">ROE消费</span><span class="pv">≥${(moat.min_roe*100).toFixed(0)}%</span></div>
+          <div class="param-row"><span class="pk">毛利率</span><span class="pv">≥${(moat.min_gross_margin*100).toFixed(0)}%</span></div>
+          <div class="param-row"><span class="pk">D/E上限</span><span class="pv">≤${moat.max_debt_equity}</span></div>
+          <div class="param-row"><span class="pk">ROE银行</span><span class="pv green">≥${((sectors.bank||{}).min_roe*100).toFixed(0)}%</span></div>
+          <div class="param-row"><span class="pk">ROE保险</span><span class="pv green">≥${((sectors.insurance||{}).min_roe*100).toFixed(0)}%</span></div>
+          <div class="param-row"><span class="pk">ROE券商</span><span class="pv green">≥${((sectors.securities||{}).min_roe*100).toFixed(0)}%</span></div>
+        </div>
+        <div class="param-block">
+          <h3>安全边际 (DCF)</h3>
+          <div class="param-row"><span class="pk">折现率</span><span class="pv">${(margin.dcf_discount_rate*100).toFixed(0)}%</span></div>
+          <div class="param-row"><span class="pk">永续增长</span><span class="pv">${(margin.growth_rate_terminal*100).toFixed(0)}%</span></div>
+          <div class="param-row"><span class="pk">要求安全边际</span><span class="pv gold">≥${(margin.safety_margin_pct*100).toFixed(0)}%</span></div>
+          <div class="param-row"><span class="pk">评分:ROE</span><span class="pv">30%</span></div>
+          <div class="param-row"><span class="pk">评分:利润率</span><span class="pv">20%</span></div>
+          <div class="param-row"><span class="pk">评分:安全边际</span><span class="pv gold">50%</span></div>
+        </div>
+        <div class="param-block">
+          <h3>控制论自适应</h3>
+          <div class="param-row"><span class="pk">牛市仓位</span><span class="pv green">30%</span></div>
+          <div class="param-row"><span class="pk">牛市止损</span><span class="pv green">-8%</span></div>
+          <div class="param-row"><span class="pk">牛市最大持仓</span><span class="pv green">8只</span></div>
+          <div class="param-row"><span class="pk">震荡仓位</span><span class="pv">15%</span></div>
+          <div class="param-row"><span class="pk">震荡止损</span><span class="pv">-5%</span></div>
+          <div class="param-row"><span class="pk">熊市仓位</span><span class="pv red">5%</span></div>
+          <div class="param-row"><span class="pk">熊市止损</span><span class="pv red">-3%</span></div>
+        </div>
+      </div>
+    `;
+  }
 }
 
-// 加载巴菲特
+// 加载巴菲特 (进度条)
 async function loadBuffett() {
   const el = document.getElementById('bf-content');
   if (el.style.display !== 'none') return;
-  const r = await fetch('/api/buffett');
-  const d = await r.json();
+  const loading = document.getElementById('bf-loading');
+
+  // 显示进度条
+  loading.innerHTML = `
+    <div style="text-align:center">
+      <div style="font-size:.8rem;color:#8a8f98;margin-bottom:.6rem">正在扫描 1000 只股票...</div>
+      <div style="width:300px;height:4px;background:rgba(255,255,255,.06);border-radius:2px;margin:0 auto;overflow:hidden">
+        <div id="bf-progress-bar" style="height:100%;background:#7170ff;border-radius:2px;width:0%;transition:width .3s"></div>
+      </div>
+      <div id="bf-progress-text" style="font-size:.65rem;color:#62666d;margin-top:.4rem">0%</div>
+    </div>
+  `;
+
+  // 启动扫描
+  const start = await fetch('/api/buffett/start');
+  const { job_id } = await start.json();
+
+  // 轮询进度
+  const poll = setInterval(async () => {
+    const r = await fetch('/api/buffett/progress/' + job_id);
+    const p = await r.json();
+    document.getElementById('bf-progress-bar').style.width = p.progress + '%';
+    document.getElementById('bf-progress-text').textContent = p.progress + '%';
+
+    if (p.status === 'done') {
+      clearInterval(poll);
+      renderBuffett(p.result);
+    }
+  }, 800);
+}
+
+function renderBuffett(d) {
   document.getElementById('bf-time').textContent = d.updated;
   document.getElementById('bf-loading').style.display = 'none';
   el.style.display = 'block';
