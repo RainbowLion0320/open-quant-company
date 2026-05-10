@@ -103,7 +103,6 @@ def retry_with_backoff(
             last_error = None
             for attempt in range(max_retries + 1):
                 try:
-                    _throttle()  # 全局节流
                     return func(*args, **kwargs)
                 except RETRYABLE_ERRORS as e:
                     last_error = e
@@ -124,27 +123,146 @@ def retry_with_backoff(
 
 
 # ============================================================
-# 缓存层
+# 缓存层 — 两层：磁盘(parquet,跨会话) + 内存(dict,会话内)
 # ============================================================
+
+# 内存缓存 — 同一会话内避免重复磁盘读取
+_mem_cache: dict = {}
+_MEM_CACHE_MAX = 64  # 最多缓存 64 个 DataFrame
+
 
 def _cache_path(key: str) -> str:
     h = hashlib.md5(key.encode()).hexdigest()[:12]
     return os.path.join(CACHE_DIR, f"{h}.parquet")
 
 
+def _mem_get(key: str) -> Optional[pd.DataFrame]:
+    """从内存缓存读取"""
+    return _mem_cache.get(key)
+
+
+def _mem_set(key: str, df: pd.DataFrame):
+    """写入内存缓存，维护上限"""
+    if len(_mem_cache) >= _MEM_CACHE_MAX:
+        # 淘汰最旧的
+        oldest = next(iter(_mem_cache))
+        del _mem_cache[oldest]
+    _mem_cache[key] = df
+
+
 def _read_cache(key: str, max_age_hours: int = 24) -> Optional[pd.DataFrame]:
+    """读缓存：先内存 → 再磁盘。max_age_hours=0 表示永不过期。"""
+    # 1. 内存命中
+    df = _mem_get(key)
+    if df is not None:
+        return df
+
+    # 2. 磁盘命中
     path = _cache_path(key)
     if not os.path.exists(path):
         return None
-    mtime = datetime.fromtimestamp(os.path.getmtime(path))
-    if datetime.now() - mtime > timedelta(hours=max_age_hours):
-        return None
-    return pd.read_parquet(path)
+    if max_age_hours > 0:
+        mtime = datetime.fromtimestamp(os.path.getmtime(path))
+        if datetime.now() - mtime > timedelta(hours=max_age_hours):
+            return None
+    df = pd.read_parquet(path)
+    _mem_set(key, df)
+    return df
 
 
 def _write_cache(key: str, df: pd.DataFrame):
+    """写缓存：同时写内存和磁盘"""
     os.makedirs(CACHE_DIR, exist_ok=True)
     df.to_parquet(_cache_path(key), index=False)
+    _mem_set(key, df)
+
+
+# TTL 常量——分三级
+TTL_FOREVER = 365 * 24       # 历史数据：永不失效（annual: 365天 ≈ 永久）
+TTL_DAILY = 24               # 日线数据：建议日常 force_refresh=True
+TTL_REALTIME = 1             # 实时数据：1h
+
+
+def refresh_stock_daily(symbol: str, adjust: str = "qfq", source: str = "sina") -> pd.DataFrame:
+    """强制刷新个股日线（追加模式：缓存+新数据合并）"""
+    cache_key = f"stock_daily_{symbol}_{adjust}_{source}"
+
+    # 读已有缓存，获取最后日期
+    old = _read_cache(cache_key, max_age_hours=0)
+    last_date = None
+    if old is not None and len(old) > 0:
+        last_date = old["date"].iloc[-1] if "date" in old.columns else None
+
+    # 拉全量（AKShare 不支持增量接口）
+    import akshare as ak
+    _throttle()  # API调用前节流
+    if source == "sina":
+        df = ak.stock_zh_a_daily(symbol=_to_sina_symbol(symbol), adjust=adjust)
+        col_map = {
+            "date": "date", "open": "open", "close": "close", "high": "high", "low": "low",
+            "volume": "volume", "amount": "amount",
+            "outstanding_share": "outstanding_share", "turnover": "turnover",
+        }
+        df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+    elif source == "tx":
+        import datetime as dt_mod
+        df = ak.stock_zh_a_hist_tx(
+            symbol=_to_sina_symbol(symbol),
+            start_date="19900101",
+            end_date=dt_mod.date.today().strftime("%Y%m%d"),
+        )
+        df = df.rename(columns={"date": "date", "open": "open", "close": "close",
+                                "high": "high", "low": "low", "amount": "volume"})
+    else:
+        df = ak.stock_zh_a_hist(symbol=_to_plain_code(symbol), period="daily", adjust=adjust)
+        col_map = {
+            "日期": "date", "开盘": "open", "收盘": "close", "最高": "high", "最低": "low",
+            "成交量": "volume", "成交额": "amount",
+            "振幅": "amplitude", "涨跌幅": "pct_change", "涨跌额": "change", "换手率": "turnover",
+        }
+        df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+
+    # 和新数据合并
+    if old is not None and len(old) > 0:
+        existing_dates = set(old["date"].tolist()) if "date" in old.columns else set()
+        new_rows = df[~df["date"].isin(existing_dates)]
+        df = pd.concat([old, new_rows], ignore_index=True)
+        df = df.sort_values("date").reset_index(drop=True)
+
+    _write_cache(cache_key, df)
+    return df
+
+
+def refresh_index_daily(symbol: str = "sh000001", source: str = "default") -> pd.DataFrame:
+    """强制刷新指数日线（追加模式）"""
+    cache_key = f"index_daily_{symbol}_{source}"
+
+    old = _read_cache(cache_key, max_age_hours=0)
+    last_date = None
+    if old is not None and len(old) > 0:
+        col = "date" if "date" in old.columns else old.columns[0]
+        last_date = old[col].iloc[-1]
+
+    import akshare as ak
+    _throttle()  # API调用前节流
+    if source == "tx":
+        df = ak.stock_zh_index_daily_tx(symbol=symbol)
+    elif source == "em":
+        df = ak.stock_zh_index_daily_em(symbol=symbol)
+    else:
+        df = ak.stock_zh_index_daily(symbol=symbol)
+
+    df.columns = [c.lower() for c in df.columns]
+
+    if old is not None and len(old) > 0:
+        date_col = "date" if "date" in df.columns else df.columns[0]
+        existing_dates = set(old[date_col].tolist())
+        new_rows = df[~df[date_col].isin(existing_dates)]
+        df = pd.concat([old, new_rows], ignore_index=True)
+        df = df.sort_values(date_col).reset_index(drop=True)
+
+    _write_cache(cache_key, df)
+    return df
 
 
 # ============================================================
@@ -190,12 +308,13 @@ def get_index_daily(
     """
     cache_key = f"index_daily_{symbol}_{source}"
     if not force_refresh:
-        cached = _read_cache(cache_key, max_age_hours=24)
+        cached = _read_cache(cache_key, max_age_hours=TTL_FOREVER)
         if cached is not None:
             return cached
 
     import akshare as ak
 
+    _throttle()  # API调用前节流
     if source == "tx":
         df = ak.stock_zh_index_daily_tx(symbol=symbol)
     elif source == "em":
@@ -223,12 +342,13 @@ def get_stock_daily(
     """
     cache_key = f"stock_daily_{symbol}_{adjust}_{source}"
     if not force_refresh:
-        cached = _read_cache(cache_key, max_age_hours=24)
+        cached = _read_cache(cache_key, max_age_hours=TTL_FOREVER)
         if cached is not None:
             return cached
 
     import akshare as ak
 
+    _throttle()  # API调用前节流
     if source == "sina":
         df = ak.stock_zh_a_daily(symbol=_to_sina_symbol(symbol), adjust=adjust)
         col_map = {
@@ -280,11 +400,12 @@ def get_financial_indicator(
     """
     cache_key = f"financial_{symbol}"
     if not force_refresh:
-        cached = _read_cache(cache_key, max_age_hours=6)
+        cached = _read_cache(cache_key, max_age_hours=720)  # 30天，季度财报更新周期
         if cached is not None:
             return cached
 
     import akshare as ak
+    _throttle()
     df = ak.stock_financial_abstract_ths(symbol=symbol, indicator="按报告期")
     _write_cache(cache_key, df)
     return df
@@ -305,6 +426,7 @@ def get_stock_spot(
             return cached
 
     import akshare as ak
+    _throttle()
     df = ak.stock_zh_a_spot_em()
     _write_cache(cache_key, df)
     return df

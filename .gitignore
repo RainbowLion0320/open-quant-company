@@ -31,3 +31,6 @@ Thumbs.db
 # Quant-specific
 backtest/results/
 *.html           # backtrader plot outputs
+
+# Web
+.streamlit/
