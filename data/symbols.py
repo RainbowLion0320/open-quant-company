@@ -78,24 +78,69 @@ KNOWN_INDUSTRY: Dict[str, str] = {
 }
 
 # ============================================================
-# 板块类型（用于巴菲特过滤器 moat 检查）
+# 板块类型推断（名称匹配，不做手工映射）
 # ============================================================
-SYMBOL_SECTOR: Dict[str, str] = {
-    # 银行 — 用净利率替代毛利率
-    "600036": "bank", "000001": "bank", "601166": "bank",
-    "601398": "bank", "601288": "bank", "600016": "bank",
-    # 保险
-    "601318": "insurance", "601601": "insurance",
-    # 券商
-    "600030": "securities", "601688": "securities",
-}
 
-INDUSTRY_SECTOR_TYPE: Dict[str, str] = {
-    "银行": "finance",
-    "非银金融": "finance",
-}
+def _infer_sector(code: str, name: str, industry: str) -> str:
+    """
+    推断板块类型: bank / insurance / securities / consumer
+    优先级: 行业分类 > 名称关键词 > 默认
+    """
+    # 申万行业直接判定
+    if industry == "银行":
+        return "bank"
+    if industry == "非银金融":
+        # 非银内部区分
+        if any(kw in name for kw in ["保险", "人寿", "太保"]):
+            return "insurance"
+        if any(kw in name for kw in ["证券", "券商"]):
+            return "securities"
+        return "insurance"  # 非银默认保险
 
-FALLBACK_SECTOR = "consumer"
+    # 名称关键词兜底（沪深300里行业分类可能缺失）
+    if "银行" in name:
+        return "bank"
+    if any(kw in name for kw in ["保险", "人寿", "太保"]):
+        return "insurance"
+    if any(kw in name for kw in ["证券", "券商", "建投", "中信建投"]):
+        return "securities"
+
+    return "consumer"
+
+
+# 同时推断申万行业
+def _infer_industry(name: str) -> str:
+    """从名称推断申万一级行业（仅用于 KNOWN_INDUSTRY 未覆盖的股票）"""
+    if "银行" in name:
+        return "银行"
+    if any(kw in name for kw in ["保险", "人寿", "太保", "平安"]):
+        return "非银金融"
+    if any(kw in name for kw in ["证券", "券商"]):
+        return "非银金融"
+    return "待分类"
+
+
+# ============================================================
+# 便捷查询（动态生成，不再手工维护）
+# ============================================================
+
+def _get_name(code: str) -> str:
+    for s in ALL_STOCKS_RAW:
+        if s["code"] == code:
+            return s.get("name", code)
+    return code
+
+
+def _get_industry(code: str) -> str:
+    if code in KNOWN_INDUSTRY:
+        return KNOWN_INDUSTRY[code]
+    name = _get_name(code)
+    return _infer_industry(name)
+
+
+SYMBOL_NAME: Dict[str, str] = {}
+SYMBOL_INDUSTRY: Dict[str, str] = {}
+SYMBOL_SECTOR: Dict[str, str] = {}
 
 # ============================================================
 # 股票池分层
@@ -133,22 +178,17 @@ else:
     CIRCLE_STOCKS = sorted(set(s["code"] for s in POOL_HS300))
 
 # ============================================================
-# 便捷查询
+# 填充映射表（动态推断，不手工维护）
 # ============================================================
 
-def _get_name(code: str) -> str:
-    for s in ALL_STOCKS_RAW:
-        if s["code"] == code:
-            return s.get("name", code)
-    return code
+SYMBOL_NAME = {c: _get_name(c) for c in CIRCLE_STOCKS}
+SYMBOL_INDUSTRY = {c: _get_industry(c) for c in CIRCLE_STOCKS}
+SYMBOL_SECTOR = {
+    c: _infer_sector(c, SYMBOL_NAME[c], SYMBOL_INDUSTRY[c])
+    for c in CIRCLE_STOCKS
+}
 
-def _get_industry(code: str) -> str:
-    if code in KNOWN_INDUSTRY:
-        return KNOWN_INDUSTRY[code]
-    return "待分类"
-
-SYMBOL_NAME: Dict[str, str] = {c: _get_name(c) for c in CIRCLE_STOCKS}
-SYMBOL_INDUSTRY: Dict[str, str] = {c: _get_industry(c) for c in CIRCLE_STOCKS}
+FALLBACK_SECTOR = "consumer"
 
 # 行业 → 股票列表
 INDUSTRY_STOCKS: Dict[str, List[str]] = {}
@@ -156,7 +196,7 @@ for code in CIRCLE_STOCKS:
     ind = SYMBOL_INDUSTRY[code]
     INDUSTRY_STOCKS.setdefault(ind, []).append(code)
 
-# 能力圈: 全部31个申万行业
+# 能力圈: 全部出现的行业
 CIRCLE_OF_COMPETENCE_INDUSTRIES: List[str] = sorted(set(SYMBOL_INDUSTRY.values()))
 
 # ============================================================
