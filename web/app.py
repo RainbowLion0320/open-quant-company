@@ -11,6 +11,9 @@ import plotly.graph_objects as go
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_DIR)
 
+# 延迟导入避免循环依赖 — TOTAL_ACTIVE 在 sidebar 需要
+from data.symbols import TOTAL_ACTIVE
+
 for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
     os.environ.pop(key, None)
 os.environ["no_proxy"] = "eastmoney.com,10jqka.com.cn,sina.com.cn,qianlong.com,163.com,qq.com"
@@ -191,7 +194,7 @@ with st.sidebar:
     page = st.radio("", ["📈 市场概览", "🔍 巴菲特筛选", "📊 回测分析", "💾 数据管理"], label_visibility="collapsed")
     st.markdown("---")
     st.caption("**架构** 巴菲特价值投资 + 钱学森控制论")
-    st.caption(f"**股票池** 沪深300 · 300只")
+    st.caption(f"**股票池** 全市场Top500 · {TOTAL_ACTIVE}只")
 
 # ============================================================
 # 页面1: 市场概览

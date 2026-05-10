@@ -167,15 +167,18 @@ POOL_CSI500: List[Dict] = [
 # 活跃股票池
 # ============================================================
 
-# 当前使用的池（默认沪深300，可通过环境变量切换）
-ACTIVE_POOL = os.environ.get("QUANT_POOL", "hs300")  # hs300 | csi500 | all
+# 当前使用的池（默认 top500，可通过环境变量切换）
+ACTIVE_POOL = os.environ.get("QUANT_POOL", "top500")  # top500 | hs300 | csi500 | all
 
 if ACTIVE_POOL == "csi500":
     CIRCLE_STOCKS = sorted(set(s["code"] for s in POOL_CSI500))
 elif ACTIVE_POOL == "all":
     CIRCLE_STOCKS = sorted(set(s["code"] for s in ALL_STOCKS_RAW))
-else:
+elif ACTIVE_POOL == "hs300":
     CIRCLE_STOCKS = sorted(set(s["code"] for s in POOL_HS300))
+else:  # top500: 全量按市值取前500
+    sorted_all = sorted(ALL_STOCKS_RAW, key=lambda x: -x.get("mktcap", 0))
+    CIRCLE_STOCKS = sorted(set(s["code"] for s in sorted_all[:500]))
 
 # ============================================================
 # 填充映射表（动态推断，不手工维护）
