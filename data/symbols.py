@@ -91,7 +91,7 @@ def _infer_sector(code: str, name: str, industry: str) -> str:
         return "bank"
     if industry == "非银金融":
         # 非银内部区分
-        if any(kw in name for kw in ["保险", "人寿", "太保"]):
+        if any(kw in name for kw in ["保险", "人寿", "太保", "平安"]):
             return "insurance"
         if any(kw in name for kw in ["证券", "券商"]):
             return "securities"
@@ -100,7 +100,7 @@ def _infer_sector(code: str, name: str, industry: str) -> str:
     # 名称关键词兜底（沪深300里行业分类可能缺失）
     if "银行" in name:
         return "bank"
-    if any(kw in name for kw in ["保险", "人寿", "太保"]):
+    if any(kw in name for kw in ["保险", "人寿", "太保", "平安"]):
         return "insurance"
     if any(kw in name for kw in ["证券", "券商", "建投", "中信建投"]):
         return "securities"
