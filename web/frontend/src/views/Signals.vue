@@ -1,32 +1,64 @@
 <template>
-  <div class="p-6 space-y-6">
-    <h1 class="text-lg font-semibold text-white/90">信号历史</h1>
-    <div class="bg-[#111214] border border-white/5 rounded-lg p-4">
-      <p class="text-white/40 text-sm">信号变更追溯 — 每日扫描后自动记录信号变化（买入↔持有）</p>
-    </div>
-    <div class="bg-[#111214] border border-white/5 rounded-lg p-4">
-      <h2 class="text-sm font-medium text-white/60 mb-4">最近7天信号变更</h2>
-      <div v-if="changes.length" class="space-y-2">
-        <div v-for="c in changes" :key="c.symbol + c.date" class="flex items-center gap-3 text-xs py-2 border-b border-white/[0.02]">
-          <span class="font-mono text-white/50 w-16">{{ c.symbol }}</span>
-          <span class="text-white/70 w-20">{{ c.name }}</span>
-          <span class="w-16 px-2 py-0.5 rounded text-center text-[10px]" :class="c.to_signal === 'buy' ? 'bg-green-400/10 text-green-400' : 'bg-white/5 text-white/40'">{{ c.to_signal === 'buy' ? '→买入' : '→持有' }}</span>
-          <span class="text-white/30">{{ c.strategy }}</span>
-          <span class="text-white/20 ml-auto">{{ c.date }}</span>
-        </div>
+  <div class="p-6 space-y-5">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">信号历史</h1>
+        <p class="page-subtitle">最近 7 天信号变更追踪</p>
       </div>
-      <p v-else class="text-white/30 text-sm py-4">暂无变更记录</p>
+    </div>
+
+    <div class="glass-card" style="padding:20px">
+      <table class="data-table" v-if="changes.length">
+        <thead>
+          <tr>
+            <th>日期</th><th>策略</th><th>代码</th><th>名称</th>
+            <th class="text-right">旧信号</th><th class="text-right">新信号</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(c, i) in changes" :key="i">
+            <td class="font-mono" style="color:var(--text-disabled)">{{ c.date?.slice(0, 10) }}</td>
+            <td style="color:var(--text-secondary)">{{ c.strategy }}</td>
+            <td class="font-mono">{{ c.symbol }}</td>
+            <td>{{ c.name }}</td>
+            <td class="text-right">
+              <span :style="{ color: signalColor(c.old_signal) }">{{ signalLabel(c.old_signal) }}</span>
+            </td>
+            <td class="text-right">
+              <span :style="{ color: signalColor(c.new_signal), fontWeight: c.new_signal !== c.old_signal ? '600' : '400' }">
+                <span v-if="c.new_signal !== c.old_signal" style="color:var(--positive); margin-right:4px">↑</span>
+                {{ signalLabel(c.new_signal) }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else class="empty-state">
+        <span>暂无信号变更记录</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-const changes = ref<any[]>([]);
+import { api } from "../api";
+import type { SignalChange } from "../api";
+
+const changes = ref<SignalChange[]>([]);
+
+function signalColor(s: string) {
+  if (s === "buy") return "var(--positive)";
+  if (s === "sell") return "var(--negative)";
+  return "var(--text-disabled)";
+}
+function signalLabel(s: string) {
+  if (s === "buy") return "买入";
+  if (s === "sell") return "卖出";
+  return "持有";
+}
+
 onMounted(async () => {
-  try {
-    const res = await fetch("/api/signals/changes?days=7");
-    changes.value = await res.json();
-  } catch {}
+  try { changes.value = await api.signalChanges(7); } catch {}
 });
 </script>

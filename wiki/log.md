@@ -13,7 +13,7 @@
 
 ## [2026-05-14] lint | 1 issue found + fixed
 - ✅ 无孤立页面 (12页全部交叉引用)
-- ✅ 无断链 (所有 [[wikilinks]] 解析正确)
+- ✅ 无断链 (所有 wikilinks 解析正确)
 - ❌→✅ buffett-rolling-backtest.md: 补 frontmatter (title/created/updated/type/tags)
 - ⚠️ system-architecture.md: 229行略超200 (可后续拆分)
 - ✅ 12页全部在 index.md 索引
@@ -107,3 +107,107 @@
 - duckdb-migration.md: 纠正错误声明——macOS 不支持真正并发读写，加入 INSERT OR REPLACE pitfall
 - web-architecture.md: 新增设计系统段 (Linear-inspired tokens + Inter typography)，更新回测页描述
 - 未同步: UI 微调 (pct bug fix, slider CSS, 侧栏具体像素值, emoji 选择) — 属 transient，不具架构意义
+
+## [2026-05-15] update | Phase 3.0–4.0 架构文档全面更新
+
+Phase 3.0 (ML基础设施) + Phase 3.5 (自动化R&D) + Phase 4.0 (AI Agent) 已完成或部分完成，wiki 与代码严重脱节。逐页审计，推动 wiki 与代码同步。
+
+### 变更清单
+
+- **system-architecture.md**: 重写。
+  - 更新系统分层图：新增 "ML / AI Layer" (Feature Store + Model Registry + LLM Hypothesis)
+  - 数据层更新: DuckDB→Parquet store，DuckDB → :memory: views
+  - 新增策略: ml_lgbm 注册，AShareExchange 成本模型
+  - 新增模块14个 (models/, signals/dsl_parser.py, data/feature_store.py, backtest/strategies/*)
+  - 因子体系表 (26→33因子，含7个LLM发现)
+  - 锦标赛结果表 (4策略)
+  - 路线图状态更新 (3.0 ✅, 3.5 ✅, 4.0 🟡)
+
+- **ai-automation-roadmap.md**: 重写。
+  - Phase 3.0: 全部完成，每个子任务标注 ✅ + 产出文件 + 验证结果
+  - Phase 3.5: 全部完成，追加 Optuna IC=0.097、锦标赛 ML+28.31%
+  - Phase 4.0-1: ✅ (LLM 7/8 因子通过)
+  - Phase 4.0-2: 🟡 (单轮已通，多轮迭代待实现)
+  - Phase 4.0-3: 🔜
+
+- **duckdb-migration.md**: 追加 Phase 3 (特征存储扩展)。
+  - data/store/features/ 目录结构
+  - 特征表 schema (33列)
+  - 读写分离模式更新
+  - 链接新增 ml-pipeline
+
+- **ml-pipeline.md**: ★ 新建。端到端 ML 管道文档。
+  - 6步管道总览图
+  - 因子 DSL 完整列表 (33因子，含公式和来源)
+  - PIT 特征存储 (Point-in-Time 设计、TimeSeriesSplitter)
+  - LightGBM 训练 (模型注册表 registry.json、Optuna)
+  - 策略锦标赛 (最新结果表)
+  - 生产部署 (ml_signals.py + cron 集成)
+  - LLM 因子发现 (DSL解析器→IC评估→采纳)
+  - 技术债务 + 下一步
+
+- **cybernetics-regime.md**: 追加 Monthly Regime Fix (v3.4)。
+  - 问题描述: 日频 regime 翻转 → 过度交易 → -5.85%
+  - 修复方案: 月线K预计算 → regime 稳定 → 交易暴跌
+  - Before/After: -5.85% → +10.07% (100只)
+
+- **financial-cache.md**: 追加 Phase 3.0 财务→因子扩展。
+  - 基本面因子 (8)、估值因子 (6)
+  - PIT 构建集成 (as_of 限制)
+  - 链接 ml-pipeline
+
+- **index.md**: 更新为14页。新增 ml-pipeline，策略数3→4，回测结果更新。
+- **SCHEMA.md**: 修复 `[[wikilinks]]` → backtick 引用；更新 tag taxonomy (ml 类、新策略)
+- **log.md**: 修复 `[[wikilinks]]` → backtick 引用；追加本条目
+
+### 页面统计
+- 修改: 6页 (system-architecture, ai-automation-roadmap, duckdb-migration, cybernetics-regime, financial-cache, index)
+- 新建: 1页 (ml-pipeline)
+- 修复: 2个 broken wikilinks (SCHEMA.md, log.md)
+- 总页数: 13 → 14
+
+### 交叉引用验证
+- 2个 meta-reference wikilinks 已修复 (不是真正的断链，是关于 wikilinks 自身的文档引用)
+- 所有页面至少2个出站 wikilinks ✓
+- 所有页面有 frontmatter ✓
+
+## [2026-05-15] redesign | Quantum Terminal Web UI v4.0
+
+完整前端重构。从 Linear-inspired 暗色主题跨越到「量子终端」科幻风格。
+
+### 设计系统
+- 底色: `#020617` 深空蓝黑 (原 `#08090a`)
+- 主色: `#00d4ff` 电光青 + `#7c3aed` 量子紫 (原 `#06b6d4` 纯青)
+- 面板: 玻璃拟态 (`backdrop-filter: blur(12px)`, 半透边框)
+- 氛围: Canvas 粒子场 (60粒子 + 连线辉光) + 扫描线叠加
+- 字体: Inter (UI) + JetBrains Mono (数据/代码)
+
+### 架构改进
+- **API 层**: 新建 `src/api/index.ts` — 统一 fetch 客户端，14 个 endpoints 全部类型化，无 raw fetch 散布
+- **ECharts**: 新建 `src/charts/useECharts.ts` — composable wrapper + QUANTUM_THEME 默认，4个页面复用
+- **粒子场**: 新建 `src/charts/particles.ts` — useParticles() composable, 60粒子+连线
+- **GlassCard**: 新建 `src/components/GlassCard.vue` — 可复用玻璃拟态卡片
+- **设计系统**: 新建 `src/assets/quantum.css` — 完整 token 体系，统一全站
+- **老样式**: 删除 `src/assets/main.css`
+
+### Shell (App.vue)
+- 浮动玻璃侧栏 (72px) — 图标 + hover tooltip + active 辉光条
+- 底部状态栏 — 实时时钟 + Regime 轮询 (60s)
+- 页面过渡动画 (fade + slide)
+- 扫描线 overlay
+
+### 视图重写 (8 pages)
+| 页面 | 变更 |
+|------|------|
+| Market.vue | 玻璃卡片 + regime 进度条 + 量子紫宽度卡 + ECharts composable |
+| Backtest.vue | 策略行 left-stats + right-chart + 渐变面积填充 + glow hover |
+| Strategies.vue | 策略 dot 指示器 + 渐显动画 + data-table |
+| Stocks.vue | 搜索玻璃栏 + 巴菲特评分色 + 信号表 |
+| StockDetail.vue | DCF 估值条 + K线 composable + 信号表 |
+| Portfolio.vue | 4格概览 + data-table + 下单表单 |
+| Signals.vue | 变更箭头 ↑ + 信号色 |
+| Settings.vue | Toggle 开关 + 系统信息表 |
+
+### 构建验证
+- Vite build: 610 modules, 0 errors, 1.44s
+- 部署: `rm -f dist/ && npm run build` 替换，Web restart 可见新 UI

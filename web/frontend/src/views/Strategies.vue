@@ -1,68 +1,66 @@
 <template>
-  <div class="p-6 space-y-6">
-    <div class="flex items-center justify-between">
-      <h1 class="text-lg font-semibold text-white/90">策略中心</h1>
-      <button
-        @click="runStrategy"
-        :disabled="store.running"
-        class="px-4 py-2 text-sm rounded bg-[#7170ff] hover:bg-[#8b8aff] disabled:opacity-40 transition-colors"
-      >
-        {{ store.running ? `运行中 ${store.progress}%` : '运行全部策略' }}
+  <div class="p-6 space-y-5">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">策略中心</h1>
+        <p class="page-subtitle">扫描控制台 · 信号查看 · 手动触发</p>
+      </div>
+      <button @click="runAll" :disabled="store.running" class="btn btn-primary btn-sm">
+        {{ store.running ? `运行中 ${store.progress}%` : '▶ 运行全部' }}
       </button>
     </div>
 
-    <!-- 进度条 -->
-    <div v-if="store.running" class="bg-[#111214] border border-white/5 rounded-lg p-4">
-      <div class="text-xs text-white/50 mb-2">{{ store.progressMsg }}</div>
-      <div class="w-full bg-white/5 rounded-full h-1.5">
-        <div class="bg-[#7170ff] h-1.5 rounded-full transition-all" :style="{ width: store.progress + '%' }"></div>
+    <!-- Progress Bar -->
+    <div v-if="store.running" class="glass-card" style="padding:14px 18px">
+      <div class="text-xs mb-2" style="color:var(--text-secondary)">{{ store.progressMsg }}</div>
+      <div class="progress-bar">
+        <div class="progress-bar-fill" :style="{ width: store.progress + '%' }"></div>
       </div>
     </div>
 
-    <!-- 策略卡片 -->
-    <div v-for="s in store.strategies" :key="s.name" class="bg-[#111214] border border-white/5 rounded-lg p-4">
+    <!-- Strategy Cards -->
+    <div v-for="s in store.strategies" :key="s.name" class="glass-card glow-cyan animate-fade-in" style="padding:18px">
       <div class="flex items-center justify-between mb-3">
-        <div>
-          <h2 class="text-sm font-medium text-white/80">{{ s.label }}</h2>
-          <div class="text-xs text-white/40 mt-1">
-            {{ s.total }} 只股票 · {{ s.buys }} 只买入
-            <span v-if="s.last_computed" class="ml-3">更新: {{ s.last_computed?.slice(0, 16) }}</span>
+        <div class="flex items-center gap-3">
+          <div class="w-2 h-2 rounded-full" :style="{ background: colorFor(s.name), boxShadow: `0 0 6px ${colorFor(s.name)}` }"></div>
+          <div>
+            <h2 class="text-sm font-semibold" style="color:var(--text-primary)">{{ s.label }}</h2>
+            <div class="text-[11px] mt-0.5" style="color:var(--text-disabled)">
+              {{ s.total }} 只扫描 · {{ s.buys }} 只买入
+              <span v-if="s.last_computed" class="ml-3">⏱ {{ s.last_computed?.slice(0, 16) }}</span>
+            </div>
           </div>
         </div>
         <div class="flex gap-2">
-          <button @click="loadSignals(s.name)" class="px-3 py-1.5 text-xs rounded bg-white/5 hover:bg-white/10">
-            查看信号
-          </button>
-          <button @click="runSingle(s.name)" class="px-3 py-1.5 text-xs rounded bg-[#7170ff]/20 hover:bg-[#7170ff]/30 text-[#7170ff]">
-            运行
-          </button>
+          <button @click="toggleSignals(s.name)" class="btn btn-sm btn-ghost">信号</button>
+          <button @click="runSingle(s.name)" class="btn btn-sm" style="border-color:rgba(0,212,255,0.2); color:var(--accent)">运行</button>
         </div>
       </div>
 
-      <!-- 信号表格 -->
-      <div v-if="currentStrategy === s.name && signals.length" class="mt-4">
-        <table class="w-full text-xs">
+      <!-- Signal Table -->
+      <div v-if="currentStrategy === s.name && signals.length" class="mt-4 animate-fade-in">
+        <table class="data-table">
           <thead>
-            <tr class="text-white/40 border-b border-white/5">
-              <th class="text-left py-2 pr-4">代码</th>
-              <th class="text-left py-2 pr-4">名称</th>
-              <th class="text-left py-2 pr-4">行业</th>
-              <th class="text-right py-2 pr-4">评分</th>
-              <th class="text-right py-2">信号</th>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>行业</th>
+              <th class="text-right">评分</th>
+              <th class="text-right">信号</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="sig in signals.slice(0, 20)" :key="sig.symbol" class="border-b border-white/[0.02] hover:bg-white/[0.02]">
-              <td class="py-2 pr-4 font-mono text-white/50">{{ sig.symbol }}</td>
-              <td class="py-2 pr-4">
-                <router-link :to="`/stocks/${sig.symbol}`" class="text-white/70 hover:text-[#7170ff]">
+            <tr v-for="sig in signals.slice(0, 20)" :key="sig.symbol">
+              <td class="font-mono">{{ sig.symbol }}</td>
+              <td>
+                <router-link :to="`/stocks/${sig.symbol}`" class="hover:underline" style="color:var(--accent)">
                   {{ sig.name }}
                 </router-link>
               </td>
-              <td class="py-2 pr-4 text-white/40">{{ sig.industry }}</td>
-              <td class="py-2 pr-4 text-right font-mono">{{ sig.score?.toFixed(1) }}</td>
-              <td class="py-2 text-right">
-                <span :class="sig.signal === 'buy' ? 'text-green-400' : 'text-white/30'">
+              <td>{{ sig.industry }}</td>
+              <td class="text-right font-mono">{{ sig.score?.toFixed(1) }}</td>
+              <td class="text-right">
+                <span :style="{ color: sig.signal === 'buy' ? 'var(--positive)' : 'var(--text-disabled)' }">
                   {{ sig.signal === 'buy' ? '买入' : '持有' }}
                 </span>
               </td>
@@ -82,19 +80,23 @@ const store = useStrategyStore();
 const currentStrategy = ref("");
 const signals = ref<any[]>([]);
 
-async function loadSignals(name: string) {
+const strategyColors: Record<string, string> = {
+  buffett: "#00d4ff",
+  multifactor: "#22c55e",
+  cybernetic: "#eab308",
+  ml_lgbm: "#7c3aed",
+};
+function colorFor(name: string) { return strategyColors[name] || "var(--accent)"; }
+
+async function toggleSignals(name: string) {
+  if (currentStrategy.value === name) { currentStrategy.value = ""; signals.value = []; return; }
   currentStrategy.value = name;
   await store.fetchSignals(name);
   signals.value = store.signals[name] || [];
 }
 
-function runStrategy() {
-  store.run("all");
-}
-
-function runSingle(name: string) {
-  store.run(name);
-}
+function runAll() { store.run("all"); }
+function runSingle(name: string) { store.run(name); }
 
 onMounted(() => store.fetchList());
 </script>

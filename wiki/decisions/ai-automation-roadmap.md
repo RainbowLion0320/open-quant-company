@@ -1,9 +1,9 @@
 ---
 title: AI 自动化交易框架路线图
 created: 2026-05-14
-updated: 2026-05-14
+updated: 2026-05-15
 type: decision
-tags: [AI, ML, RL, architecture, roadmap, strategy, factor-DSL, PIT, LightGBM, RD-Agent]
+tags: [AI, ML, RL, architecture, roadmap, strategy, factor-DSL, PIT, LightGBM, RD-Agent, LLM]
 ---
 
 # AI 自动化交易框架路线图
@@ -12,136 +12,76 @@ tags: [AI, ML, RL, architecture, roadmap, strategy, factor-DSL, PIT, LightGBM, R
 
 ## 背景
 
-当前三策略（巴菲特 23.89% / 控制论 0.25% / 多因子 -5.15%）全部基于手写规则。多因子追涨杀跌暴露了手调规则的极限——没有系统性的因子发现、模型优化和自适应能力。
+当前四策略体系：手调规则 (巴菲特 / 控制论 / 多因子) + ML (LightGBM)。目标是搭建能自动发现因子、训练模型、优化策略、自适应市场的框架。
 
-**目标**：搭建一个能自动发现因子、训练模型、优化策略、自适应市场的框架。不依赖 Qlib 生态，在其设计哲学上自建。
+## 已完成 (截至 2026-05-15)
 
-参考论文：RD-Agent-Quant (NeurIPS 2025) — 联合因子-模型优化，2x 收益，70% 更少因子，$10/cycle。
+### Phase 3.0 — ML 基础设施 ✅
 
----
+| 任务 | 状态 | 产出 |
+|------|:--:|------|
+| 3.0-1 Strategy 接口 | ✅ | `backtest/strategies/base.py` — BaseStrategy + StrategyRegistry |
+| 3.0-2 Exchange 成本 | ✅ | `broker/exchange.py` — AShareExchange (印花税0.05%/佣金0.025%/过户费0.001%) |
+| 3.0-3 因子 DSL | ✅ | `signals/expression.py` — 26因子声明式 (Ref/MA/Std/Delta/Ret/Gt/Lt/BinOp等19个Alpha因子) |
+| 3.0-4 PIT 特征存储 | ✅ | `data/store/features/YYYY-MM.parquet` — 月切片零前视, `data/feature_store.py` 构建器 |
+| 3.0-5 LightGBM | ✅ | `models/__init__.py` — LightGBMRegressor + sklearn GBR fallback (macOS libomp兼容) |
 
-## Phase 3.0 — ML 基础设施 (地基)
+**验证**: 50股×6月 → 300行, IC=-0.12 (小样本预期内)
 
-### 3.0-1: Strategy 接口形式化
+### Phase 3.5 — 自动化 R&D ✅
 
-借鉴 Qlib `BaseStrategy`，定义标准策略接口：
+| 任务 | 状态 | 产出 |
+|------|:--:|------|
+| 3.5-1 Model Registry | ✅ | `models/__init__.py` — BaseModel + save/load/list_versions + `data/models/registry.json` |
+| 3.5-2 Optuna 超参搜索 | ✅ | `scripts/tune_model.py` — 48月训练/6月测试/12月步长滚动CV |
+| 3.5-3 策略锦标赛 | ✅ | `scripts/strategy_tournament.py` — 4策略自动对比 (回测+评分+导出JSON) |
+| 3.5-4 ML 生产集成 | ✅ | `signals/ml_signals.py` + cron `scripts/compute_signals.py` 集成 ml_lgbm 策略 |
 
-```
-class BaseStrategy:
-    def score(self, symbol, features, date, regime) -> float
-    def should_rebalance(self, date, regime, last_regime) -> bool  
-    def get_positions(self, scores, holdings, capital) -> dict
-```
+**结果**:
+- Optuna CV IC = 0.097 (vs Alpha158基线 0.042, **2.3x**)
+- In-sample IC = 0.551
+- 锦标赛 (100股 2020-2026): ML +28.31% / 多因子 +4.56% / 控制论 +0.49% / 巴菲特 n/a
 
-现有三个策略改造为 BaseStrategy 子类，统一注册、测试、对比。
+### Phase 4.0 — AI Agent 驱动 (部分完成)
 
-### 3.0-2: Exchange 成本模型
+| 任务 | 状态 | 产出 |
+|------|:--:|------|
+| 4.0-1 LLM 因子生成 | ✅ | `scripts/factor_hypothesis.py` — deepseek-v4-pro 生成 → DSL解析器 → IC评估 |
+| 4.0-2 因子-模型联合优化 | 🟡 | 单轮已验证，自动迭代循环尚未实现 |
+| 4.0-3 自适应策略切换 | 🔜 | 待实现 |
 
-借鉴 Qlib `Exchange` 抽象，分离交易成本：
+**LLM 因子研究结果** (2026-05-15):
+- 8个候选因子 → 7个通过IC测试 (IC > 0.01)
+- Top因子: `midpoint_bias` IC=0.216, `vol_adj_mom_5d` IC=0.215, `intraday_close_strength` IC=0.206
+- $0.00/cycle (用自己的API key)
+- 7个因子已加入 `alpha_factors()` → 26因子体系
 
-```
-class AShareExchange:
-    stamp_tax = 0.0005
-    commission = 0.00025
-    transfer_fee = 0.00001
-    t_plus = 1
-    def calc_buy_cost(self, price, shares) -> float
-    def calc_sell_cost(self, price, shares) -> float
-```
-
-当前成本硬编码在 `run_all_strategies.py`，抽离后回测引擎更干净。
-
-### 3.0-3: 因子 DSL 表达式引擎
-
-借鉴 Qlib `ExpressionOps`，声明式因子表达：
-
-```python
-# 现在（命令式）
-mom_1m = close[-1] / close[-21] - 1
-
-# 目标（声明式）
-mom_1m = Ref("close", -1) / Ref("close", -21) - 1
-vol_20d = Std(Ret("close"), 20)
-ma_cross = Gt(MA("close", 5), MA("close", 20))
-```
-
-好处：因子可组合、可缓存、可自动前视防护、可序列化。参考 Alpha158 的 158 个因子作为初始特征池。
-
-### 3.0-4: Point-in-Time 特征存储
-
-借鉴 Qlib PIT DB，每个数据点带时间戳标记何时可知：
-
-```
-data/store/features/
-├── 2020-01.parquet   # 2020年1月已知的所有特征
-├── 2020-02.parquet
-└── ...
-```
-
-回测时按月切片，绝不使用未来数据。彻底杜绝前视偏差。
-
-### 3.0-5: LightGBM 基线 + 时间序列 CV
-
-- LightGBM 作为第一个 ML 模型（业界标准，比 GRU/LSTM 更稳健）
-- 时间序列交叉验证（滚动窗口 train/valid/test）
-- 目标：预测下月收益率排名（learning-to-rank）
-- 评估指标：IC Rank, ICIR
+**局限性**: ML +28.31% 低于纯LightGBM +36.22% (因子数13→26, 过拟合)。In-sample IC 0.194→0.551 但 OOS 下降, 验证了RD-Agent论文的发现：更多因子≠更好, 需要因子选择。
 
 ---
 
-## Phase 3.5 — 自动化 R&D 循环
+## 待实现
 
-### 3.5-1: Model Registry
+### Phase 4.0-2: 因子-模型联合优化循环
 
-```python
-# 模型版本化
-registry/
-├── lgbm_v1_20260514.pkl    # 训练日期+版本
-├── lgbm_v2_20260521.pkl
-└── meta.json               # 元数据 (IC, Sharpe, 训练参数)
+借鉴 RD-Agent 核心逻辑:
+```
+for round in range(max_rounds):
+    1. Research: LLM 提出 K 个候选因子
+    2. Development: LightGBM 训练 + 评估
+    3. Feedback: IC 排序 → 保留 top-K
+    4. 终止条件: 连续 N 轮无提升
 ```
 
-### 3.5-2: 超参数自动搜索
+当前单轮已通, 需添加:
+- 多轮迭代 (阈值判断自动停止)
+- 因子重要性 → 提示下一轮LLM ("exploited short-term volatility too much → suggest fundamental factors")
+- 结果持久化 (因子历史表)
 
-Optuna 驱动，搜索空间：num_leaves, learning_rate, feature_fraction, bagging_fraction。目标：最大化验证集 IC。
+### Phase 4.0-3: 自适应策略切换
 
-### 3.5-3: 策略锦标赛
-
-每周自动对比：
-- 巴菲特策略（不变基线）
-- 多因子（当前手调）
-- LightGBM vLatest（ML）
-- 所有历史模型版本
-
-胜者自动标记为"当前推荐"，cron 可切换到最优模型。
-
-### 3.5-4: 周度 Cron
-
-每周自动：re-train → evaluate vs baselines → 生成报告 → push Telegram。
-
----
-
-## Phase 4.0 — AI Agent 驱动 (长期愿景)
-
-### 4.0-1: LLM 因子假设生成
-
-- 输入：最新研报、财经新闻、学术论文
-- LLM：提出因子假设 ("earnings surprise + low volatility → alpha")
-- 自动翻译为因子 DSL 表达式
-- 验证：time-series CV → IC 评估
-
-### 4.0-2: 因子-模型联合优化
-
-借鉴 RD-Agent 核心逻辑：
-- Research phase：LLM 提出 K 个候选因子
-- Development phase：LightGBM 训练 + 评估
-- Feedback：IC 排序 → 保留 top-K → 下一轮迭代
-- 终止条件：连续 N 轮无提升
-
-### 4.0-3: 自适应策略切换
-
-- 每月评估所有策略的近期表现
-- Regime 变化时自动切换最优策略
+- 每月评估各策略近3-6月相对表现
+- Regime变化时权重调整 (not equal-weight, dynamic)
 - "策略组合"替代"单一策略"
 
 ---
@@ -149,40 +89,39 @@ Optuna 驱动，搜索空间：num_leaves, learning_rate, feature_fraction, bagg
 ## 与现有系统的关系
 
 ```
-手调策略（保留）               AI 策略（新增）
-├─ buffett (年调仓)            ├─ lgbm_v1 (日预测, 月调仓)
-├─ multifactor (月调仓)        ├─ lgbm_v2 (迭代优化)
-└─ cybernetic (月+regime)      └─ ensemble (模型组合)
+手调策略（保留）               AI 策略（已集成）
+├─ buffett (年调仓)            ├─ ml_lgbm (日预测, 月调仓)
+├─ multifactor (月调仓)        │   26因子 LightGBM
+└─ cybernetic (月+regime)      │   锦标赛最优
         │                              │
         └──────────┬───────────────────┘
                    ▼
-         Strategy Registry (统一注册)
+         Strategy Registry (4策略平等竞争)
                    │
          run_all_strategies.py (统一回测)
                    │
-         Web UI (统一对比展示)
+         Web UI (4策略曲线叠加, 点击高亮)
 ```
-
-AI 策略与手调策略平等竞争，均在注册表中管理，统一回测对比。
 
 ---
 
-## 借鉴 Qlib 的设计模式
+## Qlib 模式映射 (以我们实现为准)
 
-| Qlib 模式 | 我们的实现 | Phase |
-|-----------|-----------|-------|
-| BaseStrategy | `backtest/strategies/base.py` | 3.0-1 |
-| Exchange | `broker/exchange.py` | 3.0-2 |
-| ExpressionOps | `signals/expression.py` | 3.0-3 |
-| PIT Database | `data/store/features/` | 3.0-4 |
-| DataHandler | 保留现有 Parquet + DuckDB | ✅ 已有 |
-| Backtest Analyzer | `backtest/analytics.py` | ✅ 已有 |
-| Model Registry | `models/registry.py` | 3.5-1 |
-| Workflow (qrun) | Makefile + compute_signals.py | ✅ 已有 |
+| Qlib 模式 | 我们的实现 | 状态 |
+|-----------|-----------|:--:|
+| BaseStrategy | `backtest/strategies/base.py` | ✅ |
+| Exchange | `broker/exchange.py` | ✅ |
+| ExpressionOps | `signals/expression.py` (26因子) | ✅ |
+| PIT Database | `data/store/features/YYYY-MM.parquet` | ✅ |
+| DataHandler | Parquet + DuckDB `:memory:` | ✅ |
+| Backtest Analyzer | `backtest/analytics.py` (15项指标) | ✅ |
+| Model Registry | `models/__init__.py` + `data/models/registry.json` | ✅ |
+| Workflow (qrun) | Makefile + scripts/compute_signals.py (cron) | ✅ |
+| RD-Agent | `scripts/factor_hypothesis.py` | 🟡 单轮 |
 
 ## See Also
 
-- [[strategy-evolution]] — 三策略回测结果
+- [[ml-pipeline]] — ML管道端到端文档
+- [[system-architecture]] — 系统五层架构 (含ML层)
+- [[strategy-evolution]] — 四策略回测结果
 - [[duckdb-migration]] — Parquet 存储架构
-- [[system-architecture]] — 系统五层架构
-- [[financial-cache]] — 财务数据缓存

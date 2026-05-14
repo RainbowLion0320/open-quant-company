@@ -24,7 +24,7 @@
 - 已配置 Hindsight Local 模式 (deepseek-v4-flash, bank_id=quant-agent)
 - 首次启动需 /reset, daemon 会自动拉起 (首次初始化约1分钟)
 
-## 当前进度 (2026-05-10)
+## 当前进度 (2026-05-15)
 - [x] 环境搭建 + 数据源验证
 - [x] fetcher 稳定性 (三源切换, 重试, 节流, 代理绕过)
 - [x] 财务数据桥接 (同花顺 → ROE/毛利率/负债率, 万亿格式修复)
@@ -34,7 +34,14 @@
 - [x] 行业适配 (银行用净利率替代毛利率, D/E修复)
 - [x] 全量巴菲特扫描 (25只→5只通过, 通过率20%)
 - [x] 控制论层接入真实数据 (上证bull, 均线多头排列)
-- [x] Backtrader 回测模板 (MA5/MA20金叉+止损, 5只精选池6.85% vs 基准35.48%)
+- [x] Backtrader 回测模板
+- [x] Parquet 存储迁移 + DuckDB :memory: 查询引擎
+- [x] 回测引擎纠正 (日频→月频regime, 策略自主调仓)
+- [x] Phase 3.0: ML基础设施 (Factor DSL, PIT特征, LightGBM, Strategy接口)
+- [x] Phase 3.5: 自动化R&D (Optuna, 锦标赛, 基本面+估值因子)
+- [x] Phase 4.0: AI Agent (ML生产集成, LLM因子发现 7/8通过)
+- [x] Wiki 全面更新 (14页, 交叉验证lint通过)
+- [x] Quantum Terminal Web UI v4.0 (全套玻璃拟态+粒子场+辉光重设计)
 
 ## 巴菲特精选池 (2026-05-10扫描结果)
 ```
@@ -88,8 +95,22 @@
 │   └── compute_signals.py            # 日频三策略扫描 (cron 15:30 CST)
 ├── web/
 │   ├── api/                          # FastAPI 后端 (6 routes + WebSocket + jobs)
-│   └── frontend/                     # Vue 3 + Pinia + ECharts (8 pages)
-├── wiki/                             # LLM Wiki (15 pages)
+│   └── frontend/                     # Vue 3 + Pinia + ECharts (8 pages, Quantum Terminal)
+│       ├── src/
+│       │   ├── api/index.ts          # ★ 统一 API 客户端 (类型安全)
+│       │   ├── charts/
+│       │   │   ├── useECharts.ts     # ★ ECharts composable + theme
+│       │   │   └── particles.ts      # ★ 粒子场动画 composable
+│       │   ├── components/
+│       │   │   ├── GlassCard.vue     # ★ 玻璃拟态卡片
+│       │   │   └── SliderGroup.vue   # 滑块组件
+│       │   ├── assets/quantum.css    # ★ Quantum Terminal 设计系统
+│       │   ├── stores/index.ts       # Pinia stores
+│       │   ├── router/index.ts       # Vue Router
+│       │   └── views/                # 8 页面 (全部重写)
+│       ├── index.html                # JetBrains Mono + 粒子 canvas
+│       └── vite.config.ts
+├── wiki/                             # LLM Wiki (14 pages)
 ├── docs/tushare-mcp-guide.md
 └── tests/
 ```
