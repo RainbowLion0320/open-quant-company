@@ -135,41 +135,42 @@ class LightGBMRegressor(BaseModel):
         self._val_ic: float = 0.0
 
     def fit(self, X: pd.DataFrame, y: pd.Series, X_val=None, y_val=None, **kwargs):
-        import lightgbm as lgb
+        try:
+            import lightgbm as lgb
+            self._use_lgb = True
+        except (ImportError, OSError):
+            from sklearn.ensemble import GradientBoostingRegressor as GBR
+            self._use_lgb = False
 
         self._feature_names = list(X.columns)
-        self._model = lgb.LGBMRegressor(
-            num_leaves=self.num_leaves,
-            learning_rate=self.learning_rate,
-            n_estimators=self.n_estimators,
-            subsample=self.subsample,
-            colsample_bytree=self.colsample_bytree,
-            reg_alpha=self.reg_alpha,
-            reg_lambda=self.reg_lambda,
-            min_child_samples=self.min_child_samples,
-            random_state=self.random_state,
-            verbose=-1,
-            **kwargs,
-        )
 
-        eval_set = [(X_val, y_val)] if X_val is not None and y_val is not None else None
-        eval_metric = None
-        callbacks = None
-        if eval_set:
-            callbacks = [lgb.early_stopping(20), lgb.log_evaluation(0)]
+        if self._use_lgb:
+            self._model = lgb.LGBMRegressor(
+                num_leaves=getattr(self, 'num_leaves', 31),
+                learning_rate=getattr(self, 'learning_rate', 0.05),
+                n_estimators=getattr(self, 'n_estimators', 200),
+                subsample=getattr(self, 'subsample', 0.8),
+                colsample_bytree=getattr(self, 'colsample_bytree', 0.8),
+                reg_alpha=getattr(self, 'reg_alpha', 0.1),
+                reg_lambda=getattr(self, 'reg_lambda', 0.1),
+                min_child_samples=getattr(self, 'min_child_samples', 20),
+                random_state=getattr(self, 'random_state', 42),
+                verbose=-1,
+                **kwargs,
+            )
+        else:
+            print("  [INFO] LightGBM unavailable, using sklearn GradientBoostingRegressor")
+            self._model = GBR(
+                n_estimators=getattr(self, 'n_estimators', 200),
+                learning_rate=getattr(self, 'learning_rate', 0.05),
+                max_depth=5,
+                subsample=getattr(self, 'subsample', 0.8),
+                random_state=getattr(self, 'random_state', 42),
+                **{k: v for k, v in kwargs.items() if k in ('min_samples_leaf',)},
+            )
 
-        self._model.fit(
-            X, y,
-            eval_set=eval_set,
-            eval_metric=eval_metric,
-            callbacks=callbacks,
-        )
-
+        self._model.fit(X, y)
         self._train_ic = self.evaluate(X, y)["ic"]
-        if X_val is not None and y_val is not None:
-            self._val_ic = self.evaluate(X_val, y_val)["ic"]
-
-        return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         if self._model is None:
@@ -197,10 +198,15 @@ def prepare_xy(
     注意: 需要外部确保 target_col 不是前视的(PIT 约束)。
     """
     if skip_cols is None:
-        skip_cols = ["symbol", "date", "month", target_col]
+        skip_cols = ["symbol", "date", "month", "name", target_col]
 
     cols = [c for c in features_df.columns if c not in skip_cols]
-    X = features_df[cols].fillna(0)
+    # 只保留数值列
+    numeric_cols = []
+    for c in cols:
+        if features_df[c].dtype in ('float64', 'float32', 'int64', 'int32', 'bool'):
+            numeric_cols.append(c)
+    X = features_df[numeric_cols].fillna(0)
     y = features_df[target_col].fillna(0)
 
     return X, y
