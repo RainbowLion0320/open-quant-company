@@ -8,6 +8,18 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
+from pathlib import Path
+import yaml
+
+
+def _load_config() -> dict:
+    config_path = Path("~/quant-agent/config/settings.yaml").expanduser()
+    with open(config_path) as f:
+        return yaml.safe_load(f)
+
+
+CONFIG = _load_config()
+MFC = CONFIG.get("signals", {}).get("multifactor", {})
 
 
 class MultiFactorScorer:
@@ -35,11 +47,16 @@ class MultiFactorScorer:
         technical = self._technical_score(factors)
         market = self._market_score(factors)
 
-        total = quality * 0.40 + valuation * 0.30 + technical * 0.15 + market * 0.15
+        w = MFC.get("weights", {})
+        total = (quality * w.get("quality", 0.40)
+                 + valuation * w.get("valuation", 0.30)
+                 + technical * w.get("technical", 0.15)
+                 + market * w.get("market", 0.15))
         return min(100, max(0, total))
 
     def _quality_score(self, f: dict) -> float:
         """质量分: 巴菲特基本面"""
+        qc = MFC.get("quality", {})
         buffett = f.get("buffett_score", 50)
         roe = f.get("roe_5y", 0) * 100  # 转百分比
 
@@ -47,65 +64,89 @@ class MultiFactorScorer:
         trend_bonus = 0
         trend = f.get("roe_trend", "flat")
         if trend == "up":
-            trend_bonus = 5
+            trend_bonus = qc.get("trend_bonus_up", 5)
         elif trend == "down":
-            trend_bonus = -5
+            trend_bonus = qc.get("trend_bonus_down", -5)
 
         # ROE越高越好，但边际递减
-        roe_score = min(30, roe * 1.2)  # 25% ROE → 满分30
+        roe_cap = qc.get("roe_cap", 30.0)
+        roe_mult = qc.get("roe_multiplier", 1.2)
+        roe_score = min(roe_cap, roe * roe_mult)
 
-        return buffett * 0.6 + roe_score * 1.0 + trend_bonus
+        buffett_w = qc.get("buffett_weight", 0.6)
+        return buffett * buffett_w + roe_score * 1.0 + trend_bonus
 
     def _valuation_score(self, f: dict) -> float:
         """估值分: 安全边际越大越好"""
+        vc = MFC.get("valuation", {})
         margin = f.get("safety_margin", 0)
 
-        if margin >= 0.50:  # 50%以上折扣 → 满分
-            return 100
-        elif margin >= 0.30:
-            return 70 + (margin - 0.30) / 0.20 * 30
-        elif margin >= 0.15:
-            return 40 + (margin - 0.15) / 0.15 * 30
+        t_dv = vc.get("tier_deep_value", 0.50)
+        t_mv = vc.get("tier_moderate_value", 0.30)
+        t_sv = vc.get("tier_slight_value", 0.15)
+        s_dv = vc.get("score_deep", 80)
+        s_mv = vc.get("score_moderate", 60)
+        s_sv = vc.get("score_slight", 40)
+
+        if margin >= t_dv:
+            return s_dv + (margin - t_dv) / (1.0 - t_dv) * (100 - s_dv)
+        elif margin >= t_mv:
+            return s_mv + (margin - t_mv) / (t_dv - t_mv) * (s_dv - s_mv)
+        elif margin >= t_sv:
+            return s_sv + (margin - t_sv) / (t_mv - t_sv) * (s_mv - s_sv)
         elif margin >= 0:
-            return 10 + margin / 0.15 * 30
+            return 10 + margin / t_sv * (s_sv - 10)
         else:
             # 溢价 → 扣分
             return max(0, 10 + margin * 20)
 
     def _technical_score(self, f: dict) -> float:
         """技术分: 动量 + 波动率"""
+        tc = MFC.get("technical", {})
         mom_1m = f.get("momentum_1m", 0)
         mom_3m = f.get("momentum_3m", 0)
-        volatility = f.get("volatility", 0.30)
+        volatility = f.get("volatility", tc.get("default_volatility", 0.30))
 
         # 动量: 正动量好但不要追涨(太高反而回调风险)
         mom_composite = mom_1m * 0.4 + mom_3m * 0.6
-        if mom_composite > 0.15:
+        mom_strong = tc.get("mom_strong", 0.15)
+        if mom_composite > mom_strong:
             mom_score = 40  # 涨太多，等回调
         elif mom_composite > 0:
-            mom_score = 40 + mom_composite * 400
+            mom_score = 40 + mom_composite * tc.get("mom_multiplier_strong", 400)
         elif mom_composite > -0.10:
-            mom_score = 40 + mom_composite * 200
+            mom_score = 40 + mom_composite * tc.get("mom_multiplier_normal", 200)
         else:
             mom_score = 20  # 跌太多，观望
 
         # 低波动加分
-        vol_score = max(0, 30 - volatility * 100)
+        vol_max = tc.get("vol_max_score", 30)
+        vol_penalty = tc.get("vol_penalty_mult", 100)
+        vol_score = max(0, vol_max - volatility * vol_penalty)
 
-        return min(100, mom_score * 0.6 + vol_score * 0.4)
+        w_mom = tc.get("weight_momentum", 0.6)
+        w_vol = tc.get("weight_volatility", 0.4)
+        return min(100, mom_score * w_mom + vol_score * w_vol)
 
     def _market_score(self, f: dict) -> float:
         """市场环境分: 当前市场状态下的板块适配"""
+        mc = MFC.get("market", {})
         sector = f.get("sector", "consumer")
 
-        # 牛市: 高beta板块加分
-        # 熊市: 防御板块(银行/公用事业)加分
+        # 从config读取板块加分表，回落至原始硬编码值
         if self.regime == "bull":
-            sector_bonus = {"bank": 15, "insurance": 10, "securities": 20}.get(sector, 5)
+            cfg_bonus = mc.get("bull", {})
+            sector_bonus = cfg_bonus.get(sector, {
+                "bank": 15, "insurance": 10, "securities": 20
+            }.get(sector, 5))
         elif self.regime == "bear":
-            sector_bonus = {"bank": 25, "consumer": 20}.get(sector, 5)
+            cfg_bonus = mc.get("bear", {})
+            sector_bonus = cfg_bonus.get(sector, {
+                "bank": 25, "consumer": 20
+            }.get(sector, 5))
         else:
-            sector_bonus = 10  # 震荡均等
+            cfg_bonus = mc.get("sideways", {})
+            sector_bonus = cfg_bonus.get(sector, 10)  # 震荡均等
 
         return min(100, 50 + sector_bonus)
 
