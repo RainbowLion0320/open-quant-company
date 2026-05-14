@@ -1,2 +1,2 @@
 # Backtest package
-from .strategies.ma_cross import BuffettMACross
+from .strategies.base import BaseStrategy, StrategyRegistry
