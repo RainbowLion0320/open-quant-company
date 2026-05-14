@@ -48,7 +48,9 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
         print("[ML] ⚠️ 模型未训练, 跳过")
         return []
 
-    print(f"[ML] 模型已加载 (IC={meta.get('ic_in_sample', '?'):.4s}, {len(feature_names)} 特征)")
+    ic_val = meta.get('ic_in_sample', 0)
+    print(f"[ML] 模型已加载 (IC={ic_val:.4f}, {len(feature_names)} 特征)")
+
 
     # 2. 准备股票池
     symbols = list(CIRCLE_STOCKS)
