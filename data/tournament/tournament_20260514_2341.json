@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-05-14T23:41:43.432870",
+  "pool_size": 100,
+  "period": "2020-01-01 → 2026-05-10",
+  "bench_return": -17.46,
+  "results": {
+    "buffett": {
+      "label": "巴菲特价值精选",
+      "total_return": 0.0,
+      "sharpe": 0,
+      "max_drawdown": 0.0,
+      "win_rate": 0.0,
+      "trades": 0,
+      "bench_return": -17.46
+    },
+    "multifactor": {
+      "label": "多因子月度调仓",
+      "total_return": 4.56,
+      "sharpe": -0.09,
+      "max_drawdown": -34.9,
+      "win_rate": 51.2,
+      "trades": 77,
+      "bench_return": -17.46
+    },
+    "cybernetic": {
+      "label": "控制论自适应",
+      "total_return": 0.49,
+      "sharpe": -0.24,
+      "max_drawdown": -13.8,
+      "win_rate": 50.3,
+      "trades": 77,
+      "bench_return": -17.46
+    },
+    "ml_lgbm": {
+      "label": "LightGBM ML",
+      "total_return": 36.22,
+      "sharpe": 0.28,
+      "max_drawdown": -11.3,
+      "win_rate": 54.6,
+      "trades": 77,
+      "bench_return": -17.46
+    }
+  },
+  "rankings": [
+    "ml_lgbm",
+    "multifactor",
+    "cybernetic",
+    "buffett"
+  ]
+}

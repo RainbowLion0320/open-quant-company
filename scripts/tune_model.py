@@ -47,36 +47,50 @@ def optimize_hyperparams(n_trials: int = 50) -> dict:
     print(f"\n[Optuna] 超参数优化 ({n_trials} trials)...")
     df = load_all_features()
     valid = df.dropna(subset=["ret_fwd_20d"])
-    X_all, y_all = prepare_xy(valid, "ret_fwd_20d")
 
-    # 固定 train/test split
+    # ── 滚动窗口 CV (消除数据泄露) ──
+    from data.feature_store import TimeSeriesSplitter
     months = sorted(valid["month"].unique())
-    split_idx = int(len(months) * 0.8)
-    train_months = months[:split_idx]
-    test_months = months[split_idx:]
+    splitter = TimeSeriesSplitter(train_months=48, test_months=6, step_months=12)
+    splits = splitter.split(months)
 
-    train = valid[valid["month"].isin(train_months)]
-    test = valid[valid["month"].isin(test_months)]
+    if len(splits) < 2:
+        print(f"  ⚠️ 只有 {len(splits)} 个 CV split, 用80/20 fallback")
+        split_idx = int(len(months) * 0.8)
+        splits = [(months[:split_idx], months[split_idx:])]
 
-    X_train, y_train = prepare_xy(train, "ret_fwd_20d")
-    X_test, y_test = prepare_xy(test, "ret_fwd_20d")
+    # 预构建每轮的数据
+    fold_data = []
+    for train_ms, test_ms in splits:
+        train = valid[valid["month"].isin(train_ms)]
+        test = valid[valid["month"].isin(test_ms)]
+        if len(train) < 100 or len(test) < 20:
+            continue
+        X_tr, y_tr = prepare_xy(train, "ret_fwd_20d")
+        X_te, y_te = prepare_xy(test, "ret_fwd_20d")
+        fold_data.append((X_tr, y_tr, X_te, y_te, train_ms, test_ms))
+
+    print(f"  CV folds: {len(fold_data)} (48月训练, 6月测试, 12月步长)")
 
     def objective(trial):
         params = {
             "num_leaves": trial.suggest_int("num_leaves", 7, 63),
             "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
-            "n_estimators": trial.suggest_int("n_estimators", 50, 500),
+            "n_estimators": trial.suggest_int("n_estimators", 50, 300),
             "subsample": trial.suggest_float("subsample", 0.5, 1.0),
             "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
             "reg_alpha": trial.suggest_float("reg_alpha", 1e-4, 10, log=True),
             "reg_lambda": trial.suggest_float("reg_lambda", 1e-4, 10, log=True),
             "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
         }
-        model = LightGBMRegressor(**params, random_state=42)
-        model.fit(X_train, y_train)
-        preds = model.predict(X_test)
-        ic, _ = spearmanr(preds, y_test)
-        return ic if not np.isnan(ic) else -1.0
+        ics = []
+        for X_tr, y_tr, X_te, y_te, _, _ in fold_data:
+            model = LightGBMRegressor(**params, random_state=42)
+            model.fit(X_tr, y_tr)
+            preds = model.predict(X_te)
+            ic, _ = spearmanr(preds, y_te)
+            ics.append(ic if not np.isnan(ic) else 0.0)
+        return np.mean(ics) if ics else -1.0
 
     study = optuna.create_study(direction="maximize")
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True)

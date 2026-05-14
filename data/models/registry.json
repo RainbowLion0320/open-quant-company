@@ -6,7 +6,7 @@
   },
   "best": {
     "model": "lgbm",
-    "saved_at": "2026-05-14T22:40:12.944824",
+    "saved_at": "2026-05-14T23:41:04.723587",
     "file": "lgbm_best.pkl"
   }
 }

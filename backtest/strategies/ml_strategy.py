@@ -87,10 +87,9 @@ class MLStrategy(BaseStrategy):
 
         # 确保 prices 是 DataFrame (有 OHLCV 列)
         if isinstance(prices, pd.Series):
-            df = prices.to_frame("close")
+            df = pd.DataFrame({"close": prices})
             for col in ["open", "high", "low", "volume"]:
-                if col not in df.columns:
-                    df[col] = df["close"]
+                df[col] = df["close"]  # fallback: 用 close 近似其他列
         else:
             df = prices
 

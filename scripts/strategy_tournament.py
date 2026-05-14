@@ -88,11 +88,15 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
     symbols = list(CIRCLE_STOCKS)[:pool_size]
     exchange = AShareExchange()
 
-    # 加载基准
+    # 加载基准 (用上证综指日线, get_stock_daily兼容指数代码)
     print("\n加载数据...")
-    bench = get_index_daily("000001")
+    try:
+        bench = get_index_daily("000001")
+    except Exception:
+        bench = get_stock_daily("000001")
+    bench["date"] = pd.to_datetime(bench["date"])
     bench = bench.set_index("date").sort_index()
-    bench = bench.loc[start:end]
+    bench = bench.loc[pd.Timestamp(start):pd.Timestamp(end)]
 
     # 加载股票日线
     prices_dict = {}
@@ -117,6 +121,7 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
 
     results = {}
     dates = bench.index
+    bench_ret_total = bench["close"].iloc[-1] / bench["close"].iloc[0] - 1
 
     for strategy in reg.get_enabled():
         print(f"\n── {strategy.label} ──")
@@ -140,7 +145,9 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
                     if dt not in df.index:
                         continue
                     idx = df.index.get_loc(dt)
-                    sc = strategy.score(sym, df, idx, regime)
+                    # 只传 close Series (兼容旧 scorer)
+                    close_only = df["close"] if isinstance(df, pd.DataFrame) else df
+                    sc = strategy.score(sym, close_only, idx, regime)
                     if sc > 0:
                         scores[sym] = sc
 
@@ -169,11 +176,9 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
         if len(aligned) > 0:
             report = RiskAnalytics.compute(aligned.iloc[:, 0], aligned.iloc[:, 1])
         else:
-            report = FullReport(total_return=0, sharpe=0, max_drawdown=0,
-                                win_rate=0, bench_return=0, alpha=0, beta=0)
+            report = FullReport()
 
         total_ret = values.iloc[-1] / values.iloc[0] - 1 if len(values) > 0 else 0
-        bench_ret_total = bench["close"].iloc[-1] / bench["close"].iloc[0] - 1
 
         results[strategy.name] = {
             "label": strategy.label,
