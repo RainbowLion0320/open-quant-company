@@ -222,11 +222,11 @@ def run_hypothesis_loop(n_candidates: int = 10, ic_threshold: float = 0.02):
         candidates = [
             FactorCandidate("gap_reversal", "Gap opening tends to reverse intraday",
                           "(open_t - close_t-1) / close_t-1", "negative",
-                          "(Ref('open',0) / Ref('close',-1) - 1)"),
+                          dsl_expression="(Ref('open',0) / Ref('close',-1) - 1)"),
             FactorCandidate("volume_price_trend", "Volume × price trend divergence",
-                          "volume_t / MA(volume,20) * Ret('close')", "positive", ""),
+                          "volume_t / MA(volume,20) * Ret('close')", "positive"),
             FactorCandidate("high_low_pressure", "High-low range expansion",
-                          "(high_t - low_t) / Std(high_t - low_t, 20)", "negative", ""),
+                          "(high_t - low_t) / Std(high_t - low_t, 20)", "negative"),
         ]
 
     print(f"\n   生成 {len(candidates)} 个候选因子:")
@@ -235,12 +235,12 @@ def run_hypothesis_loop(n_candidates: int = 10, ic_threshold: float = 0.02):
     accepted = []
     for c in candidates:
         result = evaluate_factor(c.name, c.dsl_expression, features)
-        c.ic = result["ic"]
-        c.icir = result["icir"]
-        status = "✅" if result["ic"] > ic_threshold and result["valid"] else "❌"
+        c.ic = result.get("ic", 0)
+        c.icir = result.get("icir", 0)
+        status = "✅" if c.ic > ic_threshold and result.get("valid") else "❌"
         print(f"   {status} {c.name}: IC={c.ic:.4f} | {c.description[:60]}")
 
-        if result["ic"] > ic_threshold and result["valid"]:
+        if c.ic > ic_threshold and result.get("valid"):
             accepted.append(c)
 
     # 报告
