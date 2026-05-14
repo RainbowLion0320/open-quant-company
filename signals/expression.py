@@ -373,6 +373,15 @@ def alpha_factors() -> Dict[str, Factor]:
 
         # ── 动量 ──
         "rsi_14": _rsi(close, 14),
+
+        # ── LLM 发现的新因子 (Phase 4.0, deepseek-v4-pro) ──
+        "vol_adj_mom_5d": Delta(close, 5) / (Std("close", 20) + Constant(1e-6)),
+        "volume_conviction": (volume * Delta(close, 5)) / (Std("close", 20) + Constant(1e-6)),
+        "intraday_close_strength": (close - low) / (high - low + Constant(0.0001)),
+        "upside_intraday_range": (high - open_) / (Std("close", 20) + Constant(1e-6)),
+        "midpoint_bias": (close - (high + low) / Constant(2)) / (Std("close", 20) + Constant(1e-6)),
+        "volume_vol_ratio": volume / (Std("close", 20) * MA("close", 20) + Constant(1e-6)),
+        "open_gap_ma20": (open_ - MA("close", 20)) / (Std("close", 20) + Constant(1e-6)),
     }
     return factors
 
