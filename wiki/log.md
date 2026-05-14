@@ -2,6 +2,15 @@
 
 > 操作日志。追加模式。
 
+## [2026-05-14] create | AI 自动化路线图 + Phase 3.0 基础设施
+- 新建 wiki/decisions/ai-automation-roadmap.md: 三阶段路线图
+- Phase 3.0-1: Strategy 接口形式化 (backtest/strategies/base.py)
+- Phase 3.0-2: Exchange 成本模型 (broker/exchange.py)
+- Phase 3.0-3: 因子 DSL 表达式引擎 (signals/expression.py)
+- Phase 3.0-4: Point-in-Time 特征存储 (data/feature_store.py)
+- Phase 3.0-5: LightGBM 基线模型 + 注册表 (models/__init__.py)
+- 更新 CLAUDE.md, index.md
+
 ## [2026-05-14] lint | 1 issue found + fixed
 - ✅ 无孤立页面 (12页全部交叉引用)
 - ✅ 无断链 (所有 [[wikilinks]] 解析正确)

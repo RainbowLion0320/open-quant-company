@@ -60,22 +60,30 @@
 │   ├── fetcher.py                    # AKShare 3源 fallback + parquet 缓存
 │   ├── financials.py                 # 财务数据提取（三层缓存：内存→parquet→API）
 │   ├── symbols.py                    # 1000只股票池 + 申万31行业 + 板块分类
-│   ├── registry.py                   # 策略注册表 (Phase 2.5, 消除硬编码)
+│   ├── feature_store.py              # ★ Point-in-Time 特征存储
 │   ├── db.py                         # DuckDB 抽象层 (:memory: read-only)
 │   ├── results_db.py                 # Parquet 存储 + DuckDB 视图查询
 │   └── store/                        # ★ Parquet 事实存储 (无锁, 多进程安全)
 │       ├── signals/{strategy}.parquet
+│       ├── features/YYYY-MM.parquet  # ★ PIT 特征 (Phase 3.0)
 │       ├── buffett_scan.parquet
 │       └── scan_meta.parquet
 ├── signals/
 │   ├── multifactor.py                # 多因子打分引擎（四维加权）
+│   ├── expression.py                 # ★ 因子 DSL 表达式引擎 (Phase 3.0)
 │   └── factors.py                    # 因子表达式 DSL (qlib-inspired)
+├── models/                           # ★ ML 模型层 (Phase 3.0)
+│   └── __init__.py                   # LightGBM + BaseModel + 注册表
 ├── backtest/
 │   ├── run_all_strategies.py         # N策略对比回测运行器 (日频引擎)
 │   ├── buffett_real_scorer.py        # 真实三重过滤滚动回测评分器
 │   ├── analytics.py                  # 15项风险指标 (Sharpe/Sortino/Calmar/α/β)
-│   └── pipeline.py                   # 可插拔回测流水线
-├── broker/__init__.py                # PaperBroker (T+1 + 佣金) + 接口定义
+│   ├── pipeline.py                   # 可插拔回测流水线
+│   └── strategies/
+│       └── base.py                   # ★ BaseStrategy 接口 (Phase 3.0)
+├── broker/
+│   ├── __init__.py                    # PaperBroker (T+1 + 佣金)
+│   └── exchange.py                    # ★ AShareExchange 成本模型 (Phase 3.0)
 ├── scripts/
 │   └── compute_signals.py            # 日频三策略扫描 (cron 15:30 CST)
 ├── web/
