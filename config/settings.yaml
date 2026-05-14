@@ -254,7 +254,11 @@ strategies:
     color: '#10b981'
     config_key: signals.multifactor
     enabled: true
-    label: 多因子月度调仓
+  ml_lgbm:
+    color: '#8b5cf6'
+    config_key: ml
+    enabled: true
+    label: LightGBM ML
 trading:
   commission:
     brokerage: 0.00025

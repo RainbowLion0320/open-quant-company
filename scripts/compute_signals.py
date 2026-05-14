@@ -36,6 +36,7 @@ from data.results_db import (
     load_buffett_results, load_strategy_signals,
     get_buffett_meta, list_strategies,
 )
+from signals.ml_signals import compute_ml_signals as compute_ml
 
 
 def compute_buffett(limit: int = 0) -> list[dict]:
@@ -275,6 +276,7 @@ def main():
         "buffett": (compute_buffett, save_buffett_results, get_buffett_meta, "buffett"),
         "multifactor": (compute_multifactor, None, None, "multifactor"),
         "cybernetic": (compute_cybernetic, None, None, "cybernetic"),
+        "ml_lgbm": (compute_ml, None, None, "ml_lgbm"),
     }
 
     for s in get_enabled_strategies():
