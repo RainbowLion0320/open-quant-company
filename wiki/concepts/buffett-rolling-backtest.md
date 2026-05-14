@@ -20,7 +20,7 @@ tags: [buffett, backtest, lookahead-bias, rolling-window]
 Tushare `daily_basic` 拉 PE/PB/股息率 → parquet 缓存 → 每月查当时估值评分。
 - 结果: +10.03%, 548 笔, MaxDD -16.8%
 - 局限: 只有 PE/PB，没有 ROE/毛利率/D-E/DCF
-- 代码: `backtest/buffett_rolling.py`（保留但不再使用）
+- 代码: `backtest/buffett_rolling.py`（v1, 已被 `backtest/run_all_strategies.py` 日频引擎取代并移除）
 
 ### v2: 真实三重过滤（当前）
 完整 `buffett_filter()`: 能力圈 → ROE/毛利率/D-E → DCF安全边际。

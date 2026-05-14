@@ -29,13 +29,13 @@ clean: pyc-clean tmp-clean
 dist-clean: clean cache-clean
 	@echo "深度清理完成"
 
-# 扫描全量股票
+# 扫描全量股票 (日频 cron 标准入口)
 scan:
-	$(PYTHON) scripts/scan_all.py
+	$(PYTHON) scripts/compute_signals.py
 
-# 回测（默认精选池）
+# 三策略对比回测
 backtest:
-	$(PYTHON) backtest/run_ma_cross.py
+	$(PYTHON) backtest/run_all_strategies.py
 
 # 市场状态检测
 regime:

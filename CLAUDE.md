@@ -71,10 +71,8 @@
 │   ├── multifactor.py                # 多因子打分引擎（四维加权）
 │   └── factors.py                    # 因子表达式 DSL (qlib-inspired)
 ├── backtest/
-│   ├── run_all_strategies.py         # N策略对比回测运行器
+│   ├── run_all_strategies.py         # N策略对比回测运行器 (日频引擎)
 │   ├── buffett_real_scorer.py        # 真实三重过滤滚动回测评分器
-│   ├── buffett_rolling.py            # PE/PB简化滚动评分器（v1，保留）
-│   ├── rolling.py                    # 滚动窗口 filter_as_of()
 │   ├── analytics.py                  # 15项风险指标 (Sharpe/Sortino/Calmar/α/β)
 │   └── pipeline.py                   # 可插拔回测流水线
 ├── broker/__init__.py                # PaperBroker (T+1 + 佣金) + 接口定义
