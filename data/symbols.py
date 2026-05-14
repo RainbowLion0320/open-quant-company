@@ -54,7 +54,7 @@ KNOWN_INDUSTRY: Dict[str, str] = {
     "000895": "食品饮料",
     # 家用电器
     "000333": "家用电器", "600690": "家用电器", "000651": "家用电器",
-    "002032": "家用电器", "002050": "家用电器",
+    "002032": "家用电器",
     # 医药生物
     "600276": "医药生物", "000538": "医药生物", "300760": "医药生物",
     "603259": "医药生物", "002001": "医药生物", "300015": "医药生物",
@@ -172,7 +172,7 @@ POOL_CSI500: List[Dict] = [
 # ============================================================
 
 # 当前使用的池（默认 top500，可通过环境变量切换）
-ACTIVE_POOL = os.environ.get("QUANT_POOL", "all")  # all | top500 | hs300 | csi500
+ACTIVE_POOL = os.environ.get("QUANT_POOL", "all")  # env-only: all | top500 | hs300 | csi500
 
 if ACTIVE_POOL == "csi500":
     CIRCLE_STOCKS = sorted(set(s["code"] for s in POOL_CSI500))
@@ -244,7 +244,7 @@ def list_industries() -> Dict[str, str]:
 
 def set_pool(pool_name: str):
     """切换股票池：hs300 / csi500 / all"""
-    global ACTIVE_POOL, CIRCLE_STOCKS, SYMBOL_NAME, SYMBOL_INDUSTRY, INDUSTRY_STOCKS, CIRCLE_OF_COMPETENCE_INDUSTRIES
+    global ACTIVE_POOL, CIRCLE_STOCKS, SYMBOL_NAME, SYMBOL_INDUSTRY, SYMBOL_SECTOR, INDUSTRY_STOCKS, CIRCLE_OF_COMPETENCE_INDUSTRIES
     ACTIVE_POOL = pool_name
     if pool_name == "csi500":
         CIRCLE_STOCKS = sorted(set(s["code"] for s in POOL_CSI500))
@@ -254,6 +254,10 @@ def set_pool(pool_name: str):
         CIRCLE_STOCKS = sorted(set(s["code"] for s in POOL_HS300))
     SYMBOL_NAME = {c: _get_name(c) for c in CIRCLE_STOCKS}
     SYMBOL_INDUSTRY = {c: _get_industry(c) for c in CIRCLE_STOCKS}
+    SYMBOL_SECTOR = {
+        c: _infer_sector(c, SYMBOL_NAME[c], SYMBOL_INDUSTRY[c])
+        for c in CIRCLE_STOCKS
+    }
     INDUSTRY_STOCKS = {}
     for code in CIRCLE_STOCKS:
         ind = SYMBOL_INDUSTRY[code]

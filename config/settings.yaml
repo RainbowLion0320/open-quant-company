@@ -1,121 +1,266 @@
-# Quant Agent Configuration
-# 个人A股量化AI - 基于Hermes Agent的量化交易系统
-
-project:
-  name: "quant-agent"
-  version: "0.1.0"
-  phase: 1  # 1=分析助手, 2=信号系统, 3=半自动交易
-
-# ----- 数据源配置 -----
-data:
-  provider: "akshare"
-  cache_dir: "data/cache"
-  cache_days: 1  # 缓存有效期（天）
-  index:
-    shanghai: "sh000001"
-    shenzhen: "sz399001"
-    csi300: "sh000300"
-
-# ----- 巴菲特决策约束层 -----
+backtest:
+  benchmark: sh000001
+  benchmark_name: 上证指数
+  commission: 0.00081
+  engine: pipeline
+  initial_cash: 1000000
+  periods_per_year: 252
+  pipeline:
+    portfolio:
+      rebalance_freq: ME
+    signal:
+      top_n: 20
+  pool_size: 0
+  risk_free_rate: 0.03
+  stamp_duty: 0.0005
+  start_date: '2020-01-01'
+  strategy:
+    buffett_cyber:
+      circuit_breaker: 3
+      cooldown_bars: 15
+      ma_long: 20
+      ma_short: 5
+      max_positions: 8
+      position_pct: 0.3
+      score_weight_base: 0.5
+      score_weight_scale: 100.0
+      stop_loss: -0.08
+    cybernetic:
+      ma_long: 20
+      ma_short: 10
+      max_pos_bear: 2
+      max_pos_bull: 8
+      max_pos_side: 5
+      position_bear: 0.05
+      position_bull: 0.3
+      position_side: 0.15
+      regime_ma_long: 60
+      regime_ma_mid: 20
+      regime_ma_short: 5
+      stop_loss_bear: -0.03
+      stop_loss_bull: -0.08
+      stop_loss_side: -0.05
+    ma_cross:
+      ma_long: 20
+      ma_short: 5
+      max_positions: 5
+      position_pct: 0.3
+      stop_loss: -0.08
+    multifactor:
+      factor_window_long: 60
+      factor_window_short: 21
+      max_per_sector: 3
+      rebalance_interval_days: 20
+      score_base: 50
+      score_momentum_weight: 100
+      score_volatility_weight: 50
+      top_n: 10
 buffett:
-  # 安全边际
-  margin_of_safety:
-    dcf_discount_rate: 0.08     # DCF折现率
-    safety_margin_pct: 0.30     # 要求的安全边际（30%）
-    growth_rate_terminal: 0.03  # 永续增长率
-
-  # 护城河
-  moat:
-    min_roe_years: 5            # ROE持续>15%的最少年数
-    min_roe: 0.15               # 最低ROE（消费/制造）
-    min_gross_margin: 0.30      # 最低毛利率（消费/制造）
-    max_debt_equity: 1.5        # 最高负债权益比（消费/制造）
-    # 行业特定参数
-    sectors:
-      bank:
-        min_roe: 0.10           # 银行ROE>10%已属优秀
-        max_debt_equity: 20.0   # 银行天然高杠杆，产权比率可达10+
-        skip_gross_margin: true # 银行无毛利率概念，用净息差/销售净利率替代
-        min_net_margin: 0.20    # 销售净利率 >20%（优秀银行净息差保障）
-      insurance:
-        min_roe: 0.08           # 保险ROE波动大，8%为合理门槛
-        max_debt_equity: 20.0   # 保险也高杠杆
-        skip_gross_margin: true
-        min_net_margin: 0.05    # 保险净利率偏低属正常
-      securities:
-        min_roe: 0.06           # 券商ROE周期性强，6%即可
-        max_debt_equity: 10.0   # 券商杠杆居中
-        skip_gross_margin: true
-        min_net_margin: 0.15
-
-  # 能力圈 — 申万一级行业（全部31个，默认开放）
-  # 沪深300成分股覆盖所有行业，全部纳入能力圈
   circle_of_competence:
     industries:
-      - "农林牧渔"
-      - "基础化工"
-      - "钢铁"
-      - "有色金属"
-      - "电子"
-      - "家用电器"
-      - "食品饮料"
-      - "纺织服饰"
-      - "轻工制造"
-      - "医药生物"
-      - "公用事业"
-      - "交通运输"
-      - "房地产"
-      - "商贸零售"
-      - "社会服务"
-      - "综合"
-      - "建筑材料"
-      - "建筑装饰"
-      - "电力设备"
-      - "国防军工"
-      - "计算机"
-      - "传媒"
-      - "通信"
-      - "银行"
-      - "非银金融"
-      - "汽车"
-      - "机械设备"
-      - "石油石化"
-      - "煤炭"
-      - "环保"
-      - "美容护理"
-      - "待分类"
-
-# ----- 控制论运行机制层 -----
+    - 农林牧渔
+    - 基础化工
+    - 钢铁
+    - 有色金属
+    - 电子
+    - 家用电器
+    - 食品饮料
+    - 纺织服饰
+    - 轻工制造
+    - 医药生物
+    - 公用事业
+    - 交通运输
+    - 房地产
+    - 商贸零售
+    - 社会服务
+    - 综合
+    - 建筑材料
+    - 建筑装饰
+    - 电力设备
+    - 国防军工
+    - 计算机
+    - 传媒
+    - 通信
+    - 银行
+    - 非银金融
+    - 汽车
+    - 机械设备
+    - 石油石化
+    - 煤炭
+    - 环保
+    - 美容护理
+    - 待分类
+  margin_of_safety:
+    dcf_discount_rate: 0.08
+    growth_rate_terminal: 0.03
+    safety_margin_pct: 0.3
+  moat:
+    max_debt_equity: 1.5
+    min_gross_margin: 0.3
+    min_roe: 0.15
+    min_roe_years: 5
+    sectors:
+      bank:
+        max_debt_equity: 20.0
+        min_net_margin: 0.2
+        min_roe: 0.1
+        skip_gross_margin: true
+      insurance:
+        max_debt_equity: 20.0
+        min_net_margin: 0.05
+        min_roe: 0.08
+        skip_gross_margin: true
+      securities:
+        max_debt_equity: 10.0
+        min_net_margin: 0.15
+        min_roe: 0.06
+        skip_gross_margin: true
+  scoring:
+    cap_margin: 0.6
+    cap_roe: 0.25
+    cap_safety: 0.5
+    weight_margin: 20
+    weight_roe: 30
+    weight_safety: 50
+  valuation:
+    fcf_fallback_ratio: 0.7
+    growth_default: 0.05
+    growth_max: 0.12
+    growth_min: 0.03
 cybernetics:
-  # 多层递阶结构
+  adaptive:
+    bear:
+      confidence_threshold: 0.85
+      max_positions: 2
+      position_size: 0.05
+      stop_loss: -0.03
+    bull:
+      confidence_threshold: 0.6
+      max_positions: 8
+      position_size: 0.3
+      stop_loss: -0.08
+    detection:
+      breadth_window: 20
+      volume_contraction: 0.8
+      volume_expansion: 1.2
+    market_regime_detection: true
+    param_tuning_frequency: monthly
+    sideways:
+      confidence_threshold: 0.75
+      max_positions: 5
+      position_size: 0.15
+      stop_loss: -0.05
+    volatility_adjustment: true
+  feedback:
+    loop_interval: daily
+    max_consecutive_losses: 3
+    min_trades_for_review: 10
+    min_win_rate: 0.35
+    performance_review_days: 30
   hierarchy:
     levels:
-      - name: "市场环境"
-        priority: 1
-        indicators: ["指数趋势", "市场情绪", "资金流向"]
-      - name: "板块轮动"
-        priority: 2
-        indicators: ["行业强度", "板块资金", "政策面"]
-      - name: "个股筛选"
-        priority: 3
-        indicators: ["基本面", "技术面", "估值"]
-
-  # 反馈回路
-  feedback:
-    loop_interval: "daily"      # 日频反馈
-    max_consecutive_losses: 3   # 连续止损后触发审查
-    performance_review_days: 30 # 每月绩效回顾
-
-  # 自适应机制
-  adaptive:
-    market_regime_detection: true
-    param_tuning_frequency: "monthly"
-    volatility_adjustment: true
-
-# ----- 回测配置 -----
-backtest:
-  engine: "backtrader"
-  initial_cash: 1000000        # 初始资金100万
-  commission: 0.0003           # 万三佣金
-  benchmark: "sh000001"         # 基准：上证指数
-  start_date: "2020-01-01"
+    - indicators:
+      - 指数趋势
+      - 市场情绪
+      - 资金流向
+      name: 市场环境
+      priority: 1
+    - indicators:
+      - 行业强度
+      - 板块资金
+      - 政策面
+      name: 板块轮动
+      priority: 2
+    - indicators:
+      - 基本面
+      - 技术面
+      - 估值
+      name: 个股筛选
+      priority: 3
+data:
+  cache_days: 1
+  cache_dir: data/cache
+  index:
+    csi300: sh000300
+    shanghai: sh000001
+    shenzhen: sz399001
+  provider: akshare
+  tushare:
+    token: REDACTED
+project:
+  name: quant-agent
+  phase: 1
+  version: 0.1.0
+signals:
+  multifactor:
+    market:
+      bear:
+        bank: 15
+        food_beverage: 10
+        pharma: 10
+        transport: 10
+        utilities: 15
+      bull:
+        computers: 15
+        defense: 10
+        electrical: 10
+        electronics: 15
+        securities: 20
+      sideways:
+        bank: 10
+        coal: 10
+        construction: 10
+        petroleum: 10
+        utilities: 10
+    quality:
+      buffett_weight: 0.6
+      roe_cap: 30.0
+      roe_multiplier: 1.2
+      trend_bonus_down: -5
+      trend_bonus_up: 5
+    technical:
+      default_volatility: 0.3
+      mom_multiplier_normal: 200
+      mom_multiplier_strong: 400
+      mom_strong: 0.15
+      vol_max_score: 30
+      vol_penalty_mult: 100
+      weight_momentum: 0.6
+      weight_volatility: 0.4
+    valuation:
+      score_deep: 80
+      score_moderate: 60
+      score_slight: 40
+      tier_deep_value: 0.5
+      tier_moderate_value: 0.3
+      tier_slight_value: 0.15
+    weights:
+      market: 0.15
+      quality: 0.4
+      technical: 0.15
+      valuation: 0.3
+strategies:
+  buffett:
+    color: '#06b6d4'
+    config_key: buffett
+    enabled: true
+    label: 巴菲特价值精选
+  cybernetic:
+    color: '#f59e0b'
+    config_key: cybernetics
+    enabled: true
+    label: 控制论自适应
+  multifactor:
+    color: '#10b981'
+    config_key: signals.multifactor
+    enabled: true
+    label: 多因子月度调仓
+trading:
+  commission:
+    brokerage: 0.00025
+    stamp_duty: 0.0005
+    transfer_fee: 1.0e-05
+  notification:
+    enabled: true
+    require_confirmation: false
+    signal_change_only: true

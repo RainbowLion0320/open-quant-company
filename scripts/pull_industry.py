@@ -8,8 +8,13 @@ https://tushare.pro/document/2?doc_id=25
 import sys, os, json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd
+import yaml
 
-TOKEN = "REDACTED"
+# Load token from config
+_config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "settings.yaml")
+with open(_config_path) as f:
+    _cfg = yaml.safe_load(f)
+TOKEN = _cfg["data"]["tushare"]["token"]
 
 # 申万二级 → 申万一级 映射表
 SW2_TO_SW1 = {

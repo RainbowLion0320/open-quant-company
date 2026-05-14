@@ -1,0 +1,80 @@
+"""
+Quant Agent API v2 — 应用工厂
+"""
+
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
+    os.environ.pop(key, None)
+os.environ["no_proxy"] = "eastmoney.com,10jqka.com.cn,sina.com.cn,qianlong.com,163.com,qq.com"
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
+from web.api.routes import market, strategies, stocks, portfolio, signals, settings, backtest
+from web.api.errors import register_error_handlers
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="Quant Agent API",
+        version="2.0.0",
+        description="A-share quantitative trading platform — Buffett + Cybernetics",
+    )
+
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+    app.include_router(market.router)
+    app.include_router(strategies.router)
+    app.include_router(stocks.router)
+    app.include_router(portfolio.router)
+    app.include_router(signals.router)
+    app.include_router(settings.router)
+    app.include_router(backtest.router)
+
+    register_error_handlers(app)
+
+    @app.get("/api/health")
+    async def health():
+        from data.results_db import get_buffett_meta, list_strategies
+        from data.db import get_backend
+        db_locked = False
+        meta = {}
+        strategies_count = 0
+        try:
+            meta = get_buffett_meta()
+            strategies_count = len(list_strategies())
+        except Exception as e:
+            db_locked = "lock" in str(e).lower() or "conflict" in str(e).lower()
+        return {
+            "status": "degraded" if db_locked else "ok",
+            "db_locked": db_locked,
+            "backend": get_backend(),
+            "data_updated": meta.get("last_scan", "") if not db_locked else "数据库被占用",
+            "stocks_scanned": meta.get("total", 0) if not db_locked else 0,
+            "strategies": strategies_count,
+            "version": "2.0.0",
+        }
+
+    @app.on_event("startup")
+    async def startup():
+        pass  # DB连接按需打开，不持有持久锁
+
+    # 静态文件 (前端)
+    static_dir = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    if static_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
+        
+        # SPA fallback: 非 API 路径回退到 index.html
+        from fastapi.responses import FileResponse
+        @app.get("/{full_path:path}")
+        async def spa_fallback(full_path: str):
+            index = static_dir / "index.html"
+            if index.exists():
+                return FileResponse(index, media_type="text/html")
+            return {"detail": "Not Found"}
+
+    return app

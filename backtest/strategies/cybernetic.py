@@ -34,13 +34,23 @@ class CyberneticStrategy(bt.Strategy):
     )
 
     def __init__(self):
-        self.ma_short = SMA(self.data.close, period=self.p.ma_short)
-        self.ma_long = SMA(self.data.close, period=self.p.ma_long)
-        self.cross = CrossOver(self.ma_short, self.ma_long)
-        self.order = None
-        self.entry_price = None
+        self.inds = {}  # data_name -> {ma_short, ma_long, cross}
+        self.entry_price = {}
+        self.order = {}
         self.trades = 0
         self.consec_loss = 0
+        for d in self.datas:
+            if d._name == "REGIME":
+                continue
+            ma_s = SMA(d.close, period=self.p.ma_short)
+            ma_l = SMA(d.close, period=self.p.ma_long)
+            self.inds[d._name] = {
+                'ma_short': ma_s,
+                'ma_long': ma_l,
+                'cross': CrossOver(ma_s, ma_l),
+            }
+            self.entry_price[d._name] = None
+            self.order[d._name] = None
 
     def _regime(self):
         """读取当前 bar 的市场状态"""
@@ -52,10 +62,12 @@ class CyberneticStrategy(bt.Strategy):
                 pass
         return 0  # default: sideways
 
-    def _score_weight(self):
+    def _score_weight(self, d=None):
         if not self.p.score_weight:
             return 1.0
-        name = self.data._name
+        if d is None:
+            d = self.data
+        name = d._name
         if "_" in name:
             try:
                 return 0.5 + float(name.rsplit("_", 1)[-1]) / 100.0
@@ -66,23 +78,36 @@ class CyberneticStrategy(bt.Strategy):
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
             return
+        dname = order.data._name
+        if dname == "REGIME":
+            return
+        if dname not in self.entry_price:
+            self.entry_price[dname] = None
+        if dname not in self.order:
+            self.order[dname] = None
         if order.status == order.Completed:
             if order.isbuy():
-                self.entry_price = order.executed.price
+                self.entry_price[dname] = order.executed.price
             else:
-                if self.entry_price:
-                    pnl = (order.executed.price - self.entry_price) / self.entry_price
+                if self.entry_price.get(dname):
+                    pnl = (order.executed.price - self.entry_price[dname]) / self.entry_price[dname]
                     self.trades += 1
-                    self.consec_loss = self.consec_loss + 1 if pnl <= 0 else 0
-                self.entry_price = None
-        self.order = None
+                    self.consec_loss = self.consec_loss + 1 if pnl < 0 else 0
+                self.entry_price[dname] = None
+        self.order[dname] = None
 
     def next(self):
-        # 跳过市场状态数据（只在股票数据上交易）
-        if self.data._name == "REGIME":
-            return
+        # 遍历所有股票数据（跳过 REGIME）
+        for d in self.datas:
+            if d._name == "REGIME":
+                continue
+            self._next_data(d)
 
-        if self.order:
+    def _next_data(self, d):
+        dname = d._name
+        ind = self.inds[dname]
+
+        if self.order.get(dname):
             return
 
         regime = self._regime()
@@ -105,41 +130,45 @@ class CyberneticStrategy(bt.Strategy):
             pos_pct = self.p.position_side
             max_pos = self.p.max_pos_side
 
+        pos = self.getposition(d)
+
         # 止损
-        if self.position and self.entry_price:
-            loss = (self.data.close[0] - self.entry_price) / self.entry_price
+        if pos and self.entry_price.get(dname):
+            loss = (d.close[0] - self.entry_price[dname]) / self.entry_price[dname]
             if loss <= stop_loss:
-                self.order = self.close()
+                self.order[dname] = self.close(data=d)
                 return
 
         # 仓位上限
-        if len(self.broker.positions) >= max_pos and not self.position:
+        if len(self.broker.positions) >= max_pos and not pos:
             return
 
         # 信号 — 按 regime 不同逻辑
         if regime > 0:
             # 牛市: 金叉买入，不因死叉卖出（趋势跟踪）
-            if self.cross > 0 and not self.position:
-                size = int(self.broker.getvalue() * pos_pct / self.data.close[0]
-                           * self._score_weight() // 100) * 100
+            if ind['cross'] > 0 and not pos:
+                w = self._score_weight(d)
+                size = int(self.broker.getvalue() * pos_pct / d.close[0]
+                           * w // 100) * 100
                 if size >= 100:
-                    self.order = self.buy(size=size)
+                    self.order[dname] = self.buy(data=d, size=size)
             # 牛市死叉不卖（放宽），只靠止损退出
 
         elif regime < 0:
             # 熊市: 几乎不买，只管理已有仓位
-            if self.cross < 0 and self.position:
-                self.order = self.close()
+            if ind['cross'] < 0 and pos:
+                self.order[dname] = self.close(data=d)
 
         else:
             # 震荡: 金叉买，死叉卖（波段操作）
-            if self.cross > 0 and not self.position:
-                size = int(self.broker.getvalue() * pos_pct / self.data.close[0]
-                           * self._score_weight() // 100) * 100
+            if ind['cross'] > 0 and not pos:
+                w = self._score_weight(d)
+                size = int(self.broker.getvalue() * pos_pct / d.close[0]
+                           * w // 100) * 100
                 if size >= 100:
-                    self.order = self.buy(size=size)
-            elif self.cross < 0 and self.position:
-                self.order = self.close()
+                    self.order[dname] = self.buy(data=d, size=size)
+            elif ind['cross'] < 0 and pos:
+                self.order[dname] = self.close(data=d)
 
     def stop(self):
         ret = (self.broker.getvalue() / self.broker.startingcash - 1) * 100

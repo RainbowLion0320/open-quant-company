@@ -40,6 +40,7 @@ class BuffettCyberStrategy(bt.Strategy):
         self.trade_count = 0
         self.consecutive_losses = 0
         self.circuit_breaker = False
+        self.circuit_breaker_bars = 0
 
     def log(self, txt):
         if self.p.print_log:
@@ -69,20 +70,31 @@ class BuffettCyberStrategy(bt.Strategy):
                 if self.entry_price:
                     pnl = (order.executed.price - self.entry_price) / self.entry_price
                     self.trade_count += 1
-                    if pnl <= 0:
+                    if pnl < 0:
                         self.consecutive_losses += 1
                     else:
                         self.consecutive_losses = 0
+                        self.circuit_breaker = False
                 self.entry_price = None
         self.order = None
 
     def next(self):
-        if self.order or self.circuit_breaker:
+        if self.order:
             return
 
-        # 熔断
+        # 熔断冷却中
+        if self.circuit_breaker:
+            self.circuit_breaker_bars += 1
+            if self.circuit_breaker_bars >= 15:
+                self.circuit_breaker = False
+                self.consecutive_losses = 0
+                self.circuit_breaker_bars = 0
+            return
+
+        # 触发熔断
         if self.consecutive_losses >= 3:
             self.circuit_breaker = True
+            self.circuit_breaker_bars = 0
             return
 
         # 止损

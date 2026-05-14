@@ -107,7 +107,7 @@ def assess_moat(
     debt_equity: float,                # 最新负债权益比（产权比率）
     net_margin_history: List[float] = None,  # 销售净利率（金融板块替代毛利率）
     sector: str = "consumer",          # 板块类型
-) -> Tuple[float, float, float, bool, List[str]]:
+) -> Tuple[float, float, float, bool, List[str], float]:
     """
     护城河评估 — 板块感知
     消费/制造: ROE + 毛利率 + 负债权益比
@@ -124,7 +124,6 @@ def assess_moat(
     skip_gm = sector_cfg.get("skip_gross_margin", False)
     min_gm = sector_cfg.get("min_gross_margin", cfg.get("min_gross_margin", 0.30))
     min_nm = sector_cfg.get("min_net_margin", 0.15)
-    min_gm = sector_cfg.get("min_gross_margin", cfg.get("min_gross_margin", 0.30))
 
     details = []
     passed = True
@@ -189,7 +188,7 @@ def buffett_filter(
     industry: str = "",
     sector: str = "consumer",
     fcf: float = 0,
-    growth_rate: float = 0.05,
+    growth_rate: float = None,
     shares_outstanding: float = 1,
     current_price: float = 0,
     roe_history: List[float] = None,
@@ -232,6 +231,10 @@ def buffett_filter(
         score.verdict = Verdict.FAIL_MOAT
         return score
 
+    # 从配置读取默认增长率（如果未指定）
+    if growth_rate is None:
+        growth_rate = _load_config().get("valuation", {}).get("growth_default", 0.05)
+
     # 3. 安全边际
     iv_per_share, price, margin, margin_pass = calc_margin_of_safety(
         fcf, growth_rate, shares_outstanding, current_price
@@ -252,9 +255,17 @@ def buffett_filter(
     score.verdict = Verdict.PASS
     # 金融板块用净利率替代毛利率参与评分
     margin_indicator = avg_nm if avg_nm > 0 else avg_gm
+    # 从配置读取评分权重（保留硬编码值作为兜底）
+    scoring_cfg = _load_config().get("scoring", {})
+    weight_roe = scoring_cfg.get("weight_roe", 30)
+    weight_margin = scoring_cfg.get("weight_margin", 20)
+    weight_safety = scoring_cfg.get("weight_safety", 50)
+    cap_roe = scoring_cfg.get("cap_roe", 0.25)
+    cap_margin = scoring_cfg.get("cap_margin", 0.60)
+    cap_safety = scoring_cfg.get("cap_safety", 0.50)
     score.score = min(100, int(
-        30 * min(avg_roe / 0.25, 1.0) +         # ROE贡献
-        20 * min(margin_indicator / 0.60, 1.0) + # 利润率贡献
-        50 * min(margin / 0.50, 1.0)             # 安全边际贡献
+        weight_roe * min(avg_roe / cap_roe, 1.0) +         # ROE贡献
+        weight_margin * min(margin_indicator / cap_margin, 1.0) + # 利润率贡献
+        weight_safety * min(margin / cap_safety, 1.0)             # 安全边际贡献
     ))
     return score

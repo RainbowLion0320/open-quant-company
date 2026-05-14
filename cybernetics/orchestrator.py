@@ -159,8 +159,16 @@ def generate_feedback(
         report.circuit_reason = f"连续亏损{report.consecutive_losses}次，触发熔断"
         report.adjustments.append("暂停新开仓，审查策略")
 
-    # 胜率过低
-    if report.win_rate < 0.35 and report.total_trades >= 10:
+    # 胜率过低 — 阈值从 config 读取，fallback 0.35/10
+    try:
+        fb_cfg = _load_config()["feedback"]
+        min_win_rate = float(fb_cfg.get("min_win_rate", 0.35))
+        min_trades_for_review = int(fb_cfg.get("min_trades_for_review", 10))
+    except Exception:
+        min_win_rate = 0.35
+        min_trades_for_review = 10
+
+    if report.win_rate < min_win_rate and report.total_trades >= min_trades_for_review:
         report.adjustments.append(f"胜率{report.win_rate:.1%}过低，建议调高置信度阈值")
 
     return report
@@ -222,12 +230,29 @@ def detect_market_regime(
 def adaptive_params(regime: MarketRegime) -> Dict[str, float]:
     """
     根据市场状态自适应调整参数
+    优先从 config/settings.yaml → cybernetics.adaptive.{regime} 读取
     """
+    # 尝试从配置加载
+    try:
+        cfg = _load_config()["adaptive"]
+        regime_key = regime.value  # "bull", "sideways", "bear"
+        if regime_key in cfg:
+            entry = cfg[regime_key]
+            return {
+                "position_size": float(entry["position_size"]),
+                "stop_loss": float(entry["stop_loss"]),
+                "confidence_threshold": float(entry["confidence_threshold"]),
+                "max_positions": int(entry["max_positions"]),
+            }
+    except Exception:
+        pass
+
+    # 配置不可用时的硬编码回退
     params = {
         MarketRegime.BULL: {
             "position_size": 0.30,      # 牛市：单票可到30%
             "stop_loss": -0.08,         # 止损：-8%
-            "confidence_threshold": 0.6, # 置信度阈值：0.6
+            "confidence_threshold": 0.60,
             "max_positions": 8,
         },
         MarketRegime.SIDEWAYS: {
@@ -314,14 +339,26 @@ class QuantOrchestrator:
 
         self.params = adaptive_params(self.regime)
 
-        # 量能趋势
+        # 量能趋势 — 阈值从 config 读取，fallback 1.2/0.8
         vol_5 = volume[-5:].mean() if volume is not None else 0
         vol_20 = volume[-20:].mean() if volume is not None and len(volume) >= 20 else vol_5
-        vol_trend = "放量" if vol_5 > vol_20 * 1.2 else ("缩量" if vol_5 < vol_20 * 0.8 else "正常")
+
+        try:
+            det_cfg = _load_config()["adaptive"]["detection"]
+            vol_expand = float(det_cfg.get("volume_expansion", 1.2))
+            vol_contract = float(det_cfg.get("volume_contraction", 0.8))
+            breadth_w = int(det_cfg.get("breadth_window", 20))
+        except Exception:
+            vol_expand = 1.2
+            vol_contract = 0.8
+            breadth_w = 20
+
+        vol_trend = "放量" if vol_5 > vol_20 * vol_expand else ("缩量" if vol_5 < vol_20 * vol_contract else "正常")
 
         # 涨跌比（从OHLC近似: 收盘>开盘为涨）
-        up_count = sum(1 for i in range(len(close) - 20, len(close)) if close[i] > close[i-1])
-        breadth = up_count / 20
+        lookback = min(breadth_w, len(close))
+        up_count = sum(1 for i in range(len(close) - lookback, len(close)) if close[i] > close[i-1])
+        breadth = up_count / lookback if lookback > 0 else 0.5
 
         self.market_snapshot = MarketContext(
             regime=self.regime,

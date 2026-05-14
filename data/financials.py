@@ -5,11 +5,66 @@
 from typing import Tuple, List, Optional
 import pandas as pd
 import numpy as np
+import yaml
+import os
 
 from .fetcher import get_financial_indicator, retry_with_backoff
 
-# ---- 内存缓存 ----
+# ---- 配置加载 ----
+_CONFIG = None
+
+def _load_config():
+    global _CONFIG
+    if _CONFIG is not None:
+        return _CONFIG
+    try:
+        _config_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "config", "settings.yaml"
+        )
+        with open(_config_path) as f:
+            _CONFIG = yaml.safe_load(f)
+    except Exception:
+        _CONFIG = {}
+    return _CONFIG
+
+# 模块级常量，从 config 读取，不可用时回退到合理默认值
+_MIN_ROE_YEARS = 5
+_FCF_FALLBACK_RATIO = 0.7
+_GROWTH_MIN = 0.03
+_GROWTH_MAX = 0.12
+_GROWTH_DEFAULT = 0.05
+
+try:
+    _cfg = _load_config()
+    _buffett = _cfg.get("buffett", {})
+    _MIN_ROE_YEARS = _buffett.get("moat", {}).get("min_roe_years", _MIN_ROE_YEARS)
+    _valuation = _buffett.get("valuation", {})
+    _FCF_FALLBACK_RATIO = _valuation.get("fcf_fallback_ratio", _FCF_FALLBACK_RATIO)
+    _GROWTH_MIN = _valuation.get("growth_min", _GROWTH_MIN)
+    _GROWTH_MAX = _valuation.get("growth_max", _GROWTH_MAX)
+    _GROWTH_DEFAULT = _valuation.get("growth_default", _GROWTH_DEFAULT)
+except Exception:
+    pass
+
+# ---- 内存缓存 + 磁盘缓存 ----
 _financial_cache: dict = {}
+_FINANCIAL_CACHE_MAX_SIZE = 50  # LRU上限，防止OOM
+
+import os as _os
+import gc as _gc
+_CACHE_DIR = _os.path.join(_os.path.dirname(__file__), "cache", "financials")
+
+
+def _evict_lru():
+    """当缓存超过上限时，淘汰最老的一半条目"""
+    if len(_financial_cache) <= _FINANCIAL_CACHE_MAX_SIZE:
+        return
+    # 只保留最近的一半
+    to_keep = _FINANCIAL_CACHE_MAX_SIZE // 2
+    keys = list(_financial_cache.keys())
+    for key in keys[:-to_keep]:
+        del _financial_cache[key]
+    _gc.collect()
 
 
 def _parse_pct(val) -> float:
@@ -26,37 +81,71 @@ def _parse_pct(val) -> float:
     return 0.0
 
 
+def _get_cache_path(symbol: str) -> str:
+    _os.makedirs(_CACHE_DIR, exist_ok=True)
+    return _os.path.join(_CACHE_DIR, f"{symbol}.parquet")
+
+
 @retry_with_backoff(max_retries=2, base_delay=2.0)
 def get_financial_summary(symbol: str, force_refresh: bool = False) -> pd.DataFrame:
     """
     获取个股财务摘要（同花顺源）
     返回包含 ROE、毛利率、资产负债率等核心指标的 DataFrame
     列: 报告期, 净利润, 营业总收入, 净资产收益率, 销售毛利率, 资产负债率, ...
+    两层缓存: 内存 → 磁盘(parquet) → AKShare API
     """
     cache_key = f"financial_summary_{symbol}"
+
+    # 1. 内存缓存
     if not force_refresh and cache_key in _financial_cache:
         return _financial_cache[cache_key]
 
-    # 尝试同花顺源（更稳定）
+    # 2. 磁盘缓存
+    cache_path = _get_cache_path(symbol)
+    if not force_refresh and _os.path.exists(cache_path):
+        try:
+            df = pd.read_parquet(cache_path)
+            if len(df) > 0:
+                _financial_cache[cache_key] = df
+                _evict_lru()
+                return df
+        except Exception:
+            pass  # 损坏的缓存文件，重新拉取
+
+    # 3. API 拉取
     try:
         import akshare as ak
         df = ak.stock_financial_abstract_ths(symbol=symbol, indicator="按报告期")
-    except Exception:
-        # 回退到通用源
+    except (ImportError, ConnectionError, ValueError) as e:
         df = get_financial_indicator(symbol, force_refresh=force_refresh)
 
     if len(df) == 0:
         return df
 
+    # 写入磁盘缓存 — 转换 object 列为 str，避免 to_parquet 报错 (如 "64.75%")
+    try:
+        df_write = df.copy()
+        for col in df_write.columns:
+            if df_write[col].dtype == object:
+                df_write[col] = df_write[col].astype(str)
+        df_write.to_parquet(cache_path, index=False)
+    except Exception as e:
+        # 静默但记录 — 不阻塞主流程
+        import sys as _sys
+        print(f"  [CACHE_WARN] parquet write failed for {symbol}: {e}", file=_sys.stderr)
+
     _financial_cache[cache_key] = df
+    _evict_lru()
     return df
 
 
-def extract_roe_history(df: pd.DataFrame, years: int = 5) -> List[float]:
+def extract_roe_history(df: pd.DataFrame, years: int = None) -> List[float]:
     """
     从财务摘要 DataFrame 提取近N年 ROE 序列（仅取年报）
     返回: [ROE_year1, ROE_year2, ...] 从旧到新排列
     """
+    if years is None:
+        years = _MIN_ROE_YEARS
     if "净资产收益率" not in df.columns:
         return []
 
@@ -71,10 +160,12 @@ def extract_roe_history(df: pd.DataFrame, years: int = 5) -> List[float]:
     return roe_values[-years:] if len(roe_values) > years else roe_values
 
 
-def extract_gross_margin_history(df: pd.DataFrame, years: int = 5) -> List[float]:
+def extract_gross_margin_history(df: pd.DataFrame, years: int = None) -> List[float]:
     """
     从财务摘要提取近N年毛利率序列（仅取年报）
     """
+    if years is None:
+        years = _MIN_ROE_YEARS
     if "销售毛利率" not in df.columns:
         return []
 
@@ -93,14 +184,24 @@ def extract_debt_equity_ratio(df: pd.DataFrame) -> float:
     从财务摘要提取最新负债权益比（D/E ratio）
     优先使用 产权比率 列（直接就是 D/E），回退到 资产负债率 换算
     """
+    if df is None or len(df) == 0:
+        return 0.0
+    report_col = "报告期"
+    has_report_col = report_col in df.columns
+
     # 优先：产权比率 直接就是 D/E
     if "产权比率" in df.columns:
         # 取最新年报的产权比率
-        report_col = "报告期"
-        annual = df[df[report_col].astype(str).str.endswith("-12-31")]
+        if has_report_col:
+            annual = df[df[report_col].astype(str).str.endswith("-12-31")]
+        else:
+            annual = df.copy()
         if len(annual) == 0:
             annual = df
-        latest = annual.sort_values(report_col).iloc[-1]
+        if has_report_col:
+            latest = annual.sort_values(report_col).iloc[-1]
+        else:
+            latest = annual.iloc[-1]
         val = latest["产权比率"]
         try:
             f = float(val)
@@ -112,18 +213,23 @@ def extract_debt_equity_ratio(df: pd.DataFrame) -> float:
     if "资产负债率" not in df.columns:
         return 0.0
 
-    latest = df.sort_values("报告期").iloc[-1]
+    if has_report_col:
+        latest = df.sort_values(report_col).iloc[-1]
+    else:
+        latest = df.iloc[-1]
     debt_ratio = _parse_pct(latest["资产负债率"])
     if debt_ratio >= 1.0:
         return 99.0  # 极端情况
     return debt_ratio / (1 - debt_ratio) if debt_ratio < 1 else 99.0
 
 
-def extract_net_margin_history(df: pd.DataFrame, years: int = 5) -> List[float]:
+def extract_net_margin_history(df: pd.DataFrame, years: int = None) -> List[float]:
     """
     从财务摘要提取近N年销售净利率序列（仅取年报）
     用于金融板块替代毛利率
     """
+    if years is None:
+        years = _MIN_ROE_YEARS
     if "销售净利率" not in df.columns:
         return []
 
@@ -181,7 +287,7 @@ def extract_latest_revenue(df: pd.DataFrame) -> float:
             return float(val.replace("亿", "").replace(",", ""))
         if "万" in val:
             return float(val.replace("万", "").replace(",", "")) / 10000
-        return float(val.replace(",", ""))
+        return float(val.replace(",", "")) / 1e8
     return float(val) / 1e8
 
 
@@ -251,11 +357,18 @@ def _estimate_fcf(symbol: str, net_profit_fallback: float = 0) -> float:
             raise ValueError("无现金流数据")
 
         # 只取最新年报
-        annual = df[df["报告期"].astype(str).str.endswith("-12-31")]
+        report_col = "报告期"
+        if report_col in df.columns:
+            annual = df[df[report_col].astype(str).str.endswith("-12-31")]
+        else:
+            annual = df.copy()
         if len(annual) == 0:
             raise ValueError("无年报现金流")
 
-        latest = annual.sort_values("报告期").iloc[-1]
+        if report_col in annual.columns:
+            latest = annual.sort_values(report_col).iloc[-1]
+        else:
+            latest = annual.iloc[-1]
 
         # 经营活动现金流净额
         ocf_str = str(latest.get("经营活动产生的现金流量净额", "0"))
@@ -281,28 +394,32 @@ def _estimate_fcf(symbol: str, net_profit_fallback: float = 0) -> float:
         pass
 
     # 回退
-    return net_profit_fallback * 0.7 if net_profit_fallback > 0 else 0
+    return net_profit_fallback * _FCF_FALLBACK_RATIO if net_profit_fallback > 0 else 0
 
 
 def _estimate_growth(df: pd.DataFrame) -> float:
     """
     从近5年净利润同比增长率中位数估算增长率
-    保守下限 0.03, 上限 0.12
+    保守下限/上限从 config 读取
     """
     if "净利润同比增长率" not in df.columns:
-        return 0.05
+        return _GROWTH_DEFAULT
 
-    annual = df[df["报告期"].astype(str).str.endswith("-12-31")]
+    report_col = "报告期"
+    if report_col in df.columns:
+        annual = df[df[report_col].astype(str).str.endswith("-12-31")]
+    else:
+        annual = df.copy()
     if len(annual) < 3:
-        return 0.05
+        return _GROWTH_DEFAULT
 
     growth_rates = annual["净利润同比增长率"].apply(_parse_pct).tail(5).tolist()
     growth_rates = [g for g in growth_rates if abs(g) < 1.0]  # 过滤异常值 (>100%)
     if not growth_rates:
-        return 0.05
+        return _GROWTH_DEFAULT
 
     median_growth = np.median(growth_rates)
-    return max(0.03, min(0.12, median_growth))
+    return max(_GROWTH_MIN, min(_GROWTH_MAX, median_growth))
 
 
 def _parse_financial_number(val: str) -> float:
@@ -317,6 +434,6 @@ def _parse_financial_number(val: str) -> float:
             return float(val.replace("亿", ""))
         if "万" in val:
             return float(val.replace("万", "")) / 10000
-        return float(val)
+        return float(val) / 1e8
     except ValueError:
         return 0.0

@@ -169,33 +169,47 @@ def backtest(pool, start="2015-01-01", end="2026-05-10", cash=1_000_000):
                         portfolio_value -= cost
                         trade_log.append((month_dt, "BUY", sym, shares, p))
 
-    # 期末清算
-    final_prices = prices.iloc[-1]
-    for sym, shares in holdings.items():
-        if sym in final_prices and not pd.isna(final_prices[sym]):
-            portfolio_value += shares * final_prices[sym]
+    # 期末清算 — 生成日度收益序列用于绩效分析
+    daily_values = []
+    for i in range(len(prices)):
+        dt = prices.index[i]
+        row = prices.iloc[i]
+        mv = 0
+        for sym, shares in holdings.items():
+            if sym in row and not pd.isna(row[sym]):
+                mv += shares * row[sym]
+        daily_values.append((dt, portfolio_value + mv))
+    
+    value_df = pd.DataFrame(daily_values, columns=["date", "value"])
+    value_df["date"] = pd.to_datetime(value_df["date"])
+    value_df = value_df.set_index("date")
+    daily_returns = value_df["value"].pct_change().dropna()
+
+    # 基准日收益
+    bench_returns = bc.pct_change().dropna()
+
+    # 绩效分析
+    try:
+        from backtest.analytics import RiskAnalytics, FullReport
+        aligned = pd.concat([daily_returns, bench_returns], axis=1, join="inner").dropna()
+        report = RiskAnalytics.compute(aligned.iloc[:, 0], aligned.iloc[:, 1])
+    except Exception:
+        report = None
 
     total_ret = (portfolio_value / cash - 1) * 100
     bench_ret = (bc.iloc[-1] / bc.iloc[0] - 1) * 100
 
-    print(f"\n{'='*60}")
-    print(f"多因子月度调仓 {start[:4]}-{end[:4]}")
-    print(f"{'='*60}")
-    print(f"  策略: {total_ret:+.2f}%  基准: {bench_ret:+.2f}%  α: {total_ret-bench_ret:+.2f}%")
-    print(f"  交易: {len(trade_log)} 笔")
-    print(f"  期末持仓: {len(holdings)} 只")
-    if holdings:
-        print(f"  持仓: {list(holdings.keys())[:5]}")
+    print(report.summary() if report else f"\n策略: {total_ret:+.2f}%  基准: {bench_ret:+.2f}%")
+    print(f"\n交易: {len(trade_log)} 笔  期末持仓: {len(holdings)} 只")
 
-
-if __name__ == "__main__":
-    import argparse
-    p = argparse.ArgumentParser()
-    p.add_argument("--start", default="2015-01-01")
-    p.add_argument("--end", default="2026-05-10")
-    args = p.parse_args()
-
-    pool = ["601225","603288","600938","002415","601838","002555","600989","600036",
-            "002142","600926","600919","601009","601128","601939","601665","600999",
-            "601288","601577","002736","600030","601066","601688","601601","601318","601878"]
-    backtest(pool, args.start, args.end)
+    # 存结果
+    result_path = os.path.expanduser("~/quant-agent/data/backtest_monthly_result.pkl")
+    pd.to_pickle({
+        "daily_returns": daily_returns,
+        "bench_returns": bench_returns,
+        "trade_log": trade_log,
+        "final_holdings": holdings,
+        "total_return": total_ret / 100,
+        "bench_return": bench_ret / 100,
+    }, result_path)
+    print(f"结果已保存: {result_path}")

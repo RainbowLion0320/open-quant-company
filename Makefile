@@ -41,9 +41,13 @@ backtest:
 regime:
 	$(PYTHON) -c "from cybernetics.orchestrator import QuantOrchestrator; o=QuantOrchestrator(); s=o.detect(); print(f'Regime: {s.regime.value} | {s.index_ma_trend}')"
 
-# Web 仪表盘
+# Web 仪表盘 (Vue 3 + FastAPI)
 web:
-	$(PYTHON) -m streamlit run web/app.py --server.port 8501
+	cd web/frontend && npm run build
+	$(PYTHON) -m web.api
+
+web-dev:
+	$(PYTHON) -m web.api
 
 web-stop:
-	pkill -f "streamlit run web/app.py" || true
+	pkill -f "web.api" || true

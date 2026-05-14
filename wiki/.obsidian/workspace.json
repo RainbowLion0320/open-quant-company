@@ -1,0 +1,204 @@
+{
+  "main": {
+    "id": "f9a3cba7aa8b4a14",
+    "type": "split",
+    "children": [
+      {
+        "id": "0fa4d2228da214cf",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7aeeae959f8ae78b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "concepts/buffett-rolling-backtest.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "buffett-rolling-backtest"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "545d75a95b74f33d",
+    "type": "split",
+    "children": [
+      {
+        "id": "200f2ec91e7f4c8b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9482335530e41de7",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "38bd51abec779bbc",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "7b8dbbed9002d02e",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "a2572dea1a20b3a3",
+    "type": "split",
+    "children": [
+      {
+        "id": "78de4042dffe7222",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d088a91f56fc7fb2",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "concepts/buffett-rolling-backtest.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "buffett-rolling-backtest 的反向链接列表"
+            }
+          },
+          {
+            "id": "759c2d4f60ab08f6",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "concepts/buffett-rolling-backtest.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "buffett-rolling-backtest 的出链列表"
+            }
+          },
+          {
+            "id": "cfe4dd67038c9265",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "a587df6927fedac9",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "7febcac9b7219fca",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "concepts/buffett-rolling-backtest.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "buffett-rolling-backtest 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "7aeeae959f8ae78b",
+  "lastOpenFiles": [
+    "raw/assets",
+    "concepts/system-architecture.md",
+    "concepts/cybernetics-regime.md",
+    "concepts/financial-cache.md",
+    "concepts/dcf-valuation.md",
+    "concepts/multifactor-scoring.md",
+    "concepts/buffett-rolling-backtest.md",
+    "concepts/buffett-filter.md",
+    "comparisons/strategy-evolution.md",
+    "comparisons/data-sources.md",
+    "index.md",
+    "SCHEMA.md",
+    "entities/tushare-mcp.md",
+    "decisions/web-architecture.md",
+    "decisions/duckdb-migration.md"
+  ]
+}

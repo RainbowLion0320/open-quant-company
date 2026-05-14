@@ -14,10 +14,11 @@
 - 代理: fetcher.py 会自动绕过 v2ray
 
 ## 数据源约定
-- 个股日线: `stock_zh_a_daily` (新浪), 备选 `stock_zh_a_hist` (东财), `stock_zh_a_hist_tx` (腾讯)
-- 指数日线: `stock_zh_index_daily` (通用), 备选 `stock_zh_index_daily_tx` (腾讯)
-- 财务数据: `stock_financial_abstract_ths` (同花顺, 含ROE/毛利率/负债率)
+- **AKShare** (日线行情，免费不限流): `stock_zh_a_daily` (新浪), 备选 `stock_zh_a_hist`/`stock_zh_a_hist_tx`
+- **Tushare MCP** (财务/指标/情绪/行业，2000积分): `fina_indicator`, `daily_basic`, `income`/`balance`/`cashflow`, `sw_daily`, `margin`, `hk_hold`
 - 请求频率: 3s间隔, 指数退避重试3次
+- Tushare MCP 模块文档: `docs/tushare-mcp-guide.md`
+- AKShare↔Tushare 分工: AKShare管日线，Tushare管三张表+daily_basic+融资融券+北向+申万+宏观
 
 ## 记忆系统
 - 已配置 Hindsight Local 模式 (deepseek-v4-flash, bank_id=quant-agent)
@@ -52,13 +53,37 @@
 ## 关键文件
 ```
 ~/quant-agent/
-├── config/settings.yaml           # 全局配置（含行业阈值）
-├── buffett/filters.py             # 巴菲特三重过滤器（板块感知）
-├── cybernetics/orchestrator.py    # 控制论协调器（真实数据接入）
-├── data/financials.py             # 财务数据提取（净利率+D/E）
-├── data/symbols.py                # 股票池+板块分类
-├── scripts/scan_all.py            # 全量扫描脚本
-├── backtest/strategies/ma_cross.py # 均线金叉策略
-├── backtest/run_ma_cross.py       # 回测运行脚本
-└── main.py                        # CLI入口
+├── config/settings.yaml              # 全局配置（含策略注册表、行业阈值）
+├── buffett/filters.py                # 巴菲特三重过滤器（板块感知）
+├── cybernetics/orchestrator.py       # 控制论协调器（Regime检测+自适应）
+├── data/
+│   ├── fetcher.py                    # AKShare 3源 fallback + parquet 缓存
+│   ├── financials.py                 # 财务数据提取（三层缓存：内存→parquet→API）
+│   ├── symbols.py                    # 1000只股票池 + 申万31行业 + 板块分类
+│   ├── registry.py                   # 策略注册表 (Phase 2.5, 消除硬编码)
+│   ├── db.py                         # DuckDB 抽象层 (:memory: read-only)
+│   ├── results_db.py                 # Parquet 存储 + DuckDB 视图查询
+│   └── store/                        # ★ Parquet 事实存储 (无锁, 多进程安全)
+│       ├── signals/{strategy}.parquet
+│       ├── buffett_scan.parquet
+│       └── scan_meta.parquet
+├── signals/
+│   ├── multifactor.py                # 多因子打分引擎（四维加权）
+│   └── factors.py                    # 因子表达式 DSL (qlib-inspired)
+├── backtest/
+│   ├── run_all_strategies.py         # N策略对比回测运行器
+│   ├── buffett_real_scorer.py        # 真实三重过滤滚动回测评分器
+│   ├── buffett_rolling.py            # PE/PB简化滚动评分器（v1，保留）
+│   ├── rolling.py                    # 滚动窗口 filter_as_of()
+│   ├── analytics.py                  # 15项风险指标 (Sharpe/Sortino/Calmar/α/β)
+│   └── pipeline.py                   # 可插拔回测流水线
+├── broker/__init__.py                # PaperBroker (T+1 + 佣金) + 接口定义
+├── scripts/
+│   └── compute_signals.py            # 日频三策略扫描 (cron 15:30 CST)
+├── web/
+│   ├── api/                          # FastAPI 后端 (6 routes + WebSocket + jobs)
+│   └── frontend/                     # Vue 3 + Pinia + ECharts (8 pages)
+├── wiki/                             # LLM Wiki (15 pages)
+├── docs/tushare-mcp-guide.md
+└── tests/
 ```

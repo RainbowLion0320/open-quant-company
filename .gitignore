@@ -8,7 +8,13 @@ build/
 *.egg
 
 # Data cache (managed by fetcher.py TTL)
-data/cache/*.parquet
+data/cache/
+
+# Node (frontend)
+node_modules/
+
+# Progress files
+.financials_progress.json
 
 # Temporary / scratch
 tmp/
@@ -32,6 +38,10 @@ Thumbs.db
 # Quant-specific
 backtest/results/
 *.html           # backtrader plot outputs
+data/*.pkl       # backtest results (可重新生成)
+data/quant_results.duckdb  # DuckDB 视图缓存
+data/quant_results.db      # 旧 SQLite (已废弃)
+data/store/scan_meta.parquet  # 元数据缓存
 
 # Web
 .streamlit/
