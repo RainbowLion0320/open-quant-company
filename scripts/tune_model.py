@@ -124,7 +124,8 @@ def train_best_model(params: dict = None) -> str:
         "features": list(X.columns),
         "trained_at": pd.Timestamp.now().isoformat(),
     }
-    json.dump(meta, (MODEL_DIR / "lgbm_best_meta.json").open("w"), indent=2)
+    with open(MODEL_DIR / "lgbm_best_meta.json", "w") as f:
+        json.dump(meta, f, indent=2)
 
     return path
 

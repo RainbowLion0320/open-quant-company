@@ -1,0 +1,12 @@
+{
+  "phase30_verify": {
+    "model": "lgbm",
+    "saved_at": "2026-05-14T22:32:45.370493",
+    "file": "lgbm_phase30_verify.pkl"
+  },
+  "best": {
+    "model": "lgbm",
+    "saved_at": "2026-05-14T22:40:12.944824",
+    "file": "lgbm_best.pkl"
+  }
+}

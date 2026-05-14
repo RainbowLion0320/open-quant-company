@@ -74,20 +74,23 @@ class BaseModel:
         meta_path = MODEL_DIR / "registry.json"
         meta = {}
         if meta_path.exists():
-            meta = json.loads(meta_path.open())
+            with open(meta_path) as f:
+                meta = json.load(f)
         meta[version] = {
             "model": self.name,
             "saved_at": datetime.now().isoformat(),
             "file": str(path.name),
         }
-        json.dump(meta, meta_path.open("w"), indent=2)
+        with open(meta_path, "w") as f:
+            json.dump(meta, f, indent=2)
         return str(path)
 
     @classmethod
     def load(cls, version: str) -> "BaseModel":
         meta_path = MODEL_DIR / "registry.json"
         if meta_path.exists():
-            meta = json.loads(meta_path.open())
+            with open(meta_path) as f:
+                meta = json.load(f)
             if version in meta:
                 path = MODEL_DIR / meta[version]["file"]
                 with open(path, "rb") as f:
@@ -98,7 +101,8 @@ class BaseModel:
     def list_versions(cls) -> List[dict]:
         meta_path = MODEL_DIR / "registry.json"
         if meta_path.exists():
-            return json.loads(meta_path.open())
+            with open(meta_path) as f:
+                return json.load(f)
         return {}
 
 

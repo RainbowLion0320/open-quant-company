@@ -1,0 +1,33 @@
+{
+  "ic_in_sample": 0.3408,
+  "n_samples": 18800,
+  "n_features": 20,
+  "params": {
+    "num_leaves": 31,
+    "learning_rate": 0.05,
+    "n_estimators": 200
+  },
+  "features": [
+    "ret_1d",
+    "ret_5d",
+    "ret_10d",
+    "ret_20d",
+    "ret_60d",
+    "ma5_bias",
+    "ma10_bias",
+    "ma20_bias",
+    "ma60_bias",
+    "vol_5d",
+    "vol_20d",
+    "vol_60d",
+    "volume_ratio_5",
+    "volume_ratio_20",
+    "amplitude",
+    "high_low_ratio",
+    "ma5_20_cross",
+    "ma20_60_cross",
+    "rsi_14",
+    "ret_20d_fwd"
+  ],
+  "trained_at": "2026-05-14T22:40:12.945210"
+}
