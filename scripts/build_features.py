@@ -218,3 +218,49 @@ pq_files = sorted(FEATURES_DIR.glob("*.parquet"))
 total_rows = sum(len(pd.read_parquet(pq)) for pq in pq_files)
 print(f"\n完成: {len(pq_files)} 个月, {total_rows} 总行")
 print("✅ 特征构建完成")
+
+
+def rebuild_recent(months: int = 3):
+    """增量重建最近N个月的特征 (用于周度cron, 跳过已存在的)"""
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    recent = [(now - timedelta(days=30 * m)).strftime("%Y-%m") for m in range(months - 1, -1, -1)]
+    for month in recent:
+        pq_path = FEATURES_DIR / f"{month}.parquet"
+        if not pq_path.exists():
+            print(f"  [cron] 重建 {month}...")
+            # Re-run the month-building logic inline (same as main loop)
+            # Use the already-loaded caches
+            month_dt = pd.Timestamp(month + "-01")
+            month_end = month_dt + pd.offsets.MonthEnd(0)
+            rows = []
+            for sym, df in price_cache.items():
+                df_pit = df[df.index <= month_end]
+                if len(df_pit) < 60:
+                    continue
+                idx = len(df_pit) - 1
+                row = {"symbol": sym, "month": month}
+                for fname, factor in factors.items():
+                    val = factor.compute(df_pit, idx)
+                    row[fname] = val if not (isinstance(val, float) and np.isnan(val)) else None
+                fin_df = fin_cache.get(sym)
+                if fin_df is not None:
+                    row.update(_compute_fundamental_factors(fin_df, month_end))
+                daily_df = daily_cache.get(sym)
+                if daily_df is not None:
+                    row.update(_compute_valuation_factors(daily_df, month_end, df_pit, idx))
+                full_idx = df.index.get_indexer([df_pit.index[-1]])[0]
+                fwd_idx = full_idx + 20
+                if full_idx >= 0 and fwd_idx < len(df):
+                    cur = df.iloc[full_idx]["close"]
+                    fwd = df.iloc[fwd_idx]["close"]
+                    row["ret_fwd_20d"] = (fwd / cur - 1) if cur > 0 else None
+                rows.append(row)
+            if rows:
+                result_df = pd.DataFrame(rows)
+                from data.cleaner import DataCleaner
+                cleaner = DataCleaner()
+                result_df, _ = cleaner.clean_features(result_df)
+                result_df = enrich_from_registry(result_df, month, list(price_cache.keys()))
+                result_df.to_parquet(pq_path, index=False)
+                print(f"    {month}: {len(rows)} stocks")

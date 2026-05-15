@@ -70,13 +70,17 @@ AVAILABLE DATA DIMENSIONS (use these in your formulas):
 
 CRITICAL RULE — Cross-Sectional Discrimination:
   • MACRO variables (PMI, SHIBOR, M2, CPI, etc.) are the SAME for ALL stocks on a given date.
-  • A formula like `Delta(MACRO_PMI, 3)` or `(1/PE) * MACRO_SHIBOR_3M` produces identical
-    values for every stock → ZERO cross-sectional IC → AUTOMATIC REJECTION.
-  • TO USE MACRO VARIABLES CORRECTLY: combine with stock-level data to create dispersion.
-    Example: `(stock_net_profit_growth - MACRO_GDP_growth)` creates stock-relative macro adjustment.
-    Example: `close / MA(close,20) * (1 if MACRO_PMI > 50 else -1)` flips sign but keeps dispersion.
-  • MACRO variables applied DIRECTLY to stocks (multiply, divide, add, subtract with no stock-level
-    interaction term) WILL FAIL. Every stock gets the same value — no alpha possible.
+  • ❌ FAILED EXAMPLES (these were REJECTED — do NOT propose anything similar):
+      - `pmi_conditional_value = (1 / val_pe_ttm) * max(Delta(MACRO_PMI, 3), 0)`
+      - `shibor_value_yield = (1 / val_pe_ttm) / MACRO_SHIBOR_3M`
+    These failed because MACRO_PMI and MACRO_SHIBOR_3M are identical for all stocks,
+    so multiplying/dividing them with stock-level PE still produces near-constant values.
+  • ✅ WORKING PATTERNS — macro used as interaction/condition, not direct multiplication:
+      - `stock_growth = Delta(close,60) / close * (1.5 if MACRO_PMI > 50 else 0.5)`
+      - `liquidity_adj = volume / MA(volume,20) / MACRO_SHIBOR_3M`
+    Key insight: macro should MODIFY or CONDITION a stock-level signal, not BE the signal.
+  • RULE OF THUMB: If you remove all stock-level terms from the formula and the remaining
+    expression still produces a number, it's a cross-sectional constant → WILL BE REJECTED.
 
 SUPPORTED FORMULA FUNCTIONS:
   Price: close_t, close_t-N, open_t, high_t, low_t, volume_t
@@ -465,7 +469,7 @@ def run_research_loop(
 
     # Load data symbols
     from data.symbols import CIRCLE_STOCKS
-    symbols = list(CIRCLE_STOCKS)[:200]  # 200 for evaluation speed
+    symbols = list(CIRCLE_STOCKS)[:500]  # 500 for stable OOS IC estimates
 
     all_accepted: List[FactorCandidate] = []
 
@@ -522,6 +526,18 @@ def run_research_loop(
         if not round_accepted:
             print("  ⏹ No factors passed in this round — stopping")
             break
+
+    # Save to scoreboard
+    from data.factor_scoreboard import record as scoreboard_record
+    all_candidates_dicts = []
+    for c in all_accepted:
+        all_candidates_dicts.append({
+            "name": c.name, "formula": c.formula, "ic": c.ic,
+            "ic_std": c.ic_std, "icir": c.icir, "oos_ic": c.oos_ic,
+            "round_num": c.round_num, "passed_oos": True,
+        })
+    if all_candidates_dicts:
+        scoreboard_record(all_candidates_dicts)
 
     # Summary
     print(f"\n{'='*60}")

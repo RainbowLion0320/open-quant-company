@@ -234,11 +234,16 @@ step 4: 判定
 
 ## 技术债务 & 下一步
 
-- [ ] **因子选择**: ICIR 过滤替代简单 |IC| > 0.01 阈值
-- [ ] **多轮迭代**: factor_hypothesis.py → 自动重复 → 收敛停止
-- [ ] **周度再训练**: ML 模型 cron (尚未注册, 待观察 OOS 稳定性)
-- [ ] **Regime 感知 ML**: 按市场状态分模型训练 (bull/bear/sideways)
-- [ ] **特征重要性反馈**: 训练后自动报告 → 提示下一次 LLM 因子假说方向
+- [x] **因子选择**: ICIR 过滤替代简单 |IC| > 0.01 阈值 → v4.2 已实现 IC+ICIR+OOS 三重验证
+- [x] **多轮迭代**: factor_hypothesis.py → 自动重复 → 收敛停止 → --rounds 3 + 早停
+- [x] **特征重要性反馈**: 训练后自动报告 → 提示下一次 LLM 因子假说方向
+- [x] **周度再训练**: ML 模型 cron → job_id a87203cdd2d7 (每周六 6:00 CST)
+- [x] **因子记分板**: `data/factor_scoreboard.py` — Parquet 持久化 IC/ICIR/OOS 历史
+- [x] **OOS 样本不足**: 评估池 200→500 只股票
+- [x] **LLM 提示词横截面常量盲区**: 已加入失败案例 + 正例 + rule-of-thumb
+- [ ] **Regime 感知 ML**: 按市场状态分三模型 (bull/bear/sideways) ← `scripts/train_regime_models.py` 已实现, 待运行验证
+- [ ] **因子淘汰机制**: 记分板满 5 次测试后, ICIR 持续 < 0.1 的因子自动标记 deprecated
+- [ ] **模型版本对比**: 新旧模型 A/B 对比 → 锦标赛自动选择最佳版本
 
 ## See Also
 
