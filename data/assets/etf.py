@@ -143,10 +143,23 @@ class ETFAsset(AssetAdapter):
 
     def fetch_fundamentals(self, symbol: str) -> Dict:
         """Fetch ETF-specific fundamentals: discount/premium, size growth, flows."""
+        # Use global cache to avoid re-downloading 1466 ETFs each call
+        if not hasattr(ETFAsset, '_spot_cache'):
+            try:
+                import akshare as ak
+                import os as _os
+                for k in list(_os.environ.keys()):
+                    if k.lower() in ('http_proxy', 'https_proxy', 'all_proxy'):
+                        del _os.environ[k]
+                _os.environ.setdefault('no_proxy', '*')
+                ETFAsset._spot_cache = ak.fund_etf_spot_em()
+            except Exception:
+                ETFAsset._spot_cache = None
+
+        if ETFAsset._spot_cache is None:
+            return {}
+        df = ETFAsset._spot_cache
         try:
-            import akshare as ak
-            time.sleep(0.3)
-            df = ak.fund_etf_spot_em()
             row = df[df["代码"] == symbol]
             if len(row) == 0:
                 return {}
