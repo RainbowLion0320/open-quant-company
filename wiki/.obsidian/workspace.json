@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "decisions/ai-automation-roadmap.md",
+                "file": "concepts/system-architecture.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "ai-automation-roadmap"
+              "title": "system-architecture"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "decisions/ai-automation-roadmap.md",
+                "file": "concepts/system-architecture.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "ai-automation-roadmap 的反向链接列表"
+              "title": "system-architecture 的反向链接列表"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "decisions/ai-automation-roadmap.md",
+                "file": "concepts/system-architecture.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "ai-automation-roadmap 的出链列表"
+              "title": "system-architecture 的出链列表"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "decisions/ai-automation-roadmap.md",
+                "file": "concepts/system-architecture.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "ai-automation-roadmap 的大纲"
+              "title": "system-architecture 的大纲"
             }
           }
         ]
@@ -185,9 +185,9 @@
   },
   "active": "7aeeae959f8ae78b",
   "lastOpenFiles": [
+    "decisions/ai-automation-roadmap.md",
     "concepts/system-architecture.md",
     "decisions/duckdb-migration.md",
-    "decisions/ai-automation-roadmap.md",
     "decisions/web-architecture.md",
     "comparisons/strategy-evolution.md",
     "comparisons/data-sources.md",
