@@ -60,20 +60,42 @@
 ## 关键文件
 ```
 ~/quant-agent/
-├── config/settings.yaml              # 全局配置（含策略注册表、行业阈值）
-├── buffett/filters.py                # 巴菲特三重过滤器（板块感知）
-├── cybernetics/orchestrator.py       # 控制论协调器（Regime检测+自适应）
+├── config/settings.yaml              # 全局配置（策略注册表+数据注册表+资产注册表）
 ├── data/
+│   ├── assets/                       # ★ 多资产架构 (Phase 4.1)
+│   │   ├── base.py                   # AssetAdapter + AssetRegistry
+│   │   └── stock.py                  # StockAsset (AKShare/Tushare双源)
+│   ├── fetchers/                     # ★ 数据获取器 (Phase 4.1)
+│   │   ├── moneyflow.py              # 资金流向 (AKShare日频 + Tushare月频)
+│   │   ├── holders.py                # 股东户数 + 增减持 (Tushare)
+│   │   └── macro.py                  # 宏观经济7指标 (AKShare)
+│   ├── data_registry.py              # ★ 数据维度注册表 (28维度, config驱动)
 │   ├── fetcher.py                    # AKShare 3源 fallback + parquet 缓存
-│   ├── financials.py                 # 财务数据提取（三层缓存：内存→parquet→API）
-│   ├── symbols.py                    # 1000只股票池 + 申万31行业 + 板块分类
-│   ├── feature_store.py              # ★ Point-in-Time 特征存储
-│   ├── db.py                         # DuckDB 抽象层 (:memory: read-only)
-│   ├── results_db.py                 # Parquet 存储 + DuckDB 视图查询
-│   └── store/                        # ★ Parquet 事实存储 (无锁, 多进程安全)
-│       ├── signals/{strategy}.parquet
-│       ├── features/YYYY-MM.parquet  # ★ PIT 特征 (Phase 3.0)
-│       ├── buffett_scan.parquet
+│   ├── financials.py                 # 财务数据提取（三层缓存）
+│   ├── symbols.py                    # 1000只股票池 + 申万31行业
+│   ├── feature_store.py              # PIT 特征存储
+│   ├── db.py                         # DuckDB :memory: + 多资产视图
+│   ├── results_db.py                 # Parquet 存储 + 查询
+│   └── store/                        # Parquet 事实存储
+│       ├── stock/                    # ★ 股票数据
+│       │   ├── moneyflow/            # 资金流向 (monthly/ + daily/)
+│       │   ├── holders/              # 股东户数
+│       │   ├── holdertrade/          # 股东增减持
+│       │   ├── broker_recommend/     # 券商金股
+│       │   ├── research_report/      # 券商研报
+│       │   ├── share_float/          # 限售解禁
+│       │   ├── repurchase/           # 股票回购
+│       │   ├── signals/              # 策略信号
+│       │   └── features/             # PIT 特征
+│       ├── macro/                    # ★ 宏观经济指标
+│       │   ├── money_supply.parquet
+│       │   ├── pmi.parquet
+│       │   ├── cpi.parquet
+│       │   ├── ppi.parquet
+│       │   ├── gdp.parquet
+│       │   ├── shibor.parquet
+│       │   └── lpr.parquet
+│       ├── signals/                  # 策略信号 (兼容)
 │       └── scan_meta.parquet
 ├── signals/
 │   ├── multifactor.py                # 多因子打分引擎（四维加权）

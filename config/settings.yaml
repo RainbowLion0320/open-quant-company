@@ -239,6 +239,29 @@ signals:
       quality: 0.4
       technical: 0.15
       valuation: 0.3
+# ★ Multi-asset architecture (Phase 4.1)
+# Register all asset types. New types just add entries here.
+# Adapters: data/assets/stock.py, data/assets/fund.py, etc.
+assets:
+  stock:
+    enabled: true
+    label: A股股票
+    universe: CIRCLE_STOCKS  # 1000只
+    features: true
+  # fund:           # future
+  #   enabled: false
+  #   label: 公募基金
+  # futures:        # future
+  #   enabled: false
+  #   label: 期货
+  # crypto:         # future
+  #   enabled: false
+  #   label: 加密货币
+  macro:
+    enabled: true
+    label: 宏观经济
+    features: true
+
 strategies:
   buffett:
     color: '#06b6d4'
@@ -268,3 +291,319 @@ trading:
     enabled: true
     require_confirmation: false
     signal_change_only: true
+
+# ═══════════════════════════════════════════════════════════
+# ★ Data Dimension Registry (Phase 4.1)
+# Single source of truth for ALL data dimensions across ALL asset types.
+# status: available | rate_limited | paid | planned
+# New dimensions: add an entry here + implement a fetcher.
+# ═══════════════════════════════════════════════════════════
+data_registry:
+  # ── Stock: 行情 ──
+  ohlcv_daily:
+    source: akshare
+    asset: stock
+    status: available
+    freq: daily
+    enabled: true
+    label: 日线行情 OHLCV
+    cache: stock/daily/{symbol}.parquet
+    description: 全A股日线, 通过新浪源获取
+
+  adj_factor:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: daily
+    enabled: true
+    label: 复权因子
+    cache: stock/adj_factor/{symbol}.parquet
+
+  # ── Stock: 财务 ──
+  financial_summary:
+    source: akshare
+    asset: stock
+    status: available
+    freq: quarterly
+    enabled: true
+    label: 同花顺财务摘要
+    cache: stock/financials/{symbol}.parquet
+    description: ROE/毛利率/净利率/D-E/净利润
+
+  fina_indicator:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: quarterly
+    enabled: true
+    label: Tushare 财务指标
+    cache: stock/fina_indicator/{symbol}.parquet
+    description: 50+指标 EPS/ROA/ROIC/FCFF/FCFE等
+
+  # ── Stock: 估值 ──
+  valuation_daily:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: daily
+    enabled: true
+    label: 每日估值 PE/PB/PS
+    cache: stock/valuation/{symbol}.parquet
+
+  # ── Stock: 资金流向 (P0) ──
+  moneyflow_monthly:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: monthly
+    enabled: true
+    label: 月频资金流向 (全历史)
+    cache: stock/moneyflow/monthly/{YYYYMMDD}.parquet
+    description: 主力/超大单/大单/中单/小单净流入, 136月全历史
+
+  moneyflow_daily:
+    source: akshare
+    asset: stock
+    status: available
+    freq: daily
+    enabled: true
+    label: 日频资金流向 (近120日)
+    cache: stock/moneyflow/{symbol}.parquet
+    description: 同花顺个股资金流向, 近100交易日
+
+  # ── Stock: 筹码 (P0) ──
+  holder_number:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: quarterly
+    enabled: true
+    label: 股东户数
+    cache: stock/holders/{symbol}.parquet
+    description: 全历史股东户数, 筹码集中度核心指标
+
+  holder_trade:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: event
+    enabled: true
+    label: 股东增减持
+    cache: stock/holdertrade/{symbol}.parquet
+
+  # ── Stock: 市场情绪 ──
+  limit_list:
+    source: tushare_free
+    asset: stock
+    status: rate_limited
+    freq: daily
+    enabled: false
+    label: 涨跌停统计
+    cache: stock/limit_list/{YYYYMMDD}.parquet
+    description: 1次/分钟限流, cron后台拉取
+
+  top_list:
+    source: tushare_free
+    asset: stock
+    status: rate_limited
+    freq: daily
+    enabled: false
+    label: 龙虎榜
+    cache: stock/top_list/{YYYYMMDD}.parquet
+
+  broker_recommend:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: monthly
+    enabled: true
+    label: 券商月度金股
+    cache: stock/broker_recommend/{YYYYMM}.parquet
+
+  research_report:
+    source: tushare_free
+    asset: stock
+    status: rate_limited
+    freq: monthly
+    enabled: false
+    label: 券商研报
+    cache: stock/research_report/{YYYYMM}.parquet
+
+  # ── Stock: 公司事件 ──
+  share_float:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: event
+    enabled: true
+    label: 限售股解禁
+    cache: stock/share_float/all.parquet
+
+  repurchase:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: event
+    enabled: true
+    label: 股票回购
+    cache: stock/repurchase/all.parquet
+
+  dividend:
+    source: tushare_free
+    asset: stock
+    status: planned
+    freq: event
+    enabled: false
+    label: 分红送股
+    cache: stock/dividend/{symbol}.parquet
+
+  # ── Stock: 付费数据 (预留接口) ──
+  cyq_chips:
+    source: tushare_paid
+    asset: stock
+    status: paid
+    freq: daily
+    enabled: false
+    label: 筹码分布 (需5000积分)
+    cache: stock/cyq/{YYYYMMDD}.parquet
+    description: 每日筹码分布, 各价位占比
+
+  stk_factor_pro:
+    source: tushare_paid
+    asset: stock
+    status: paid
+    freq: daily
+    enabled: false
+    label: 技术面因子专业版 (需5000积分)
+    cache: stock/factor_pro/{symbol}.parquet
+    description: MACD/KDJ/RSI/BOLL等全量技术因子
+
+  stk_mins:
+    source: tushare_paid
+    asset: stock
+    status: paid
+    freq: minute
+    enabled: false
+    label: 分钟行情 (需5000积分)
+    cache: stock/mins/{symbol}_{freq}.parquet
+
+  moneyflow_daily_full:
+    source: tushare_paid
+    asset: stock
+    status: paid
+    freq: daily
+    enabled: false
+    label: 日频资金流向全历史 (需5000积分)
+    cache: stock/moneyflow/daily_full/{YYYYMMDD}.parquet
+
+  # ── Macro ──
+  macro_money_supply:
+    source: akshare
+    asset: macro
+    status: available
+    freq: monthly
+    enabled: true
+    label: 货币供应量 M0/M1/M2
+    cache: macro/money_supply.parquet
+
+  macro_pmi:
+    source: akshare
+    asset: macro
+    status: available
+    freq: monthly
+    enabled: true
+    label: 制造业 PMI
+    cache: macro/pmi.parquet
+
+  macro_cpi:
+    source: akshare
+    asset: macro
+    status: available
+    freq: monthly
+    enabled: true
+    label: CPI 居民消费价格
+    cache: macro/cpi.parquet
+
+  macro_ppi:
+    source: akshare
+    asset: macro
+    status: available
+    freq: monthly
+    enabled: true
+    label: PPI 工业品出厂价
+    cache: macro/ppi.parquet
+
+  macro_gdp:
+    source: akshare
+    asset: macro
+    status: available
+    freq: quarterly
+    enabled: true
+    label: 国内生产总值 GDP
+    cache: macro/gdp.parquet
+
+  macro_shibor:
+    source: akshare
+    asset: macro
+    status: available
+    freq: daily
+    enabled: true
+    label: Shibor 利率
+    cache: macro/shibor.parquet
+
+  macro_lpr:
+    source: akshare
+    asset: macro
+    status: available
+    freq: monthly
+    enabled: true
+    label: LPR 贷款基础利率
+    cache: macro/lpr.parquet
+
+  # ── Fund (预留) ──
+  fund_daily:
+    source: tushare_free
+    asset: fund
+    status: planned
+    freq: daily
+    enabled: false
+    label: 基金日线
+    cache: fund/daily/{symbol}.parquet
+
+  fund_portfolio:
+    source: tushare_free
+    asset: fund
+    status: planned
+    freq: quarterly
+    enabled: false
+    label: 基金持仓
+    cache: fund/portfolio/{report_date}.parquet
+
+  fund_nav:
+    source: tushare_free
+    asset: fund
+    status: planned
+    freq: daily
+    enabled: false
+    label: 基金净值
+    cache: fund/nav/{symbol}.parquet
+
+  # ── Futures (预留) ──
+  futures_daily:
+    source: tushare_free
+    asset: futures
+    status: planned
+    freq: daily
+    enabled: false
+    label: 期货日线
+    cache: futures/daily/{symbol}.parquet
+
+  # ── Crypto (预留) ──
+  crypto_daily:
+    source: future
+    asset: crypto
+    status: planned
+    freq: daily
+    enabled: false
+    label: 加密货币日线
+    cache: crypto/daily/{symbol}.parquet

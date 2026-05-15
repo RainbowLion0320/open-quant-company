@@ -211,3 +211,41 @@ Phase 3.0 (ML基础设施) + Phase 3.5 (自动化R&D) + Phase 4.0 (AI Agent) 已
 ### 构建验证
 - Vite build: 610 modules, 0 errors, 1.44s
 - 部署: `rm -f dist/ && npm run build` 替换，Web restart 可见新 UI
+
+## [2026-05-15] expand | 数据维度全面扩展 + 多资产架构 + 注册表体系
+
+### 重大发现: Tushare积分不消耗
+积分是权限门槛, 不按调用次数扣费。2000分可免费访问所有门槛≤2000的API。
+所有数据源切换为免费途径: AKShare (永久免费) + Tushare (2000分门槛内免费)。
+
+### 多资产架构底座
+- `data/assets/base.py`: AssetAdapter ABC + AssetRegistry (统一接口)
+- `data/assets/stock.py`: StockAsset (包装 AKShare + Tushare 双源)
+- `data/db.py`: get_store_dir(asset_type=) + 多资产视图注册
+- `config/settings.yaml`: 新增 assets: [stock, macro] + 预留 fund/futures/crypto
+
+### 数据维度扩展 (15 维度, ~800K 行, 全部免费)
+- Tushare 月频资金流向: 136月 × 4000股 = 540K行
+- Tushare 股东户数: 1000/1000股全历史
+- Tushare 股东增减持: 703/1000股有记录
+- Tushare 券商金股: 17月, 限售解禁6000条, 股票回购2000条
+- AKShare 日频资金流向: 1000股 × 120天
+- AKShare 宏观7指标: M2/PMI/CPI/PPI/GDP/Shibor/LPR 全历史
+
+### 数据维度注册表
+- `data/data_registry.py`: DataRegistry (28维度, 4状态)
+- `config/settings.yaml` → data_registry: 每个维度的 source/asset/status/enabled/cache
+- feature flags: available | rate_limited | paid | planned
+- 付费维度预留: cyq_chips/stk_factor_pro/stk_mins/moneyflow_daily_full (5000分)
+- 多资产预留: fund/futures/crypto (planned)
+
+### Cron 限流数据
+- `scripts/cron_fetch_slow.py`: 涨跌停 + 研报后台拉取
+- Cron job_id=664a3603be57: 每交易日 16:00 CST 执行
+- `scripts/fetch_moneyflow_full.py`: 资金流向全历史下载器
+- `scripts/cache_all_data.py`: 批量预缓存脚本
+
+### 文档同步
+- CLAUDE.md: 更新文件树 (data/assets/, data/fetchers/, data/data_registry.py, store/stock/, store/macro/)
+- config/settings.yaml: 新增 data_registry (28维度) + assets 段
+- 暂未同步 wiki (待 Phase D 完成后统一更新)
