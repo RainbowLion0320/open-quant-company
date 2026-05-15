@@ -71,6 +71,7 @@ class AShareExchange(Exchange):
     """A股交易所 — 含印花税/佣金/过户费/T+1"""
 
     name = "ashare"
+    asset_type = "stock"
 
     def __init__(
         self,
@@ -119,18 +120,75 @@ class AShareExchange(Exchange):
         return True
 
     def apply_cost_rate(self, price: float, side: OrderSide) -> float:
-        """
-        返回价格乘数: buy 时 >1 (加成本), sell 时 <1 (减成本).
-
-        用于简化净值计算。
-        """
+        """返回价格乘数: buy 时 >1 (加成本), sell 时 <1 (减成本)."""
         if side == OrderSide.BUY:
             rate = 1.0 + self.commission + self.transfer_fee
         else:
             rate = 1.0 - self.commission - self.transfer_fee - self.stamp_tax
-        return max(rate, 0.99)  # 保底
+        return max(rate, 0.99)
 
     @property
     def roundtrip_cost_pct(self) -> float:
         """完整双边交易成本百分比"""
         return (self.commission * 2 + self.transfer_fee * 2 + self.stamp_tax) * 100
+
+
+class ETFExchange(Exchange):
+    """ETF交易所 — T+0, 无印花税, 低佣金, 无涨跌停"""
+
+    name = "etf"
+    asset_type = "etf"
+
+    def __init__(
+        self,
+        commission: float = 0.00005,       # 佣金 (双向, 万0.5)
+        min_commission: float = 0.10,       # 最低佣金 (0.1元)
+        lot_size: int = 100,
+    ):
+        self.commission = commission
+        self.min_commission = min_commission
+        self.lot_size = lot_size
+
+    def calc_cost(self, price: float, shares: int, side: OrderSide) -> float:
+        """ETF: 佣金双向, 无印花税, 无过户费"""
+        amount = price * shares
+        return max(amount * self.commission, self.min_commission)
+
+    def can_trade(self, symbol: str) -> bool:
+        return True
+
+    def apply_cost_rate(self, price: float, side: OrderSide) -> float:
+        if side == OrderSide.BUY:
+            return 1.0 + self.commission
+        else:
+            return 1.0 - self.commission
+
+    @property
+    def roundtrip_cost_pct(self) -> float:
+        return self.commission * 2 * 100
+
+
+class MultiAssetExchange:
+    """多资产交易所 — 按 asset_type 分发到对应 Exchange"""
+
+    def __init__(self):
+        self._exchanges: dict = {}
+
+    def register(self, asset_type: str, exchange: Exchange) -> None:
+        self._exchanges[asset_type] = exchange
+
+    def get(self, asset_type: str) -> Exchange:
+        if asset_type not in self._exchanges:
+            raise KeyError(f"No exchange registered for asset type: {asset_type}")
+        return self._exchanges[asset_type]
+
+    def calc_cost(self, asset_type: str, price: float, shares: int, side: OrderSide) -> float:
+        return self.get(asset_type).calc_cost(price, shares, side)
+
+    @property
+    def all_types(self) -> list:
+        return list(self._exchanges.keys())
+
+    def __repr__(self) -> str:
+        types = ", ".join(f"{k}({v.roundtrip_cost_pct:.4f}%)" for k, v in self._exchanges.items())
+        return f"<MultiAssetExchange: {types}>"

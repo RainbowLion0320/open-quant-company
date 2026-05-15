@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "log.md",
+                "file": "concepts/system-architecture.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "log"
+              "title": "system-architecture"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "log.md",
+                "file": "concepts/system-architecture.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "log 的反向链接列表"
+              "title": "system-architecture 的反向链接列表"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "log.md",
+                "file": "concepts/system-architecture.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "log 的出链列表"
+              "title": "system-architecture 的出链列表"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "log.md",
+                "file": "concepts/system-architecture.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "log 的大纲"
+              "title": "system-architecture 的大纲"
             }
           }
         ]
@@ -185,11 +185,12 @@
   },
   "active": "7aeeae959f8ae78b",
   "lastOpenFiles": [
+    "decisions/web-architecture.md",
+    "concepts/system-architecture.md",
+    "log.md",
     "SCHEMA.md",
     "comparisons/data-sources.md",
-    "concepts/system-architecture.md",
     "concepts/multifactor-scoring.md",
-    "decisions/web-architecture.md",
     "concepts/ml-pipeline.md",
     "decisions/ai-automation-roadmap.md",
     "decisions/duckdb-migration.md",

@@ -296,6 +296,12 @@ assets:
     label: A股股票
     universe: CIRCLE_STOCKS  # 1000只
     features: true
+  etf:
+    enabled: true
+    label: ETF基金
+    universe: ETF_UNIVERSE  # ~50只 (宽基/行业/债券/黄金/跨境)
+    features: true
+    adapter: data/assets/etf.py
   # fund:           # future
   #   enabled: false
   #   label: 公募基金
@@ -309,6 +315,25 @@ assets:
     enabled: true
     label: 宏观经济
     features: true
+
+# ★ Asset Allocation (Phase 5.0)
+# Regime → dynamic weights → cross-asset orders
+# broker/allocator.py 从本段加载
+asset_allocation:
+  max_positions_per_asset: 8
+  regime_weights:
+    bull:
+      stock: 0.60
+      etf: 0.30
+      cash: 0.10
+    sideways:
+      stock: 0.35
+      etf: 0.35
+      cash: 0.30
+    bear:
+      stock: 0.15
+      etf: 0.15
+      cash: 0.70
 
 strategies:
   buffett:
