@@ -41,9 +41,6 @@ def init():
 
 def save_buffett_results(results: List[dict]):
     """批量写入巴菲特结果 → Parquet (buffett_scan.parquet, 含财务详情)"""
-    if not results:
-        return
-
     now = _now()
     rows = []
     for r in results:
@@ -64,8 +61,13 @@ def save_buffett_results(results: List[dict]):
             "updated_at": now,
         })
 
-    df = pd.DataFrame(rows)
     pq_path = SIGNALS_DIR / "buffett_scan.parquet"
+    df = pd.DataFrame(rows, columns=[
+        "symbol", "name", "industry", "sector", "verdict", "score",
+        "avg_roe_5y", "avg_gross_margin_5y", "avg_net_margin_5y",
+        "debt_equity_ratio", "safety_margin_pct", "dcf_value",
+        "current_price", "updated_at",
+    ])
     df.to_parquet(pq_path, index=False)
 
     # 元数据
@@ -80,9 +82,6 @@ def save_buffett_results(results: List[dict]):
 
 def save_strategy_signals(strategy: str, signals: List[dict]):
     """批量写入策略信号 → Parquet"""
-    if not signals:
-        return
-
     now = _now()
     rows = []
     for s in signals:
@@ -100,8 +99,11 @@ def save_strategy_signals(strategy: str, signals: List[dict]):
             "computed_at": now,
         })
 
-    df = pd.DataFrame(rows)
     pq_path = SIGNALS_DIR / f"{strategy}.parquet"
+    df = pd.DataFrame(rows, columns=[
+        "strategy", "symbol", "name", "industry", "score",
+        "signal", "detail", "computed_at",
+    ])
     df.to_parquet(pq_path, index=False)
 
     # 元数据
@@ -128,6 +130,7 @@ def load_buffett_results(sort: str = "score", order: str = "desc", limit: int = 
     valid_sorts = {"score", "symbol", "name", "safety_margin_pct", "avg_roe_5y"}
     if sort not in valid_sorts:
         sort = "score"
+    order = "asc" if str(order).lower() == "asc" else "desc"
     sql = f"SELECT * FROM buffett_scan ORDER BY {sort} {order.upper()}"
     if limit:
         sql += f" LIMIT {limit}"
@@ -158,6 +161,7 @@ def load_strategy_signals(strategy: str, sort: str = "score", order: str = "desc
     valid_sorts = {"score", "symbol", "name"}
     if sort not in valid_sorts:
         sort = "score"
+    order = "asc" if str(order).lower() == "asc" else "desc"
     sql = f"SELECT * FROM {view} ORDER BY {sort} {order.upper()}"
     try:
         rows = db.fetchall(sql)

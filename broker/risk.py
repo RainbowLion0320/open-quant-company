@@ -85,7 +85,9 @@ class MaxTotalExposureRule(RiskRule):
 
         total_exposure = portfolio.get("total_exposure", 0)
         total_equity = portfolio.get("total_equity", 1)
-        exposure_pct = total_exposure / total_equity if total_equity > 0 else 0
+        order_amount = context.get("order", {}).get("amount", 0)
+        proposed_exposure = total_exposure + order_amount
+        exposure_pct = proposed_exposure / total_equity if total_equity > 0 else 0
 
         if exposure_pct > limit:
             return RiskCheckResult(

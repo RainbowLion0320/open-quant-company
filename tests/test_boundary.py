@@ -122,13 +122,13 @@ p1 = next((p for p in pos if p.code == '000001'), None)
 check("卖出一半持仓", p1 is not None and p1.volume == 50)
 
 # Overbuy
-broker2 = PaperBroker(initial_cash=1000)
+broker2 = PaperBroker(initial_cash=1000, enable_risk=False)
 oid6 = broker2.submit_order('000001', price=100.00, volume=100, side='buy')
 check("资金不足自动缩量", oid6.startswith("PAPER_") or oid6 == "资金不足")
 
 print(f"\n── 数据库抽象层 (data/db.py) ──")
 
-from data.db import get_db, reset_db
+from data.db import get_db, reset_db, get_store_dir
 from data import results_db
 
 reset_db()
@@ -143,15 +143,26 @@ check("CRUD写入读取", row['name'] == 'test')
 db.execute("DROP TABLE _test")
 
 # Test results_db integration
-results_db.save_buffett_results([{
-    "symbol": "TEST01", "name": "测试股", "industry": "银行", "sector": "bank",
-    "verdict": "通过-护城河", "score": 85.0,
-    "roe": 15.5, "gross_margin": 0, "net_margin": 12.3,
-    "de": 6.5, "safety_margin": 35.2, "dcf_value": 100.0, "current_price": 65.0,
-}])
-meta = results_db.get_buffett_meta()
-check("results_db写入", meta["total"] > 0)
-db.execute("DELETE FROM buffett_scan WHERE symbol='TEST01'")
+sig_dir = get_store_dir() / "signals"
+backup_paths = [sig_dir / "buffett_scan.parquet", get_store_dir() / "scan_meta.parquet"]
+backups = {p: (p.read_bytes() if p.exists() else None) for p in backup_paths}
+try:
+    results_db.save_buffett_results([{
+        "symbol": "TEST01", "name": "测试股", "industry": "银行", "sector": "bank",
+        "verdict": "通过-护城河", "score": 85.0,
+        "roe": 15.5, "gross_margin": 0, "net_margin": 12.3,
+        "de": 6.5, "safety_margin": 35.2, "dcf_value": 100.0, "current_price": 65.0,
+    }])
+    meta = results_db.get_buffett_meta()
+    check("results_db写入", meta["total"] > 0)
+finally:
+    for p, data in backups.items():
+        if data is None:
+            p.unlink(missing_ok=True)
+        else:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(data)
+    reset_db()
 
 db.close()
 reset_db()

@@ -93,9 +93,11 @@ def run_backtest(name, pool, prices, bench_close, score_fn, start, end, cash=1_0
     total_days = len(prices)
     rebal_count = 0
     rebal_indicator = getattr(score_fn, "rebal_indicator", lambda dt: ".")  # 显示调仓节奏
+    daily_values = []
     
     for day_idx in range(total_days):
         dt = prices.index[day_idx]
+        current_price = prices.iloc[day_idx]
 
         # ── 进度 ──
         if total_days >= 200 and day_idx % (total_days // 10) == 0:
@@ -122,7 +124,6 @@ def run_backtest(name, pool, prices, bench_close, score_fn, start, end, cash=1_0
 
             # ── 评分 ──
             scores = {}
-            current_price = prices.iloc[day_idx]
             pool_total = len(pool)
             for pi, sym in enumerate(pool):
                 if pool_total >= 500 and pi % (pool_total // 5) == 0:
@@ -165,14 +166,13 @@ def run_backtest(name, pool, prices, bench_close, score_fn, start, end, cash=1_0
                                 portfolio_value -= cost
                                 trade_log.append((dt, "BUY", sym, shares, p))
 
-    # ── 日度净值 ──
-    daily_values = []
-    for day_idx in range(len(prices)):
-        dt = prices.index[day_idx]
+        # ── 日度净值: 必须用当日现金和当日持仓，不能用最终持仓回填历史。
         mv = 0
         for sym, shares in holdings.items():
-            if sym in prices.columns and not pd.isna(prices[sym].iloc[day_idx]):
-                mv += shares * prices[sym].iloc[day_idx]
+            if sym in prices.columns:
+                known = prices[sym].iloc[: day_idx + 1].dropna()
+                if len(known):
+                    mv += shares * known.iloc[-1]
         daily_values.append((dt, portfolio_value + mv))
 
     vdf = pd.DataFrame(daily_values, columns=["date", "value"]).set_index("date")

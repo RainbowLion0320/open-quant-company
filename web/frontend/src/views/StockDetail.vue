@@ -38,8 +38,8 @@
             <div class="text-lg font-mono mt-1" style="color:var(--text-secondary)">{{ (stock.buffett.gross_margin * 100).toFixed(1) }}%</div>
           </div>
           <div class="text-center p-3 rounded-lg" style="background:var(--bg-deep)">
-            <div class="text-[10px] mb-1" style="color:var(--text-disabled)">资产负债率</div>
-            <div class="text-lg font-mono mt-1" style="color:var(--text-secondary)">{{ (stock.buffett.debt_equity * 100).toFixed(1) }}%</div>
+            <div class="text-[10px] mb-1" style="color:var(--text-disabled)">产权比率</div>
+            <div class="text-lg font-mono mt-1" style="color:var(--text-secondary)">{{ stock.buffett.debt_equity.toFixed(2) }}</div>
           </div>
         </div>
         <div v-if="stock.buffett.dcf_value" class="mt-4 p-3 rounded-lg" style="background:var(--bg-deep)">

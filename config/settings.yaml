@@ -234,7 +234,7 @@ data:
     shenzhen: sz399001
   provider: akshare
   tushare:
-    token: REDACTED
+    token: ''
 project:
   name: quant-agent
   phase: 1

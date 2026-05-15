@@ -50,13 +50,13 @@ class Factor(ABC):
         """
         计算因子在 idx 处的值。
 
-        自动缓存 + 前视防护: 只使用 df[:idx+1] 的数据。
+        前视防护: 只使用 df[:idx+1] 的数据。
+
+        注意：同一个 Factor 对象会在多只股票、多个 DataFrame 上复用。
+        旧实现只按 idx 缓存，导致不同股票在相同 idx 上串值，污染特征和 ML 信号。
+        因子计算本身很轻，这里优先保证正确性，不做跨调用缓存。
         """
-        if idx in self._cache:
-            return self._cache[idx]
-        val = self._compute(df, idx)
-        self._cache[idx] = val
-        return val
+        return self._compute(df, idx)
 
     @abstractmethod
     def _compute(self, df: pd.DataFrame, idx: int) -> float:

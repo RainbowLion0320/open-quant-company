@@ -25,7 +25,17 @@ def create_app() -> FastAPI:
         description="A-share quantitative trading platform — Buffett + Cybernetics",
     )
 
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:8501",
+            "http://127.0.0.1:8501",
+        ],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     app.include_router(market.router)
     app.include_router(strategies.router)

@@ -193,7 +193,7 @@ class LightGBMRegressor(BaseModel):
 
 def prepare_xy(
     features_df: pd.DataFrame,
-    target_col: str = "ret_20d_fwd",
+    target_col: str = "ret_fwd_20d",
     skip_cols: List[str] = None,
 ) -> Tuple[pd.DataFrame, pd.Series]:
     """

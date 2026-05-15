@@ -22,8 +22,8 @@ def create_buffett_real_scorer(pool):
     每个回测月: 确定当年年份 → 用当年之前5年的年报数据跑 buffett_filter()
     结果按年缓存，同年各月共用
     """
-    # 按年缓存的过滤结果: {year: {symbol: score}}
-    yearly_results = {}
+    # 按年缓存的 PIT 财务输入: {year: {symbol: inputs}}
+    yearly_inputs = {}
 
     def scorer(sym, series, idx, regime):
         # 确定回测月所属年份
@@ -31,11 +31,25 @@ def create_buffett_real_scorer(pool):
         year = month_dt.year
 
         # 年缓存查找
-        if year not in yearly_results:
+        if year not in yearly_inputs:
             _build_year_cache(year, pool)
 
-        year_cache = yearly_results.get(year, {})
-        return year_cache.get(sym, 0)
+        year_cache = yearly_inputs.get(year, {})
+        inputs = year_cache.get(sym)
+        if not inputs:
+            return 0
+
+        from buffett.filters import buffett_filter, Verdict
+
+        try:
+            current_price = float(series.iloc[idx])
+        except Exception:
+            current_price = 0.0
+        if current_price <= 0:
+            return 0
+
+        result = buffett_filter(current_price=current_price, **inputs)
+        return result.score if result.verdict == Verdict.PASS else 0
 
     def _build_year_cache(year, stock_pool):
         """构建某一年的巴菲特过滤结果"""
@@ -43,9 +57,10 @@ def create_buffett_real_scorer(pool):
             get_financial_summary, extract_roe_history,
             extract_gross_margin_history, extract_net_margin_history,
             extract_debt_equity_ratio, extract_latest_net_profit,
+            _estimate_growth,
         )
+        from data.fetcher import get_stock_daily
         from data.symbols import SYMBOL_NAME, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
-        from buffett.filters import buffett_filter, Verdict
 
         result = {}
         cutoff = pd.Timestamp(f"{year - 1}-12-31")
@@ -70,6 +85,7 @@ def create_buffett_real_scorer(pool):
                 nm = extract_net_margin_history(historical)
                 debt = extract_debt_equity_ratio(historical)
                 net_profit = extract_latest_net_profit(historical)
+                growth = _estimate_growth(historical)
 
                 if not roe or len(roe) < 5:
                     continue
@@ -78,23 +94,38 @@ def create_buffett_real_scorer(pool):
                 industry = SYMBOL_INDUSTRY.get(sym, "待分类")
                 sector = SYMBOL_SECTOR.get(sym, FALLBACK_SECTOR)
 
-                filter_result = buffett_filter(
-                    symbol=sym, name=name, industry=industry, sector=sector,
-                    fcf=net_profit * 0.7, roe_history=roe,
-                    gross_margin_history=gm, net_margin_history=nm,
-                    debt_equity=debt, current_price=0,
-                )
+                shares = 0.0
+                try:
+                    price_df = get_stock_daily(sym)
+                    price_df["date"] = pd.to_datetime(price_df["date"])
+                    price_df = price_df[price_df["date"] <= cutoff]
+                    if len(price_df) > 0 and "outstanding_share" in price_df.columns:
+                        shares = float(price_df.iloc[-1]["outstanding_share"]) / 1e8
+                except Exception:
+                    pass
 
-                if filter_result.verdict == Verdict.PASS:
-                    result[sym] = filter_result.score
-                # 不通过的不加入 (score = 0)
+                result[sym] = {
+                    "symbol": sym,
+                    "name": name,
+                    "industry": industry,
+                    "sector": sector,
+                    "fcf": net_profit * 0.7,
+                    "growth_rate": growth,
+                    "shares_outstanding": max(shares, 0.1),
+                    "roe_history": roe,
+                    "gross_margin_history": gm,
+                    "net_margin_history": nm,
+                    "debt_equity": debt,
+                }
             except Exception:
                 pass
 
-        yearly_results[year] = result
+        yearly_inputs[year] = result
         if result:
-            print(f"  巴菲特 {year}年: {len(result)} 只通过 (数据截止{year-1}年报)")
+            print(f"  巴菲特 {year}年: {len(result)} 只具备PIT财务输入 (数据截止{year-1}年报)")
 
+    scorer._build_year_cache = _build_year_cache
+    scorer.yearly_inputs = yearly_inputs
     return scorer
 
 
@@ -127,4 +158,4 @@ if __name__ == "__main__":
 
     # 手动触发 2016 年缓存构建
     scorer._build_year_cache(2016, pool)
-    print(f"  2016 年结果: {scorer.yearly_results.get(2016, {})}")
+    print(f"  2016 年结果: {scorer.yearly_inputs.get(2016, {})}")

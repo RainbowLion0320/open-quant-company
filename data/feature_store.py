@@ -262,11 +262,14 @@ def enrich_from_registry(
             pass
 
     # ── Macro factors ──
-    if reg.get("macro_pmi") and reg.get("macro_pmi").is_available:
+    macro_sources = [("pmi", "今值"), ("money_supply", "M2_yoy"), ("shibor", "3M-定价"), ("cpi", "今值")]
+    if any((reg.get(f"macro_{name}") and reg.get(f"macro_{name}").is_available) for name, _ in macro_sources):
         try:
             macro_dir = get_store_dir("macro")
-            for name, col_map in [("pmi", "今值"), ("money_supply", "M2_yoy"),
-                                   ("shibor", "3M-定价"), ("cpi", "今值")]:
+            for name, col_map in macro_sources:
+                dim = reg.get(f"macro_{name}")
+                if dim is not None and not dim.is_available:
+                    continue
                 mf_path = macro_dir / f"{name}.parquet"
                 if not mf_path.exists():
                     continue

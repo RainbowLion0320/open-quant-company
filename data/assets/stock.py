@@ -7,13 +7,14 @@ into the uniform AssetAdapter interface.
 All data fetched from AKShare + Tushare MCP, cached in Parquet.
 """
 from typing import Dict, List, Optional
-from pathlib import Path
 
 import pandas as pd
 
 from data.assets.base import AssetAdapter
 from data.fetcher import get_stock_daily
+from data.financials import _parse_pct, _parse_financial_number
 from data.symbols import CIRCLE_STOCKS, SYMBOL_NAME, SYMBOL_INDUSTRY, SYMBOL_SECTOR
+from data.tushare_utils import get_tushare_token
 
 
 class StockAsset(AssetAdapter):
@@ -53,24 +54,20 @@ class StockAsset(AssetAdapter):
             return {}
         latest = df.iloc[-1]
         return {
-            "roe": float(latest.get("净资产收益率", 0) or 0),
-            "gross_margin": float(latest.get("销售毛利率", 0) or 0),
-            "net_margin": float(latest.get("销售净利率", 0) or 0),
-            "debt_equity": float(latest.get("产权比率", 0) or 0),
-            "net_profit": float(latest.get("净利润", 0) or 0),
-            "revenue": float(latest.get("营业总收入", 0) or 0),
+            "roe": _parse_pct(latest.get("净资产收益率", 0)),
+            "gross_margin": _parse_pct(latest.get("销售毛利率", 0)),
+            "net_margin": _parse_pct(latest.get("销售净利率", 0)),
+            "debt_equity": _parse_pct(latest.get("产权比率", 0)),
+            "net_profit": _parse_financial_number(str(latest.get("净利润", 0))),
+            "revenue": _parse_financial_number(str(latest.get("营业总收入", 0))),
         }
 
     def fetch_valuation(self, symbol: str, date: Optional[str] = None) -> Dict:
         """Fetch PE/PB/PS/market cap via Tushare daily_basic."""
         import time
-        import yaml
         import tushare as ts
 
-        cfg_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
-        with open(cfg_path) as f:
-            cfg = yaml.safe_load(f)
-        token = cfg.get("data", {}).get("tushare", {}).get("token", "")
+        token = get_tushare_token()
         if not token:
             return {}
 

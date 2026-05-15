@@ -21,11 +21,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install akshare pandas pyarrow backtrader pyyaml requests plotly
+          pip install akshare pandas numpy pyarrow duckdb pyyaml requests fastapi uvicorn scipy scikit-learn lightgbm tushare
 
-      - name: Run Buffett scan
+      - name: Run strategy scan
         env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           WECHAT_WEBHOOK_URL: ${{ secrets.WECHAT_WEBHOOK_URL }}
-        run: python scripts/scan_all.py
+        run: python scripts/compute_signals.py

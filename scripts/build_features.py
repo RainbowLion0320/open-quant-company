@@ -67,16 +67,8 @@ daily_cache = {}
 print(f"\n[3/4] 加载日频指标 PE/PB (Tushare daily_basic)...")
 try:
     import tushare as _ts
-    import yaml
-    # 从配置文件读取 token
-    cfg_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
-    token = ""
-    try:
-        with open(cfg_path) as f:
-            cfg = yaml.safe_load(f)
-            token = cfg.get("data", {}).get("tushare", {}).get("token", "")
-    except Exception:
-        pass
+    from data.tushare_utils import get_tushare_token
+    token = get_tushare_token()
     ts_api = _ts.pro_api(token) if token else None
     if ts_api is None:
         raise RuntimeError("No Tushare token")
@@ -200,10 +192,13 @@ for mi, month_dt in enumerate(months):
             row.update(_compute_valuation_factors(daily_df, month_end, df_pit, idx))
 
         # ── 前向标签 ──
-        fut = df[df.index <= month_end + pd.Timedelta(days=35)]
-        if len(fut) > idx:
-            cur = df.iloc[idx]["close"]
-            fwd = fut.iloc[-1]["close"]
+        # 严格使用 20 个交易日后的收盘价；旧逻辑使用 35 个自然日内最后一条，
+        # 会让目标期限随节假日和停牌漂移。
+        full_idx = df.index.get_indexer([df_pit.index[-1]])[0]
+        fwd_idx = full_idx + 20
+        if full_idx >= 0 and fwd_idx < len(df):
+            cur = df.iloc[full_idx]["close"]
+            fwd = df.iloc[fwd_idx]["close"]
             row["ret_fwd_20d"] = (fwd / cur - 1) if cur > 0 else None
         rows.append(row)
 

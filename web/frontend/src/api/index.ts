@@ -69,11 +69,14 @@ export interface MarketResponse {
 }
 
 export interface StrategySignal {
+  strategy?: string;
   symbol: string;
   name: string;
   industry: string;
   score: number;
   signal: "buy" | "hold";
+  detail?: any;
+  computed_at?: string;
 }
 
 export interface StrategyInfo {
@@ -138,10 +141,11 @@ export interface PortfolioBalance {
 }
 
 export interface StockDetail {
-  basic: { symbol: string; name: string; industry: string; area: string; market: string };
-  buffet?: { score: number; roe: number; gross_margin: number; debt_equity: number; dcf_value: number };
+  basic: { symbol: string; name: string; industry: string; sector: string; area: string; market: string };
+  buffett?: { score: number; roe: number; gross_margin: number; debt_equity: number; dcf_value: number };
   kline?: KlinePoint[];
   signals?: Record<string, StrategySignal[]>;
+  financials?: any[];
 }
 
 export interface SignalChange {
@@ -151,6 +155,13 @@ export interface SignalChange {
   name: string;
   old_signal: string;
   new_signal: string;
+}
+
+function pct(v: unknown): number | undefined {
+  if (v == null) return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.abs(n) > 1 ? n / 100 : n;
 }
 
 // ═══════════════════════════════════════
@@ -172,18 +183,82 @@ export const api = {
   backtestDetail: (key: string) => get<BacktestDetail>(`/api/backtest/${key}`),
 
   // Portfolio
-  portfolioPositions: () => get<PortfolioPosition[]>("/api/portfolio/positions"),
-  portfolioBalance: () => get<PortfolioBalance>("/api/portfolio/balance"),
+  portfolioPositions: async () => {
+    const data = await get<{ positions: any[] }>("/api/portfolio/positions");
+    return (data.positions || []).map((p) => ({
+      symbol: p.code,
+      name: p.name,
+      shares: p.volume,
+      cost: p.avg_cost,
+      price: p.current_price,
+      pnl: p.pnl,
+      pnl_pct: (p.pnl_pct || 0) / 100,
+    })) as PortfolioPosition[];
+  },
+  portfolioBalance: async () => {
+    const data = await get<any>("/api/portfolio/balance");
+    const initial = 1_000_000;
+    const total = Number(data.total_asset || 0);
+    const pnl = total - initial;
+    return {
+      cash: Number(data.cash || 0),
+      total_value: total,
+      total_pnl: pnl,
+      total_pnl_pct: initial > 0 ? pnl / initial : 0,
+    } as PortfolioBalance;
+  },
   portfolioOrder: (order: { symbol: string; side: "buy" | "sell"; shares: number; price?: number }) =>
-    post<any>("/api/portfolio/order", order),
+    post<any>("/api/portfolio/order", {
+      code: order.symbol,
+      side: order.side,
+      volume: order.shares,
+      price: order.price ?? 0,
+    }),
 
   // Stocks
-  stock: (code: string) => get<StockDetail>(`/api/stocks/${code}`),
+  stock: async (code: string) => {
+    const data = await get<any>(`/api/stocks/${code}`);
+    const br = data.buffett_result || null;
+    const grouped: Record<string, StrategySignal[]> = {};
+    for (const sig of data.signals || []) {
+      const key = sig.strategy || "strategy";
+      (grouped[key] ||= []).push(sig);
+    }
+    return {
+      ...data,
+      basic: {
+        ...data.basic,
+        area: data.basic?.area || "",
+        market: data.basic?.market || "",
+      },
+      buffett: br ? {
+        score: Number(br.score || 0),
+        roe: pct(br.avg_roe_5y) ?? 0,
+        gross_margin: pct(br.avg_gross_margin_5y) ?? pct(br.avg_net_margin_5y) ?? 0,
+        debt_equity: Number(br.debt_equity_ratio || 0),
+        dcf_value: Number(br.dcf_value || 0),
+      } : undefined,
+      signals: grouped,
+    } as StockDetail;
+  },
 
   // Signals
-  signalChanges: (days = 7) => get<SignalChange[]>(`/api/signals/changes?days=${days}`),
+  signalChanges: async (days = 7) => {
+    const data = await get<any>(`/api/signals/changes?days=${days}`);
+    return (data.changes || []).map((c: any) => ({
+      date: c.date,
+      strategy: c.strategy,
+      symbol: c.symbol,
+      name: c.name,
+      old_signal: c.from_signal,
+      new_signal: c.to_signal,
+    })) as SignalChange[];
+  },
 
   // Settings
-  settings: () => get<Record<string, any>>("/api/settings"),
+  settings: async () => {
+    const data = await get<any>("/api/settings");
+    return data.config || {};
+  },
   saveSettings: (data: Record<string, any>) => put<Record<string, any>>("/api/settings", data),
 };

@@ -10,7 +10,7 @@ Cron: 后台拉取限流数据
   python scripts/cron_fetch_slow.py
   # 或通过 Hermes cronjob 定时执行
 """
-import sys, time, yaml
+import sys, time
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -22,10 +22,8 @@ from data.db import get_store_dir
 
 
 def get_token() -> str:
-    cfg_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
-    with open(cfg_path) as f:
-        cfg = yaml.safe_load(f)
-    return cfg.get("data", {}).get("tushare", {}).get("token", "")
+    from data.tushare_utils import get_tushare_token
+    return get_tushare_token()
 
 
 def fetch_limit_list():

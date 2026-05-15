@@ -184,6 +184,12 @@ class PaperBroker(Broker):
         )
 
     def submit_order(self, code: str, price: float, volume: int, side: str) -> str:
+        # 成交价确定。市价单必须先解析出价格，否则风控无法按真实订单金额预检。
+        if price <= 0:
+            price = self._prices.get(code, 0)
+            if price <= 0:
+                return f"无行情: {code}"
+
         # ★ Risk pre-check (Phase 4.3)
         if self._risk_mgr and side == "buy":
             balance = self.get_balance()
@@ -212,12 +218,6 @@ class PaperBroker(Broker):
                 volume = available
                 if volume <= 0:
                     return f"T+1限制: {code} 当日买入不可卖出"
-
-        # 成交价确定
-        if price <= 0:
-            price = self._prices.get(code, 0)  # 市价
-            if price <= 0:
-                return f"无行情: {code}"
 
         order_id = self._next_order_id()
         order = Order(

@@ -39,6 +39,18 @@ from data.results_db import (
 from signals.ml_signals import compute_ml_signals as compute_ml
 
 
+def _get_latest_price(symbol: str) -> float:
+    """Return latest cached/refreshed close price, or 0 when unavailable."""
+    try:
+        from data.fetcher import get_stock_daily
+        df = get_stock_daily(symbol)
+        if df is None or len(df) == 0:
+            return 0.0
+        return float(df.sort_values("date").iloc[-1]["close"])
+    except Exception:
+        return 0.0
+
+
 def compute_buffett(limit: int = 0) -> list[dict]:
     """运行巴菲特全量扫描，返回结果列表"""
     from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR, SYMBOL_NAME
@@ -56,8 +68,8 @@ def compute_buffett(limit: int = 0) -> list[dict]:
     for i, sym in enumerate(symbols):
         try:
             ind = SYMBOL_INDUSTRY.get(sym, "待分类")
-            sec = SYMBOL_SECTOR.get(sym, FALLBACK_SECTOR)
-            inputs = get_buffett_inputs(sym, current_price=0, industry=ind)
+            price = _get_latest_price(sym)
+            inputs = get_buffett_inputs(sym, current_price=price, industry=ind)
             if not inputs or not inputs.get("roe_history"):
                 continue
 
@@ -77,7 +89,7 @@ def compute_buffett(limit: int = 0) -> list[dict]:
                 "de": round(r.debt_equity_ratio, 1),
                 "safety_margin": round(r.safety_margin_pct * 100, 1),
                 "dcf_value": round(r.dcf_value, 1),
-                "current_price": 0,
+                "current_price": round(price, 2),
             })
 
             if passed_flag:
@@ -98,6 +110,7 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
     from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_NAME
     from signals.multifactor import MultiFactorScorer
     from cybernetics.orchestrator import QuantOrchestrator
+    from buffett.filters import buffett_filter as bf
 
     # 先检测市场状态
     orch = QuantOrchestrator()
@@ -123,14 +136,16 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
 
             # 简单多因子：基于巴菲特评分 + 行业 + regime
             from data.financials import get_buffett_inputs
-            inputs = get_buffett_inputs(sym, current_price=0, industry=ind)
+            price = _get_latest_price(sym)
+            inputs = get_buffett_inputs(sym, current_price=price, industry=ind)
             if not inputs:
                 continue
+            br = bf(symbol=sym, name=name, **inputs)
 
             tech = _get_technical_factors(sym)
             factors = {
-                "buffett_score": _estimate_buffett_score(inputs),
-                "safety_margin": max(0, inputs.get("safety_margin_pct", 0) / 100),
+                "buffett_score": br.score if br.score > 0 else _estimate_buffett_score(inputs),
+                "safety_margin": max(0, br.safety_margin_pct),
                 "roe_5y": (sum(inputs.get("roe_history", [0])[-5:]) / max(1, len(inputs.get("roe_history", [0])[-5:]))) if inputs.get("roe_history") else 0,
                 "roe_trend": _roe_trend(inputs.get("roe_history", [])),
                 "momentum_1m": tech["momentum_1m"],

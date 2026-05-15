@@ -89,6 +89,7 @@ async def get_stock_detail(code: str):
                         except Exception:
                             pass
                     signals.append(StrategySignal(
+                        strategy=strategy_name,
                         symbol=sg["symbol"],
                         name=sg.get("name", name),
                         industry=sg.get("industry", industry),
@@ -169,6 +170,8 @@ async def compute_dcf(
 
     if g >= r:
         g = r * 0.9  # 增长率不可超过折现率
+    if tg >= r:
+        tg = r * 0.5  # 永续增长率必须低于折现率
 
     # 第一阶段: 5年高速增长
     stage1_pv = 0

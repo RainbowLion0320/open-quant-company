@@ -152,8 +152,14 @@ class OutlierDetectionRule(CleanRule):
                 df.loc[mask_lower, "close"] = df.loc[mask_lower, "close"].shift(1) * (1 + lower)
                 capped += n
 
-        # 单日涨跌幅超过 max_change（非涨跌停，可能是数据错误）
-        mask_big = (df["_ret"].abs() > max_change) & (df["_ret"].abs() < 0.095)
+        # 单日涨跌幅超过 max_change；保留常见涨跌停幅度附近的真实行情。
+        abs_ret = df["_ret"].abs()
+        limit_like = (
+            abs_ret.between(0.095, 0.105)
+            | abs_ret.between(0.195, 0.205)
+            | abs_ret.between(0.295, 0.305)
+        )
+        mask_big = (abs_ret > max_change) & ~limit_like
         if mask_big.any():
             n = mask_big.sum()
             df.loc[mask_big, "close"] = df.loc[mask_big, "close"].shift(1)
@@ -220,9 +226,10 @@ class MissingValueRule(CleanRule):
         for col in ["open", "high", "low", "close", "volume"]:
             if col not in df.columns:
                 continue
+            before_na = df[col].isna().sum()
             # 前向填充 (最多 max_ffill 天)
             df[col] = df[col].ffill(limit=max_ffill)
-            filled += df[col].isna().sum()  # count before fill
+            filled += max(0, before_na - df[col].isna().sum())
 
         # 仍有 NA 的行 → 丢弃
         before = len(df)
@@ -347,9 +354,6 @@ class DataCleaner:
                              "suspended_detection", "missing_value"):
                 self._ohlcv_rules.append(rule)
             if rule_name in ("financial_validation", "winsorize"):
-                self._feature_rules.append(rule)
-            # outlier_detection 也可用于特征
-            if rule_name == "winsorize":
                 self._feature_rules.append(rule)
 
     def clean_ohlcv(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, CleanReport]:

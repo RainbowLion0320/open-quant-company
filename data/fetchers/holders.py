@@ -20,11 +20,8 @@ from data.assets.stock import _to_ts_code
 
 
 def get_token() -> str:
-    import yaml
-    cfg_path = Path(__file__).resolve().parent.parent.parent / "config" / "settings.yaml"
-    with open(cfg_path) as f:
-        cfg = yaml.safe_load(f)
-    return cfg.get("data", {}).get("tushare", {}).get("token", "")
+    from data.tushare_utils import get_tushare_token
+    return get_tushare_token()
 
 
 class HolderFetcher:

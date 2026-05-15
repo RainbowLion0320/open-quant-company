@@ -36,6 +36,7 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
 
     model = None
     feature_names = []
+    meta = {}
     if model_path.exists():
         with open(model_path, "rb") as f:
             model = pickle.load(f)
@@ -43,6 +44,8 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
         with open(meta_path) as f:
             meta = json.load(f)
             feature_names = meta.get("features", [])
+    if not feature_names:
+        feature_names = list(getattr(model, "_feature_names", []) or [])
 
     if model is None:
         print("[ML] ⚠️ 模型未训练, 跳过")
@@ -63,8 +66,25 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
         print("[ML] ⚠️ 无 PIT 特征文件, 请先运行 build_features.py")
         return []
 
-    latest_month = pq_files[-1].stem
+    latest_feature_path = pq_files[-1]
+    latest_month = latest_feature_path.stem
     print(f"[ML] 使用特征: {latest_month}")
+    try:
+        feature_df = pd.read_parquet(latest_feature_path)
+    except Exception as e:
+        print(f"[ML] ⚠️ 特征文件读取失败: {e}")
+        return []
+    if "symbol" not in feature_df.columns:
+        print("[ML] ⚠️ 特征文件缺少 symbol 列")
+        return []
+
+    feature_df = feature_df.drop_duplicates("symbol", keep="last").set_index("symbol")
+    skip_cols = {"symbol", "date", "month", "name", "ret_fwd_20d", "ts_code"}
+    if not feature_names:
+        feature_names = [
+            c for c in feature_df.columns
+            if c not in skip_cols and pd.api.types.is_numeric_dtype(feature_df[c])
+        ]
 
     # 4. 对每只股票生成预测
     factors = alpha_factors()
@@ -73,20 +93,29 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
 
     for i, sym in enumerate(symbols):
         try:
-            df = get_stock_daily(sym)
-            if df is None or len(df) < 60:
-                continue
-            df["date"] = pd.to_datetime(df["date"])
-            df = df.set_index("date").sort_index()
-            idx = len(df) - 1
-
-            # 计算因子
             features = {}
-            for name, factor in factors.items():
-                if feature_names and name not in feature_names:
+            if sym in feature_df.index:
+                row = feature_df.loc[sym]
+                for name in feature_names:
+                    val = row.get(name, 0.0)
+                    try:
+                        num = float(val)
+                    except (TypeError, ValueError):
+                        num = 0.0
+                    features[name] = num if np.isfinite(num) else 0.0
+            else:
+                df = get_stock_daily(sym)
+                if df is None or len(df) < 60:
                     continue
-                val = factor.compute(df, idx)
-                features[name] = val if not (isinstance(val, float) and np.isnan(val)) else 0.0
+                df["date"] = pd.to_datetime(df["date"])
+                df = df.set_index("date").sort_index()
+                idx = len(df) - 1
+
+                for name, factor in factors.items():
+                    if feature_names and name not in feature_names:
+                        continue
+                    val = factor.compute(df, idx)
+                    features[name] = val if not (isinstance(val, float) and np.isnan(val)) else 0.0
 
             # 预测
             X = pd.DataFrame([features])

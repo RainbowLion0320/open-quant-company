@@ -38,6 +38,7 @@ class StrategyInfo(BaseModel):
     last_computed: str = ""
 
 class StrategySignal(BaseModel):
+    strategy: str = ""
     symbol: str
     name: str
     industry: str = ""

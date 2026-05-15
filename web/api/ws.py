@@ -23,10 +23,24 @@ async def ws_endpoint(websocket: WebSocket, job_id: str = None):
 
     try:
         while True:
-            # 保持连接，等待客户端消息 (用于心跳)
-            data = await websocket.receive_text()
-            if data == "ping":
-                await websocket.send_text("pong")
+            # 轮询任务状态并推送，避免后台线程跨 event loop 调 broadcast。
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                if data == "ping":
+                    await websocket.send_text("pong")
+            except asyncio.TimeoutError:
+                if job_id:
+                    from web.api.jobs import get_job
+                    job = get_job(job_id)
+                    if job:
+                        await websocket.send_text(json.dumps({
+                            "job_id": job_id,
+                            "status": job.get("status"),
+                            "progress": job.get("progress", 0),
+                            "message": job.get("message", ""),
+                        }))
+                        if job.get("status") in ("done", "error"):
+                            break
     except WebSocketDisconnect:
         pass
     finally:

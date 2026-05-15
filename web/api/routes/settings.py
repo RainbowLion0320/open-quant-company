@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/settings", tags=["Settings"])
 def _config_path() -> str:
     """获取 config/settings.yaml 的绝对路径"""
     return os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
         "config", "settings.yaml",
     )
 

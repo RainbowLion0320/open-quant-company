@@ -61,16 +61,21 @@ export const useStrategyStore = defineStore("strategy", () => {
     jobId.value = data.job_id;
 
     // WebSocket 监听进度
-    const ws = new WebSocket(`ws://localhost:8501/ws/strategies/${data.job_id}`);
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/strategies/ws/${data.job_id}`);
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
-      progress.value = msg.progress;
-      progressMsg.value = msg.message;
-      if (msg.progress >= 100) {
+      progress.value = msg.progress ?? progress.value;
+      progressMsg.value = msg.message || "";
+      if (msg.status === "done" || msg.status === "error" || progress.value >= 100) {
         ws.close();
         running.value = false;
         fetchList();
       }
+    };
+    ws.onerror = () => {
+      running.value = false;
+      progressMsg.value = "进度连接失败";
     };
   }
 

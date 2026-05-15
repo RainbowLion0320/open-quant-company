@@ -308,7 +308,7 @@ def get_index_daily(
     """
     cache_key = f"index_daily_{symbol}_{source}"
     if not force_refresh:
-        cached = _read_cache(cache_key, max_age_hours=TTL_FOREVER)
+        cached = _read_cache(cache_key, max_age_hours=TTL_DAILY)
         if cached is not None:
             return cached
 
@@ -342,7 +342,7 @@ def get_stock_daily(
     """
     cache_key = f"stock_daily_{symbol}_{adjust}_{source}"
     if not force_refresh:
-        cached = _read_cache(cache_key, max_age_hours=TTL_FOREVER)
+        cached = _read_cache(cache_key, max_age_hours=TTL_DAILY)
         if cached is not None:
             return cached
 
