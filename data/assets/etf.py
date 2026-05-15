@@ -103,6 +103,12 @@ class ETFAsset(AssetAdapter):
         self, symbol: str, start_date: str = "20180101", end_date: str = "",
     ) -> Optional[pd.DataFrame]:
         """Fetch OHLCV via AKShare fund_etf_hist_em."""
+        import os
+        for k in list(os.environ.keys()):
+            if k.lower() in ('http_proxy', 'https_proxy', 'all_proxy'):
+                del os.environ[k]
+        os.environ.setdefault('no_proxy', '*')
+
         cache_path = self.cache_path(symbol)
         if cache_path.exists():
             try:
