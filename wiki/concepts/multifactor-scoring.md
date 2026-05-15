@@ -36,10 +36,10 @@ confidence: medium
 
 - 引擎: `signals/multifactor.py`
 - 因子表达式: `signals/factors.py`（借鉴 qlib DSL）
-- 回测: `backtest/run_all_strategies.py`（三策略对比）
+- 回测: `backtest/run_all_strategies.py`（四策略对比）
 
 ## 相关
 
 - [[buffett-filter]] (评分输入)
 - [[cybernetics-regime]] (市场维度输入)
-- [[strategy-evolution]] (三策略对比)
+- [[strategy-evolution]] (四策略对比)

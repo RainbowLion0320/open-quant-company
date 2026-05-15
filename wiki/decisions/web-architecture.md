@@ -37,7 +37,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR]
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
-| 市场总览 | `/` | Regime 卡片 + 三策略参数可调滑块 + 保存/重跑 |
+| 市场总览 | `/` | Regime 卡片 + 四策略参数可调滑块 + 保存/重跑 |
 | 策略中心 | `/strategies` | 信号表格 + WebSocket 进度 |
 | 模拟交易 | `/portfolio` | PaperBroker 仓位/委托 |
 | 个股搜索 | `/stocks` | 搜索入口 |
@@ -54,5 +54,5 @@ Web 以 `get_db(read_only=True)` 连接 DuckDB。注意 macOS 不支持真正的
 
 - [[duckdb-migration]] — Web 查询 DuckDB
 - [[tushare-mcp]] — 设置页配置 Tushare token
-- [[strategy-evolution]] — 回测页展示三策略对比
+- [[strategy-evolution]] — 回测页展示四策略对比
 - [[system-architecture]] — 完整系统分层
