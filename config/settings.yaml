@@ -311,6 +311,23 @@ assets:
   # crypto:         # future
   #   enabled: false
   #   label: 加密货币
+  bond:
+    enabled: false
+    label: 债券
+    universe: BOND_UNIVERSE
+    features: false
+    adapter: data/assets/bond.py
+  futures:
+    enabled: false
+    label: 期货
+    universe: FUTURES_UNIVERSE
+    features: false
+    adapter: data/assets/futures.py
+  crypto:
+    enabled: false
+    label: 加密货币
+    universe: CRYPTO_UNIVERSE  # placeholder
+    adapter: data/assets/crypto.py
   macro:
     enabled: true
     label: 宏观经济

@@ -168,6 +168,53 @@ class ETFExchange(Exchange):
         return self.commission * 2 * 100
 
 
+class BondExchange(Exchange):
+    """债券交易所 — 净价交易, 低佣金, T+0/T+1"""
+
+    name = "bond"
+    asset_type = "bond"
+
+    def __init__(self, commission: float = 0.00002, min_commission: float = 0.10):
+        self.commission = commission
+        self.min_commission = min_commission
+
+    def calc_cost(self, price: float, shares: int, side: OrderSide) -> float:
+        amount = price * shares
+        return max(amount * self.commission, self.min_commission)
+
+    def can_trade(self, symbol: str) -> bool:
+        return True
+
+    @property
+    def roundtrip_cost_pct(self) -> float:
+        return self.commission * 2 * 100
+
+
+class FuturesExchange(Exchange):
+    """期货交易所 — 保证金交易, 逐日盯市, 手续费按手"""
+
+    name = "futures"
+    asset_type = "futures"
+
+    def __init__(self, commission_per_lot: float = 10.0, lot_size: int = 1,
+                 margin_rate: float = 0.10):
+        self.commission_per_lot = commission_per_lot
+        self.lot_size = lot_size
+        self.margin_rate = margin_rate
+
+    def calc_cost(self, price: float, shares: int, side: OrderSide) -> float:
+        """期货: 按手数收佣金 (简化, 实际按合约不同)"""
+        lots = shares / self.lot_size if self.lot_size > 0 else 1
+        return lots * self.commission_per_lot
+
+    def can_trade(self, symbol: str) -> bool:
+        return True
+
+    @property
+    def roundtrip_cost_pct(self) -> float:
+        return 0  # 期货按手, 不按比例
+
+
 class MultiAssetExchange:
     """多资产交易所 — 按 asset_type 分发到对应 Exchange"""
 
