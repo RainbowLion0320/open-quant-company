@@ -176,6 +176,24 @@ def _register_views(db: Database):
             except Exception:
                 pass
 
+    # ── 多资产存储视图 (Phase 4.1) ──
+    # 扫描 data/store/{asset_type}/signals/ 下的信号文件
+    for asset_dir in sorted(_STORE_DIR.glob("*/")):
+        atype = asset_dir.name
+        if atype in ("signals", "features"):  # 跳过顶层兼容目录
+            continue
+        atype_sig_dir = asset_dir / "signals"
+        if atype_sig_dir.exists():
+            for pq in sorted(atype_sig_dir.glob("*.parquet")):
+                vname = f"{atype}_{pq.stem}_signals"
+                try:
+                    db.execute(
+                        f"CREATE OR REPLACE VIEW IF NOT EXISTS {vname} AS "
+                        f"SELECT * FROM read_parquet('{pq}')"
+                    )
+                except Exception:
+                    pass
+
 
 # ── 全局单例 ──
 _db: Optional[Database] = None
@@ -204,5 +222,10 @@ def get_backend() -> str:
     return get_db().backend
 
 
-def get_store_dir() -> Path:
+def get_store_dir(asset_type: Optional[str] = None) -> Path:
+    """获取存储目录。asset_type=None → 返回根目录。"""
+    if asset_type:
+        asset_dir = _STORE_DIR / asset_type
+        asset_dir.mkdir(parents=True, exist_ok=True)
+        return asset_dir
     return _STORE_DIR
