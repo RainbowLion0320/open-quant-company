@@ -35,13 +35,25 @@ config/notify.yaml
 .DS_Store
 Thumbs.db
 
-# Quant-specific
-backtest/results/
-*.html           # backtrader plot outputs
-data/*.pkl       # backtest results (可重新生成)
-data/quant_results.duckdb  # DuckDB 视图缓存
-data/quant_results.db      # 旧 SQLite (已废弃)
-data/store/scan_meta.parquet  # 元数据缓存
+# ── Quant: 数据文件 (可重新生成) ──
+data/*.pkl
+data/*.duckdb
+data/*.db
+data/store/features/
+data/store/signals/
+data/store/macro/
+data/store/stock/
+data/store/scan_meta.parquet
+data/models/*.pkl
+data/models/*.json
+data/tournament/
 
-# Web
+# ── Web 构建产物 ──
+web/frontend/*.tsbuildinfo
+web/frontend/vite.config.d.ts
+web/frontend/vite.config.js
+
+# ── Backtrader 输出 ──
+backtest/results/
+*.html
 .streamlit/
