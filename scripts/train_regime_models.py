@@ -67,16 +67,17 @@ def train_regime_models():
             print(f"  {regime}: {len(subset)} samples — skipping (need 500+)")
             continue
 
-        X, y, feature_names = prepare_xy(subset, "ret_fwd_20d")
+        X, y = prepare_xy(subset, "ret_fwd_20d")
+        feature_names = list(X.columns)
         print(f"  {regime}: {len(subset)} samples, {len(feature_names)} features")
 
         model = LightGBMRegressor()
-        model.fit(X.values, y.values)
+        model.fit(X, y)
         path = MODEL_DIR / f"lgbm_{regime}.pkl"
         model.save(str(path.stem))
 
         # Predict on training set for IC
-        pred = model.predict(X.values)
+        pred = model.predict(X)
         from scipy.stats import spearmanr
         ic, _ = spearmanr(pred, y.values)
         results[regime] = {"samples": len(subset), "features": len(feature_names), "ic": round(ic, 4)}
