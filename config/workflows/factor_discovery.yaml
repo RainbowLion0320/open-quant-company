@@ -1,0 +1,42 @@
+# ═══════════════════════════════════════════════════════════
+# Workflow: LLM 因子发现管道 (Factor Discovery Pipeline)
+#
+# LLM 生成 → OOS 验证 → 自注入库
+#
+# 运行: python scripts/run_workflow.py factor_discovery
+# ═══════════════════════════════════════════════════════════
+
+name: factor_discovery
+description: LLM 因子发现 — 多轮迭代 + OOS 验证 + 自注入库
+
+steps:
+  - name: llm_factor_hypothesis
+    description: LLM 生成因子 + OOS 验证 + 自动入库
+    script: scripts/factor_hypothesis.py
+    args: ["--n-candidates", "8", "--rounds", "3", "--auto-register"]
+    timeout_minutes: 45
+    retry: 0
+    on_fail: warn
+
+  - name: rebuild_features
+    description: 重建特征 (含新因子)
+    script: scripts/build_features.py
+    timeout_minutes: 30
+    retry: 1
+    on_fail: abort
+
+  - name: retrain_model
+    description: 用新特征重训模型
+    script: scripts/tune_model.py
+    args: ["--n-trials", "20"]
+    timeout_minutes: 45
+    retry: 1
+    on_fail: continue
+
+  - name: verify_tournament
+    description: 验证新模型 vs 旧模型
+    script: scripts/strategy_tournament.py
+    args: ["--pool-size", "100"]
+    timeout_minutes: 30
+    retry: 0
+    on_fail: warn

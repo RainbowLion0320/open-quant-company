@@ -276,3 +276,24 @@ LLM因子发现 → 因子进化        能力圈 → 资产白名单           
 - SOUL.md: 完整重写。新增认知层定义，四回路反馈，三层正交关系图
 - wiki system-architecture.md: 设计哲学段更新为三层
 - wiki log.md: 追加本条
+
+## [2026-05-15] layer | 新增风险控制层 + 统一工作流层
+
+对标 vnpy RiskManager 和 Qlib qrun。
+
+### 风险控制层 (broker/risk.py)
+- RiskRule 基类 + 5 个可插拔规则: MaxSinglePosition, MaxTotalExposure, MaxOrdersPerDay, MaxDrawdownCircuitBreaker, MaxSingleOrderAmount
+- RiskManager: 从 config/settings.yaml → risk_control 段加载, 预检通过才能下单
+- 所有规则有 enabled 开关, 各阈值在 config 中配置
+- settings.yaml: 新增 risk_control 段 (5规则)
+
+### 统一工作流层 (scripts/run_workflow.py)
+- 对标 Qlib qrun: YAML 定义 pipeline, 单命令执行
+- config/workflows/research_pipeline.yaml: build_features → tune_model → strategy_tournament
+- config/workflows/factor_discovery.yaml: LLM因子发现 → 重建特征 → 重训 → 验证
+- run_workflow.py: 读 YAML, 顺序执行 steps, 超时+重试+on_fail 策略
+- `python scripts/run_workflow.py --list` 列出所有可用工作流
+
+### 架构图更新
+- 新增 Risk Control Layer + Workflow Layer
+- 层数: 6 → 8 (Web / API / Risk / Execution / Workflow / ML / Strategy / Data)

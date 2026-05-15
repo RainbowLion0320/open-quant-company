@@ -1,3 +1,25 @@
+# ═══════════════════════════════════════════════════════════
+# ★ Risk Control Layer (Phase 4.3)
+# 对标 vnpy RiskManager — 预检风控, 可插拔规则
+# broker/risk.py 从本段加载规则
+# ═══════════════════════════════════════════════════════════
+risk_control:
+  max_single_position:
+    enabled: true
+    max_pct: 0.25       # 单只股票仓位不超过总权益25%
+  max_total_exposure:
+    enabled: true
+    max_pct: 0.80       # 总敞口不超过80% (留20%现金/对冲)
+  max_orders_per_day:
+    enabled: true
+    max_count: 20       # 单日最多20笔订单
+  max_drawdown_circuit_breaker:
+    enabled: true
+    max_drawdown_pct: -0.15  # 回撤超15%触发熔断
+  max_single_order_amount:
+    enabled: true
+    max_amount: 500000  # 单笔订单最多50万
+
 backtest:
   benchmark: sh000001
   benchmark_name: 上证指数

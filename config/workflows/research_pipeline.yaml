@@ -1,0 +1,35 @@
+# ═══════════════════════════════════════════════════════════
+# Workflow: 全量研究管道 (Full Research Pipeline)
+#
+# 按顺序执行: build_features → tune_model → strategy_tournament
+# 对标 Qlib `qrun` YAML workflow 设计
+#
+# 运行: python scripts/run_workflow.py research_pipeline
+# ═══════════════════════════════════════════════════════════
+
+name: research_pipeline
+description: 全量研究管道 — 特征构建 → 模型训练 → 锦标赛验证
+
+steps:
+  - name: build_features
+    description: 构建 PIT 特征 (200股 × 100月 × 35因子)
+    script: scripts/build_features.py
+    timeout_minutes: 30
+    retry: 2
+    on_fail: abort
+
+  - name: tune_model
+    description: Optuna 超参数搜索 + 模型训练
+    script: scripts/tune_model.py
+    args: ["--n-trials", "30"]
+    timeout_minutes: 60
+    retry: 1
+    on_fail: continue
+
+  - name: strategy_tournament
+    description: 四策略锦标赛对比验证
+    script: scripts/strategy_tournament.py
+    args: ["--pool-size", "100"]
+    timeout_minutes: 30
+    retry: 0
+    on_fail: warn
