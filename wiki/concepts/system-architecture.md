@@ -10,7 +10,7 @@ tags: [architecture, system-overview, extensibility, strategy-registry, ML, Fact
 
 A股量化交易系统架构总览。巴菲特价值投资为决策约束层，钱学森控制论为运行机制层——两者正交不冲突。所有代码在 `~/quant-agent/`，Web 在 8501 端口，日频 cron 在 15:30 CST。
 
-**当前版本: v4.0** — 从手调规则演进到 AI/ML 驱动的自动化 R&D 框架。
+**当前版本: v5.1** — 多资产量化系统，5种资产可开关，AI/ML驱动R&D。
 
 ## 设计哲学：三层正交架构
 
@@ -45,47 +45,38 @@ LLM Research → 自动化R&D      Circuit Breaker → -15%熔断  Self-healing 
 ┌──────────────────────────────────────────────────────────┐
 │  Web Dashboard (port 8501)                               │
 │  Vue 3 + Pinia + ECharts + Tailwind — Quantum Terminal   │
-│  N dynamic pages from Strategy Registry                  │
 ├──────────────────────────────────────────────────────────┤
 │  FastAPI Backend                                         │
-│  N route modules + WebSocket + async job queue            │
-│  DuckDB :memory: read-only → read_parquet() views        │
-│  /api/health → db_locked monitoring                      │
+│  routes + WebSocket + async jobs + DuckDB :memory: views │
 ├──────────────────────────────────────────────────────────┤
-│  Risk Control Layer ★ NEW (Phase 4.3)                    │
+│  Risk Control Layer                                      │
 │  broker/risk.py — 5 pluggable rules                      │
 │  max_single_position / max_total_exposure / circuit_breaker│
 ├──────────────────────────────────────────────────────────┤
 │  Execution Layer (compute_signals.py, 15:30 CST cron)    │
-│  4 strategies: buffett / multifactor / cybernetic / ml_lgbm │
-│  iterate Registry → scorer → save to Parquet             │
-│  Telegram @buffett0320_bot (signal push)                 │
+│  4 strategies + Telegram @buffett0320_bot                │
 ├──────────────────────────────────────────────────────────┤
-│  Workflow Layer ★ NEW (Phase 4.3)                        │
+│  Multi-Asset Layer (Phase 5.1)                           │
+│  AssetAdapter ABC + AssetRegistry (5 types)              │
+│  MultiAssetExchange (stock/ETF/bond/futures)              │
+│  AssetAllocator (regime → weights → cross-asset orders)  │
+├──────────────────────────────────────────────────────────┤
+│  Workflow Layer                                          │
 │  run_workflow.py + config/workflows/*.yaml                │
-│  research_pipeline / factor_discovery — qrun-style        │
 ├──────────────────────────────────────────────────────────┤
-│  ML / AI Layer (Phase 3.0-4.2)                           │
-│  ┌─────────────────┬────────────────┬─────────────────┐  │
-│  │ Feature Store   │ Model Registry │ LLM Hypothesis  │  │
-│  │ PIT 35 factors  │ LightGBM+Optuna│ DSL Parser      │  │
-│  │ 200 stocks×100m │ save/load/ver  │ Auto Research   │  │
-│  └─────────────────┴────────────────┴─────────────────┘  │
+│  ML / AI Layer                                           │
+│  Feature Store (PIT 51cols×200stocks×100m)               │
+│  Model Registry (LightGBM+Optuna)                        │
+│  LLM Hypothesis (DeepSeek v4-pro → DSL Parser)           │
 ├──────────────────────────────────────────────────────────┤
 │  Strategy Layer                                          │
-│  BaseStrategy interface + StrategyRegistry               │
-│  Exchange (AShareExchange: stamp/commission/transfer)    │
-│  4 strategies: buffett / multifactor / cybernetic / ml_lgbm │
+│  BaseStrategy + StrategyRegistry — 4 strategies          │
 ├──────────────────────────────────────────────────────────┤
 │  Data Layer                                              │
-│  ┌──────────┐  ┌──────────────┐  ┌───────────────────┐  │
-│  │ AKShare  │  │ Tushare MCP  │  │ Parquet Store ★   │  │
-│  │ OHLCV    │  │ daily_basic  │  │ data/store/        │  │
-│  │ 同花顺财务│  │ PE/PB/估值   │  │ stock/macro/...    │  │
-│  │ 宏观/资金│  │ moneyflow    │  │ 多资产分区          │  │
-│  └──────────┘  └──────────────┘  └───────────────────┘  │
-│  Data Cleaning (6 rules) → enrich_from_registry (9因子)  │
-│  Data Registry (28维度)                                    │
+│  AKShare (OHLCV/财务/宏观) + Tushare (PE/PB/资金/筹码)   │
+│  Parquet Store (stock/ETF/bond/futures/macro)            │
+│  Data Cleaner (6 rules) → Enrich (9 dims)                │
+│  Data Registry (28 dimensions)                            │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -98,7 +89,7 @@ strategies:
   buffett:     {color: '#06b6d4', label: 巴菲特价值精选}
   cybernetic:  {color: '#f59e0b', label: 控制论自适应}
   multifactor: {color: '#10b981', label: 多因子月度调仓}
-  ml_lgbm:     {color: '#8b5cf6', label: LightGBM ML}  ★ NEW
+  ml_lgbm:     {color: '#8b5cf6', label: LightGBM ML}
 ```
 
 策略接口 (`backtest/strategies/base.py`):
@@ -122,7 +113,7 @@ strategies:
    因子 × 股票 × 月数 → data/store/features/YYYY-MM.parquet (PIT, 零前视, 严格20交易日前向收益)
    → data/store/features/YYYY-MM.parquet (PIT, 零前视)
 
-4. 模型训练 (tune_model.py) ★ NEW
+4. 模型训练 (tune_model.py)
    LightGBM + Optuna + 滚动窗口CV (48月训练/6月测试)
    → data/models/lgbm_best.pkl
 
@@ -144,38 +135,47 @@ strategies:
 
 | 模块 | 文件 | 角色 |
 |------|------|------|
-| 策略接口 | `backtest/strategies/base.py` | BaseStrategy + StrategyRegistry ★ |
-| 交易所 | `broker/exchange.py` | AShareExchange 成本模型 ★ |
-| 因子 DSL | `signals/expression.py` | 26因子声明式表达式 ★ |
-| DSL 解析器 | `signals/dsl_parser.py` | LLM公式→计算 ★ |
-| ML 信号 | `signals/ml_signals.py` | 模型预测→买卖信号 ★ |
-| 特征存储 | `data/feature_store.py` | PIT特征构建 + 时间序列CV ★ |
-| 模型层 | `models/__init__.py` | LightGBM + BaseModel + 注册表 ★ |
-| ML 策略 | `backtest/strategies/ml_strategy.py` | LightGBM→BaseStrategy ★ |
-| 批量特征 | `scripts/build_features.py` | 200股×100月特征构建 ★ |
-| 模型训练 | `scripts/tune_model.py` | Optuna优化 + 模型训练 ★ |
-| 锦标赛 | `scripts/strategy_tournament.py` | 多策略自动对比 ★ |
-| 因子发现 | `scripts/factor_hypothesis.py` | LLM因子假说→验证 ★ |
-| 数据获取 | `data/fetchers/moneyflow.py` | 资金流向 (AKShare+Tushare) ★ |
-| 筹码获取 | `data/fetchers/holders.py` | 股东户数+增减持 ★ |
-| 宏观获取 | `data/fetchers/macro.py` | PMI/M2/Shibor等7指标 ★ |
-| 多资产 | `data/assets/base.py` | AssetAdapter + AssetRegistry ★ |
-| 数据注册 | `data/data_registry.py` | 28维度统一管理 ★ |
-| Tushare | `data/tushare_utils.py` | 统一token(环境变量优先→config兜底) |
-| 数据富化 | `data/feature_store.py` | PIT特征 + enrich_from_registry ★ |
-| 数据清洗 | `data/cleaner.py` | DataCleaner 6规则 (保留涨跌停异常值检测) |
-| 风险控制 | `broker/risk.py` | RiskManager 5规则预检 ★ |
-| 工作流 | `scripts/run_workflow.py` | qrun-style pipeline ★ NEW |
-| 日频扫描 | `scripts/compute_signals.py` | Cron 15:30, 4策略 |
-| 配置 | `config/settings.yaml` | 全部可调参数 |
+| 策略接口 | `backtest/strategies/base.py` | BaseStrategy + StrategyRegistry |
+| 多资产交易所 | `broker/exchange.py` | MultiAssetExchange (stock/ETF/bond/futures) |
+| 资产分配 | `broker/allocator.py` | AssetAllocator (regime→权重→跨资产下单) |
+| 风险控制 | `broker/risk.py` | RiskManager 5规则预检 |
+| 因子 DSL | `signals/expression.py` | 因子声明式表达式 |
+| DSL 解析器 | `signals/dsl_parser.py` | LLM公式→计算 |
+| 巴菲特过滤 | `signals/buffett.py` | 安全边际+DCF+三重过滤 |
+| 多因子打分 | `signals/multifactor.py` | 四维加权 (质量/估值/技术/市场) |
+| ML 信号 | `signals/ml_signals.py` | 模型预测→买卖信号 |
+| 特征存储 | `data/feature_store.py` | PIT特征 + enrich_from_registry |
+| 模型层 | `models/__init__.py` | LightGBM + 注册表 |
+| 数据清洗 | `data/cleaner.py` | DataCleaner 6规则 |
+| 数据注册 | `data/data_registry.py` | 28维度统一管理 |
+| Tushare工具 | `data/tushare_utils.py` | Token统一(环境变量优先→config兜底) |
+| 多资产基类 | `data/assets/base.py` | AssetAdapter ABC + AssetRegistry |
+| 股票适配器 | `data/assets/stock.py` | StockAsset |
+| ETF适配器 | `data/assets/etf.py` | ETFAsset (宽基/行业/黄金/债券/货币) |
+| 债券适配器 | `data/assets/bond.py` | BondAsset (国债收益率+可转债) |
+| 期货适配器 | `data/assets/futures.py` | FuturesAsset (11只主力合约) |
+| 加密适配器 | `data/assets/crypto.py` | CryptoAsset (占位, CCXT待接入) |
 | 数据获取 | `data/fetcher.py` | AKShare 3源 fallback |
 | 财务数据 | `data/financials.py` | 同花顺 → ROE/毛利/D-E |
 | 股票池 | `data/symbols.py` | 1000只, 申万31行业 |
+| 资金流获取 | `data/fetchers/moneyflow.py` | 资金流向 |
+| 筹码获取 | `data/fetchers/holders.py` | 股东户数+增减持 |
+| 宏观获取 | `data/fetchers/macro.py` | PMI/M2/Shibor等7指标 |
 | 数据库 | `data/db.py` + `data/results_db.py` | Parquet存储 + DuckDB视图 |
-| 巴菲特过滤 | `buffett/filters.py` | 三重过滤 + 板块感知 |
-| 控制论 | `cybernetics/orchestrator.py` | 月线Regime检测 ★ |
+| 控制论 | `cybernetics/orchestrator.py` | 月线Regime检测 + 自适应参数 |
+| 工作流 | `scripts/run_workflow.py` | qrun-style pipeline |
+| 特征构建 | `scripts/build_features.py` | 批量PIT特征(200股×100月) |
+| 模型训练 | `scripts/tune_model.py` | Optuna + LightGBM |
+| 锦标赛 | `scripts/strategy_tournament.py` | 多策略自动对比 |
+| 多资产锦标赛 | `scripts/multi_asset_tournament.py` | 二资产分配验证 |
+| 因子发现 | `scripts/factor_hypothesis.py` | LLM因子假说→DSL→IC/OOS |
+| 日频扫描 | `scripts/compute_signals.py` | Cron 15:30, 4策略 |
+| 慢数据填充 | `scripts/cron_fetch_slow.py` | 限流数据日常积累 |
 | 回测引擎 | `backtest/run_all_strategies.py` | 日频引擎 + 策略自主调仓 |
+| 回测评分 | `backtest/buffett_real_scorer.py` | PIT滚动评分器 |
 | 风险分析 | `backtest/analytics.py` | 15项风险指标 |
+| 回测流水线 | `backtest/pipeline.py` | 可插拔回测 |
+| 配置 | `config/settings.yaml` | 全部可调参数 |
 
 ## 因子体系
 
@@ -222,7 +222,9 @@ strategies:
 | 2.5 可扩展重构 | ✅ | Strategy Registry + 消除硬编码 |
 | 3.0 ML基础设施 | ✅ | Strategy接口 + Factor DSL + PIT特征 + LightGBM |
 | 3.5 自动化R&D | ✅ | 基本面因子 + PE/PB + Optuna + 锦标赛 |
-| 4.0 AI Agent 驱动 | 🟡 | ML接入生产 ✅ / LLM因子发现 ✅ / 自适应策略 🔜 |
+| 4.0 AI Agent 驱动 | ✅ | ML生产 + LLM因子发现 + 自适应策略 |
+| 5.0 多资产架构 | ✅ | ETF/Bond/Futures/Crypto适配器 + 开关控制 |
+| 5.1 跨资产分配 | ✅ | MultiAssetExchange + AssetAllocator + 锦标赛验证 |
 
 ## 关键设计约束
 

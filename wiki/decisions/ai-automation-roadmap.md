@@ -86,12 +86,34 @@ for round in range(max_rounds):
 
 ---
 
+### Phase 5.0 — 多资产架构 ✅
+
+多资产系统，开关控制，5种资产类型可独立启用/禁用。
+
+| 任务 | 状态 | 产出 |
+|------|:--:|------|
+| 5.0-1 MultiAssetExchange | ✅ | 按资产类型分发费率 (stock 0.102%, ETF 0.01%, bond 0.004%, futures按手) |
+| 5.0-2 ETFAsset | ✅ | 8只ETF (权益/黄金/债券/货币), AKShare+指数代理 |
+| 5.0-3 AssetAllocator | ✅ | regime → 动态权重 → 跨资产下单 |
+| 5.0-4 配置开关 | ✅ | settings.yaml assets.{type}.enabled 控制 |
+
+### Phase 5.1 — 资产扩展 ✅
+
+| 任务 | 状态 | 产出 |
+|------|:--:|------|
+| 5.1-1 BondAsset | ✅ | 国债收益率曲线 (2/5/10/30Y) + 可转债 |
+| 5.1-2 FuturesAsset | ✅ | 11只主力合约 (IF/IC/IH/IM/T/TF/TS/RB/AU/CU/SC) |
+| 5.1-3 CryptoAsset | 🔜 | 占位框架, CCXT待接入 |
+| 5.1-4 多资产锦标赛 | ✅ | stock-only -46% vs ETF-only +28% vs multi-asset -26% |
+
+---
+
 ## 与现有系统的关系
 
 ```
 手调策略（保留）               AI 策略（已集成）
 ├─ buffett (年调仓)            ├─ ml_lgbm (日预测, 月调仓)
-├─ multifactor (月调仓)        │   26因子 LightGBM
+├─ multifactor (月调仓)        │   51因子 LightGBM
 └─ cybernetic (月+regime)      │   锦标赛最优
         │                              │
         └──────────┬───────────────────┘
@@ -101,6 +123,8 @@ for round in range(max_rounds):
          run_all_strategies.py (统一回测)
                    │
          Web UI (4策略曲线叠加, 点击高亮)
+                   │
+         Multi-Asset Allocation (5种资产, 可开关)
 ```
 
 ---
