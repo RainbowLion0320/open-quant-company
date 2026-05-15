@@ -55,7 +55,7 @@ def compute_buffett(limit: int = 0) -> list[dict]:
     """运行巴菲特全量扫描，返回结果列表"""
     from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR, SYMBOL_NAME
     from data.financials import get_buffett_inputs
-    from buffett.filters import buffett_filter as bf
+    from signals.buffett import buffett_filter as bf
 
     symbols = list(CIRCLE_STOCKS)
     if limit and limit < len(symbols):
@@ -110,7 +110,7 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
     from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_NAME
     from signals.multifactor import MultiFactorScorer
     from cybernetics.orchestrator import QuantOrchestrator
-    from buffett.filters import buffett_filter as bf
+    from signals.buffett import buffett_filter as bf
 
     # 先检测市场状态
     orch = QuantOrchestrator()

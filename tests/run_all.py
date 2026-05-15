@@ -91,7 +91,7 @@ def test_buffett_filter():
     from data.financials import get_financial_summary, extract_roe_history
     from data.financials import extract_gross_margin_history, extract_debt_equity_ratio
     from data.financials import extract_latest_net_profit, extract_net_margin_history
-    from buffett.filters import buffett_filter, Verdict
+    from signals.buffett import buffett_filter, Verdict
     
     # 茅台 — 应该卡在安全边际 (12.56亿股)
     df = get_financial_summary("600519")
@@ -212,7 +212,7 @@ def test_multifactor():
 # ============================================================
 def test_edge_cases():
     """验证边界: 空数据/极端值/错误输入"""
-    from buffett.filters import buffett_filter, calc_margin_of_safety, Verdict
+    from signals.buffett import buffett_filter, calc_margin_of_safety, Verdict
     
     # 空ROE
     r = buffett_filter(symbol="000000", name="test", industry="食品饮料",

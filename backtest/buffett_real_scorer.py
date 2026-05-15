@@ -39,7 +39,7 @@ def create_buffett_real_scorer(pool):
         if not inputs:
             return 0
 
-        from buffett.filters import buffett_filter, Verdict
+        from signals.buffett import buffett_filter, Verdict
 
         try:
             current_price = float(series.iloc[idx])

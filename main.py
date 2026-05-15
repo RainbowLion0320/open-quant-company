@@ -16,7 +16,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from data import get_index_daily, get_stock_daily, StockUniverse
-from buffett import buffett_filter
+from signals.buffett import buffett_filter
 from cybernetics import QuantOrchestrator
 
 
