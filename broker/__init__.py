@@ -130,6 +130,7 @@ class PaperBroker(Broker):
       - 佣金: 自定义费率 (默认0.081% = A股完整买卖成本)
       - T+1 限制 (当日买不可当日卖)
       - 涨停/跌停限制
+      - ★ RiskManager 预检 (Phase 4.3)
     """
 
     def __init__(
@@ -138,20 +139,27 @@ class PaperBroker(Broker):
         commission_rate: float = 0.00081,
         stamp_duty: float = 0.0005,
         t_plus_1: bool = True,
+        enable_risk: bool = True,
     ):
         self._cash = initial_cash
         self._frozen_cash = 0.0
         self._positions: Dict[str, Position] = {}
         self._orders: List[Order] = []
         self._order_counter = 0
-        self._today_sells: Dict[str, int] = {}  # 当日卖出计数 (T+1用)
-        self._today_buys: Dict[str, int] = {}   # 当日买入计数 (T+1用)
+        self._today_sells: Dict[str, int] = {}
+        self._today_buys: Dict[str, int] = {}
+        self._peak_equity = initial_cash
 
-        self.commission_rate = commission_rate  # 双向佣金+过户费
-        self.stamp_duty = stamp_duty  # 卖出单向印花税
+        self.commission_rate = commission_rate
+        self.stamp_duty = stamp_duty
         self.t_plus_1 = t_plus_1
+        self._prices: Dict[str, float] = {}
 
-        self._prices: Dict[str, float] = {}  # 当前行情
+        # ★ Risk Manager
+        self._risk_mgr = None
+        if enable_risk:
+            from broker.risk import RiskManager
+            self._risk_mgr = RiskManager()
 
     def set_prices(self, prices: Dict[str, float]):
         """设置当前行情 (策略需在调用下单前设置)"""
@@ -176,6 +184,25 @@ class PaperBroker(Broker):
         )
 
     def submit_order(self, code: str, price: float, volume: int, side: str) -> str:
+        # ★ Risk pre-check (Phase 4.3)
+        if self._risk_mgr and side == "buy":
+            balance = self.get_balance()
+            portfolio = {
+                "total_equity": balance.total_asset,
+                "total_exposure": balance.market_value,
+                "peak_equity": self._peak_equity,
+                "positions": {
+                    c: {"market_value": p.market_value}
+                    for c, p in self._positions.items() if p.volume > 0
+                },
+            }
+            amount = price * volume
+            passed, results = self._risk_mgr.check_order(code, amount, portfolio)
+            if not passed:
+                failed = [r for r in results if not r.passed]
+                reasons = "; ".join(r.reason for r in failed)
+                return f"风控拒绝: {reasons}"
+
         # T+1 检查：当日买入的不可卖
         if self.t_plus_1 and side == "sell":
             bought_today = self._today_buys.get(code, 0)
@@ -241,6 +268,16 @@ class PaperBroker(Broker):
                 self._today_sells[code] = self._today_sells.get(code, 0) + volume
 
         self._orders.append(order)
+
+        # ★ Record order for daily limit tracking
+        if self._risk_mgr and side == "buy":
+            self._risk_mgr.record_order()
+
+        # ★ Update peak equity
+        balance = self.get_balance()
+        if balance.total_asset > self._peak_equity:
+            self._peak_equity = balance.total_asset
+
         return order_id
 
     def cancel_order(self, order_id: str) -> bool:
