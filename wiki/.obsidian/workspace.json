@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "concepts/system-architecture.md",
+                "file": "concepts/ml-pipeline.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "system-architecture"
+              "title": "ml-pipeline"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "concepts/system-architecture.md",
+                "file": "concepts/ml-pipeline.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "system-architecture 的反向链接列表"
+              "title": "ml-pipeline 的反向链接列表"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "concepts/system-architecture.md",
+                "file": "concepts/ml-pipeline.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "system-architecture 的出链列表"
+              "title": "ml-pipeline 的出链列表"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "concepts/system-architecture.md",
+                "file": "concepts/ml-pipeline.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "system-architecture 的大纲"
+              "title": "ml-pipeline 的大纲"
             }
           }
         ]
@@ -185,12 +185,12 @@
   },
   "active": "7aeeae959f8ae78b",
   "lastOpenFiles": [
-    "decisions/web-architecture.md",
+    "concepts/multifactor-scoring.md",
     "concepts/system-architecture.md",
+    "decisions/web-architecture.md",
     "log.md",
     "SCHEMA.md",
     "comparisons/data-sources.md",
-    "concepts/multifactor-scoring.md",
     "concepts/ml-pipeline.md",
     "decisions/ai-automation-roadmap.md",
     "decisions/duckdb-migration.md",
