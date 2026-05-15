@@ -23,4 +23,4 @@
 
 ## Comparisons
 - [[data-sources]] — AKShare(日线+财务+宏观+资金) vs Tushare(三张表+指标+moneyflow+holders)
-- [[strategy-evolution]] — 四策略回测对比：ML +28% / 多因子 +5% / 控制论 +0.5% / 巴菲特 n/a
+- [[strategy-evolution]] — 四策略回测对比：ML — 见 `data/tournament/`

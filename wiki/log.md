@@ -324,3 +324,24 @@ LLM因子发现 → 因子进化        能力圈 → 资产白名单           
 
 ### 数据流重排
 采集(1) → 清洗(2) → 特征构建(3) → 模型训练(4) → 策略计算(5) → 信号(6) → 因子研究(7) → Web(8)
+
+## [2026-05-15] cleanup | Wiki 去数据化 — 存架构，不存数值
+
+### 原则
+Wiki 记录系统如何工作（HOW），不记录当前数值是什么（WHAT）。
+更新数值时不该改 wiki。数值的权威来源：代码/配置/数据文件。
+
+### 移除的易变内容
+- system-architecture.md: 锦标赛结果表 + IC/因子数断言 → 改为引用 `data/tournament/`
+- strategy-evolution.md: 回测数字表 → 简化为策略迭代历史 + 引用
+- ai-automation-roadmap.md: Optuna IC/锦标赛数字/Phase状态 → 引用对应文件
+- ml-pipeline.md: 锦标赛结果表 → 引用 `data/tournament/`
+- index.md: ML+28% → 引用 `data/tournament/`
+
+### 保留的内容（不受此规则约束）
+- buffett-filter.md: +37.61% 是历史锚点结论，不是会重复更新的状态
+- cybernetics-regime.md: Before/After 对比是方法论验证的一部分
+- log.md: 历史日志，天然包含数值
+
+### SCHEMA.md 更新
+新增「内容准则」段，定义应该写什么/不应该写什么，以及每种数值的权威来源。

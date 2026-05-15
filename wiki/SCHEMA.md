@@ -37,6 +37,28 @@ wiki/
 - 新页面加入 `index.md` 对应分区，按字母序
 - 所有操作追加到 `log.md`
 
+### ★ 内容准则：Wiki 存架构，不存数据
+
+Wiki 记录系统如何工作（HOW），不记录当前数值是什么（WHAT）。
+
+| ✅ 应该写 | ❌ 不应该写 |
+|----------|-----------|
+| 模块职责和层级关系 | 具体回测收益/Sharpe/MaxDD |
+| 数据流方向和清洗规则 | 当前因子数量 |
+| 接口契约和设计约束 | 当前策略数量 |
+| 过滤逻辑和方法论 | 当前 IC 值 |
+| 关键决策及其理由 | Phase 完成状态 (✅/🟡) |
+| 引用配置文件路径 | 配置中的具体阈值 |
+
+**更新数值时不该改 wiki**。数值的权威来源：
+- 模型指标 → `data/models/lgbm_best_meta.json`
+- 锦标赛结果 → `data/tournament/` JSON 文件
+- 策略数量 → `config/settings.yaml` → strategies
+- 因子数量 → `signals/expression.py::alpha_factors()`.len()
+- 数据维度 → `config/settings.yaml` → data_registry
+
+页面里引用这些来源，不复制数值。
+
 ## Frontmatter
 
 ### Wiki 页面

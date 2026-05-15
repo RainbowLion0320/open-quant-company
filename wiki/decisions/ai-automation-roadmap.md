@@ -38,7 +38,7 @@ tags: [AI, ML, RL, architecture, roadmap, strategy, factor-DSL, PIT, LightGBM, R
 | 3.5-4 ML 生产集成 | ✅ | `signals/ml_signals.py` + cron `scripts/compute_signals.py` 集成 ml_lgbm 策略 |
 
 **结果**:
-- Optuna CV IC = 0.097 (vs Alpha158基线 0.042, **2.3x**)
+- Optuna 结果: 见 `data/models/lgbm_best_meta.json`。
 - In-sample IC = 0.551
 - 锦标赛 (100股 2020-2026): ML +28.31% / 多因子 +4.56% / 控制论 +0.49% / 巴菲特 n/a
 
@@ -50,7 +50,7 @@ tags: [AI, ML, RL, architecture, roadmap, strategy, factor-DSL, PIT, LightGBM, R
 | 4.0-2 因子-模型联合优化 | 🟡 | 单轮已验证，自动迭代循环尚未实现 |
 | 4.0-3 自适应策略切换 | 🔜 | 待实现 |
 
-**LLM 因子研究结果** (2026-05-15):
+LLM 因子研究结果: 见 `scripts/factor_hypothesis.py` 最新运行的输出。
 - 8个候选因子 → 7个通过IC测试 (IC > 0.01)
 - Top因子: `midpoint_bias` IC=0.216, `vol_adj_mom_5d` IC=0.215, `intraday_close_strength` IC=0.206
 - $0.00/cycle (用自己的API key)
