@@ -15,7 +15,7 @@ import numpy as np
 from data.symbols import CIRCLE_STOCKS, SYMBOL_NAME
 from data.fetcher import get_stock_daily
 from signals.expression import alpha_factors
-from data.feature_store import FEATURES_DIR, FeatureStoreBuilder
+from data.feature_store import FEATURES_DIR, FeatureStoreBuilder, enrich_from_registry
 
 # ══════════════════════════════════════════════════════════
 N_STOCKS = 200
@@ -208,7 +208,10 @@ for mi, month_dt in enumerate(months):
         rows.append(row)
 
     if rows:
-        pd.DataFrame(rows).to_parquet(pq_path, index=False)
+        result_df = pd.DataFrame(rows)
+        # ── 新数据维度富化 (Phase 4.2) ──
+        result_df = enrich_from_registry(result_df, month, list(price_cache.keys()))
+        result_df.to_parquet(pq_path, index=False)
     print(f"  {month}: {len(rows)} stocks")
 
 # 统计
