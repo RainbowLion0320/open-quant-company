@@ -1,7 +1,7 @@
 ---
 title: ML 管道 (端到端机器学习)
 created: 2026-05-15
-updated: 2026-05-15
+updated: 2026-05-16
 type: concept
 tags: [ML, LightGBM, PIT, Factor-DSL, Optuna, Tournament, LLM, Factor-Discovery]
 ---
@@ -14,13 +14,14 @@ tags: [ML, LightGBM, PIT, Factor-DSL, Optuna, Tournament, LLM, Factor-Discovery]
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│ 1. 因子定义              signals/expression.py       │
-│    26因子 (19 价量 + 7 LLM) DSL 声明式               │
-│    alpha_factors() → dict[name, Factor]              │
+| 1. 因子定义              signals/expression.py       |
+|    DSL 声明式因子，由 alpha_factors() 定义          |
+|    注: Factor 对象不含缓存（v4.3 移除 _cache,       |
+|    避免跨股票串值导致特征污染）                     |
 ├──────────────────────────────────────────────────────┤
 │ 2. 特征构建             data/feature_store.py        │
 │    PIT 月切片 → data/store/features/YYYY-MM.parquet  │
-│    200股票 × 100月 × 26因子 = 520,000 数据点          │
+│    严格 20 交易日前向收益（非 35 自然日）           |
 ├──────────────────────────────────────────────────────┤
 │ 3. 模型训练             scripts/tune_model.py        │
 │    LightGBM + Optuna + 滚动CV (48/6/12)              │
@@ -96,7 +97,7 @@ ma_golden = Gt(MA("close", 5), MA("close", 20))
 | 32 | open_gap_ma20 | **LLM** | `(open-Ref(close,1)) / MA(close,20)` | V4 Pro ★ |
 | 33 | upside_intraday_range | **LLM** | `(high-close) / Std(close,20)` | V4 Pro ★ |
 
-注: 起始的 26=19 价量+7 LLM, 加上 8 基本面和 6 估值后实际共 33。本表列出完整 26 + 8 基本面 + 6 估值 = 40 特征。
+注: 起始的价量因子 + LLM 因子 + 基本面 + 估值 = 总计由 `alpha_factors()` 动态定义。本表列出完整因子库，实际数量以源码和 feature_store 为准。
 
 ## 2. PIT 特征存储
 
@@ -159,9 +160,6 @@ model.save("lgbm_best")
 {
   "lgbm_best": {
     "version": "v3",
-    "ic_in_sample": 0.551,
-    "n_features": 33,
-    "training_date": "2026-05-15",
     "hyperparams": {"n_estimators": 200, "max_depth": 6, ...}
   }
 }
@@ -175,7 +173,7 @@ model.save("lgbm_best")
 - 48月训练 / 6月测试 / 12月步长
 - 最佳模型自动保存
 
-**结果**: CV IC = 0.097 (vs Alpha158 基线 0.042, +2.3x)
+**结果**: 以对比 Alpha158 基线为准，具体 IC 见 `scripts/tune_model.py` 运行输出。
 
 ## 4. 策略锦标赛
 
@@ -228,15 +226,11 @@ step 4: 判定
   → |IC| ≤ 0.01 → 丢弃
 ```
 
-**首轮结果** (2026-05-15):
-- 输入: 8 个LLM提出的因子
-- 通过: 7 个 (87.5%)
-- Top IC: midpoint_bias (0.216), vol_adj_mom_5d (0.215)
-- 已全部加入 `alpha_factors()` → 因子数量 19→26 (LLM贡献7个), PIT全特征40个(含基本面和估值)
+**首轮结果**: 8因子 → 通过见 `alpha_factors()` 源码；具体 IC 见 `scripts/factor_hypothesis.py` 运行输出。
 
 ### 发现的问题
 
-因子从 19→26→33 后, in-sample IC 0.194→0.551 但锦标赛收益 36%→28%——**过拟合**。LLM 因子找到了历史数据的模式, 但 OOS 不成立。下一步需引入因子选择 (ICIR 过滤, 样本外验证)。
+因子增长后 in-sample IC 提升但锦标赛收益下降——**过拟合**。LLM 因子找到了历史数据的模式, 但 OOS 不成立。v4.2 已引入 OOS 验证和多轮迭代机制，详见 `scripts/factor_hypothesis.py`。
 
 ## 技术债务 & 下一步
 

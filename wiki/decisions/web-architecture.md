@@ -50,9 +50,13 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR]
 
 Web 以 `get_db(read_only=True)` 连接 DuckDB。注意 macOS 不支持真正的并发读写——扫描和 Web 需串行执行。见 [[duckdb-migration]]。
 
+## 后端策略运行改进 (v4.3)
+
+`web/api/jobs.py` 不再重复实现策略逻辑，改为委托 `scripts/compute_signals.py` 中的 `compute_buffett/compute_multifactor/compute_cybernetic/compute_ml`。消除了 157 行重复代码。新增 `ml_lgbm` 策略支持。
+
 ## 相关
 
 - [[duckdb-migration]] — Web 查询 DuckDB
-- [[tushare-mcp]] — 设置页配置 Tushare token
+- [[tushare-mcp]] — Token 管理: 环境变量优先, 统一由 data/tushare_utils.py 获取
 - [[strategy-evolution]] — 回测页展示四策略对比
 - [[system-architecture]] — 完整系统分层

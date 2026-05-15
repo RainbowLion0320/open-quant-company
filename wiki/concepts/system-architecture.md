@@ -1,7 +1,7 @@
 ---
 title: System Architecture (系统架构总览)
 created: 2026-05-12
-updated: 2026-05-15
+updated: 2026-05-16
 type: concept
 tags: [architecture, system-overview, extensibility, strategy-registry, ML, Factor-DSL, PIT, LightGBM, LLM]
 ---
@@ -105,12 +105,12 @@ strategies:
    AKShare → stock_financial_abstract_ths → 同花顺财务
    Tushare → daily_basic (PE/PB/市值) → data/store/
 
-2. 数据清洗 (data/cleaner.py) ★ NEW
-   OHLCV 完整性 → 异常值检测 → 停牌过滤 → 缺失值填充
+2. 数据清洗 (data/cleaner.py)
+   OHLCV 完整性 → 异常值检测(保留涨跌停) → 停牌过滤 → 缺失值填充
    → 清洗报告 (丢弃/填充/缩尾统计)
 
-3. 特征构建 (build_features.py) ★ NEW
-   26 因子 (19 价量 + 7 LLM) × 200 股票 × 100 月
+3. 特征构建 (build_features.py)
+   因子 × 股票 × 月数 → data/store/features/YYYY-MM.parquet (PIT, 零前视, 严格20交易日前向收益)
    → data/store/features/YYYY-MM.parquet (PIT, 零前视)
 
 4. 模型训练 (tune_model.py) ★ NEW
@@ -123,9 +123,9 @@ strategies:
 
 6. 信号推送 → Telegram @buffett0320_bot
 
-7. 因子研究 (factor_hypothesis.py) ★ NEW
-   LLM (deepseek-v4-pro) → 因子假说 → DSL解析器计算 → IC评估
-   7/8 采纳, 入库 alpha_factors()
+7. 因子研究 (factor_hypothesis.py)
+   LLM (deepseek-v4-pro) → 因子假说 → DSL解析器计算 → IC评估 → 多轮迭代 + OOS验证
+   通过因子自动注册到 alpha_factors()
 
 8. Web 展示
    FastAPI ← DuckDB(:memory:) + read_parquet() views → Vue 3 SPA
@@ -152,8 +152,9 @@ strategies:
 | 宏观获取 | `data/fetchers/macro.py` | PMI/M2/Shibor等7指标 ★ |
 | 多资产 | `data/assets/base.py` | AssetAdapter + AssetRegistry ★ |
 | 数据注册 | `data/data_registry.py` | 28维度统一管理 ★ |
+| Tushare | `data/tushare_utils.py` | 统一token(环境变量优先→config兜底) |
 | 数据富化 | `data/feature_store.py` | PIT特征 + enrich_from_registry ★ |
-| 数据清洗 | `data/cleaner.py` | DataCleaner 6规则 (完整性/异常/停牌/缺失/基本面/缩尾) ★ NEW |
+| 数据清洗 | `data/cleaner.py` | DataCleaner 6规则 (保留涨跌停异常值检测) |
 | 风险控制 | `broker/risk.py` | RiskManager 5规则预检 ★ |
 | 工作流 | `scripts/run_workflow.py` | qrun-style pipeline ★ NEW |
 | 日频扫描 | `scripts/compute_signals.py` | Cron 15:30, 4策略 |

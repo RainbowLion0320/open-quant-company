@@ -51,14 +51,14 @@ def detect_regime(date):
 - Regime 切换时额外触发调仓
 - 月频 regime → 切换事件大幅减少 → 交易量暴跌
 
-**结果** (100只，2020-2026):
+**结果** (回测, 来源: `scripts/run_all_strategies.py` 最新输出):
 
-| 版本 | 收益 | 交易笔数 | 问题 |
-|------|------|:--:|------|
-| Daily regime (旧) | -5.85% | 5974 | regime 翻转导致过度交易 |
-| Monthly regime (新) | **+10.07%** | 42 | ✓ |
+| 版本 | 说明 | 问题 |
+|------|------|------|
+| Daily regime (旧) | regime 日频翻转导致过度交易 | 已弃用 |
+| Monthly regime (新) | 月频 regime, 交易量大幅减少 | ✓ |
 
-1000只全量: 控制论 +0.25% (268笔), 大幅改善。
+具体回测收益和交易笔数以最新 `scripts/run_all_strategies.py` 运行输出为准，不写入 wiki。
 
 ## Feedback Loop
 
