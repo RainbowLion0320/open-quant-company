@@ -297,3 +297,30 @@ LLM因子发现 → 因子进化        能力圈 → 资产白名单           
 ### 架构图更新
 - 新增 Risk Control Layer + Workflow Layer
 - 层数: 6 → 8 (Web / API / Risk / Execution / Workflow / ML / Strategy / Data)
+
+## [2026-05-15] layer | 新增数据清洗层 + 数据流重排
+
+### 问题
+数据流缺少清洗环节——原始数据直接喂特征构建。OHLCV 的负价、异常涨跌、停牌数据、缺失值都会污染训练集。
+
+### 数据清洗层 (data/cleaner.py)
+- CleanRule 基类 + 6 个可插拔规则: OHLCVIntegrity, OutlierDetection, SuspendedDetection, MissingValue, FinancialValidation, Winsorize
+- DataCleaner: 从 config/settings.yaml → data_cleaning 段加载规则
+- 两种模式: clean_ohlcv(df) 清洗 OHLCV, clean_features(df) 清洗特征
+- 每步返回 CleanReport (丢弃/填充/缩尾统计)
+
+### 6 条清洗规则
+1. OHLCVIntegrity: 价格合理性 (high>=low, close in [low,high], close>0)
+2. OutlierDetection: Z-score 检测 + 成交量暴增检测 (sigma=5)
+3. SuspendedDetection: 价格连续不变≥60天 → 停牌标记
+4. MissingValue: 前向填充 (最多5天), 仍有NA则丢弃
+5. FinancialValidation: ROE/PE/D-E 合理性裁剪
+6. Winsorize: 1%/99% 缩尾
+
+### 集成
+- build_features.py: 特征构建后 → clean_features → enrich
+- feature_store.py: OHLCV 拉取后可调 clean_ohlcv
+- settings.yaml: 新增 data_cleaning 段 (6规则 + enabled开关)
+
+### 数据流重排
+采集(1) → 清洗(2) → 特征构建(3) → 模型训练(4) → 策略计算(5) → 信号(6) → 因子研究(7) → Web(8)

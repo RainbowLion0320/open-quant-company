@@ -1,4 +1,30 @@
 # ═══════════════════════════════════════════════════════════
+# ★ Data Cleaning Layer (Phase 4.3)
+# 数据采集 → 清洗 → 特征构建。每条规则可独立开关和调参。
+# data/cleaner.py 从本段加载规则
+# ═══════════════════════════════════════════════════════════
+data_cleaning:
+  ohlcv_integrity:
+    enabled: true
+  outlier_detection:
+    enabled: true
+    sigma: 5                 # Z-score 阈值
+    max_daily_change_pct: 0.20
+    max_volume_ratio: 15
+  suspended_detection:
+    enabled: true
+    max_flat_days: 60        # 价格连续不变≥60天 → 停牌标记
+  missing_value:
+    enabled: true
+    max_forward_fill: 5      # 前向填充最多5天
+  financial_validation:
+    enabled: true
+  winsorize:
+    enabled: true
+    lower_pct: 0.01          # 1%缩尾
+    upper_pct: 0.99          # 99%缩尾
+
+# ═══════════════════════════════════════════════════════════
 # ★ Risk Control Layer (Phase 4.3)
 # 对标 vnpy RiskManager — 预检风控, 可插拔规则
 # broker/risk.py 从本段加载规则

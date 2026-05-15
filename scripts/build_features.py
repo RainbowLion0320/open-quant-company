@@ -209,6 +209,10 @@ for mi, month_dt in enumerate(months):
 
     if rows:
         result_df = pd.DataFrame(rows)
+        # ── 数据清洗 (Phase 4.3) ──
+        from data.cleaner import DataCleaner
+        cleaner = DataCleaner()
+        result_df, clean_report = cleaner.clean_features(result_df)
         # ── 新数据维度富化 (Phase 4.2) ──
         result_df = enrich_from_registry(result_df, month, list(price_cache.keys()))
         result_df.to_parquet(pq_path, index=False)
