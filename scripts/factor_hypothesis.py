@@ -68,6 +68,16 @@ GENERATE {n} NOVEL alpha factor hypotheses for cross-sectional stock return pred
 AVAILABLE DATA DIMENSIONS (use these in your formulas):
 {vocab}
 
+CRITICAL RULE — Cross-Sectional Discrimination:
+  • MACRO variables (PMI, SHIBOR, M2, CPI, etc.) are the SAME for ALL stocks on a given date.
+  • A formula like `Delta(MACRO_PMI, 3)` or `(1/PE) * MACRO_SHIBOR_3M` produces identical
+    values for every stock → ZERO cross-sectional IC → AUTOMATIC REJECTION.
+  • TO USE MACRO VARIABLES CORRECTLY: combine with stock-level data to create dispersion.
+    Example: `(stock_net_profit_growth - MACRO_GDP_growth)` creates stock-relative macro adjustment.
+    Example: `close / MA(close,20) * (1 if MACRO_PMI > 50 else -1)` flips sign but keeps dispersion.
+  • MACRO variables applied DIRECTLY to stocks (multiply, divide, add, subtract with no stock-level
+    interaction term) WILL FAIL. Every stock gets the same value — no alpha possible.
+
 SUPPORTED FORMULA FUNCTIONS:
   Price: close_t, close_t-N, open_t, high_t, low_t, volume_t
   Aggregations: MA(col,window), Std(col,window), Delta(col,window)

@@ -228,16 +228,66 @@ def _buffett_rebal(dt, regime, last_regime):
 buffett_scorer.should_rebalance = _buffett_rebal
 
 
+# ── 多因子财务缓存（避免每只股票每次调仓都拉取同花顺） ──
+_multifactor_fin_cache = {}
+
+def _get_multifactor_fin_inputs(sym, ind):
+    """缓存式获取财务数据，首次拉取后复用"""
+    cache_key = sym
+    if cache_key in _multifactor_fin_cache:
+        return _multifactor_fin_cache[cache_key]
+    try:
+        from data.financials import get_buffett_inputs
+        inputs = get_buffett_inputs(sym, current_price=0, industry=ind)
+        _multifactor_fin_cache[cache_key] = inputs
+        return inputs
+    except Exception:
+        _multifactor_fin_cache[cache_key] = None
+        return None
+
+
 def multifactor_scorer(sym, series, idx, regime):
-    """多因子评分: 动量 + 波动率"""
-    close = series[:idx+1].values
-    if len(close) < 63: return 0
-    mom_1m = close[-1] / close[-21] - 1
-    mom_3m = close[-1] / close[-63] - 1
-    rets = np.diff(close[-21:]) / close[-21:-1]
-    vol = np.std(rets) * np.sqrt(252)
-    score = 50 + mom_1m * 100 + mom_3m * 50 - vol * 30
-    return max(0, min(100, score))
+    """多因子评分: 质量(40%)+估值(30%)+技术(15%)+市场(15%)"""
+    from signals.multifactor import MultiFactorScorer
+    from data.symbols import SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
+
+    ind = SYMBOL_INDUSTRY.get(sym, "待分类")
+    sec = SYMBOL_SECTOR.get(sym, FALLBACK_SECTOR)
+
+    # 构建因子输入
+    mom_1m = mom_3m = 0.0
+    vol = 0.30
+    close_last = 0.0
+    try:
+        close_vals = series[:idx+1].values
+        if len(close_vals) < 63:
+            return 0
+        mom_1m = close_vals[-1] / close_vals[-21] - 1 if len(close_vals) >= 21 else 0
+        mom_3m = close_vals[-1] / close_vals[-63] - 1 if len(close_vals) >= 63 else 0
+        rets = np.diff(close_vals[-21:]) / close_vals[-21:-1]
+        vol = np.std(rets) * np.sqrt(252)
+    except Exception:
+        mom_1m = mom_3m = 0
+        vol = 0.30
+
+    # 财务数据从缓存获取（每个symbol首次拉取，之后复用）
+    inputs = _get_multifactor_fin_inputs(sym, ind)
+    buffett_score = min(100, max(0, inputs.get("score", 40) if inputs else 40))
+    safety_margin = max(0, inputs.get("safety_margin", 0.05) if inputs else 0.05)
+    roe_5y = (sum(inputs.get("roe_history", [0.08])[-5:]) / max(1, len(inputs.get("roe_history", [0.08])[-5:]))) if inputs else 0.08
+
+    from signals.multifactor import MultiFactorScorer
+    scorer = MultiFactorScorer(regime=regime)
+    factors = {
+        "buffett_score": buffett_score,
+        "safety_margin": safety_margin,
+        "roe_5y": roe_5y,
+        "momentum_1m": mom_1m,
+        "momentum_3m": mom_3m,
+        "volatility": vol,
+        "sector": sec,
+    }
+    return scorer.score(factors)
 
 
 def _make_monthly_rebal():

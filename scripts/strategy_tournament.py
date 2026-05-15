@@ -84,8 +84,25 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
     reg = register_all_strategies()
     print(f"\n已注册 {len(reg.list_names())} 策略: {reg.list_names()}")
 
-    # 数据
-    symbols = list(CIRCLE_STOCKS)[:pool_size]
+    # 数据 — 按市值排序选股（避免前200只=纯深市小票，巴菲特0交易）
+    symbols_raw = list(CIRCLE_STOCKS)
+    # 优先用已有 Parquet 缓存中的最新 total_mv 排序
+    try:
+        from pathlib import Path as _P
+        feat_dir = _P(__file__).resolve().parent.parent / "data" / "store" / "features"
+        latest_pq = sorted(feat_dir.glob("*.parquet"))[-1] if list(feat_dir.glob("*.parquet")) else None
+        if latest_pq:
+            import pandas as _pd
+            df_latest = _pd.read_parquet(latest_pq)
+            if "val_total_mv" in df_latest.columns and "symbol" in df_latest.columns:
+                mv_map = dict(zip(df_latest["symbol"], df_latest["val_total_mv"]))
+                symbols_raw.sort(key=lambda s: mv_map.get(s, 0), reverse=True)
+    except Exception:
+        pass  # fallback: 均匀采样
+    if len(symbols_raw) <= pool_size:
+        symbols = symbols_raw
+    else:
+        symbols = symbols_raw[:pool_size]
     exchange = AShareExchange()
 
     # 加载基准 (用上证综指日线, get_stock_daily兼容指数代码)
