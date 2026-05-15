@@ -59,11 +59,15 @@
 ├── signals/
 │   ├── expression.py             # 因子 DSL 表达式引擎
 │   ├── dsl_parser.py             # LLM公式→计算
+│   ├── buffett.py                # 巴菲特价值过滤 (安全边际/DCF)
 │   ├── multifactor.py            # 多因子打分 (四维加权)
 │   └── ml_signals.py             # ML信号生成
+├── cybernetics/
+│   └── orchestrator.py           # 市场状态检测 + 自适应参数
 ├── models/__init__.py            # LightGBM + 注册表
 ├── backtest/
 │   ├── run_all_strategies.py     # N策略对比回测 (日频)
+│   ├── buffett_real_scorer.py    # 滚动PIT评分器
 │   ├── analytics.py              # 15项风险指标
 │   ├── pipeline.py               # 可插拔回测流水线
 │   └── strategies/{base,ml_strategy}.py
@@ -79,5 +83,10 @@
 ├── web/api/                      # FastAPI (routes + ws + jobs)
 ├── web/frontend/                 # Vue 3 SPA (Quantum Terminal)
 ├── wiki/                         # LLM Wiki (14页)
-└── config/workflows/*.yaml       # 研究/因子发现 pipeline
+├── tests/                        # 边界测试
+├── docs/tushare-mcp-guide.md     # Tushare文档
+├── config/workflows/*.yaml       # 研究/因子发现 pipeline
+├── main.py                       # 入口
+├── Makefile                      # 构建/扫描命令
+└── CLAUDE.md
 ```
