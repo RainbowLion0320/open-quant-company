@@ -382,6 +382,9 @@ def alpha_factors() -> Dict[str, Factor]:
         "midpoint_bias": (close - (high + low) / Constant(2)) / (Std("close", 20) + Constant(1e-6)),
         "volume_vol_ratio": volume / (Std("close", 20) * MA("close", 20) + Constant(1e-6)),
         "open_gap_ma20": (open_ - MA("close", 20)) / (Std("close", 20) + Constant(1e-6)),
+
+        # ── LLM 自动注册因子 — AUTO-REGISTER START (do not edit manually) ──
+        # ── AUTO-REGISTER END ──
     }
     return factors
 
