@@ -36,9 +36,12 @@ class MLStrategy(BaseStrategy):
         super().__init__()
         self.model_version = model_version
         self._model = None
+        self._regime_models: Dict[str, object] = {}
+        self._regime_features: Dict[str, List[str]] = {}
         self._factors = alpha_factors()
         self._feature_names: List[str] = []
         self._load_model()
+        self._load_regime_models()
 
     def _load_model(self):
         """加载训练好的模型和元数据"""
@@ -63,7 +66,36 @@ class MLStrategy(BaseStrategy):
                 self._feature_names = meta.get("features", [])
 
         if self._model is None:
-            print(f"[MLStrategy] ⚠️ 模型未找到: {model_path}, 将返回中性评分")
+            print(f"[MLStrategy] ⚠️ 模型未找到: {model_path}, 将跳过 ML 入选")
+
+    def _load_regime_models(self):
+        """加载 bull/bear/sideways 专属模型；兼容历史双 lgbm_ 文件名。"""
+        for regime in ("bull", "bear", "sideways"):
+            model_path = None
+            for candidate in (MODEL_DIR / f"lgbm_{regime}.pkl", MODEL_DIR / f"lgbm_lgbm_{regime}.pkl"):
+                if candidate.exists():
+                    model_path = candidate
+                    break
+            if model_path is None:
+                continue
+            try:
+                with open(model_path, "rb") as f:
+                    model = pickle.load(f)
+                self._regime_models[regime] = model
+            except Exception:
+                continue
+            meta_path = MODEL_DIR / f"lgbm_{regime}_meta.json"
+            if meta_path.exists():
+                try:
+                    with open(meta_path) as f:
+                        self._regime_features[regime] = json.load(f).get("features", [])
+                except Exception:
+                    pass
+
+    def _select_model(self, regime: str):
+        if regime in self._regime_models:
+            return self._regime_models[regime], self._regime_features.get(regime, self._feature_names)
+        return self._model, self._feature_names
 
     def score(
         self,
@@ -76,14 +108,15 @@ class MLStrategy(BaseStrategy):
         """
         ML 评分: 计算因子 → 模型预测 → 映射到 0-100。
 
-        如果模型未加载, 返回 50 (中性)。
+        如果模型未加载或历史不足, 返回 0，避免把缺数据股票选入组合。
         """
-        if self._model is None or self._model._model is None:
-            return 50.0
+        model, feature_names = self._select_model(regime)
+        if model is None or getattr(model, "_model", None) is None:
+            return 0.0
 
         # 检查数据充分性
         if idx < 60 or prices is None:
-            return 50.0
+            return 0.0
 
         # 确保 prices 是 DataFrame (有 OHLCV 列)
         if isinstance(prices, pd.Series):
@@ -96,29 +129,32 @@ class MLStrategy(BaseStrategy):
         # 计算因子
         features = {}
         for name, factor in self._factors.items():
-            if self._feature_names and name not in self._feature_names:
+            if feature_names and name not in feature_names:
                 continue
             val = factor.compute(df, idx)
             features[name] = val if not (isinstance(val, float) and np.isnan(val)) else 0.0
 
         # 预测
         X = pd.DataFrame([features])
-        if self._feature_names:
-            X = X.reindex(columns=self._feature_names, fill_value=0)
+        if feature_names:
+            X = X.reindex(columns=feature_names, fill_value=0)
         X = X.fillna(0)
 
         try:
-            pred = float(self._model.predict(X)[0])
+            pred = float(model.predict(X)[0])
         except Exception:
-            return 50.0
+            return 0.0
 
         # 映射预测值 → 评分 (0-100)
         # 使用 sigmoid: 预测值越大 → 评分越高
         score = 50.0 + 50.0 * np.tanh(pred * 5)  # tanh 压缩到 [-1,1]
         return max(0.0, min(100.0, score))
 
-    def should_rebalance(self, dt, regime: str, last_regime=None) -> bool:
-        """每月初调仓"""
+    def should_rebalance(self, dt, regime: str, last_regime=None, *args, **kwargs) -> bool:
+        """月度复评；regime 切换时额外复评。"""
+        if last_regime is not None and regime != last_regime:
+            self._last_rebalance_month = dt.month
+            return True
         if dt.month != self._last_rebalance_month:
             self._last_rebalance_month = dt.month
             return True
@@ -126,4 +162,6 @@ class MLStrategy(BaseStrategy):
 
     @property
     def is_ready(self) -> bool:
-        return self._model is not None and self._model._model is not None
+        if self._regime_models:
+            return True
+        return self._model is not None and getattr(self._model, "_model", None) is not None

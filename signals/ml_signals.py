@@ -15,8 +15,71 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from data.symbols import CIRCLE_STOCKS, SYMBOL_NAME, SYMBOL_INDUSTRY
 from data.fetcher import get_stock_daily
 from signals.expression import alpha_factors
+from signals.selection import apply_ranked_buys
 from models import MODEL_DIR
 from data.feature_store import FEATURES_DIR
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def _load_settings() -> dict:
+    try:
+        import yaml
+        with open(ROOT / "config" / "settings.yaml") as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
+
+def _current_regime() -> str:
+    try:
+        from cybernetics.orchestrator import QuantOrchestrator
+        snapshot = QuantOrchestrator().detect()
+        regime = snapshot.regime.value if hasattr(snapshot.regime, "value") else str(snapshot.regime)
+        return regime if regime in {"bull", "bear", "sideways"} else "sideways"
+    except Exception:
+        return "sideways"
+
+
+def _load_model_bundle(model_version: str = "best") -> tuple[object | None, list[str], dict, str]:
+    """Load regime-aware model when available, falling back to lgbm_best."""
+    cfg = _load_settings().get("ml", {})
+    regime = _current_regime()
+    use_regime = cfg.get("use_regime_models", True)
+
+    candidates: list[tuple[Path, Path, str]] = []
+    if use_regime and model_version == "best" and regime in {"bull", "bear", "sideways"}:
+        candidates.extend([
+            (MODEL_DIR / f"lgbm_{regime}.pkl", MODEL_DIR / f"lgbm_{regime}_meta.json", f"regime:{regime}"),
+            (MODEL_DIR / f"lgbm_lgbm_{regime}.pkl", MODEL_DIR / f"lgbm_{regime}_meta.json", f"regime:{regime}"),
+        ])
+    candidates.append((MODEL_DIR / f"lgbm_{model_version}.pkl", MODEL_DIR / "lgbm_best_meta.json", model_version))
+
+    for model_path, meta_path, label in candidates:
+        if not model_path.exists():
+            continue
+        try:
+            with open(model_path, "rb") as f:
+                model = pickle.load(f)
+        except Exception:
+            continue
+        meta = {}
+        feature_names: list[str] = []
+        if meta_path.exists():
+            try:
+                with open(meta_path) as f:
+                    meta = json.load(f)
+                    feature_names = meta.get("features", [])
+            except Exception:
+                meta = {}
+        if not feature_names:
+            feature_names = list(getattr(model, "_feature_names", []) or [])
+        meta["selected_regime"] = regime
+        meta["selected_model"] = label
+        return model, feature_names, meta, label
+
+    return None, [], {"selected_regime": regime, "selected_model": "missing"}, "missing"
 
 
 def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict]:
@@ -31,28 +94,14 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
         信号列表 [{symbol, name, industry, score, signal, detail}]
     """
     # 1. 加载模型
-    model_path = MODEL_DIR / f"lgbm_{model_version}.pkl"
-    meta_path = MODEL_DIR / "lgbm_best_meta.json"
-
-    model = None
-    feature_names = []
-    meta = {}
-    if model_path.exists():
-        with open(model_path, "rb") as f:
-            model = pickle.load(f)
-    if meta_path.exists():
-        with open(meta_path) as f:
-            meta = json.load(f)
-            feature_names = meta.get("features", [])
-    if not feature_names:
-        feature_names = list(getattr(model, "_feature_names", []) or [])
+    model, feature_names, meta, selected_model = _load_model_bundle(model_version)
 
     if model is None:
         print("[ML] ⚠️ 模型未训练, 跳过")
         return []
 
-    ic_val = meta.get('ic_in_sample', 0)
-    print(f"[ML] 模型已加载 (IC={ic_val:.4f}, {len(feature_names)} 特征)")
+    ic_val = meta.get("ic_in_sample", meta.get("ic", 0))
+    print(f"[ML] 模型已加载 ({selected_model}, IC={ic_val:.4f}, {len(feature_names)} 特征)")
 
 
     # 2. 准备股票池
@@ -128,17 +177,16 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
             # 评分: sigmoid 映射
             score = 50.0 + 50.0 * np.tanh(pred * 5)
             score = max(0.0, min(100.0, score))
-            signal = "buy" if score >= 50 else "hold"
-
             signals.append({
                 "symbol": sym,
                 "name": SYMBOL_NAME.get(sym, sym),
                 "industry": SYMBOL_INDUSTRY.get(sym, "待分类"),
                 "score": round(score, 1),
-                "signal": signal,
+                "signal": "hold",
                 "detail": {
                     "pred_raw": round(float(pred), 4),
-                    "model": model_version,
+                    "model": selected_model,
+                    "regime": meta.get("selected_regime", ""),
                 },
             })
 
@@ -149,6 +197,13 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
             buys = sum(1 for s in signals if s["signal"] == "buy")
             print(f"  ML [{i+1}/{total}] {buys} buys")
 
+    score_scale = _load_settings().get("ml", {}).get("score_scale", 5.0)
+    if score_scale != 5.0:
+        for s in signals:
+            pred = float((s.get("detail") or {}).get("pred_raw", 0.0))
+            s["score"] = round(max(0.0, min(100.0, 50.0 + 50.0 * np.tanh(pred * float(score_scale)))), 1)
+
+    signals = apply_ranked_buys(signals, "ml_lgbm", default_min_score=52.0)
     buys = sum(1 for s in signals if s["signal"] == "buy")
     print(f"  ML 完成: {len(signals)} stocks, {buys} buys")
     return signals

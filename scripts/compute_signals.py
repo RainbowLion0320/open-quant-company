@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-一次性批计算：运行所有策略，结果存入 SQLite。
+一次性批计算：运行所有策略，结果存入 Parquet 信号库。
 
 策略:
   buffett     — 巴菲特三层过滤器 (能力圈→护城河→安全边际)
   multifactor — 多因子打分 (质量40%+估值30%+技术15%+市场15%)
   cybernetic  — 控制论市场状态信号 (基于当前市场regime)
+  ml_lgbm     — LightGBM PIT特征模型
 
 后续:
   每日 cron: 只更新价格敏感列 (safety_margin / dcf_value / current_price)
@@ -30,6 +31,7 @@ sys.path.insert(0, str(PROJECT))
 
 import pandas as pd
 import numpy as np
+import yaml
 
 from data.results_db import (
     save_buffett_results, save_strategy_signals,
@@ -37,6 +39,7 @@ from data.results_db import (
     get_buffett_meta, list_strategies,
 )
 from signals.ml_signals import compute_ml_signals as compute_ml
+from signals.selection import apply_ranked_buys
 
 
 def _get_latest_price(symbol: str) -> float:
@@ -145,27 +148,33 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
             tech = _get_technical_factors(sym)
             factors = {
                 "buffett_score": br.score if br.score > 0 else _estimate_buffett_score(inputs),
-                "safety_margin": max(0, br.safety_margin_pct),
+                "safety_margin": br.safety_margin_pct,
                 "roe_5y": (sum(inputs.get("roe_history", [0])[-5:]) / max(1, len(inputs.get("roe_history", [0])[-5:]))) if inputs.get("roe_history") else 0,
                 "roe_trend": _roe_trend(inputs.get("roe_history", [])),
                 "momentum_1m": tech["momentum_1m"],
                 "momentum_3m": tech["momentum_3m"],
+                "momentum_3m_skip_1m": tech["momentum_3m_skip_1m"],
+                "momentum_6m_skip_1m": tech["momentum_6m_skip_1m"],
+                "trend_strength": tech["trend_strength"],
                 "volatility": tech["volatility"],
                 "sector": inputs.get("sector", ""),
             }
 
-            score = scorer.score(factors)
-            signal = "buy" if score >= 45 else "hold"
+            components = scorer.score_components(factors)
+            score = components["total"]
 
             results.append({
                 "symbol": sym, "name": name, "industry": ind,
-                "score": round(score, 1), "signal": signal,
+                "score": round(score, 1), "signal": "hold",
                 "detail": {
                     "regime": regime,
-                    "quality": round(score * 0.40, 1),
-                    "valuation": round(score * 0.30, 1),
-                    "technical": round(score * 0.15, 1),
-                    "market": round(score * 0.15, 1),
+                    "quality": components["quality"],
+                    "valuation": components["valuation"],
+                    "technical": components["technical"],
+                    "market": components["market"],
+                    "momentum_3m_skip_1m": round(tech.get("momentum_3m_skip_1m", 0), 4),
+                    "momentum_6m_skip_1m": round(tech.get("momentum_6m_skip_1m", 0), 4),
+                    "trend_strength": round(tech.get("trend_strength", 0), 4),
                 }
             })
 
@@ -176,9 +185,19 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
             buys = sum(1 for r in results if r["signal"] == "buy")
             print(f"  Multifactor [{i+1}/{total}] {buys} buys ...")
 
+    results = apply_ranked_buys(results, "multifactor", default_min_score=MFC_BUY_THRESHOLD())
     buys = sum(1 for r in results if r["signal"] == "buy")
     print(f"  Multifactor done: {len(results)} scored, {buys} buys (regime={regime})")
     return results
+
+
+def MFC_BUY_THRESHOLD() -> float:
+    try:
+        with open(PROJECT / "config" / "settings.yaml") as f:
+            cfg = yaml.safe_load(f) or {}
+        return float(cfg.get("signals", {}).get("multifactor", {}).get("buy_threshold", 52))
+    except Exception:
+        return 52.0
 
 
 def _estimate_buffett_score(inputs: dict) -> float:
@@ -203,15 +222,34 @@ def _get_technical_factors(symbol: str) -> dict:
     """从行情数据计算动量 + 波动率"""
     try:
         from data.fetcher import get_stock_daily
-        from signals.multifactor import compute_momentum, compute_volatility
+        from signals.multifactor import compute_momentum, compute_trend_strength, compute_volatility
         df = get_stock_daily(symbol)
         if df is None or len(df) < 63:
-            return {"momentum_1m": 0, "momentum_3m": 0, "volatility": 0.30}
+            return {
+                "momentum_1m": 0, "momentum_3m": 0,
+                "momentum_3m_skip_1m": 0, "momentum_6m_skip_1m": 0,
+                "trend_strength": 0, "volatility": 0.30,
+            }
+        df = df.sort_values("date") if "date" in df.columns else df
         mom = compute_momentum(df, [21, 63])
+        mom_3m_skip = compute_momentum(df, [42], skip_recent=21)
+        mom_6m_skip = compute_momentum(df, [105], skip_recent=21)
         vol = compute_volatility(df, 20)
-        return {"momentum_1m": mom.get(21, 0), "momentum_3m": mom.get(63, 0), "volatility": vol}
+        trend = compute_trend_strength(df, 120)
+        return {
+            "momentum_1m": mom.get(21, 0),
+            "momentum_3m": mom.get(63, 0),
+            "momentum_3m_skip_1m": mom_3m_skip.get(42, 0),
+            "momentum_6m_skip_1m": mom_6m_skip.get(105, 0),
+            "trend_strength": trend,
+            "volatility": vol,
+        }
     except Exception:
-        return {"momentum_1m": 0, "momentum_3m": 0, "volatility": 0.30}
+        return {
+            "momentum_1m": 0, "momentum_3m": 0,
+            "momentum_3m_skip_1m": 0, "momentum_6m_skip_1m": 0,
+            "trend_strength": 0, "volatility": 0.30,
+        }
 
 
 def compute_cybernetic(limit: int = 0) -> list[dict]:
@@ -228,7 +266,7 @@ def compute_cybernetic(limit: int = 0) -> list[dict]:
         regime = "sideways"
         params = {"position_pct": 0.15, "max_positions": 5, "stop_loss": -0.05}
 
-    # 板块轮动逻辑
+    # 板块轮动逻辑 + 个股趋势过滤
     regime_sectors = {
         "bull": ["证券", "电子", "计算机", "电力设备", "国防军工"],
         "bear": ["银行", "公用事业", "交通运输", "食品饮料", "医药生物"],
@@ -246,24 +284,37 @@ def compute_cybernetic(limit: int = 0) -> list[dict]:
         sec = SYMBOL_SECTOR.get(sym, FALLBACK_SECTOR)
         name = SYMBOL_NAME.get(sym, sym)
 
-        if ind in favored:
-            score = 75.0
-            signal = "buy"
-        else:
-            score = 40.0
-            signal = "hold"
+        tech = _get_technical_factors(sym)
+        base = 62.0 if ind in favored else (35.0 if regime == "bear" else 45.0)
+        trend_bonus = max(-18.0, min(18.0, tech.get("trend_strength", 0) * 100))
+        mom_bonus = max(-12.0, min(12.0, tech.get("momentum_3m_skip_1m", 0) * 80))
+        vol_penalty = max(0.0, (tech.get("volatility", 0.30) - 0.35) * 45)
+        if regime == "bear" and ind not in favored:
+            vol_penalty += 8.0
+        score = max(0.0, min(100.0, base + trend_bonus + mom_bonus - vol_penalty))
 
         results.append({
             "symbol": sym, "name": name, "industry": ind,
-            "score": score, "signal": signal,
+            "score": round(score, 1), "signal": "hold",
             "detail": {
                 "regime": regime,
                 "favored_sectors": favored,
-                "position_pct": params.get("position_pct", 0.15),
+                "position_pct": params.get("position_size", params.get("position_pct", 0.15)),
                 "max_positions": params.get("max_positions", 5),
+                "trend_strength": round(tech.get("trend_strength", 0), 4),
+                "momentum_3m_skip_1m": round(tech.get("momentum_3m_skip_1m", 0), 4),
+                "volatility": round(tech.get("volatility", 0), 4),
             }
         })
 
+    min_score = float(params.get("confidence_threshold", 0.60)) * 100
+    max_buys = max(10, int(params.get("max_positions", 5)) * 4)
+    results = apply_ranked_buys(
+        results,
+        "cybernetic",
+        default_min_score=min_score,
+        default_max_buys=max_buys,
+    )
     buys = sum(1 for r in results if r["signal"] == "buy")
     print(f"  Cybernetic done: {len(results)} signals, {buys} buys (regime={regime})")
     return results
@@ -421,31 +472,29 @@ def notify_signals(strategies: list[dict]):
 
 
 def _save_prev_signals():
-    """把当前信号备份为上一次（用于下次对比）"""
+    """把当前信号 Parquet 备份为上一次（用于下次对比）"""
     import shutil
-    db_path = PROJECT / "data" / "quant_results.db"
-    prev_path = PROJECT / "data" / "quant_results_prev.db"
+    signals_dir = PROJECT / "data" / "store" / "signals"
+    prev_dir = PROJECT / "data" / "store" / "signals_prev"
     try:
-        shutil.copy(db_path, prev_path)
+        prev_dir.mkdir(parents=True, exist_ok=True)
+        for pq in signals_dir.glob("*.parquet"):
+            shutil.copy2(pq, prev_dir / pq.name)
     except Exception:
         pass
 
 
 def _load_prev_signals(strategy: str) -> list[dict] | None:
     """加载上一次的信号快照"""
-    prev_path = PROJECT / "data" / "quant_results_prev.db"
+    prev_path = PROJECT / "data" / "store" / "signals_prev" / f"{strategy}.parquet"
     if not prev_path.exists():
         return None
     try:
-        import sqlite3
-        db = sqlite3.connect(str(prev_path))
-        db.row_factory = sqlite3.Row
-        rows = db.execute(
-            "SELECT symbol, name, signal FROM strategy_signals WHERE strategy=?",
-            (strategy,)
-        ).fetchall()
-        db.close()
-        return [{"symbol": r["symbol"], "signal": r["signal"]} for r in rows]
+        df = pd.read_parquet(prev_path)
+        if "computed_at" in df.columns and len(df):
+            latest_ts = df["computed_at"].max()
+            df = df[df["computed_at"] == latest_ts]
+        return df[["symbol", "signal"]].to_dict("records")
     except Exception:
         return None
 

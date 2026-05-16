@@ -168,5 +168,28 @@ db.close()
 reset_db()
 check("连接关闭与重置", True)
 
+print(f"\n── 策略信号选择 ──")
+
+from signals.multifactor import compute_momentum
+from signals.selection import apply_ranked_buys
+
+price_df = pd.DataFrame({"close": [float(i) for i in range(1, 81)]})
+mom = compute_momentum(price_df, [21])
+check("动量按完整lookback计算", round(mom[21], 6) == round(80 / 59 - 1, 6))
+mom_skip = compute_momentum(price_df, [42], skip_recent=21)
+check("动量支持跳过最近一月", round(mom_skip[42], 6) == round(59 / 17 - 1, 6))
+
+ranked = apply_ranked_buys(
+    [{"symbol": f"S{i}", "score": s, "signal": "hold"} for i, s in enumerate([40, 80, 70, 60, 55])],
+    "unit_test",
+    default_min_score=60,
+    default_top_pct=0.4,
+    default_min_buys=1,
+    default_max_buys=2,
+)
+buy_syms = [r["symbol"] for r in ranked if r["signal"] == "buy"]
+check("信号按分数降序输出", [r["symbol"] for r in ranked[:3]] == ["S1", "S2", "S3"])
+check("buy信号满足全局门槛", buy_syms == ["S1", "S2", "S3", "S4"], buy_syms)
+
 print(f"\n{'='*50}")
 print(f"结果: {passed}通过 / {failed}失败 / {passed+failed}总计")

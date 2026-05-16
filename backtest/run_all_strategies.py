@@ -1,9 +1,12 @@
 """
-三策略对比回测 — 逐日引擎，策略自主调仓
+四策略对比回测 — 逐日引擎，策略自主调仓
 产量: data/backtest_<strategy>.pkl + data/backtest_comparison.pkl
 """
 import os, sys, pickle
-sys.path.insert(0, os.path.expanduser("~/quant-agent"))
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 for k in list(os.environ.keys()):
     if k.lower() in ('http_proxy','https_proxy','all_proxy'):
         del os.environ[k]
@@ -11,14 +14,22 @@ os.environ['no_proxy'] = '*'
 
 import pandas as pd
 import numpy as np
+import yaml
 from datetime import datetime
-from pathlib import Path
 
 from data.fetcher import get_stock_daily, get_index_daily
 from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
 from backtest.analytics import RiskAnalytics, FullReport
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_DIR = ROOT / "data"
+
+
+def _settings() -> dict:
+    try:
+        with open(ROOT / "config" / "settings.yaml") as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
 
 
 def load_prices(pool, start, end):
@@ -141,12 +152,15 @@ def run_backtest(name, pool, prices, bench_close, score_fn, start, end, cash=1_0
                     scores[sym] = sc
 
             if scores:
-                ranked = sorted(scores.items(), key=lambda x: -x[1])[:8]
+                max_positions = getattr(score_fn, "max_positions", 8)
+                if callable(max_positions):
+                    max_positions = max_positions(regime)
+                ranked = sorted(scores.items(), key=lambda x: -x[1])[:int(max_positions)]
                 target = {s for s, _ in ranked}
 
-                # 记录本次 target 供信号驱动调仓的下次重叠判断
-                if name == "multifactor":
-                    _multifactor_last_target = target
+                record_target = getattr(score_fn, "record_target", None)
+                if callable(record_target):
+                    record_target(target)
 
                 # ── 卖出 ──
                 for sym in list(holdings):
@@ -309,23 +323,36 @@ def multifactor_scorer(sym, series, idx, regime):
     # 构建因子输入
     mom_1m = mom_3m = 0.0
     vol = 0.30
-    close_last = 0.0
     try:
         close_vals = series[:idx+1].values
         if len(close_vals) < 63:
             return 0
-        mom_1m = close_vals[-1] / close_vals[-21] - 1 if len(close_vals) >= 21 else 0
-        mom_3m = close_vals[-1] / close_vals[-63] - 1 if len(close_vals) >= 63 else 0
+        current_price = float(close_vals[-1])
+        mom_1m = close_vals[-1] / close_vals[-22] - 1 if len(close_vals) >= 22 and close_vals[-22] else 0
+        mom_3m = close_vals[-1] / close_vals[-64] - 1 if len(close_vals) >= 64 and close_vals[-64] else 0
+        mom_3m_skip = close_vals[-22] / close_vals[-64] - 1 if len(close_vals) >= 64 and close_vals[-64] else 0
+        mom_6m_skip = close_vals[-22] / close_vals[-127] - 1 if len(close_vals) >= 127 and close_vals[-127] else mom_3m_skip
+        ma120 = np.mean(close_vals[-120:]) if len(close_vals) >= 120 else np.mean(close_vals)
+        trend_strength = current_price / ma120 - 1 if ma120 else 0
         rets = np.diff(close_vals[-21:]) / close_vals[-21:-1]
         vol = np.std(rets) * np.sqrt(252)
     except Exception:
-        mom_1m = mom_3m = 0
+        current_price = 0.0
+        mom_1m = mom_3m = mom_3m_skip = mom_6m_skip = trend_strength = 0
         vol = 0.30
 
     # 财务数据从缓存获取（每个symbol首次拉取，之后复用）
     inputs = _get_multifactor_fin_inputs(sym, ind)
-    buffett_score = min(100, max(0, inputs.get("score", 40) if inputs else 40))
-    safety_margin = max(0, inputs.get("safety_margin", 0.05) if inputs else 0.05)
+    buffett_score = 40
+    safety_margin = 0.0
+    if inputs and current_price > 0:
+        try:
+            from signals.buffett import buffett_filter
+            br = buffett_filter(current_price=current_price, **inputs)
+            buffett_score = br.score if br.score > 0 else _estimate_buffett_score(inputs)
+            safety_margin = br.safety_margin_pct
+        except Exception:
+            buffett_score = _estimate_buffett_score(inputs)
     roe_5y = (sum(inputs.get("roe_history", [0.08])[-5:]) / max(1, len(inputs.get("roe_history", [0.08])[-5:]))) if inputs else 0.08
 
     from signals.multifactor import MultiFactorScorer
@@ -336,42 +363,79 @@ def multifactor_scorer(sym, series, idx, regime):
         "roe_5y": roe_5y,
         "momentum_1m": mom_1m,
         "momentum_3m": mom_3m,
+        "momentum_3m_skip_1m": mom_3m_skip,
+        "momentum_6m_skip_1m": mom_6m_skip,
+        "trend_strength": trend_strength,
         "volatility": vol,
         "sector": sec,
     }
     return scorer.score(factors)
 
 # ── 多因子调仓: 信号重叠度 < 50% 或 仓位漂移 > 50% ──
-_multifactor_last_target = set()
-
-
 def _multifactor_rebal(dt, regime, last_regime, holdings, current_price):
-    global _multifactor_last_target
+    last_target = getattr(multifactor_scorer, "_last_target", set())
+    last_rebal = getattr(multifactor_scorer, "_last_rebalance_date", None)
+    if last_rebal is None:
+        multifactor_scorer._last_rebalance_date = dt
+        return True
+    if regime != last_regime:
+        multifactor_scorer._last_rebalance_date = dt
+        return True
     drift = _position_drift(holdings, current_price)
-    if drift > 1.0:
+    if drift > 0.75:
+        multifactor_scorer._last_rebalance_date = dt
         return True
-    overlap = _overlap_ratio(_multifactor_last_target, holdings)
-    if _multifactor_last_target and overlap < 0.5:
+    overlap = _overlap_ratio(last_target, holdings)
+    if last_target and overlap < 0.5:
+        multifactor_scorer._last_rebalance_date = dt
         return True
-    if not holdings and not _multifactor_last_target:
+    # Signal-driven portfolios still need scheduled review; otherwise the old
+    # target never refreshes and overlap can remain 100% forever.
+    if (dt - last_rebal).days >= 28 and dt.month != last_rebal.month:
+        multifactor_scorer._last_rebalance_date = dt
+        return True
+    if not holdings:
+        multifactor_scorer._last_rebalance_date = dt
         return True
     return False
 
 
 multifactor_scorer.should_rebalance = _multifactor_rebal
+multifactor_scorer.max_positions = lambda regime: int(_settings().get("backtest", {}).get("strategy", {}).get("multifactor", {}).get("top_n", 10))
+multifactor_scorer.record_target = lambda target: setattr(multifactor_scorer, "_last_target", set(target))
+multifactor_scorer._last_target = set()
+multifactor_scorer._last_rebalance_date = None
 
 
 def cybernetic_scorer(sym, series, idx, regime):
-    """控制论评分: regime + 板块轮动"""
-    bull_sectors = {"证券", "电子", "计算机"}
-    bear_sectors = {"银行", "公用事业", "食品饮料"}
-    sideways_sectors = {"银行", "煤炭", "建筑装饰"}
+    """控制论评分: regime + 板块轮动 + 个股趋势确认"""
+    bull_sectors = {"证券", "电子", "计算机", "电力设备", "国防军工"}
+    bear_sectors = {"银行", "公用事业", "交通运输", "食品饮料", "医药生物"}
+    sideways_sectors = {"银行", "公用事业", "煤炭", "石油石化", "建筑装饰"}
 
     ind = SYMBOL_INDUSTRY.get(sym, "")
-    if regime == "bull" and ind in bull_sectors: return 80
-    if regime == "bear" and ind in bear_sectors: return 70
-    if regime == "sideways" and ind in sideways_sectors: return 60
-    return 30
+    favored = (
+        ind in bull_sectors if regime == "bull"
+        else ind in bear_sectors if regime == "bear"
+        else ind in sideways_sectors
+    )
+    base = 62 if favored else (35 if regime == "bear" else 45)
+    try:
+        vals = series[:idx+1].values
+        if len(vals) < 64:
+            return base
+        mom_3m_skip = vals[-22] / vals[-64] - 1 if vals[-64] else 0
+        ma120 = np.mean(vals[-120:]) if len(vals) >= 120 else np.mean(vals)
+        trend = vals[-1] / ma120 - 1 if ma120 else 0
+        rets = np.diff(vals[-21:]) / vals[-21:-1]
+        vol = np.std(rets) * np.sqrt(252)
+        score = base + max(-18, min(18, trend * 100)) + max(-12, min(12, mom_3m_skip * 80))
+        score -= max(0, (vol - 0.35) * 45)
+        if regime == "bear" and not favored:
+            score -= 8
+        return max(0, min(100, score))
+    except Exception:
+        return base
 
 
 # ── 控制论调仓: 仅 regime 切换 + 漂移 > 50% ──
@@ -380,7 +444,7 @@ def _cybernetic_rebal(dt, regime, last_regime, holdings, current_price):
     if regime != last_regime:
         return True
     drift = _position_drift(holdings, current_price)
-    if drift > 1.0:
+    if drift > 0.75:
         return True
     if not holdings:
         return True
@@ -388,6 +452,48 @@ def _cybernetic_rebal(dt, regime, last_regime, holdings, current_price):
 
 
 cybernetic_scorer.should_rebalance = _cybernetic_rebal
+cybernetic_scorer.max_positions = lambda regime: int(
+    _settings().get("cybernetics", {}).get("adaptive", {}).get(regime, {}).get("max_positions", 5)
+)
+
+
+_ml_strategy = None
+
+
+def ml_lgbm_scorer(sym, series, idx, regime):
+    """LightGBM评分: 优先使用regime-aware模型，缺模型时不入选。"""
+    global _ml_strategy
+    if _ml_strategy is None:
+        try:
+            from backtest.strategies.ml_strategy import MLStrategy
+            _ml_strategy = MLStrategy("best")
+        except Exception:
+            _ml_strategy = False
+    if not _ml_strategy or not getattr(_ml_strategy, "is_ready", False):
+        return 0
+    return _ml_strategy.score(sym, series, idx, regime)
+
+
+def _ml_rebal(dt, regime, last_regime, holdings, current_price):
+    if regime != last_regime:
+        return True
+    last_rebal = getattr(ml_lgbm_scorer, "_last_rebalance_date", None)
+    if last_rebal is None or (dt - last_rebal).days >= 28 and dt.month != last_rebal.month:
+        ml_lgbm_scorer._last_rebalance_date = dt
+        return True
+    drift = _position_drift(holdings, current_price)
+    if drift > 0.75:
+        ml_lgbm_scorer._last_rebalance_date = dt
+        return True
+    if not holdings:
+        ml_lgbm_scorer._last_rebalance_date = dt
+        return True
+    return False
+
+
+ml_lgbm_scorer.should_rebalance = _ml_rebal
+ml_lgbm_scorer.max_positions = lambda regime: 8
+ml_lgbm_scorer._last_rebalance_date = None
 
 
 # ══════════════════════════════════════════════════════════
@@ -402,7 +508,7 @@ if __name__ == "__main__":
     if pool_size > 0:
         pool = pool[:pool_size]
     start, end = "2015-01-01", "2026-05-10"
-    print(f"三策略对比回测: {len(pool)} stocks, {start} ~ {end}")
+    print(f"四策略对比回测: {len(pool)} stocks, {start} ~ {end}")
 
     prices = load_prices(pool, start, end)
     bench = get_index_daily("sh000001")
@@ -417,6 +523,7 @@ if __name__ == "__main__":
         "buffett": buffett_scorer,
         "multifactor": multifactor_scorer,
         "cybernetic": cybernetic_scorer,
+        "ml_lgbm": ml_lgbm_scorer,
     }
 
     results = {}
@@ -428,7 +535,7 @@ if __name__ == "__main__":
             continue
         if name == "buffett":
             scorer._pool = pool
-        print(f"\n  {s['label']} (调仓: { '年报季' if name=='buffett' else '信号+漂移' if name=='multifactor' else 'regime+漂移' if name=='cybernetic' else '默认' })")
+        print(f"\n  {s['label']} (调仓: { '年报季' if name=='buffett' else '月度复评+信号+漂移' if name=='multifactor' else 'regime+漂移' if name=='cybernetic' else '月度复评+regime' })")
         results[name] = run_backtest(name, pool, prices, bc, scorer, start, end)
 
     comparison = {
@@ -445,7 +552,7 @@ if __name__ == "__main__":
         pickle.dump(comparison, f)
 
     print(f"\n{'='*60}")
-    print("三策略对比:")
+    print("四策略对比:")
     print(f"基准: {comparison['bench_return']*100:+.2f}%")
     for name, r in comparison["strategies"].items():
         print(f"  {name}: {r['total_return']*100:+.2f}%  Sharpe {r['sharpe']:.2f}  MaxDD {r['max_drawdown']*100:.1f}%  Win {r['win_rate']*100:.0f}%  {r['trade_count']}笔")

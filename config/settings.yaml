@@ -241,6 +241,7 @@ project:
   version: 0.1.0
 signals:
   multifactor:
+    buy_threshold: 52
     market:
       bear:
         bank: 15
@@ -287,6 +288,31 @@ signals:
       quality: 0.4
       technical: 0.15
       valuation: 0.3
+
+# ═══════════════════════════════════════════════════════════
+# ★ Signal Selection
+# 策略先给全股票池打分，再按横截面排名把最强候选标记为 buy。
+# 这避免阈值过宽导致 paper trading 按原始股票顺序买入。
+# ═══════════════════════════════════════════════════════════
+signal_selection:
+  top_pct: 0.05
+  min_buys: 5
+  max_buys: 80
+  min_score: 50
+  strategies:
+    multifactor:
+      min_score: 52
+      max_buys: 80
+    cybernetic:
+      min_score: 60
+      max_buys: 40
+    ml_lgbm:
+      min_score: 52
+      max_buys: 80
+
+ml:
+  use_regime_models: true
+  score_scale: 5.0
 # ★ Multi-asset architecture (Phase 4.1)
 # Register all asset types. New types just add entries here.
 # Adapters: data/assets/stock.py, data/assets/fund.py, etc.

@@ -13,7 +13,7 @@ import yaml
 
 
 def _load_config() -> dict:
-    config_path = Path("~/quant-agent/config/settings.yaml").expanduser()
+    config_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
     with open(config_path) as f:
         return yaml.safe_load(f)
 
@@ -28,9 +28,14 @@ class MultiFactorScorer:
     def __init__(self, regime: str = "sideways"):
         self.regime = regime
 
-    def score(self, factors: dict) -> float:
+    @staticmethod
+    def _bounded(v: float) -> float:
+        return min(100.0, max(0.0, float(v)))
+
+    def score_components(self, factors: dict) -> dict:
         """
-        综合打分 (0-100)
+        返回四维组件分 + 综合分 (0-100).
+
         factors = {
             "buffett_score": 0-100,   # 巴菲特综合评分
             "safety_margin": -1.0~1.0, # 安全边际%
@@ -42,17 +47,27 @@ class MultiFactorScorer:
             "sector": str,             # 板块类型
         }
         """
-        quality = self._quality_score(factors)
-        valuation = self._valuation_score(factors)
-        technical = self._technical_score(factors)
-        market = self._market_score(factors)
+        quality = self._bounded(self._quality_score(factors))
+        valuation = self._bounded(self._valuation_score(factors))
+        technical = self._bounded(self._technical_score(factors))
+        market = self._bounded(self._market_score(factors))
 
         w = MFC.get("weights", {})
         total = (quality * w.get("quality", 0.40)
                  + valuation * w.get("valuation", 0.30)
                  + technical * w.get("technical", 0.15)
                  + market * w.get("market", 0.15))
-        return min(100, max(0, total))
+        return {
+            "quality": round(quality, 2),
+            "valuation": round(valuation, 2),
+            "technical": round(technical, 2),
+            "market": round(market, 2),
+            "total": round(self._bounded(total), 2),
+        }
+
+    def score(self, factors: dict) -> float:
+        """综合打分 (0-100)."""
+        return self.score_components(factors)["total"]
 
     def _quality_score(self, f: dict) -> float:
         """质量分: 巴菲特基本面"""
@@ -105,10 +120,16 @@ class MultiFactorScorer:
         tc = MFC.get("technical", {})
         mom_1m = f.get("momentum_1m", 0)
         mom_3m = f.get("momentum_3m", 0)
+        # Prefer intermediate momentum with the most recent month skipped.
+        # This follows the mature 3-12 month momentum convention and avoids
+        # over-weighting short-term reversal noise.
+        mom_3m_skip = f.get("momentum_3m_skip_1m", mom_1m)
+        mom_6m_skip = f.get("momentum_6m_skip_1m", mom_3m)
+        trend_strength = f.get("trend_strength", 0)
         volatility = f.get("volatility", tc.get("default_volatility", 0.30))
 
         # 动量: 正动量好但不要追涨(太高反而回调风险)
-        mom_composite = mom_1m * 0.4 + mom_3m * 0.6
+        mom_composite = mom_3m_skip * 0.35 + mom_6m_skip * 0.65
         mom_strong = tc.get("mom_strong", 0.15)
         if mom_composite > mom_strong:
             mom_score = 40  # 涨太多，等回调
@@ -118,6 +139,11 @@ class MultiFactorScorer:
             mom_score = 40 + mom_composite * tc.get("mom_multiplier_normal", 200)
         else:
             mom_score = 20  # 跌太多，观望
+
+        if trend_strength < -0.05:
+            mom_score *= 0.55
+        elif trend_strength > 0:
+            mom_score += min(10, trend_strength * 100)
 
         # 低波动加分
         vol_max = tc.get("vol_max_score", 30)
@@ -151,15 +177,18 @@ class MultiFactorScorer:
         return min(100, 50 + sector_bonus)
 
 
-def compute_momentum(df: pd.DataFrame, periods: List[int]) -> Dict[int, float]:
-    """计算多周期动量"""
-    if len(df) < max(periods) + 1:
+def compute_momentum(df: pd.DataFrame, periods: List[int], skip_recent: int = 0) -> Dict[int, float]:
+    """计算多周期动量，可跳过最近 N 个交易日以降低短期反转噪声。"""
+    if len(df) < max(periods) + skip_recent + 1:
         return {p: 0 for p in periods}
 
     result = {}
     for p in periods:
-        if len(df) >= p:
-            result[p] = (df["close"].iloc[-1] / df["close"].iloc[-p] - 1)
+        if len(df) >= p + skip_recent + 1:
+            end_idx = -1 - skip_recent if skip_recent else -1
+            start_idx = end_idx - p
+            base = df["close"].iloc[start_idx]
+            result[p] = (df["close"].iloc[end_idx] / base - 1) if base else 0
         else:
             result[p] = 0
     return result
@@ -171,6 +200,14 @@ def compute_volatility(df: pd.DataFrame, window: int = 20) -> float:
         return 0.30
     returns = df["close"].pct_change().dropna().tail(window)
     return returns.std() * np.sqrt(252)
+
+
+def compute_trend_strength(df: pd.DataFrame, window: int = 120) -> float:
+    """当前价格相对中长期均线的强弱。"""
+    if len(df) < window:
+        return 0.0
+    ma = df["close"].tail(window).mean()
+    return float(df["close"].iloc[-1] / ma - 1) if ma else 0.0
 
 
 def rank_stocks(scores: Dict[str, float], top_n: int = 10,

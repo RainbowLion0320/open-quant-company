@@ -73,8 +73,7 @@ def train_regime_models():
 
         model = LightGBMRegressor()
         model.fit(X, y)
-        path = MODEL_DIR / f"lgbm_{regime}.pkl"
-        model.save(str(path.stem))
+        model.save(regime)
 
         # Predict on training set for IC
         pred = model.predict(X)
