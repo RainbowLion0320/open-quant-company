@@ -1,16 +1,16 @@
 ---
 title: Web Architecture (Vue 3 + FastAPI)
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-16
 type: decision
-tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR]
+tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-center, monitor]
 ---
 
-# Decision: Refactor Web UI to Vue 3 + FastAPI
+# Decision: Quantum Terminal Web SPA
 
-- **Date**: 2026-05-12
+- **Date**: 2026-05-12 (initial), 2026-05-16 (command center upgrade)
 - **Status**: Implemented
-- **Author**: Quant Agent
+- **Author**: Quant Agent + Codex
 
 ## Stack
 
@@ -28,23 +28,45 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR]
 ## 设计系统
 
 基于 Linear.app 设计语言适配量化终端场景：
-- 侧栏：72px 极窄图标列，hover tooltip
+- 侧栏：72px 极窄图标列，hover tooltip, SVG 图标
 - 配色：青色主调 (#06b6d4)，翠绿/琥珀策略分色
 - 卡片：暗色表面 + 半透明白边框 (`rgba(255,255,255,0.05)`)
 - 滑块：青色渐变轨道 + 光环 thumb
+- Regime 球体：CSS 动画光晕, 评分环形进度
+- 预警面板：多级颜色 (success/warning/danger/info)
 
-## 页面结构 (8 页)
+## 页面结构 (10 页)
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
-| 市场总览 | `/` | Regime 卡片 + 四策略参数可调滑块 + 保存/重跑 |
+| 指挥中心 | `/` | Regime 球体 + 多资产跟踪器 + 宏观快照 + 策略矩阵 + 智能预警 |
 | 策略中心 | `/strategies` | 信号表格 + WebSocket 进度 |
 | 模拟交易 | `/portfolio` | PaperBroker 仓位/委托 |
 | 个股搜索 | `/stocks` | 搜索入口 |
 | 个股深挖 | `/stocks/:code` | K线 + DCF计算器 + 巴菲特评分 + 策略信号 |
-| 回测分析 | `/backtest` | **N策略同屏叠加曲线 + 点击高亮 + 基准参照** |
+| 回测分析 | `/backtest` | N策略同屏叠加曲线 + 点击高亮 + 基准参照 |
 | 信号历史 | `/signals` | 信号变更追踪 |
+| 活动监视器 | `/monitor` | 🖥️ CPU/内存/Token 仪表盘 + 历史趋势图 |
 | 系统设置 | `/settings` | 通知开关 + 数据源状态 |
+
+### 指挥中心 (2026-05-16 Codex 升级)
+
+Market API 新增字段：
+- `multi_asset[]` — A股/黄金ETF/10Y国债/SHIBOR 实时卡片+42日趋势线
+- `macro[]` — GDP/PMI/CPI/SHIBOR 宏观快照
+- `strategy_matrix[]` — 4策略买比/评分/Top1标的
+- `alerts[]` — 智能预警 (regime/PMI偏离/黄金波动/策略完成)
+- `freshness` — 数据新鲜度时间戳
+
+前端 Market.vue 完全重写：从4张简单卡片升级为 Command Center 布局，含 animated regime orb、4资产跟踪器、宏观快照行、策略矩阵卡片、预警面板。仅读 Parquet 缓存，无网络阻塞。
+
+### 活动监视器 (2026-05-16)
+
+独立 SQLite WAL 时序库 `system_monitor.db`：
+- 每分钟 cron 采集 CPU/内存/磁盘/电池/Token
+- API: `/api/system/monitor` (实时快照) + `/api/system/history` (趋势)
+- 前端: ActivityMonitor.vue, canvas 迷你趋势图
+- Token 三来源覆盖: Hermes state.db + factor_hypothesis log + Hindsight /metrics
 
 ## DuckDB 读写分离
 

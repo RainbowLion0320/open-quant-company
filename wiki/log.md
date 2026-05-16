@@ -10,6 +10,13 @@ tags: [log]
 
 > 操作日志。追加模式。
 
+## [2026-05-16] codex | 指挥中心升级 + wiki同步
+- Codex: Market API 扩展 (multi_asset/macro/alerts) + Market.vue 重写为 Command Center
+- 前端: Regime 动画球体, 多资产跟踪器, 策略矩阵, 智能预警
+- web-architecture.md: 更新为10页结构 + 指挥中心/活动监视器详情
+- 锦标赛: 5204全量结果 (多因子+65.97% 🥇, ML -38.63% ❌)
+- log.md/wiki同步
+
 ## [2026-05-16] plan | 下阶段计划 (Phase 5.1+)
 - 更新 ai-automation-roadmap.md: 当前进度 + P1/P2/P3 计划 + 瓶颈
 - P1 模型成熟度: regime ML推理/因子淘汰/A-B对比/LLM因子rerun
