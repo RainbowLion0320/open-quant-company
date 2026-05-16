@@ -9,7 +9,7 @@ tags: [index]
 # Wiki Index
 
 > Quant Agent 知识库目录。每行 = wikilink + 一句话概括。
-> Last updated: 2026-05-17 | Total pages: 15 ( + log + schema )
+> Last updated: 2026-05-17 | Total pages: 16 ( + log + schema )
 
 ## Concepts
 - [[system-architecture]] — **系统架构总览**：五层设计，4策略注册表，35特征体系，多资产架构，数据注册表
@@ -22,6 +22,7 @@ tags: [index]
 - [[financial-cache]] — 三层财务缓存 + PIT基本面/估值/资金/筹码/宏观因子提取
 
 - [[hindsight-graph]] — ★ Hindsight 记忆知识图谱可视化：Canvas 力导向图, 节点悬浮/点击探索
+- [[paper-trading]] — ★ 日频模拟交易: 信号→PaperBroker→Parquet持久化→Web展示
 
 ## Entities
 - [[tushare-mcp]] — Tushare MCP，258工具，2000积分（门槛制，不消耗）

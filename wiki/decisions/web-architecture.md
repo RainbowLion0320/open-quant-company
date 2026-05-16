@@ -41,7 +41,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 |------|------|------|
 | 指挥中心 | `/` | Regime 球体 + 多资产跟踪器 + 宏观快照 + 策略矩阵 + 智能预警 |
 | 策略中心 | `/strategies` | 信号表格 + WebSocket 进度 |
-| 模拟交易 | `/portfolio` | PaperBroker 仓位/委托 |
+| 模拟交易 | `/portfolio` | ★ PaperBroker 日频模拟: NAV权益曲线 + 持仓 + 交易记录 + 手动下单 |
 | 个股搜索 | `/stocks` | 搜索入口 |
 | 个股深挖 | `/stocks/:code` | K线 + DCF计算器 + 巴菲特评分 + 策略信号 |
 | 回测分析 | `/backtest` | N策略同屏叠加曲线 + 点击高亮 + 基准参照 |

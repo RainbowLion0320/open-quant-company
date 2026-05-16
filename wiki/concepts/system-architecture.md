@@ -29,8 +29,8 @@ LLM Research → 自动化R&D      Circuit Breaker → -15%熔断  Self-healing 
 
 **每一层都穿透所有策略，而非某一层对应某一策略：**
 
-- **认知层**运行在：`compute_signals.py` 调 ML 模型时 → build_features 构建特征时 → factor_hypothesis 评估新因子时 → tournament 比较策略时。它不专属于 ML——巴菲特策略也通过 PIT 特征存储获取财务数据。
-- **约束层**运行在：`PaperBroker.submit_order()` 提交前 → `build_features.py` 构建特征前清洗 → `tune_model.py` 滚动窗口 CV 防过拟合 → cron 遵守 API rate limit。它不专属于巴菲特——ML 策略同样受 5 规则风控。
+- **认知层**运行在：`scripts/compute_signals.py` 调 ML 模型时 → `scripts/build_features.py` 构建特征时 → factor_hypothesis 评估新因子时 → tournament 比较策略时。它不专属于 ML——巴菲特策略也通过 PIT 特征存储获取财务数据。
+- **约束层**运行在：`PaperBroker.submit_order()` 提交前 → `scripts/build_features.py` 构建特征前清洗 → `scripts/tune_model.py` 滚动窗口 CV 防过拟合 → cron 遵守 API rate limit。它不专属于巴菲特——ML 策略同样受 5 规则风控。
 - **执行层**运行在：cron 调度扫描 → workflow 引擎执行 pipeline → WebSocket 推送进度 → telegram 发送信号 → DuckDB :memory: 零锁查询。它不专属于控制论——所有策略共享同一执行基础设施。
 
 三层在**四回路反馈**交汇：
@@ -53,7 +53,7 @@ LLM Research → 自动化R&D      Circuit Breaker → -15%熔断  Self-healing 
 │  broker/risk.py — 5 pluggable rules                      │
 │  max_single_position / max_total_exposure / circuit_breaker│
 ├──────────────────────────────────────────────────────────┤
-│  Execution Layer (compute_signals.py, 15:30 CST cron)    │
+│  Execution Layer (scripts/compute_signals.py, 15:30 CST cron)    │
 │  4 strategies + Telegram @buffett0320_bot                │
 ├──────────────────────────────────────────────────────────┤
 │  Multi-Asset Layer (Phase 5.1)                           │
@@ -109,15 +109,14 @@ strategies:
    OHLCV 完整性 → 异常值检测(保留涨跌停) → 停牌过滤 → 缺失值填充
    → 清洗报告 (丢弃/填充/缩尾统计)
 
-3. 特征构建 (build_features.py)
+3. 特征构建 (scripts/build_features.py)
    因子 × 股票 × 月数 → data/store/features/YYYY-MM.parquet (PIT, 零前视, 严格20交易日前向收益)
-   → data/store/features/YYYY-MM.parquet (PIT, 零前视)
 
-4. 模型训练 (tune_model.py)
+4. 模型训练 (scripts/tune_model.py)
    LightGBM + Optuna + 滚动窗口CV (48月训练/6月测试)
    → data/models/lgbm_best.pkl
 
-5. 策略计算 (compute_signals.py, 每日 15:30)
+5. 策略计算 (scripts/compute_signals.py, 每日 15:30)
    for each strategy in Registry:
      scorer → signals → data/store/signals/{strategy}.parquet
 
@@ -165,6 +164,8 @@ strategies:
 | 控制论 | `cybernetics/orchestrator.py` | 月线Regime检测 + 自适应参数 |
 | 工作流 | `scripts/run_workflow.py` | qrun-style pipeline |
 | 锦标赛 | `scripts/strategy_tournament.py` | 多策略自动对比 |
+| 模拟执行 | `scripts/execute_paper_trades.py` | ★ 日频: 信号→下单→NAV→持久化 |
+| 状态持久化 | `broker/persistence.py` | ★ PaperBroker Parquet 序列化 |
 | 多资产锦标赛 | `scripts/multi_asset_tournament.py` | 二资产分配验证 |
 | 因子发现 | `scripts/factor_hypothesis.py` | LLM因子假说→DSL→IC/OOS |
 | 日频扫描 | `scripts/compute_signals.py` | Cron 15:30, 4策略 |
@@ -181,6 +182,7 @@ strategies:
 | 图谱API | `web/api/routes/hindsight.py` | ★ `/api/hindsight/graph` — 知识图谱数据端点 |
 | 活动监视器 | `web/frontend/src/views/ActivityMonitor.vue` | 🖥️ CPU/内存/Token 仪表盘 |
 | 记忆图谱 | `web/frontend/src/views/HindsightGraph.vue` | ★ Canvas力导向图, Hindsight知识图谱可视化 |
+| 模拟交易 | `web/frontend/src/views/Portfolio.vue` | ★ PaperBroker 日频模拟, NAV曲线+持仓+交易记录 |
 | 回测引擎 | `backtest/run_all_strategies.py` | 日频引擎 + 策略自主调仓 |
 | 回测评分 | `backtest/buffett_real_scorer.py` | PIT滚动评分器 |
 | 风险分析 | `backtest/analytics.py` | 15项风险指标 |
@@ -212,7 +214,7 @@ strategies:
 | 筹码集中 | 2 | Tushare holders | holder_change_pct, holder_concentration |
 | 宏观经济 | 4 | AKShare macro | macro_pmi, macro_shibor_3m, macro_shibor_on, macro_cpi |
 
-### 基本面+估值 (14, build_features.py)
+### 基本面+估值 (14, scripts/build_features.py)
 
 | 维度 | 数量 | 来源 | 因子 |
 |------|:--:|------|------|
@@ -254,3 +256,5 @@ strategies:
 - [[strategy-evolution]] — 策略迭代历史 + 回测结果
 - [[buffett-rolling-backtest]] — 滚动回测 + 前视偏差修复
 - [[cybernetics-regime]] — 月线Regime检测 ★
+- [[multifactor-scoring]] — 四维打分引擎
+- [[paper-trading]] — ★ 日频模拟交易系统

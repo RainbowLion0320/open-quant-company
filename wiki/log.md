@@ -10,6 +10,13 @@ tags: [log]
 
 > 操作日志。追加模式。
 
+## [2026-05-17] create | Paper Trading 模拟交易系统
+- 创建 concepts/paper-trading.md — 日频执行, Parquet持久化, Web展示, 风控集成
+- 更新 concepts/system-architecture.md — 模拟执行+状态持久化+模拟交易加入关键模块表
+- 更新 decisions/web-architecture.md — 模拟交易页描述更新为完整功能
+- 更新 index.md — 16页, 新增 paper-trading 条目
+- 模块文件: broker/persistence.py + scripts/execute_paper_trades.py + web/api/routes/portfolio.py + Portfolio.vue
+
 ## [2026-05-17] create | Hindsight 知识图谱模块
 - 创建 concepts/hindsight-graph.md — Canvas 力导向图, 4链接类型, 交互设计
 - 更新 decisions/web-architecture.md — 10→11页, 记忆图谱专节

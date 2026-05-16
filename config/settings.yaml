@@ -383,6 +383,26 @@ trading:
     signal_change_only: true
 
 # ═══════════════════════════════════════════════════════════
+# ★ Paper Trading (模拟交易) — Phase 5.2
+# 日频信号→次日开盘模拟成交→Parquet持久化→Web展示
+# broker/persistence.py + scripts/execute_paper_trades.py
+# ═══════════════════════════════════════════════════════════
+paper_trading:
+  enabled: true
+  initial_cash: 1000000           # 初始资金
+  commission_rate: 0.00081        # 完整买卖成本(印花税+佣金+过户费)
+  t_plus_1: true                  # T+1限制
+  risk_enabled: true              # 启用RiskManager预检
+  store_dir: data/store/paper     # 持久化存储目录
+  strategies:                     # 参与模拟交易的策略
+    - buffett
+    - multifactor
+    - cybernetic
+    - ml_lgbm
+  execution_price: close          # 成交价: close(收盘价模拟) | open(开盘价)
+  auto_execute: false             # cron是否自动执行 (手动执行时false)
+
+# ═══════════════════════════════════════════════════════════
 # ★ Data Dimension Registry (Phase 4.1)
 # Single source of truth for ALL data dimensions across ALL asset types.
 # status: available | rate_limited | paid | planned

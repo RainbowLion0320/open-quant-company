@@ -57,3 +57,4 @@ web/frontend/vite.config.js
 backtest/results/
 *.html
 .streamlit/
+data/store/paper/

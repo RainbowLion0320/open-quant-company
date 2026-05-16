@@ -3,69 +3,131 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">模拟交易</h1>
-        <p class="page-subtitle">PaperBroker · T+1 制度 · 实盘成本模拟</p>
+        <p class="page-subtitle">PaperBroker · T+1 制度 · 日频执行 · 持久化存储</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-sm" @click="refresh" :disabled="loading">
+          {{ loading ? '刷新中...' : '刷新状态' }}
+        </button>
+        <button class="btn btn-sm btn-primary" @click="loadAll" :disabled="loading">
+          载入数据
+        </button>
       </div>
     </div>
 
-    <!-- Balance Card -->
-    <div class="grid grid-cols-4 gap-3">
+    <!-- Balance Cards -->
+    <div class="grid grid-cols-5 gap-3">
       <div class="glass-card" style="padding:14px 16px">
         <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">总资产</div>
-        <div class="text-xl font-bold font-mono mt-1" style="color:var(--accent)">¥{{ balance.total_value?.toLocaleString() || '—' }}</div>
+        <div class="text-xl font-bold font-mono mt-1" style="color:var(--accent)">
+          ¥{{ summary.total_asset?.toLocaleString() || '—' }}
+        </div>
       </div>
       <div class="glass-card" style="padding:14px 16px">
         <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">可用现金</div>
-        <div class="text-lg font-mono mt-1" style="color:var(--text-secondary)">¥{{ balance.cash?.toLocaleString() || '—' }}</div>
-      </div>
-      <div class="glass-card" style="padding:14px 16px">
-        <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">总盈亏</div>
-        <div class="text-lg font-bold font-mono mt-1" :style="{ color: (balance.total_pnl||0) >= 0 ? 'var(--positive)' : 'var(--negative)' }">
-          {{ fmtPnl(balance.total_pnl) }}
+        <div class="text-lg font-mono mt-1" style="color:var(--text-secondary)">
+          ¥{{ summary.cash?.toLocaleString() || '—' }}
         </div>
       </div>
       <div class="glass-card" style="padding:14px 16px">
-        <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">收益率</div>
-        <div class="text-lg font-bold font-mono mt-1" :style="{ color: (balance.total_pnl_pct||0) >= 0 ? 'var(--positive)' : 'var(--negative)' }">
-          {{ fmtPct(balance.total_pnl_pct) }}
+        <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">持仓市值</div>
+        <div class="text-lg font-mono mt-1" style="color:var(--text-secondary)">
+          ¥{{ summary.market_value?.toLocaleString() || '—' }}
         </div>
+      </div>
+      <div class="glass-card" style="padding:14px 16px">
+        <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">总收益</div>
+        <div class="text-lg font-bold font-mono mt-1" :style="{ color: summary.total_return_pct >= 0 ? 'var(--positive)' : 'var(--negative)' }">
+          {{ fmtReturn(summary.total_return_pct) }}
+        </div>
+      </div>
+      <div class="glass-card" style="padding:14px 16px">
+        <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">最高权益</div>
+        <div class="text-lg font-mono mt-1" style="color:var(--text-secondary)">
+          ¥{{ (summary.peak_equity || 0).toLocaleString() }}
+        </div>
+      </div>
+    </div>
+
+    <!-- NAV Equity Curve -->
+    <div class="glass-card" style="padding:20px">
+      <div class="flex justify-between items-center mb-3">
+        <div class="text-xs font-semibold tracking-wide" style="color:var(--text-secondary)">
+          权益曲线 ({{ navData.length }} 天)
+        </div>
+      </div>
+      <div ref="chartRef" style="height:280px"></div>
+      <div v-if="!navData.length" class="text-xs text-center py-10" style="color:var(--text-disabled)">
+        暂无数据 — 运行 python scripts/execute_paper_trades.py 生成 NAV
       </div>
     </div>
 
     <!-- Positions -->
     <div class="glass-card" style="padding:20px">
-      <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">当前持仓</div>
+      <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">
+        当前持仓 ({{ positions.length }})
+      </div>
       <table class="data-table" v-if="positions.length">
         <thead>
           <tr>
             <th>代码</th><th>名称</th><th class="text-right">数量</th>
             <th class="text-right">成本</th><th class="text-right">现价</th>
-            <th class="text-right">盈亏</th><th class="text-right">比例</th>
+            <th class="text-right">市值</th><th class="text-right">盈亏</th><th class="text-right">比例</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in positions" :key="p.symbol">
-            <td class="font-mono">{{ p.symbol }}</td>
+          <tr v-for="p in positions" :key="p.code">
+            <td class="font-mono" style="color:var(--accent)">{{ p.code }}</td>
             <td>{{ p.name }}</td>
-            <td class="text-right font-mono">{{ p.shares }}</td>
-            <td class="text-right font-mono">¥{{ p.cost?.toFixed(2) }}</td>
-            <td class="text-right font-mono">¥{{ p.price?.toFixed(2) }}</td>
+            <td class="text-right font-mono">{{ p.volume }}</td>
+            <td class="text-right font-mono">¥{{ p.avg_cost?.toFixed(2) }}</td>
+            <td class="text-right font-mono">¥{{ p.current_price?.toFixed(2) }}</td>
+            <td class="text-right font-mono">¥{{ (p.market_value || 0).toLocaleString() }}</td>
             <td class="text-right font-mono" :style="{ color: (p.pnl||0) >= 0 ? 'var(--positive)' : 'var(--negative)' }">
               {{ fmtPnl(p.pnl) }}
             </td>
             <td class="text-right font-mono" :style="{ color: (p.pnl_pct||0) >= 0 ? 'var(--positive)' : 'var(--negative)' }">
-              {{ fmtPct(p.pnl_pct) }}
+              {{ (p.pnl_pct || 0).toFixed(1) }}%
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-else class="empty-state" style="padding:24px">
-        <span>暂无持仓</span>
+      <div v-else class="empty-state" style="padding:24px">暂无持仓</div>
+    </div>
+
+    <!-- Trade History -->
+    <div class="glass-card" style="padding:20px">
+      <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">
+        交易记录 ({{ tradeTotal }} 笔)
       </div>
+      <table class="data-table" v-if="trades.length">
+        <thead>
+          <tr>
+            <th>日期</th><th>代码</th><th>方向</th>
+            <th class="text-right">价格</th><th class="text-right">数量</th>
+            <th class="text-right">金额</th><th>策略</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="t in trades" :key="t.code + t.date + t.side">
+            <td class="font-mono text-[10px]">{{ t.date }}</td>
+            <td class="font-mono" style="color:var(--accent)">{{ t.code }}</td>
+            <td :style="{ color: t.side === 'buy' ? 'var(--positive)' : 'var(--negative)' }">
+              {{ t.side === 'buy' ? '买入' : '卖出' }}
+            </td>
+            <td class="text-right font-mono">¥{{ t.price?.toFixed(2) }}</td>
+            <td class="text-right font-mono">{{ t.volume }}</td>
+            <td class="text-right font-mono">¥{{ (t.amount || 0).toLocaleString() }}</td>
+            <td class="text-[10px]" style="color:var(--text-tertiary)">{{ t.strategy }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else class="empty-state" style="padding:24px">暂无交易记录</div>
     </div>
 
     <!-- Order Form -->
     <div class="glass-card" style="padding:20px">
-      <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">下单</div>
+      <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">手动下单 (测试用)</div>
       <div class="flex gap-3 items-end">
         <div class="flex-1">
           <div class="text-[10px] mb-1" style="color:var(--text-disabled)">股票代码</div>
@@ -89,39 +151,145 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
-import { api } from "../api";
-import type { PortfolioPosition, PortfolioBalance } from "../api";
+import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from "vue";
+import * as echarts from "echarts";
 
-const positions = ref<PortfolioPosition[]>([]);
-const balance = ref<PortfolioBalance>({ cash: 0, total_value: 0, total_pnl: 0, total_pnl_pct: 0 });
+interface Position {
+  code: string; name: string; volume: number; avg_cost: number;
+  current_price: number; market_value: number; pnl: number; pnl_pct: number;
+}
+interface NavPoint { date: string; total_asset: number; cash: number; market_value: number; }
+interface Trade {
+  date: string; code: string; name: string; side: string;
+  price: number; volume: number; amount: number; strategy: string;
+}
+interface Summary {
+  total_asset: number; cash: number; market_value: number;
+  total_return: number; total_return_pct: number;
+  positions_count: number; peak_equity: number; nav_days: number;
+}
+
+const positions = ref<Position[]>([]);
+const navData = ref<NavPoint[]>([]);
+const trades = ref<Trade[]>([]);
+const tradeTotal = ref(0);
+const summary = ref<Summary>({
+  total_asset: 0, cash: 0, market_value: 0, total_return: 0,
+  total_return_pct: 0, positions_count: 0, peak_equity: 0, nav_days: 0,
+});
+const loading = ref(false);
 const order = reactive({ symbol: "", side: "buy" as "buy" | "sell", shares: 100 });
+const chartRef = ref<HTMLElement | null>(null);
+let chart: echarts.ECharts | null = null;
 
 function fmtPnl(v: number | undefined) {
   if (v == null) return "—";
-  return (v >= 0 ? "+" : "") + "¥" + Math.abs(v).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const sign = v >= 0 ? "+" : "";
+  return sign + "¥" + Math.abs(v).toLocaleString("zh-CN", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
-function fmtPct(v: number | undefined) {
-  if (v == null) return "—";
-  return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%";
+function fmtReturn(v: number | undefined) {
+  if (v == null || v === 0) return "0.00%";
+  return (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
 }
 
-async function load() {
+async function loadAll() {
+  loading.value = true;
   try {
-    positions.value = await api.portfolioPositions();
-    balance.value = await api.portfolioBalance();
-  } catch {}
+    const [posRes, navRes, tradeRes, sumRes] = await Promise.all([
+      fetch("/api/portfolio/positions").then(r => r.json()),
+      fetch("/api/portfolio/nav").then(r => r.json()),
+      fetch("/api/portfolio/trades?limit=50").then(r => r.json()),
+      fetch("/api/portfolio/summary").then(r => r.json()),
+    ]);
+
+    positions.value = (posRes.positions || []).map((p: any) => ({
+      code: p.code, name: p.name, volume: p.volume,
+      avg_cost: p.avg_cost, current_price: p.current_price,
+      market_value: p.market_value, pnl: p.pnl, pnl_pct: p.pnl_pct,
+    }));
+
+    navData.value = navRes.nav || [];
+    trades.value = tradeRes.trades || [];
+    tradeTotal.value = tradeRes.total || 0;
+
+    const s = sumRes;
+    summary.value = {
+      total_asset: s.balance?.total_asset || 0,
+      cash: s.balance?.cash || 0,
+      market_value: s.position_value || 0,
+      total_return: s.total_return || 0,
+      total_return_pct: s.total_return_pct || 0,
+      positions_count: s.positions_count || 0,
+      peak_equity: s.peak_equity || 0,
+      nav_days: s.nav_days || 0,
+    };
+
+    await nextTick();
+    renderChart();
+  } catch (e) {
+    console.error("Load portfolio failed:", e);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function refresh() {
+  loading.value = true;
+  try {
+    await fetch("/api/portfolio/refresh", { method: "POST" });
+    await loadAll();
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function submitOrder() {
   if (!order.symbol) return;
   try {
-    await api.portfolioOrder({ ...order });
+    await fetch("/api/portfolio/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: order.symbol, side: order.side, volume: order.shares, price: 0 }),
+    });
     order.symbol = "";
     order.shares = 100;
-    await load();
-  } catch {}
+    await loadAll();
+  } catch (e) {
+    console.error("Order failed:", e);
+  }
 }
 
-onMounted(load);
+function renderChart() {
+  if (!chartRef.value || !navData.value.length) return;
+
+  if (!chart) {
+    chart = echarts.init(chartRef.value);
+  }
+
+  const dates = navData.value.map(d => d.date);
+  const assets = navData.value.map(d => d.total_asset);
+
+  chart.setOption({
+    grid: { top: 8, right: 16, bottom: 24, left: 60 },
+    xAxis: { type: "category", data: dates, axisLine: { lineStyle: { color: "rgba(148,163,184,0.15)" } },
+      axisLabel: { color: "#64748b", fontSize: 9, interval: Math.max(1, Math.floor(dates.length / 8)) } },
+    yAxis: { type: "value", axisLabel: { color: "#64748b", fontSize: 9, formatter: (v: number) => (v / 10000).toFixed(0) + "万" },
+      splitLine: { lineStyle: { color: "rgba(148,163,184,0.06)" } } },
+    series: [{
+      type: "line", data: assets, showSymbol: false, smooth: true,
+      lineStyle: { color: "#00d4ff", width: 1.5 },
+      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: "rgba(0,212,255,0.12)" },
+        { offset: 1, color: "rgba(0,212,255,0.01)" },
+      ]) },
+      markLine: { silent: true, symbol: "none", lineStyle: { color: "rgba(255,255,255,0.15)", type: "dashed", width: 1 },
+        data: [{ yAxis: 1_000_000, label: { formatter: "本金", color: "#64748b", fontSize: 9 } }] },
+    }],
+  }, true);
+}
+
+watch(navData, () => nextTick(renderChart));
+
+onMounted(loadAll);
+onUnmounted(() => { chart?.dispose(); });
 </script>
