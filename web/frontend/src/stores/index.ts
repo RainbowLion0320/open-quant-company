@@ -6,6 +6,13 @@ export const useMarketStore = defineStore("market", () => {
   const kline = ref<any[]>([]);
   const config = ref<any>({});
   const registry = ref<any[]>([]);
+  const multiAsset = ref<any[]>([]);
+  const macro = ref<any[]>([]);
+  const strategyMatrix = ref<any[]>([]);
+  const alerts = ref<any[]>([]);
+  const freshness = ref<any>({});
+  const updated = ref("");
+  const poolSize = ref(0);
   const loading = ref(false);
   const error = ref("");
 
@@ -20,6 +27,13 @@ export const useMarketStore = defineStore("market", () => {
       kline.value = data.kline;
       config.value = data.config;
       registry.value = data.registry || [];
+      multiAsset.value = data.multi_asset || [];
+      macro.value = data.macro || [];
+      strategyMatrix.value = data.strategy_matrix || [];
+      alerts.value = data.alerts || [];
+      freshness.value = data.freshness || {};
+      updated.value = data.updated || "";
+      poolSize.value = data.pool_size || 0;
     } catch (e: any) {
       error.value = e.message;
     } finally {
@@ -27,7 +41,10 @@ export const useMarketStore = defineStore("market", () => {
     }
   }
 
-  return { regime, kline, config, registry, loading, error, fetchMarket };
+  return {
+    regime, kline, config, registry, multiAsset, macro, strategyMatrix,
+    alerts, freshness, updated, poolSize, loading, error, fetchMarket,
+  };
 });
 
 export const useStrategyStore = defineStore("strategy", () => {

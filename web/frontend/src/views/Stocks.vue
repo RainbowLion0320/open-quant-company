@@ -89,12 +89,11 @@
       </div>
 
       <router-link :to="`/stocks/${stock.basic.symbol}`" class="btn btn-sm mt-4" style="border-color:rgba(0,212,255,0.2); color:var(--accent)">
-        查看详细 →
+        查看详细
       </router-link>
     </div>
 
     <div v-else-if="searched && !stock" class="empty-state">
-      <div class="text-2xl mb-2">🔍</div>
       未找到该股票
     </div>
   </div>

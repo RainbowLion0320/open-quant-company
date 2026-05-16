@@ -61,11 +61,65 @@ export interface StrategyMeta {
   enabled: boolean;
 }
 
+export interface MarketSeriesPoint {
+  date: string;
+  value: number;
+}
+
+export interface MarketAssetCard {
+  key: string;
+  label: string;
+  symbol: string;
+  value: number | null;
+  change: number;
+  change_pct: number;
+  unit: string;
+  series: MarketSeriesPoint[];
+}
+
+export interface MacroCard {
+  key: string;
+  label: string;
+  value: number | null;
+  prev: number | null;
+  unit: string;
+  date: string;
+  series: MarketSeriesPoint[];
+}
+
+export interface StrategyMatrixRow {
+  name: string;
+  label: string;
+  total: number;
+  buys: number;
+  buy_ratio: number;
+  score: number;
+  signal: "buy" | "hold" | "sell";
+  top_symbol: string;
+  top_name: string;
+  industry: string;
+  last_computed: string;
+}
+
+export interface MarketAlert {
+  level: "success" | "warning" | "danger" | "info";
+  title: string;
+  detail: string;
+  time: string;
+}
+
 export interface MarketResponse {
   regime: RegimeData;
   kline: KlinePoint[];
   config: Record<string, any>;
   registry: StrategyMeta[];
+  multi_asset?: MarketAssetCard[];
+  macro?: MacroCard[];
+  strategy_matrix?: StrategyMatrixRow[];
+  alerts?: MarketAlert[];
+  freshness?: { market: string; macro: string };
+  pool_size?: number;
+  updated?: string;
 }
 
 export interface StrategySignal {

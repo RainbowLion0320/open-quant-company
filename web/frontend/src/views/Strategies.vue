@@ -6,7 +6,7 @@
         <p class="page-subtitle">扫描控制台 · 信号查看 · 手动触发</p>
       </div>
       <button @click="runAll" :disabled="store.running" class="btn btn-primary btn-sm">
-        {{ store.running ? `运行中 ${store.progress}%` : '▶ 运行全部' }}
+        {{ store.running ? `运行中 ${store.progress}%` : '运行全部' }}
       </button>
     </div>
 

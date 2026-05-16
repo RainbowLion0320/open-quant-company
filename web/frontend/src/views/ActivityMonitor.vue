@@ -2,7 +2,6 @@
   <div class="monitor-page">
     <div class="glass-card p-6">
       <div class="flex items-center gap-2 mb-4">
-        <span class="text-lg">🖥️</span>
         <h2 class="text-lg font-semibold" style="color:var(--text-primary)">活动监视器</h2>
         <span class="text-2xs px-2 py-0.5 rounded" style="background:var(--bg-active);color:var(--text-disabled)">{{ elapsed }}s前</span>
         <button @click="fetchData" class="text-xs px-2 py-1 rounded" style="background:var(--accent);color:#000">刷新</button>
@@ -41,8 +40,8 @@
         <div class="metric-card">
           <div class="text-2xs" style="color:var(--text-disabled)">电池</div>
           <div class="flex items-center gap-1">
-            <span class="text-lg">{{ data?.battery?.charging ? '⚡' : '🔋' }}</span>
             <span class="text-xl font-mono font-bold" style="color:var(--positive)">{{ data?.battery?.percent ?? '—' }}%</span>
+            <span class="text-2xs" style="color:var(--text-disabled)">{{ data?.battery?.charging ? 'charging' : 'battery' }}</span>
           </div>
         </div>
         <div class="metric-card">
@@ -60,7 +59,7 @@
           <div>
             <div class="text-2xs" style="color:var(--text-disabled)">Hermes 会话</div>
             <div class="text-xs font-mono mt-0.5" style="color:var(--text-secondary)">
-              📥 {{ fmtNum(data?.token?.hermes?.input_tokens ?? 0) }}  📤 {{ fmtNum(data?.token?.hermes?.output_tokens ?? 0) }}
+              IN {{ fmtNum(data?.token?.hermes?.input_tokens ?? 0) }}  OUT {{ fmtNum(data?.token?.hermes?.output_tokens ?? 0) }}
             </div>
             <div class="text-2xs" style="color:var(--accent)">${{ (data?.token?.hermes?.cost_usd ?? 0).toFixed(4) }}</div>
           </div>
@@ -69,7 +68,7 @@
               外部调用 <span v-if="(data?.token?.external?.sources ?? []).length">({{ data?.token?.external?.sources?.join(', ') }})</span>
             </div>
             <div class="text-xs font-mono mt-0.5" :style="{color: (data?.token?.external?.input_tokens ?? 0) > 0 ? 'var(--text-secondary)' : 'var(--text-disabled)'}">
-              📥 {{ fmtNum(data?.token?.external?.input_tokens ?? 0) }}  📤 {{ fmtNum(data?.token?.external?.output_tokens ?? 0) }}
+              IN {{ fmtNum(data?.token?.external?.input_tokens ?? 0) }}  OUT {{ fmtNum(data?.token?.external?.output_tokens ?? 0) }}
             </div>
             <div class="text-2xs" :style="{color: (data?.token?.external?.cost_usd ?? 0) > 0 ? 'var(--accent)' : 'var(--text-disabled)'}">
               ${{ (data?.token?.external?.cost_usd ?? 0).toFixed(4) }} ({{ data?.token?.external?.calls ?? 0 }} calls)
@@ -79,7 +78,7 @@
         <div class="mt-2 pt-2 flex justify-between" style="border-top:1px solid var(--border-subtle)">
           <span class="text-xs font-bold" style="color:var(--text-primary)">合计 ${{ (data?.token?.total?.cost_usd ?? 0).toFixed(4) }}</span>
           <span class="text-2xs" style="color:var(--text-disabled)">
-            📥 {{ fmtNum(data?.token?.total?.input_tokens ?? 0) }} 📤 {{ fmtNum(data?.token?.total?.output_tokens ?? 0) }}
+            IN {{ fmtNum(data?.token?.total?.input_tokens ?? 0) }} OUT {{ fmtNum(data?.token?.total?.output_tokens ?? 0) }}
           </span>
         </div>
       </div>
@@ -202,7 +201,7 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 </script>
 
 <style scoped>
-.monitor-page { padding: 24px; max-width: 800px; margin: 0 auto; }
+.monitor-page { padding: 18px; max-width: 1280px; margin: 0 auto; }
 .metric-card { background: var(--glass-bg); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 12px; }
 .progress-bar { height: 3px; border-radius: 2px; transition: width 0.5s ease; min-width: 0; }
 </style>
