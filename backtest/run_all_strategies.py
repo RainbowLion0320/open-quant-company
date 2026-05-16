@@ -79,6 +79,7 @@ def build_monthly_regime(bench_close_series):
 def run_backtest(name, pool, prices, bench_close, score_fn, start, end, cash=1_000_000):
     """通用回测引擎 — 逐日评估，策略自主决定调仓日"""
     # 策略调仓规则：默认月初，可通过 score_fn.should_rebalance 自定义
+    # should_rebalance 签名: (dt, regime, last_regime, holdings, current_price) → bool
     should_rebal = getattr(score_fn, "should_rebalance", None)
     last_regime = None
 
@@ -106,16 +107,14 @@ def run_backtest(name, pool, prices, bench_close, score_fn, start, end, cash=1_0
         # ── 市场状态（从月线预计算字典查）──
         regime = monthly_regimes.get(dt.strftime("%Y-%m"), "sideways")
 
-        # ── 调仓决策 ──
+        # ── 调仓决策 (信号驱动, 非日历驱动) ──
         do_rebalance = False
         if should_rebal is not None:
-            do_rebalance = should_rebal(dt, regime, last_regime)
-        elif dt.day <= 7 and (last_regime is None or last_regime != regime):
-            # 默认：每月前7天 + regime 变化时调仓
+            do_rebalance = should_rebal(dt, regime, last_regime, holdings, current_price)
+        elif last_regime is None or last_regime != regime:
             do_rebalance = True
         else:
-            # 默认后备：每月前7天
-            do_rebalance = (dt.day <= 7)
+            do_rebalance = False
 
         if do_rebalance:
             rebal_count += 1
@@ -144,6 +143,10 @@ def run_backtest(name, pool, prices, bench_close, score_fn, start, end, cash=1_0
             if scores:
                 ranked = sorted(scores.items(), key=lambda x: -x[1])[:8]
                 target = {s for s, _ in ranked}
+
+                # 记录本次 target 供信号驱动调仓的下次重叠判断
+                if name == "multifactor":
+                    _multifactor_last_target = target
 
                 # ── 卖出 ──
                 for sym in list(holdings):
@@ -221,9 +224,58 @@ buffett_scorer._scorer = None
 buffett_scorer._pool = []
 
 
-def _buffett_rebal(dt, regime, last_regime):
-    """巴菲特调仓: 每年第一个月"""
-    return dt.month == 1 and dt.day <= 7
+# ════════════════════════════════════════════════════
+# 低成本低频规则 — 信号驱动, 非日历驱动
+# ════════════════════════════════════════════════════
+
+def _overlap_ratio(target_set: set, holdings: dict) -> float:
+    """当前持仓和目标持仓的重叠度 (0-1)"""
+    held = set(holdings.keys())
+    if not held:
+        return 0.0
+    return len(target_set & held) / len(held)
+
+
+def _position_drift(holdings: dict, current_price, target_pct: float = 0.125) -> float:
+    """最大仓位漂移 (相对目标的偏离百分比)。
+    持仓<3只时不计算漂移 (集中持仓不适合漂移触发)"""
+    if len(holdings) < 3:
+        return 0.0
+    total = 0.0
+    values = {}
+    for sym, shares in holdings.items():
+        try:
+            p = float(current_price[sym])
+        except Exception:
+            continue
+        v = shares * p
+        values[sym] = v
+        total += v
+    if total <= 0:
+        return 0.0
+    # 动态目标权重: 1/N
+    n = len(values)
+    dyn_target = 1.0 / n if n > 0 else target_pct
+    max_drift = 0.0
+    for sym, v in values.items():
+        actual = v / total
+        drift = abs(actual - dyn_target) / dyn_target if dyn_target > 0 else 0.0
+        if drift > max_drift:
+            max_drift = drift
+    return max_drift
+
+
+# ── 巴菲特: 年报季 (4月底至5月中) ──
+_last_buffett_year = 0
+
+
+def _buffett_rebal(dt, regime, last_regime, holdings, current_price):
+    global _last_buffett_year
+    if dt.month in (4, 5) and dt.year != _last_buffett_year:
+        _last_buffett_year = dt.year
+        return True
+    return False
+
 
 buffett_scorer.should_rebalance = _buffett_rebal
 
@@ -289,21 +341,24 @@ def multifactor_scorer(sym, series, idx, regime):
     }
     return scorer.score(factors)
 
+# ── 多因子调仓: 信号重叠度 < 50% 或 仓位漂移 > 50% ──
+_multifactor_last_target = set()
 
-def _make_monthly_rebal():
-    """闭包: 每月仅调一次(月初第一个交易日)"""
-    last_month = -1
 
-    def _rebal(dt, regime, last_regime):
-        nonlocal last_month
-        if dt.month != last_month:
-            last_month = dt.month
-            return True
-        return False
+def _multifactor_rebal(dt, regime, last_regime, holdings, current_price):
+    global _multifactor_last_target
+    drift = _position_drift(holdings, current_price)
+    if drift > 1.0:
+        return True
+    overlap = _overlap_ratio(_multifactor_last_target, holdings)
+    if _multifactor_last_target and overlap < 0.5:
+        return True
+    if not holdings and not _multifactor_last_target:
+        return True
+    return False
 
-    return _rebal
 
-multifactor_scorer.should_rebalance = _make_monthly_rebal()
+multifactor_scorer.should_rebalance = _multifactor_rebal
 
 
 def cybernetic_scorer(sym, series, idx, regime):
@@ -319,23 +374,20 @@ def cybernetic_scorer(sym, series, idx, regime):
     return 30
 
 
-def _make_cybernetic_rebal():
-    """闭包: regime切换时调, 否则每月仅调一次"""
-    last_month = -1
+# ── 控制论调仓: 仅 regime 切换 + 漂移 > 50% ──
 
-    def _rebal(dt, regime, last_regime):
-        nonlocal last_month
-        if regime != last_regime:
-            last_month = dt.month
-            return True
-        if dt.month != last_month:
-            last_month = dt.month
-            return True
-        return False
+def _cybernetic_rebal(dt, regime, last_regime, holdings, current_price):
+    if regime != last_regime:
+        return True
+    drift = _position_drift(holdings, current_price)
+    if drift > 1.0:
+        return True
+    if not holdings:
+        return True
+    return False
 
-    return _rebal
 
-cybernetic_scorer.should_rebalance = _make_cybernetic_rebal()
+cybernetic_scorer.should_rebalance = _cybernetic_rebal
 
 
 # ══════════════════════════════════════════════════════════
@@ -376,7 +428,7 @@ if __name__ == "__main__":
             continue
         if name == "buffett":
             scorer._pool = pool
-        print(f"\n  {s['label']} (调仓: {'年' if name == 'buffett' else '周' if name == 'multifactor' else '双周/regime切换'})")
+        print(f"\n  {s['label']} (调仓: { '年报季' if name=='buffett' else '信号+漂移' if name=='multifactor' else 'regime+漂移' if name=='cybernetic' else '默认' })")
         results[name] = run_backtest(name, pool, prices, bc, scorer, start, end)
 
     comparison = {
