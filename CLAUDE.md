@@ -36,7 +36,7 @@
 ```
 基准 (CSI 300): -17.46%。完整结果见 `data/tournament/`。
 
-## 精选池 (2026-05-10扫描, 1000只全量)
+## 精选池 (2026-05-16扫描, 5517只全量)
 603288 海天味业 91分 | 002415 海康威视 88分 | 600036 招商银行 82分
 详情见 `data/store/signals/buffett_scan.parquet`
 
@@ -47,7 +47,7 @@
 ├── data/
 │   ├── fetcher.py                # AKShare 3源 fallback
 │   ├── financials.py             # 财务数据提取 (三层缓存)
-│   ├── symbols.py                # 1000只股票池 + 申万31行业
+│   ├── symbols.py                # 5517只全A股 + 申万31行业
 │   ├── feature_store.py          # PIT 特征存储 + enrich
 │   ├── data_registry.py          # 28维度注册表
 │   ├── cleaner.py                # 6规则数据清洗

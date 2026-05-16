@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """批量构建 PIT 特征 → data/store/features/YYYY-MM.parquet"""
-import os, sys, time
+import os, sys, time, socket
+socket.setdefaulttimeout(30)  # 全局网络超时30秒，防止AKShare卡死
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -18,7 +19,7 @@ from signals.expression import alpha_factors
 from data.feature_store import FEATURES_DIR, FeatureStoreBuilder, enrich_from_registry
 
 # ══════════════════════════════════════════════════════════
-N_STOCKS = 200
+N_STOCKS = 5517
 START = "2018-01"
 END = "2026-04"
 # ══════════════════════════════════════════════════════════
@@ -26,7 +27,12 @@ END = "2026-04"
 print(f"批量构建 PIT 特征: {N_STOCKS}只, {START}→{END}")
 
 factors = alpha_factors()
-symbols = list(CIRCLE_STOCKS)[:N_STOCKS]
+# 过滤已知无数据标的: 北交所(92xxxx), 退市/ST(689009等)
+_skip_prefixes = ('92', '83', '87', '43')  # 北交所 + 新三板 + 退市板
+symbols_raw = list(CIRCLE_STOCKS)[:N_STOCKS]
+symbols = [s for s in symbols_raw if not any(s.startswith(p) for p in _skip_prefixes)]
+if len(symbols) < len(symbols_raw):
+    print(f"  过滤掉 {len(symbols_raw)-len(symbols)} 只无效标的 (北交所/新三板/退市板), 剩余 {len(symbols)}")
 
 # ═══════════════════════════════════════════════
 # 预加载: 价格 + 财务数据

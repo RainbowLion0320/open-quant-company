@@ -157,7 +157,7 @@ strategies:
 | 加密适配器 | `data/assets/crypto.py` | CryptoAsset (占位, CCXT待接入) |
 | 数据获取 | `data/fetcher.py` | AKShare 3源 fallback |
 | 财务数据 | `data/financials.py` | 同花顺 → ROE/毛利/D-E |
-| 股票池 | `data/symbols.py` | 1000只, 申万31行业 |
+| 股票池 | `data/symbols.py` | 5517只, 全A股, 申万31行业 |
 | 资金流获取 | `data/fetchers/moneyflow.py` | 资金流向 |
 | 筹码获取 | `data/fetchers/holders.py` | 股东户数+增减持 |
 | 宏观获取 | `data/fetchers/macro.py` | PMI/M2/Shibor等7指标 |

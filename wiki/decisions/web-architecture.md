@@ -14,16 +14,16 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR]
 
 ## Stack
 
-| Layer | Choice | 说明 |
-|-------|--------|------|
-| Frontend | Vue 3 (Composition API) | SPA, 响应式 |
-| State | Pinia | 类型安全 store |
-| Charts | ECharts 5 | Canvas 渲染，万点级流畅 |
-| Styling | Tailwind CSS + CSS custom properties | 暗色主题，Linear-inspired design tokens |
-| Typography | Inter (Google Fonts) | `font-feature-settings: "cv01","ss03"` |
-| Build | Vite | ESM 原生 HMR |
-| Backend | FastAPI | 异步原生，Pydantic 校验 |
-| Real-time | WebSocket | 扫描进度推送 |
+| Layer      | Choice                               | 说明                                     |
+| ---------- | ------------------------------------ | -------------------------------------- |
+| Frontend   | Vue 3 (Composition API)              | SPA, 响应式                               |
+| State      | Pinia                                | 类型安全 store                             |
+| Charts     | ECharts 5                            | Canvas 渲染，万点级流畅                        |
+| Styling    | Tailwind CSS + CSS custom properties | 暗色主题，Linear-inspired design tokens     |
+| Typography | Inter (Google Fonts)                 | `font-feature-settings: "cv01","ss03"` |
+| Build      | Vite                                 | ESM 原生 HMR                             |
+| Backend    | FastAPI                              | 异步原生，Pydantic 校验                       |
+| Real-time  | WebSocket                            | 扫描进度推送                                 |
 
 ## 设计系统
 
@@ -49,10 +49,6 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR]
 ## DuckDB 读写分离
 
 Web 以 `get_db(read_only=True)` 连接 DuckDB。注意 macOS 不支持真正的并发读写——扫描和 Web 需串行执行。见 [[duckdb-migration]]。
-
-## 后端策略运行改进 (v4.3)
-
-`web/api/jobs.py` 不再重复实现策略逻辑，改为委托 `scripts/compute_signals.py` 中的 `compute_buffett/compute_multifactor/compute_cybernetic/compute_ml`。消除了 157 行重复代码。新增 `ml_lgbm` 策略支持。
 
 ## 相关
 

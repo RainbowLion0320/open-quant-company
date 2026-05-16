@@ -1,22 +1,70 @@
 ---
 title: AI 自动化交易框架路线图
 created: 2026-05-14
-updated: 2026-05-15
+updated: 2026-05-16
 type: decision
 tags: [AI, ML, RL, architecture, roadmap, strategy, factor-DSL, PIT, LightGBM, RD-Agent, LLM]
 ---
 
 # AI 自动化交易框架路线图
 
-从手调规则策略 → AI/ML 驱动的自动化 R&D 循环。借鉴 Microsoft Qlib 架构设计和 RD-Agent 自动化理念，在我们现有 Parquet 存储 + DuckDB 查询引擎基础上逐步演进。
+从手调规则策略 → AI/ML 驱动的自动化 R&D 循环。
 
-## 背景
+## 当前进度 (截至 2026-05-16)
 
-当前四策略体系：手调规则 (巴菲特 / 控制论 / 多因子) + ML (LightGBM)。目标是搭建能自动发现因子、训练模型、优化策略、自适应市场的框架。
+### 全A股扩满 ✅
 
-## 已完成 (截至 2026-05-15)
+- CIRCLE_STOCKS: 1000 → 5517 只 (过滤后 5204 有效)
+- PIT特征: 100月 × 5204只 × 53列, 427K行, PE/PB 覆盖 70-92%
+- 模型重训: Optuna 20 trials, CV IC 0.0373 (旧 0.0344), In-sample 0.6169
+- 锦标赛: 全量 5204 只 (4策略对比, 正在跑)
 
-### Phase 3.0 — ML 基础设施 ✅
+### 已完成的 Phase
+
+| Phase | 内容 | 状态 |
+|-------|------|:----:|
+| 1.0 | 数据基础 (AKShare日线, 三表, 申万行业) | ✅ |
+| 2.0 | 三策略体系 (巴菲特/多因子/控制论) | ✅ |
+| 2.5 | 策略注册表重构 (消除硬编码) | ✅ |
+| 3.0 | ML基础设施 (因子DSL, PIT特征, LightGBM) | ✅ |
+| 3.5 | 自动化R&D (build_features, tune_model, tournament) | ✅ |
+| 4.0 | LLM因子发现 + DSL解析 + IC/OOS验证 | ✅ |
+| 4.1 | 多资产架构 (5种资产适配器) | ✅ |
+| 4.2 | 28维度数据注册表 + PIT富化 | ✅ |
+| 4.3 | 风险控制 + 数据清洗 + 统一工作流 | ✅ |
+| 5.0 | 全A股扩满 + 模型全量重训 | 🔄 tournament跑中 |
+
+## 下阶段计划 (Phase 5.1+)
+
+### P1 — 模型成熟度
+
+- [ ] **regime ML 接入推理**: lgbm_{bull,bear,sideways}.pkl 已训好 (IC 0.91/0.92/0.74), 未接入 ml_signals.py 推理管线
+- [ ] **因子记分板自动淘汰**: `data/factor_scoreboard.py` 数据已累积, 缺自动淘汰逻辑 (IC<0.01 或 ICIR<0.3 连续三轮淘汰)
+- [ ] **模型 A/B 对比**: 新旧模型锦标赛并存, 自动切换更优模型
+- [ ] **LLM 因子发现 rerun**: prompt 已修正 (失败案例+Rule-of-Thumb), 待 `--rounds 3 --auto-register` 重跑
+
+### P2 — 数据广度
+
+- [ ] **ETF 真实行情**: 当前 index proxy 占位 (short-term), 待 AKShare `fund_etf_hist_em` 恢复或接入 Tushare 付费 ETF 数据
+- [ ] **Crypto CCXT 接入**: `data/assets/crypto.py` 框架已有, 需 `pip install ccxt` + 交易所 API key
+- [ ] **北向/融资融券 日常积累**: 限速慢, cron 后台慢慢填 (已有 scripts/cron_fetch_slow.py)
+- [ ] **因子/特征扩展到 ETF/债券**: 当前仅股票有完整 53 列特征
+
+### P3 — 生产化
+
+- [ ] **实盘 Broker 对接**: 当前 PaperBroker, 需券商 API (华泰/中信等)
+- [ ] **信号推送 Telegram**: 已有 @buffett0320_bot, 需确认每日推送稳定性
+- [ ] **Web 策略卡片实时数据**: 当前读 Parquet 静态快照, 可加 WebSocket 实时推送
+- [ ] **回测引擎加速**: 巴菲特 DCF 评分 5204 只是瓶颈, 可分批/并行/缓存中间结果
+
+## 瓶颈
+
+| 瓶颈 | 影响 | 缓解 |
+|------|------|------|
+| 网络不稳定 (AKShare/Tushare) | 数据拉取卡死 | 磁盘缓存 + socket 30s超时 |
+| Python DCF评分慢 (5204只) | 锦标赛 15min+ | 纯本地计算, 等就完了 |
+| ETF/Crypto 数据源空窗 | 多资产回测缺真数据 | index proxy 占位 |
+| 实盘需券商 API | 无法自动下单 | 信号推 Telegram, 手动确认 |
 
 | 任务 | 状态 | 产出 |
 |------|:--:|------|

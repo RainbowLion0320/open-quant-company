@@ -116,8 +116,10 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
     bench = bench.loc[pd.Timestamp(start):pd.Timestamp(end)]
 
     # 加载股票日线
+    print(f"  加载 {len(symbols)} 只日线...")
     prices_dict = {}
-    for sym in symbols:
+    t_load = time.monotonic()
+    for i, sym in enumerate(symbols):
         try:
             df = get_stock_daily(sym)
             if df is not None and len(df) > 60:
@@ -126,7 +128,9 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
                 prices_dict[sym] = df
         except Exception:
             pass
-    print(f"  有效股票: {len(prices_dict)}/{pool_size}")
+        if (i+1) % 1000 == 0:
+            print(f"    {i+1}/{len(symbols)} ({len(prices_dict)} valid, {time.monotonic()-t_load:.1f}s)")
+    print(f"  有效股票: {len(prices_dict)}/{pool_size} ({time.monotonic()-t_load:.1f}s)")
 
     # 检测 regime (月线)
     from backtest.run_all_strategies import build_monthly_regime
@@ -141,6 +145,7 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
     bench_ret_total = bench["close"].iloc[-1] / bench["close"].iloc[0] - 1
 
     for strategy in reg.get_enabled():
+        t_s0 = time.monotonic()
         print(f"\n── {strategy.label} ──")
         cash = 1_000_000
         holdings = {}
@@ -155,6 +160,7 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
             do_rebal = strategy.should_rebalance(dt, regime, last_regime)
 
             if do_rebal:
+                trade_count += 1
                 last_regime = regime
                 # 评分
                 scores = {}
@@ -175,7 +181,8 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
                         pd.Series({s: df.loc[dt, "close"] for s, df in prices_dict.items() if dt in df.index}),
                         cash,
                     )
-                    trade_count += 1
+                if trade_count % 20 == 0:
+                    print(f"  调仓 #{trade_count} ({dt.strftime('%Y-%m-%d')}), 候选 {len(scores)} 只, 持仓 {sum(holdings.values())} 股, {time.monotonic()-t_s0:.0f}s")
 
             # 计算当日净值
             mv = cash
@@ -196,6 +203,7 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
             report = FullReport()
 
         total_ret = values.iloc[-1] / values.iloc[0] - 1 if len(values) > 0 else 0
+        t_elapsed = time.monotonic() - t_s0
 
         results[strategy.name] = {
             "label": strategy.label,
@@ -207,7 +215,7 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
             "bench_return": round(bench_ret_total * 100, 2),
         }
 
-        print(f"  {strategy.label}: {total_ret*100:+.2f}% | Sharpe {report.sharpe:.2f} | MaxDD {report.max_drawdown*100:.1f}%")
+        print(f"  {strategy.label}: {total_ret*100:+.2f}% | Sharpe {report.sharpe:.2f} | MaxDD {report.max_drawdown*100:.1f}% ({t_elapsed:.0f}s)")
 
     # ══════════════════════════════════════════════════════
     # 排名 + 保存

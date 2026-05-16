@@ -2,6 +2,20 @@
 
 > 操作日志。追加模式。
 
+## [2026-05-16] plan | 下阶段计划 (Phase 5.1+)
+- 更新 ai-automation-roadmap.md: 当前进度 + P1/P2/P3 计划 + 瓶颈
+- P1 模型成熟度: regime ML推理/因子淘汰/A-B对比/LLM因子rerun
+- P2 数据广度: ETF真实行情/Crypto CCXT/北向积累/因子跨资产
+- P3 生产化: 实盘Broker/Telegram推送稳定性/WebSocket/回测加速
+- 核心引擎 90% 就绪, 锦标赛全量跑中
+
+## [2026-05-16] expand | 全A股扩满 (1000→5517只)
+- CIRCLE_STOCKS: 1000 → 5517 (AKShare stock_info_a_code_name() 全量)
+- universe_raw.json 更新 (5517条, 从沪深300+中证500成分股改为全量)
+- CLAUDE.md / wiki/system-architecture.md 同步更新
+- 特征重建后台运行中 (5517×100月, ~7-8h)
+- 下一步: 重训模型 + 全量锦标赛
+
 ## [2026-05-14] create | AI 自动化路线图 + Phase 3.0 基础设施
 - 新建 wiki/decisions/ai-automation-roadmap.md: 三阶段路线图
 - Phase 3.0-1: Strategy 接口形式化 (backtest/strategies/base.py)
