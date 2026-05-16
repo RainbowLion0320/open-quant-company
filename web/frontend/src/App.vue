@@ -102,6 +102,7 @@ const nav = [
   { path: "/backtest", label: "回测分析", icon: "📈" },
   { path: "/signals", label: "信号历史", icon: "📡" },
   { path: "/settings", label: "系统设置", icon: "⚙️" },
+  { path: "/monitor", label: "活动监视", icon: "🖥️" },
 ];
 
 const regimeLabel = computed(() => {

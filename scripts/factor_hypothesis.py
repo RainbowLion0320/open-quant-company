@@ -16,6 +16,36 @@ import os, sys, json, re
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
+from datetime import datetime
+
+# ── 共享 LLM token 记录器 (供活动监视器) ──
+_LLM_USAGE_FILE = os.path.expanduser("~/quant-agent/data/cache/llm_usage_today.json")
+
+def _log_llm_usage(source: str, usage, model: str):
+    """记录非 Hermes 网关的 LLM token 用量到共享缓存"""
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+        data = {}
+        if os.path.exists(_LLM_USAGE_FILE):
+            with open(_LLM_USAGE_FILE) as f:
+                data = json.load(f)
+        if data.get("date") != today:
+            data = {"date": today, "items": [], "total_input": 0, "total_output": 0, "total_cost": 0.0, "calls": 0}
+        inp = usage.prompt_tokens if hasattr(usage, 'prompt_tokens') else usage.get('prompt_tokens', 0)
+        out = usage.completion_tokens if hasattr(usage, 'completion_tokens') else usage.get('completion_tokens', 0)
+        # 费用估算 deepseek-v4-pro: $0.55/M in, $2.19/M out; v4-flash: $0.27/M in, $1.10/M out
+        cost_r = (0.55, 2.19) if "pro" in model else (0.27, 1.10)
+        cost = inp / 1_000_000 * cost_r[0] + out / 1_000_000 * cost_r[1]
+        data["items"].append({"source": source, "model": model, "input": inp, "output": out, "cost": round(cost, 6), "time": datetime.now().isoformat()})
+        data["total_input"] += inp
+        data["total_output"] += out
+        data["total_cost"] += cost
+        data["calls"] += 1
+        os.makedirs(os.path.dirname(_LLM_USAGE_FILE), exist_ok=True)
+        with open(_LLM_USAGE_FILE, "w") as f:
+            json.dump(data, f)
+    except Exception:
+        pass  # 静默失败, 不影响主流程
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -160,6 +190,10 @@ def generate_via_llm(n: int, existing: List[str],
         temperature=0.8,
     )
     text = response.choices[0].message.content
+
+    # 记录 token 用量到共享缓存 (供活动监视器统计)
+    if hasattr(response, 'usage') and response.usage:
+        _log_llm_usage("factor_hypothesis", response.usage, "deepseek-v4-pro")
 
     candidates = []
     json_blocks = re.findall(r'```json\s*(.*?)\s*```', text, re.DOTALL)

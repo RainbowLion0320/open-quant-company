@@ -1,3 +1,11 @@
+---
+title: Wiki Log
+created: 2026-05-13
+updated: 2026-05-16
+type: meta
+tags: [log]
+---
+
 # Wiki Log
 
 > 操作日志。追加模式。
@@ -171,8 +179,8 @@ Phase 3.0 (ML基础设施) + Phase 3.5 (自动化R&D) + Phase 4.0 (AI Agent) 已
   - 链接 ml-pipeline
 
 - **index.md**: 更新为14页。新增 ml-pipeline，策略数3→4，回测结果更新。
-- **SCHEMA.md**: 修复 `[[wikilinks]]` → backtick 引用；更新 tag taxonomy (ml 类、新策略)
-- **log.md**: 修复 `[[wikilinks]]` → backtick 引用；追加本条目
+- **SCHEMA.md**: 修复 wikilinks 语法示例 → backtick 引用；更新 tag taxonomy (ml 类、新策略)
+- **log.md**: 修复 wikilinks 语法示例 → backtick 引用；追加本条目
 
 ### 页面统计
 - 修改: 6页 (system-architecture, ai-automation-roadmap, duckdb-migration, cybernetics-regime, financial-cache, index)

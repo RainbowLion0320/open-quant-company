@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-from web.api.routes import market, strategies, stocks, portfolio, signals, settings, backtest
+from web.api.routes import market, strategies, stocks, portfolio, signals, settings, backtest, system
 from web.api.errors import register_error_handlers
 
 
@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(signals.router)
     app.include_router(settings.router)
     app.include_router(backtest.router)
+    app.include_router(system.router)
 
     register_error_handlers(app)
 

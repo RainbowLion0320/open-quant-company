@@ -1,3 +1,11 @@
+---
+title: Wiki Schema
+created: 2026-05-14
+updated: 2026-05-16
+type: meta
+tags: [wiki, schema]
+---
+
 # Wiki Schema
 
 ## Domain
@@ -32,7 +40,7 @@ wiki/
 - 文件名: lowercase-hyphens.md
 - 每页必须有 YAML frontmatter (title, created, updated, type, tags)
 - raw/ 下的素材也有 frontmatter (source_url, ingested, sha256)
-- 使用 `[[page-name]]` wikilink 语法（示例：`[[system-architecture]]`）链接其它页面，至少2个出站链接
+- 使用 Wikilink 语法（如 \`[[system-architecture]]\`）链接其它页面，至少2个出站链接
 - 更新时修改 `updated` 日期
 - 新页面加入 `index.md` 对应分区，按字母序
 - 所有操作追加到 `log.md`

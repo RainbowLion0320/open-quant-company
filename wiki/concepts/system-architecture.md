@@ -164,13 +164,21 @@ strategies:
 | 数据库 | `data/db.py` + `data/results_db.py` | Parquet存储 + DuckDB视图 |
 | 控制论 | `cybernetics/orchestrator.py` | 月线Regime检测 + 自适应参数 |
 | 工作流 | `scripts/run_workflow.py` | qrun-style pipeline |
-| 特征构建 | `scripts/build_features.py` | 批量PIT特征(200股×100月) |
-| 模型训练 | `scripts/tune_model.py` | Optuna + LightGBM |
 | 锦标赛 | `scripts/strategy_tournament.py` | 多策略自动对比 |
 | 多资产锦标赛 | `scripts/multi_asset_tournament.py` | 二资产分配验证 |
 | 因子发现 | `scripts/factor_hypothesis.py` | LLM因子假说→DSL→IC/OOS |
 | 日频扫描 | `scripts/compute_signals.py` | Cron 15:30, 4策略 |
 | 慢数据填充 | `scripts/cron_fetch_slow.py` | 限流数据日常积累 |
+| 特征构建 | `scripts/build_features.py` | 批量PIT特征(5204只×100月) |
+| 模型训练 | `scripts/tune_model.py` | Optuna + LightGBM |
+| PE/PB补增 | `scripts/enrich_pe_pb.py` | 给特征文件批量补估值列 |
+| 财务预缓存 | `scripts/precache_financials.py` | 磁盘缓存全量财务数据 |
+| 缺月补建 | `scripts/rebuild_missing_months.py` | 精准补建受损特征文件 |
+| Token缓存 | `scripts/update_token_cache.py` | Hermes state.db + Hindsight → JSON |
+| 系统指标采集 | `scripts/collect_system_metrics.py` | 每分钟写 SQLite 时序数据 |
+| Hindsight采集 | `scripts/collect_hindsight_tokens.py` | 从 /metrics 拉取 LLM token |
+| 系统监视API | `web/api/routes/system.py` | /monitor + /history 端点 |
+| 活动监视器 | `web/frontend/src/views/ActivityMonitor.vue` | 🖥️ CPU/内存/Token 仪表盘 |
 | 回测引擎 | `backtest/run_all_strategies.py` | 日频引擎 + 策略自主调仓 |
 | 回测评分 | `backtest/buffett_real_scorer.py` | PIT滚动评分器 |
 | 风险分析 | `backtest/analytics.py` | 15项风险指标 |

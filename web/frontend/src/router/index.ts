@@ -11,6 +11,7 @@ const router = createRouter({
     { path: "/backtest", name: "backtest", component: () => import("../views/Backtest.vue") },
     { path: "/signals", name: "signals", component: () => import("../views/Signals.vue") },
     { path: "/settings", name: "settings", component: () => import("../views/Settings.vue") },
+    { path: "/monitor", name: "monitor", component: () => import("../views/ActivityMonitor.vue") },
   ],
 });
 
