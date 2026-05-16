@@ -9,7 +9,7 @@ tags: [index]
 # Wiki Index
 
 > Quant Agent 知识库目录。每行 = wikilink + 一句话概括。
-> Last updated: 2026-05-15 | Total pages: 14 ( + log + schema )
+> Last updated: 2026-05-17 | Total pages: 15 ( + log + schema )
 
 ## Concepts
 - [[system-architecture]] — **系统架构总览**：五层设计，4策略注册表，35特征体系，多资产架构，数据注册表
@@ -20,6 +20,8 @@ tags: [index]
 - [[dcf-valuation]] — DCF估值方法
 - [[multifactor-scoring]] — 四维打分引擎（已演进为四策略对比体系）
 - [[financial-cache]] — 三层财务缓存 + PIT基本面/估值/资金/筹码/宏观因子提取
+
+- [[hindsight-graph]] — ★ Hindsight 记忆知识图谱可视化：Canvas 力导向图, 节点悬浮/点击探索
 
 ## Entities
 - [[tushare-mcp]] — Tushare MCP，258工具，2000积分（门槛制，不消耗）

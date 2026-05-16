@@ -178,7 +178,9 @@ strategies:
 | 系统指标采集 | `scripts/collect_system_metrics.py` | 每分钟写 SQLite 时序数据 |
 | Hindsight采集 | `scripts/collect_hindsight_tokens.py` | 从 /metrics 拉取 LLM token |
 | 系统监视API | `web/api/routes/system.py` | /monitor + /history 端点 |
+| 图谱API | `web/api/routes/hindsight.py` | ★ `/api/hindsight/graph` — 知识图谱数据端点 |
 | 活动监视器 | `web/frontend/src/views/ActivityMonitor.vue` | 🖥️ CPU/内存/Token 仪表盘 |
+| 记忆图谱 | `web/frontend/src/views/HindsightGraph.vue` | ★ Canvas力导向图, Hindsight知识图谱可视化 |
 | 回测引擎 | `backtest/run_all_strategies.py` | 日频引擎 + 策略自主调仓 |
 | 回测评分 | `backtest/buffett_real_scorer.py` | PIT滚动评分器 |
 | 风险分析 | `backtest/analytics.py` | 15项风险指标 |

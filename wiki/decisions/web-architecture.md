@@ -35,7 +35,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 - Regime 球体：CSS 动画光晕, 评分环形进度
 - 预警面板：多级颜色 (success/warning/danger/info)
 
-## 页面结构 (10 页)
+## 页面结构 (11 页)
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
@@ -48,6 +48,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 | 信号历史 | `/signals` | 信号变更追踪 |
 | 活动监视器 | `/monitor` | 🖥️ CPU/内存/Token 仪表盘 + 历史趋势图 |
 | 系统设置 | `/settings` | 通知开关 + 数据源状态 |
+| 记忆图谱 | `/hindsight` | ★ Hindsight 知识图谱 — Canvas 力导向图, 悬浮/点击探索节点关系 |
 
 ### 指挥中心 (2026-05-16 Codex 升级)
 
@@ -67,6 +68,14 @@ Market API 新增字段：
 - API: `/api/system/monitor` (实时快照) + `/api/system/history` (趋势)
 - 前端: ActivityMonitor.vue, canvas 迷你趋势图
 - Token 三来源覆盖: Hermes state.db + factor_hypothesis log + Hindsight /metrics
+
+### 记忆图谱 (2026-05-17)
+
+Canvas 自建力导向图，零外部图谱库依赖。直接从 Hindsight REST API 拉取节点和链接数据，渲染为交互式知识图谱。节点按类型分色（青色 observation / 紫色 experience），链接按来源区分（entity共享/同轮对话/合并提炼/tag共享）。不支持节点文字标签——悬浮显示 tooltip，点击展开详情面板。缩放、拖拽、平移全支持。
+
+物理模拟：节点间斥力（inverse-square）+ 图中心引力 + 链接弹簧力 + 阻尼。Canvas 2D 渲染，DPR 适配视网膜屏。数据非实时——页面加载时拉取一次，手动按钮可刷新。
+
+详见 [[hindsight-graph]]。
 
 ## DuckDB 读写分离
 

@@ -10,6 +10,13 @@ tags: [log]
 
 > 操作日志。追加模式。
 
+## [2026-05-17] create | Hindsight 知识图谱模块
+- 创建 concepts/hindsight-graph.md — Canvas 力导向图, 4链接类型, 交互设计
+- 更新 decisions/web-architecture.md — 10→11页, 记忆图谱专节
+- 更新 concepts/system-architecture.md — 图谱API + 记忆图谱加入关键模块表
+- 更新 index.md — 15页, 新增 hindsight-graph 条目
+- 模块文件: web/api/routes/hindsight.py + web/frontend/src/views/HindsightGraph.vue
+
 ## [2026-05-16] codex | 指挥中心升级 + wiki同步
 - Codex: Market API 扩展 (multi_asset/macro/alerts) + Market.vue 重写为 Command Center
 - 前端: Regime 动画球体, 多资产跟踪器, 策略矩阵, 智能预警
