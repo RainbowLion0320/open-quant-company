@@ -225,7 +225,7 @@ async function drawDSChart() {
       const leftPad = 34, topPad = 6, botPad = 16;
       const chartH = H - topPad - botPad;
       const slotW = (W - leftPad - 2) / dates.length;
-      const barW = Math.max(1, slotW * 0.45);
+      const barW = Math.max(1, slotW * 0.20);
 
       ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
       for (let t = 0; t <= maxVal; t += maxVal / 3) {
@@ -270,7 +270,7 @@ async function drawDSChart() {
         const maxCost = Math.max(...costs.map((r: any) => r.cost_cny), 1);
         const leftPad = 34, botPad = 14, chartH = H - 8 - botPad;
         const slotWc = (W - leftPad - 2) / dates.length;
-        const barWc = Math.max(1, slotWc * 0.45);
+        const barWc = Math.max(1, slotWc * 0.20);
 
         // Y grid
         ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
