@@ -64,6 +64,14 @@
         <canvas ref="dsFlashRef" class="w-full mb-3" style="height:130px"></canvas>
         <div class="text-2xs mb-1" style="color:var(--text-disabled)">费用 ¥</div>
         <canvas ref="dsCostRef" class="w-full" style="height:100px"></canvas>
+        <div class="flex justify-between mt-1 text-2xs" style="color:var(--text-disabled); padding: 0 34px">
+          <span>30天合计</span>
+          <span class="flex gap-3">
+            <span style="color:rgba(6,182,212,0.9)">v4-pro {{ fmtNum(dsTotals?.pro ?? 0) }}</span>
+            <span style="color:rgba(124,58,237,0.9)">v4-flash {{ fmtNum(dsTotals?.flash ?? 0) }}</span>
+            <span style="color:#f59e0b">¥{{ (dsTotals?.cost ?? 0).toFixed(0) }}</span>
+          </span>
+        </div>
         <div class="flex justify-center gap-3 mt-1 text-2xs" style="color:var(--text-disabled)">
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.85)"></span>输出</span>
@@ -144,6 +152,13 @@ const cpuChartId = "cpu-chart"; const memChartId = "mem-chart"; const tokenChart
 const dsProRef = ref<HTMLCanvasElement | null>(null);
 const dsFlashRef = ref<HTMLCanvasElement | null>(null);
 const dsCostRef = ref<HTMLCanvasElement | null>(null);
+const dsTotals = ref<{ pro: number; flash: number; cost: number } | null>(null);
+
+function fmtNum(n: number): string {
+  if (n > 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n > 1_000) return (n / 1_000).toFixed(1) + "K";
+  return String(Math.round(n));
+}
 
 async function fetchData() {
   try {
@@ -331,6 +346,14 @@ async function drawDSChart() {
         });
       }
     }
+    // Compute 30-day totals
+    const proRows = rows.filter((r: any) => r.model === "deepseek-v4-pro");
+    const flashRows = rows.filter((r: any) => r.model === "deepseek-v4-flash");
+    dsTotals.value = {
+      pro: proRows.reduce((s: number, r: any) => s + (r.input_cache_miss||0) + (r.output_tokens||0) + (r.input_cache_hit||0), 0),
+      flash: flashRows.reduce((s: number, r: any) => s + (r.input_cache_miss||0) + (r.output_tokens||0) + (r.input_cache_hit||0), 0),
+      cost: rows.reduce((s: number, r: any) => s + (r.cost_cny||0), 0),
+    };
   } catch (e) { /* silent */ }
 }
 
