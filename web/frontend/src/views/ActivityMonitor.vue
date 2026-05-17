@@ -55,7 +55,12 @@
       <!-- DeepSeek Token Usage Bar Chart -->
       <div class="metric-card p-4 mb-4" style="border-left:2px solid #e8a840">
         <div class="flex items-center justify-between mb-2">
-          <div class="text-2xs" style="color:var(--text-disabled)">DeepSeek Token 消耗趋势</div>
+          <div class="flex items-center gap-2">
+            <span class="text-2xs" style="color:var(--text-disabled)">DeepSeek Token 消耗趋势</span>
+            <span class="tag-badge" style="background:rgba(6,182,212,0.12);color:rgba(6,182,212,0.9)">v4-pro {{ fmtNum(dsTotals?.pro ?? 0) }}</span>
+            <span class="tag-badge" style="background:rgba(124,58,237,0.12);color:rgba(124,58,237,0.9)">v4-flash {{ fmtNum(dsTotals?.flash ?? 0) }}</span>
+            <span class="tag-badge" style="background:rgba(245,158,11,0.12);color:#f59e0b">¥{{ (dsTotals?.cost ?? 0).toFixed(0) }}</span>
+          </div>
           <span class="text-2xs" style="color:var(--accent)">过去30天</span>
         </div>
         <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-pro</div>
@@ -64,14 +69,6 @@
         <canvas ref="dsFlashRef" class="w-full mb-3" style="height:130px"></canvas>
         <div class="text-2xs mb-1" style="color:var(--text-disabled)">费用 ¥</div>
         <canvas ref="dsCostRef" class="w-full" style="height:100px"></canvas>
-        <div class="flex justify-between mt-1 text-2xs" style="color:var(--text-disabled); padding: 0 34px">
-          <span>30天合计</span>
-          <span class="flex gap-3">
-            <span style="color:rgba(6,182,212,0.9)">v4-pro {{ fmtNum(dsTotals?.pro ?? 0) }}</span>
-            <span style="color:rgba(124,58,237,0.9)">v4-flash {{ fmtNum(dsTotals?.flash ?? 0) }}</span>
-            <span style="color:#f59e0b">¥{{ (dsTotals?.cost ?? 0).toFixed(0) }}</span>
-          </span>
-        </div>
         <div class="flex justify-center gap-3 mt-1 text-2xs" style="color:var(--text-disabled)">
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.85)"></span>输出</span>
@@ -370,4 +367,5 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 .metric-card { background: var(--glass-bg); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 12px; }
 .progress-bar { height: 3px; border-radius: 2px; transition: width 0.5s ease; min-width: 0; }
 .load-values { display: flex; gap: 8px; flex-wrap: wrap; }
+.tag-badge { font-size: 9px; font-family: \"JetBrains Mono\", monospace; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
 </style>
