@@ -52,37 +52,6 @@
         </div>
       </div>
 
-      <!-- Token Usage -->
-      <div class="metric-card p-4 mb-4" style="border-left:2px solid var(--accent)">
-        <div class="text-2xs mb-2" style="color:var(--text-disabled)">今日 Token 用量</div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <div class="text-2xs" style="color:var(--text-disabled)">Hermes 会话</div>
-            <div class="text-xs font-mono mt-0.5" style="color:var(--text-secondary)">
-              IN {{ fmtNum(data?.token?.hermes?.input_tokens ?? 0) }}  OUT {{ fmtNum(data?.token?.hermes?.output_tokens ?? 0) }}
-            </div>
-            <div class="text-2xs" style="color:var(--accent)">${{ (data?.token?.hermes?.cost_usd ?? 0).toFixed(4) }}</div>
-          </div>
-          <div>
-            <div class="text-2xs" style="color:var(--text-disabled)">
-              外部调用 <span v-if="(data?.token?.external?.sources ?? []).length">({{ data?.token?.external?.sources?.join(', ') }})</span>
-            </div>
-            <div class="text-xs font-mono mt-0.5" :style="{color: (data?.token?.external?.input_tokens ?? 0) > 0 ? 'var(--text-secondary)' : 'var(--text-disabled)'}">
-              IN {{ fmtNum(data?.token?.external?.input_tokens ?? 0) }}  OUT {{ fmtNum(data?.token?.external?.output_tokens ?? 0) }}
-            </div>
-            <div class="text-2xs" :style="{color: (data?.token?.external?.cost_usd ?? 0) > 0 ? 'var(--accent)' : 'var(--text-disabled)'}">
-              ${{ (data?.token?.external?.cost_usd ?? 0).toFixed(4) }} ({{ data?.token?.external?.calls ?? 0 }} calls)
-            </div>
-          </div>
-        </div>
-        <div class="mt-2 pt-2 flex justify-between" style="border-top:1px solid var(--border-subtle)">
-          <span class="text-xs font-bold" style="color:var(--text-primary)">合计 ${{ (data?.token?.total?.cost_usd ?? 0).toFixed(4) }}</span>
-          <span class="text-2xs" style="color:var(--text-disabled)">
-            IN {{ fmtNum(data?.token?.total?.input_tokens ?? 0) }} OUT {{ fmtNum(data?.token?.total?.output_tokens ?? 0) }}
-          </span>
-        </div>
-      </div>
-
       <!-- DeepSeek Token Usage Bar Chart -->
       <div class="metric-card p-4 mb-4" style="border-left:2px solid #e8a840">
         <div class="flex items-center justify-between mb-2">
@@ -175,12 +144,6 @@ const memColor = computed(() => {
 const cpuChartId = "cpu-chart"; const memChartId = "mem-chart"; const tokenChartId = "token-chart";
 const dsProRef = ref<HTMLCanvasElement | null>(null);
 const dsFlashRef = ref<HTMLCanvasElement | null>(null);
-
-function fmtNum(n: number): string {
-  if (n > 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n > 1_000) return (n / 1_000).toFixed(1) + "K";
-  return String(n);
-}
 
 async function fetchData() {
   try {
