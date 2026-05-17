@@ -576,3 +576,72 @@ Hindsight 事实提取的三层模型：
 
 ### 系统监控留存期 (0479e20)
 `collect_system_metrics.py` 自带内联清理逻辑 (`_cleanup()`)，每次采集时自动删除超期数据。留存期从 30 天改为 365 天 (~515K 行 ≈ 72 MB，SQLite 完全可控)。
+
+## 2026-05-17: Codex UI polish — 11个文件系统性优化 (commit 18ebb0d)
+
+### 背景
+我之前按 Market.vue 风格重构了系统信息页，但 Codex 在此基础上做了大幅 polish。这是对我工作的 code review + 提升，暴露出我多个设计习惯问题。
+
+### Codex 改动范围
+11 文件, 972 insertions: ActivityMonitor.vue(573行), quantum.css(67行), Settings.vue(188行), Market.vue(60行), HindsightGraph.vue(114行), Backtest/Portfolio/StockDetail/Strategies/Stocks/Signals
+
+### 关键教训（与我的做法对比）
+
+**1. 语义化 class 而非 inline style 堆砌**
+我写: `<div class="hero-value" :style="{ color: cpuColor }">`
+Codex: `.metric-main strong` + `.telemetry-card` + `.meter-track i`
+→ 命名 CSS class 可复用、可维护、可全局主题切换
+
+**2. null 安全 + computed 格式化函数**
+我写: `data?.cpu.percent ?? 0` → 无数据时显示"0%"（误导）
+Codex: `fmtPercent(monitor?.cpu?.percent)` → 无数据返回"—%"
+添加了 `fmtGb()`, `fmtPercent()`, `pctWidth()`, `loadText`, `batteryText` computed
+
+**3. Canvas 防御性 fallback 尺寸**
+我写: `canvas.offsetWidth` → 初始化时可能为 0
+Codex: `canvas.offsetWidth || 320` → 始终有合法值
+
+**4. 语义化 HTML 标签**
+我用匿名 `<div>` 套 `<div>`
+Codex: `<article>` 指标卡, `<aside>` 侧栏, `<section>` 页面分区
+
+**5. CSS 上提到共享样式表**
+我把 `padding:18px; display:flex;flex-direction:column;gap:12px` 写在各页面 scoped style 里
+Codex: 提取为 `quantum.css` 的 `.view-page`, `.card-pad`, `.section-heading`, `.metric-card`
+
+**6. min-height 替代固定 height**
+我写: `style="height:120px"` → 内容溢出被截断
+Codex: `.chart-block { min-height: 142px }` → 允许自然增长
+
+**7. clamp() 响应式字号**
+我写: `font-size: 36px`
+Codex: `font-size: clamp(26px, 3vw, 38px)` → 跨视口自然缩放
+
+**8. minmax() 防 grid 列塌缩**
+我写: `grid-template-columns: 2fr 1fr` → 小屏幕可能塌为 0
+Codex: `minmax(0, 1.65fr) minmax(330px, 0.8fr)` → 始终有最小宽度
+
+**9. 命名 CSS 状态 class 而非 inline rgba 色值**
+我写: `style="background:rgba(6,182,212,0.12);color:rgba(6,182,212,0.9)"`
+Codex: `.tag-badge.cyan` `.tag-badge.violet` `.tag-badge.amber`
+
+**10. 全线添加空状态占位**
+我完全没有空状态处理
+Codex: Market 指数K线/告警/资产/策略矩阵/宏观指标均有 `v-if/v-else` 占位符，进程表有 "暂无进程采样"
+
+**11. `<strong>` / `<em>` 语义标签替代样式 span**
+我写: `<span :style="{ color: 'var(--text-primary)' }">`
+Codex: `<strong>` + `<em>` + CSS 赋色
+
+### 知识沉淀
+- 更新 `wiki/log.md` — 本条目
+- 提炼为可复用的前端开发规范（见下文）
+
+### 前端开发规范（从本次对比中提取）
+- 禁止在模板中使用裸 `rgba()` 或 hex 色值 inline style → 使用命名 CSS class
+- 所有 `?? 0` 默认值改为格式化函数的 `"—"` 安全返回
+- Canvas 尺寸读取必须带 `|| 320` style fallback
+- 所有数据列表必须有 `v-if` 空状态分支
+- 页面容器用 `.view-page` class (quantum.css 全局共享)
+- grid 用 `minmax()` 防塌缩，字号用 `clamp()` 做响应式
+- 语义标签: `<article>` → 独立卡片, `<aside>` → 侧栏, `<section>` → 页面分区
