@@ -39,6 +39,7 @@ Thumbs.db
 data/*.pkl
 data/*.duckdb
 data/*.db
+data/**/*.db
 data/store/features/
 data/store/signals/
 data/store/macro/

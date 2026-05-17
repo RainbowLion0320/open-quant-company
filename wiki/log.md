@@ -10,6 +10,18 @@ tags: [log]
 
 > 操作日志。追加模式。
 
+## [2026-05-17] digest | Codex hardening (ccb56ef) — wiki + 记忆同步
+- signals/selection.py: 新增横截面排名信号选择模块 (apply_ranked_buys)
+- signals/multifactor.py: 动量增强 (skip-1m/趋势确认/bounded保护/score_components)
+- backtest/run_all_strategies.py: 3→4策略回测 (ml_lgbm scorer + max_positions动态)
+- 控制论增强: 板块扩展 (电力设备/军工/交运/医药/石油石化) + 趋势确认 + 波动惩罚
+- 调仓优化: 月度复评安全网 (防信号冻住) + 漂移阈值0.75
+- scripts/compute_signals.py: 信号选择集成 + 组件分detail
+- config/settings.yaml: signal_selection 段 + ml配置
+- 前视偏差修复: mom_1m close[-22] 等
+- wiki/system-architecture.md: 信号选择模块 + 动量增强因子 + 数据流步骤更新
+- 新增 cron: paper-trading-daily (fcf64b5abf36, 交易日09:30)
+
 ## [2026-05-17] create | Paper Trading 模拟交易系统
 - 创建 concepts/paper-trading.md — 日频执行, Parquet持久化, Web展示, 风控集成
 - 更新 concepts/system-architecture.md — 模拟执行+状态持久化+模拟交易加入关键模块表

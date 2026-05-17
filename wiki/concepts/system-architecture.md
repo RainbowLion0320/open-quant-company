@@ -126,7 +126,11 @@ strategies:
    LLM (deepseek-v4-pro) → 因子假说 → DSL解析器计算 → IC评估 → 多轮迭代 + OOS验证
    通过因子自动注册到 alpha_factors()
 
-8. Web 展示
+8. 信号选择 (signals/selection.py, Phase 4.4 Codex)
+   全池子打分 → 横截面排名取前 N% → apply_ranked_buys() 标记 buy。
+   替代旧简单阈值 (score>=45→buy)，避免阈值过宽导致按代码顺序买入。
+
+9. Web 展示
    FastAPI ← DuckDB(:memory:) + read_parquet() views → Vue 3 SPA
 ```
 
@@ -140,6 +144,7 @@ strategies:
 | 风险控制 | `broker/risk.py` | RiskManager 5规则预检 |
 | 因子 DSL | `signals/expression.py` | 因子声明式表达式 |
 | DSL 解析器 | `signals/dsl_parser.py` | LLM公式→计算 |
+| 信号选择 | `signals/selection.py` | ★ 横截面排名→交易信号 (Codex) |
 | 巴菲特过滤 | `signals/buffett.py` | 安全边际+DCF+三重过滤 |
 | 多因子打分 | `signals/multifactor.py` | 四维加权 (质量/估值/技术/市场) |
 | ML 信号 | `signals/ml_signals.py` | 模型预测→买卖信号 |
@@ -197,14 +202,15 @@ strategies:
 
 | 类别 | 数量 | 来源 | 示例 |
 |------|:--:|------|------|
-| 收益率 | 5 | Qlib Alpha158 | ret_1d, ret_5d, ret_20d, ret_60d |
-| 均线偏离 | 4 | Qlib Alpha158 | ma5_bias, ma20_bias, ma60_bias |
-| 波动率 | 3 | Qlib Alpha158 | vol_5d, vol_20d, vol_60d |
-| 成交量 | 2 | Qlib Alpha158 | volume_ratio_5, volume_ratio_20 |
-| 价格范围 | 2 | Qlib Alpha158 | amplitude, high_low_ratio |
-| 趋势 | 2 | Qlib Alpha158 | ma5_20_cross, ma20_60_cross |
-| 动量 | 1 | Qlib Alpha158 | rsi_14 |
-| **LLM发现** | **7** | **deepseek-v4-pro** ★ | vol_adj_mom_5d, midpoint_bias 等 |
+|收益率 | 5 | Qlib Alpha158 | ret_1d, ret_5d, ret_20d, ret_60d |
+|均线偏离 | 4 | Qlib Alpha158 | ma5_bias, ma20_bias, ma60_bias |
+|波动率 | 3 | Qlib Alpha158 | vol_5d, vol_20d, vol_60d |
+|成交量 | 2 | Qlib Alpha158 | volume_ratio_5, volume_ratio_20 |
+|价格范围 | 2 | Qlib Alpha158 | amplitude, high_low_ratio |
+|趋势 | 2 | Qlib Alpha158 | ma5_20_cross, ma20_60_cross |
+|动量 | 1 | Qlib Alpha158 | rsi_14 |
+|**LLM发现** | **7** | **deepseek-v4-pro** ★ | vol_adj_mom_5d, midpoint_bias 等 |
+|**动量增强** | **4** | **Codex 4.4** ★ | mom_3m_skip_1m, mom_6m_skip_1m, trend_strength, ma120_deviation |
 
 ### 外部富化因子 (9, enrich_from_registry)
 
