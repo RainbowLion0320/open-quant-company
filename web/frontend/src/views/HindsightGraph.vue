@@ -130,6 +130,8 @@ let isDragging = false;
 let dragTarget: SimNode | null = null;
 let dragStart = { x: 0, y: 0 };
 let lastMouse = { x: 0, y: 0 };
+let converged = false;
+let stillFrames = 0;
 
 // ── Colors ──
 const COLORS = {
@@ -190,6 +192,8 @@ function initSimulation(nodes: GraphNode[], links: GraphLink[]) {
   transform = { x: 0, y: 0, scale: 1 };
   selectedNode.value = null;
   hoveredNode.value = null;
+  converged = false;
+  stillFrames = 0;
 
   // Kick off the animation loop
   cancelAnimationFrame(animFrame);
@@ -198,11 +202,11 @@ function initSimulation(nodes: GraphNode[], links: GraphLink[]) {
 
 function tick() {
   const alpha = 0.03;
-  const centering = 0.002;
-  const damping = 0.92;
-  const repulsion = 600;
-  const springLen = 120;
-  const springK = 0.02;
+  const centering = 0.005;
+  const damping = 0.85;
+  const repulsion = 300;
+  const springLen = 80;
+  const springK = 0.005;
 
   const w = canvasRef.value!.width / dpr;
   const h = canvasRef.value!.height / dpr;
@@ -246,6 +250,24 @@ function tick() {
     const fy = (dy / dist) * displacement;
     if (s.fx == null) { s.vx += fx; s.vy += fy; }
     if (t.fx == null) { t.vx -= fx; t.vy -= fy; }
+  }
+
+  // Convergence check
+  let maxV = 0;
+  for (const n of simNodes) {
+    if (n.fx != null) continue;
+    const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+    if (speed > maxV) maxV = speed;
+  }
+  if (maxV < 0.15) {
+    stillFrames++;
+    if (stillFrames > 60) {
+      converged = true;
+      draw();
+      return;
+    }
+  } else {
+    stillFrames = 0;
   }
 
   draw();
@@ -369,6 +391,10 @@ function findNodeAt(wx: number, wy: number): SimNode | null {
 }
 
 function onMouseDown(e: MouseEvent) {
+  converged = false;
+  stillFrames = 0;
+  if (!animFrame) animFrame = requestAnimationFrame(tick);
+
   const world = screenToWorld(e.clientX, e.clientY);
   const node = findNodeAt(world.x, world.y);
   if (node) {
