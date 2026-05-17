@@ -197,7 +197,17 @@ async function drawDSChart() {
     if (!d.data || d.data.length === 0) return;
     const rows: any[] = d.data;
     if (rows.length < 2) return;
-    const dates = [...new Set(rows.map((r: any) => r.utc_date))].slice(-30);
+    // Generate last 30 calendar days (fill missing with 0)
+    const dates: string[] = [];
+    const today = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      dates.push(d.toISOString().slice(0, 10));
+    }
+    // Index rows by date+model for fast lookup
+    const rowByDate: Record<string, any> = {};
+    for (const r of rows) rowByDate[r.utc_date + "|" + r.model] = r;
 
     const models = [
       { key: "deepseek-v4-pro",   ref: dsProRef,   colors: ["rgba(6,95,107,0.85)","rgba(6,182,212,0.85)","rgba(6,182,212,0.28)"] },
@@ -237,7 +247,7 @@ async function drawDSChart() {
       }
 
       dates.forEach((date: string, di: number) => {
-        const row = modelRows.find((r: any) => r.utc_date === date);
+        const row = rowByDate[date + "|" + model.key];
         if (!row) return;
         const x0 = leftPad + di * slotW + (slotW - barW) / 2;
         let yBottom = H - botPad;
