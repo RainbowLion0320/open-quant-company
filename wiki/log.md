@@ -545,4 +545,34 @@ Hindsight 事实提取的三层模型：
 缓存命中 token 不收费 (v4-pro: 1.6B, v4-flash: 23M)。总费用约 ¥275。
 
 ### Cron 任务
-- `job_id=781d17fea37f`: 每日 09:00 自动摄入最新 CSV
+- `job_id=781d17fea37f`: 每日 23:30 自动摄入最新 CSV
+
+## 2026-05-17: DeepSeek 图表多轮迭代
+
+### 三级叠加柱状图 (fde8a41)
+将简单总 token 柱改为三级叠加：底部 input_cache_miss(深色)、中部 output_tokens(实色)、顶部 input_cache_hit(半透明)。直观展示计费 vs 免费的占比。
+
+### 拆分为独立图表 (7a17943)
+两个模型放同一图时 Y 轴比例失衡（v4-pro cache_hit 200M+ 碾压 v4-flash 4M）。改为两个独立画布，各自独立 Y 轴缩放。
+
+### 30 天视图 + 费用图 (f8dca87)
+- 范围从 7 天扩展到 30 天
+- 三行垂直布局：v4-pro 叠加柱 / v4-flash 叠加柱 / 费用 ¥ 柱状+折线
+- X 轴日历生成（非数据驱动），缺失日期填 0
+- 柱宽从满槽逐步收窄到 20% 槽宽 (ec17743→ef43259→ac7d5ae)
+- 30 天合计值以 tag-badge 形式显示在表头 (9e01d61→eadf2b1)
+
+### 图表周边清理
+- 删除旧的「今日 Token 用量」卡片 (d2d1e92)
+- 删除旧的「Token $」历史趋势折线图 (c7b3099)
+
+## 2026-05-17: 系统页面重构 + 留存优化
+
+### 活动监视器 + 系统设置合并 (7fc6430)
+两个页面都是"系统信息"，合并为一个页面：
+- ActivityMonitor.vue 追加三块 Settings 内容：Telegram 通知开关、数据源状态 (AKShare/Tushare/Hindsight/Parquet)、系统信息网格
+- 侧栏从 10 项减为 9 项，「活动监视」→「系统信息」
+- 路由移除 /settings，Settings.vue 不再加载 (618→618 模块)
+
+### 系统监控留存期 (0479e20)
+`collect_system_metrics.py` 自带内联清理逻辑 (`_cleanup()`)，每次采集时自动删除超期数据。留存期从 30 天改为 365 天 (~515K 行 ≈ 72 MB，SQLite 完全可控)。
