@@ -79,6 +79,7 @@
       <div class="legend glass-card">
         <div class="legend-item"><span class="legend-dot obs"></span> Observation</div>
         <div class="legend-item"><span class="legend-dot exp"></span> Experience</div>
+        <div class="legend-item"><span class="legend-dot wld"></span> World</div>
         <div class="legend-item"><span class="legend-line sem"></span> Semantic</div>
         <div class="legend-item"><span class="legend-line tmp"></span> Temporal</div>
         <div class="legend-item"><span class="legend-line tag-l"></span> Tag</div>
@@ -156,6 +157,7 @@ let graphDataRef: GraphData | null = null;
 const COLORS = {
   obs: 0x00d4ff,
   exp: 0x7c3aed,
+  world: 0xe8a840,
   semantic: 0x00d4ff,
   temporal: 0x64748b,
   consolidation: 0x00ffc8,
@@ -269,7 +271,9 @@ function buildGraph(data: GraphData) {
   for (const n of simNodes) {
     const degRatio = n.degree / maxDeg;
     const scale = 1.8 + degRatio * 4.5; // degree → size: 1.8 ~ 6.3
-    const color = n.type === "experience" ? COLORS.exp : COLORS.obs;
+    const color = n.type === "experience" ? COLORS.exp
+                : n.type === "world" ? COLORS.world
+                : COLORS.obs;
     const mat = new THREE.MeshStandardMaterial({
       color,
       emissive: color,
@@ -699,6 +703,7 @@ onUnmounted(() => {
 }
 .tip-badge.observation { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
 .tip-badge.experience { background: rgba(124, 58, 237, 0.2); color: #7c3aed; }
+.tip-badge.world { background: rgba(232, 168, 64, 0.2); color: #e8a840; }
 .tip-text {
   font-size: 12px;
   color: #e2e8f0;
@@ -747,6 +752,7 @@ onUnmounted(() => {
 }
 .panel-badge.observation { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
 .panel-badge.experience { background: rgba(124, 58, 237, 0.2); color: #7c3aed; }
+.panel-badge.world { background: rgba(232, 168, 64, 0.2); color: #e8a840; }
 .panel-id { font-size: 10px; color: #64748b; font-family: "JetBrains Mono", monospace; }
 .panel-degree { font-size: 10px; color: #00d4ff; margin-left: auto; font-family: "JetBrains Mono", monospace; }
 .panel-text {
@@ -791,6 +797,7 @@ onUnmounted(() => {
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
 .legend-dot.obs { background: #00d4ff; box-shadow: 0 0 8px rgba(0, 212, 255, 0.5); }
 .legend-dot.exp { background: #7c3aed; box-shadow: 0 0 8px rgba(124, 58, 237, 0.5); }
+.legend-dot.wld { background: #e8a840; box-shadow: 0 0 8px rgba(232, 168, 64, 0.5); }
 .legend-line { width: 14px; height: 1px; }
 .legend-line.sem { background: rgba(0, 212, 255, 0.5); }
 .legend-line.tmp { background: rgba(100, 116, 139, 0.3); }
