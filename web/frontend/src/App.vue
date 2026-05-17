@@ -105,9 +105,8 @@ const nav = [
   { path: "/portfolio", label: "模拟交易", pathData: "M5 7h14v12H5V7Zm3 0V5h8v2M8 13h3m2 0h3" },
   { path: "/backtest", label: "回测分析", pathData: "M4 19V5m0 14h16M7 15l3-4 3 2 5-7" },
   { path: "/signals", label: "信号历史", pathData: "M12 20a8 8 0 1 0-8-8m8 8V9m0 0 4 4m-4-4-4 4" },
-  { path: "/monitor", label: "活动监视", pathData: "M4 13h3l2-6 4 12 2-6h5M4 20h16M4 4h16" },
+  { path: "/monitor", label: "系统信息", pathData: "M4 13h3l2-6 4 12 2-6h5M4 20h16M4 4h16" },
   { path: "/hindsight", label: "记忆图谱", pathData: "M12 2a5 5 0 0 0-5 5v1a5 5 0 0 0 0 10v1a5 5 0 0 0 10 0v-1a5 5 0 0 0 0-10V7a5 5 0 0 0-5-5Zm-3 5a3 3 0 1 1 6 0v1h-6V7Zm6 10a3 3 0 1 1-6 0v-1h6v1ZM9 16a4 4 0 0 1 6 0M8 10h8M8 14h8" },
-  { path: "/settings", label: "系统设置", pathData: "M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0-5v3m0 12v3M4.2 4.2l2.1 2.1m11.4 11.4 2.1 2.1M3 12h3m12 0h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" },
 ];
 
 const routeTitle = computed(() => nav.find(item => isActive(item.path))?.label || "Quant Terminal");

@@ -122,11 +122,85 @@
         </div>
       </div>
     </div>
+
+    <!-- ── Settings: Telegram Notification ── -->
+    <div class="glass-card p-6 mt-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm" style="color:var(--text-primary)">Telegram 信号推送</div>
+          <div class="text-2xs mt-0.5" style="color:var(--text-disabled)">每日 15:30 扫描后推送信号变更到 @buffett0320_bot</div>
+        </div>
+        <button @click="toggleNotify" class="relative w-10 h-5 rounded-full transition-colors"
+          :style="{ background: sysSettings.trading?.notification?.enabled ? 'var(--accent)' : 'var(--border-strong)' }">
+          <span class="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
+            :style="{ left: sysSettings.trading?.notification?.enabled ? '22px' : '2px' }">
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Settings: Data Sources ── -->
+    <div class="glass-card p-6 mt-4">
+      <h3 class="text-sm font-semibold mb-3" style="color:var(--text-primary)">数据源</h3>
+      <div class="space-y-2">
+        <div class="flex justify-between text-xs py-1" style="border-bottom:1px solid var(--border-subtle)">
+          <span style="color:var(--text-primary)">AKShare</span>
+          <span class="text-2xs px-2 py-0.5 rounded" style="background:rgba(16,185,129,0.15);color:#10b981">正常</span>
+        </div>
+        <div class="flex justify-between text-xs py-1" style="border-bottom:1px solid var(--border-subtle)">
+          <span style="color:var(--text-primary)">Tushare MCP</span>
+          <span class="text-2xs px-2 py-0.5 rounded" style="background:rgba(16,185,129,0.15);color:#10b981">正常</span>
+        </div>
+        <div class="flex justify-between text-xs py-1" style="border-bottom:1px solid var(--border-subtle)">
+          <span style="color:var(--text-primary)">Hindsight (pg0)</span>
+          <span class="text-2xs px-2 py-0.5 rounded" style="background:rgba(16,185,129,0.15);color:#10b981">正常</span>
+        </div>
+        <div class="flex justify-between text-xs py-1">
+          <span style="color:var(--text-primary)">Parquet 存储</span>
+          <span class="text-2xs px-2 py-0.5 rounded" style="background:rgba(16,185,129,0.15);color:#10b981">正常</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Settings: System Info ── -->
+    <div class="glass-card p-6 mt-4">
+      <h3 class="text-sm font-semibold mb-3" style="color:var(--text-primary)">系统信息</h3>
+      <div class="grid grid-cols-2 gap-3 text-xs">
+        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
+          <span style="color:var(--text-disabled)">版本</span>
+          <span class="font-mono" style="color:var(--text-secondary)">v4.0 Quantum Terminal</span>
+        </div>
+        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
+          <span style="color:var(--text-disabled)">API 端口</span>
+          <span class="font-mono" style="color:var(--text-secondary)">8501</span>
+        </div>
+        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
+          <span style="color:var(--text-disabled)">股票池</span>
+          <span class="font-mono" style="color:var(--text-secondary)">5204 只</span>
+        </div>
+        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
+          <span style="color:var(--text-disabled)">策略数</span>
+          <span class="font-mono" style="color:var(--text-secondary)">4 (巴菲特/多因子/控制论/ML)</span>
+        </div>
+        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
+          <span style="color:var(--text-disabled)">因子数</span>
+          <span class="font-mono" style="color:var(--text-secondary)">35+</span>
+        </div>
+        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
+          <span style="color:var(--text-disabled)">ML 模型</span>
+          <span class="font-mono" style="color:var(--text-secondary)">LightGBM</span>
+        </div>
+        <div class="flex justify-between py-1">
+          <span style="color:var(--text-disabled)">Cron</span>
+          <span class="font-mono" style="color:var(--text-secondary)">每交易日 15:30</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, reactive, onMounted, onUnmounted } from "vue";
 import { api, type SystemMonitor } from "../api";
 
 const data = ref<SystemMonitor | null>(null);
@@ -150,6 +224,24 @@ const dsProRef = ref<HTMLCanvasElement | null>(null);
 const dsFlashRef = ref<HTMLCanvasElement | null>(null);
 const dsCostRef = ref<HTMLCanvasElement | null>(null);
 const dsTotals = ref<{ pro: number; flash: number; cost: number } | null>(null);
+
+// ── Settings ──
+const sysSettings = reactive<Record<string, any>>({});
+
+async function toggleNotify() {
+  const enabled = !sysSettings.trading?.notification?.enabled;
+  sysSettings.trading = sysSettings.trading || {};
+  sysSettings.trading.notification = sysSettings.trading.notification || {};
+  sysSettings.trading.notification.enabled = enabled;
+  try { await api.saveSettings(sysSettings); } catch {}
+}
+
+async function loadSettings() {
+  try {
+    const data = await api.settings();
+    Object.assign(sysSettings, data);
+  } catch {}
+}
 
 function fmtNum(n: number): string {
   if (n > 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -356,6 +448,7 @@ async function drawDSChart() {
 
 onMounted(() => {
   fetchData();
+  loadSettings();
   timer = window.setInterval(fetchData, 10_000);
   elapTimer = window.setInterval(() => { elapsed.value = Math.round((Date.now() - lastFetch.value) / 1000); }, 1000);
 });
