@@ -1,96 +1,106 @@
 <template>
-  <div class="monitor-page">
-    <div class="glass-card p-6">
-      <div class="flex items-center gap-2 mb-4">
-        <h2 class="text-lg font-semibold" style="color:var(--text-primary)">活动监视器</h2>
-        <span class="text-2xs px-2 py-0.5 rounded" style="background:var(--bg-active);color:var(--text-disabled)">{{ elapsed }}s前</span>
-        <button @click="fetchData" class="text-xs px-2 py-1 rounded" style="background:var(--accent);color:#000">刷新</button>
-      </div>
-
-      <!-- CPU + Memory + Disk row -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        <div class="metric-card">
-          <div class="text-2xs" style="color:var(--text-disabled)">CPU</div>
-          <div class="flex items-baseline gap-1">
-            <span class="text-2xl font-mono font-bold" :style="{color: cpuColor}">{{ data?.cpu.percent ?? 0 }}%</span>
-          </div>
-          <div class="text-2xs" style="color:var(--text-disabled)">{{ data?.cpu.cores_physical }}核</div>
-          <div class="progress-bar mt-1" :style="{width: (data?.cpu.percent ?? 0)+'%', background: cpuColor}"></div>
+  <div class="system-page">
+    <!-- ── Hero: CPU + Memory + Disk ── -->
+    <section class="system-hero">
+      <div class="glass-card">
+        <div class="panel-head">
+          <span>CPU</span>
+          <small>{{ data?.cpu.cores_physical }} Cores</small>
         </div>
-        <div class="metric-card">
-          <div class="text-2xs" style="color:var(--text-disabled)">内存</div>
-          <div class="flex items-baseline gap-1">
-            <span class="text-2xl font-mono font-bold" :style="{color: memColor}">{{ data?.memory.percent ?? 0 }}%</span>
-          </div>
-          <div class="text-2xs" style="color:var(--text-disabled)">{{ data?.memory.used_gb }} / {{ data?.memory.total_gb }} GB</div>
-          <div class="progress-bar mt-1" :style="{width: (data?.memory.percent ?? 0)+'%', background: memColor}"></div>
-        </div>
-        <div class="metric-card">
-          <div class="text-2xs" style="color:var(--text-disabled)">磁盘</div>
-          <div class="flex items-baseline gap-1">
-            <span class="text-2xl font-mono font-bold" style="color:var(--text-secondary)">{{ data?.disk.percent ?? 0 }}%</span>
-          </div>
-          <div class="text-2xs" style="color:var(--text-disabled)">{{ data?.disk.used_gb }} / {{ data?.disk.total_gb }} GB</div>
-          <div class="progress-bar mt-1" :style="{width: (data?.disk.percent ?? 0)+'%', background: 'var(--text-secondary)'}"></div>
+        <div class="hero-value" :style="{ color: cpuColor }">{{ data?.cpu.percent ?? 0 }}%</div>
+        <div class="progress-bar mt-2" :style="{ width: (data?.cpu.percent ?? 0) + '%', background: cpuColor }"></div>
+        <div class="hero-foot">
+          <span>Load</span>
+          <div class="load-values">{{ (data?.cpu.load_avg ?? []).join(' / ') }}</div>
         </div>
       </div>
-
-      <!-- Battery + Load -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-        <div class="metric-card">
-          <div class="text-2xs" style="color:var(--text-disabled)">电池</div>
-          <div class="flex items-center gap-1">
-            <span class="text-xl font-mono font-bold" style="color:var(--positive)">{{ data?.battery?.percent ?? '—' }}%</span>
-            <span class="text-2xs" style="color:var(--text-disabled)">{{ data?.battery?.charging ? 'charging' : 'battery' }}</span>
-          </div>
+      <div class="glass-card">
+        <div class="panel-head">
+          <span>MEMORY</span>
+          <small>{{ data?.memory.used_gb }} / {{ data?.memory.total_gb }} GB</small>
         </div>
-        <div class="metric-card">
-          <div class="text-2xs" style="color:var(--text-disabled)">系统负载</div>
-          <div class="load-values text-sm font-mono" style="color:var(--text-secondary)">
-            <span v-for="(l, i) in data?.cpu.load_avg ?? []" :key="i">{{ l }}</span>
-          </div>
+        <div class="hero-value" :style="{ color: memColor }">{{ data?.memory.percent ?? 0 }}%</div>
+        <div class="progress-bar mt-2" :style="{ width: (data?.memory.percent ?? 0) + '%', background: memColor }"></div>
+        <div class="hero-foot">
+          <span>Battery</span>
+          <strong :style="{ color: 'var(--positive)' }">{{ data?.battery?.percent ?? '—' }}%</strong>
+          <em v-if="data?.battery?.charging">⚡</em>
         </div>
       </div>
+      <div class="glass-card">
+        <div class="panel-head">
+          <span>DISK</span>
+          <small>{{ data?.disk.used_gb }} / {{ data?.disk.total_gb }} GB</small>
+        </div>
+        <div class="hero-value" style="color:var(--text-secondary)">{{ data?.disk.percent ?? 0 }}%</div>
+        <div class="progress-bar mt-2" :style="{ width: (data?.disk.percent ?? 0) + '%', background: 'var(--text-secondary)' }"></div>
+        <div class="hero-foot">
+          <span>Updated</span>
+          <em>{{ elapsed }}s ago</em>
+          <button @click="fetchData" class="icon-button ml-auto" aria-label="刷新">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
 
-      <!-- DeepSeek Token Usage Bar Chart -->
-      <div class="metric-card p-4 mb-4" style="border-left:2px solid #e8a840">
-        <div class="flex items-center justify-between mb-2">
+    <!-- ── DeepSeek Token Usage ── -->
+    <section>
+      <div class="glass-card">
+        <div class="panel-head">
+          <span>DEEPSEEK TOKEN USAGE · 过去30天</span>
           <div class="flex items-center gap-2">
-            <span class="text-2xs" style="color:var(--text-disabled)">DeepSeek Token 消耗趋势</span>
             <span class="tag-badge" style="background:rgba(6,182,212,0.12);color:rgba(6,182,212,0.9)">v4-pro {{ fmtNum(dsTotals?.pro ?? 0) }}</span>
             <span class="tag-badge" style="background:rgba(124,58,237,0.12);color:rgba(124,58,237,0.9)">v4-flash {{ fmtNum(dsTotals?.flash ?? 0) }}</span>
             <span class="tag-badge" style="background:rgba(245,158,11,0.12);color:#f59e0b">¥{{ (dsTotals?.cost ?? 0).toFixed(0) }}</span>
           </div>
-          <span class="text-2xs" style="color:var(--accent)">过去30天</span>
         </div>
-        <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-pro</div>
-        <canvas ref="dsProRef" class="w-full mb-3" style="height:130px"></canvas>
-        <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-flash</div>
-        <canvas ref="dsFlashRef" class="w-full mb-3" style="height:130px"></canvas>
-        <div class="text-2xs mb-1" style="color:var(--text-disabled)">费用 ¥</div>
-        <canvas ref="dsCostRef" class="w-full" style="height:100px"></canvas>
-        <div class="flex justify-center gap-3 mt-1 text-2xs" style="color:var(--text-disabled)">
-          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
-          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.85)"></span>输出</span>
-          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.25);border:1px dashed rgba(6,182,212,0.3)"></span>缓存命中</span>
-          <span class="mx-1" style="color:#475569">|</span>
-          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>v4-pro</span>
-          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(61,21,120,0.85)"></span>v4-flash</span>
+        <div class="ds-chart-label">v4-pro</div>
+        <canvas ref="dsProRef" class="w-full mb-3" style="height:120px"></canvas>
+        <div class="ds-chart-label">v4-flash</div>
+        <canvas ref="dsFlashRef" class="w-full mb-3" style="height:120px"></canvas>
+        <div class="ds-chart-label">费用 ¥</div>
+        <canvas ref="dsCostRef" class="w-full" style="height:90px"></canvas>
+        <div class="chart-legend">
+          <span><span class="legend-swatch" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
+          <span><span class="legend-swatch" style="background:rgba(6,182,212,0.85)"></span>输出</span>
+          <span><span class="legend-swatch" style="background:rgba(6,182,212,0.25);border:1px dashed rgba(6,182,212,0.3)"></span>缓存命中</span>
+          <span class="legend-sep">|</span>
+          <span><span class="legend-swatch" style="background:rgba(6,95,107,0.85)"></span>v4-pro</span>
+          <span><span class="legend-swatch" style="background:rgba(61,21,120,0.85)"></span>v4-flash</span>
         </div>
       </div>
+    </section>
 
-      <!-- Top Processes -->
-      <div>
-        <div class="text-2xs mb-2" style="color:var(--text-disabled)">高占用进程</div>
-        <div class="table-shell" style="--table-min:420px">
+    <!-- ── Resource History + Top Processes ── -->
+    <section class="system-mid">
+      <div class="glass-card">
+        <div class="panel-head">
+          <span>RESOURCE HISTORY</span>
+          <small>{{ historyHours }}h</small>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <canvas :id="cpuChartId" class="w-full h-32"></canvas>
+            <div class="text-2xs text-center" style="color:var(--text-disabled)">CPU %</div>
+          </div>
+          <div>
+            <canvas :id="memChartId" class="w-full h-32"></canvas>
+            <div class="text-2xs text-center" style="color:var(--text-disabled)">MEM %</div>
+          </div>
+        </div>
+      </div>
+      <div class="glass-card">
+        <div class="panel-head">
+          <span>TOP PROCESSES</span>
+        </div>
+        <div class="table-shell" style="--table-min:0">
           <table class="data-table">
             <colgroup>
-              <col style="width:64%">
-              <col style="width:18%">
-              <col style="width:18%">
+              <col style="width:68%"><col style="width:16%"><col style="width:16%">
             </colgroup>
             <thead>
-              <tr><th>进程</th><th class="text-right">CPU</th><th class="text-right">内存</th></tr>
+              <tr><th>Process</th><th class="text-right">CPU</th><th class="text-right">MEM</th></tr>
             </thead>
             <tbody>
               <tr v-for="p in data?.top_processes ?? []" :key="p.pid">
@@ -102,96 +112,52 @@
           </table>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- History Charts -->
-    <div class="glass-card p-6 mt-4">
-      <h3 class="text-sm font-semibold mb-3" style="color:var(--text-primary)">历史趋势 ({{ historyHours }}h)</h3>
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div>
-          <canvas :id="cpuChartId" class="w-full h-32"></canvas>
-          <div class="text-2xs text-center" style="color:var(--text-disabled)">CPU %</div>
+    <!-- ── Settings ── -->
+    <section class="system-settings">
+      <div class="glass-card">
+        <div class="panel-head">
+          <span>TELEGRAM</span>
         </div>
-        <div>
-          <canvas :id="memChartId" class="w-full h-32"></canvas>
-          <div class="text-2xs text-center" style="color:var(--text-disabled)">内存 %</div>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm" style="color:var(--text-primary)">信号推送</div>
+            <div class="text-2xs mt-0.5" style="color:var(--text-disabled)">每日 15:30 → @buffett0320_bot</div>
+          </div>
+          <button @click="toggleNotify"
+            class="toggle-switch"
+            :class="{ active: sysSettings.trading?.notification?.enabled }">
+            <span></span>
+          </button>
         </div>
       </div>
-    </div>
-
-    <!-- ── Settings: Telegram Notification ── -->
-    <div class="glass-card p-6 mt-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="text-sm" style="color:var(--text-primary)">Telegram 信号推送</div>
-          <div class="text-2xs mt-0.5" style="color:var(--text-disabled)">每日 15:30 扫描后推送信号变更到 @buffett0320_bot</div>
+      <div class="glass-card">
+        <div class="panel-head">
+          <span>DATA SOURCES</span>
         </div>
-        <button @click="toggleNotify" class="relative w-10 h-5 rounded-full transition-colors"
-          :style="{ background: sysSettings.trading?.notification?.enabled ? 'var(--accent)' : 'var(--border-strong)' }">
-          <span class="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
-            :style="{ left: sysSettings.trading?.notification?.enabled ? '22px' : '2px' }">
-          </span>
-        </button>
-      </div>
-    </div>
-
-    <!-- ── Settings: Data Sources ── -->
-    <div class="glass-card p-6 mt-4">
-      <h3 class="text-sm font-semibold mb-3" style="color:var(--text-primary)">数据源</h3>
-      <div class="space-y-2">
-        <div class="flex justify-between text-xs py-1" style="border-bottom:1px solid var(--border-subtle)">
-          <span style="color:var(--text-primary)">AKShare</span>
-          <span class="text-2xs px-2 py-0.5 rounded" style="background:rgba(16,185,129,0.15);color:#10b981">正常</span>
-        </div>
-        <div class="flex justify-between text-xs py-1" style="border-bottom:1px solid var(--border-subtle)">
-          <span style="color:var(--text-primary)">Tushare MCP</span>
-          <span class="text-2xs px-2 py-0.5 rounded" style="background:rgba(16,185,129,0.15);color:#10b981">正常</span>
-        </div>
-        <div class="flex justify-between text-xs py-1" style="border-bottom:1px solid var(--border-subtle)">
-          <span style="color:var(--text-primary)">Hindsight (pg0)</span>
-          <span class="text-2xs px-2 py-0.5 rounded" style="background:rgba(16,185,129,0.15);color:#10b981">正常</span>
-        </div>
-        <div class="flex justify-between text-xs py-1">
-          <span style="color:var(--text-primary)">Parquet 存储</span>
-          <span class="text-2xs px-2 py-0.5 rounded" style="background:rgba(16,185,129,0.15);color:#10b981">正常</span>
+        <div class="space-y-2">
+          <div class="flex justify-between text-xs py-1" style="border-bottom:1px solid var(--border-subtle)"><span style="color:var(--text-primary)">AKShare</span><span class="badge-ok">正常</span></div>
+          <div class="flex justify-between text-xs py-1" style="border-bottom:1px solid var(--border-subtle)"><span style="color:var(--text-primary)">Tushare MCP</span><span class="badge-ok">正常</span></div>
+          <div class="flex justify-between text-xs py-1" style="border-bottom:1px solid var(--border-subtle)"><span style="color:var(--text-primary)">Hindsight (pg0)</span><span class="badge-ok">正常</span></div>
+          <div class="flex justify-between text-xs py-1"><span style="color:var(--text-primary)">Parquet</span><span class="badge-ok">正常</span></div>
         </div>
       </div>
-    </div>
-
-    <!-- ── Settings: System Info ── -->
-    <div class="glass-card p-6 mt-4">
-      <h3 class="text-sm font-semibold mb-3" style="color:var(--text-primary)">系统信息</h3>
-      <div class="grid grid-cols-2 gap-3 text-xs">
-        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
-          <span style="color:var(--text-disabled)">版本</span>
-          <span class="font-mono" style="color:var(--text-secondary)">v4.0 Quantum Terminal</span>
+      <div class="glass-card">
+        <div class="panel-head">
+          <span>SYSTEM INFO</span>
         </div>
-        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
-          <span style="color:var(--text-disabled)">API 端口</span>
-          <span class="font-mono" style="color:var(--text-secondary)">8501</span>
-        </div>
-        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
-          <span style="color:var(--text-disabled)">股票池</span>
-          <span class="font-mono" style="color:var(--text-secondary)">5204 只</span>
-        </div>
-        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
-          <span style="color:var(--text-disabled)">策略数</span>
-          <span class="font-mono" style="color:var(--text-secondary)">4 (巴菲特/多因子/控制论/ML)</span>
-        </div>
-        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
-          <span style="color:var(--text-disabled)">因子数</span>
-          <span class="font-mono" style="color:var(--text-secondary)">35+</span>
-        </div>
-        <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)">
-          <span style="color:var(--text-disabled)">ML 模型</span>
-          <span class="font-mono" style="color:var(--text-secondary)">LightGBM</span>
-        </div>
-        <div class="flex justify-between py-1">
-          <span style="color:var(--text-disabled)">Cron</span>
-          <span class="font-mono" style="color:var(--text-secondary)">每交易日 15:30</span>
+        <div class="grid grid-cols-1 gap-2 text-xs">
+          <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)"><span style="color:var(--text-disabled)">Version</span><span class="font-mono" style="color:var(--text-secondary)">v4.0 Quantum Terminal</span></div>
+          <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)"><span style="color:var(--text-disabled)">API Port</span><span class="font-mono" style="color:var(--text-secondary)">8501</span></div>
+          <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)"><span style="color:var(--text-disabled)">Pool</span><span class="font-mono" style="color:var(--text-secondary)">5204 stocks</span></div>
+          <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)"><span style="color:var(--text-disabled)">Strategies</span><span class="font-mono" style="color:var(--text-secondary)">4 (Buffett / MF / Cyb / ML)</span></div>
+          <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)"><span style="color:var(--text-disabled)">Factors</span><span class="font-mono" style="color:var(--text-secondary)">35+</span></div>
+          <div class="flex justify-between py-1" style="border-bottom:1px solid var(--border-subtle)"><span style="color:var(--text-disabled)">ML Model</span><span class="font-mono" style="color:var(--text-secondary)">LightGBM</span></div>
+          <div class="flex justify-between py-1"><span style="color:var(--text-disabled)">Cron</span><span class="font-mono" style="color:var(--text-secondary)">15:30 CST</span></div>
         </div>
       </div>
-    </div>
+    </section>
   </div>
 </template>
 
@@ -221,7 +187,6 @@ const dsFlashRef = ref<HTMLCanvasElement | null>(null);
 const dsCostRef = ref<HTMLCanvasElement | null>(null);
 const dsTotals = ref<{ pro: number; flash: number; cost: number } | null>(null);
 
-// ── Settings ──
 const sysSettings = reactive<Record<string, any>>({});
 
 async function toggleNotify() {
@@ -233,10 +198,7 @@ async function toggleNotify() {
 }
 
 async function loadSettings() {
-  try {
-    const data = await api.settings();
-    Object.assign(sysSettings, data);
-  } catch {}
+  try { const d = await api.settings(); Object.assign(sysSettings, d); } catch {}
 }
 
 function fmtNum(n: number): string {
@@ -255,7 +217,6 @@ async function fetchData() {
 }
 
 function drawCharts() {
-  // Lightweight canvas chart — no ECharts dependency
   const charts = [
     { id: cpuChartId, key: "cpu_pct" as const, color: "#06b6d4", max: 100 },
     { id: memChartId, key: "mem_pct" as const, color: "#10b981", max: 100 },
@@ -272,7 +233,6 @@ function drawCharts() {
       ctx.scale(2, 2);
       const W = canvas.offsetWidth, H = canvas.offsetHeight;
       ctx.clearRect(0, 0, W, H);
-
       if (pts.length < 2) return;
       const vals = pts.map((p: any) => p[ch.key] || 0);
       const maxVal = ch.max || Math.max(...vals, 1);
@@ -296,15 +256,12 @@ async function drawDSChart() {
     if (!d.data || d.data.length === 0) return;
     const rows: any[] = d.data;
     if (rows.length < 2) return;
-    // Generate last 30 calendar days (fill missing with 0)
     const dates: string[] = [];
     const today = new Date();
     for (let i = 29; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      dates.push(d.toISOString().slice(0, 10));
+      const dt = new Date(today); dt.setDate(dt.getDate() - i);
+      dates.push(dt.toISOString().slice(0, 10));
     }
-    // Index rows by date+model for fast lookup
     const rowByDate: Record<string, any> = {};
     for (const r of rows) rowByDate[r.utc_date + "|" + r.model] = r;
 
@@ -314,7 +271,6 @@ async function drawDSChart() {
     ];
     const layers = ["input_cache_miss", "output_tokens", "input_cache_hit"];
 
-    // ── Token stacked bars ──
     for (const model of models) {
       const canvas = model.ref.value;
       if (!canvas) continue;
@@ -323,29 +279,23 @@ async function drawDSChart() {
       const dpr = 2;
       const W = canvas.offsetWidth, H = canvas.offsetHeight;
       canvas.width = W * dpr; canvas.height = H * dpr;
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, W, H);
+      ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
 
       const modelRows = rows.filter((r: any) => r.model === model.key);
-      const maxVal = Math.max(...modelRows.map((r: any) =>
-        (r.input_cache_miss||0) + (r.output_tokens||0) + (r.input_cache_hit||0)
-      ), 1);
-
-      const leftPad = 34, topPad = 6, botPad = 16;
-      const chartH = H - topPad - botPad;
+      const maxVal = Math.max(...modelRows.map((r: any) => (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0)), 1);
+      const leftPad = 34, botPad = 16;
+      const chartH = H - 6 - botPad;
       const slotW = (W - leftPad - 2) / dates.length;
       const barW = Math.max(1, slotW * 0.20);
 
       ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
       for (let t = 0; t <= maxVal; t += maxVal / 3) {
         const y = H - botPad - (t / maxVal) * chartH;
-        const label = t >= 1_000_000 ? (t/1_000_000).toFixed(0)+"M" : t>=1000 ? (t/1000).toFixed(0)+"K" : String(t);
-        ctx.fillText(label, 2, y + 3);
+        ctx.fillText(t>=1e6?(t/1e6).toFixed(0)+"M":t>=1e3?(t/1e3).toFixed(0)+"K":String(t), 2, y+3);
         ctx.strokeStyle = "rgba(148,163,184,0.05)"; ctx.lineWidth = 0.5;
-        ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W - 2, y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W-2, y); ctx.stroke();
       }
-
-      dates.forEach((date: string, di: number) => {
+      dates.forEach((date, di) => {
         const row = rowByDate[date + "|" + model.key];
         if (!row) return;
         const x0 = leftPad + di * slotW + (slotW - barW) / 2;
@@ -357,14 +307,11 @@ async function drawDSChart() {
           ctx.fillRect(x0, yBottom - h, barW, h);
           yBottom -= h;
         });
-        if (dates.length <= 14 || di % 3 === 0) {
-          ctx.fillStyle = "#64748b"; ctx.font = "7px monospace";
-          ctx.fillText(date.slice(5), x0, H - 3);
-        }
+        if (di % 3 === 0) { ctx.fillStyle = "#64748b"; ctx.font = "7px monospace"; ctx.fillText(date.slice(5), x0, H-3); }
       });
     }
 
-    // ── Cost line chart ──
+    // Cost chart
     const costCanvas = dsCostRef.value;
     if (costCanvas) {
       const ctx = costCanvas.getContext("2d");
@@ -372,70 +319,49 @@ async function drawDSChart() {
         const dpr = 2;
         const W = costCanvas.offsetWidth, H = costCanvas.offsetHeight;
         costCanvas.width = W * dpr; costCanvas.height = H * dpr;
-        ctx.scale(dpr, dpr);
-        ctx.clearRect(0, 0, W, H);
-
+        ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
         const costs = rows.filter((r: any) => r.cost_cny > 0);
         const maxCost = Math.max(...costs.map((r: any) => r.cost_cny), 1);
         const leftPad = 34, botPad = 14, chartH = H - 8 - botPad;
         const slotWc = (W - leftPad - 2) / dates.length;
         const barWc = Math.max(1, slotWc * 0.20);
-
-        // Y grid
         ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
         for (let t = 0; t <= maxCost; t += maxCost / 3) {
           const y = H - botPad - (t / maxCost) * chartH;
-          ctx.fillText("¥" + t.toFixed(0), 2, y + 3);
+          ctx.fillText("¥"+t.toFixed(0), 2, y+3);
           ctx.strokeStyle = "rgba(148,163,184,0.05)"; ctx.lineWidth = 0.5;
-          ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W - 2, y); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W-2, y); ctx.stroke();
         }
-
-        // Group by utc_date, sum cost across models
         const costByDate: Record<string, number> = {};
-        for (const r of costs) {
-          costByDate[r.utc_date] = (costByDate[r.utc_date] || 0) + r.cost_cny;
-        }
-
-        // Bars + fill area
+        for (const r of costs) costByDate[r.utc_date] = (costByDate[r.utc_date]||0) + r.cost_cny;
         const costDates = dates.filter(d => costByDate[d] > 0);
         if (costDates.length > 0) {
-          // Draw bars
           for (const date of costDates) {
-            const di = dates.indexOf(date);
-            const val = costByDate[date];
+            const di = dates.indexOf(date), val = costByDate[date];
             const x0 = leftPad + di * slotWc + (slotWc - barWc) / 2;
-            const h = (val / maxCost) * chartH;
             ctx.fillStyle = "rgba(6,182,212,0.35)";
-            ctx.fillRect(x0, H - botPad - h, barWc, h);
+            ctx.fillRect(x0, H - botPad - (val/maxCost)*chartH, barWc, (val/maxCost)*chartH);
           }
-          // Connecting line
-          ctx.beginPath();
-          ctx.strokeStyle = "#06b6d4"; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.strokeStyle = "#06b6d4"; ctx.lineWidth = 1.2;
           for (let i = 0; i < costDates.length; i++) {
-            const di = dates.indexOf(costDates[i]);
-            const val = costByDate[costDates[i]];
-            const x = leftPad + di * ((W - leftPad - 2) / dates.length) + (W-leftPad-2)/dates.length/2;
-            const y = H - botPad - (val / maxCost) * chartH;
+            const di = dates.indexOf(costDates[i]), val = costByDate[costDates[i]];
+            const x = leftPad + di * slotWc + slotWc / 2;
+            const y = H - botPad - (val/maxCost)*chartH;
             if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
           }
           ctx.stroke();
         }
-
-        // Date labels (sparse)
-        dates.forEach((date: string, di: number) => {
-          if (dates.length <= 14 || di % 3 === 0) {
-            ctx.fillStyle = "#64748b"; ctx.font = "7px monospace";
-            ctx.fillText(date.slice(5), leftPad + di * ((W - leftPad - 2) / dates.length), H - 2);
-          }
+        dates.forEach((date, di) => {
+          if (di % 3 === 0) { ctx.fillStyle = "#64748b"; ctx.font = "7px monospace"; ctx.fillText(date.slice(5), leftPad + di*slotWc, H-2); }
         });
       }
     }
-    // Compute 30-day totals
+
     const proRows = rows.filter((r: any) => r.model === "deepseek-v4-pro");
     const flashRows = rows.filter((r: any) => r.model === "deepseek-v4-flash");
     dsTotals.value = {
-      pro: proRows.reduce((s: number, r: any) => s + (r.input_cache_miss||0) + (r.output_tokens||0) + (r.input_cache_hit||0), 0),
-      flash: flashRows.reduce((s: number, r: any) => s + (r.input_cache_miss||0) + (r.output_tokens||0) + (r.input_cache_hit||0), 0),
+      pro: proRows.reduce((s: number, r: any) => s + (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0), 0),
+      flash: flashRows.reduce((s: number, r: any) => s + (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0), 0),
       cost: rows.reduce((s: number, r: any) => s + (r.cost_cny||0), 0),
     };
   } catch (e) { /* silent */ }
@@ -451,9 +377,163 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 </script>
 
 <style scoped>
-.monitor-page { padding: 18px; max-width: 1280px; margin: 0 auto; }
-.metric-card { background: var(--glass-bg); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 12px; }
-.progress-bar { height: 3px; border-radius: 2px; transition: width 0.5s ease; min-width: 0; }
-.load-values { display: flex; gap: 8px; flex-wrap: wrap; }
-.tag-badge { font-size: 9px; font-family: \"JetBrains Mono\", monospace; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
+.system-page {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.system-hero {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.system-mid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+}
+.system-settings {
+  display: grid;
+  grid-template-columns: 300px 1fr 1fr;
+  gap: 12px;
+}
+
+/* ── Shared with Market.vue style ── */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 10px;
+}
+.panel-head span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.panel-head small {
+  color: var(--text-disabled);
+  font-size: 10px;
+}
+
+/* ── Hero cards ── */
+.hero-value {
+  font-size: 36px;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  line-height: 1;
+}
+.hero-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-disabled);
+}
+.hero-foot strong { color: var(--text-secondary); }
+.hero-foot em { font-style: normal; margin-left: 2px; }
+
+.load-values { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--text-secondary); }
+
+/* ── Progress bar ── */
+.progress-bar {
+  height: 3px;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+  min-width: 0;
+}
+
+/* ── Charts ── */
+.ds-chart-label {
+  font-size: 10px;
+  color: var(--text-disabled);
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-disabled);
+}
+.legend-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 3px;
+  vertical-align: middle;
+}
+.legend-sep { color: #475569; margin: 0 2px; }
+
+/* ── Toggle ── */
+.toggle-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle-switch.active { background: var(--accent); }
+.toggle-switch span {
+  position: absolute;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.2s;
+}
+.toggle-switch:not(.active) span { left: 2px; }
+.toggle-switch.active span { left: 20px; }
+
+/* ── Badge / Icon ── */
+.badge-ok {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(16,185,129,0.15);
+  color: #10b981;
+}
+.tag-badge {
+  font-size: 9px;
+  font-family: "JetBrains Mono", monospace;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.icon-button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(0, 212, 255, 0.04);
+  color: var(--accent);
+  cursor: pointer;
+}
+.icon-button svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .system-hero { grid-template-columns: 1fr; }
+  .system-mid { grid-template-columns: 1fr; }
+  .system-settings { grid-template-columns: 1fr; }
+}
 </style>
