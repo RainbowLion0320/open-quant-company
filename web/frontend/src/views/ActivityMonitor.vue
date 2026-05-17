@@ -90,9 +90,13 @@
           <span class="text-2xs" style="color:var(--accent)">过去7天</span>
         </div>
         <canvas ref="dsChartRef" class="w-full" style="height:160px"></canvas>
-        <div class="flex justify-center gap-4 mt-1">
-          <span class="text-2xs flex items-center gap-1"><span class="inline-block w-2 h-2 rounded" style="background:#06b6d4"></span> v4-pro</span>
-          <span class="text-2xs flex items-center gap-1"><span class="inline-block w-2 h-2 rounded" style="background:#7c3aed"></span> v4-flash</span>
+        <div class="flex justify-center gap-3 mt-1 text-2xs" style="color:var(--text-disabled)">
+          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
+          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.85)"></span>输出</span>
+          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.25);border:1px dashed rgba(6,182,212,0.3)"></span>缓存命中</span>
+          <span class="mx-1" style="color:#475569">|</span>
+          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>v4-pro</span>
+          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(61,21,120,0.85)"></span>v4-flash</span>
         </div>
       </div>
 
@@ -230,42 +234,70 @@ async function drawDSChart() {
     canvas.width = W * dpr; canvas.height = H * dpr;
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, W, H);
-    const rows = d.data.slice(-14); // last 7 days × 2 models
+
+    const rows: any[] = d.data.slice(-14);
     if (rows.length < 2) return;
     const dates = [...new Set(rows.map((r: any) => r.utc_date))].slice(-7);
-    const maxVal = Math.max(...rows.map((r: any) => r.total_tokens || 0), 1);
-    const barW = Math.max(4, Math.min(16, (W - 40) / dates.length / 3));
+    // max = sum of all three layers
+    const maxVal = Math.max(...rows.map((r: any) =>
+      (r.input_cache_miss||0) + (r.output_tokens||0) + (r.input_cache_hit||0)
+    ), 1);
+
     const leftPad = 40, topPad = 10, botPad = 22;
     const chartH = H - topPad - botPad;
-    // Y-axis labels
+    const groupW = (W - leftPad - 8) / dates.length;
+    const barW = Math.max(3, Math.min(10, groupW / 2.5));
+
+    // Y-axis grid
     ctx.fillStyle = "#64748b"; ctx.font = "9px monospace";
     for (let t = 0; t <= maxVal; t += maxVal / 4) {
       const y = H - botPad - (t / maxVal) * chartH;
-      ctx.fillText((t / 1_000_000).toFixed(0) + "M", 2, y + 3);
-      ctx.strokeStyle = "rgba(148,163,184,0.08)"; ctx.lineWidth = 0.5;
+      const label = t >= 1_000_000 ? (t / 1_000_000).toFixed(0) + "M"
+        : t >= 1000 ? (t / 1000).toFixed(0) + "K" : String(t);
+      ctx.fillText(label, 2, y + 3);
+      ctx.strokeStyle = "rgba(148,163,184,0.06)"; ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W - 8, y); ctx.stroke();
     }
-    // Bars
+
+    // Stacked bars: two models per day, 3 layers each
+    const models = ["deepseek-v4-pro", "deepseek-v4-flash"];
+    const colors: Record<string, string[]> = {
+      "deepseek-v4-pro":    ["rgba(6,95,107,0.85)",  "rgba(6,182,212,0.85)",  "rgba(6,182,212,0.28)"],
+      "deepseek-v4-flash":  ["rgba(61,21,120,0.85)", "rgba(124,58,237,0.85)", "rgba(124,58,237,0.28)"],
+    };
+    const layers = ["input_cache_miss", "output_tokens", "input_cache_hit"];
+
     dates.forEach((date: string, di: number) => {
-      const proRow = rows.find((r: any) => r.utc_date === date && r.model === "deepseek-v4-pro");
-      const flashRow = rows.find((r: any) => r.utc_date === date && r.model === "deepseek-v4-flash");
-      const x0 = leftPad + di * ((W - leftPad - 8) / dates.length) + 2;
-      // v4-pro bar
-      if (proRow) {
-        const h = (proRow.total_tokens / maxVal) * chartH;
-        ctx.fillStyle = "rgba(6,182,212,0.8)";
-        ctx.fillRect(x0, H - botPad - h, barW, h);
-      }
-      // v4-flash bar
-      if (flashRow) {
-        const h = (flashRow.total_tokens / maxVal) * chartH;
-        ctx.fillStyle = "rgba(124,58,237,0.8)";
-        ctx.fillRect(x0 + barW + 1, H - botPad - h, barW, h);
-      }
+      const groupX = leftPad + di * groupW + (groupW - barW * 2 - 2) / 2;
+      models.forEach((model, mi: number) => {
+        const row = rows.find((r: any) => r.utc_date === date && r.model === model);
+        if (!row) return;
+        const x0 = groupX + mi * (barW + 2);
+        let yBottom = H - botPad;
+        layers.forEach((layer, li) => {
+          const val = row[layer] || 0;
+          const h = (val / maxVal) * chartH;
+          ctx.fillStyle = colors[model][li];
+          ctx.fillRect(x0, yBottom - h, barW, h);
+          yBottom -= h;
+        });
+      });
       // Date label
       ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
-      ctx.fillText(date.slice(5), x0, H - 4);
+      ctx.fillText(date.slice(5), groupX, H - 4);
     });
+
+    // Legend — tiny stacked bar example
+    const lx = W - 130, ly = 8;
+    ctx.font = "7px monospace";
+    [["计费输入","rgba(6,95,107,0.85)"],["输出","rgba(6,182,212,0.85)"],["缓存命中","rgba(6,182,212,0.35)"]]
+      .forEach(([label, color], i) => {
+        const x = lx + i * 44;
+        ctx.fillStyle = color as string;
+        ctx.fillRect(x, ly, 8, 8);
+        ctx.fillStyle = "#64748b";
+        ctx.fillText(label as string, x + 10, ly + 7);
+      });
   } catch (e) { /* silent */ }
 }
 
