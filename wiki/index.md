@@ -21,6 +21,7 @@ tags: [index]
 - [[multifactor-scoring]] — 四维打分引擎（已演进为四策略对比体系）
 - [[financial-cache]] — 三层财务缓存 + PIT基本面/估值/资金/筹码/宏观因子提取
 
+- [[hindsight-architecture]] — Hindsight 记忆引擎深层架构：配置详解, 端口陷阱, 生命周期, 检索策略
 - [[hindsight-graph]] — ★ Hindsight 记忆知识图谱可视化：Canvas 力导向图, 节点悬浮/点击探索
 - [[paper-trading]] — ★ 日频模拟交易: 信号→PaperBroker→Parquet持久化→Web展示
 

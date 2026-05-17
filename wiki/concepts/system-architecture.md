@@ -182,7 +182,7 @@ strategies:
 | 缺月补建 | `scripts/rebuild_missing_months.py` | 精准补建受损特征文件 |
 | Token缓存 | `scripts/update_token_cache.py` | Hermes state.db + Hindsight → JSON |
 | 系统指标采集 | `scripts/collect_system_metrics.py` | 每分钟写 SQLite 时序数据 |
-| Hindsight采集 | `scripts/collect_hindsight_tokens.py` | 从 /metrics 拉取 LLM token |
+| Hindsight采集 | `scripts/collect_hindsight_tokens.py` | 从 /metrics (port 9177) 拉取 LLM token |
 | 系统监视API | `web/api/routes/system.py` | /monitor + /history 端点 |
 | 图谱API | `web/api/routes/hindsight.py` | ★ `/api/hindsight/graph` — 知识图谱数据端点 |
 | 活动监视器 | `web/frontend/src/views/ActivityMonitor.vue` | 🖥️ CPU/内存/Token 仪表盘 |

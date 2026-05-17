@@ -5,7 +5,7 @@ from typing import Optional
 
 router = APIRouter(prefix="/api/hindsight", tags=["Hindsight"])
 
-HINDSIGHT = "http://localhost:8888"
+HINDSIGHT = "http://localhost:9177"
 BANK = "quant-agent"
 
 

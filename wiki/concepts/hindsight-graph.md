@@ -13,7 +13,7 @@ Hindsight 持久化记忆的交互式知识图谱可视化。Canvas 力导向图
 ## 数据来源
 
 ```
-Hindsight REST API (localhost:8888)
+Hindsight REST API (localhost:9177)
   ├── /memories/list    → 全部记忆节点 (id, text, type, entities[], tags[], document_id)
   ├── /stats            → 图谱元数据 (total_nodes, total_links, links_by_type)
   └── /memories/recall  → 搜索 + source_fact_ids
@@ -88,7 +88,12 @@ Canvas 自建力导向图，不依赖第三方图谱库。
 - **Canvas 非 SVG**：节点数可能增长到数百，Canvas 比 SVG DOM 更高效
 - **无实时轮询**：数据变化慢（每轮对话才增量），无需 WebSocket 推送
 
+## 已知 Bug (2026-05-17)
+
+- **Web UI 图谱不显示节点**: 数据已正确拉取 (100 nodes via API)，但前端渲染为空白。Canvas 初始化或数据注入逻辑待排查。暂时不影响后端存储。
+
 ## See Also
 
+- [[hindsight-architecture]] — Hindsight 引擎深层架构 + 配置详解
 - [[web-architecture]] — Web 整体架构 + 10 页结构
 - [[system-architecture]] — 系统分层 + 关键模块表
