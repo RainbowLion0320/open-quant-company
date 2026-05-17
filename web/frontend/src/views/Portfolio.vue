@@ -70,9 +70,9 @@
       <table class="data-table" v-if="positions.length">
         <thead>
           <tr>
-            <th>代码</th><th>名称</th><th class="text-right">数量</th>
-            <th class="text-right">成本</th><th class="text-right">现价</th>
-            <th class="text-right">市值</th><th class="text-right">盈亏</th><th class="text-right">比例</th>
+            <th style="width:13%">代码</th><th style="width:16%">名称</th><th style="width:8%" class="text-right">数量</th>
+            <th style="width:12%" class="text-right">成本</th><th style="width:12%" class="text-right">现价</th>
+            <th style="width:14%" class="text-right">市值</th><th style="width:13%" class="text-right">盈亏</th><th style="width:12%" class="text-right">比例</th>
           </tr>
         </thead>
         <tbody>
@@ -103,9 +103,9 @@
       <table class="data-table" v-if="trades.length">
         <thead>
           <tr>
-            <th>日期</th><th>代码</th><th>方向</th>
-            <th class="text-right">价格</th><th class="text-right">数量</th>
-            <th class="text-right">金额</th><th>策略</th>
+            <th style="width:16%">日期</th><th style="width:14%">代码</th><th style="width:10%">方向</th>
+            <th style="width:14%" class="text-right">价格</th><th style="width:10%" class="text-right">数量</th>
+            <th style="width:20%" class="text-right">金额</th><th style="width:16%">策略</th>
           </tr>
         </thead>
         <tbody>

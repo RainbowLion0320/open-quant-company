@@ -59,7 +59,7 @@
         <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">策略信号</div>
         <table class="data-table">
           <thead>
-            <tr><th>策略</th><th class="text-right">评分</th><th class="text-right">信号</th></tr>
+            <tr><th style="width:40%">策略</th><th style="width:30%" class="text-right">评分</th><th style="width:30%" class="text-right">信号</th></tr>
           </thead>
           <tbody>
             <tr v-for="(sigs, strategy) in stock.signals" :key="strategy">

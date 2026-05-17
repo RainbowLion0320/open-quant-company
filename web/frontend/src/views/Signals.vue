@@ -10,9 +10,9 @@
     <div class="glass-card" style="padding:20px">
       <table class="data-table" v-if="changes.length">
         <thead>
-          <tr>
-            <th>日期</th><th>策略</th><th>代码</th><th>名称</th>
-            <th class="text-right">旧信号</th><th class="text-right">新信号</th>
+            <tr>
+            <th style="width:14%">日期</th><th style="width:16%">策略</th><th style="width:14%">代码</th><th style="width:22%">名称</th>
+            <th style="width:17%" class="text-right">旧信号</th><th style="width:17%" class="text-right">新信号</th>
           </tr>
         </thead>
         <tbody>

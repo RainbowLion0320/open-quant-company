@@ -40,6 +40,13 @@
       <!-- Signal Table -->
       <div v-if="currentStrategy === s.name && signals.length" class="mt-4 animate-fade-in">
         <table class="data-table">
+          <colgroup>
+            <col style="width:14%">
+            <col style="width:22%">
+            <col style="width:22%">
+            <col style="width:18%">
+            <col style="width:24%">
+          </colgroup>
           <thead>
             <tr>
               <th>代码</th>

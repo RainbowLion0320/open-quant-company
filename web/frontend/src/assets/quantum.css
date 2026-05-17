@@ -481,6 +481,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
+  table-layout: fixed;
 }
 .data-table th {
   text-align: left;
@@ -491,11 +492,17 @@ input[type="range"]::-webkit-slider-thumb:hover {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .data-table td {
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .data-table tr:hover td {
   background: var(--bg-hover);
