@@ -4,6 +4,8 @@
 """
 import sys, os
 sys.path.insert(0, os.path.expanduser('~/quant-agent'))
+from pathlib import Path
+import tempfile
 
 import numpy as np
 import pandas as pd
@@ -129,7 +131,25 @@ check("资金不足自动缩量", oid6.startswith("PAPER_") or oid6 == "资金�
 print(f"\n── 数据库抽象层 (data/db.py) ──")
 
 from data.db import get_db, reset_db, get_store_dir
+from data.datahub import DataHub
 from data import results_db
+
+with tempfile.TemporaryDirectory() as tmp:
+    hub = DataHub(store_root=Path(tmp) / "store", cache_root=Path(tmp) / "cache")
+    sig_path = hub.signal_path("unit_strategy")
+    hub.write_parquet(pd.DataFrame([
+        {"symbol": "A", "signal": "hold", "computed_at": "2026-05-01T15:00:00"},
+        {"symbol": "B", "signal": "buy", "computed_at": "2026-05-02T15:00:00"},
+        {"symbol": "C", "signal": "buy", "computed_at": "2026-05-02T15:00:00"},
+    ]), sig_path)
+    latest = hub.latest_batch(sig_path)
+    check("DataHub最新批次读取", sorted(latest["symbol"].tolist()) == ["B", "C"])
+    hub.append_parquet(sig_path, {"symbol": "B", "signal": "sell", "computed_at": "2026-05-03T15:00:00"}, dedupe_subset=["symbol"])
+    after = hub.read_parquet(sig_path)
+    row_b = after[after["symbol"] == "B"].iloc[0].to_dict()
+    check("DataHub追加去重写入", row_b["signal"] == "sell" and sig_path.exists())
+    audit_keys = {item["key"] for item in hub.audit()}
+    check("DataHub目录审计", {"signals", "features", "paper", "token_usage"}.issubset(audit_keys))
 
 reset_db()
 results_db.init()

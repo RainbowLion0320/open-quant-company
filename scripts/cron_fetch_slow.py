@@ -18,7 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 import tushare as ts
-from data.db import get_store_dir
+from data.datahub import get_datahub
+
+HUB = get_datahub()
 
 
 def get_token() -> str:
@@ -32,7 +34,7 @@ def fetch_limit_list():
     1次/分钟限流 → 每次只拉1天。
     """
     api = ts.pro_api(get_token())
-    store = get_store_dir("stock") / "limit_list"
+    store = HUB.store_dir("stock") / "limit_list"
     store.mkdir(parents=True, exist_ok=True)
 
     # Get the most recent date NOT already cached
@@ -42,14 +44,15 @@ def fetch_limit_list():
     fetched = 0
     for d in trade_days[:5]:  # Try up to 5 recent dates
         pq_path = store / f"{d}.parquet"
-        if pq_path.exists() and pd.read_parquet(pq_path).memory_usage().sum() > 0:
+        cached = HUB.read_parquet(pq_path, default=pd.DataFrame())
+        if pq_path.exists() and cached is not None and cached.memory_usage().sum() > 0:
             continue
 
         try:
             time.sleep(65)  # 1次/分钟限流
             df = api.limit_list_d(trade_date=d, limit_type="U")
             if df is not None and len(df) > 0:
-                df.to_parquet(pq_path, index=False)
+                HUB.write_parquet(df, pq_path)
                 fetched += 1
                 print(f"  [limit_list] ✓ {d}: {len(df)} records")
         except Exception as e:
@@ -61,12 +64,13 @@ def fetch_limit_list():
 def fetch_research_report():
     """拉取最近一个月的研报数据。"""
     api = ts.pro_api(get_token())
-    store = get_store_dir("stock") / "research_report"
+    store = HUB.store_dir("stock") / "research_report"
     store.mkdir(parents=True, exist_ok=True)
 
     mon = datetime.now().strftime("%Y%m")
     pq_path = store / f"{mon}.parquet"
-    if pq_path.exists() and len(pd.read_parquet(pq_path)) > 100:
+    cached = HUB.read_parquet(pq_path, default=pd.DataFrame())
+    if pq_path.exists() and cached is not None and len(cached) > 100:
         print(f"  [research] ✓ {mon}: already cached")
         return 0
 
@@ -76,7 +80,7 @@ def fetch_research_report():
         end = f"{mon}31"
         df = api.research_report(start_date=start, end_date=end)
         if df is not None and len(df) > 0:
-            df.to_parquet(pq_path, index=False)
+            HUB.write_parquet(df, pq_path)
             print(f"  [research] ✓ {mon}: {len(df)} records")
             return 1
     except Exception as e:

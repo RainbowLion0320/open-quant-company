@@ -19,6 +19,9 @@ import time
 from pathlib import Path
 
 from data.assets.base import AssetAdapter
+from data.datahub import get_datahub
+
+HUB = get_datahub()
 
 
 # ── ETF universe: top 200 by volume + category diversity ──
@@ -91,7 +94,7 @@ class ETFAsset(AssetAdapter):
     label: str = "ETF基金"
     description: str = "A股场内ETF (宽基/行业/债券/黄金/跨境)"
 
-    def __init__(self, store_root: Path):
+    def __init__(self, store_root: Path | str | None = None):
         super().__init__(store_root)
         self._universe = list(ETF_UNIVERSE)
         self._universe_dir = self.asset_dir / "universe"
@@ -112,7 +115,7 @@ class ETFAsset(AssetAdapter):
         cache_path = self.cache_path(symbol)
         if cache_path.exists():
             try:
-                cached = pd.read_parquet(cache_path)
+                cached = HUB.read_parquet(cache_path)
                 if len(cached) > 0:
                     cached["date"] = pd.to_datetime(cached["date"])
                     return cached
@@ -135,7 +138,7 @@ class ETFAsset(AssetAdapter):
             })
             df["date"] = pd.to_datetime(df["date"])
             df = df.sort_values("date")
-            df.to_parquet(cache_path, index=False)
+            HUB.write_parquet(df, cache_path)
             return df
         except Exception as e:
             print(f"  [ETF] {symbol}: {type(e).__name__}: {str(e)[:60]}")

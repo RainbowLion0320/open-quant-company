@@ -24,9 +24,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from data.db import get_store_dir
+from data.datahub import get_datahub
 from data.symbols import CIRCLE_STOCKS
 from data.assets.stock import _to_ts_code
+
+HUB = get_datahub()
 
 
 def get_token() -> str:
@@ -53,7 +55,7 @@ def fetch_moneyflow_date(trade_date: str, store_dir: Path) -> Optional[pd.DataFr
     """
     cache_path = store_dir / f"{trade_date}.parquet"
     if cache_path.exists():
-        return pd.read_parquet(cache_path)
+        return HUB.read_parquet(cache_path)
 
     import tushare as ts
     api = ts.pro_api(get_token())
@@ -63,7 +65,7 @@ def fetch_moneyflow_date(trade_date: str, store_dir: Path) -> Optional[pd.DataFr
         df = api.moneyflow(trade_date=trade_date)
         if df is None or len(df) == 0:
             return None
-        df.to_parquet(cache_path, index=False)
+        HUB.write_parquet(df, cache_path)
         return df
     except Exception as e:
         print(f"  ✗ {trade_date}: {type(e).__name__}: {str(e)[:60]}")
@@ -102,7 +104,7 @@ def fetch_monthly_only(start: str = "20150101", end: str = "20260501"):
     print(f"   积分: 0 (门槛2000，不消耗)")
     print(f"{'='*60}")
 
-    store_dir = get_store_dir("stock") / "moneyflow" / "monthly"
+    store_dir = HUB.store_dir("stock") / "moneyflow" / "monthly"
     store_dir.mkdir(parents=True, exist_ok=True)
 
     all_days = get_trade_calendar(start, end)
@@ -133,7 +135,7 @@ def fetch_daily_recent(n_days: int = 60):
     print(f"   积分: 0 (门槛2000，不消耗)")
     print(f"{'='*60}")
 
-    store_dir = get_store_dir("stock") / "moneyflow" / "daily"
+    store_dir = HUB.store_dir("stock") / "moneyflow" / "daily"
     store_dir.mkdir(parents=True, exist_ok=True)
 
     all_days = get_trade_calendar(start, end)

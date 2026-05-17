@@ -26,7 +26,12 @@ import pandas as pd
 import akshare as ak
 
 PROJECT = Path(__file__).resolve().parent.parent
-CACHE_DIR = PROJECT / 'data' / 'cache'
+sys.path.insert(0, str(PROJECT))
+
+from data.datahub import get_datahub
+
+HUB = get_datahub()
+CACHE_DIR = HUB.cache_dir()
 UNIVERSE_PATH = PROJECT / 'data' / 'universe_raw.json'
 PROGRESS_PATH = PROJECT / 'data' / '.financials_progress.json'
 
@@ -74,7 +79,7 @@ def fetch_one(symbol: str, name: str) -> bool:
                 if df[col].dtype == 'object':
                     df[col] = df[col].astype(str)
 
-            df.to_parquet(path, index=False)
+            HUB.write_parquet(df, path)
             return True
 
         except Exception as e:

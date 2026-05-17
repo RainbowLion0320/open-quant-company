@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
 """精确补建缺失的特征月份 — 只拉缓存，建缺失月"""
 import os, sys, time, socket
+from pathlib import Path
 socket.setdefaulttimeout(30)
 for k in list(os.environ.keys()):
     if k.lower() in ('http_proxy', 'https_proxy', 'all_proxy'):
         del os.environ[k]
 os.environ['no_proxy'] = '*'
-sys.path.insert(0, '/Users/fushao/quant-agent')
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 import pandas as pd
 import numpy as np
-from pathlib import Path
 from data.symbols import CIRCLE_STOCKS
 from data.fetcher import get_stock_daily
+from data.datahub import get_datahub
 from data.financials import get_financial_summary
 from signals.expression import alpha_factors
 from data.feature_store import FEATURES_DIR, enrich_from_registry
+
+HUB = get_datahub()
 
 MISSING = ['2018-01', '2018-03', '2018-04', '2018-05', '2018-07']
 _skip_prefixes = ('92', '83', '87', '43')
@@ -177,7 +181,7 @@ for month in MISSING:
         cleaner = DataCleaner()
         result_df, _ = cleaner.clean_features(result_df)
         result_df = enrich_from_registry(result_df, month, list(price_cache.keys()))
-        result_df.to_parquet(FEATURES_DIR / f"{month}.parquet", index=False)
+        HUB.write_parquet(result_df, FEATURES_DIR / f"{month}.parquet")
     print(f"  {month}: {len(rows)} stocks")
 
 print("\n✅ 补建完成")

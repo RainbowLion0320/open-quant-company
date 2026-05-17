@@ -18,6 +18,9 @@ import time
 from pathlib import Path
 
 from data.assets.base import AssetAdapter
+from data.datahub import get_datahub
+
+HUB = get_datahub()
 
 
 # ── Futures universe: main contracts ──
@@ -59,7 +62,7 @@ class FuturesAsset(AssetAdapter):
     label: str = "期货"
     description: str = "股指/国债/商品主力连续合约"
 
-    def __init__(self, store_root: Path):
+    def __init__(self, store_root: Path | str | None = None):
         super().__init__(store_root)
         self._universe = list(FUTURES_UNIVERSE)
 
@@ -70,7 +73,7 @@ class FuturesAsset(AssetAdapter):
         cache_path = self.cache_path(symbol)
         if cache_path.exists():
             try:
-                return pd.read_parquet(cache_path)
+                return HUB.read_parquet(cache_path)
             except Exception:
                 pass
 
@@ -108,7 +111,7 @@ class FuturesAsset(AssetAdapter):
             # Keep only OHLCV + OI
             keep = [c for c in ["open", "high", "low", "close", "volume", "open_interest"] if c in df.columns]
             df = df[keep]
-            df.to_parquet(cache_path)
+            HUB.write_parquet(df, cache_path, index=True)
             return df
         except Exception as e:
             print(f"  [Futures] {symbol}: {type(e).__name__}: {str(e)[:60]}")

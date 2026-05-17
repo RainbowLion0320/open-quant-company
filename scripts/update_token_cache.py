@@ -2,10 +2,18 @@
 """更新 Token 缓存 → 合并 Hermes state.db + factor_hypothesis log + Hindsight"""
 import sqlite3, json, os
 from datetime import datetime
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from data.datahub import get_datahub
 
 DB = os.path.expanduser("~/.hermes/state.db")
-OUT = "/Users/fushao/quant-agent/data/cache/token_usage.json"
-LLM_LOG = "/Users/fushao/quant-agent/data/cache/llm_usage_today.json"
+HUB = get_datahub()
+OUT = HUB.token_usage_path()
+LLM_LOG = HUB.llm_usage_path()
 
 
 def read_hermes_usage():
@@ -31,7 +39,7 @@ def read_hermes_usage():
 def read_external_usage():
     """读取 factor_hypothesis / Hindsight 等外部 LLM 调用日志"""
     try:
-        if os.path.exists(LLM_LOG):
+        if LLM_LOG.exists():
             with open(LLM_LOG) as f:
                 data = json.load(f)
             if data.get("date") == datetime.now().strftime("%Y-%m-%d"):
@@ -46,10 +54,10 @@ def update():
     ext = read_external_usage()
 
     # 合并 Hindsight token
-    hindsight_file = "/Users/fushao/quant-agent/data/cache/hindsight_tokens.json"
+    hindsight_file = HUB.hindsight_tokens_path()
     hs = {"total_input": 0, "total_output": 0, "total_cost": 0.0, "calls": 0}
     try:
-        if os.path.exists(hindsight_file):
+        if hindsight_file.exists():
             with open(hindsight_file) as f:
                 d = json.load(f)
             hs["total_input"] = d["input_tokens"]
@@ -95,9 +103,7 @@ def update():
         "updated_at": datetime.now().isoformat(),
     }
 
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w") as f:
-        json.dump(data, f)
+    HUB.write_json(data, OUT)
 
     t = data["total"]
     print(f"Token updated: Hermes {h['input_tokens']:,} in + ext {ext['total_input']:,} in "

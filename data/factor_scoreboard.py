@@ -10,7 +10,10 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional
 
-SCOREBOARD_PATH = Path(__file__).resolve().parent.parent / "data" / "models" / "factor_scoreboard.parquet"
+from data.datahub import get_datahub
+
+HUB = get_datahub()
+SCOREBOARD_PATH = HUB.model_path("factor_scoreboard")
 
 COLUMNS = [
     "name", "formula", "ic", "ic_std", "icir", "oos_ic",
@@ -21,7 +24,7 @@ COLUMNS = [
 def load() -> pd.DataFrame:
     """Load existing scoreboard."""
     if SCOREBOARD_PATH.exists():
-        return pd.read_parquet(SCOREBOARD_PATH)
+        return HUB.read_parquet(SCOREBOARD_PATH)
     return pd.DataFrame(columns=COLUMNS)
 
 
@@ -44,7 +47,7 @@ def record(candidates: List[dict]) -> None:
         })
     new = pd.DataFrame(rows, columns=COLUMNS)
     df = pd.concat([df, new], ignore_index=True)
-    df.to_parquet(SCOREBOARD_PATH, index=False)
+    HUB.write_parquet(df, SCOREBOARD_PATH)
 
 
 def top_factors(min_icir: float = 0.2, min_tests: int = 2) -> pd.DataFrame:

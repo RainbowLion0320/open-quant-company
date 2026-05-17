@@ -24,24 +24,30 @@ from datetime import date as DateType, datetime
 from typing import Dict, List, Optional
 import os
 
+from data.datahub import get_datahub
+
 # ── 默认路径 (可在 settings.yaml 覆盖) ──
-STORE_DIR = Path(__file__).resolve().parent.parent / "data" / "store" / "paper"
+HUB = get_datahub()
+STORE_DIR = HUB.paper_dir()
 
 
 def _resolve_store() -> Path:
     """读取 config/settings.yaml 的 paper_trading.store_dir, 兜底为默认"""
     try:
         import yaml
-        cfg_path = STORE_DIR.parent.parent / "config" / "settings.yaml"
+        cfg_path = HUB.project_root / "config" / "settings.yaml"
         if cfg_path.exists():
             with open(cfg_path) as f:
                 cfg = yaml.safe_load(f)
             pt = cfg.get("paper_trading", {})
             custom = pt.get("store_dir")
             if custom:
-                return Path(custom)
+                path = HUB.resolve_path(custom)
+                path.mkdir(parents=True, exist_ok=True)
+                return path
     except Exception:
         pass
+    STORE_DIR.mkdir(parents=True, exist_ok=True)
     return STORE_DIR
 
 
@@ -65,7 +71,9 @@ def load_state() -> PaperState:
         return PaperState()
 
     try:
-        df = pd.read_parquet(state_file)
+        df = HUB.read_parquet(state_file)
+        if df is None or df.empty:
+            return PaperState()
         row = df.iloc[0].to_dict()
 
         # 持仓是嵌套 dict, parquet 存为 JSON 字符串
@@ -105,7 +113,7 @@ def save_state(state: PaperState):
         "order_counter": state.order_counter,
         "updated_at": state.updated_at,
     }])
-    df.to_parquet(store / "state.parquet", index=False)
+    HUB.write_parquet(df, store / "state.parquet")
 
 
 # ── NAV 快照 ──
@@ -124,7 +132,7 @@ def append_nav(run_date: DateType, total_asset: float, cash: float, market_value
     }])
 
     if nav_file.exists():
-        existing = pd.read_parquet(nav_file)
+        existing = HUB.read_parquet(nav_file, default=pd.DataFrame())
         # 同一天不重复写
         target = pd.Timestamp(run_date)
         if not existing[existing["date"] == target].empty:
@@ -132,7 +140,7 @@ def append_nav(run_date: DateType, total_asset: float, cash: float, market_value
         df = pd.concat([existing, row], ignore_index=True)
     else:
         df = row
-    df.to_parquet(nav_file, index=False)
+    HUB.write_parquet(df, nav_file)
 
 
 def load_nav() -> pd.DataFrame:
@@ -140,7 +148,7 @@ def load_nav() -> pd.DataFrame:
     nav_file = _resolve_store() / "nav.parquet"
     if not nav_file.exists():
         return pd.DataFrame(columns=["date", "total_asset", "cash", "market_value"])
-    return pd.read_parquet(nav_file)
+    return HUB.read_parquet(nav_file, default=pd.DataFrame(columns=["date", "total_asset", "cash", "market_value"]))
 
 
 # ── 交易记录 ──
@@ -164,10 +172,11 @@ def append_trade(run_date: DateType, code: str, side: str, price: float,
     }])
 
     if trade_file.exists():
-        df = pd.concat([pd.read_parquet(trade_file), row], ignore_index=True)
+        existing = HUB.read_parquet(trade_file, default=pd.DataFrame())
+        df = pd.concat([existing, row], ignore_index=True)
     else:
         df = row
-    df.to_parquet(trade_file, index=False)
+    HUB.write_parquet(df, trade_file)
 
 
 def load_trades() -> pd.DataFrame:
@@ -175,7 +184,7 @@ def load_trades() -> pd.DataFrame:
     trade_file = _resolve_store() / "trades.parquet"
     if not trade_file.exists():
         return pd.DataFrame(columns=["date", "code", "name", "side", "price", "volume", "amount", "strategy"])
-    return pd.read_parquet(trade_file)
+    return HUB.read_parquet(trade_file, default=pd.DataFrame(columns=["date", "code", "name", "side", "price", "volume", "amount", "strategy"]))
 
 
 def load_today_trades(run_date: Optional[DateType] = None) -> pd.DataFrame:

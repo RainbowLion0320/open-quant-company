@@ -42,7 +42,10 @@ from broker.persistence import (
     load_state, save_state, append_nav, append_trade,
     load_nav, load_trades, PaperState, _resolve_store,
 )
+from data.datahub import get_datahub
 from data.symbols import CIRCLE_STOCKS
+
+HUB = get_datahub()
 
 
 # ── 配置 ──
@@ -88,7 +91,6 @@ def _read_latest_signals() -> Dict[str, List[Tuple[str, str, int]]]:
     Returns: {strategy: [(code, side, shares), ...]}
     信号 parquet 使用 computed_at 列 (ISO格式), 取最新批次。
     """
-    signals_dir = ROOT / "data" / "store" / "signals"
     cfg = load_config()
     strategies = cfg.get("strategies", {})
 
@@ -97,24 +99,18 @@ def _read_latest_signals() -> Dict[str, List[Tuple[str, str, int]]]:
     for strategy_name, strategy_cfg in strategies.items():
         if not strategy_cfg.get("enabled", True):
             continue
-        sig_file = signals_dir / f"{strategy_name}.parquet"
+        sig_file = HUB.signal_path(strategy_name)
         if not sig_file.exists():
             continue
         try:
-            df = pd.read_parquet(sig_file)
+            df = HUB.latest_batch(sig_file)
             if df.empty or "signal" not in df.columns:
                 continue
 
-            # 用 computed_at 列取最新批次
-            if "computed_at" in df.columns:
-                latest_ts = df["computed_at"].max()
-                latest = df[df["computed_at"] == latest_ts]
-            else:
-                latest = df
-
             # 信号过滤 (大小写兼容)
-            buys = latest[latest["signal"].str.lower().isin(["buy", "strong_buy"])]
-            sells = latest[latest["signal"].str.lower().isin(["sell", "strong_sell"])]
+            signal_col = df["signal"].astype(str).str.lower()
+            buys = df[signal_col.isin(["buy", "strong_buy"])]
+            sells = df[signal_col.isin(["sell", "strong_sell"])]
 
             items = []
             for _, row in buys.iterrows():

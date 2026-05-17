@@ -38,8 +38,11 @@ from data.results_db import (
     load_buffett_results, load_strategy_signals,
     get_buffett_meta, list_strategies,
 )
+from data.datahub import get_datahub
 from signals.ml_signals import compute_ml_signals as compute_ml
 from signals.selection import apply_ranked_buys
+
+HUB = get_datahub()
 
 
 def _get_latest_price(symbol: str) -> float:
@@ -474,8 +477,8 @@ def notify_signals(strategies: list[dict]):
 def _save_prev_signals():
     """把当前信号 Parquet 备份为上一次（用于下次对比）"""
     import shutil
-    signals_dir = PROJECT / "data" / "store" / "signals"
-    prev_dir = PROJECT / "data" / "store" / "signals_prev"
+    signals_dir = HUB.signals_dir()
+    prev_dir = HUB.signals_prev_dir()
     try:
         prev_dir.mkdir(parents=True, exist_ok=True)
         for pq in signals_dir.glob("*.parquet"):
@@ -486,11 +489,11 @@ def _save_prev_signals():
 
 def _load_prev_signals(strategy: str) -> list[dict] | None:
     """加载上一次的信号快照"""
-    prev_path = PROJECT / "data" / "store" / "signals_prev" / f"{strategy}.parquet"
+    prev_path = HUB.signal_prev_path(strategy)
     if not prev_path.exists():
         return None
     try:
-        df = pd.read_parquet(prev_path)
+        df = HUB.read_parquet(prev_path)
         if "computed_at" in df.columns and len(df):
             latest_ts = df["computed_at"].max()
             df = df[df["computed_at"] == latest_ts]

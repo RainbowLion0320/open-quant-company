@@ -2,10 +2,17 @@
 """系统监控数据采集 —— 每分钟写入 SQLite (WAL 模式)"""
 import os, sys, time, json, sqlite3
 from datetime import datetime
+from pathlib import Path
 import psutil
 
-DB = "/Users/fushao/quant-agent/data/store/system_monitor.db"
-TOKEN_CACHE = "/Users/fushao/quant-agent/data/cache/token_usage.json"
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from data.datahub import get_datahub
+
+HUB = get_datahub()
+DB = HUB.system_monitor_path()
+TOKEN_CACHE = HUB.token_usage_path()
 
 
 def init_db(conn):
@@ -44,7 +51,8 @@ def init_db(conn):
 
 
 def collect():
-    conn = sqlite3.connect(DB)
+    DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB))
     init_db(conn)
 
     now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
@@ -59,7 +67,7 @@ def collect():
     # Token
     token = {"hermes": {}, "external": {}, "total": {}}
     try:
-        if os.path.exists(TOKEN_CACHE):
+        if TOKEN_CACHE.exists():
             with open(TOKEN_CACHE) as f:
                 token = json.load(f)
     except Exception:
@@ -122,7 +130,7 @@ def _cleanup():
     from datetime import timedelta
     cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%S")
     try:
-        conn = sqlite3.connect(DB)
+        conn = sqlite3.connect(str(DB))
         conn.execute("DELETE FROM metrics WHERE ts < ?", (cutoff,))
         conn.execute("DELETE FROM top_processes WHERE ts < ?", (cutoff,))
         conn.commit()

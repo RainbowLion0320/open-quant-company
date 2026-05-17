@@ -4,13 +4,14 @@ from fastapi import APIRouter
 from datetime import datetime
 import pandas as pd
 import yaml
-import os
 from pathlib import Path
+
+from data.datahub import get_datahub
 
 router = APIRouter(prefix="/api/market", tags=["Market"])
 
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
-STORE = ROOT / "data" / "store"
+HUB = get_datahub()
 
 
 def _num(v, default=0.0) -> float:
@@ -58,11 +59,11 @@ def _series_card(key: str, label: str, symbol: str, df: pd.DataFrame | None, val
 
 def _load_etf(symbol: str) -> pd.DataFrame | None:
     """Load cached ETF data only; the dashboard must not block on network fetches."""
-    path = STORE / "etf" / "daily" / f"{symbol}.parquet"
+    path = HUB.asset_daily_path("etf", symbol)
     if not path.exists():
         return None
     try:
-        df = pd.read_parquet(path)
+        df = HUB.read_parquet(path)
         if "date" in df.columns:
             df["date"] = pd.to_datetime(df["date"], errors="coerce")
         return df
@@ -71,11 +72,11 @@ def _load_etf(symbol: str) -> pd.DataFrame | None:
 
 
 def _load_bond_yield() -> pd.DataFrame | None:
-    path = STORE / "bond" / "treasury_yields.parquet"
+    path = HUB.store_dir("bond") / "treasury_yields.parquet"
     if not path.exists():
         return None
     try:
-        df = pd.read_parquet(path).reset_index(drop=True)
+        df = HUB.read_parquet(path).reset_index(drop=True)
         if "日期" in df.columns:
             df["date"] = pd.to_datetime(df["日期"], errors="coerce")
         return df
@@ -84,11 +85,11 @@ def _load_bond_yield() -> pd.DataFrame | None:
 
 
 def _load_macro(name: str) -> pd.DataFrame | None:
-    path = STORE / "macro" / f"{name}.parquet"
+    path = HUB.macro_path(name)
     if not path.exists():
         return None
     try:
-        df = pd.read_parquet(path)
+        df = HUB.read_parquet(path)
         if "date" not in df.columns:
             date_col = next((c for c in df.columns if "date" in str(c).lower() or "日期" in str(c)), None)
             if date_col:

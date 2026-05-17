@@ -15,6 +15,8 @@ from typing import Dict, List, Optional
 from pathlib import Path
 import pandas as pd
 
+from data.datahub import get_datahub
+
 
 class AssetAdapter(ABC):
     """
@@ -33,12 +35,12 @@ class AssetAdapter(ABC):
     label: str = ""            # "A股股票", "公募基金", etc.
     description: str = ""
 
-    def __init__(self, store_root: Path):
+    def __init__(self, store_root: Path | str | None = None):
         """
         Args:
             store_root: root of the data store (data/store/)
         """
-        self.store_root = Path(store_root)
+        self.store_root = Path(store_root) if store_root is not None else get_datahub().store_dir()
         self.asset_dir = self.store_root / self.asset_type
         self.asset_dir.mkdir(parents=True, exist_ok=True)
 

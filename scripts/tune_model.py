@@ -17,8 +17,11 @@ import pandas as pd
 import numpy as np
 from scipy.stats import spearmanr
 
+from data.datahub import get_datahub
 from data.feature_store import FEATURES_DIR, TimeSeriesSplitter
 from models import LightGBMRegressor, prepare_xy, MODEL_DIR
+
+HUB = get_datahub()
 
 
 def load_all_features() -> pd.DataFrame:
@@ -27,7 +30,7 @@ def load_all_features() -> pd.DataFrame:
     for pq in sorted(FEATURES_DIR.glob("*.parquet")):
         if pq.stem in ("scan_meta", "buffett_scan"):
             continue
-        df = pd.read_parquet(pq)
+        df = HUB.read_parquet(pq)
         if "month" not in df.columns:
             df["month"] = pq.stem
         dfs.append(df)

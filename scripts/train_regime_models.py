@@ -12,9 +12,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pandas as pd
 import numpy as np
 
+from data.datahub import get_datahub
 from data.feature_store import FEATURES_DIR
 from models import LightGBMRegressor, prepare_xy, MODEL_DIR
 from cybernetics.orchestrator import MarketRegime, detect_market_regime
+
+HUB = get_datahub()
 
 
 def train_regime_models():
@@ -53,7 +56,7 @@ def train_regime_models():
     for pq in sorted(FEATURES_DIR.glob("*.parquet")):
         if pq.stem in ("scan_meta", "buffett_scan"):
             continue
-        df = pd.read_parquet(pq)
+        df = HUB.read_parquet(pq)
         df["month"] = pq.stem
         dfs.append(df)
     all_features = pd.concat(dfs, ignore_index=True)

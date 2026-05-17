@@ -15,8 +15,10 @@ from typing import Dict, List, Optional
 import pandas as pd
 import numpy as np
 
-from data.db import get_store_dir
+from data.datahub import get_datahub
 from data.assets.stock import _to_ts_code
+
+HUB = get_datahub()
 
 
 def get_token() -> str:
@@ -28,7 +30,7 @@ class HolderFetcher:
     """股东户数获取器 (Tushare, 免费)"""
 
     def __init__(self):
-        self.store_dir = get_store_dir("stock") / "holders"
+        self.store_dir = HUB.store_dir("stock") / "holders"
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
     def fetch_symbol(self, symbol: str) -> Optional[pd.DataFrame]:
@@ -36,7 +38,7 @@ class HolderFetcher:
         cache_path = self.store_dir / f"{symbol}.parquet"
         if cache_path.exists():
             try:
-                df = pd.read_parquet(cache_path)
+                df = HUB.read_parquet(cache_path)
                 if len(df) > 0:
                     return df
             except Exception:
@@ -56,7 +58,7 @@ class HolderFetcher:
             df["ann_date"] = pd.to_datetime(df["ann_date"], errors="coerce")
             df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce")
             df = df.sort_values("end_date")
-            df.to_parquet(cache_path, index=False)
+            HUB.write_parquet(df, cache_path)
             return df
         except Exception as e:
             print(f"  [holders] {symbol}: {type(e).__name__}: {str(e)[:60]}")
@@ -88,7 +90,7 @@ class HolderTradeFetcher:
     """股东增减持获取器 (Tushare, 免费)"""
 
     def __init__(self):
-        self.store_dir = get_store_dir("stock") / "holdertrade"
+        self.store_dir = HUB.store_dir("stock") / "holdertrade"
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
     def fetch_symbol(self, symbol: str) -> Optional[pd.DataFrame]:
@@ -96,7 +98,7 @@ class HolderTradeFetcher:
         cache_path = self.store_dir / f"{symbol}.parquet"
         if cache_path.exists():
             try:
-                df = pd.read_parquet(cache_path)
+                df = HUB.read_parquet(cache_path)
                 if len(df) > 0:
                     return df
             except Exception:
@@ -115,7 +117,7 @@ class HolderTradeFetcher:
                 return None
             df["ann_date"] = pd.to_datetime(df["ann_date"], errors="coerce")
             df = df.sort_values("ann_date")
-            df.to_parquet(cache_path, index=False)
+            HUB.write_parquet(df, cache_path)
             return df
         except Exception as e:
             # Some stocks may have no trade records — not an error

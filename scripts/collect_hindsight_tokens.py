@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """从 Hindsight /metrics 提取 LLM token 统计"""
-import re, urllib.request, json, os, sys
+import re, urllib.request, sys
 from datetime import datetime
+from pathlib import Path
 
-OUT = "/Users/fushao/quant-agent/data/cache/hindsight_tokens.json"
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from data.datahub import get_datahub
+
+HUB = get_datahub()
+OUT = HUB.hindsight_tokens_path()
 
 
 def parse_metrics(text: str) -> dict:
@@ -30,9 +37,7 @@ def collect():
         resp = urllib.request.urlopen("http://localhost:8888/metrics", timeout=5)
         text = resp.read().decode()
         data = parse_metrics(text)
-        os.makedirs(os.path.dirname(OUT), exist_ok=True)
-        with open(OUT, "w") as f:
-            json.dump(data, f)
+        HUB.write_json(data, OUT)
         print(f"Hindsight: {data['input_tokens']:,} in / {data['output_tokens']:,} out "
               f"= ${data['cost_usd']:.6f} ({data['calls']} calls)")
     except Exception as e:

@@ -15,8 +15,11 @@ import numpy as np
 
 from data.symbols import CIRCLE_STOCKS, SYMBOL_NAME
 from data.fetcher import get_stock_daily
+from data.datahub import get_datahub
 from signals.expression import alpha_factors
 from data.feature_store import FEATURES_DIR, FeatureStoreBuilder, enrich_from_registry
+
+HUB = get_datahub()
 
 # ══════════════════════════════════════════════════════════
 N_STOCKS = 5517
@@ -216,12 +219,12 @@ for mi, month_dt in enumerate(months):
         result_df, clean_report = cleaner.clean_features(result_df)
         # ── 新数据维度富化 (Phase 4.2) ──
         result_df = enrich_from_registry(result_df, month, list(price_cache.keys()))
-        result_df.to_parquet(pq_path, index=False)
+        HUB.write_parquet(result_df, pq_path)
     print(f"  {month}: {len(rows)} stocks")
 
 # 统计
 pq_files = sorted(FEATURES_DIR.glob("*.parquet"))
-total_rows = sum(len(pd.read_parquet(pq)) for pq in pq_files)
+total_rows = sum(len(HUB.read_parquet(pq)) for pq in pq_files)
 print(f"\n完成: {len(pq_files)} 个月, {total_rows} 总行")
 print("✅ 特征构建完成")
 
@@ -268,5 +271,5 @@ def rebuild_recent(months: int = 3):
                 cleaner = DataCleaner()
                 result_df, _ = cleaner.clean_features(result_df)
                 result_df = enrich_from_registry(result_df, month, list(price_cache.keys()))
-                result_df.to_parquet(pq_path, index=False)
+                HUB.write_parquet(result_df, pq_path)
                 print(f"    {month}: {len(rows)} stocks")

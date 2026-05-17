@@ -17,11 +17,13 @@ from typing import Optional, List, Dict
 
 import pandas as pd
 
-from data.db import get_db, reset_db, get_store_dir
+from data.datahub import get_datahub
+from data.db import get_db, reset_db
 
 # ── Parquet 存储路径 ──
-STORE = get_store_dir()
-SIGNALS_DIR = STORE / "signals"
+HUB = get_datahub()
+STORE = HUB.store_dir()
+SIGNALS_DIR = HUB.signals_dir()
 SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -61,14 +63,14 @@ def save_buffett_results(results: List[dict]):
             "updated_at": now,
         })
 
-    pq_path = SIGNALS_DIR / "buffett_scan.parquet"
+    pq_path = HUB.buffett_scan_path()
     df = pd.DataFrame(rows, columns=[
         "symbol", "name", "industry", "sector", "verdict", "score",
         "avg_roe_5y", "avg_gross_margin_5y", "avg_net_margin_5y",
         "debt_equity_ratio", "safety_margin_pct", "dcf_value",
         "current_price", "updated_at",
     ])
-    df.to_parquet(pq_path, index=False)
+    HUB.write_parquet(df, pq_path)
 
     # 元数据
     _save_meta("buffett_scan", {
@@ -99,12 +101,12 @@ def save_strategy_signals(strategy: str, signals: List[dict]):
             "computed_at": now,
         })
 
-    pq_path = SIGNALS_DIR / f"{strategy}.parquet"
+    pq_path = HUB.signal_path(strategy)
     df = pd.DataFrame(rows, columns=[
         "strategy", "symbol", "name", "industry", "score",
         "signal", "detail", "computed_at",
     ])
-    df.to_parquet(pq_path, index=False)
+    HUB.write_parquet(df, pq_path)
 
     # 元数据
     _save_meta(f"strategy_{strategy}", {"total": len(signals), "buys": sum(1 for s in signals if s.get("signal") == "buy"), "last_computed": now})
@@ -154,15 +156,17 @@ def get_buffett_meta() -> dict:
     return {"total": 0, "passed": 0, "last_scan": ""}
 
 
-def load_strategy_signals(strategy: str, sort: str = "score", order: str = "desc") -> List[dict]:
+def load_strategy_signals(strategy: str, sort: str = "score", order: str = "desc", limit: int = 0) -> List[dict]:
     """加载某策略的全部信号"""
     db = get_db(read_only=True)
     view = f"{strategy}_signals"
-    valid_sorts = {"score", "symbol", "name"}
+    valid_sorts = {"score", "symbol", "name", "computed_at"}
     if sort not in valid_sorts:
         sort = "score"
     order = "asc" if str(order).lower() == "asc" else "desc"
     sql = f"SELECT * FROM {view} ORDER BY {sort} {order.upper()}"
+    if limit:
+        sql += f" LIMIT {int(limit)}"
     try:
         rows = db.fetchall(sql)
         return [_row_to_dict(r) for r in rows]
@@ -176,7 +180,7 @@ def list_strategies() -> List[dict]:
     registry = {s["name"]: s for s in get_enabled_strategies()}
 
     strategies = []
-    for pq in sorted(SIGNALS_DIR.glob("*.parquet")):
+    for pq in HUB.list_parquet(SIGNALS_DIR):
         name = pq.stem
         if name not in registry:
             continue
@@ -207,19 +211,18 @@ def list_strategies() -> List[dict]:
 
 def _save_meta(key: str, data: dict):
     """写入元数据到 scan_meta.parquet"""
-    import os
-    meta_path = STORE / "scan_meta.parquet"
+    meta_path = HUB.scan_meta_path()
     now = _now()
     new_row = pd.DataFrame([{"key": key, "value": json.dumps(data, ensure_ascii=False), "updated_at": now}])
 
     if meta_path.exists():
-        existing = pd.read_parquet(meta_path)
+        existing = HUB.read_parquet(meta_path, default=pd.DataFrame())
         existing = existing[existing["key"] != key]
         merged = pd.concat([existing, new_row], ignore_index=True)
     else:
         merged = new_row
 
-    merged.to_parquet(meta_path, index=False)
+    HUB.write_parquet(merged, meta_path)
 
 
 def _to_signal(r: dict) -> str:

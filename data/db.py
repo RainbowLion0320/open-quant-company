@@ -16,14 +16,17 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from data.datahub import get_datahub
+
 _DB_DIR = Path(__file__).resolve().parent
-_STORE_DIR = _DB_DIR / "store"
+_HUB = get_datahub()
+_STORE_DIR = _HUB.store_dir()
 _DUCKDB_PATH = _DB_DIR / "quant_results.duckdb"
 _SQLITE_PATH = _DB_DIR / "quant_results.db"
 
 # 确保 store 目录存在
 for _sub in ["signals", "equity", "financials"]:
-    (_STORE_DIR / _sub).mkdir(parents=True, exist_ok=True)
+    _HUB.store_dir(_sub) if _sub != "signals" else _HUB.signals_dir().mkdir(parents=True, exist_ok=True)
 
 
 class Column:
@@ -129,7 +132,7 @@ def _register_views(db: Database):
         return
 
     # 策略信号视图
-    sig_dir = _STORE_DIR / "signals"
+    sig_dir = _HUB.signals_dir()
     for pq in sorted(sig_dir.glob("*.parquet")):
         name = pq.stem
         # buffett_scan.parquet → buffett_scan 视图 (财务详情)
@@ -156,7 +159,7 @@ def _register_views(db: Database):
         )
 
     # 元数据视图
-    meta_pq = _STORE_DIR / "scan_meta.parquet"
+    meta_pq = _HUB.scan_meta_path()
     if meta_pq.exists():
         db.execute(
             f"CREATE OR REPLACE VIEW scan_meta AS "
@@ -164,7 +167,7 @@ def _register_views(db: Database):
         )
 
     # 盘后数据缓存视图 (兼容 create_cache_views)
-    cache_dir = _DB_DIR / "cache"
+    cache_dir = _HUB.cache_dir()
     if cache_dir.exists():
         for pq in sorted(cache_dir.glob("*.parquet")):
             vname = "cache_" + pq.stem.replace("-", "_").replace(".", "_")
@@ -224,8 +227,4 @@ def get_backend() -> str:
 
 def get_store_dir(asset_type: Optional[str] = None) -> Path:
     """获取存储目录。asset_type=None → 返回根目录。"""
-    if asset_type:
-        asset_dir = _STORE_DIR / asset_type
-        asset_dir.mkdir(parents=True, exist_ok=True)
-        return asset_dir
-    return _STORE_DIR
+    return _HUB.store_dir(asset_type)

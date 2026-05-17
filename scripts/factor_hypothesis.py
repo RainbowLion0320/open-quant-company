@@ -18,15 +18,20 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from data.datahub import get_datahub
+
 # ── 共享 LLM token 记录器 (供活动监视器) ──
-_LLM_USAGE_FILE = os.path.expanduser("~/quant-agent/data/cache/llm_usage_today.json")
+_LLM_USAGE_FILE = get_datahub().llm_usage_path()
 
 def _log_llm_usage(source: str, usage, model: str):
     """记录非 Hermes 网关的 LLM token 用量到共享缓存"""
     try:
         today = datetime.now().strftime("%Y-%m-%d")
         data = {}
-        if os.path.exists(_LLM_USAGE_FILE):
+        if _LLM_USAGE_FILE.exists():
             with open(_LLM_USAGE_FILE) as f:
                 data = json.load(f)
         if data.get("date") != today:
@@ -41,13 +46,12 @@ def _log_llm_usage(source: str, usage, model: str):
         data["total_output"] += out
         data["total_cost"] += cost
         data["calls"] += 1
-        os.makedirs(os.path.dirname(_LLM_USAGE_FILE), exist_ok=True)
+        _LLM_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(_LLM_USAGE_FILE, "w") as f:
             json.dump(data, f)
     except Exception:
         pass  # 静默失败, 不影响主流程
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 import numpy as np
@@ -497,7 +501,7 @@ def run_research_loop(
     # Load existing factors
     existing = []
     for pq in sorted(FEATURES_DIR.glob("*.parquet"))[:1]:
-        df = pd.read_parquet(pq)
+        df = get_datahub().read_parquet(pq)
         existing = [c for c in df.columns if c not in ("symbol", "month", "ret_fwd_20d", "name")]
         break
 

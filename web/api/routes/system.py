@@ -1,34 +1,36 @@
 """系统活动监视器 — SQLite 时序库 + 历史趋势"""
 from fastapi import APIRouter, Query
-import sqlite3, json, os
-from datetime import datetime
+import sqlite3
+
+from data.datahub import get_datahub
 
 router = APIRouter(prefix="/api/system", tags=["System"])
 
-DB = "/Users/fushao/quant-agent/data/store/system_monitor.db"
-TOKEN_CACHE = "/Users/fushao/quant-agent/data/cache/token_usage.json"
+HUB = get_datahub()
+DB = HUB.system_monitor_path()
+TOKEN_CACHE = HUB.token_usage_path()
 
 
 def _query(sql: str, params=()):
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(sql, params).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    if not DB.exists():
+        return []
+    try:
+        conn = sqlite3.connect(str(DB))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(sql, params).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except sqlite3.Error:
+        return []
 
 
 def _read_token():
-    try:
-        if os.path.exists(TOKEN_CACHE):
-            with open(TOKEN_CACHE) as f:
-                return json.load(f)
-    except Exception:
-        pass
-    return {"hermes": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-                       "sessions": 0, "messages": 0, "tool_calls": 0, "api_calls": 0, "cost_usd": 0},
-            "external": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "calls": 0, "cost_usd": 0, "sources": []},
-            "total": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "cost_usd": 0},
-            "updated_at": None}
+    default = {"hermes": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
+                          "sessions": 0, "messages": 0, "tool_calls": 0, "api_calls": 0, "cost_usd": 0},
+               "external": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "calls": 0, "cost_usd": 0, "sources": []},
+               "total": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "cost_usd": 0},
+               "updated_at": None}
+    return HUB.read_json(TOKEN_CACHE, default)
 
 
 @router.get("/monitor")

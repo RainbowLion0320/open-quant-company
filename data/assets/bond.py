@@ -21,6 +21,9 @@ import time
 from pathlib import Path
 
 from data.assets.base import AssetAdapter
+from data.datahub import get_datahub
+
+HUB = get_datahub()
 
 
 # ── Bond universe ──
@@ -61,7 +64,7 @@ class BondAsset(AssetAdapter):
     label: str = "债券"
     description: str = "国债收益率曲线 + 可转债"
 
-    def __init__(self, store_root: Path):
+    def __init__(self, store_root: Path | str | None = None):
         super().__init__(store_root)
         self._universe = list(BOND_UNIVERSE)
         self._yield_cache: Optional[pd.DataFrame] = None
@@ -72,7 +75,7 @@ class BondAsset(AssetAdapter):
             return self._yield_cache
         cache = self.asset_dir / "treasury_yields.parquet"
         if cache.exists():
-            self._yield_cache = pd.read_parquet(cache)
+            self._yield_cache = HUB.read_parquet(cache)
             return self._yield_cache
         try:
             import akshare as ak
@@ -84,7 +87,7 @@ class BondAsset(AssetAdapter):
             df = ak.bond_zh_us_rate()
             df["date"] = pd.to_datetime(df["日期"])
             df = df.set_index("date").sort_index()
-            df.to_parquet(cache)
+            HUB.write_parquet(df, cache, index=True)
             self._yield_cache = df
             return df
         except Exception as e:

@@ -18,6 +18,10 @@ from datetime import datetime, timedelta
 from typing import Optional, Callable
 import pandas as pd
 
+from data.datahub import get_datahub
+
+_HUB = get_datahub()
+
 # ============================================================
 # 代理绕过 — 境内数据源直连，不走 v2ray/clash
 # ============================================================
@@ -45,7 +49,7 @@ for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy
 # 基础设施
 # ============================================================
 
-CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
+CACHE_DIR = str(_HUB.cache_dir())
 
 
 # ============================================================
@@ -165,7 +169,7 @@ def _read_cache(key: str, max_age_hours: int = 24) -> Optional[pd.DataFrame]:
         mtime = datetime.fromtimestamp(os.path.getmtime(path))
         if datetime.now() - mtime > timedelta(hours=max_age_hours):
             return None
-    df = pd.read_parquet(path)
+    df = _HUB.read_parquet(path)
     _mem_set(key, df)
     return df
 
@@ -173,7 +177,7 @@ def _read_cache(key: str, max_age_hours: int = 24) -> Optional[pd.DataFrame]:
 def _write_cache(key: str, df: pd.DataFrame):
     """写缓存：同时写内存和磁盘"""
     os.makedirs(CACHE_DIR, exist_ok=True)
-    df.to_parquet(_cache_path(key), index=False)
+    _HUB.write_parquet(df, _cache_path(key))
     _mem_set(key, df)
 
 

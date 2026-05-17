@@ -20,14 +20,16 @@ from typing import Dict, List, Optional
 import pandas as pd
 import numpy as np
 
-from data.db import get_store_dir
+from data.datahub import get_datahub
+
+HUB = get_datahub()
 
 
 class MoneyflowFetcher:
     """个股资金流向获取器 (AKShare, 免费无限)"""
 
     def __init__(self):
-        self.store_dir = get_store_dir("stock") / "moneyflow"
+        self.store_dir = HUB.store_dir("stock") / "moneyflow"
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
     def fetch_symbol(self, symbol: str) -> Optional[pd.DataFrame]:
@@ -38,7 +40,7 @@ class MoneyflowFetcher:
         cache_path = self.store_dir / f"{symbol}.parquet"
         if cache_path.exists():
             try:
-                df = pd.read_parquet(cache_path)
+                df = HUB.read_parquet(cache_path)
                 # If cache is fresh (within 1 day), reuse
                 if len(df) > 0:
                     last_date = pd.to_datetime(df["日期"].iloc[-1])
@@ -59,7 +61,7 @@ class MoneyflowFetcher:
             # Normalize columns
             df["日期"] = pd.to_datetime(df["日期"])
             df = df.sort_values("日期")
-            df.to_parquet(cache_path, index=False)
+            HUB.write_parquet(df, cache_path)
             return df
         except Exception as e:
             print(f"  [moneyflow] {symbol}: {type(e).__name__}: {str(e)[:80]}")

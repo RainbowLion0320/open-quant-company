@@ -8,6 +8,7 @@ import numpy as np
 import yaml
 import os
 
+from data.datahub import get_datahub
 from .fetcher import get_financial_indicator, retry_with_backoff
 
 # ---- 配置加载 ----
@@ -52,7 +53,8 @@ _FINANCIAL_CACHE_MAX_SIZE = 50  # LRU上限，防止OOM
 
 import os as _os
 import gc as _gc
-_CACHE_DIR = _os.path.join(_os.path.dirname(__file__), "cache", "financials")
+_HUB = get_datahub()
+_CACHE_DIR = _HUB.cache_dir() / "financials"
 
 
 def _evict_lru():
@@ -82,8 +84,8 @@ def _parse_pct(val) -> float:
 
 
 def _get_cache_path(symbol: str) -> str:
-    _os.makedirs(_CACHE_DIR, exist_ok=True)
-    return _os.path.join(_CACHE_DIR, f"{symbol}.parquet")
+    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return str(_CACHE_DIR / f"{symbol}.parquet")
 
 
 @retry_with_backoff(max_retries=2, base_delay=2.0)
@@ -104,7 +106,7 @@ def get_financial_summary(symbol: str, force_refresh: bool = False) -> pd.DataFr
     cache_path = _get_cache_path(symbol)
     if not force_refresh and _os.path.exists(cache_path):
         try:
-            df = pd.read_parquet(cache_path)
+            df = _HUB.read_parquet(cache_path)
             if len(df) > 0:
                 _financial_cache[cache_key] = df
                 _evict_lru()
@@ -128,7 +130,7 @@ def get_financial_summary(symbol: str, force_refresh: bool = False) -> pd.DataFr
         for col in df_write.columns:
             if df_write[col].dtype == object:
                 df_write[col] = df_write[col].astype(str)
-        df_write.to_parquet(cache_path, index=False)
+        _HUB.write_parquet(df_write, cache_path)
     except Exception as e:
         # 静默但记录 — 不阻塞主流程
         import sys as _sys

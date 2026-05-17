@@ -22,11 +22,12 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 
-from data.db import get_store_dir
+from data.datahub import get_datahub
 from signals.expression import Factor, alpha_factors
 
 
-FEATURES_DIR = get_store_dir() / "features"
+HUB = get_datahub()
+FEATURES_DIR = HUB.features_dir()
 FEATURES_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -88,8 +89,8 @@ class FeatureStoreBuilder:
 
         result = pd.DataFrame(rows)
         # 保存
-        pq_path = FEATURES_DIR / f"{month}.parquet"
-        result.to_parquet(pq_path, index=False)
+        pq_path = HUB.feature_path(month)
+        HUB.write_parquet(result, pq_path)
         return result
 
     def build_all(
@@ -118,9 +119,9 @@ class FeatureStoreBuilder:
     @staticmethod
     def load_month(month: str) -> Optional[pd.DataFrame]:
         """加载单月特征"""
-        pq = FEATURES_DIR / f"{month}.parquet"
+        pq = HUB.feature_path(month)
         if pq.exists():
-            return pd.read_parquet(pq)
+            return HUB.read_parquet(pq)
         return None
 
 
@@ -203,7 +204,7 @@ def enrich_from_registry(
     # ── Moneyflow factors ──
     if reg.get("moneyflow_monthly") and reg.get("moneyflow_monthly").is_available:
         try:
-            mf_dir = get_store_dir("stock") / "moneyflow" / "monthly"
+            mf_dir = HUB.store_dir("stock") / "moneyflow" / "monthly"
             mf_files = sorted(mf_dir.glob("*.parquet"))
 
             # Find latest moneyflow date ON OR BEFORE month_end
@@ -214,7 +215,7 @@ def enrich_from_registry(
                 except:
                     continue
                 if dt <= month_end:
-                    mf_df = pd.read_parquet(pq)
+                    mf_df = HUB.read_parquet(pq)
                     break
 
             if mf_df is not None and len(mf_df) > 0:
@@ -240,12 +241,12 @@ def enrich_from_registry(
     # ── Holder factors ──
     if reg.get("holder_number") and reg.get("holder_number").is_available:
         try:
-            holders_dir = get_store_dir("stock") / "holders"
+            holders_dir = HUB.store_dir("stock") / "holders"
             for sym in symbols:
                 hf_path = holders_dir / f"{sym}.parquet"
                 if not hf_path.exists():
                     continue
-                hf_df = pd.read_parquet(hf_path)
+                hf_df = HUB.read_parquet(hf_path)
                 if "end_date" not in hf_df.columns or len(hf_df) < 2:
                     continue
                 hf_df["end_date"] = pd.to_datetime(hf_df["end_date"], errors="coerce")
@@ -265,7 +266,7 @@ def enrich_from_registry(
     macro_sources = [("pmi", "今值"), ("money_supply", "M2_yoy"), ("shibor", "3M-定价"), ("cpi", "今值")]
     if any((reg.get(f"macro_{name}") and reg.get(f"macro_{name}").is_available) for name, _ in macro_sources):
         try:
-            macro_dir = get_store_dir("macro")
+            macro_dir = HUB.store_dir("macro")
             for name, col_map in macro_sources:
                 dim = reg.get(f"macro_{name}")
                 if dim is not None and not dim.is_available:
@@ -273,7 +274,7 @@ def enrich_from_registry(
                 mf_path = macro_dir / f"{name}.parquet"
                 if not mf_path.exists():
                     continue
-                md = pd.read_parquet(mf_path)
+                md = HUB.read_parquet(mf_path)
                 # Find date column
                 date_col = None
                 for c in md.columns:

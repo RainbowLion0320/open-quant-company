@@ -19,10 +19,12 @@ import numpy as np
 from data.symbols import CIRCLE_STOCKS
 from data.fetcher import get_stock_daily, get_index_daily
 from data.assets.etf import ETFAsset, ETF_UNIVERSE
-from data.db import get_store_dir
+from data.datahub import get_datahub
 from cybernetics.orchestrator import detect_market_regime
 from broker.exchange import AShareExchange, ETFExchange, OrderSide
 from broker.allocator import AssetAllocator
+
+HUB = get_datahub()
 
 # ════════════════ config ════════════════
 N_STOCKS, N_ETFS = 50, 5
@@ -75,10 +77,10 @@ def _load_bond_proxy():
 
 def _load_money_proxy():
     """[SHORT-TERM] Shibor隔夜 → 货币ETF净值 (日复利)"""
-    pq = Path("/Users/fushao/quant-agent/data/store/macro/shibor.parquet")
+    pq = HUB.macro_path("shibor")
     if not pq.exists():
         return None
-    df = pd.read_parquet(pq)
+    df = HUB.read_parquet(pq)
     df["date"] = pd.to_datetime(df["date"])
     df = df.set_index("date").sort_index()
     on = df["O/N-定价"].dropna() / 100.0  # decimal
@@ -96,7 +98,7 @@ PROXY_LOADERS = {
 
 stock_ex, etf_ex = AShareExchange(), ETFExchange()
 allocator = AssetAllocator()
-etf_asset = ETFAsset(get_store_dir())
+etf_asset = ETFAsset(HUB.store_dir())
 
 # ════════════════ load ════════════════
 print("Loading data...")

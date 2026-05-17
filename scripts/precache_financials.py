@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
 """预缓存全部财务数据 → 后续回测/锦标赛纯本地计算, 零网络依赖"""
 import os, sys, time, socket
+from pathlib import Path
 socket.setdefaulttimeout(30)
 for k in list(os.environ.keys()):
     if k.lower() in ('http_proxy', 'https_proxy', 'all_proxy'):
         del os.environ[k]
 os.environ['no_proxy'] = '*'
-sys.path.insert(0, '/Users/fushao/quant-agent')
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 import pandas as pd
-from pathlib import Path
+from data.datahub import get_datahub
 from data.symbols import CIRCLE_STOCKS
 from data.financials import get_financial_summary
 
 # 从特征文件收集实际需要的 symbol
-FEATURES_DIR = Path('/Users/fushao/quant-agent/data/store/features')
+HUB = get_datahub()
+FEATURES_DIR = HUB.features_dir()
 symbols_set = set()
 for pq in sorted(FEATURES_DIR.glob('*.parquet')):
-    df = pd.read_parquet(pq)
+    df = HUB.read_parquet(pq)
     symbols_set.update(df['symbol'].unique())
 symbols = sorted(symbols_set)
 print(f"预缓存 {len(symbols)} 只财务数据...")

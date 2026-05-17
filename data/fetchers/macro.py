@@ -20,7 +20,9 @@ from typing import Dict, List, Optional, Callable
 import pandas as pd
 import numpy as np
 
-from data.db import get_store_dir
+from data.datahub import get_datahub
+
+HUB = get_datahub()
 
 # Macro indicator registry
 MACRO_INDICATORS = {
@@ -73,7 +75,7 @@ class MacroFetcher:
     """宏观经济数据获取器 (AKShare, 免费无限)"""
 
     def __init__(self):
-        self.store_dir = get_store_dir("macro")
+        self.store_dir = HUB.store_dir("macro")
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
     def fetch_indicator(self, name: str) -> Optional[pd.DataFrame]:
@@ -85,10 +87,10 @@ class MacroFetcher:
             print(f"  [macro] Unknown indicator: {name}")
             return None
 
-        cache_path = self.store_dir / f"{name}.parquet"
+        cache_path = HUB.macro_path(name)
         if cache_path.exists():
             try:
-                df = pd.read_parquet(cache_path)
+                df = HUB.read_parquet(cache_path)
                 # Macro data updates monthly — cache for 7 days
                 return df
             except Exception:
@@ -108,7 +110,7 @@ class MacroFetcher:
 
             # Normalize to standard format
             df = self._normalize(name, raw)
-            df.to_parquet(cache_path, index=False)
+            HUB.write_parquet(df, cache_path)
             return df
         except Exception as e:
             print(f"  [macro] {name}: {type(e).__name__}: {str(e)[:80]}")

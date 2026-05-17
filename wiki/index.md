@@ -9,7 +9,7 @@ tags: [index]
 # Wiki Index
 
 > Quant Agent — 个人A股量化交易系统知识库。每行 = wikilink + 一句话概括。
-> Last updated: 2026-05-17 | Total pages: 16 ( + log + schema )
+> Last updated: 2026-05-17 | Total pages: 17 ( + log + schema )
 
 ## Concepts
 - [[system-architecture]] — **系统架构总览**：多层正交设计，4策略注册表，35+因子体系，多资产架构，数据注册表
@@ -31,6 +31,7 @@ tags: [index]
 ## Decisions
 - [[ai-automation-roadmap]] — **AI自动化路线图** ★：Phase 4.2 LLM多轮迭代+OOS+自注入库
 - [[duckdb-migration]] — SQLite→DuckDB→Parquet 三阶段演进
+- [[datahub]] — DataHub 数据中台：统一路径、原子写入、最新批次、存储审计
 - [[web-architecture]] — Vue 3 + FastAPI，Quantum Terminal v4.0 设计系统
 
 ## Comparisons

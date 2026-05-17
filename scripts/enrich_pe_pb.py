@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 """补增 PE/PB 估值数据到已存在的特征文件"""
 import os, sys, time, socket
+from pathlib import Path
 socket.setdefaulttimeout(30)
 for k in list(os.environ.keys()):
     if k.lower() in ('http_proxy', 'https_proxy', 'all_proxy'):
         del os.environ[k]
 os.environ['no_proxy'] = '*'
-sys.path.insert(0, '/Users/fushao/quant-agent')
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 import pandas as pd
 import numpy as np
-from pathlib import Path
+from data.datahub import get_datahub
 from data.tushare_utils import get_tushare_token
 import tushare as ts
 
-FEATURES_DIR = Path('/Users/fushao/quant-agent/data/store/features')
+HUB = get_datahub()
+FEATURES_DIR = HUB.features_dir()
 token = get_tushare_token()
 api = ts.pro_api(token)
 print(f"Tushare token: {'OK' if api else 'FAIL'}")
@@ -27,7 +30,7 @@ symbols_needed = set()
 # 从特征文件收集 symbol 列表
 for pq in sorted(FEATURES_DIR.glob('*.parquet')):
     try:
-        df = pd.read_parquet(pq)
+        df = HUB.read_parquet(pq)
         symbols_needed.update(df['symbol'].unique())
     except Exception:
         pass
@@ -93,7 +96,7 @@ def compute_valuation_factors(daily_df, as_of):
 print("\n[2] 补增 PE/PB 到特征文件...")
 for pq in sorted(FEATURES_DIR.glob('*.parquet')):
     try:
-        df = pd.read_parquet(pq)
+        df = HUB.read_parquet(pq)
         month_str = pq.stem
         
         # 检查是否已有估值数据
@@ -116,7 +119,7 @@ for pq in sorted(FEATURES_DIR.glob('*.parquet')):
         for col in ['val_pe', 'val_pe_ttm', 'val_pb', 'val_ps', 'val_dv_ratio', 'val_pe_percentile', 'val_total_mv', 'val_circ_mv']:
             df[col] = df['symbol'].map(lambda s: val_data.get(s, {}).get(col))
         
-        df.to_parquet(pq, index=False)
+        HUB.write_parquet(df, pq)
         val_ok = df['val_pe'].notna().sum()
         print(f"  {month_str}: {len(df)} stocks, val_pe={val_ok} ({100*val_ok//len(df)}%)")
     except Exception as e:
