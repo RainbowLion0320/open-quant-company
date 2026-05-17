@@ -107,7 +107,7 @@
     <!-- History Charts -->
     <div class="glass-card p-6 mt-4">
       <h3 class="text-sm font-semibold mb-3" style="color:var(--text-primary)">历史趋势 ({{ historyHours }}h)</h3>
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div>
           <canvas :id="cpuChartId" class="w-full h-32"></canvas>
           <div class="text-2xs text-center" style="color:var(--text-disabled)">CPU %</div>
@@ -115,10 +115,6 @@
         <div>
           <canvas :id="memChartId" class="w-full h-32"></canvas>
           <div class="text-2xs text-center" style="color:var(--text-disabled)">内存 %</div>
-        </div>
-        <div>
-          <canvas :id="tokenChartId" class="w-full h-32"></canvas>
-          <div class="text-2xs text-center" style="color:var(--text-disabled)">Token $</div>
         </div>
       </div>
     </div>
@@ -219,7 +215,7 @@ const memColor = computed(() => {
   if (p > 85) return "var(--negative)"; if (p > 60) return "var(--warning)"; return "var(--positive)";
 });
 
-const cpuChartId = "cpu-chart"; const memChartId = "mem-chart"; const tokenChartId = "token-chart";
+const cpuChartId = "cpu-chart"; const memChartId = "mem-chart";
 const dsProRef = ref<HTMLCanvasElement | null>(null);
 const dsFlashRef = ref<HTMLCanvasElement | null>(null);
 const dsCostRef = ref<HTMLCanvasElement | null>(null);
@@ -263,7 +259,6 @@ function drawCharts() {
   const charts = [
     { id: cpuChartId, key: "cpu_pct" as const, color: "#06b6d4", max: 100 },
     { id: memChartId, key: "mem_pct" as const, color: "#10b981", max: 100 },
-    { id: tokenChartId, key: "token_total_cost" as const, color: "#f59e0b", max: 0 },
   ];
   fetch(`/api/system/history?hours=${historyHours.value}`).then(r => r.json()).then(hist => {
     const pts = hist.data || [];
