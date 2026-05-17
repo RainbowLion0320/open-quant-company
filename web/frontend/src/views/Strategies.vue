@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 space-y-5">
+  <div class="view-page">
     <div class="page-header">
       <div>
         <h1 class="page-title">策略中心</h1>
@@ -11,15 +11,19 @@
     </div>
 
     <!-- Progress Bar -->
-    <div v-if="store.running" class="glass-card" style="padding:14px 18px">
+    <div v-if="store.running" class="glass-card card-pad">
       <div class="text-xs mb-2" style="color:var(--text-secondary)">{{ store.progressMsg }}</div>
       <div class="progress-bar">
         <div class="progress-bar-fill" :style="{ width: store.progress + '%' }"></div>
       </div>
     </div>
 
+    <div v-if="loaded && !store.strategies.length && !store.running" class="glass-card card-pad-lg empty-panel">
+      暂无策略扫描结果
+    </div>
+
     <!-- Strategy Cards -->
-    <div v-for="s in store.strategies" :key="s.name" class="glass-card glow-cyan animate-fade-in" style="padding:18px">
+    <div v-for="s in store.strategies" :key="s.name" class="strategy-card glass-card glow-cyan animate-fade-in">
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-3">
           <div class="w-2 h-2 rounded-full" :style="{ background: colorFor(s.name), boxShadow: `0 0 6px ${colorFor(s.name)}` }"></div>
@@ -27,7 +31,7 @@
             <h2 class="text-sm font-semibold" style="color:var(--text-primary)">{{ s.label }}</h2>
             <div class="text-[11px] mt-0.5" style="color:var(--text-disabled)">
               {{ s.total }} 只扫描 · {{ s.buys }} 只买入
-              <span v-if="s.last_computed" class="ml-3">⏱ {{ s.last_computed?.slice(0, 16) }}</span>
+              <span v-if="s.last_computed" class="ml-3">updated {{ s.last_computed?.slice(0, 16) }}</span>
             </div>
           </div>
         </div>
@@ -88,6 +92,7 @@ import { useStrategyStore } from "../stores";
 const store = useStrategyStore();
 const currentStrategy = ref("");
 const signals = ref<any[]>([]);
+const loaded = ref(false);
 
 const strategyColors: Record<string, string> = {
   buffett: "#00d4ff",
@@ -107,5 +112,34 @@ async function toggleSignals(name: string) {
 function runAll() { store.run("all"); }
 function runSingle(name: string) { store.run(name); }
 
-onMounted(() => store.fetchList());
+onMounted(async () => {
+  try { await store.fetchList(); }
+  finally { loaded.value = true; }
+});
 </script>
+
+<style scoped>
+.strategy-card {
+  padding: 16px;
+}
+.empty-panel {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  color: var(--text-disabled);
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .strategy-card > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .strategy-card > div:first-child > .flex:last-child {
+    width: 100%;
+  }
+  .strategy-card button {
+    flex: 1;
+    justify-content: center;
+  }
+}
+</style>

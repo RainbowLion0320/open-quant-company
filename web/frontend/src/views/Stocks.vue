@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 space-y-5">
+  <div class="view-page">
     <div class="page-header">
       <div>
         <h1 class="page-title">个股深挖</h1>
@@ -8,7 +8,7 @@
     </div>
 
     <!-- Search -->
-    <div class="glass-card" style="padding:16px">
+    <div class="glass-card card-pad">
       <div class="flex gap-3">
         <input
           v-model="query"
@@ -22,7 +22,7 @@
     </div>
 
     <!-- Result -->
-    <div v-if="stock" class="glass-card glow-cyan animate-fade-in" style="padding:20px">
+    <div v-if="stock" class="glass-card glow-cyan animate-fade-in card-pad-lg">
       <!-- Basic Info -->
       <div class="flex items-center gap-3 mb-4">
         <div class="text-xl font-bold font-mono" style="color:var(--accent)">{{ stock.basic.symbol }}</div>

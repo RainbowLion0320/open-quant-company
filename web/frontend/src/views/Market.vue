@@ -40,7 +40,10 @@
           </span>
           <em>fresh {{ store.freshness?.market || '—' }}</em>
         </div>
-        <div ref="chartRef" class="index-chart"></div>
+        <div class="index-chart-shell">
+          <div ref="chartRef" class="index-chart"></div>
+          <div v-if="!store.kline.length" class="panel-empty chart-empty">暂无指数K线数据</div>
+        </div>
       </div>
 
       <div class="alerts-panel glass-card">
@@ -48,7 +51,7 @@
           <span>ALERTS</span>
           <small>{{ alerts.length }} active</small>
         </div>
-        <div class="alerts-list">
+        <div v-if="alerts.length" class="alerts-list">
           <div v-for="item in alerts" :key="item.title + item.time" class="alert-row" :class="`alert-${item.level}`">
             <i></i>
             <div>
@@ -58,10 +61,11 @@
             <em>{{ item.time || '—' }}</em>
           </div>
         </div>
+        <div v-else class="panel-empty">暂无活跃告警</div>
       </div>
     </section>
 
-    <section class="asset-strip">
+    <section v-if="assets.length" class="asset-strip">
       <article v-for="asset in assets" :key="asset.key" class="asset-card glass-card">
         <div class="asset-top">
           <span>{{ asset.label }}</span>
@@ -76,6 +80,12 @@
         <svg viewBox="0 0 160 44" preserveAspectRatio="none" class="sparkline">
           <polyline :points="sparkPoints(asset.series, 160, 44)" :stroke="sparkColor(asset.change_pct)" />
         </svg>
+      </article>
+    </section>
+    <section v-else class="asset-strip">
+      <article class="asset-card glass-card asset-empty">
+        <span>宏观与跨资产数据暂未载入</span>
+        <strong>等待数据源刷新</strong>
       </article>
     </section>
 
@@ -121,6 +131,7 @@
             </tr>
           </tbody>
         </table>
+        <div v-if="!matrix.length" class="panel-empty table-empty">暂无策略矩阵，等待扫描结果</div>
       </div>
 
       <aside class="right-stack">
@@ -158,6 +169,7 @@
               </svg>
             </article>
           </div>
+          <div v-if="!macro.length" class="panel-empty">暂无宏观指标数据</div>
         </div>
       </aside>
     </section>
@@ -567,7 +579,31 @@ onMounted(async () => {
   border-color: var(--border-default);
   background: rgba(0,212,255,0.06);
 }
+.index-chart-shell {
+  position: relative;
+  min-height: 310px;
+}
 .index-chart { height: 310px; }
+.panel-empty {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  color: var(--text-disabled);
+  font-size: 12px;
+  border: 1px dashed rgba(125, 211, 252, 0.08);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.08);
+}
+.chart-empty {
+  position: absolute;
+  inset: 8px 0 0;
+  min-height: 0;
+}
+.table-empty {
+  min-height: 86px;
+  border-top: 0;
+  border-radius: 0 0 7px 7px;
+}
 .alerts-list {
   display: flex;
   flex-direction: column;
@@ -609,6 +645,24 @@ onMounted(async () => {
 .asset-card {
   padding: 12px 14px;
   min-height: 126px;
+}
+.asset-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  min-height: 92px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.asset-empty span {
+  color: var(--text-disabled);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.asset-empty strong {
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 .asset-top {
   display: flex;

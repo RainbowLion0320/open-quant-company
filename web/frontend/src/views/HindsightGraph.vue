@@ -1,5 +1,5 @@
 <template>
-  <div class="hindsight-graph">
+  <div class="hindsight-graph view-page">
     <!-- 控制栏 -->
     <div class="graph-toolbar glass-card">
       <div class="toolbar-left">
@@ -15,7 +15,10 @@
           @click="loadGraph"
           :disabled="isLoading"
         >
-          <span class="btn-icon">{{ isLoading ? '◈' : '⟳' }}</span>
+          <span v-if="isLoading" class="btn-spinner" aria-hidden="true"></span>
+          <svg v-else class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4" />
+          </svg>
           {{ isLoading ? 'FETCHING...' : 'LOAD GRAPH' }}
         </button>
       </div>
@@ -24,6 +27,10 @@
     <!-- 3D 容器 -->
     <div class="graph-stage" ref="stageRef">
       <div ref="threeRef" class="three-container"></div>
+      <div v-if="!graphLoaded && !isLoading" class="graph-placeholder glass-card">
+        <span>GRAPH STANDBY</span>
+        <strong>等待手动载入</strong>
+      </div>
 
       <!-- 悬浮提示 -->
       <div
@@ -43,7 +50,9 @@
       <!-- 详情面板 -->
       <transition name="panel-slide">
         <div v-if="selectedNode" class="detail-panel glass-card">
-          <button class="panel-close" @click="deselectNode">✕</button>
+          <button class="panel-close" @click="deselectNode" aria-label="关闭详情">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
           <div class="panel-header">
             <span class="panel-badge" :class="selectedNode.type">
               {{ selectedNode.type }}
@@ -125,6 +134,7 @@ interface SimNode extends GraphNode {
 const threeRef = ref<HTMLElement | null>(null);
 const stageRef = ref<HTMLElement | null>(null);
 const isLoading = ref(false);
+const graphLoaded = ref(false);
 const stats = ref<GraphData["stats"] | null>(null);
 const hoveredNode = ref<GraphNode | null>(null);
 const selectedNode = ref<GraphNode | null>(null);
@@ -575,6 +585,7 @@ async function loadGraph() {
     stats.value = data.stats || null;
     linkCount.value = data.links?.length || 0;
     buildGraph(data);
+    graphLoaded.value = true;
 
     converged = false;
     stillFrames = 0;
@@ -609,7 +620,6 @@ onMounted(async () => {
   container.addEventListener("pointermove", onPointerMove);
 
   renderLoop();
-  await loadGraph();
 });
 
 onUnmounted(() => {
@@ -625,6 +635,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   gap: 12px;
 }
 
@@ -641,7 +652,7 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 700;
   color: #00d4ff;
-  letter-spacing: 2px;
+  letter-spacing: 0.08em;
   margin: 0;
 }
 .toolbar-stats {
@@ -657,16 +668,33 @@ onUnmounted(() => {
   padding: 8px 16px;
   background: rgba(0, 212, 255, 0.08);
   border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 7px;
   color: #00d4ff;
   font-size: 11px;
   font-family: "JetBrains Mono", monospace;
-  letter-spacing: 1px;
+  letter-spacing: 0.08em;
   cursor: pointer;
   transition: all 0.2s;
 }
 .btn-load:hover { background: rgba(0, 212, 255, 0.15); }
 .btn-load.loading { opacity: 0.5; cursor: wait; }
-.btn-icon { font-size: 14px; }
+.btn-icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.btn-spinner {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(0, 212, 255, 0.25);
+  border-top-color: #00d4ff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
 
 /* Stage */
 .graph-stage {
@@ -682,6 +710,30 @@ onUnmounted(() => {
 }
 .three-container canvas {
   display: block;
+}
+.graph-placeholder {
+  position: absolute;
+  inset: 50%;
+  width: min(280px, calc(100% - 32px));
+  min-height: 96px;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 18px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.graph-placeholder span {
+  color: #64748b;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.graph-placeholder strong {
+  color: #00d4ff;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 /* Tooltip */
@@ -736,11 +788,25 @@ onUnmounted(() => {
   position: absolute;
   top: 12px;
   right: 14px;
-  background: none;
-  border: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 212, 255, 0.04);
+  border: 1px solid rgba(0, 212, 255, 0.08);
+  border-radius: 6px;
   color: #64748b;
-  font-size: 18px;
   cursor: pointer;
+}
+.panel-close:hover { color: #00d4ff; border-color: rgba(0, 212, 255, 0.2); }
+.panel-close svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 .panel-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .panel-badge {
@@ -818,5 +884,33 @@ onUnmounted(() => {
   backdrop-filter: blur(12px);
   border: 1px solid rgba(0, 212, 255, 0.08);
   border-radius: 6px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@media (max-width: 720px) {
+  .graph-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .toolbar-stats {
+    display: block;
+    margin: 4px 0 0;
+  }
+  .detail-panel {
+    left: 12px;
+    right: 12px;
+    top: 12px;
+    bottom: 12px;
+    width: auto;
+  }
+  .legend {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
 }
 </style>

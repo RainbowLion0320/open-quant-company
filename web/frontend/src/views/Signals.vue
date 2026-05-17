@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 space-y-5">
+  <div class="view-page">
     <div class="page-header">
       <div>
         <h1 class="page-title">信号历史</h1>
@@ -7,7 +7,7 @@
       </div>
     </div>
 
-    <div class="glass-card" style="padding:20px">
+    <div class="glass-card card-pad-lg">
       <div v-if="changes.length" class="table-shell" style="--table-min:680px">
         <table class="data-table">
           <colgroup>

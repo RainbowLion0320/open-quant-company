@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 space-y-5">
+  <div class="view-page">
     <div class="page-header">
       <div>
         <h1 class="page-title">模拟交易</h1>
@@ -17,40 +17,40 @@
 
     <!-- Balance Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
-      <div class="glass-card" style="padding:14px 16px">
-        <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">总资产</div>
-        <div class="text-xl font-bold font-mono mt-1" style="color:var(--accent)">
+      <div class="glass-card metric-card">
+        <div class="metric-label">总资产</div>
+        <div class="metric-value primary">
           ¥{{ summary.total_asset?.toLocaleString() || '—' }}
         </div>
       </div>
-      <div class="glass-card" style="padding:14px 16px">
-        <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">可用现金</div>
-        <div class="text-lg font-mono mt-1" style="color:var(--text-secondary)">
+      <div class="glass-card metric-card">
+        <div class="metric-label">可用现金</div>
+        <div class="metric-value">
           ¥{{ summary.cash?.toLocaleString() || '—' }}
         </div>
       </div>
-      <div class="glass-card" style="padding:14px 16px">
-        <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">持仓市值</div>
-        <div class="text-lg font-mono mt-1" style="color:var(--text-secondary)">
+      <div class="glass-card metric-card">
+        <div class="metric-label">持仓市值</div>
+        <div class="metric-value">
           ¥{{ summary.market_value?.toLocaleString() || '—' }}
         </div>
       </div>
-      <div class="glass-card" style="padding:14px 16px">
-        <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">总收益</div>
-        <div class="text-lg font-bold font-mono mt-1" :style="{ color: summary.total_return_pct >= 0 ? 'var(--positive)' : 'var(--negative)' }">
+      <div class="glass-card metric-card">
+        <div class="metric-label">总收益</div>
+        <div class="metric-value" :style="{ color: summary.total_return_pct >= 0 ? 'var(--positive)' : 'var(--negative)' }">
           {{ fmtReturn(summary.total_return_pct) }}
         </div>
       </div>
-      <div class="glass-card" style="padding:14px 16px">
-        <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">最高权益</div>
-        <div class="text-lg font-mono mt-1" style="color:var(--text-secondary)">
+      <div class="glass-card metric-card">
+        <div class="metric-label">最高权益</div>
+        <div class="metric-value">
           ¥{{ (summary.peak_equity || 0).toLocaleString() }}
         </div>
       </div>
     </div>
 
     <!-- NAV Equity Curve -->
-    <div class="glass-card" style="padding:20px">
+    <div class="glass-card card-pad-lg">
       <div class="flex justify-between items-center mb-3">
         <div class="text-xs font-semibold tracking-wide" style="color:var(--text-secondary)">
           权益曲线 ({{ navData.length }} 天)
@@ -63,7 +63,7 @@
     </div>
 
     <!-- Positions -->
-    <div class="glass-card" style="padding:20px">
+    <div class="glass-card card-pad-lg">
       <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">
         当前持仓 ({{ positions.length }})
       </div>
@@ -109,11 +109,11 @@
           </tbody>
         </table>
       </div>
-      <div v-else class="empty-state" style="padding:24px">暂无持仓</div>
+      <div v-else class="empty-state empty-state-compact">暂无持仓</div>
     </div>
 
     <!-- Trade History -->
-    <div class="glass-card" style="padding:20px">
+    <div class="glass-card card-pad-lg">
       <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">
         交易记录 ({{ tradeTotal }} 笔)
       </div>
@@ -154,11 +154,11 @@
           </tbody>
         </table>
       </div>
-      <div v-else class="empty-state" style="padding:24px">暂无交易记录</div>
+      <div v-else class="empty-state empty-state-compact">暂无交易记录</div>
     </div>
 
     <!-- Order Form -->
-    <div class="glass-card" style="padding:20px">
+    <div class="glass-card card-pad-lg">
       <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">手动下单 (测试用)</div>
       <div class="flex flex-col md:flex-row gap-3 md:items-end">
         <div class="flex-1">

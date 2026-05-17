@@ -1,5 +1,5 @@
 <template>
-  <div class="p-6 space-y-5">
+  <div class="view-page">
     <!-- Header -->
     <div class="page-header">
       <div>
@@ -9,7 +9,7 @@
     </div>
 
     <!-- Per-strategy rows -->
-    <div v-for="s in strategies" :key="s.key" class="glass-card glow-cyan animate-fade-in" style="padding:20px">
+    <div v-for="s in strategies" :key="s.key" class="glass-card glow-cyan animate-fade-in card-pad-lg">
       <div class="flex flex-col md:flex-row gap-6" style="min-height:220px">
         <!-- Left: Stats -->
         <div class="flex flex-col justify-center shrink-0 w-full md:w-[150px]">
@@ -43,6 +43,10 @@
         <div :ref="el => setChartRef(s.key, el as HTMLElement)" style="flex:1; min-height:200px"></div>
       </div>
     </div>
+
+    <div v-if="loaded && !strategies.length" class="glass-card card-pad-lg empty-panel">
+      暂无回测结果
+    </div>
   </div>
 </template>
 
@@ -54,6 +58,7 @@ import { fmtReturn, QUANTUM_THEME } from "../charts/useECharts";
 
 const overview = ref<any>({});
 const strategyList = ref<Array<{ key: string; label: string; color: string }>>([]);
+const loaded = ref(false);
 
 const strategies = computed(() =>
   strategyList.value.map(s => ({
@@ -156,22 +161,36 @@ function initAllCharts() {
 }
 
 onMounted(async () => {
-  const regData = await api.strategies();
-  if (regData.registry?.length) {
-    strategyList.value = regData.registry.map((r: any) => ({
-      key: r.name, label: r.label, color: r.color
-    }));
+  try {
+    const regData = await api.strategies();
+    if (regData.registry?.length) {
+      strategyList.value = regData.registry.map((r: any) => ({
+        key: r.name, label: r.label, color: r.color
+      }));
+    }
+    overview.value = await api.backtest();
+    if (!strategyList.value.length) {
+      strategyList.value = Object.keys(overview.value.strategies || {}).map(k => ({
+        key: k, label: k, color: "#00d4ff"
+      }));
+    }
+    await loadAllDetails();
+  } finally {
+    loaded.value = true;
   }
-  overview.value = await api.backtest();
-  if (!strategyList.value.length) {
-    strategyList.value = Object.keys(overview.value.strategies || {}).map(k => ({
-      key: k, label: k, color: "#00d4ff"
-    }));
-  }
-  await loadAllDetails();
 });
 
 onUnmounted(() => {
   Object.values(charts).forEach(c => c.dispose());
 });
 </script>
+
+<style scoped>
+.empty-panel {
+  min-height: 140px;
+  display: grid;
+  place-items: center;
+  color: var(--text-disabled);
+  font-size: 12px;
+}
+</style>
