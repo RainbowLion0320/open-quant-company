@@ -147,6 +147,9 @@ class DataHub:
     def hindsight_tokens_path(self) -> Path:
         return self.cache_root / "hindsight_tokens.json"
 
+    def deepseek_usage_path(self) -> Path:
+        return self.store_dir("deepseek") / "daily_usage.parquet"
+
     # ── Parquet helpers ──────────────────────────────────────
 
     def read_parquet(
@@ -257,6 +260,7 @@ class DataHub:
             "macro": DatasetSpec("macro", self.store_dir("macro"), "directory", "macro", "Macro and rates datasets"),
             "system_monitor": DatasetSpec("system_monitor", self.system_monitor_path(), "sqlite", "system", "System metrics time-series DB"),
             "token_usage": DatasetSpec("token_usage", self.token_usage_path(), "json", "system", "LLM token usage cache"),
+            "deepseek_usage": DatasetSpec("deepseek_usage", self.deepseek_usage_path(), "parquet", "system", "DeepSeek daily token/cost summary"),
         }
 
     def audit(self, include_rows: bool = False) -> list[dict[str, Any]]:

@@ -509,3 +509,40 @@ Hindsight 事实提取的三层模型：
 - 更新 `wiki/concepts/hindsight-graph.md` — 3D 架构细节
 - 更新 `wiki/log.md` — 完整审计（本条）
 - 更新 `wiki/index.md` — 链接决策页
+
+## 2026-05-17: DeepSeek Token 消耗监控接入
+
+### 背景
+通过 Chrome DevTools MCP (Google 官方) 连接到用户本机 Chrome，在 DeepSeek 平台用量页面点击「导出」按钮下载 CSV，实现无需 API key 即可获取 token 数据。
+
+### 技术栈
+- **Chrome DevTools MCP**: Google 官方 MCP server (v0.26.0)，通过 CDP WebSocket 直接控制用户本机 Chrome
+- **配置**: Hermes `mcp_servers.chrome` — stdio transport via `npx chrome-devtools-mcp@latest --autoConnect`
+- **Chrome 启动**: `--remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug-profile`
+
+### 数据摄入 (scripts/ingest_deepseek_usage.py)
+- 输入: DeepSeek 平台导出的 `usage_data_YYYY_M.zip`（含 amount-*.csv + cost-*.csv）
+- 处理: pivot token 类型 → 列 + merge cost → 统一 daily summary
+- 输出: `data/store/deepseek/daily_usage.parquet` (22 rows, per-day per-model)
+- 列: utc_date | model | input_cache_miss | input_cache_hit | output_tokens | requests | cost_cny | total_tokens
+
+### DataHub 集成
+- `datahub.py`: 新增 `deepseek_usage_path()` 路径方法 + catalog entry
+- 目录: `data/store/deepseek/daily_usage.parquet`
+
+### Web 监控面板 (Activity Monitor)
+- 后端 API: `GET /api/system/deepseek-usage` (raw parquet → JSON, last 14 days)
+- 前端: Canvas 柱状图，过去 7 天每天两组柱 (v4-pro 青色 + v4-flash 紫色)
+- Y 轴单位: 百万 tokens，X 轴: MM-DD 日期
+
+### 5 月统计 (1-17 日)
+| 模型 | 实际计费 Token | 调用次数 |
+|------|---------------|---------|
+| v4-pro | 46.7M | 7,193 |
+| v4-flash | 57.5M | 8,522 |
+| **合计** | **104.2M** | **15,715** |
+
+缓存命中 token 不收费 (v4-pro: 1.6B, v4-flash: 23M)。总费用约 ¥275。
+
+### Cron 任务
+- `job_id=781d17fea37f`: 每日 09:00 自动摄入最新 CSV

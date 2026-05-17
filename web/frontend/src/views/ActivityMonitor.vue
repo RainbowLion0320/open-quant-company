@@ -83,6 +83,19 @@
         </div>
       </div>
 
+      <!-- DeepSeek Token Usage Bar Chart -->
+      <div class="metric-card p-4 mb-4" style="border-left:2px solid #e8a840">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-2xs" style="color:var(--text-disabled)">DeepSeek Token 消耗趋势</div>
+          <span class="text-2xs" style="color:var(--accent)">过去7天</span>
+        </div>
+        <canvas ref="dsChartRef" class="w-full" style="height:160px"></canvas>
+        <div class="flex justify-center gap-4 mt-1">
+          <span class="text-2xs flex items-center gap-1"><span class="inline-block w-2 h-2 rounded" style="background:#06b6d4"></span> v4-pro</span>
+          <span class="text-2xs flex items-center gap-1"><span class="inline-block w-2 h-2 rounded" style="background:#7c3aed"></span> v4-flash</span>
+        </div>
+      </div>
+
       <!-- Top Processes -->
       <div>
         <div class="text-2xs mb-2" style="color:var(--text-disabled)">高占用进程</div>
@@ -150,6 +163,7 @@ const memColor = computed(() => {
 });
 
 const cpuChartId = "cpu-chart"; const memChartId = "mem-chart"; const tokenChartId = "token-chart";
+const dsChartRef = ref<HTMLCanvasElement | null>(null);
 
 function fmtNum(n: number): string {
   if (n > 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -162,6 +176,7 @@ async function fetchData() {
     data.value = await api.systemMonitor();
     lastFetch.value = Date.now();
     drawCharts();
+    drawDSChart();
   } catch (e) { /* silent */ }
 }
 
@@ -199,6 +214,59 @@ function drawCharts() {
       ctx.stroke();
     }
   }).catch(() => {});
+}
+
+async function drawDSChart() {
+  try {
+    const res = await fetch("/api/system/deepseek-usage");
+    const d = await res.json();
+    if (!d.data || d.data.length === 0) return;
+    const canvas = dsChartRef.value;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = 2;
+    const W = canvas.offsetWidth, H = canvas.offsetHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    const rows = d.data.slice(-14); // last 7 days × 2 models
+    if (rows.length < 2) return;
+    const dates = [...new Set(rows.map((r: any) => r.utc_date))].slice(-7);
+    const maxVal = Math.max(...rows.map((r: any) => r.total_tokens || 0), 1);
+    const barW = Math.max(4, Math.min(16, (W - 40) / dates.length / 3));
+    const leftPad = 40, topPad = 10, botPad = 22;
+    const chartH = H - topPad - botPad;
+    // Y-axis labels
+    ctx.fillStyle = "#64748b"; ctx.font = "9px monospace";
+    for (let t = 0; t <= maxVal; t += maxVal / 4) {
+      const y = H - botPad - (t / maxVal) * chartH;
+      ctx.fillText((t / 1_000_000).toFixed(0) + "M", 2, y + 3);
+      ctx.strokeStyle = "rgba(148,163,184,0.08)"; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W - 8, y); ctx.stroke();
+    }
+    // Bars
+    dates.forEach((date: string, di: number) => {
+      const proRow = rows.find((r: any) => r.utc_date === date && r.model === "deepseek-v4-pro");
+      const flashRow = rows.find((r: any) => r.utc_date === date && r.model === "deepseek-v4-flash");
+      const x0 = leftPad + di * ((W - leftPad - 8) / dates.length) + 2;
+      // v4-pro bar
+      if (proRow) {
+        const h = (proRow.total_tokens / maxVal) * chartH;
+        ctx.fillStyle = "rgba(6,182,212,0.8)";
+        ctx.fillRect(x0, H - botPad - h, barW, h);
+      }
+      // v4-flash bar
+      if (flashRow) {
+        const h = (flashRow.total_tokens / maxVal) * chartH;
+        ctx.fillStyle = "rgba(124,58,237,0.8)";
+        ctx.fillRect(x0 + barW + 1, H - botPad - h, barW, h);
+      }
+      // Date label
+      ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
+      ctx.fillText(date.slice(5), x0, H - 4);
+    });
+  } catch (e) { /* silent */ }
 }
 
 onMounted(() => {

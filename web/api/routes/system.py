@@ -87,3 +87,20 @@ async def system_history(hours: int = Query(default=24, ge=1, le=720)):
         "points": len(rows),
         "data": rows,
     }
+
+@router.get("/deepseek-usage")
+async def deepseek_usage():
+    """DeepSeek daily token/cost summary from Parquet."""
+    import pandas as pd
+    pq = HUB.deepseek_usage_path()
+    if not pq.exists():
+        return {"data": [], "status": "no_data"}
+
+    df = pd.read_parquet(pq)
+    df = df.sort_values("utc_date").tail(28)
+    return {
+        "data": df.to_dict(orient="records"),
+        "models": df["model"].unique().tolist(),
+        "dates": sorted(df["utc_date"].unique().tolist()),
+        "total_cost": float(df["cost_cny"].sum()),
+    }
