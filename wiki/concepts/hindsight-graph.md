@@ -3,12 +3,14 @@ title: Hindsight Knowledge Graph (记忆知识图谱)
 created: 2026-05-17
 updated: 2026-05-17
 type: concept
-tags: [web, hindsight, knowledge-graph, visualization, canvas]
+tags: [web, hindsight, knowledge-graph, three.js, 3d]
 ---
 
 # Hindsight Knowledge Graph
 
-Hindsight 持久化记忆的交互式知识图谱可视化。Canvas 力导向图 + Quantum Terminal 风格，独立 Web 页面。
+Hindsight 持久化记忆的交互式知识图谱可视化。**Three.js WebGL 3D 星空图** + Quantum Terminal 风格，独立 Web 页面。
+
+2026-05-17: 从 Canvas 2D 迁移到 Three.js 3D (commit 9c3bac9)。
 
 ## 数据来源
 
@@ -19,78 +21,83 @@ Hindsight REST API (localhost:9177)
   └── /memories/recall  → 搜索 + source_fact_ids
 ```
 
-## 图谱构建
+## 3D 架构
 
-后端 `web/api/routes/hindsight.py` 的 `/api/hindsight/graph` 端点从 Hindsight API 拉取原始数据，构建 `{nodes, links}` 结构：
+### 场景组件
 
-**节点**：每条记忆一个节点。属性包括 id、标签（截断80字符）、类型（observation/experience）、entities、tags、时间戳。
+| 组件 | 技术 | 细节 |
+|------|------|------|
+| 星空背景 | `THREE.Points` + `AdditiveBlending` | 600 粒子，深蓝 #334466，`depthWrite: false` |
+| 节点球体 | `THREE.SphereGeometry(1, 24, 16)` 复用 | `MeshStandardMaterial` + emissive 发光 |
+| 边 | `THREE.BufferGeometry` + `vertexColors` | 单次 draw call，逐边颜色控制 |
+| 光源 | `AmbientLight` + `PointLight` | 环境光 #334466 + 点光源 #00d4ff |
+| 相机 | `PerspectiveCamera(55°)` | 初始距离 160，OrbitControls |
+| 交互 | `Raycaster` | 替代 Canvas 2D hit-test |
 
-**链接（4种）**：
-1. **Entity 共享** — 两个节点有相同 entity（如「AKShare」→ 语义链接
-2. **Document 聚合** — 同一 document_id 下的节点互连 → 时序链接
-3. **Consolidation** — observation 被合并为 experience → 提炼关系
-4. **Tag 共享** — 两个节点有相同 tag
+### 力模拟 (3D)
 
-## 前端渲染
+```
+tick() 每帧:
+  repulsion=400,  inverse-square 3D 斥力
+  centering=0.003, 原点引力
+  damping=0.85,    15% 能量衰减/帧
+  springLen=45,  springK=0.003
+  → 收敛: max_velocity < 0.08 持续 60 帧 → stop
+```
 
-Canvas 自建力导向图，不依赖第三方图谱库。
+### 节点类型与颜色 (色轮等边三角: 195°-270°-40°)
 
-**物理模拟**（`HindsightGraph.vue → tick()`）：
-- 节点间斥力（inverse-square）
-- 图中心引力
-- 链接弹簧力
-- 速度阻尼衰减
+| 类型 | 颜色 | 语义 |
+|------|------|------|
+| Observation | 青色 #00d4ff | 「刚发生的」对话碎片 |
+| Experience  | 紫色 #7c3aed | 「学到的」精炼知识 |
+| World       | 金色 #e8a840 | 「本来如此的」通用知识 |
 
-**渲染**：Canvas 2D，Device Pixel Ratio 适配视网膜屏。
+节点大小按 `degree` 动态缩放: `scale = 1.8 + (degree/maxDegree) * 4.5`
 
-**节点区分**：
-- Observation → 青色 (#00d4ff) 小圆点，径向渐变光晕
-- Experience → 紫色 (#7c3aed) 大圆点，径向渐变光晕  
-- 悬浮/选中 → 阴影发光 + 放大
+### 点击高亮 (逐边 vertexColors)
 
-**链接区分**：
-- Semantic → 青色虚线
-- Temporal → 白色细线
-- Consolidation → 绿色虚线
-- Tag → 紫色点线
+所有边存为单一 `BufferGeometry`，`edgeMeta[]` 并行记录每条边 `{srcId, tgtId, type}`。点击节点时：
 
-**无文字标签**：节点不显示文字，保持图谱干净。文字信息通过悬浮 tooltip 和点击详情面板获取。
+- 关联边顶点颜色 → 白色 `#ffffff`
+- 非关联边顶点颜色 → `#111122`（几乎隐身）
+- `geometry.attributes.color.needsUpdate = true`
 
-## 交互
+### 交互 (Three.js)
 
 | 操作 | 效果 |
 |------|------|
-| 悬浮节点 | 固定定位 tooltip: 类型徽章 + 全文 + entities |
-| 点击节点 | 右侧详情面板弹出: 完整文字 + entities列表 + tags + 日期 |
-| 拖拽节点 | 固定节点位置 |
-| 拖拽空白 | 平移画布 |
-| 滚轮 | 缩放 (0.2x ~ 3x) |
-| 底部图例 | 标注四种节点/链接类型的颜色 |
+| 左键拖拽 | 旋转视角 (OrbitControls) |
+| 滚轮 | 缩放 (30~600 距离) |
+| 右键拖拽 | 平移 |
+| 悬停节点 | 放大 1.3x + tooltip + cursor:pointer |
+| 点击节点 | 选中高亮+详情面板展开 |
+| 点击空白 | 取消选中，边恢复原色 |
+| 自动旋转 | `autoRotate=true`, speed=0.15 |
 
-## 集成
+### 性能特征
 
-- **路由**: `/hindsight`（Vue Router）
-- **侧栏入口**: 记忆图谱 SVG 图标
-- **加载方式**: 页面打开自动加载，也支持手动点击「LOAD GRAPH」按钮刷新
-- **非实时**: 不轮询，数据在点击载入时拉取一次
+- **单次 draw call**: 所有边一个 BufferGeometry
+- **GPU 渲染**: Three.js WebGL，59 节点 ~0.5ms/frame
+- **收敛停止**: 节点稳定后停 requestAnimationFrame
+- **闲置渲染**: `renderLoop()` 保持 controls.update + 重绘
+- **Three.js 体积**: ~135KB gzipped (约 Vue 3 + ECharts 已完成)
 
 ## 关键文件
 
 | 文件 | 角色 |
 |------|------|
 | `web/api/routes/hindsight.py` | 后端端点 + 图谱构建逻辑 |
-| `web/frontend/src/views/HindsightGraph.vue` | Canvas 力导向图渲染 + 交互 (650行) |
+| `web/frontend/src/views/HindsightGraph.vue` | 3D 渲染 + 物理模拟 + 交互 (~820行) |
 | `web/frontend/src/router/index.ts` | 路由注册 |
+| `web/frontend/package.json` | 依赖: three@latest |
 
 ## 设计约束
 
-- **零外部图谱库依赖**：自建物理模拟，避免引入 cytoscape/vis/d3-force 等重依赖
-- **Canvas 非 SVG**：节点数可能增长到数百，Canvas 比 SVG DOM 更高效
-- **无实时轮询**：数据变化慢（每轮对话才增量），无需 WebSocket 推送
-
-## 已知 Bug (2026-05-17)
-
-- **Web UI 图谱不显示节点**: 数据已正确拉取 (100 nodes via API)，但前端渲染为空白。Canvas 初始化或数据注入逻辑待排查。暂时不影响后端存储。
+- **Three.js 是唯一 3D 依赖**: 零外部图谱库
+- **自建力模拟**: 不依赖 D3-force/cytoscape 等
+- **vertexColors 逐边控制**: 避免分组 material 的全局变色
+- **无实时轮询**: 数据变化慢，手动 Load Graph 触发
 
 ## See Also
 

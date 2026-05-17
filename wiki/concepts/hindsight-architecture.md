@@ -87,16 +87,33 @@ memory:
   → Hindsight API POST /memories/retain (raw text)
   → LLM 事实提取 (deepseek-v4-flash)
   → 消歧 + 实体解析
-  → 知识图谱节点 (observation / experience)
+  → 知识图谱节点 (observation / experience / world)
   → Consolidation (observation → experience 精炼)
   → 索引构建 (pgvector + FTS5)
   → 可召回 (auto_recall / recall / reflect)
 ```
 
-## 记忆类型
+## 记忆类型 (3 层事实模型)
 
-- **Observation** (94 个): 原始对话事实，语义节点，未精炼
-- **Experience** (101 个): 合并后的精炼知识，跨对话稳定存在
+Hindsight 的 LLM 事实提取不只记录对话，它同时提取三种不同层级的知识：
+
+| 类型 | 颜色 | 语义 | 时间性 | 可替代 |
+|------|------|------|--------|--------|
+| **Observation** | 青色 #00d4ff | 「刚发生的」对话原始碎片 | 绑定对话轮次 | 被 experience 取代 |
+| **Experience** | 紫色 #7c3aed | 「学到的」精炼知识 | 弱绑定 | 被更新的 experience 取代 |
+| **World** | 金色 #e8a840 | 「本来如此的」通用客观知识 | 无时间性 | 被更新的 world 取代 |
+
+- **Observation**: 一次性的原子事实，关联到具体 conversation turn（如"助手创建了 cron job"）
+- **Experience**: Consolidation 合并多个 observation 后的精炼知识（如"Web UI 图谱 bug 根因是边按类型分组共用 material"）
+- **World**: 脱人脱时的纯客观知识（如"两层架构的原因：只有 Observation 会导致碎片化"），不绑定人物和时间
+
+Consolidation 做四件事：消歧、合并、抽象、实体解析。Observation → Experience 通过 `caused_by` 链接保持溯源性。
+
+边类型同样分三层，各有独立的 entity/semantic/temporal/caused_by 链接矩阵。
+
+当前分布 (2026-05-17):
+- Observation: 114 | Experience: 129 | World: 111
+- 总节点: 354 | 总链接: 14,399+
 
 ## 四种检索策略 (recall)
 
