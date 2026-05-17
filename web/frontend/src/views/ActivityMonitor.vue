@@ -56,18 +56,14 @@
       <div class="metric-card p-4 mb-4" style="border-left:2px solid #e8a840">
         <div class="flex items-center justify-between mb-2">
           <div class="text-2xs" style="color:var(--text-disabled)">DeepSeek Token 消耗趋势</div>
-          <span class="text-2xs" style="color:var(--accent)">过去7天</span>
+          <span class="text-2xs" style="color:var(--accent)">过去30天</span>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <div>
-            <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-pro</div>
-            <canvas ref="dsProRef" class="w-full" style="height:140px"></canvas>
-          </div>
-          <div>
-            <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-flash</div>
-            <canvas ref="dsFlashRef" class="w-full" style="height:140px"></canvas>
-          </div>
-        </div>
+        <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-pro</div>
+        <canvas ref="dsProRef" class="w-full mb-3" style="height:130px"></canvas>
+        <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-flash</div>
+        <canvas ref="dsFlashRef" class="w-full mb-3" style="height:130px"></canvas>
+        <div class="text-2xs mb-1" style="color:var(--text-disabled)">费用 ¥</div>
+        <canvas ref="dsCostRef" class="w-full" style="height:100px"></canvas>
         <div class="flex justify-center gap-3 mt-1 text-2xs" style="color:var(--text-disabled)">
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.85)"></span>输出</span>
@@ -147,6 +143,7 @@ const memColor = computed(() => {
 const cpuChartId = "cpu-chart"; const memChartId = "mem-chart"; const tokenChartId = "token-chart";
 const dsProRef = ref<HTMLCanvasElement | null>(null);
 const dsFlashRef = ref<HTMLCanvasElement | null>(null);
+const dsCostRef = ref<HTMLCanvasElement | null>(null);
 
 async function fetchData() {
   try {
@@ -198,9 +195,9 @@ async function drawDSChart() {
     const res = await fetch("/api/system/deepseek-usage");
     const d = await res.json();
     if (!d.data || d.data.length === 0) return;
-    const rows: any[] = d.data.slice(-14);
+    const rows: any[] = d.data;
     if (rows.length < 2) return;
-    const dates = [...new Set(rows.map((r: any) => r.utc_date))].slice(-7);
+    const dates = [...new Set(rows.map((r: any) => r.utc_date))].slice(-30);
 
     const models = [
       { key: "deepseek-v4-pro",   ref: dsProRef,   colors: ["rgba(6,95,107,0.85)","rgba(6,182,212,0.85)","rgba(6,182,212,0.28)"] },
@@ -208,6 +205,7 @@ async function drawDSChart() {
     ];
     const layers = ["input_cache_miss", "output_tokens", "input_cache_hit"];
 
+    // ── Token stacked bars ──
     for (const model of models) {
       const canvas = model.ref.value;
       if (!canvas) continue;
@@ -219,32 +217,28 @@ async function drawDSChart() {
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, W, H);
 
-      // max for this model only
       const modelRows = rows.filter((r: any) => r.model === model.key);
       const maxVal = Math.max(...modelRows.map((r: any) =>
         (r.input_cache_miss||0) + (r.output_tokens||0) + (r.input_cache_hit||0)
       ), 1);
 
-      const leftPad = 36, topPad = 8, botPad = 20;
+      const leftPad = 34, topPad = 6, botPad = 16;
       const chartH = H - topPad - botPad;
-      const barW = Math.max(3, Math.min(12, (W - leftPad - 8) / dates.length - 3));
+      const barW = Math.max(2, (W - leftPad - 4) / dates.length - 1);
 
-      // Y grid
       ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
       for (let t = 0; t <= maxVal; t += maxVal / 3) {
         const y = H - botPad - (t / maxVal) * chartH;
-        const label = t >= 1_000_000 ? (t / 1_000_000).toFixed(0) + "M"
-          : t >= 1000 ? (t / 1000).toFixed(0) + "K" : String(t);
+        const label = t >= 1_000_000 ? (t/1_000_000).toFixed(0)+"M" : t>=1000 ? (t/1000).toFixed(0)+"K" : String(t);
         ctx.fillText(label, 2, y + 3);
-        ctx.strokeStyle = "rgba(148,163,184,0.06)"; ctx.lineWidth = 0.5;
-        ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W - 4, y); ctx.stroke();
+        ctx.strokeStyle = "rgba(148,163,184,0.05)"; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W - 2, y); ctx.stroke();
       }
 
-      // Stacked bars
       dates.forEach((date: string, di: number) => {
         const row = modelRows.find((r: any) => r.utc_date === date);
         if (!row) return;
-        const x0 = leftPad + di * ((W - leftPad - 4) / dates.length) + 2;
+        const x0 = leftPad + di * ((W - leftPad - 2) / dates.length);
         let yBottom = H - botPad;
         layers.forEach((layer, li) => {
           const val = row[layer] || 0;
@@ -253,9 +247,76 @@ async function drawDSChart() {
           ctx.fillRect(x0, yBottom - h, barW, h);
           yBottom -= h;
         });
-        ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
-        ctx.fillText(date.slice(5), x0, H - 4);
+        if (dates.length <= 14 || di % 3 === 0) {
+          ctx.fillStyle = "#64748b"; ctx.font = "7px monospace";
+          ctx.fillText(date.slice(5), x0, H - 3);
+        }
       });
+    }
+
+    // ── Cost line chart ──
+    const costCanvas = dsCostRef.value;
+    if (costCanvas) {
+      const ctx = costCanvas.getContext("2d");
+      if (ctx) {
+        const dpr = 2;
+        const W = costCanvas.offsetWidth, H = costCanvas.offsetHeight;
+        costCanvas.width = W * dpr; costCanvas.height = H * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, W, H);
+
+        const costs = rows.filter((r: any) => r.cost_cny > 0);
+        const maxCost = Math.max(...costs.map((r: any) => r.cost_cny), 1);
+        const leftPad = 34, botPad = 14, chartH = H - 8 - botPad;
+
+        // Y grid
+        ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
+        for (let t = 0; t <= maxCost; t += maxCost / 3) {
+          const y = H - botPad - (t / maxCost) * chartH;
+          ctx.fillText("¥" + t.toFixed(0), 2, y + 3);
+          ctx.strokeStyle = "rgba(148,163,184,0.05)"; ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W - 2, y); ctx.stroke();
+        }
+
+        // Group by utc_date, sum cost across models
+        const costByDate: Record<string, number> = {};
+        for (const r of costs) {
+          costByDate[r.utc_date] = (costByDate[r.utc_date] || 0) + r.cost_cny;
+        }
+
+        // Bars + fill area
+        const costDates = dates.filter(d => costByDate[d] > 0);
+        if (costDates.length > 0) {
+          // Draw bars
+          for (const date of costDates) {
+            const di = dates.indexOf(date);
+            const val = costByDate[date];
+            const x0 = leftPad + di * ((W - leftPad - 2) / dates.length);
+            const h = (val / maxCost) * chartH;
+            ctx.fillStyle = "rgba(6,182,212,0.35)";
+            ctx.fillRect(x0, H - botPad - h, Math.max(2, (W-leftPad-2)/dates.length-1), h);
+          }
+          // Connecting line
+          ctx.beginPath();
+          ctx.strokeStyle = "#06b6d4"; ctx.lineWidth = 1.2;
+          for (let i = 0; i < costDates.length; i++) {
+            const di = dates.indexOf(costDates[i]);
+            const val = costByDate[costDates[i]];
+            const x = leftPad + di * ((W - leftPad - 2) / dates.length) + (W-leftPad-2)/dates.length/2;
+            const y = H - botPad - (val / maxCost) * chartH;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+
+        // Date labels (sparse)
+        dates.forEach((date: string, di: number) => {
+          if (dates.length <= 14 || di % 3 === 0) {
+            ctx.fillStyle = "#64748b"; ctx.font = "7px monospace";
+            ctx.fillText(date.slice(5), leftPad + di * ((W - leftPad - 2) / dates.length), H - 2);
+          }
+        });
+      }
     }
   } catch (e) { /* silent */ }
 }
