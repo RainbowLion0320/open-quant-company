@@ -72,6 +72,9 @@
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.85)"></span>输出</span>
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.25);border:1px dashed rgba(6,182,212,0.3)"></span>缓存命中</span>
+          <span class="mx-1" style="color:#475569">|</span>
+          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>v4-pro</span>
+          <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(61,21,120,0.85)"></span>v4-flash</span>
         </div>
       </div>
 
