@@ -59,11 +59,11 @@
           <span class="text-2xs" style="color:var(--accent)">过去30天</span>
         </div>
         <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-pro</div>
-        <canvas ref="dsProRef" class="mb-3" style="width:100%;max-width:640px;height:130px;display:block;margin:0 auto"></canvas>
+        <canvas ref="dsProRef" class="w-full mb-3" style="height:130px"></canvas>
         <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-flash</div>
-        <canvas ref="dsFlashRef" class="mb-3" style="width:100%;max-width:640px;height:130px;display:block;margin:0 auto"></canvas>
+        <canvas ref="dsFlashRef" class="w-full mb-3" style="height:130px"></canvas>
         <div class="text-2xs mb-1" style="color:var(--text-disabled)">费用 ¥</div>
-        <canvas ref="dsCostRef" class="" style="width:100%;max-width:640px;height:100px;display:block;margin:0 auto"></canvas>
+        <canvas ref="dsCostRef" class="w-full" style="height:100px"></canvas>
         <div class="flex justify-center gap-3 mt-1 text-2xs" style="color:var(--text-disabled)">
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.85)"></span>输出</span>
@@ -224,7 +224,8 @@ async function drawDSChart() {
 
       const leftPad = 34, topPad = 6, botPad = 16;
       const chartH = H - topPad - botPad;
-      const barW = Math.max(2, (W - leftPad - 4) / dates.length - 1);
+      const slotW = (W - leftPad - 2) / dates.length;
+      const barW = Math.max(1, slotW * 0.45);
 
       ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
       for (let t = 0; t <= maxVal; t += maxVal / 3) {
@@ -238,7 +239,7 @@ async function drawDSChart() {
       dates.forEach((date: string, di: number) => {
         const row = modelRows.find((r: any) => r.utc_date === date);
         if (!row) return;
-        const x0 = leftPad + di * ((W - leftPad - 2) / dates.length);
+        const x0 = leftPad + di * slotW + (slotW - barW) / 2;
         let yBottom = H - botPad;
         layers.forEach((layer, li) => {
           const val = row[layer] || 0;
@@ -268,6 +269,8 @@ async function drawDSChart() {
         const costs = rows.filter((r: any) => r.cost_cny > 0);
         const maxCost = Math.max(...costs.map((r: any) => r.cost_cny), 1);
         const leftPad = 34, botPad = 14, chartH = H - 8 - botPad;
+        const slotWc = (W - leftPad - 2) / dates.length;
+        const barWc = Math.max(1, slotWc * 0.45);
 
         // Y grid
         ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
@@ -291,10 +294,10 @@ async function drawDSChart() {
           for (const date of costDates) {
             const di = dates.indexOf(date);
             const val = costByDate[date];
-            const x0 = leftPad + di * ((W - leftPad - 2) / dates.length);
+            const x0 = leftPad + di * slotWc + (slotWc - barWc) / 2;
             const h = (val / maxCost) * chartH;
             ctx.fillStyle = "rgba(6,182,212,0.35)";
-            ctx.fillRect(x0, H - botPad - h, Math.max(2, (W-leftPad-2)/dates.length-1), h);
+            ctx.fillRect(x0, H - botPad - h, barWc, h);
           }
           // Connecting line
           ctx.beginPath();
