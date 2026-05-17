@@ -21,7 +21,7 @@ Tushare MCP Server 通过 Streamable HTTP 协议运行:
 | `balancesheet` | 完整资产负债表（200+字段） | 当前无 | P0 |
 | `cashflow` | 完整现金流量表（80+字段） | 当前同花顺现金流(72字段) | P0 |
 | `stock_basic` | 全A股列表+行业+上市日期+是否ST | 当前AKShare stock_info_a_code_name | P1 |
-| `index_classify` | 申万2014/2021版行业分类（三级） | 当前scripts/pull_industry.py | P1 |
+| `index_classify` | 申万2014/2021版行业分类（三级） | `data/symbols.py`已内置 | - |
 | `sw_daily` | 申万行业指数日行情 | 当前无（只用个股） | P1 |
 
 ### 二级：策略增强（2000积分解锁，AKShare没有）

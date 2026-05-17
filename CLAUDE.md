@@ -89,7 +89,6 @@
 ├── tests/                        # 边界测试
 ├── docs/tushare-mcp-guide.md     # Tushare文档
 ├── config/workflows/*.yaml       # 研究/因子发现 pipeline
-├── main.py                       # 入口
 ├── Makefile                      # 构建/扫描命令
 └── CLAUDE.md
 ```

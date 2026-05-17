@@ -1,5 +1,7 @@
 """
 因子表达式引擎 — 借鉴 Microsoft/qlib 的 operator overloading DSL
+⚠️ DEPRECATED: 已被 signals/expression.py 取代。保留仅用于向后兼容测试。
+新代码请使用 signals/expression.py。
 
 设计理念:
   因子 = 可组合的表达式树
