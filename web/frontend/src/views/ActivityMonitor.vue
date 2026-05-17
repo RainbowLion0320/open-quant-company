@@ -59,11 +59,11 @@
           <span class="text-2xs" style="color:var(--accent)">过去30天</span>
         </div>
         <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-pro</div>
-        <canvas ref="dsProRef" class="w-full mb-3" style="height:130px"></canvas>
+        <canvas ref="dsProRef" class="mb-3" style="width:100%;max-width:640px;height:130px;display:block;margin:0 auto"></canvas>
         <div class="text-2xs mb-1" style="color:var(--text-disabled)">v4-flash</div>
-        <canvas ref="dsFlashRef" class="w-full mb-3" style="height:130px"></canvas>
+        <canvas ref="dsFlashRef" class="mb-3" style="width:100%;max-width:640px;height:130px;display:block;margin:0 auto"></canvas>
         <div class="text-2xs mb-1" style="color:var(--text-disabled)">费用 ¥</div>
-        <canvas ref="dsCostRef" class="w-full" style="height:100px"></canvas>
+        <canvas ref="dsCostRef" class="" style="width:100%;max-width:640px;height:100px;display:block;margin:0 auto"></canvas>
         <div class="flex justify-center gap-3 mt-1 text-2xs" style="color:var(--text-disabled)">
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
           <span class="flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-sm" style="background:rgba(6,182,212,0.85)"></span>输出</span>
