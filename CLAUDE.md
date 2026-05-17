@@ -61,7 +61,8 @@
 │   ├── dsl_parser.py             # LLM公式→计算
 │   ├── buffett.py                # 巴菲特价值过滤 (安全边际/DCF)
 │   ├── multifactor.py            # 多因子打分 (四维加权)
-│   └── ml_signals.py             # ML信号生成
+│   ├── ml_signals.py             # ML信号生成
+│   └── selection.py              # 横截面排名→交易信号
 ├── cybernetics/
 │   └── orchestrator.py           # 市场状态检测 + 自适应参数
 ├── models/__init__.py            # LightGBM + 注册表
@@ -71,18 +72,20 @@
 │   ├── analytics.py              # 15项风险指标
 │   ├── pipeline.py               # 可插拔回测流水线
 │   └── strategies/{base,ml_strategy}.py
-├── broker/{__init__,exchange,risk}.py  # PaperBroker + 成本 + 风控
+├── broker/{__init__,exchange,risk,persistence,allocator}.py  # PaperBroker + 持久化 + 风控
 ├── scripts/
 │   ├── compute_signals.py        # Cron 15:30 日频扫描
+│   ├── execute_paper_trades.py   # Cron 09:30 模拟交易执行
 │   ├── build_features.py         # 批量PIT特征构建
 │   ├── tune_model.py             # Optuna训练
+│   ├── weekly_retrain.py         # Cron 周六 模型重训
 │   ├── strategy_tournament.py    # 锦标赛对比
 │   ├── factor_hypothesis.py      # LLM因子发现
 │   ├── run_workflow.py           # qrun YAML工作流
 │   └── cron_fetch_slow.py        # 限流数据日常填充
 ├── web/api/                      # FastAPI (routes + ws + jobs)
 ├── web/frontend/                 # Vue 3 SPA (Quantum Terminal)
-├── wiki/                         # LLM Wiki (14页)
+├── wiki/                         # LLM Wiki (16页)
 ├── tests/                        # 边界测试
 ├── docs/tushare-mcp-guide.md     # Tushare文档
 ├── config/workflows/*.yaml       # 研究/因子发现 pipeline
