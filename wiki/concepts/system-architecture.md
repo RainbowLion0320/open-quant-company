@@ -10,7 +10,7 @@ tags: [architecture, system-overview, extensibility, strategy-registry, ML, Fact
 
 A股量化交易系统架构总览。巴菲特价值投资为决策约束层，钱学森控制论为运行机制层——两者正交不冲突。所有代码在 `~/quant-agent/`，Web 在 8501 端口，日频 cron 在 15:30 CST。
 
-**当前版本: v5.1** — 多资产量化系统，5种资产可开关，AI/ML驱动R&D。
+**当前版本: v5.1** — 日频个人量化系统：4策略回测 + 模拟交易 + AI增强R&D + 11页Web终端。
 
 ## 设计哲学：三层正交架构
 

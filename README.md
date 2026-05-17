@@ -1,6 +1,6 @@
 <div align="center">
-  <h1>Hermes Quant Agent</h1>
-  <h3>个人A股量化交易系统 — 巴菲特价值投资 × 钱学森控制论</h3>
+  <h1>Quant Agent</h1>
+  <h3>个人A股量化交易系统 — 日频 · 自托管 · AI增强</h3>
   <p>
     <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
     <img src="https://img.shields.io/badge/version-5.1-orange" alt="Version">
@@ -14,7 +14,7 @@
 
 ## 概述
 
-日频 A 股量化系统。巴菲特价值投资哲学为决策约束层，钱学森工程控制论为系统运行机制层——两者正交不冲突。
+日频 A 股量化系统，自托管，全链路闭环。巴菲特价值投资为决策约束层，钱学森工程控制论为运行机制层——两者正交不冲突。
 
 - **4 策略并行**：巴菲特价值精选 / 多因子月度调仓 / 控制论自适应 / LightGBM ML
 - **5204 只全 A 股**：申万 31 行业分类，日线 + 财务 + 估值 + 资金 + 筹码 + 宏观

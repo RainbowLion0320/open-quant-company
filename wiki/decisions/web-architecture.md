@@ -1,7 +1,7 @@
 ---
 title: Web Architecture (Vue 3 + FastAPI)
 created: 2026-05-12
-updated: 2026-05-16
+updated: 2026-05-17
 type: decision
 tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-center, monitor]
 ---

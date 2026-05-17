@@ -8,11 +8,11 @@ tags: [index]
 
 # Wiki Index
 
-> Quant Agent 知识库目录。每行 = wikilink + 一句话概括。
+> Quant Agent — 个人A股量化交易系统知识库。每行 = wikilink + 一句话概括。
 > Last updated: 2026-05-17 | Total pages: 16 ( + log + schema )
 
 ## Concepts
-- [[system-architecture]] — **系统架构总览**：五层设计，4策略注册表，35特征体系，多资产架构，数据注册表
+- [[system-architecture]] — **系统架构总览**：多层正交设计，4策略注册表，35+因子体系，多资产架构，数据注册表
 - [[ml-pipeline]] — **ML 管道** ★：因子DSL→PIT特征→LightGBM→锦标赛→LLM因子发现，enrich_from_registry
 - [[buffett-filter]] — 三重过滤器：能力圈→护城河→安全边际
 - [[buffett-rolling-backtest]] — 滚动回测：按年重新过滤，消除前视偏差

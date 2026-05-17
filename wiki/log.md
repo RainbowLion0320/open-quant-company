@@ -10,6 +10,13 @@ tags: [log]
 
 > 操作日志。追加模式。
 
+## [2026-05-17] audit | 项目地毯式审视 — 身份统一+config清理
+- 项目标题: "Quant Agent — 个人A股量化交易系统 — 日频 · 自托管 · AI增强"
+- settings.yaml: version 0.1.0→5.1.0, phase删除, 股票数1000→5204
+- settings.yaml: 删除死配置 buffett_cyber + ma_cross + backtest pipeline 旧段
+- README: 新标题+概述更新
+- wiki: index描述更新, web-architecture日期修正, system-architecture版本描述更新
+
 ## [2026-05-17] digest | Codex hardening (ccb56ef) — wiki + 记忆同步
 - signals/selection.py: 新增横截面排名信号选择模块 (apply_ranked_buys)
 - signals/multifactor.py: 动量增强 (skip-1m/趋势确认/bounded保护/score_components)

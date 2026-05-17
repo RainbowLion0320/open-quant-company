@@ -49,30 +49,12 @@ risk_control:
 backtest:
   benchmark: sh000001
   benchmark_name: 上证指数
-  commission: 0.00081
-  engine: pipeline
   initial_cash: 1000000
   periods_per_year: 252
-  pipeline:
-    portfolio:
-      rebalance_freq: ME
-    signal:
-      top_n: 20
   pool_size: 0
   risk_free_rate: 0.03
-  stamp_duty: 0.0005
   start_date: '2020-01-01'
   strategy:
-    buffett_cyber:
-      circuit_breaker: 3
-      cooldown_bars: 15
-      ma_long: 20
-      ma_short: 5
-      max_positions: 8
-      position_pct: 0.3
-      score_weight_base: 0.5
-      score_weight_scale: 100.0
-      stop_loss: -0.08
     cybernetic:
       ma_long: 20
       ma_short: 10
@@ -88,12 +70,6 @@ backtest:
       stop_loss_bear: -0.03
       stop_loss_bull: -0.08
       stop_loss_side: -0.05
-    ma_cross:
-      ma_long: 20
-      ma_short: 5
-      max_positions: 5
-      position_pct: 0.3
-      stop_loss: -0.08
     multifactor:
       factor_window_long: 60
       factor_window_short: 21
@@ -237,8 +213,8 @@ data:
     token: ''
 project:
   name: quant-agent
-  phase: 1
-  version: 0.1.0
+  version: 5.1.0
+  description: 个人A股量化交易系统 — 日频 · 自托管 · AI增强
 signals:
   multifactor:
     buy_threshold: 52
@@ -320,7 +296,7 @@ assets:
   stock:
     enabled: true
     label: A股股票
-    universe: CIRCLE_STOCKS  # 1000只
+    universe: CIRCLE_STOCKS  # 5204只全A股
     features: true
   etf:
     enabled: true
@@ -399,6 +375,7 @@ strategies:
     enabled: true
     label: LightGBM ML
 trading:
+  # 实际交易费率 (用于成本估算)
   commission:
     brokerage: 0.00025
     stamp_duty: 0.0005
