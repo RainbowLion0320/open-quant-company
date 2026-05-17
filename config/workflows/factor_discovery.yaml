@@ -21,6 +21,7 @@ steps:
   - name: rebuild_features
     description: 重建特征 (含新因子)
     script: scripts/build_features.py
+    args: ["--n-stocks", "200"]
     timeout_minutes: 30
     retry: 1
     on_fail: abort

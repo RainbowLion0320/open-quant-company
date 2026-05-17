@@ -251,7 +251,7 @@ class DataHub:
     # ── Catalog / audit ─────────────────────────────────────
 
     def catalog(self) -> dict[str, DatasetSpec]:
-        return {
+        catalog = {
             "signals": DatasetSpec("signals", self.signals_dir(), "directory", "strategies", "Latest strategy signals"),
             "signals_prev": DatasetSpec("signals_prev", self.signals_prev_dir(), "directory", "strategies", "Previous signal snapshots"),
             "scan_meta": DatasetSpec("scan_meta", self.scan_meta_path(), "parquet", "strategies", "Strategy scan metadata"),
@@ -262,6 +262,31 @@ class DataHub:
             "token_usage": DatasetSpec("token_usage", self.token_usage_path(), "json", "system", "LLM token usage cache"),
             "deepseek_usage": DatasetSpec("deepseek_usage", self.deepseek_usage_path(), "parquet", "system", "DeepSeek daily token/cost summary"),
         }
+        try:
+            from data.data_registry import get_registry
+
+            for dim in get_registry().get_enabled():
+                if not dim.cache:
+                    continue
+                root = self._registry_cache_root(dim.cache)
+                catalog[f"dimension:{dim.key}"] = DatasetSpec(
+                    key=f"dimension:{dim.key}",
+                    path=root,
+                    kind="registry_dataset",
+                    owner=dim.source or dim.asset,
+                    description=f"{dim.label} [{dim.freq}/{dim.status}]",
+                )
+        except Exception:
+            pass
+        return catalog
+
+    def _registry_cache_root(self, pattern: str) -> Path:
+        parts = []
+        for part in Path(pattern).parts:
+            if "{" in part and "}" in part:
+                break
+            parts.append(part)
+        return self.store_root.joinpath(*parts) if parts else self.store_root
 
     def audit(self, include_rows: bool = False) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []

@@ -1,7 +1,7 @@
 ---
 title: Web Architecture (Vue 3 + FastAPI)
 created: 2026-05-12
-updated: 2026-05-17
+updated: 2026-05-18
 type: decision
 tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-center, monitor]
 ---
@@ -46,8 +46,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 | 个股深挖 | `/stocks/:code` | K线 + DCF计算器 + 巴菲特评分 + 策略信号 |
 | 回测分析 | `/backtest` | N策略同屏叠加曲线 + 点击高亮 + 基准参照 |
 | 信号历史 | `/signals` | 信号变更追踪 |
-| 活动监视器 | `/monitor` | 🖥️ CPU/内存/Token 仪表盘 + 历史趋势图 |
-| 系统设置 | `/settings` | 通知开关 + 数据源状态 |
+| 系统信息 | `/monitor` | CPU/内存/Token 仪表盘 + 历史趋势图 + 系统设置入口 |
 | 记忆图谱 | `/hindsight` | ★ Hindsight 知识图谱 — Canvas 力导向图, 悬浮/点击探索节点关系 |
 
 ### 指挥中心 (2026-05-16 Codex 升级)
@@ -55,7 +54,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 Market API 新增字段：
 - `multi_asset[]` — A股/黄金ETF/10Y国债/SHIBOR 实时卡片+42日趋势线
 - `macro[]` — GDP/PMI/CPI/SHIBOR 宏观快照
-- `strategy_matrix[]` — 4策略买比/评分/Top1标的
+- `strategy_matrix[]` — 已注册策略的买比/评分/Top1标的
 - `alerts[]` — 智能预警 (regime/PMI偏离/黄金波动/策略完成)
 - `freshness` — 数据新鲜度时间戳
 

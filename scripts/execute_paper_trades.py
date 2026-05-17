@@ -26,7 +26,7 @@ from __future__ import annotations
 import sys
 import os
 from pathlib import Path
-from datetime import date, timedelta, datetime
+from datetime import date
 from typing import Dict, List, Tuple, Optional
 import argparse
 
@@ -85,21 +85,24 @@ def _get_close_prices(symbols: List[str], target_date: Optional[date] = None) ->
 
 # ── 信号读取 ──
 
-def _read_latest_signals() -> Dict[str, List[Tuple[str, str, int]]]:
+def _read_latest_signals() -> Dict[str, List[Tuple[str, str, float]]]:
     """
     读取各策略最新信号。
-    Returns: {strategy: [(code, side, shares), ...]}
+    Returns: {strategy: [(code, side, score), ...]}
     信号 parquet 使用 computed_at 列 (ISO格式), 取最新批次。
     """
     cfg = load_config()
     strategies = cfg.get("strategies", {})
+    paper_cfg = cfg.get("paper_trading", {})
+    max_per_strategy = int(paper_cfg.get("max_orders_per_strategy", 5))
 
-    result: Dict[str, List[Tuple[str, str, int]]] = {}
+    result: Dict[str, List[Tuple[str, str, float]]] = {}
 
     for strategy_name, strategy_cfg in strategies.items():
         if not strategy_cfg.get("enabled", True):
             continue
-        sig_file = HUB.signal_path(strategy_name)
+        signal_name = strategy_cfg.get("signal_name", strategy_name)
+        sig_file = HUB.signal_path(signal_name)
         if not sig_file.exists():
             continue
         try:
@@ -111,16 +114,20 @@ def _read_latest_signals() -> Dict[str, List[Tuple[str, str, int]]]:
             signal_col = df["signal"].astype(str).str.lower()
             buys = df[signal_col.isin(["buy", "strong_buy"])]
             sells = df[signal_col.isin(["sell", "strong_sell"])]
+            if "score" in buys.columns:
+                buys = buys.sort_values("score", ascending=False)
+            if max_per_strategy > 0:
+                buys = buys.head(max_per_strategy)
 
             items = []
             for _, row in buys.iterrows():
                 code = str(row.get("symbol", row.get("code", "")))
                 code = code.split(".")[0] if "." in code else code
-                items.append((code, "buy", 100))
+                items.append((code, "buy", float(row.get("score", 0) or 0)))
             for _, row in sells.iterrows():
                 code = str(row.get("symbol", row.get("code", "")))
                 code = code.split(".")[0] if "." in code else code
-                items.append((code, "sell", 100))
+                items.append((code, "sell", float(row.get("score", 0) or 0)))
 
             if items:
                 result[strategy_name] = items
@@ -128,6 +135,26 @@ def _read_latest_signals() -> Dict[str, List[Tuple[str, str, int]]]:
             print(f"  ⚠ 读取 {strategy_name} 信号失败: {e}")
 
     return result
+
+
+def _calc_order_volume(broker: PaperBroker, code: str, side: str, price: float, paper_cfg: dict) -> int:
+    lot_size = int(paper_cfg.get("lot_size", 100))
+    lot_size = max(1, lot_size)
+
+    if side == "sell":
+        pos = broker._positions.get(code)
+        if not pos:
+            return 0
+        if paper_cfg.get("sell_all_on_sell_signal", True):
+            return int(pos.volume // lot_size) * lot_size
+        configured = int(paper_cfg.get("sell_shares", lot_size))
+        return min(pos.volume, int(configured // lot_size) * lot_size)
+
+    balance = broker.get_balance()
+    order_value_pct = float(paper_cfg.get("order_value_pct", 0.05))
+    max_order_value = float(paper_cfg.get("max_order_value", balance.total_asset * order_value_pct))
+    budget = min(balance.total_asset * order_value_pct, broker._cash, max_order_value)
+    return int(budget / max(price, 1e-9) // lot_size) * lot_size
 
 
 # ── 主逻辑 ──
@@ -176,6 +203,8 @@ def execute_daily(run_date: Optional[date] = None, dry_run: bool = False,
         )
 
     # 2) 获取价格
+    cfg = load_config()
+    paper_cfg = cfg.get("paper_trading", {})
     all_symbols = list(broker._positions.keys())
     signals = _read_latest_signals()
     for strat_name, items in signals.items():
@@ -191,7 +220,9 @@ def execute_daily(run_date: Optional[date] = None, dry_run: bool = False,
     total_trades = 0
     trade_count = 0
     for strat_name, items in signals.items():
-        for code, side, shares in items:
+        if limit > 0 and trade_count >= limit:
+            break
+        for code, side, score in items:
             if limit > 0 and trade_count >= limit:
                 break
             if code not in prices:
@@ -199,11 +230,17 @@ def execute_daily(run_date: Optional[date] = None, dry_run: bool = False,
                 continue
 
             price = prices[code]
+            shares = _calc_order_volume(broker, code, side, price, paper_cfg)
+            if shares <= 0:
+                print(f"  ⚠ {code} 无可执行数量，跳过")
+                continue
             amount = price * shares
 
-            print(f"  {'买' if side == 'buy' else '卖'} {code} {shares}股 @{price:.2f} [{strat_name}]")
+            print(f"  {'买' if side == 'buy' else '卖'} {code} {shares}股 @{price:.2f} score={score:.1f} [{strat_name}]")
 
             if dry_run:
+                total_trades += 1
+                trade_count += 1
                 continue
 
             result = broker.submit_order(code=code, price=price, volume=shares, side=side)

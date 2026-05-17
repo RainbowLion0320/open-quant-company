@@ -1,7 +1,7 @@
 ---
 title: Wiki Log
 created: 2026-05-13
-updated: 2026-05-16
+updated: 2026-05-18
 type: meta
 tags: [log]
 ---
@@ -9,6 +9,12 @@ tags: [log]
 # Wiki Log
 
 > 操作日志。追加模式。
+
+## [2026-05-18] refactor | 架构治理修正 — wiki 去动态事实
+- system-architecture.md: 移除版本/策略数量/因子数量/phase状态等易过期事实，改为引用代码和运行产物。
+- ml-pipeline.md: 改写为稳定方法论文档，不再复制当前 IC、因子数量、cron id。
+- ai-automation-roadmap.md: 改写为晋级门槛和优先级文档，不再保存当前进度表。
+- web-architecture.md: 修正系统信息路由，移除已不存在的 `/settings` 页面描述。
 
 ## [2026-05-17] audit | 项目地毯式审视 — 身份统一+config清理
 - 项目标题: "Quant Agent — 个人A股量化交易系统 — 日频 · 自托管 · AI增强"

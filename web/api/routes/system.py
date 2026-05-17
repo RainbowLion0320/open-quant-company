@@ -1,6 +1,7 @@
 """系统活动监视器 — SQLite 时序库 + 历史趋势"""
 from fastapi import APIRouter, Query
 import sqlite3
+import psutil
 
 from data.datahub import get_datahub
 
@@ -33,6 +34,18 @@ def _read_token():
     return HUB.read_json(TOKEN_CACHE, default)
 
 
+def _live_system_totals() -> dict:
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+    return {
+        "cores_physical": psutil.cpu_count(logical=False) or psutil.cpu_count() or 0,
+        "cores_logical": psutil.cpu_count() or 0,
+        "memory_total_gb": round(mem.total / 1024**3, 1),
+        "disk_total_gb": round(disk.total / 1024**3, 1),
+        "disk_used_gb": round(disk.used / 1024**3, 1),
+    }
+
+
 @router.get("/monitor")
 async def system_monitor():
     """当前快照 (读最新一行 SQLite)"""
@@ -43,23 +56,24 @@ async def system_monitor():
         return {"status": "no_data"}
     r = rows[0]
     token = _read_token()
+    totals = _live_system_totals()
 
     return {
         "timestamp": r["ts"],
         "cpu": {
             "percent": r["cpu_pct"],
-            "cores_physical": 10,
-            "cores_logical": 10,
+            "cores_physical": totals["cores_physical"],
+            "cores_logical": totals["cores_logical"],
             "load_avg": [r["load_1m"], r["load_5m"], r["load_15m"]],
         },
         "memory": {
-            "total_gb": 16.0,
+            "total_gb": totals["memory_total_gb"],
             "used_gb": r["mem_used_gb"],
             "percent": r["mem_pct"],
         },
         "disk": {
-            "total_gb": 460.4,
-            "used_gb": 11.7,
+            "total_gb": totals["disk_total_gb"],
+            "used_gb": totals["disk_used_gb"],
             "percent": r["disk_pct"],
         },
         "battery": {

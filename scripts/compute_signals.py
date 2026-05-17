@@ -324,7 +324,8 @@ def compute_cybernetic(limit: int = 0) -> list[dict]:
 
 
 def main():
-    from data.registry import get_enabled_strategies, list_strategy_names
+    from data.registry import list_strategy_names
+    from data.strategy_plugins import run_registered_strategies
 
     parser = argparse.ArgumentParser()
     all_names = list_strategy_names()
@@ -340,50 +341,7 @@ def main():
     reset_db()  # 清除可能持有的只读连接，获取写锁
     init()
 
-    # ── 策略→计算函数映射 ──
-    _compute_map = {
-        "buffett": (compute_buffett, save_buffett_results, get_buffett_meta, "buffett"),
-        "multifactor": (compute_multifactor, None, None, "multifactor"),
-        "cybernetic": (compute_cybernetic, None, None, "cybernetic"),
-        "ml_lgbm": (compute_ml, None, None, "ml_lgbm"),
-    }
-
-    for s in get_enabled_strategies():
-        name = s["name"]
-        label = s["label"]
-
-        if args.strategy != 'all' and args.strategy != name:
-            continue
-
-        entry = _compute_map.get(name)
-        if entry is None:
-            print(f"\n── {label} ──\n  跳过: 无计算函数")
-            continue
-
-        compute_fn, save_fn, meta_fn, sig_name = entry
-        print(f"\n── {label} ──")
-        results = compute_fn(limit=args.limit)
-
-        # 特殊处理: buffett 同时写入 buffett_results 和 strategy_signals
-        if save_fn:
-            save_fn(results)
-            if meta_fn:
-                meta = meta_fn()
-                print(f"  Saved: {meta['total']} stocks, {meta['passed']} passed")
-
-        # 写入 strategy_signals
-        if name == "buffett":
-            signals = []
-            for r in results:
-                passed = "通过" in r["verdict"] or "✅" in r["verdict"]
-                signals.append({
-                    "symbol": r["symbol"], "name": r["name"], "industry": r["industry"],
-                    "score": r["score"], "signal": "buy" if passed else "hold",
-                    "detail": {"verdict": r["verdict"], "safe_margin": r["safety_margin"], "roe": r["roe"]}
-                })
-        else:
-            signals = results  # multifactor/cybernetic already return signal format
-        save_strategy_signals(sig_name, signals)
+    run_registered_strategies(args.strategy, limit=args.limit)
 
     elapsed = time.time() - start
     print(f"\nTotal: {elapsed:.0f}s")

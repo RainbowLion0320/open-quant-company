@@ -14,7 +14,7 @@
       <div class="setting-row">
         <div>
           <strong>启用信号推送</strong>
-          <span>每日 15:30 扫描后推送信号变更到 @buffett0320_bot</span>
+          <span>{{ notificationText }}</span>
         </div>
         <button @click="toggleNotify"
           class="settings-toggle"
@@ -29,17 +29,13 @@
     <div class="glass-card card-pad-lg">
       <div class="section-heading mb-4">数据源</div>
       <div class="settings-list">
-        <div>
-          <span>AKShare</span>
-          <span class="badge badge-green">正常</span>
+        <div v-for="src in sourceItems" :key="src.name">
+          <span>{{ src.name }}</span>
+          <span :class="['badge', sourceBadgeClass(src.status)]">{{ src.summary }}</span>
         </div>
-        <div>
-          <span>Tushare MCP</span>
-          <span class="badge badge-green">正常</span>
-        </div>
-        <div>
-          <span>Parquet 存储</span>
-          <span class="badge badge-green">正常</span>
+        <div v-if="sourceItems.length === 0">
+          <span>Registry</span>
+          <span class="badge badge-muted">暂无配置</span>
         </div>
       </div>
     </div>
@@ -50,31 +46,31 @@
       <div class="settings-info-grid">
         <div>
           <span>版本</span>
-          <strong>v5.1 Quantum Terminal</strong>
+          <strong>{{ versionText }}</strong>
         </div>
         <div>
-          <span>API 端口</span>
-          <strong>8501</strong>
+          <span>API 路由</span>
+          <strong>/api</strong>
         </div>
         <div>
           <span>股票池</span>
-          <strong>5204 只</strong>
+          <strong>{{ stockUniverseText }}</strong>
         </div>
         <div>
           <span>策略数</span>
-          <strong>4 active</strong>
+          <strong>{{ strategyCountText }}</strong>
         </div>
         <div>
-          <span>因子数</span>
-          <strong>35+</strong>
+          <span>特征策略</span>
+          <strong>{{ featurePolicyText }}</strong>
         </div>
         <div>
           <span>ML 模型</span>
-          <strong>LightGBM · Regime-aware</strong>
+          <strong>{{ mlModeText }}</strong>
         </div>
         <div>
-          <span>Cron</span>
-          <strong>每交易日 15:30 CST</strong>
+          <span>模拟交易</span>
+          <strong>{{ paperExecutionText }}</strong>
         </div>
       </div>
     </div>
@@ -82,10 +78,63 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, onMounted } from "vue";
+import { computed, reactive, onMounted } from "vue";
 import { api } from "../api";
 
 const settings = reactive<Record<string, any>>({});
+
+const versionText = computed(() => {
+  const version = settings.project?.version;
+  return version ? `v${version} Quantum Terminal` : "Quantum Terminal";
+});
+const stockUniverseText = computed(() => {
+  const stock = settings.assets?.stock || {};
+  return String(stock.universe || stock.label || "—");
+});
+const strategyCountText = computed(() => {
+  const strategies = Object.values(settings.strategies || {}).filter((item: any) => item?.enabled !== false);
+  return strategies.length ? `${strategies.length} active` : "—";
+});
+const featurePolicyText = computed(() => {
+  const months = Number(settings.ml?.max_feature_age_months);
+  if (settings.ml?.allow_stale_features) return "stale allowed";
+  return Number.isFinite(months) && months > 0 ? `fresh ≤ ${months}m` : "fresh only";
+});
+const mlModeText = computed(() => settings.ml?.use_regime_models ? "LightGBM · regime-aware" : "LightGBM");
+const paperExecutionText = computed(() => settings.paper_trading?.auto_execute ? "auto execute" : "manual execute");
+const notificationText = computed(() => {
+  const enabled = settings.trading?.notification?.enabled ? "已启用" : "已关闭";
+  const changeOnly = settings.trading?.notification?.signal_change_only !== false ? "仅信号变化" : "全部信号";
+  return `Telegram ${enabled} · ${changeOnly}`;
+});
+const sourceItems = computed(() => {
+  const registry = settings.data_registry || {};
+  const grouped: Record<string, { name: string; total: number; enabled: number; status: string }> = {};
+  const labels: Record<string, string> = {
+    akshare: "AKShare",
+    tushare_free: "Tushare Free",
+    tushare_mcp: "Tushare MCP",
+    parquet: "Parquet",
+    duckdb: "DuckDB",
+  };
+  for (const entry of Object.values(registry) as any[]) {
+    const key = String(entry?.source || "local");
+    grouped[key] = grouped[key] || { name: labels[key] || key, total: 0, enabled: 0, status: "available" };
+    grouped[key].total += 1;
+    if (entry?.enabled !== false) grouped[key].enabled += 1;
+    if (entry?.enabled !== false && entry?.status && entry.status !== "available") grouped[key].status = String(entry.status);
+  }
+  return Object.values(grouped)
+    .sort((a, b) => b.enabled - a.enabled || a.name.localeCompare(b.name))
+    .slice(0, 6)
+    .map(item => ({ ...item, summary: item.enabled ? `${item.enabled}/${item.total} dims` : "disabled" }));
+});
+
+function sourceBadgeClass(status: string): string {
+  if (status === "available") return "badge-green";
+  if (status === "rate_limited") return "badge-amber";
+  return "badge-muted";
+}
 
 async function toggleNotify() {
   const enabled = !settings.trading?.notification?.enabled;
@@ -169,6 +218,11 @@ onMounted(async () => {
 .settings-list span:first-child {
   color: var(--text-primary);
   font-size: 13px;
+}
+.settings-list .badge-muted {
+  color: var(--text-disabled);
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(148, 163, 184, 0.08);
 }
 .settings-info-grid {
   display: grid;

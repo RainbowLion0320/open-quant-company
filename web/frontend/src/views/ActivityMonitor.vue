@@ -153,7 +153,7 @@
         <div class="settings-row main">
           <div>
             <strong>信号推送</strong>
-            <span>每日 15:30 → @buffett0320_bot</span>
+            <span>{{ notificationText }}</span>
           </div>
           <button @click="toggleNotify"
             class="toggle-switch"
@@ -167,10 +167,11 @@
           <span>DATA SOURCES</span>
         </div>
         <div class="source-list">
-          <div><span>AKShare</span><em class="badge-ok">正常</em></div>
-          <div><span>Tushare MCP</span><em class="badge-ok">正常</em></div>
-          <div><span>Hindsight (pg0)</span><em class="badge-ok">正常</em></div>
-          <div><span>Parquet / DuckDB</span><em class="badge-ok">正常</em></div>
+          <div v-for="src in sourceItems" :key="src.name">
+            <span>{{ src.name }}</span>
+            <em :class="['source-badge', sourceBadgeClass(src.status)]">{{ src.summary }}</em>
+          </div>
+          <div v-if="sourceItems.length === 0"><span>Registry</span><em class="source-badge muted">暂无配置</em></div>
         </div>
       </div>
       <div class="glass-card settings-card">
@@ -178,12 +179,12 @@
           <span>SYSTEM INFO</span>
         </div>
         <div class="info-grid">
-          <div><span>Version</span><strong>v5.1 Quantum Terminal</strong></div>
-          <div><span>API Port</span><strong>8501</strong></div>
-          <div><span>Pool</span><strong>5204 stocks</strong></div>
-          <div><span>Strategies</span><strong>4 active</strong></div>
-          <div><span>Factors</span><strong>35+</strong></div>
-          <div><span>Cron</span><strong>15:30 CST</strong></div>
+          <div><span>Version</span><strong>{{ versionText }}</strong></div>
+          <div><span>API Route</span><strong>/api</strong></div>
+          <div><span>Universe</span><strong>{{ stockUniverseText }}</strong></div>
+          <div><span>Strategies</span><strong>{{ strategyCountText }}</strong></div>
+          <div><span>Features</span><strong>{{ featurePolicyText }}</strong></div>
+          <div><span>Paper</span><strong>{{ paperExecutionText }}</strong></div>
         </div>
       </div>
     </section>
@@ -223,6 +224,59 @@ const dsCostRef = ref<HTMLCanvasElement | null>(null);
 const dsTotals = ref<{ pro: number; flash: number; cost: number } | null>(null);
 
 const sysSettings = reactive<Record<string, any>>({});
+
+const versionText = computed(() => {
+  const version = sysSettings.project?.version;
+  return version ? `v${version} Quantum Terminal` : "Quantum Terminal";
+});
+const stockUniverseText = computed(() => {
+  const stock = sysSettings.assets?.stock || {};
+  return String(stock.universe || stock.label || "—");
+});
+const strategyCountText = computed(() => {
+  const strategies = Object.values(sysSettings.strategies || {}).filter((item: any) => item?.enabled !== false);
+  return strategies.length ? `${strategies.length} active` : "—";
+});
+const featurePolicyText = computed(() => {
+  const months = Number(sysSettings.ml?.max_feature_age_months);
+  if (sysSettings.ml?.allow_stale_features) return "stale allowed";
+  return Number.isFinite(months) && months > 0 ? `fresh ≤ ${months}m` : "fresh only";
+});
+const paperExecutionText = computed(() => sysSettings.paper_trading?.auto_execute ? "auto execute" : "manual execute");
+const notificationText = computed(() => {
+  const enabled = sysSettings.trading?.notification?.enabled ? "enabled" : "disabled";
+  const changeOnly = sysSettings.trading?.notification?.signal_change_only !== false ? "signal changes" : "all signals";
+  return `Telegram ${enabled} · ${changeOnly}`;
+});
+const sourceItems = computed(() => {
+  const registry = sysSettings.data_registry || {};
+  const grouped: Record<string, { name: string; total: number; enabled: number; status: string }> = {};
+  const labels: Record<string, string> = {
+    akshare: "AKShare",
+    tushare_free: "Tushare Free",
+    tushare_mcp: "Tushare MCP",
+    parquet: "Parquet",
+    duckdb: "DuckDB",
+  };
+  for (const entry of Object.values(registry) as any[]) {
+    const key = String(entry?.source || "local");
+    grouped[key] = grouped[key] || { name: labels[key] || key, total: 0, enabled: 0, status: "available" };
+    grouped[key].total += 1;
+    if (entry?.enabled !== false) grouped[key].enabled += 1;
+    if (entry?.enabled !== false && entry?.status && entry.status !== "available") grouped[key].status = String(entry.status);
+  }
+  return Object.values(grouped)
+    .sort((a, b) => b.enabled - a.enabled || a.name.localeCompare(b.name))
+    .slice(0, 5)
+    .map(item => ({ ...item, summary: item.enabled ? `${item.enabled}/${item.total} dims` : "disabled" }));
+});
+
+function sourceBadgeClass(status: string): string {
+  if (status === "available") return "ok";
+  if (status === "rate_limited") return "limited";
+  if (status === "paid") return "paid";
+  return "muted";
+}
 
 async function toggleNotify() {
   const enabled = !sysSettings.trading?.notification?.enabled;
@@ -672,14 +726,25 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 .toggle-switch.active span { left: 20px; }
 
 /* ── Badge / Icon ── */
-.badge-ok {
+.source-badge {
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 3px;
-  background: rgba(16,185,129,0.15);
-  color: #10b981;
   font-style: normal;
   white-space: nowrap;
+}
+.source-badge.ok {
+  background: rgba(16,185,129,0.15);
+  color: #10b981;
+}
+.source-badge.limited {
+  background: rgba(245,158,11,0.14);
+  color: #f59e0b;
+}
+.source-badge.paid,
+.source-badge.muted {
+  background: rgba(148,163,184,0.12);
+  color: var(--text-disabled);
 }
 .tag-badge {
   font-size: 9px;

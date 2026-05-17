@@ -1,7 +1,7 @@
 ---
 title: Wiki Index
 created: 2026-05-13
-updated: 2026-05-16
+updated: 2026-05-18
 type: meta
 tags: [index]
 ---
@@ -9,10 +9,10 @@ tags: [index]
 # Wiki Index
 
 > Quant Agent — 个人A股量化交易系统知识库。每行 = wikilink + 一句话概括。
-> Last updated: 2026-05-17 | Total pages: 17 ( + log + schema )
+> This index lists stable knowledge pages. Current counts, metrics, and phase status live in code/config/data outputs, not in wiki prose.
 
 ## Concepts
-- [[system-architecture]] — **系统架构总览**：多层正交设计，4策略注册表，35+因子体系，多资产架构，数据注册表
+- [[system-architecture]] — **系统架构总览**：多层正交设计，策略运行入口，多资产架构，数据注册表
 - [[ml-pipeline]] — **ML 管道** ★：因子DSL→PIT特征→LightGBM→锦标赛→LLM因子发现，enrich_from_registry
 - [[buffett-filter]] — 三重过滤器：能力圈→护城河→安全边际
 - [[buffett-rolling-backtest]] — 滚动回测：按年重新过滤，消除前视偏差
@@ -29,7 +29,7 @@ tags: [index]
 - [[tushare-mcp]] — Tushare MCP，258工具，2000积分（门槛制，不消耗）
 
 ## Decisions
-- [[ai-automation-roadmap]] — **AI自动化路线图** ★：Phase 4.2 LLM多轮迭代+OOS+自注入库
+- [[ai-automation-roadmap]] — **AI自动化路线图** ★：LLM多轮迭代、OOS验证、自注入库的方法论
 - [[duckdb-migration]] — SQLite→DuckDB→Parquet 三阶段演进
 - [[datahub]] — DataHub 数据中台：统一路径、原子写入、最新批次、存储审计
 - [[web-architecture]] — Vue 3 + FastAPI，Quantum Terminal v4.0 设计系统

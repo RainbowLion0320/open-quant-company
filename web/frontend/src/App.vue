@@ -28,7 +28,7 @@
 
       <div class="core-status">
         <span>CORE</span>
-        <strong>v5.1</strong>
+        <strong>{{ coreVersion }}</strong>
       </div>
     </aside>
 
@@ -127,6 +127,10 @@ const regimeColor = computed(() => {
   if (regime.value.value === "bull") return "var(--positive)";
   if (regime.value.value === "bear") return "var(--negative)";
   return "var(--warning)";
+});
+const coreVersion = computed(() => {
+  const version = (marketMeta.value.config as any)?.project?.version;
+  return version ? `v${version}` : "v—";
 });
 
 function tickClock() {

@@ -82,6 +82,30 @@ def _load_model_bundle(model_version: str = "best") -> tuple[object | None, list
     return None, [], {"selected_regime": regime, "selected_model": "missing"}, "missing"
 
 
+def _feature_age_months(month: str) -> int:
+    try:
+        feature_period = pd.Period(month, freq="M")
+        current_period = pd.Timestamp.today().to_period("M")
+        return int(current_period.ordinal - feature_period.ordinal)
+    except Exception:
+        return 9999
+
+
+def _latest_feature_file(cfg: dict) -> tuple[Path | None, str]:
+    pq_files = sorted(p for p in FEATURES_DIR.glob("*.parquet") if p.stem[:4].isdigit())
+    if not pq_files:
+        return None, "missing"
+
+    latest = pq_files[-1]
+    latest_month = latest.stem
+    age = _feature_age_months(latest_month)
+    max_age = int(cfg.get("max_feature_age_months", 3))
+    allow_stale = bool(cfg.get("allow_stale_features", False))
+    if age > max_age and not allow_stale:
+        return None, f"stale:{latest_month}:{age}m>{max_age}m"
+    return latest, latest_month
+
+
 def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict]:
     """
     用训练好的 LightGBM 模型计算全量 ML 信号。
@@ -94,6 +118,7 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
         信号列表 [{symbol, name, industry, score, signal, detail}]
     """
     # 1. 加载模型
+    cfg = _load_settings().get("ml", {})
     model, feature_names, meta, selected_model = _load_model_bundle(model_version)
 
     if model is None:
@@ -110,12 +135,11 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
         symbols = symbols[:limit]
 
     # 3. 加载最新的特征文件 (最近一个月)
-    pq_files = sorted(FEATURES_DIR.glob("*.parquet"))
-    if not pq_files:
-        print("[ML] ⚠️ 无 PIT 特征文件, 请先运行 build_features.py")
+    latest_feature_path, feature_status = _latest_feature_file(cfg)
+    if latest_feature_path is None:
+        print(f"[ML] ⚠️ PIT 特征不可用 ({feature_status}), 请先运行 build_features.py")
         return []
 
-    latest_feature_path = pq_files[-1]
     latest_month = latest_feature_path.stem
     print(f"[ML] 使用特征: {latest_month}")
     try:
@@ -139,10 +163,14 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
     factors = alpha_factors()
     signals = []
     total = len(symbols)
+    live_fallback = bool(cfg.get("allow_live_factor_fallback", False))
+    missing_feature_rows = 0
+    fallback_rows = 0
 
     for i, sym in enumerate(symbols):
         try:
             features = {}
+            used_fallback = False
             if sym in feature_df.index:
                 row = feature_df.loc[sym]
                 for name in feature_names:
@@ -153,6 +181,11 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
                         num = 0.0
                     features[name] = num if np.isfinite(num) else 0.0
             else:
+                missing_feature_rows += 1
+                if not live_fallback:
+                    continue
+                fallback_rows += 1
+                used_fallback = True
                 df = get_stock_daily(sym)
                 if df is None or len(df) < 60:
                     continue
@@ -187,6 +220,8 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
                     "pred_raw": round(float(pred), 4),
                     "model": selected_model,
                     "regime": meta.get("selected_regime", ""),
+                    "feature_month": latest_month,
+                    "feature_source": "live_fallback" if used_fallback else "feature_store",
                 },
             })
 
@@ -197,7 +232,13 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
             buys = sum(1 for s in signals if s["signal"] == "buy")
             print(f"  ML [{i+1}/{total}] {buys} buys")
 
-    score_scale = _load_settings().get("ml", {}).get("score_scale", 5.0)
+    if missing_feature_rows:
+        print(
+            f"[ML] 特征覆盖: {len(signals)} scored, "
+            f"{missing_feature_rows} symbols missing store rows, {fallback_rows} live fallback"
+        )
+
+    score_scale = cfg.get("score_scale", 5.0)
     if score_scale != 5.0:
         for s in signals:
             pred = float((s.get("detail") or {}).get("pred_raw", 0.0))

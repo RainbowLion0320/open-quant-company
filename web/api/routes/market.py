@@ -267,6 +267,7 @@ async def market_overview():
             "macro": max([m.get("date", "") for m in macro] or [""]),
         },
         "config": {
+            "project": cfg.get("project", {}),
             "buffett": cfg.get("buffett", {}),
             "cybernetics": cfg.get("cybernetics", {}),
             "multifactor": cfg.get("signals", {}).get("multifactor", {}),

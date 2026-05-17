@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Quick test for new modules"""
 import sys, os
-sys.path.insert(0, os.path.expanduser('~/quant-agent'))
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import py_compile
 

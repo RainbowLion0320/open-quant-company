@@ -3,8 +3,8 @@
 覆盖: factors.py, analytics.py, pipeline.py, broker/, db.py
 """
 import sys, os
-sys.path.insert(0, os.path.expanduser('~/quant-agent'))
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import tempfile
 
 import numpy as np

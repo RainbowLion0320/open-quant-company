@@ -289,6 +289,9 @@ signal_selection:
 ml:
   use_regime_models: true
   score_scale: 5.0
+  max_feature_age_months: 3
+  allow_stale_features: false
+  allow_live_factor_fallback: false
 # ★ Multi-asset architecture (Phase 4.1)
 # Register all asset types. New types just add entries here.
 # Adapters: data/assets/stock.py, data/assets/fund.py, etc.
@@ -360,20 +363,29 @@ strategies:
     config_key: buffett
     enabled: true
     label: 巴菲特价值精选
+    runner: scripts.compute_signals:compute_buffett
+    signal_name: buffett
   cybernetic:
     color: '#f59e0b'
     config_key: cybernetics
     enabled: true
     label: 控制论自适应
+    runner: scripts.compute_signals:compute_cybernetic
+    signal_name: cybernetic
   multifactor:
     color: '#10b981'
     config_key: signals.multifactor
     enabled: true
+    label: 多因子月度调仓
+    runner: scripts.compute_signals:compute_multifactor
+    signal_name: multifactor
   ml_lgbm:
     color: '#8b5cf6'
     config_key: ml
     enabled: true
     label: LightGBM ML
+    runner: signals.ml_signals:compute_ml_signals
+    signal_name: ml_lgbm
 trading:
   # 实际交易费率 (用于成本估算)
   commission:
@@ -397,6 +409,11 @@ paper_trading:
   t_plus_1: true                  # T+1限制
   risk_enabled: true              # 启用RiskManager预检
   store_dir: data/store/paper     # 持久化存储目录
+  lot_size: 100
+  order_value_pct: 0.05           # 单个buy信号最多使用总资产5%
+  max_order_value: 50000          # 单个buy信号最多5万元
+  max_orders_per_strategy: 5      # 每个策略每天最多执行前N个信号
+  sell_all_on_sell_signal: true
   strategies:                     # 参与模拟交易的策略
     - buffett
     - multifactor

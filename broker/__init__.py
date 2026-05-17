@@ -209,15 +209,17 @@ class PaperBroker(Broker):
                 reasons = "; ".join(r.reason for r in failed)
                 return f"风控拒绝: {reasons}"
 
-        # T+1 检查：当日买入的不可卖
-        if self.t_plus_1 and side == "sell":
-            bought_today = self._today_buys.get(code, 0)
+        # 卖出检查：任何模式下都不能卖超过可用持仓；T+1 模式需扣除当日买入。
+        if side == "sell":
             pos = self._positions.get(code)
-            available = (pos.volume if pos else 0) - bought_today
+            bought_today = self._today_buys.get(code, 0) if self.t_plus_1 else 0
+            available = max(0, (pos.volume if pos else 0) - bought_today)
             if volume > available:
                 volume = available
                 if volume <= 0:
-                    return f"T+1限制: {code} 当日买入不可卖出"
+                    if self.t_plus_1 and bought_today:
+                        return f"T+1限制: {code} 当日买入不可卖出"
+                    return f"持仓不足: {code}"
 
         order_id = self._next_order_id()
         order = Order(

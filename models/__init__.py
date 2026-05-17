@@ -20,6 +20,7 @@ import json
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 from data.db import get_store_dir
 
@@ -41,27 +42,37 @@ class BaseModel:
     def evaluate(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         """评估: IC Rank, ICIR"""
         preds = self.predict(X)
+        y_aligned = y.reindex(X.index) if hasattr(y, "reindex") else pd.Series(y, index=X.index)
+
+        valid = pd.Series(preds, index=X.index).replace([np.inf, -np.inf], np.nan).notna()
+        valid &= y_aligned.replace([np.inf, -np.inf], np.nan).notna()
+        if valid.sum() < 2:
+            return {"ic": 0.0, "icir": 0.0}
+        preds_valid = np.asarray(preds)[valid.to_numpy()]
+        y_valid = y_aligned.loc[valid]
 
         # IC Rank
         from scipy.stats import spearmanr
-        ic, _ = spearmanr(preds, y)
+        ic, _ = spearmanr(preds_valid, y_valid)
         ic = ic if not np.isnan(ic) else 0.0
 
         # 月度 IC 序列
         if hasattr(X, 'index') and isinstance(X.index, pd.DatetimeIndex):
             monthly_ic = []
-            for month, idx in X.groupby(X.index.to_period("M")).groups.items():
-                if len(idx) >= 5:
-                    p = preds[list(idx)]
-                    y_m = y.iloc[list(idx)]
+            pred_series = pd.Series(preds, index=X.index)
+            eval_df = pd.DataFrame({"pred": pred_series, "target": y_aligned}).replace([np.inf, -np.inf], np.nan).dropna()
+            for _, group in eval_df.groupby(eval_df.index.to_period("M")):
+                if len(group) >= 5:
+                    p = group["pred"]
+                    y_m = group["target"]
                     ic_m, _ = spearmanr(p, y_m)
                     if not np.isnan(ic_m):
                         monthly_ic.append(ic_m)
-            icir = np.mean(monthly_ic) / (np.std(monthly_ic) + 1e-9) if monthly_ic else 0.0
+            icir = np.mean(monthly_ic) / (np.std(monthly_ic) + 1e-9) if len(monthly_ic) >= 2 else 0.0
         else:
             icir = 0.0
 
-        return {"ic": ic, "icir": icir}
+        return {"ic": float(ic), "icir": float(icir)}
 
     def save(self, version: str = ""):
         """保存模型"""
@@ -201,16 +212,19 @@ def prepare_xy(
 
     注意: 需要外部确保 target_col 不是前视的(PIT 约束)。
     """
+    if target_col not in features_df.columns:
+        raise KeyError(f"target column not found: {target_col}")
+
     if skip_cols is None:
         skip_cols = ["symbol", "date", "month", "name", target_col]
 
-    cols = [c for c in features_df.columns if c not in skip_cols]
-    # 只保留数值列
-    numeric_cols = []
-    for c in cols:
-        if features_df[c].dtype in ('float64', 'float32', 'int64', 'int32', 'bool'):
-            numeric_cols.append(c)
-    X = features_df[numeric_cols].fillna(0)
-    y = features_df[target_col].fillna(0)
+    df = features_df.copy()
+    df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
+    df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=[target_col])
+
+    cols = [c for c in df.columns if c not in skip_cols]
+    numeric_cols = [c for c in cols if is_numeric_dtype(df[c])]
+    X = df[numeric_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
+    y = df[target_col]
 
     return X, y

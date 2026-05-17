@@ -33,6 +33,8 @@ def load_registry(force_reload: bool = False) -> List[Dict]:
             "label": v.get("label", name),
             "color": v.get("color", "#7170ff"),
             "config_key": v.get("config_key", name),
+            "runner": v.get("runner", ""),
+            "signal_name": v.get("signal_name", name),
             "enabled": v.get("enabled", True),
         }
         for name, v in raw.items()
