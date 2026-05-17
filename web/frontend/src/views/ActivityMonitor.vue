@@ -8,7 +8,7 @@
       </div>
 
       <!-- CPU + Memory + Disk row -->
-      <div class="grid grid-cols-3 gap-3 mb-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         <div class="metric-card">
           <div class="text-2xs" style="color:var(--text-disabled)">CPU</div>
           <div class="flex items-baseline gap-1">
@@ -36,7 +36,7 @@
       </div>
 
       <!-- Battery + Load -->
-      <div class="grid grid-cols-2 gap-3 mb-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
         <div class="metric-card">
           <div class="text-2xs" style="color:var(--text-disabled)">电池</div>
           <div class="flex items-center gap-1">
@@ -46,8 +46,8 @@
         </div>
         <div class="metric-card">
           <div class="text-2xs" style="color:var(--text-disabled)">系统负载</div>
-          <div class="text-sm font-mono" style="color:var(--text-secondary)">
-            <span v-for="(l, i) in data?.cpu.load_avg ?? []" :key="i" class="mr-2">{{ l }}</span>
+          <div class="load-values text-sm font-mono" style="color:var(--text-secondary)">
+            <span v-for="(l, i) in data?.cpu.load_avg ?? []" :key="i">{{ l }}</span>
           </div>
         </div>
       </div>
@@ -55,7 +55,7 @@
       <!-- Token Usage -->
       <div class="metric-card p-4 mb-4" style="border-left:2px solid var(--accent)">
         <div class="text-2xs mb-2" style="color:var(--text-disabled)">今日 Token 用量</div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <div class="text-2xs" style="color:var(--text-disabled)">Hermes 会话</div>
             <div class="text-xs font-mono mt-0.5" style="color:var(--text-secondary)">
@@ -86,23 +86,32 @@
       <!-- Top Processes -->
       <div>
         <div class="text-2xs mb-2" style="color:var(--text-disabled)">高占用进程</div>
-        <table class="w-full text-xs">
-          <thead><tr style="color:var(--text-disabled)"><th class="text-left font-normal">进程</th><th class="text-right font-normal w-16">CPU</th><th class="text-right font-normal w-16">内存</th></tr></thead>
-          <tbody>
-            <tr v-for="p in data?.top_processes ?? []" :key="p.pid" class="border-t" style="border-color:var(--border-subtle)">
-              <td class="py-1 font-mono" style="color:var(--text-secondary)">{{ p.name }}</td>
-              <td class="py-1 text-right font-mono" style="color:var(--text-secondary)">{{ p.cpu }}%</td>
-              <td class="py-1 text-right font-mono" style="color:var(--text-secondary)">{{ p.mem }}%</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-shell" style="--table-min:420px">
+          <table class="data-table">
+            <colgroup>
+              <col style="width:64%">
+              <col style="width:18%">
+              <col style="width:18%">
+            </colgroup>
+            <thead>
+              <tr><th>进程</th><th class="text-right">CPU</th><th class="text-right">内存</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in data?.top_processes ?? []" :key="p.pid">
+                <td class="font-mono" style="color:var(--text-secondary)">{{ p.name }}</td>
+                <td class="text-right font-mono" style="color:var(--text-secondary)">{{ p.cpu }}%</td>
+                <td class="text-right font-mono" style="color:var(--text-secondary)">{{ p.mem }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
     <!-- History Charts -->
     <div class="glass-card p-6 mt-4">
       <h3 class="text-sm font-semibold mb-3" style="color:var(--text-primary)">历史趋势 ({{ historyHours }}h)</h3>
-      <div class="grid grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div>
           <canvas :id="cpuChartId" class="w-full h-32"></canvas>
           <div class="text-2xs text-center" style="color:var(--text-disabled)">CPU %</div>
@@ -204,4 +213,5 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 .monitor-page { padding: 18px; max-width: 1280px; margin: 0 auto; }
 .metric-card { background: var(--glass-bg); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 12px; }
 .progress-bar { height: 3px; border-radius: 2px; transition: width 0.5s ease; min-width: 0; }
+.load-values { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>

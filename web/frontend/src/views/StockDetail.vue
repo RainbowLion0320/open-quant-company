@@ -14,17 +14,17 @@
           <div class="text-2xl font-bold font-mono" style="color:var(--accent)">{{ stock.basic.symbol }}</div>
           <div class="text-xl font-semibold" style="color:var(--text-primary)">{{ stock.basic.name }}</div>
         </div>
-        <div class="grid grid-cols-4 gap-3 text-xs">
-          <div><span style="color:var(--text-disabled)">行业</span><div class="mt-0.5" style="color:var(--text-secondary)">{{ stock.basic.industry }}</div></div>
-          <div><span style="color:var(--text-disabled)">地区</span><div class="mt-0.5" style="color:var(--text-secondary)">{{ stock.basic.area }}</div></div>
-          <div><span style="color:var(--text-disabled)">市场</span><div class="mt-0.5" style="color:var(--text-secondary)">{{ stock.basic.market }}</div></div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <div><span style="color:var(--text-disabled)">行业</span><div class="mt-0.5" style="color:var(--text-secondary)">{{ stock.basic.industry || '—' }}</div></div>
+          <div><span style="color:var(--text-disabled)">地区</span><div class="mt-0.5" style="color:var(--text-secondary)">{{ stock.basic.area || '—' }}</div></div>
+          <div><span style="color:var(--text-disabled)">市场</span><div class="mt-0.5" style="color:var(--text-secondary)">{{ stock.basic.market || '—' }}</div></div>
         </div>
       </div>
 
       <!-- Buffett + DCF -->
       <div v-if="stock.buffett" class="glass-card glow-cyan" style="padding:20px">
         <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">巴菲特量化分析</div>
-        <div class="grid grid-cols-4 gap-4">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div class="text-center p-3 rounded-lg" style="background:var(--bg-deep)">
             <div class="text-[10px] mb-1" style="color:var(--text-disabled)">巴菲特综合评分</div>
             <div class="text-2xl font-bold font-mono" :style="{ color: scoreColor }">{{ stock.buffett.score?.toFixed(0) || '—' }}</div>
@@ -57,29 +57,36 @@
       <!-- Signals -->
       <div v-if="stock.signals" class="glass-card" style="padding:20px">
         <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">策略信号</div>
-        <table class="data-table">
-          <thead>
-            <tr><th style="width:40%">策略</th><th style="width:30%" class="text-right">评分</th><th style="width:30%" class="text-right">信号</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="(sigs, strategy) in stock.signals" :key="strategy">
-              <td style="color:var(--text-secondary)">{{ strategy }}</td>
-              <td class="text-right font-mono">{{ sigs[0]?.score?.toFixed(1) || '—' }}</td>
-              <td class="text-right">
-                <span :style="{ color: sigs[0]?.signal === 'buy' ? 'var(--positive)' : 'var(--text-disabled)' }">
-                  {{ sigs[0]?.signal === 'buy' ? '买入' : '持有' }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-shell" style="--table-min:420px">
+          <table class="data-table">
+            <colgroup>
+              <col style="width:40%">
+              <col style="width:30%">
+              <col style="width:30%">
+            </colgroup>
+            <thead>
+              <tr><th>策略</th><th class="text-right">评分</th><th class="text-right">信号</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(sigs, strategy) in stock.signals" :key="strategy">
+                <td style="color:var(--text-secondary)">{{ strategy }}</td>
+                <td class="text-right font-mono">{{ sigs[0]?.score?.toFixed(1) || '—' }}</td>
+                <td class="text-right">
+                  <span :style="{ color: sigs[0]?.signal === 'buy' ? 'var(--positive)' : 'var(--text-disabled)' }">
+                    {{ sigs[0]?.signal === 'buy' ? '买入' : '持有' }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, watch, onMounted, computed, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { api } from "../api";
 import { useECharts, QUANTUM_THEME } from "../charts/useECharts";
@@ -102,6 +109,7 @@ async function load() {
   if (!code) return;
   try {
     stock.value = await api.stock(code);
+    await nextTick();
     if (stock.value?.kline?.length) renderKline();
   } catch {}
 }
@@ -131,11 +139,11 @@ function renderKline() {
     ],
     series: [
       {
-        type: "candlestick", data: ohlc,
+        type: "candlestick", data: ohlc, sampling: false,
         itemStyle: { color: "#22c55e", color0: "#ef4444", borderColor: "#22c55e", borderColor0: "#ef4444" },
       },
       {
-        type: "bar", data: volumes, xAxisIndex: 1, yAxisIndex: 1,
+        type: "bar", data: volumes, sampling: false, xAxisIndex: 1, yAxisIndex: 1,
         itemStyle: { color: "rgba(0,212,255,0.15)" },
       },
     ],

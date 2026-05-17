@@ -16,7 +16,7 @@
     </div>
 
     <!-- Balance Cards -->
-    <div class="grid grid-cols-5 gap-3">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <div class="glass-card" style="padding:14px 16px">
         <div class="text-[10px] tracking-wider uppercase" style="color:var(--text-disabled)">总资产</div>
         <div class="text-xl font-bold font-mono mt-1" style="color:var(--accent)">
@@ -67,31 +67,48 @@
       <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">
         当前持仓 ({{ positions.length }})
       </div>
-      <table class="data-table" v-if="positions.length">
-        <thead>
-          <tr>
-            <th style="width:13%">代码</th><th style="width:16%">名称</th><th style="width:8%" class="text-right">数量</th>
-            <th style="width:12%" class="text-right">成本</th><th style="width:12%" class="text-right">现价</th>
-            <th style="width:14%" class="text-right">市值</th><th style="width:13%" class="text-right">盈亏</th><th style="width:12%" class="text-right">比例</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="p in positions" :key="p.code">
-            <td class="font-mono" style="color:var(--accent)">{{ p.code }}</td>
-            <td>{{ p.name }}</td>
-            <td class="text-right font-mono">{{ p.volume }}</td>
-            <td class="text-right font-mono">¥{{ p.avg_cost?.toFixed(2) }}</td>
-            <td class="text-right font-mono">¥{{ p.current_price?.toFixed(2) }}</td>
-            <td class="text-right font-mono">¥{{ (p.market_value || 0).toLocaleString() }}</td>
-            <td class="text-right font-mono" :style="{ color: (p.pnl||0) >= 0 ? 'var(--positive)' : 'var(--negative)' }">
-              {{ fmtPnl(p.pnl) }}
-            </td>
-            <td class="text-right font-mono" :style="{ color: (p.pnl_pct||0) >= 0 ? 'var(--positive)' : 'var(--negative)' }">
-              {{ (p.pnl_pct || 0).toFixed(1) }}%
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-if="positions.length" class="table-shell" style="--table-min:760px">
+        <table class="data-table">
+          <colgroup>
+            <col style="width:13%">
+            <col style="width:16%">
+            <col style="width:8%">
+            <col style="width:12%">
+            <col style="width:12%">
+            <col style="width:14%">
+            <col style="width:13%">
+            <col style="width:12%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th class="text-right">数量</th>
+              <th class="text-right">成本</th>
+              <th class="text-right">现价</th>
+              <th class="text-right">市值</th>
+              <th class="text-right">盈亏</th>
+              <th class="text-right">比例</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in positions" :key="p.code">
+              <td class="font-mono" style="color:var(--accent)">{{ p.code }}</td>
+              <td>{{ p.name }}</td>
+              <td class="text-right font-mono">{{ p.volume }}</td>
+              <td class="text-right font-mono">¥{{ p.avg_cost?.toFixed(2) }}</td>
+              <td class="text-right font-mono">¥{{ p.current_price?.toFixed(2) }}</td>
+              <td class="text-right font-mono">¥{{ (p.market_value || 0).toLocaleString() }}</td>
+              <td class="text-right font-mono" :style="{ color: (p.pnl||0) >= 0 ? 'var(--positive)' : 'var(--negative)' }">
+                {{ fmtPnl(p.pnl) }}
+              </td>
+              <td class="text-right font-mono" :style="{ color: (p.pnl_pct||0) >= 0 ? 'var(--positive)' : 'var(--negative)' }">
+                {{ (p.pnl_pct || 0).toFixed(1) }}%
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div v-else class="empty-state" style="padding:24px">暂无持仓</div>
     </div>
 
@@ -100,47 +117,62 @@
       <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">
         交易记录 ({{ tradeTotal }} 笔)
       </div>
-      <table class="data-table" v-if="trades.length">
-        <thead>
-          <tr>
-            <th style="width:16%">日期</th><th style="width:14%">代码</th><th style="width:10%">方向</th>
-            <th style="width:14%" class="text-right">价格</th><th style="width:10%" class="text-right">数量</th>
-            <th style="width:20%" class="text-right">金额</th><th style="width:16%">策略</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="t in trades" :key="t.code + t.date + t.side">
-            <td class="font-mono text-[10px]">{{ t.date }}</td>
-            <td class="font-mono" style="color:var(--accent)">{{ t.code }}</td>
-            <td :style="{ color: t.side === 'buy' ? 'var(--positive)' : 'var(--negative)' }">
-              {{ t.side === 'buy' ? '买入' : '卖出' }}
-            </td>
-            <td class="text-right font-mono">¥{{ t.price?.toFixed(2) }}</td>
-            <td class="text-right font-mono">{{ t.volume }}</td>
-            <td class="text-right font-mono">¥{{ (t.amount || 0).toLocaleString() }}</td>
-            <td class="text-[10px]" style="color:var(--text-tertiary)">{{ t.strategy }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-if="trades.length" class="table-shell" style="--table-min:720px">
+        <table class="data-table">
+          <colgroup>
+            <col style="width:16%">
+            <col style="width:14%">
+            <col style="width:10%">
+            <col style="width:14%">
+            <col style="width:10%">
+            <col style="width:20%">
+            <col style="width:16%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>代码</th>
+              <th>方向</th>
+              <th class="text-right">价格</th>
+              <th class="text-right">数量</th>
+              <th class="text-right">金额</th>
+              <th>策略</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in trades" :key="t.code + t.date + t.side">
+              <td class="font-mono text-[10px]">{{ t.date }}</td>
+              <td class="font-mono" style="color:var(--accent)">{{ t.code }}</td>
+              <td :style="{ color: t.side === 'buy' ? 'var(--positive)' : 'var(--negative)' }">
+                {{ t.side === 'buy' ? '买入' : '卖出' }}
+              </td>
+              <td class="text-right font-mono">¥{{ t.price?.toFixed(2) }}</td>
+              <td class="text-right font-mono">{{ t.volume }}</td>
+              <td class="text-right font-mono">¥{{ (t.amount || 0).toLocaleString() }}</td>
+              <td class="text-[10px]" style="color:var(--text-tertiary)">{{ t.strategy }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div v-else class="empty-state" style="padding:24px">暂无交易记录</div>
     </div>
 
     <!-- Order Form -->
     <div class="glass-card" style="padding:20px">
       <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">手动下单 (测试用)</div>
-      <div class="flex gap-3 items-end">
+      <div class="flex flex-col md:flex-row gap-3 md:items-end">
         <div class="flex-1">
           <div class="text-[10px] mb-1" style="color:var(--text-disabled)">股票代码</div>
           <input v-model="order.symbol" type="text" placeholder="000001" class="w-full" />
         </div>
-        <div style="width:80px">
+        <div class="w-full md:w-20">
           <div class="text-[10px] mb-1" style="color:var(--text-disabled)">方向</div>
           <select v-model="order.side" class="w-full">
             <option value="buy">买入</option>
             <option value="sell">卖出</option>
           </select>
         </div>
-        <div style="width:100px">
+        <div class="w-full md:w-24">
           <div class="text-[10px] mb-1" style="color:var(--text-disabled)">数量</div>
           <input v-model.number="order.shares" type="number" min="100" step="100" class="w-full" />
         </div>
@@ -184,7 +216,7 @@ let chart: echarts.ECharts | null = null;
 
 function fmtPnl(v: number | undefined) {
   if (v == null) return "—";
-  const sign = v >= 0 ? "+" : "";
+  const sign = v > 0 ? "+" : v < 0 ? "-" : "";
   return sign + "¥" + Math.abs(v).toLocaleString("zh-CN", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 function fmtReturn(v: number | undefined) {
@@ -277,6 +309,7 @@ function renderChart() {
       splitLine: { lineStyle: { color: "rgba(148,163,184,0.06)" } } },
     series: [{
       type: "line", data: assets, showSymbol: false, smooth: true,
+      sampling: false,
       lineStyle: { color: "#00d4ff", width: 1.5 },
       areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
         { offset: 0, color: "rgba(0,212,255,0.12)" },

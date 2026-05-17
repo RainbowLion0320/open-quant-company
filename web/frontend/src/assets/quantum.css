@@ -477,35 +477,81 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
 /* ── Data Tables ── */
+.table-shell {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(125, 211, 252, 0.025), transparent 42px),
+    rgba(3, 10, 18, 0.18);
+}
 .data-table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: var(--table-min, 640px);
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 12px;
+  line-height: 1.35;
   table-layout: fixed;
 }
 .data-table th {
   text-align: left;
+  height: 34px;
   padding: 8px 12px;
   color: var(--text-tertiary);
-  font-weight: 500;
+  font-weight: 650;
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   border-bottom: 1px solid var(--border-subtle);
+  background: rgba(8, 19, 33, 0.42);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  vertical-align: middle;
 }
 .data-table td {
+  height: 38px;
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  vertical-align: middle;
+}
+.data-table th:first-child,
+.data-table td:first-child {
+  padding-left: 14px;
+}
+.data-table th:last-child,
+.data-table td:last-child {
+  padding-right: 14px;
+}
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.data-table tbody tr:nth-child(even) td {
+  background: rgba(125, 211, 252, 0.014);
+}
+.data-table th.text-right,
+.data-table td.text-right,
+.data-table th.numeric,
+.data-table td.numeric {
+  text-align: right;
+}
+.data-table th.text-center,
+.data-table td.text-center {
+  text-align: center;
+}
+.data-table td.font-mono,
+.data-table td.text-right,
+.data-table th.text-right {
+  font-variant-numeric: tabular-nums;
 }
 .data-table tr:hover td {
-  background: var(--bg-hover);
+  background: rgba(0, 212, 255, 0.055);
 }
 
 /* ── Progress Bar ── */

@@ -10,9 +10,9 @@
 
     <!-- Per-strategy rows -->
     <div v-for="s in strategies" :key="s.key" class="glass-card glow-cyan animate-fade-in" style="padding:20px">
-      <div class="flex gap-6" style="min-height:220px">
+      <div class="flex flex-col md:flex-row gap-6" style="min-height:220px">
         <!-- Left: Stats -->
-        <div class="flex flex-col justify-center shrink-0" style="width:150px">
+        <div class="flex flex-col justify-center shrink-0 w-full md:w-[150px]">
           <!-- Strategy header -->
           <div class="flex items-center gap-2 mb-3">
             <div class="w-2 h-2 rounded-full" :style="{ background: s.color, boxShadow: `0 0 6px ${s.color}` }"></div>
@@ -103,6 +103,7 @@ function initAllCharts() {
       name: s.label,
       type: "line",
       data: values,
+      sampling: false,
       lineStyle: { color: s.color, width: 1.5 },
       itemStyle: { color: s.color },
       symbol: "none",
@@ -120,6 +121,7 @@ function initAllCharts() {
         name: "上证指数",
         type: "line",
         data: curve.bench.map((d: any) => d.value),
+        sampling: false,
         lineStyle: { color: "rgba(255,255,255,0.08)", width: 1, type: "dashed" },
         itemStyle: { color: "rgba(255,255,255,0.08)" },
         symbol: "none",

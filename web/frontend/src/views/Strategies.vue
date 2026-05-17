@@ -39,41 +39,43 @@
 
       <!-- Signal Table -->
       <div v-if="currentStrategy === s.name && signals.length" class="mt-4 animate-fade-in">
-        <table class="data-table">
-          <colgroup>
-            <col style="width:14%">
-            <col style="width:22%">
-            <col style="width:22%">
-            <col style="width:18%">
-            <col style="width:24%">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>代码</th>
-              <th>名称</th>
-              <th>行业</th>
-              <th class="text-right">评分</th>
-              <th class="text-right">信号</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="sig in signals.slice(0, 20)" :key="sig.symbol">
-              <td class="font-mono">{{ sig.symbol }}</td>
-              <td>
-                <router-link :to="`/stocks/${sig.symbol}`" class="hover:underline" style="color:var(--accent)">
-                  {{ sig.name }}
-                </router-link>
-              </td>
-              <td>{{ sig.industry }}</td>
-              <td class="text-right font-mono">{{ sig.score?.toFixed(1) }}</td>
-              <td class="text-right">
-                <span :style="{ color: sig.signal === 'buy' ? 'var(--positive)' : 'var(--text-disabled)' }">
-                  {{ sig.signal === 'buy' ? '买入' : '持有' }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-shell" style="--table-min:680px">
+          <table class="data-table">
+            <colgroup>
+              <col style="width:14%">
+              <col style="width:22%">
+              <col style="width:22%">
+              <col style="width:18%">
+              <col style="width:24%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>代码</th>
+                <th>名称</th>
+                <th>行业</th>
+                <th class="text-right">评分</th>
+                <th class="text-right">信号</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="sig in signals.slice(0, 20)" :key="sig.symbol">
+                <td class="font-mono">{{ sig.symbol }}</td>
+                <td>
+                  <router-link :to="`/stocks/${sig.symbol}`" class="hover:underline" style="color:var(--accent)">
+                    {{ sig.name }}
+                  </router-link>
+                </td>
+                <td>{{ sig.industry }}</td>
+                <td class="text-right font-mono">{{ sig.score?.toFixed(1) }}</td>
+                <td class="text-right">
+                  <span :style="{ color: sig.signal === 'buy' ? 'var(--positive)' : 'var(--text-disabled)' }">
+                    {{ sig.signal === 'buy' ? '买入' : '持有' }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>

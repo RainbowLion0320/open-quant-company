@@ -30,7 +30,7 @@
         <div class="badge" :class="marketBadge">{{ stock.basic.market }}</div>
       </div>
 
-      <div class="grid grid-cols-4 gap-3 mb-4 text-xs">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4 text-xs">
         <div>
           <span style="color:var(--text-disabled)">行业</span>
           <div class="mt-0.5" style="color:var(--text-secondary)">{{ stock.basic.industry || '—' }}</div>
@@ -42,7 +42,7 @@
       </div>
 
       <!-- Buffett Score -->
-      <div v-if="stock.buffett" class="grid grid-cols-5 gap-3 p-3 rounded-lg mb-4" style="background:var(--bg-deep)">
+      <div v-if="stock.buffett" class="grid grid-cols-2 lg:grid-cols-5 gap-3 p-3 rounded-lg mb-4" style="background:var(--bg-deep)">
         <div class="text-center">
           <div class="text-[10px]" style="color:var(--text-disabled)">巴菲特分</div>
           <div class="text-lg font-bold font-mono mt-1" :style="{ color: (stock.buffett.score||0) >= 70 ? 'var(--positive)' : 'var(--warning)' }">
@@ -70,22 +70,29 @@
       <!-- Signals -->
       <div v-if="stock.signals && Object.keys(stock.signals).length">
         <div class="text-xs font-semibold mb-3" style="color:var(--text-tertiary)">策略信号</div>
-        <table class="data-table">
-          <thead>
-            <tr><th style="width:40%">策略</th><th style="width:30%" class="text-right">评分</th><th style="width:30%" class="text-right">信号</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="(sigs, strategy) in stock.signals" :key="strategy">
-              <td style="color:var(--text-secondary)">{{ strategy }}</td>
-              <td class="text-right font-mono">{{ sigs[0]?.score?.toFixed(1) || '—' }}</td>
-              <td class="text-right">
-                <span :style="{ color: sigs[0]?.signal === 'buy' ? 'var(--positive)' : 'var(--text-disabled)' }">
-                  {{ sigs[0]?.signal === 'buy' ? '买入' : '持有' }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-shell" style="--table-min:420px">
+          <table class="data-table">
+            <colgroup>
+              <col style="width:40%">
+              <col style="width:30%">
+              <col style="width:30%">
+            </colgroup>
+            <thead>
+              <tr><th>策略</th><th class="text-right">评分</th><th class="text-right">信号</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(sigs, strategy) in stock.signals" :key="strategy">
+                <td style="color:var(--text-secondary)">{{ strategy }}</td>
+                <td class="text-right font-mono">{{ sigs[0]?.score?.toFixed(1) || '—' }}</td>
+                <td class="text-right">
+                  <span :style="{ color: sigs[0]?.signal === 'buy' ? 'var(--positive)' : 'var(--text-disabled)' }">
+                    {{ sigs[0]?.signal === 'buy' ? '买入' : '持有' }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <router-link :to="`/stocks/${stock.basic.symbol}`" class="btn btn-sm mt-4" style="border-color:rgba(0,212,255,0.2); color:var(--accent)">

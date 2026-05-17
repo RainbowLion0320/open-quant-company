@@ -86,6 +86,14 @@
           <small>{{ matrix.length }} strategies</small>
         </div>
         <table class="command-table">
+          <colgroup>
+            <col style="width:24%">
+            <col style="width:13%">
+            <col style="width:12%">
+            <col style="width:14%">
+            <col style="width:23%">
+            <col style="width:14%">
+          </colgroup>
           <thead>
             <tr>
               <th>Strategy</th>
@@ -289,13 +297,14 @@ function renderChart() {
         xAxisIndex: 0,
         yAxisIndex: 0,
         data: closes,
+        sampling: false,
         smooth: false,
         showSymbol: false,
         connectNulls: true,
         lineStyle: { width: 2, color: "#7dd3fc" },
         itemStyle: { color: "#7dd3fc" },
       },
-      { type: "bar", data: volumes, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: "rgba(0,212,255,0.18)" } },
+      { type: "bar", data: volumes, sampling: false, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: "rgba(0,212,255,0.18)" } },
     ],
   });
 }
@@ -647,34 +656,61 @@ onMounted(async () => {
 }
 .command-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
 }
 .command-table th {
+  height: 34px;
   padding: 10px 10px;
   color: var(--text-disabled);
   border-bottom: 1px solid var(--border-subtle);
+  background: rgba(8, 19, 33, 0.34);
   font-size: 10px;
   font-weight: 600;
   text-align: left;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .command-table td {
+  height: 42px;
   padding: 11px 10px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.command-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.command-table tbody tr:nth-child(even) td {
+  background: rgba(125, 211, 252, 0.014);
 }
 .command-table td strong {
   display: block;
   color: var(--text-primary);
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .command-table td span {
   display: block;
   color: var(--text-disabled);
   font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.right { text-align: right !important; }
+.command-table tbody tr:hover td {
+  background: rgba(0, 212, 255, 0.055);
+}
+.right { text-align: right !important; font-variant-numeric: tabular-nums; }
 .signal-buy { color: var(--positive); }
 .signal-sell { color: var(--negative); }
 .signal-hold { color: var(--warning); }

@@ -8,31 +8,45 @@
     </div>
 
     <div class="glass-card" style="padding:20px">
-      <table class="data-table" v-if="changes.length">
-        <thead>
+      <div v-if="changes.length" class="table-shell" style="--table-min:680px">
+        <table class="data-table">
+          <colgroup>
+            <col style="width:14%">
+            <col style="width:16%">
+            <col style="width:14%">
+            <col style="width:22%">
+            <col style="width:17%">
+            <col style="width:17%">
+          </colgroup>
+          <thead>
             <tr>
-            <th style="width:14%">日期</th><th style="width:16%">策略</th><th style="width:14%">代码</th><th style="width:22%">名称</th>
-            <th style="width:17%" class="text-right">旧信号</th><th style="width:17%" class="text-right">新信号</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(c, i) in changes" :key="i">
-            <td class="font-mono" style="color:var(--text-disabled)">{{ c.date?.slice(0, 10) }}</td>
-            <td style="color:var(--text-secondary)">{{ c.strategy }}</td>
-            <td class="font-mono">{{ c.symbol }}</td>
-            <td>{{ c.name }}</td>
-            <td class="text-right">
-              <span :style="{ color: signalColor(c.old_signal) }">{{ signalLabel(c.old_signal) }}</span>
-            </td>
-            <td class="text-right">
-              <span :style="{ color: signalColor(c.new_signal), fontWeight: c.new_signal !== c.old_signal ? '600' : '400' }">
-                <span v-if="c.new_signal !== c.old_signal" style="color:var(--positive); margin-right:4px">↑</span>
-                {{ signalLabel(c.new_signal) }}
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              <th>日期</th>
+              <th>策略</th>
+              <th>代码</th>
+              <th>名称</th>
+              <th class="text-right">旧信号</th>
+              <th class="text-right">新信号</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(c, i) in changes" :key="i">
+              <td class="font-mono" style="color:var(--text-disabled)">{{ c.date?.slice(0, 10) }}</td>
+              <td style="color:var(--text-secondary)">{{ c.strategy }}</td>
+              <td class="font-mono">{{ c.symbol }}</td>
+              <td>{{ c.name }}</td>
+              <td class="text-right">
+                <span :style="{ color: signalColor(c.old_signal) }">{{ signalLabel(c.old_signal) }}</span>
+              </td>
+              <td class="text-right">
+                <span :style="{ color: signalColor(c.new_signal), fontWeight: c.new_signal !== c.old_signal ? '600' : '400' }">
+                  <span v-if="c.new_signal !== c.old_signal" style="color:var(--positive); margin-right:4px">↑</span>
+                  {{ signalLabel(c.new_signal) }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div v-else class="empty-state">
         <span>暂无信号变更记录</span>
       </div>
