@@ -6,6 +6,7 @@
     <img src="https://img.shields.io/badge/version-5.1-orange" alt="Version">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
     <img src="https://img.shields.io/badge/A%20Share-5204%20stocks-cyan" alt="A Share">
+    <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="macOS">
   </p>
 </div>
 
