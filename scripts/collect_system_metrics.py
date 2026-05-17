@@ -126,9 +126,9 @@ def collect():
 
 
 def _cleanup():
-    """保留最近30天数据"""
+    """保留最近365天数据"""
     from datetime import timedelta
-    cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%S")
+    cutoff = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%S")
     try:
         conn = sqlite3.connect(str(DB))
         conn.execute("DELETE FROM metrics WHERE ts < ?", (cutoff,))
