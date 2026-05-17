@@ -21,9 +21,9 @@
       </div>
     </div>
 
-    <!-- 图谱画布 -->
+    <!-- 3D 容器 -->
     <div class="graph-stage" ref="stageRef">
-      <canvas ref="canvasRef" class="graph-canvas"></canvas>
+      <div ref="threeRef" class="three-container"></div>
 
       <!-- 悬浮提示 -->
       <div
@@ -43,12 +43,13 @@
       <!-- 详情面板 -->
       <transition name="panel-slide">
         <div v-if="selectedNode" class="detail-panel glass-card">
-          <button class="panel-close" @click="selectedNode = null">✕</button>
+          <button class="panel-close" @click="deselectNode">✕</button>
           <div class="panel-header">
             <span class="panel-badge" :class="selectedNode.type">
               {{ selectedNode.type }}
             </span>
             <span class="panel-id">#{{ selectedNode.id?.slice(0, 8) }}</span>
+            <span class="panel-degree">deg: {{ selectedNode.degree || 0 }}</span>
           </div>
           <p class="panel-text">{{ selectedNode.fullText }}</p>
           <div class="panel-section" v-if="selectedNode.entities?.length">
@@ -80,20 +81,25 @@
         <div class="legend-item"><span class="legend-dot exp"></span> Experience</div>
         <div class="legend-item"><span class="legend-line sem"></span> Semantic</div>
         <div class="legend-item"><span class="legend-line tmp"></span> Temporal</div>
+        <div class="legend-item"><span class="legend-line tag-l"></span> Tag</div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, computed } from "vue";
+import { ref, onMounted, onUnmounted, nextTick } from "vue";
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
+// ── Types ──
 interface GraphNode {
   id: string; index: number; label: string; fullText: string;
   type: "observation" | "experience"; entities: string[]; tags: string[];
   date: string; documentId: string | null; chunkId: string | null;
   consolidatedAt: string | null; proofCount: number;
-  x?: number; y?: number; vx?: number; vy?: number;
+  x?: number; y?: number; z?: number; vx?: number; vy?: number; vz?: number;
+  degree?: number;
 }
 
 interface GraphLink {
@@ -108,10 +114,14 @@ interface GraphData {
 }
 
 interface SimNode extends GraphNode {
-  x: number; y: number; vx: number; vy: number; fx?: number | null; fy?: number | null;
+  x: number; y: number; z: number;
+  vx: number; vy: number; vz: number;
+  fx?: number | null; fy?: number | null; fz?: number | null;
+  degree: number;
 }
 
-const canvasRef = ref<HTMLCanvasElement | null>(null);
+// ── Vue state ──
+const threeRef = ref<HTMLElement | null>(null);
 const stageRef = ref<HTMLElement | null>(null);
 const isLoading = ref(false);
 const stats = ref<GraphData["stats"] | null>(null);
@@ -120,33 +130,33 @@ const selectedNode = ref<GraphNode | null>(null);
 const tooltipStyle = ref({ left: "0px", top: "0px" });
 const linkCount = ref(0);
 
+// ── Three.js objects ──
+let scene: THREE.Scene;
+let camera: THREE.PerspectiveCamera;
+let renderer: THREE.WebGLRenderer;
+let controls: OrbitControls;
+let nodeMeshes: Map<string, THREE.Mesh> = new Map();
+let edgeSegments: Map<string, THREE.LineSegments> = new Map();
+let selectedNodeId: string | null = null;
+let sphereGeo: THREE.SphereGeometry;
+let starfield: THREE.Points;
+
+// ── Simulation state ──
 let simNodes: SimNode[] = [];
 let simLinks: { source: SimNode; target: SimNode; type: string }[] = [];
 let animFrame = 0;
-let canvasCtx: CanvasRenderingContext2D | null = null;
-let dpr = 1;
-let transform = { x: 0, y: 0, scale: 1 };
-let isDragging = false;
-let dragTarget: SimNode | null = null;
-let dragStart = { x: 0, y: 0 };
-let lastMouse = { x: 0, y: 0 };
 let converged = false;
 let stillFrames = 0;
+let graphDataRef: GraphData | null = null;
 
 // ── Colors ──
 const COLORS = {
-  bg: "#02060d",
-  obs: "#00d4ff",
-  obsGlow: "rgba(0,212,255,0.25)",
-  exp: "#7c3aed",
-  expGlow: "rgba(124,58,237,0.25)",
-  semantic: "rgba(0,212,255,0.35)",
-  temporal: "rgba(148,163,184,0.15)",
-  tag: "rgba(124,58,237,0.12)",
-  consolidation: "rgba(0,255,200,0.2)",
-  text: "#e2e8f0",
-  textDim: "#64748b",
-  grid: "rgba(0,212,255,0.03)",
+  obs: 0x00d4ff,
+  exp: 0x7c3aed,
+  semantic: 0x00d4ff,
+  temporal: 0x64748b,
+  consolidation: 0x00ffc8,
+  tag: 0x7c3aed,
 };
 
 function fmtDate(d: string): string {
@@ -154,6 +164,393 @@ function fmtDate(d: string): string {
   return d.slice(0, 10);
 }
 
+// ── Three.js Init ──
+function initThree() {
+  const container = threeRef.value!;
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color("#02060d");
+
+  camera = new THREE.PerspectiveCamera(55, w / h, 0.5, 2000);
+  camera.position.set(0, 0, 160);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(w, h);
+  container.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.15;
+  controls.minDistance = 30;
+  controls.maxDistance = 600;
+  controls.target.set(0, 0, 0);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x334466, 1.2));
+  const pointLight = new THREE.PointLight(0x00d4ff, 0.6, 500);
+  pointLight.position.set(0, 0, 200);
+  scene.add(pointLight);
+
+  // Shared sphere geometry
+  sphereGeo = new THREE.SphereGeometry(1, 24, 16);
+
+  // Starfield particles
+  const starCount = 600;
+  const starsGeo = new THREE.BufferGeometry();
+  const starPositions = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    starPositions[i * 3] = (Math.random() - 0.5) * 800;
+    starPositions[i * 3 + 1] = (Math.random() - 0.5) * 800;
+    starPositions[i * 3 + 2] = (Math.random() - 0.5) * 800;
+  }
+  starsGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+  const starsMat = new THREE.PointsMaterial({
+    color: 0x334466,
+    size: 0.6,
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  starfield = new THREE.Points(starsGeo, starsMat);
+  scene.add(starfield);
+}
+
+// ── Graph building ──
+function buildGraph(data: GraphData) {
+  // Clear old meshes
+  for (const mesh of nodeMeshes.values()) scene.remove(mesh);
+  for (const seg of edgeSegments.values()) scene.remove(seg);
+  nodeMeshes.clear();
+  edgeSegments.clear();
+  simNodes = [];
+  simLinks = [];
+
+  const nodes = data.nodes;
+  const links = data.links;
+
+  // Calculate degree
+  const degree = new Map<string, number>();
+  for (const n of nodes) degree.set(n.id, 0);
+  for (const l of links) {
+    const srcId = typeof l.source === "number" ? nodes[l.source].id : (l.source as GraphNode).id;
+    const tgtId = typeof l.target === "number" ? nodes[l.target].id : (l.target as GraphNode).id;
+    degree.set(srcId, (degree.get(srcId) || 0) + 1);
+    degree.set(tgtId, (tgtId === srcId ? 0 : 1) + (degree.get(tgtId) || 0));
+  }
+
+  // Create sim nodes (3D)
+  const radius = Math.min(nodes.length * 3, 180);
+  simNodes = nodes.map((n) => {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = radius * Math.cbrt(Math.random()) * 0.6;
+    return {
+      ...n,
+      x: r * Math.sin(phi) * Math.cos(theta),
+      y: r * Math.sin(phi) * Math.sin(theta),
+      z: r * Math.cos(phi),
+      vx: 0, vy: 0, vz: 0,
+      degree: degree.get(n.id) || 0,
+    };
+  });
+
+  // Create 3D meshes
+  const maxDeg = Math.max(1, ...simNodes.map((n) => n.degree));
+  for (const n of simNodes) {
+    const degRatio = n.degree / maxDeg;
+    const scale = 1.8 + degRatio * 4.5; // degree → size: 1.8 ~ 6.3
+    const color = n.type === "experience" ? COLORS.exp : COLORS.obs;
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 0.3 + degRatio * 0.4,
+      roughness: 0.5,
+      metalness: 0.1,
+    });
+    const mesh = new THREE.Mesh(sphereGeo, mat);
+    mesh.position.set(n.x, n.y, n.z);
+    mesh.scale.setScalar(scale);
+    mesh.userData = { nodeId: n.id, type: n.type, scale, degRatio };
+    scene.add(mesh);
+    nodeMeshes.set(n.id, mesh);
+  }
+
+  // Create edge groups by type
+  const edgeGroups: Record<string, { points: number[][]; ids: [string, string][] }> = {};
+  for (const l of links) {
+    const srcN = typeof l.source === "number" ? nodes[l.source] : (l.source as GraphNode);
+    const tgtN = typeof l.target === "number" ? nodes[l.target] : (l.target as GraphNode);
+    const src = simNodes.find((sn) => sn.id === srcN.id);
+    const tgt = simNodes.find((sn) => sn.id === tgtN.id);
+    if (!src || !tgt) continue;
+    simLinks.push({ source: src, target: tgt, type: l.type });
+    const type = l.type || "temporal";
+    if (!edgeGroups[type]) edgeGroups[type] = { points: [], ids: [] };
+    edgeGroups[type].points.push([src.x, src.y, src.z, tgt.x, tgt.y, tgt.z]);
+    edgeGroups[type].ids.push([src.id, tgt.id]);
+  }
+
+  // Edge colors per type
+  const typeColors: Record<string, number> = {
+    semantic: COLORS.semantic,
+    temporal: COLORS.temporal,
+    consolidation: COLORS.consolidation,
+    tag: COLORS.tag,
+  };
+
+  for (const [etype, group] of Object.entries(edgeGroups)) {
+    const positions: number[] = [];
+    for (const p of group.points) positions.push(...p);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    const color = typeColors[etype] || COLORS.temporal;
+    const mat = new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity: etype === "semantic" ? 0.5 : 0.2,
+      depthWrite: false,
+    });
+    const seg = new THREE.LineSegments(geo, mat);
+    seg.userData = { edgeType: etype, edgeIds: group.ids };
+    scene.add(seg);
+    edgeSegments.set(etype, seg);
+  }
+
+  graphDataRef = data;
+}
+
+// ── Force simulation (3D) ──
+function tick() {
+  const centering = 0.003;
+  const damping = 0.85;
+  const repulsion = 400;
+  const springLen = 45;
+  const springK = 0.003;
+
+  for (const n of simNodes) {
+    if (n.fx != null) continue;
+    for (const m of simNodes) {
+      if (n === m) continue;
+      let dx = n.x - m.x;
+      let dy = n.y - m.y;
+      let dz = n.z - m.z;
+      const dist = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz), 1);
+      const force = repulsion / (dist * dist);
+      n.vx += (dx / dist) * force;
+      n.vy += (dy / dist) * force;
+      n.vz += (dz / dist) * force;
+    }
+    n.vx -= n.x * centering;
+    n.vy -= n.y * centering;
+    n.vz -= n.z * centering;
+    n.vx *= damping;
+    n.vy *= damping;
+    n.vz *= damping;
+    n.x += n.vx;
+    n.y += n.vy;
+    n.z += n.vz;
+  }
+
+  for (const l of simLinks) {
+    const s = l.source; const t = l.target;
+    let dx = t.x - s.x, dy = t.y - s.y, dz = t.z - s.z;
+    const dist = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz), 1);
+    const disp = (dist - springLen) * springK;
+    const fx = (dx / dist) * disp, fy = (dy / dist) * disp, fz = (dz / dist) * disp;
+    if (s.fx == null) { s.vx += fx; s.vy += fy; s.vz += fz; }
+    if (t.fx == null) { t.vx -= fx; t.vy -= fy; t.vz -= fz; }
+  }
+
+  // Convergence
+  let maxV = 0;
+  for (const n of simNodes) {
+    if (n.fx != null) continue;
+    const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy + n.vz * n.vz);
+    if (speed > maxV) maxV = speed;
+  }
+  if (maxV < 0.08) {
+    stillFrames++;
+    if (stillFrames > 60) {
+      converged = true;
+      syncPositions();
+      updateEdges();
+      renderer.render(scene, camera);
+      return;
+    }
+  } else {
+    stillFrames = 0;
+  }
+
+  syncPositions();
+  updateEdges();
+  renderer.render(scene, camera);
+  animFrame = requestAnimationFrame(tick);
+}
+
+function syncPositions() {
+  for (const n of simNodes) {
+    const mesh = nodeMeshes.get(n.id);
+    if (mesh) mesh.position.set(n.x, n.y, n.z);
+  }
+}
+
+function updateEdges() {
+  for (const [etype, seg] of edgeSegments) {
+    const group = (seg.userData as any).edgeIds as [string, string][];
+    const positions = seg.geometry.attributes.position.array as Float32Array;
+    for (let i = 0; i < group.length; i++) {
+      const [srcId, tgtId] = group[i];
+      const src = simNodes.find((sn) => sn.id === srcId);
+      const tgt = simNodes.find((sn) => sn.id === tgtId);
+      const off = i * 6;
+      if (src && tgt) {
+        positions[off] = src.x; positions[off + 1] = src.y; positions[off + 2] = src.z;
+        positions[off + 3] = tgt.x; positions[off + 4] = tgt.y; positions[off + 5] = tgt.z;
+      }
+    }
+    seg.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+// ── Selection highlighting ──
+function highlightEdges(nodeId: string | null) {
+  selectedNodeId = nodeId;
+  if (!nodeId || !graphDataRef) {
+    // Reset all
+    for (const [, seg] of edgeSegments) {
+      const mat = seg.material as THREE.LineBasicMaterial;
+      mat.opacity = seg.userData.edgeType === "semantic" ? 0.5 : 0.2;
+      mat.color.set(COLORS[seg.userData.edgeType as keyof typeof COLORS] || COLORS.temporal);
+    }
+    return;
+  }
+
+  // Find connected node IDs
+  const connected = new Set<string>();
+  for (const [, seg] of edgeSegments) {
+    const ids = (seg.userData as any).edgeIds as [string, string][];
+    for (const [s, t] of ids) {
+      if (s === nodeId) connected.add(t);
+      if (t === nodeId) connected.add(s);
+    }
+  }
+
+  for (const [, seg] of edgeSegments) {
+    const ids = (seg.userData as any).edgeIds as [string, string][];
+    const mat = seg.material as THREE.LineBasicMaterial;
+    let isConnected = false;
+    for (const [s, t] of ids) {
+      if (s === nodeId || t === nodeId) { isConnected = true; break; }
+    }
+    if (isConnected) {
+      mat.opacity = 0.9;
+      mat.color.set(0xffffff);
+    } else {
+      mat.opacity = 0.05;
+      mat.color.set(0x1a1a2e);
+    }
+  }
+}
+
+// ── Interaction ──
+function deselectNode() {
+  selectedNode.value = null;
+  highlightEdges(null);
+}
+
+function onClick(event: THREE.Event) {
+  // handled via raycaster in animate loop
+}
+
+// ── Animation loop (idle render + controls) ──
+let idleFrame = 0;
+function renderLoop() {
+  idleFrame = requestAnimationFrame(renderLoop);
+  controls.update();
+  if (converged) renderer.render(scene, camera);
+}
+
+// ── Raycaster setup ──
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function onPointerDown(event: PointerEvent) {
+  const container = threeRef.value!;
+  const rect = container.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const meshes = Array.from(nodeMeshes.values());
+  const intersects = raycaster.intersectObjects(meshes);
+  if (intersects.length > 0) {
+    const nodeId = intersects[0].object.userData.nodeId as string;
+    const sn = simNodes.find((n) => n.id === nodeId);
+    if (sn) {
+      selectedNode.value = { ...sn, fullText: sn.fullText || sn.label };
+      highlightEdges(nodeId);
+      // Restart sim briefly for visual feedback
+      stillFrames = 0;
+      if (converged) {
+        converged = false;
+        animFrame = requestAnimationFrame(tick);
+      }
+    }
+  } else {
+    // Clicked empty space
+    deselectNode();
+  }
+}
+
+function onPointerMove(event: PointerEvent) {
+  const container = threeRef.value!;
+  const rect = container.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const meshes = Array.from(nodeMeshes.values());
+  const intersects = raycaster.intersectObjects(meshes);
+  if (intersects.length > 0) {
+    const obj = intersects[0].object;
+    // Scale up hover
+    const baseScale = obj.userData.scale as number;
+    obj.scale.setScalar(baseScale * 1.3);
+    container.style.cursor = "pointer";
+
+    const nodeId = obj.userData.nodeId as string;
+    const sn = simNodes.find((n) => n.id === nodeId);
+    if (sn) {
+      hoveredNode.value = {
+        id: sn.id, index: sn.index, label: sn.label, fullText: sn.fullText,
+        type: sn.type, entities: sn.entities, tags: sn.tags, date: sn.date,
+        documentId: sn.documentId || null, chunkId: sn.chunkId || null,
+        consolidatedAt: sn.consolidatedAt || null, proofCount: sn.proofCount,
+        degree: sn.degree,
+      };
+      tooltipStyle.value = {
+        left: `${event.clientX + 14}px`,
+        top: `${event.clientY - 10}px`,
+      };
+    }
+  } else {
+    hoveredNode.value = null;
+    container.style.cursor = "grab";
+    // Reset all scales
+    for (const [id, mesh] of nodeMeshes) {
+      const sn = simNodes.find((n) => n.id === id);
+      mesh.scale.setScalar(sn ? (1.8 + (sn.degree / Math.max(1, ...simNodes.map(n => n.degree))) * 4.5) : 1.8);
+    }
+  }
+}
+
+// ── Load ──
 async function loadGraph() {
   isLoading.value = true;
   try {
@@ -161,7 +558,12 @@ async function loadGraph() {
     const data: GraphData = await res.json();
     stats.value = data.stats || null;
     linkCount.value = data.links?.length || 0;
-    initSimulation(data.nodes, data.links);
+    buildGraph(data);
+
+    converged = false;
+    stillFrames = 0;
+    cancelAnimationFrame(animFrame);
+    animFrame = requestAnimationFrame(tick);
   } catch (e) {
     console.error("Failed to load graph:", e);
   } finally {
@@ -169,343 +571,36 @@ async function loadGraph() {
   }
 }
 
-function initSimulation(nodes: GraphNode[], links: GraphLink[]) {
-  const w = canvasRef.value!.width / dpr;
-  const h = canvasRef.value!.height / dpr;
-  const cx = w / 2;
-  const cy = h / 2;
-
-  simNodes = nodes.map((n) => ({
-    ...n,
-    x: cx + (Math.random() - 0.5) * w * 0.3,
-    y: cy + (Math.random() - 0.5) * h * 0.3,
-    vx: 0,
-    vy: 0,
-  }));
-
-  simLinks = links.map((l) => ({
-    source: simNodes[typeof l.source === "number" ? l.source : (l.source as GraphNode).index],
-    target: simNodes[typeof l.target === "number" ? l.target : (l.target as GraphNode).index],
-    type: l.type,
-  }));
-
-  transform = { x: 0, y: 0, scale: 1 };
-  selectedNode.value = null;
-  hoveredNode.value = null;
-  converged = false;
-  stillFrames = 0;
-
-  // Kick off the animation loop
-  cancelAnimationFrame(animFrame);
-  animFrame = requestAnimationFrame(tick);
-}
-
-function tick() {
-  const alpha = 0.03;
-  const centering = 0.005;
-  const damping = 0.85;
-  const repulsion = 300;
-  const springLen = 80;
-  const springK = 0.005;
-
-  const w = canvasRef.value!.width / dpr;
-  const h = canvasRef.value!.height / dpr;
-
-  for (const n of simNodes) {
-    if (n.fx != null) continue;
-    // Repulsion
-    for (const m of simNodes) {
-      if (n === m) continue;
-      let dx = n.x - m.x;
-      let dy = n.y - m.y;
-      const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-      const force = repulsion / (dist * dist);
-      const fx = (dx / dist) * force;
-      const fy = (dy / dist) * force;
-      n.vx += fx;
-      n.vy += fy;
-    }
-    // Centering
-    n.vx += (w / 2 - n.x) * centering;
-    n.vy += (h / 2 - n.y) * centering;
-    // Damping
-    n.vx *= damping;
-    n.vy *= damping;
-    n.x += n.vx;
-    n.y += n.vy;
-    // Bounds
-    n.x = Math.max(50, Math.min(w - 50, n.x));
-    n.y = Math.max(50, Math.min(h - 50, n.y));
-  }
-
-  // Spring forces
-  for (const l of simLinks) {
-    const s = l.source as SimNode;
-    const t = l.target as SimNode;
-    let dx = t.x - s.x;
-    let dy = t.y - s.y;
-    const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-    const displacement = (dist - springLen) * springK;
-    const fx = (dx / dist) * displacement;
-    const fy = (dy / dist) * displacement;
-    if (s.fx == null) { s.vx += fx; s.vy += fy; }
-    if (t.fx == null) { t.vx -= fx; t.vy -= fy; }
-  }
-
-  // Convergence check
-  let maxV = 0;
-  for (const n of simNodes) {
-    if (n.fx != null) continue;
-    const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
-    if (speed > maxV) maxV = speed;
-  }
-  if (maxV < 0.15) {
-    stillFrames++;
-    if (stillFrames > 60) {
-      converged = true;
-      draw();
-      return;
-    }
-  } else {
-    stillFrames = 0;
-  }
-
-  draw();
-  animFrame = requestAnimationFrame(tick);
-}
-
-function draw() {
-  const canvas = canvasRef.value!;
-  const ctx = canvasCtx!;
-  const w = canvas.width / dpr;
-  const h = canvas.height / dpr;
-
-  ctx.save();
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-
-  // Background grid
-  ctx.strokeStyle = COLORS.grid;
-  ctx.lineWidth = 0.5;
-  const gs = 60;
-  const ox = ((transform.x / transform.scale) % gs + gs) % gs;
-  const oy = ((transform.y / transform.scale) % gs + gs) % gs;
-  for (let x = -ox; x < w; x += gs) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-  }
-  for (let y = -oy; y < h; y += gs) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
-
-  ctx.translate(transform.x, transform.y);
-  ctx.scale(transform.scale, transform.scale);
-
-  // Links
-  for (const l of simLinks) {
-    const s = l.source as SimNode;
-    const t = l.target as SimNode;
-    ctx.beginPath();
-    ctx.moveTo(s.x, s.y);
-    ctx.lineTo(t.x, t.y);
-
-    if (l.type === "semantic") {
-      ctx.strokeStyle = COLORS.semantic;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 6]);
-    } else if (l.type === "temporal") {
-      ctx.strokeStyle = COLORS.temporal;
-      ctx.lineWidth = 0.5;
-      ctx.setLineDash([]);
-    } else if (l.type === "consolidation") {
-      ctx.strokeStyle = COLORS.consolidation;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([2, 3]);
-    } else {
-      ctx.strokeStyle = COLORS.tag;
-      ctx.lineWidth = 0.5;
-      ctx.setLineDash([1, 4]);
-    }
-    ctx.stroke();
-  }
-  ctx.setLineDash([]);
-
-  // Nodes
-  for (const n of simNodes) {
-    const r = n.type === "experience" ? 8 : 5.5;
-    const isHovered = hoveredNode.value?.id === n.id;
-    const isSelected = selectedNode.value?.id === n.id;
-
-    // Glow ring
-    ctx.beginPath();
-    ctx.arc(n.x, n.y, r + 8 + (isHovered ? 4 : 0), 0, Math.PI * 2);
-    const glow = ctx.createRadialGradient(n.x, n.y, r * 0.5, n.x, n.y, r + 10);
-    const glowColor = n.type === "experience" ? COLORS.expGlow : COLORS.obsGlow;
-    glow.addColorStop(0, glowColor);
-    glow.addColorStop(1, "transparent");
-    ctx.fillStyle = glow;
-    ctx.fill();
-
-    // Core circle
-    ctx.beginPath();
-    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = n.type === "experience" ? COLORS.exp : COLORS.obs;
-    if (isHovered || isSelected) {
-      ctx.shadowColor = n.type === "experience" ? COLORS.exp : COLORS.obs;
-      ctx.shadowBlur = 18;
-    }
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Selection ring
-    if (isSelected) {
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
-      ctx.strokeStyle = n.type === "experience" ? COLORS.exp : COLORS.obs;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-
-  }
-
-  ctx.restore();
-}
-
-function screenToWorld(ex: number, ey: number): { x: number; y: number } {
-  const rect = canvasRef.value!.getBoundingClientRect();
-  const sx = ex - rect.left;
-  const sy = ey - rect.top;
-  return {
-    x: (sx - transform.x) / transform.scale,
-    y: (sy - transform.y) / transform.scale,
-  };
-}
-
-function findNodeAt(wx: number, wy: number): SimNode | null {
-  const hitRadius = 14;
-  for (const n of simNodes) {
-    const dx = n.x - wx;
-    const dy = n.y - wy;
-    if (dx * dx + dy * dy < hitRadius * hitRadius) return n;
-  }
-  return null;
-}
-
-function onMouseDown(e: MouseEvent) {
-  converged = false;
-  stillFrames = 0;
-  if (!animFrame) animFrame = requestAnimationFrame(tick);
-
-  const world = screenToWorld(e.clientX, e.clientY);
-  const node = findNodeAt(world.x, world.y);
-  if (node) {
-    dragTarget = node;
-    node.fx = node.x;
-    node.fy = node.y;
-    isDragging = true;
-    dragStart = { x: e.clientX, y: e.clientY };
-  } else {
-    dragTarget = null;
-    isDragging = true;
-    dragStart = { x: e.clientX - transform.x, y: e.clientY - transform.y };
-    lastMouse = { x: e.clientX, y: e.clientY };
+// ── Resize ──
+function resize() {
+  const container = threeRef.value!;
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  if (renderer) {
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
   }
 }
 
-function onMouseMove(e: MouseEvent) {
-  if (isDragging && dragTarget) {
-    const world = screenToWorld(e.clientX, e.clientY);
-    dragTarget.fx = world.x;
-    dragTarget.fy = world.y;
-  } else if (isDragging) {
-    transform.x = e.clientX - dragStart.x;
-    transform.y = e.clientY - dragStart.y;
-  } else {
-    const world = screenToWorld(e.clientX, e.clientY);
-    const node = findNodeAt(world.x, world.y);
-    if (node) {
-      hoveredNode.value = {
-        id: node.id, index: node.index, label: node.label, fullText: node.fullText,
-        type: node.type, entities: node.entities, tags: node.tags, date: node.date,
-        documentId: node.documentId || null, chunkId: node.chunkId || null,
-        consolidatedAt: node.consolidatedAt || null, proofCount: node.proofCount,
-      };
-      tooltipStyle.value = {
-        left: `${e.clientX + 14}px`,
-        top: `${e.clientY - 10}px`,
-      };
-    } else {
-      hoveredNode.value = null;
-    }
-    canvasRef.value!.style.cursor = node ? "pointer" : "grab";
-  }
-}
-
-function onMouseUp(e: MouseEvent) {
-  if (dragTarget) {
-    // If barely moved, treat as click
-    const dx = e.clientX - dragStart.x;
-    const dy = e.clientY - dragStart.y;
-    if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
-      selectedNode.value = {
-        id: dragTarget.id, index: dragTarget.index, label: dragTarget.label,
-        fullText: dragTarget.fullText, type: dragTarget.type,
-        entities: dragTarget.entities, tags: dragTarget.tags, date: dragTarget.date,
-        documentId: dragTarget.documentId || null, chunkId: dragTarget.chunkId || null,
-        consolidatedAt: dragTarget.consolidatedAt || null, proofCount: dragTarget.proofCount,
-      };
-    } else {
-      // Release drag
-      dragTarget.fx = null;
-      dragTarget.fy = null;
-    }
-  }
-  dragTarget = null;
-  isDragging = false;
-  canvasRef.value!.style.cursor = "grab";
-}
-
-function onWheel(e: WheelEvent) {
-  e.preventDefault();
-  const delta = e.deltaY > 0 ? 0.9 : 1.1;
-  const newScale = Math.max(0.2, Math.min(3, transform.scale * delta));
-  const rect = canvasRef.value!.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-  transform.x -= (mx - transform.x) * (newScale / transform.scale - 1);
-  transform.y -= (my - transform.y) * (newScale / transform.scale - 1);
-  transform.scale = newScale;
-}
-
-function resizeCanvas() {
-  const stage = stageRef.value;
-  if (!stage || !canvasRef.value) return;
-  dpr = window.devicePixelRatio || 1;
-  const w = stage.clientWidth;
-  const h = stage.clientHeight;
-  canvasRef.value.width = w * dpr;
-  canvasRef.value.height = h * dpr;
-  canvasRef.value.style.width = `${w}px`;
-  canvasRef.value.style.height = `${h}px`;
-  canvasCtx = canvasRef.value.getContext("2d")!;
-}
-
+// ── Lifecycle ──
 onMounted(async () => {
-  resizeCanvas();
-  window.addEventListener("resize", resizeCanvas);
+  initThree();
+  window.addEventListener("resize", resize);
 
-  const canvas = canvasRef.value!;
-  canvas.addEventListener("mousedown", onMouseDown);
-  canvas.addEventListener("mousemove", onMouseMove);
-  canvas.addEventListener("mouseup", onMouseUp);
-  canvas.addEventListener("wheel", onWheel, { passive: false });
-  canvas.style.cursor = "grab";
+  const container = threeRef.value!;
+  container.addEventListener("pointerdown", onPointerDown);
+  container.addEventListener("pointermove", onPointerMove);
 
+  renderLoop();
   await loadGraph();
 });
 
 onUnmounted(() => {
   cancelAnimationFrame(animFrame);
-  window.removeEventListener("resize", resizeCanvas);
+  cancelAnimationFrame(idleFrame);
+  window.removeEventListener("resize", resize);
+  renderer?.dispose();
 });
 </script>
 
@@ -525,48 +620,52 @@ onUnmounted(() => {
   padding: 12px 18px;
   flex-shrink: 0;
 }
-.toolbar-left { display: flex; align-items: center; gap: 16px; }
 .toolbar-title {
-  font-size: 11px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.22em;
-  color: var(--accent);
-  text-shadow: var(--glow-text);
+  color: #00d4ff;
+  letter-spacing: 2px;
+  margin: 0;
 }
-.toolbar-stats { font-size: 10px; color: var(--text-tertiary); letter-spacing: 0.08em; }
-
+.toolbar-stats {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: 16px;
+  letter-spacing: 1px;
+}
 .btn-load {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 16px;
-  border: 1px solid var(--accent-ring);
-  border-radius: 4px;
-  background: var(--accent-bg);
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.15em;
+  padding: 8px 16px;
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: #00d4ff;
+  font-size: 11px;
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 1px;
   cursor: pointer;
   transition: all 0.2s;
 }
-.btn-load:hover { background: rgba(0,212,255,0.16); border-color: var(--accent); }
-.btn-load.loading { opacity: 0.6; cursor: wait; }
+.btn-load:hover { background: rgba(0, 212, 255, 0.15); }
+.btn-load.loading { opacity: 0.5; cursor: wait; }
 .btn-icon { font-size: 14px; }
 
 /* Stage */
 .graph-stage {
-  flex: 1;
   position: relative;
+  flex: 1;
   overflow: hidden;
   border-radius: 8px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-void);
+  background: #02060d;
 }
-.graph-canvas {
-  display: block;
+.three-container {
   width: 100%;
   height: 100%;
+}
+.three-container canvas {
+  display: block;
 }
 
 /* Tooltip */
@@ -579,92 +678,126 @@ onUnmounted(() => {
 }
 .tip-badge {
   display: inline-block;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  padding: 2px 6px;
-  border-radius: 2px;
+  font-size: 9px;
+  font-family: "JetBrains Mono", monospace;
+  padding: 2px 8px;
+  border-radius: 3px;
   margin-bottom: 6px;
+  letter-spacing: 1px;
 }
-.tip-badge.observation { background: rgba(0,212,255,0.15); color: var(--accent); }
-.tip-badge.experience { background: rgba(124,58,237,0.15); color: var(--quantum-glow); }
-.tip-text { font-size: 11px; color: var(--text-primary); line-height: 1.5; margin: 0; }
-.tip-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.tip-entity { font-size: 9px; color: var(--text-tertiary); background: var(--bg-elevated); padding: 1px 6px; border-radius: 2px; }
+.tip-badge.observation { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+.tip-badge.experience { background: rgba(124, 58, 237, 0.2); color: #7c3aed; }
+.tip-text {
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1.5;
+  margin: 0;
+  max-height: 120px;
+  overflow: hidden;
+}
+.tip-meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.tip-entity {
+  font-size: 10px;
+  color: #64748b;
+  background: rgba(148, 163, 184, 0.1);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
 
 /* Detail panel */
 .detail-panel {
   position: absolute;
   right: 16px;
   top: 16px;
-  width: 360px;
-  max-height: calc(100% - 90px);
+  bottom: 16px;
+  width: 340px;
+  padding: 18px;
   overflow-y: auto;
-  padding: 18px 20px;
   z-index: 50;
 }
 .panel-close {
   position: absolute;
-  right: 12px;
   top: 12px;
+  right: 14px;
   background: none;
   border: none;
-  color: var(--text-tertiary);
-  font-size: 14px;
+  color: #64748b;
+  font-size: 18px;
   cursor: pointer;
-  padding: 2px 6px;
 }
-.panel-close:hover { color: var(--text-primary); }
-.panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.panel-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .panel-badge {
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  padding: 2px 8px;
-  border-radius: 2px;
+  font-size: 10px;
+  font-family: "JetBrains Mono", monospace;
+  padding: 3px 8px;
+  border-radius: 3px;
+  letter-spacing: 1px;
 }
-.panel-badge.observation { background: rgba(0,212,255,0.15); color: var(--accent); }
-.panel-badge.experience { background: rgba(124,58,237,0.15); color: var(--quantum-glow); }
-.panel-id { font-size: 10px; color: var(--text-disabled); font-family: monospace; }
-.panel-text { font-size: 12px; color: var(--text-primary); line-height: 1.6; margin: 0 0 14px; }
+.panel-badge.observation { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+.panel-badge.experience { background: rgba(124, 58, 237, 0.2); color: #7c3aed; }
+.panel-id { font-size: 10px; color: #64748b; font-family: "JetBrains Mono", monospace; }
+.panel-degree { font-size: 10px; color: #00d4ff; margin-left: auto; font-family: "JetBrains Mono", monospace; }
+.panel-text {
+  font-size: 13px;
+  color: #cbd5e1;
+  line-height: 1.7;
+  margin: 0 0 14px 0;
+}
 .panel-section { margin-bottom: 12px; }
 .panel-section h4 {
-  font-size: 9px; font-weight: 700; letter-spacing: 0.18em;
-  color: var(--text-tertiary); margin: 0 0 6px;
+  font-size: 10px;
+  color: #64748b;
+  letter-spacing: 2px;
+  margin: 0 0 6px 0;
 }
 .chip-group { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip {
-  font-size: 10px; padding: 2px 8px; border-radius: 3px;
-  background: var(--bg-elevated); color: var(--accent);
-  border: 1px solid rgba(0,212,255,0.15);
+  font-size: 11px;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.08);
+  padding: 3px 8px;
+  border-radius: 3px;
 }
-.chip.tag-chip { color: var(--quantum-glow); border-color: rgba(124,58,237,0.2); }
-.panel-meta { border-top: 1px solid var(--border-subtle); padding-top: 10px; }
-.meta-row { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 4px; }
-.meta-row span { color: var(--text-tertiary); }
-.meta-row strong { color: var(--text-secondary); }
+.tag-chip { color: #7c3aed; background: rgba(124, 58, 237, 0.1); }
+.panel-meta { border-top: 1px solid rgba(148, 163, 184, 0.1); padding-top: 10px; }
+.meta-row { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-bottom: 4px; }
+.meta-row strong { color: #e2e8f0; }
 
 /* Legend */
 .legend {
   position: absolute;
-  left: 16px;
   bottom: 16px;
+  left: 16px;
+  padding: 10px 14px;
   display: flex;
   gap: 16px;
-  padding: 8px 14px;
-  z-index: 10;
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: "JetBrains Mono", monospace;
 }
-.legend-item { display: flex; align-items: center; gap: 6px; font-size: 9px; color: var(--text-tertiary); }
+.legend-item { display: flex; align-items: center; gap: 6px; }
 .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
-.legend-dot.obs { background: var(--accent); box-shadow: 0 0 8px rgba(0,212,255,0.4); }
-.legend-dot.exp { background: var(--quantum); box-shadow: 0 0 8px rgba(124,58,237,0.4); }
+.legend-dot.obs { background: #00d4ff; box-shadow: 0 0 8px rgba(0, 212, 255, 0.5); }
+.legend-dot.exp { background: #7c3aed; box-shadow: 0 0 8px rgba(124, 58, 237, 0.5); }
 .legend-line { width: 14px; height: 1px; }
-.legend-line.sem { background: rgba(0,212,255,0.5); border-top: 1px dashed rgba(0,212,255,0.5); height: 0; }
-.legend-line.tmp { background: var(--text-tertiary); opacity: 0.3; }
+.legend-line.sem { background: rgba(0, 212, 255, 0.5); }
+.legend-line.tmp { background: rgba(100, 116, 139, 0.3); }
+.legend-line.tag-l { background: rgba(124, 58, 237, 0.3); }
 
-/* Transitions */
-.panel-slide-enter-active { transition: all 0.25s ease; }
-.panel-slide-leave-active { transition: all 0.15s ease; }
-.panel-slide-enter-from { opacity: 0; transform: translateX(20px); }
-.panel-slide-leave-to { opacity: 0; transform: translateX(20px); }
+/* Panel slide transition */
+.panel-slide-enter-active, .panel-slide-leave-active {
+  transition: all 0.25s ease;
+}
+.panel-slide-enter-from, .panel-slide-leave-to {
+  transform: translateX(40px);
+  opacity: 0;
+}
+
+/* Glass card utility — keep consistent */
+.glass-card {
+  background: rgba(10, 20, 40, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 212, 255, 0.08);
+  border-radius: 6px;
+}
 </style>
