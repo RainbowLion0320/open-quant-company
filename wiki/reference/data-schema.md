@@ -14,8 +14,8 @@ tags: [data, parquet, schema, database]
 
 ## 1. OHLCV 日线行情 (per-symbol)
 
-**存储**: `data/cache/{hash}.parquet` (单只股票，Sina 源)  
-**来源**: `data/fetcher.py` → AKShare `stock_zh_a_daily`
+**存储**: `data/store/stock/daily/{symbol}.parquet` (单只股票，Sina 源)
+**来源**: `scripts/cron_fetch_ohlcv.py` → `data/fetchers/stock_daily.py` → AKShare `stock_zh_a_daily`
 
 | 列名 | 类型 | 说明 |
 |------|------|------|
@@ -33,8 +33,8 @@ tags: [data, parquet, schema, database]
 
 ## 2. 同花顺财务摘要 (per-symbol)
 
-**存储**: `data/cache/{hash}.parquet` (hash 中含 md5)  
-**来源**: AKShare `stock_financial_abstract_ths`
+**存储**: `data/store/stock/financials/{symbol}.parquet`
+**来源**: `scripts/cron_fetch_financials.py` → `data/fetchers/financial.py` → AKShare `stock_financial_abstract_ths`
 
 | 列名 | 类型 | 说明 |
 |------|------|------|
@@ -66,7 +66,7 @@ tags: [data, parquet, schema, database]
 
 ## 3. PIT 特征月度切片
 
-**存储**: `data/store/features/{YYYY-MM}.parquet` (100 个文件, 2018-01 ~ 2026-04)  
+**存储**: `data/store/features/{YYYY-MM}.parquet`
 **每行**: 一只股票在某月的特征向量  
 **来源**: `scripts/build_features.py` → `data/feature_store.py::enrich`
 
@@ -125,7 +125,7 @@ tags: [data, parquet, schema, database]
 | val_total_mv | float64 | 估值 | 总市值 |
 | val_circ_mv | float64 | 估值 | 流通市值 |
 
-共 52 列 (2 个 ID 列 + 50 个因子列)
+实际列数以 `scripts/build_features.py` 产出的当月 Parquet 为准。
 
 ---
 

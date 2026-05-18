@@ -29,6 +29,11 @@ def load_env_value(env_path: Path, key: str) -> str:
 
 
 def main():
+    # HuggingFace is blocked by v2ray proxy. Models already cached locally.
+    # Without these, SentenceTransformer init tries to reach huggingface.co → crash.
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
     hermes_env = Path.home() / ".hermes" / ".env"
     api_key = load_env_value(hermes_env, "DEEPSEEK_API_KEY")
 

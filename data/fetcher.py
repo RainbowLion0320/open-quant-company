@@ -191,6 +191,10 @@ TTL_DAILY = 24               # 日线数据：建议日常 force_refresh=True
 TTL_REALTIME = 1             # 实时数据：1h
 
 
+def _allow_api_fallback() -> bool:
+    return os.environ.get("QUANT_ALLOW_API_FALLBACK", "").lower() in {"1", "true", "yes", "on"}
+
+
 def refresh_stock_daily(symbol: str, adjust: str = "qfq", source: str = "sina") -> pd.DataFrame:
     """强制刷新个股日线（追加模式：缓存+新数据合并）"""
     cache_key = f"stock_daily_{symbol}_{adjust}_{source}"
@@ -343,7 +347,10 @@ def get_stock_daily(
     source: str = "sina",
 ) -> pd.DataFrame:
     """
-    获取个股日线（前复权）— 优先读本地 parquet，缺失时 fallback 到 API。
+    获取个股日线（前复权）— 默认只读本地 parquet。
+
+    外部 API 拉取只在 force_refresh=True 或显式设置
+    QUANT_ALLOW_API_FALLBACK=1 时发生，避免研究/回测路径隐式触网。
     """
     from data.fetchers.stock_daily import read_one, fetch_one
 
@@ -351,6 +358,8 @@ def get_stock_daily(
         df = read_one(symbol)
         if df is not None and len(df) > 0:
             return df
+        if not _allow_api_fallback():
+            return pd.DataFrame()
 
     # Fallback: 本地无数据，从 API 拉取
     df = fetch_one(symbol, source=source, adjust=adjust, force=True)
@@ -374,6 +383,8 @@ def get_financial_indicator(
         df = read_financial_summary(symbol)
         if df is not None and len(df) > 0:
             return df
+        if not _allow_api_fallback():
+            return pd.DataFrame()
 
     df = fetch_financial_summary(symbol)
     if df is not None and len(df) > 0:

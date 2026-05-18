@@ -91,7 +91,10 @@ def _get_cache_path(symbol: str) -> str:
 @retry_with_backoff(max_retries=2, base_delay=2.0)
 def get_financial_summary(symbol: str, force_refresh: bool = False) -> pd.DataFrame:
     """
-    获取个股财务摘要（同花顺源 → 本地 parquet）
+    获取个股财务摘要（同花顺源 → 本地 parquet）。
+
+    默认只读本地 Parquet；外部 API 拉取只在 force_refresh=True 或
+    QUANT_ALLOW_API_FALLBACK=1 时发生。
     """
     from data.fetchers.financial import read_financial_summary, fetch_financial_summary
 
@@ -99,6 +102,8 @@ def get_financial_summary(symbol: str, force_refresh: bool = False) -> pd.DataFr
         df = read_financial_summary(symbol)
         if df is not None and len(df) > 0:
             return df
+        if os.environ.get("QUANT_ALLOW_API_FALLBACK", "").lower() not in {"1", "true", "yes", "on"}:
+            return pd.DataFrame()
 
     df = fetch_financial_summary(symbol)
     if df is not None and len(df) > 0:

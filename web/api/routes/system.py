@@ -1,7 +1,9 @@
 """系统活动监视器 — SQLite 时序库 + 历史趋势"""
 import json
+import sys
 
 import numpy as np
+import pandas as pd
 from fastapi import APIRouter, Query
 from pathlib import Path
 import sqlite3
@@ -49,6 +51,35 @@ def _live_system_totals() -> dict:
         "disk_total_gb": round(disk.total / 1024**3, 1),
         "disk_used_gb": round(disk.used / 1024**3, 1),
     }
+
+
+def _json_map(value) -> dict:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    try:
+        if isinstance(value, float) and np.isnan(value):
+            return {}
+    except TypeError:
+        pass
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def _json_value(value):
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
 
 
 @router.get("/monitor")
@@ -150,13 +181,9 @@ async def db_health():
 
     records = []
     for _, r in data_rows.iterrows():
-        rec = r.to_dict()
-        rec["missing_cols"] = json.loads(rec.get("missing_cols", "{}"))
-        rec["outlier_cols"] = json.loads(rec.get("outlier_cols", "{}"))
-        # NaN → None for JSON
-        for k in rec:
-            if isinstance(rec[k], float) and (pd.isna(rec[k]) or np.isnan(rec[k])):
-                rec[k] = None
+        rec = {k: _json_value(v) for k, v in r.to_dict().items()}
+        rec["missing_cols"] = _json_map(rec.get("missing_cols"))
+        rec["outlier_cols"] = _json_map(rec.get("outlier_cols"))
         records.append(rec)
 
     return {
@@ -173,48 +200,55 @@ import subprocess as _subprocess
 import uuid as _uuid
 
 _repair_jobs: dict[str, dict] = {}
+_repair_lock = threading.Lock()
+
+
+def _repairable_tables() -> set[str]:
+    try:
+        from scripts.repair_table import REPAIR_MAP
+        return set(REPAIR_MAP)
+    except Exception:
+        return {
+            "macro_cpi", "macro_gdp", "macro_lpr", "macro_money_supply",
+            "macro_pmi", "macro_ppi", "macro_shibor", "bond_treasury_yields",
+        }
 
 
 def _run_repair(table: str, job_id: str) -> None:
     """Background repair worker."""
-    _repair_jobs[job_id]["status"] = "running"
+    with _repair_lock:
+        _repair_jobs[job_id]["status"] = "running"
     try:
-        venv = str(Path.home() / ".hermes" / "hermes-agent" / "venv" / "bin" / "python3")
         proc = _subprocess.run(
-            [venv, "scripts/repair_table.py", table],
+            [sys.executable, "scripts/repair_table.py", table],
             cwd=str(PROJECT_ROOT),
-            capture_output=True, text=True, timeout=600,
+            capture_output=True, text=True, timeout=3600,
         )
-        _repair_jobs[job_id]["stdout"] = proc.stdout[-500:]
-        _repair_jobs[job_id]["stderr"] = proc.stderr[-200:]
-        _repair_jobs[job_id]["exit_code"] = proc.returncode
-        _repair_jobs[job_id]["status"] = "done" if proc.returncode == 0 else "failed"
+        with _repair_lock:
+            _repair_jobs[job_id]["stdout"] = proc.stdout[-1000:]
+            _repair_jobs[job_id]["stderr"] = proc.stderr[-500:]
+            _repair_jobs[job_id]["exit_code"] = proc.returncode
+            _repair_jobs[job_id]["status"] = "done" if proc.returncode == 0 else "failed"
     except Exception as e:
-        _repair_jobs[job_id]["status"] = "failed"
-        _repair_jobs[job_id]["error"] = str(e)
+        with _repair_lock:
+            _repair_jobs[job_id]["status"] = "failed"
+            _repair_jobs[job_id]["error"] = str(e)
 
 
 @router.post("/db-health/repair/{table_name}")
 async def repair_table(table_name: str):
     """触发单表数据修复 (后台异步)"""
-    REPAIRABLE_TABLES = {
-        "macro_cpi", "macro_gdp", "macro_lpr", "macro_money_supply",
-        "macro_pmi", "macro_ppi", "macro_shibor", "bond_treasury_yields",
-        "stock_holders", "stock_holdertrade", "stock_moneyflow_daily",
-        "stock_moneyflow_monthly", "stock_broker_recommend",
-        "stock_limit_list", "stock_research_report",
-        "share_float", "repurchase",
-    }
-    if table_name not in REPAIRABLE_TABLES:
+    if table_name not in _repairable_tables():
         return {"status": "error", "message": f"Table '{table_name}' is not repairable"}
 
     # Cancel existing job for same table
-    for jid, info in list(_repair_jobs.items()):
-        if info.get("table") == table_name and info["status"] == "running":
-            return {"status": "error", "message": f"Repair already in progress for {table_name}", "job_id": jid}
+    with _repair_lock:
+        for jid, info in list(_repair_jobs.items()):
+            if info.get("table") == table_name and info["status"] == "running":
+                return {"status": "error", "message": f"Repair already in progress for {table_name}", "job_id": jid}
 
-    job_id = _uuid.uuid4().hex[:12]
-    _repair_jobs[job_id] = {"table": table_name, "status": "pending", "stdout": "", "stderr": "", "exit_code": None}
+        job_id = _uuid.uuid4().hex[:12]
+        _repair_jobs[job_id] = {"table": table_name, "status": "pending", "stdout": "", "stderr": "", "exit_code": None}
 
     t = threading.Thread(target=_run_repair, args=(table_name, job_id), daemon=True)
     t.start()
@@ -225,7 +259,8 @@ async def repair_table(table_name: str):
 @router.get("/db-health/repair-status/{job_id}")
 async def repair_status(job_id: str):
     """查询修复进度"""
-    job = _repair_jobs.get(job_id)
+    with _repair_lock:
+        job = dict(_repair_jobs.get(job_id) or {})
     if not job:
         return {"status": "not_found"}
     return {

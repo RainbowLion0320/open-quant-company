@@ -71,3 +71,25 @@ def test_datahub_catalog_includes_data_registry_dimensions():
     catalog = get_datahub().catalog()
     assert "signals" in catalog
     assert any(key.startswith("dimension:") for key in catalog)
+
+
+def test_stock_daily_read_path_does_not_implicitly_fetch_api(monkeypatch):
+    from data import fetcher
+    import data.fetchers.stock_daily as stock_daily
+
+    monkeypatch.delenv("QUANT_ALLOW_API_FALLBACK", raising=False)
+
+    def fail_fetch(*args, **kwargs):
+        raise AssertionError("API fetch should not be called by default")
+
+    monkeypatch.setattr(stock_daily, "fetch_one", fail_fetch)
+    df = fetcher.get_stock_daily("999998")
+    assert df.empty
+
+
+def test_repairable_tables_are_sourced_from_repair_map():
+    from scripts.repair_table import REPAIR_MAP
+    from web.api.routes.system import _repairable_tables
+
+    assert _repairable_tables() == set(REPAIR_MAP)
+    assert "stock_moneyflow_daily" in _repairable_tables()

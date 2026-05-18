@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import time
 import random
-from pathlib import Path
 from typing import Optional, Sequence
 
 import pandas as pd
@@ -17,6 +16,14 @@ import pandas as pd
 from data.datahub import get_datahub
 
 HUB = get_datahub()
+
+
+def _normalize_symbol(symbol: str) -> str:
+    text = str(symbol).strip()
+    text = text.replace(".SH", "").replace(".SZ", "").replace(".sh", "").replace(".sz", "")
+    if text.lower().startswith(("sh", "sz")):
+        text = text[2:]
+    return text.zfill(6) if text.isdigit() else text
 
 
 def _throttle():
@@ -29,6 +36,7 @@ def _throttle():
 
 def fetch_financial_summary(symbol: str) -> Optional[pd.DataFrame]:
     """从 AKShare 拉取同花顺财务摘要，写入 store/stock/financials/{symbol}.parquet"""
+    symbol = _normalize_symbol(symbol)
     import akshare as ak
     _throttle()
     try:
@@ -48,6 +56,7 @@ def fetch_financial_summary(symbol: str) -> Optional[pd.DataFrame]:
 
 
 def read_financial_summary(symbol: str) -> Optional[pd.DataFrame]:
+    symbol = _normalize_symbol(symbol)
     return HUB.read_parquet(HUB.stock_financial_path(symbol))
 
 
@@ -57,6 +66,7 @@ def read_financial_summary(symbol: str) -> Optional[pd.DataFrame]:
 
 def fetch_valuation(symbol: str) -> Optional[pd.DataFrame]:
     """从 Tushare daily_basic 拉取每日估值，写入 store/stock/valuation/{symbol}.parquet"""
+    symbol = _normalize_symbol(symbol)
     import requests as _r
     import os as _os
     _throttle()
@@ -88,6 +98,7 @@ def fetch_valuation(symbol: str) -> Optional[pd.DataFrame]:
 
 
 def read_valuation(symbol: str) -> Optional[pd.DataFrame]:
+    symbol = _normalize_symbol(symbol)
     return HUB.read_parquet(HUB.stock_valuation_path(symbol))
 
 
@@ -97,6 +108,7 @@ def read_valuation(symbol: str) -> Optional[pd.DataFrame]:
 
 def fetch_fina_indicator(symbol: str) -> Optional[pd.DataFrame]:
     """从 Tushare fina_indicator 拉取财务指标，写入 store/stock/fina_indicator/{symbol}.parquet"""
+    symbol = _normalize_symbol(symbol)
     import requests as _r
     import os as _os
     _throttle()
@@ -123,6 +135,7 @@ def fetch_fina_indicator(symbol: str) -> Optional[pd.DataFrame]:
 
 
 def read_fina_indicator(symbol: str) -> Optional[pd.DataFrame]:
+    symbol = _normalize_symbol(symbol)
     return HUB.read_parquet(HUB.stock_fina_indicator_path(symbol))
 
 

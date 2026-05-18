@@ -129,7 +129,12 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
     cols = 0
     errors = 0
 
-    sample = paths if len(paths) <= max_sample else sorted(paths)[:max_sample]
+    if len(paths) <= max_sample:
+        sample = sorted(paths)
+    else:
+        # Prefer recently updated files over lexicographic first symbols/months.
+        sample = sorted(paths, key=lambda p: p.stat().st_mtime, reverse=True)[:max_sample]
+        sample = sorted(sample)
     for f in sample:
         total_size += f.stat().st_size
         try:
@@ -191,10 +196,6 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         "macro_shibor": ("AKShare", "上海银行间拆放利率", True),
         # Bonds
         "bond_treasury_yields": ("AKShare", "国债收益率曲线 (中美)", True),
-        # Features — computed, not repairable
-        "features_2026-02": ("Computed (多源融合)", "PIT 特征切片 2026-02", False),
-        "features_2026-03": ("Computed (多源融合)", "PIT 特征切片 2026-03", False),
-        "features_2026-04": ("Computed (多源融合)", "PIT 特征切片 2026-04", False),
         # Signals — computed, not repairable
         "signals_buffett": ("Computed (策略生成)", "巴菲特价值信号", False),
         "signals_buffett_scan": ("Computed (策略生成)", "巴菲特全量扫描", False),
@@ -220,6 +221,9 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     }
 
     def _meta(table_name: str) -> tuple[str, str, bool]:
+        if table_name.startswith("features_"):
+            month = table_name.removeprefix("features_")
+            return ("Computed (多源融合)", f"PIT 特征切片 {month}", False)
         return TABLE_META.get(table_name, ("", "", False))
 
     # ── Macro (single files) ──

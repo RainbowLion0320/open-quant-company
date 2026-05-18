@@ -67,7 +67,7 @@
             <tr :class="{ 'row-error': row.error }">
               <td class="table-name" :title="row.label_zh || undefined">
                 <span class="name-text">{{ row.table }}</span>
-                <span v-if="row.error" class="error-badge" :title="row.error">⚠</span>
+                <span v-if="row.error" class="error-badge" :title="row.error">!</span>
               </td>
               <td class="source-cell">{{ row.source || '—' }}</td>
               <td class="num">{{ fmtCount(row.rows) }}</td>
@@ -103,9 +103,9 @@
                   :disabled="repairing[row.table] === 'running'"
                   @click="startRepair(row.table)"
                 >
-                  <span v-if="repairing[row.table] === 'running'" class="spinning">⟳</span>
-                  <span v-else-if="repairing[row.table] === 'done'">✓</span>
-                  <span v-else-if="repairing[row.table] === 'failed'">✗</span>
+                  <span v-if="repairing[row.table] === 'running'" class="spinning">...</span>
+                  <span v-else-if="repairing[row.table] === 'done'">OK</span>
+                  <span v-else-if="repairing[row.table] === 'failed'">ERR</span>
                   <span v-else>修复</span>
                 </button>
                 <span v-else class="repair-na">—</span>
@@ -235,6 +235,7 @@ function fmtTime(iso: string | undefined): string {
 
 function freshnessLabel(days: number | null): string {
   if (days == null) return "—";
+  if (days < 0) return `${Math.abs(days)}天后`;
   if (days === 0) return "今天";
   if (days === 1) return "1天前";
   if (days <= 7) return `${days}天前`;
@@ -259,6 +260,7 @@ function outlierClass(cnt: number | null | undefined): string {
 
 function freshnessClass(days: number | null): string {
   if (days == null) return "";
+  if (days < 0) return "val-ok";
   if (days <= 1) return "val-ok";
   if (days <= 7) return "val-warn";
   return "val-bad";

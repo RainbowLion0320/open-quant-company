@@ -32,13 +32,13 @@ class MoneyflowFetcher:
         self.store_dir = HUB.store_dir("stock") / "moneyflow"
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
-    def fetch_symbol(self, symbol: str) -> Optional[pd.DataFrame]:
+    def fetch_symbol(self, symbol: str, force: bool = False) -> Optional[pd.DataFrame]:
         """
         Fetch moneyflow history for one symbol.
         Caches to Parquet. Returns up to ~120 trading days.
         """
         cache_path = self.store_dir / f"{symbol}.parquet"
-        if cache_path.exists():
+        if cache_path.exists() and not force:
             try:
                 df = HUB.read_parquet(cache_path)
                 # If cache is fresh (within 1 day), reuse
@@ -67,11 +67,11 @@ class MoneyflowFetcher:
             print(f"  [moneyflow] {symbol}: {type(e).__name__}: {str(e)[:80]}")
             return None
 
-    def batch_fetch(self, symbols: List[str]) -> Dict[str, pd.DataFrame]:
+    def batch_fetch(self, symbols: List[str], force: bool = False) -> Dict[str, pd.DataFrame]:
         """Batch fetch moneyflow for multiple symbols."""
         results = {}
         for i, sym in enumerate(symbols):
-            df = self.fetch_symbol(sym)
+            df = self.fetch_symbol(sym, force=force)
             if df is not None and len(df) > 0:
                 results[sym] = df
             if (i + 1) % 20 == 0:

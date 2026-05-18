@@ -14,7 +14,6 @@ from __future__ import annotations
 import time
 import random
 from datetime import date, timedelta
-from pathlib import Path
 from typing import Optional, Sequence
 
 import pandas as pd
@@ -24,15 +23,23 @@ from data.datahub import get_datahub
 HUB = get_datahub()
 
 
+def _normalize_symbol(symbol: str) -> str:
+    text = str(symbol).strip()
+    text = text.replace(".SH", "").replace(".SZ", "").replace(".sh", "").replace(".sz", "")
+    if text.lower().startswith(("sh", "sz")):
+        text = text[2:]
+    return text.zfill(6) if text.isdigit() else text
+
+
 def _to_sina(symbol: str) -> str:
     """'600519' → 'sh600519'"""
-    symbol = symbol.replace(".SH", "").replace(".SZ", "")
+    symbol = _normalize_symbol(symbol)
     prefix = "sh" if symbol.startswith(("6", "9")) else "sz"
     return f"{prefix}{symbol}"
 
 
 def _to_plain(symbol: str) -> str:
-    return symbol.replace(".SH", "").replace(".SZ", "")
+    return _normalize_symbol(symbol)
 
 
 def _throttle():
@@ -50,6 +57,7 @@ def fetch_one(
 
     返回 DataFrame 或 None。
     """
+    symbol = _normalize_symbol(symbol)
     path = HUB.stock_daily_path(symbol)
 
     # 如果文件已存在且不强制，增量更新
@@ -111,6 +119,7 @@ def read_one(symbol: str) -> Optional[pd.DataFrame]:
     """
     纯本地读取 — 消费者唯一入口。不从 API 拉。
     """
+    symbol = _normalize_symbol(symbol)
     return HUB.read_parquet(HUB.stock_daily_path(symbol))
 
 

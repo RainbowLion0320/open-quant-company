@@ -15,18 +15,13 @@ tags: [cache, parquet, financials, architecture, akshare, PIT, feature-store, fu
 ```
 get_financial_summary(symbol)
   │
-  ├─ 1. 内存缓存 (dict)
-  │   key: f"financial_summary_{symbol}"
-  │   命中 → 直接返回 ✅ (ns级)
+  ├─ 1. 本地 Parquet
+  │   path: data/store/stock/financials/{symbol}.parquet
+  │   命中 → pd.read_parquet → 返回
   │
-  ├─ 2. 磁盘缓存 (parquet)
-  │   path: data/cache/financials/{symbol}.parquet
-  │   命中 → pd.read_parquet → 填入内存 → 返回 ✅ (ms级)
-  │
-  └─ 3. AKShare API
-      ak.stock_financial_abstract_ths(symbol)
-      成功 → 写入 parquet → 填入内存 → 返回 (3-5s)
-      失败 → 回退 get_financial_indicator()
+  └─ 2. 外部 API 补数
+      scripts/cron_fetch_financials.py 或 repair_table.py
+      → data/fetchers/financial.py → AKShare
 ```
 
 ## 数据内容

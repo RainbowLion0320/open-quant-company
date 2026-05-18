@@ -78,7 +78,7 @@ class MacroFetcher:
         self.store_dir = HUB.store_dir("macro")
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
-    def fetch_indicator(self, name: str) -> Optional[pd.DataFrame]:
+    def fetch_indicator(self, name: str, force: bool = False) -> Optional[pd.DataFrame]:
         """
         Fetch one macro indicator.
         Caches to Parquet. Returns normalized DataFrame.
@@ -88,7 +88,7 @@ class MacroFetcher:
             return None
 
         cache_path = HUB.macro_path(name)
-        if cache_path.exists():
+        if cache_path.exists() and not force:
             try:
                 df = HUB.read_parquet(cache_path)
                 # Macro data updates monthly — cache for 7 days
@@ -172,12 +172,12 @@ class MacroFetcher:
 
         return raw
 
-    def fetch_all(self) -> Dict[str, pd.DataFrame]:
+    def fetch_all(self, force: bool = False) -> Dict[str, pd.DataFrame]:
         """Fetch all macro indicators."""
         results = {}
         for name in MACRO_INDICATORS:
             print(f"  [macro] Fetching {MACRO_INDICATORS[name]['label']}...")
-            df = self.fetch_indicator(name)
+            df = self.fetch_indicator(name, force=force)
             if df is not None:
                 results[name] = df
                 print(f"    ✓ {len(df)} rows")

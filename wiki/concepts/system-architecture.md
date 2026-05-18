@@ -101,9 +101,9 @@ strategies:
 
 ```
 1. 数据采集
-   AKShare → stock_zh_a_daily → data/cache/*.parquet
-   AKShare → stock_financial_abstract_ths → 同花顺财务
-   Tushare → daily_basic (PE/PB/市值) → data/store/
+   scripts/cron_fetch_ohlcv.py → data/store/stock/daily/{symbol}.parquet
+   scripts/cron_fetch_financials.py → data/store/stock/financials/{symbol}.parquet
+   Tushare → daily_basic (PE/PB/市值) → data/store/stock/valuation/{symbol}.parquet
 
 2. 数据清洗 (data/cleaner.py)
    OHLCV 完整性 → 异常值检测(保留涨跌停) → 停牌过滤 → 缺失值填充

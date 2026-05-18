@@ -28,7 +28,7 @@ def get_token() -> str:
     return get_tushare_token()
 
 
-def fetch_limit_list():
+def fetch_limit_list(force: bool = False):
     """
     拉取最新一天的涨跌停数据。
     1次/分钟限流 → 每次只拉1天。
@@ -45,7 +45,7 @@ def fetch_limit_list():
     for d in trade_days[:5]:  # Try up to 5 recent dates
         pq_path = store / f"{d}.parquet"
         cached = HUB.read_parquet(pq_path, default=pd.DataFrame())
-        if pq_path.exists() and cached is not None and cached.memory_usage().sum() > 0:
+        if not force and pq_path.exists() and cached is not None and cached.memory_usage().sum() > 0:
             continue
 
         try:
@@ -61,7 +61,7 @@ def fetch_limit_list():
     return fetched
 
 
-def fetch_research_report():
+def fetch_research_report(force: bool = False):
     """拉取最近一个月的研报数据。"""
     api = ts.pro_api(get_token())
     store = HUB.store_dir("stock") / "research_report"
@@ -70,7 +70,7 @@ def fetch_research_report():
     mon = datetime.now().strftime("%Y%m")
     pq_path = store / f"{mon}.parquet"
     cached = HUB.read_parquet(pq_path, default=pd.DataFrame())
-    if pq_path.exists() and cached is not None and len(cached) > 100:
+    if not force and pq_path.exists() and cached is not None and len(cached) > 100:
         print(f"  [research] ✓ {mon}: already cached")
         return 0
 
