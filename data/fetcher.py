@@ -340,61 +340,23 @@ def get_stock_daily(
     symbol: str,
     adjust: str = "qfq",
     force_refresh: bool = False,
-    source: str = "sina",  # sina / em / tx
+    source: str = "sina",
 ) -> pd.DataFrame:
     """
-    获取个股日线（前复权）
-    symbol: 如 '600519' 或 'sh600519'（自动适配格式）
-    adjust: qfq(前复权), hfq(后复权), ''(不复权)
-    source: sina(新浪,推荐), em(东方财富), tx(腾讯)
+    获取个股日线（前复权）— 优先读本地 parquet，缺失时 fallback 到 API。
     """
-    cache_key = f"stock_daily_{symbol}_{adjust}_{source}"
+    from data.fetchers.stock_daily import read_one, fetch_one
+
     if not force_refresh:
-        cached = _read_cache(cache_key, max_age_hours=TTL_DAILY)
-        if cached is not None:
-            return cached
+        df = read_one(symbol)
+        if df is not None and len(df) > 0:
+            return df
 
-    import akshare as ak
-
-    _throttle()  # API调用前节流
-    if source == "sina":
-        df = ak.stock_zh_a_daily(symbol=_to_sina_symbol(symbol), adjust=adjust)
-        col_map = {
-            "date": "date",
-            "open": "open", "close": "close", "high": "high", "low": "low",
-            "volume": "volume", "amount": "amount",
-            "outstanding_share": "outstanding_share",
-            "turnover": "turnover",
-        }
-        df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
-
-    elif source == "tx":
-        import datetime
-        df = ak.stock_zh_a_hist_tx(
-            symbol=_to_sina_symbol(symbol),
-            start_date="19900101",
-            end_date=datetime.date.today().strftime("%Y%m%d"),
-        )
-        col_map = {
-            "date": "date",
-            "open": "open", "close": "close", "high": "high", "low": "low",
-            "amount": "volume",
-        }
-        df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
-
-    else:  # em (东方财富)
-        df = ak.stock_zh_a_hist(symbol=_to_plain_code(symbol), period="daily", adjust=adjust)
-        col_map = {
-            "日期": "date", "股票代码": "symbol",
-            "开盘": "open", "收盘": "close", "最高": "high", "最低": "low",
-            "成交量": "volume", "成交额": "amount",
-            "振幅": "amplitude", "涨跌幅": "pct_change",
-            "涨跌额": "change", "换手率": "turnover",
-        }
-        df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
-
-    _write_cache(cache_key, df)
-    return df
+    # Fallback: 本地无数据，从 API 拉取
+    df = fetch_one(symbol, source=source, adjust=adjust, force=True)
+    if df is not None and len(df) > 0:
+        return df
+    return pd.DataFrame()
 
 
 @retry_with_backoff(max_retries=3, base_delay=2.0)
@@ -404,19 +366,19 @@ def get_financial_indicator(
 ) -> pd.DataFrame:
     """
     获取财务指标（ROE、毛利率、资产负债率等）
-    数据来源：同花顺
+    数据来源：同花顺 → 本地 parquet
     """
-    cache_key = f"financial_{symbol}"
-    if not force_refresh:
-        cached = _read_cache(cache_key, max_age_hours=720)  # 30天，季度财报更新周期
-        if cached is not None:
-            return cached
+    from data.fetchers.financial import read_financial_summary, fetch_financial_summary
 
-    import akshare as ak
-    _throttle()
-    df = ak.stock_financial_abstract_ths(symbol=symbol, indicator="按报告期")
-    _write_cache(cache_key, df)
-    return df
+    if not force_refresh:
+        df = read_financial_summary(symbol)
+        if df is not None and len(df) > 0:
+            return df
+
+    df = fetch_financial_summary(symbol)
+    if df is not None and len(df) > 0:
+        return df
+    return pd.DataFrame()
 
 
 @retry_with_backoff(max_retries=2, base_delay=3.0)

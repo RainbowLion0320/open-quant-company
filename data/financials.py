@@ -91,54 +91,19 @@ def _get_cache_path(symbol: str) -> str:
 @retry_with_backoff(max_retries=2, base_delay=2.0)
 def get_financial_summary(symbol: str, force_refresh: bool = False) -> pd.DataFrame:
     """
-    获取个股财务摘要（同花顺源）
-    返回包含 ROE、毛利率、资产负债率等核心指标的 DataFrame
-    列: 报告期, 净利润, 营业总收入, 净资产收益率, 销售毛利率, 资产负债率, ...
-    两层缓存: 内存 → 磁盘(parquet) → AKShare API
+    获取个股财务摘要（同花顺源 → 本地 parquet）
     """
-    cache_key = f"financial_summary_{symbol}"
+    from data.fetchers.financial import read_financial_summary, fetch_financial_summary
 
-    # 1. 内存缓存
-    if not force_refresh and cache_key in _financial_cache:
-        return _financial_cache[cache_key]
+    if not force_refresh:
+        df = read_financial_summary(symbol)
+        if df is not None and len(df) > 0:
+            return df
 
-    # 2. 磁盘缓存
-    cache_path = _get_cache_path(symbol)
-    if not force_refresh and _os.path.exists(cache_path):
-        try:
-            df = _HUB.read_parquet(cache_path)
-            if len(df) > 0:
-                _financial_cache[cache_key] = df
-                _evict_lru()
-                return df
-        except Exception:
-            pass  # 损坏的缓存文件，重新拉取
-
-    # 3. API 拉取
-    try:
-        import akshare as ak
-        df = ak.stock_financial_abstract_ths(symbol=symbol, indicator="按报告期")
-    except (ImportError, ConnectionError, ValueError) as e:
-        df = get_financial_indicator(symbol, force_refresh=force_refresh)
-
-    if len(df) == 0:
+    df = fetch_financial_summary(symbol)
+    if df is not None and len(df) > 0:
         return df
-
-    # 写入磁盘缓存 — 转换 object 列为 str，避免 to_parquet 报错 (如 "64.75%")
-    try:
-        df_write = df.copy()
-        for col in df_write.columns:
-            if df_write[col].dtype == object:
-                df_write[col] = df_write[col].astype(str)
-        _HUB.write_parquet(df_write, cache_path)
-    except Exception as e:
-        # 静默但记录 — 不阻塞主流程
-        import sys as _sys
-        print(f"  [CACHE_WARN] parquet write failed for {symbol}: {e}", file=_sys.stderr)
-
-    _financial_cache[cache_key] = df
-    _evict_lru()
-    return df
+    return pd.DataFrame()
 
 
 def extract_roe_history(df: pd.DataFrame, years: int = None) -> List[float]:

@@ -132,6 +132,22 @@ class DataHub:
     def asset_daily_path(self, asset_type: str, symbol: str) -> Path:
         return self.store_dir(asset_type) / "daily" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
 
+    def stock_daily_path(self, symbol: str) -> Path:
+        """OHLCV 日线 per-symbol parquet."""
+        return self.store_dir("stock") / "daily" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+
+    def stock_financial_path(self, symbol: str) -> Path:
+        """财务摘要 per-symbol parquet."""
+        return self.store_dir("stock") / "financials" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+
+    def stock_fina_indicator_path(self, symbol: str) -> Path:
+        """Tushare 财务指标 per-symbol parquet."""
+        return self.store_dir("stock") / "fina_indicator" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+
+    def stock_valuation_path(self, symbol: str) -> Path:
+        """每日估值 PE/PB/PS per-symbol parquet."""
+        return self.store_dir("stock") / "valuation" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+
     def model_path(self, name: str) -> Path:
         return self.project_root / "data" / "models" / f"{_safe_leaf(name, 'model dataset')}.parquet"
 
