@@ -11,6 +11,7 @@ const router = createRouter({
     { path: "/backtest", name: "backtest", component: () => import("../views/Backtest.vue") },
     { path: "/signals", name: "signals", component: () => import("../views/Signals.vue") },
     { path: "/monitor", name: "monitor", component: () => import("../views/ActivityMonitor.vue") },
+    { path: "/db-health", name: "db-health", component: () => import("../views/DatabaseHealth.vue") },
     { path: "/hindsight", name: "hindsight", component: () => import("../views/HindsightGraph.vue") },
   ],
 });

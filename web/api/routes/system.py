@@ -1,4 +1,7 @@
 """系统活动监视器 — SQLite 时序库 + 历史趋势"""
+import json
+
+import numpy as np
 from fastapi import APIRouter, Query
 import sqlite3
 import psutil
@@ -117,4 +120,46 @@ async def deepseek_usage():
         "models": df["model"].unique().tolist(),
         "dates": sorted(df["utc_date"].unique().tolist()),
         "total_cost": float(df["cost_cny"].sum()),
+    }
+
+
+@router.get("/db-health")
+async def db_health():
+    """数据库健康检查结果 — 最新一次扫描"""
+    import pandas as pd
+    pq = HUB.store_root / "db_health.parquet"
+    if not pq.exists():
+        return {"data": [], "summary": None, "status": "no_data", "message": "尚未运行健康检查，请等待周六自动扫描或手动触发"}
+
+    df = pd.read_parquet(pq)
+    summary_rows = df[df["table"] == "__SUMMARY__"]
+    data_rows = df[df["table"] != "__SUMMARY__"]
+
+    summary = None
+    if len(summary_rows) > 0:
+        s = summary_rows.iloc[0].to_dict()
+        summary = {
+            "tables": int(s.get("columns", 0)),
+            "total_size_mb": float(s.get("size_mb", 0)),
+            "avg_missing_pct": float(s.get("missing_pct", 0)),
+            "total_outliers": int(s.get("outlier_count", 0)),
+            "checked_at": str(s.get("checked_at", "")),
+        }
+
+    records = []
+    for _, r in data_rows.iterrows():
+        rec = r.to_dict()
+        rec["missing_cols"] = json.loads(rec.get("missing_cols", "{}"))
+        rec["outlier_cols"] = json.loads(rec.get("outlier_cols", "{}"))
+        # NaN → None for JSON
+        for k in rec:
+            if isinstance(rec[k], float) and (pd.isna(rec[k]) or np.isnan(rec[k])):
+                rec[k] = None
+        records.append(rec)
+
+    return {
+        "data": records,
+        "summary": summary,
+        "status": "ok",
+        "checked_at": summary["checked_at"] if summary else None,
     }
