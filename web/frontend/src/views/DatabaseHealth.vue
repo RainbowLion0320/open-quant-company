@@ -139,6 +139,20 @@
                     <strong>错误</strong>
                     <p class="error-text">{{ row.error }}</p>
                   </div>
+                  <div v-if="row.time_breakdown && Object.keys(row.time_breakdown).length" class="detail-section">
+                    <strong>按时间分段</strong>
+                    <div class="breakdown-grid">
+                      <div v-for="(info, period) in row.time_breakdown" :key="period" class="breakdown-row">
+                        <span class="bd-period">{{ period }}</span>
+                        <span class="bd-rows">{{ info.rows }} 行</span>
+                        <span class="bd-missing" :class="bdMissingClass(info.missing_pct)">缺失 {{ info.missing_pct }}%</span>
+                        <span class="bd-outlier" v-if="info.outliers && Object.keys(info.outliers).length">异常 {{ Object.values(info.outliers).reduce((a,b)=>a+b,0) }}</span>
+                        <span v-if="info.missing_cols && Object.keys(info.missing_cols).length" class="bd-cols">
+                          <span v-for="(pct, col) in info.missing_cols" :key="col" class="health-tag tag-warn">{{ col }}:{{ pct }}%</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -268,6 +282,13 @@ function freshnessClass(days: number | null): string {
   if (days <= 1) return "val-ok";
   if (days <= 7) return "val-warn";
   return "val-bad";
+}
+
+function bdMissingClass(pct: number): string {
+  if (pct === 0) return "bd-ok";
+  if (pct < 5) return "bd-low";
+  if (pct < 20) return "bd-mid";
+  return "bd-high";
 }
 
 function hasDetail(row: HealthRow): boolean {
@@ -569,5 +590,51 @@ td.mono { font-family: var(--font-mono, "JetBrains Mono", monospace); }
   background: rgba(239,68,68,0.08);
   color: var(--negative);
   border: 1px solid rgba(239,68,68,0.2);
+}
+
+/* Time breakdown */
+.breakdown-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 4px;
+  flex-wrap: wrap;
+}
+.bd-period {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 56px;
+}
+.bd-rows {
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 48px;
+}
+.bd-missing {
+  font-size: 11px;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  min-width: 80px;
+}
+.bd-ok { color: var(--positive); }
+.bd-low { color: var(--warning); }
+.bd-mid { color: #f97316; }
+.bd-high { color: var(--negative); }
+.bd-outlier {
+  font-size: 11px;
+  color: var(--negative);
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+}
+.bd-cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 </style>

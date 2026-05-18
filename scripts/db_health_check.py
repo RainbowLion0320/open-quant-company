@@ -70,6 +70,108 @@ def _freshness_days(df: pd.DataFrame) -> Optional[int]:
     return None
 
 
+def _find_date_col(df: pd.DataFrame) -> Optional[str]:
+    """Find a date-like column in the DataFrame."""
+    for dc in df.columns:
+        if dc.lower() in ("date", "trade_date", "ann_date", "end_date", "ts"):
+            try:
+                s = pd.to_datetime(df[dc], errors="coerce")
+                if s.notna().sum() > 0:
+                    return dc
+            except Exception:
+                continue
+    return None
+
+
+def _time_breakdown(df: pd.DataFrame) -> Optional[dict]:
+    """
+    If the DataFrame has a date column, compute missing/outlier stats
+    per time period: 近1年, 近5年, 近10年, 近20年, 20年前.
+
+    Returns a JSON-serializable dict, or None if no date column.
+    """
+    date_col = _find_date_col(df)
+    if date_col is None:
+        return None
+
+    today = pd.Timestamp(date.today())
+    cuts = {
+        "近1年": today - pd.DateOffset(years=1),
+        "近5年": today - pd.DateOffset(years=5),
+        "近10年": today - pd.DateOffset(years=10),
+        "近20年": today - pd.DateOffset(years=20),
+        "20年前": None,  # everything before 20 years
+    }
+
+    result = {}
+    numeric_cols = list(df.select_dtypes(include=[np.number]).columns)
+
+    for label in ["近1年", "近5年", "近10年", "近20年", "20年前"]:
+        lo = cuts.get(label)
+        hi = None
+        if label == "20年前":
+            hi = cuts["近20年"]
+        else:
+            # Find the next smaller period's cut as the upper bound
+            keys = list(cuts.keys())
+            idx = keys.index(label)
+            if idx > 0:
+                hi = cuts[keys[idx - 1]]
+
+        # Filter rows
+        dates = pd.to_datetime(df[date_col], errors="coerce")
+        if lo is None:
+            mask = dates < hi
+        elif hi is None:
+            mask = dates >= lo
+        else:
+            mask = (dates >= lo) & (dates < hi)
+
+        sub = df[mask]
+        n_rows = len(sub)
+        if n_rows == 0:
+            result[label] = {"rows": 0, "missing_pct": 0, "missing_cols": {}, "outliers": {}}
+            continue
+
+        # Missing per column
+        missing_cols = {}
+        total_missing = 0
+        for c in numeric_cols:
+            if c not in sub.columns:
+                continue
+            pct = float(sub[c].isna().mean() * 100)
+            if pct > 0:
+                missing_cols[c] = round(pct, 1)
+                total_missing += pct
+        avg_missing = round(total_missing / max(len(numeric_cols), 1), 1)
+
+        # Outliers per column
+        outlier_cols = {}
+        for c in numeric_cols:
+            if c not in sub.columns:
+                continue
+            col = sub[c].dropna()
+            if len(col) < 10:
+                continue
+            q1, q3 = float(col.quantile(0.25)), float(col.quantile(0.75))
+            iqr = q3 - q1
+            if iqr == 0:
+                continue
+            lo_bound, hi_bound = q1 - 3 * iqr, q3 + 3 * iqr
+            cnt = int(((col < lo_bound) | (col > hi_bound)).sum())
+            if cnt > 0:
+                outlier_cols[c] = cnt
+
+        result[label] = {
+            "rows": n_rows,
+            "missing_pct": avg_missing,
+            "missing_cols": missing_cols,
+            "outliers": outlier_cols,
+        }
+
+    return result
+
+
 def _scan_single(label: str, path: Path, source: str = "") -> dict:
     """Scan one parquet file."""
     size_mb = round(path.stat().st_size / 1024 / 1024, 3)
@@ -78,6 +180,7 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
         missing = _missing_pct(df)
         outliers = _outlier_count(df)
         freshness = _freshness_days(df)
+        tb = _time_breakdown(df)
         return {
             "table": label,
             "source": source,
@@ -90,6 +193,7 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
             "outlier_count": outliers["total"],
             "outlier_cols": json.dumps(outliers["per_column"], ensure_ascii=False),
             "freshness_days": freshness,
+            "time_breakdown": json.dumps(tb, ensure_ascii=False) if tb else "{}",
             "error": None,
         }
     except Exception as e:
@@ -105,6 +209,7 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
             "outlier_count": 0,
             "outlier_cols": "{}",
             "freshness_days": None,
+            "time_breakdown": "{}",
             "error": str(e),
         }
 
@@ -172,6 +277,7 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
         "outlier_count": total_outliers,
         "outlier_cols": json.dumps(outlier_cols_agg, ensure_ascii=False),
         "freshness_days": min_freshness,
+        "time_breakdown": "{}",
         "error": f"{errors} read errors" if errors else None,
     }
 
@@ -313,6 +419,7 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         "outlier_count": total_outliers,
         "outlier_cols": "{}",
         "freshness_days": None,
+        "time_breakdown": "{}",
         "error": None,
     }]
 

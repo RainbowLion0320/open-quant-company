@@ -185,6 +185,7 @@ async def db_health():
         rec = {k: _json_value(v) for k, v in r.to_dict().items()}
         rec["missing_cols"] = _json_map(rec.get("missing_cols"))
         rec["outlier_cols"] = _json_map(rec.get("outlier_cols"))
+        rec["time_breakdown"] = _json_map(rec.get("time_breakdown"))
         records.append(rec)
 
     return {
