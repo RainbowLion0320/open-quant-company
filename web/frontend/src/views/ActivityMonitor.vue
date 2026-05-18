@@ -56,23 +56,18 @@
       <div class="deepseek-panel glass-card">
         <div class="panel-head">
           <span>DEEPSEEK USAGE · 30D</span>
-          <div class="usage-total">
-            <span class="tag-badge cyan">PRO {{ fmtNum(dsTotals?.pro ?? 0) }}</span>
-            <span class="tag-badge violet">FLASH {{ fmtNum(dsTotals?.flash ?? 0) }}</span>
-            <span class="tag-badge amber">¥{{ (dsTotals?.cost ?? 0).toFixed(0) }}</span>
-          </div>
         </div>
 
         <div class="usage-summary">
-          <div>
+          <div class="usage-pro">
             <span>v4-pro tokens</span>
             <strong>{{ fmtNum(dsTotals?.pro ?? 0) }}</strong>
           </div>
-          <div>
+          <div class="usage-flash">
             <span>v4-flash tokens</span>
             <strong>{{ fmtNum(dsTotals?.flash ?? 0) }}</strong>
           </div>
-          <div>
+          <div class="usage-cost">
             <span>estimated CNY</span>
             <strong>¥{{ (dsTotals?.cost ?? 0).toFixed(0) }}</strong>
           </div>
@@ -449,10 +444,10 @@ async function drawDSChart() {
           for (const date of costDates) {
             const di = dates.indexOf(date), val = costByDate[date];
             const x0 = leftPad + di * slotWc + (slotWc - barWc) / 2;
-            ctx.fillStyle = "rgba(6,182,212,0.35)";
+            ctx.fillStyle = "rgba(232,168,64,0.42)";
             ctx.fillRect(x0, H - botPad - (val/maxCost)*chartH, barWc, (val/maxCost)*chartH);
           }
-          ctx.beginPath(); ctx.strokeStyle = "#06b6d4"; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.strokeStyle = "#e8a840"; ctx.lineWidth = 1.2;
           for (let i = 0; i < costDates.length; i++) {
             const di = dates.indexOf(costDates[i]), val = costByDate[costDates[i]];
             const x = leftPad + di * slotWc + slotWc / 2;
@@ -585,12 +580,6 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 }
 
 /* ── Charts ── */
-.usage-total {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
 .usage-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -617,6 +606,12 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
   font-family: "JetBrains Mono", monospace;
   font-size: 15px;
 }
+.usage-pro strong { color: rgba(6,182,212,0.95); }
+.usage-pro { border-left: 2px solid rgba(6,182,212,0.35) !important; }
+.usage-flash strong { color: rgba(124,58,237,0.95); }
+.usage-flash { border-left: 2px solid rgba(124,58,237,0.35) !important; }
+.usage-cost strong { color: rgba(232,168,64,0.95); }
+.usage-cost { border-left: 2px solid rgba(232,168,64,0.35) !important; }
 .chart-stack {
   display: grid;
   gap: 10px;
@@ -851,9 +846,5 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
   .panel-head {
     align-items: flex-start;
     flex-direction: column;
-  }
-  .usage-total {
-    justify-content: flex-start;
-  }
-}
+  }}
 </style>
