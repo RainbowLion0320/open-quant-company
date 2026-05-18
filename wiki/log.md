@@ -651,3 +651,31 @@ Codex: `<strong>` + `<em>` + CSS 赋色
 - 页面容器用 `.view-page` class (quantum.css 全局共享)
 - grid 用 `minmax()` 防塌缩，字号用 `clamp()` 做响应式
 - 语义标签: `<article>` → 独立卡片, `<aside>` → 侧栏, `<section>` → 页面分区
+
+## 2026-05-18: Codex 架构加固 — 插件注册表 + 合约测试 + 软约束硬化 (commit 2033584)
+
+### 核心交付 (28 files, 986 insertions)
+
+**1. 策略插件注册表 (data/strategy_plugins.py, 135行)**
+- `DEFAULT_RUNNERS` 字典：每个策略名 → `module:function` 映射
+- `StrategyPlugin` 冻结 dataclass：name/label/runner/signal_name，不可变合约
+- `load_runner()`：运行时 `importlib.import_module` + `getattr` 动态加载
+- `compute()` → `save()` 统一生命周期
+- `run_registered_strategies()`：CLI 和 Web 统一的调度入口，带 progress_callback
+
+**2. settings.yaml 显式化**
+- 每个策略新增 `runner` 和 `signal_name` 字段
+- Paper trading 新增硬约束：lot_size=100, order_value_pct=0.05, max_order_value=50000, max_orders_per_strategy=5, sell_all_on_sell_signal=true
+- ML 新增：max_feature_age_months=3, allow_stale_features=false, allow_live_factor_fallback=false
+
+**3. 架构合约测试 (tests/test_architecture_contracts.py, 73行)**
+- `test_enabled_strategy_plugins_have_runners()`：所有启用策略的 runner 必须可调用
+- `test_datahub_catalog_includes_data_registry_dimensions()`：catalog 必须覆盖数据维度
+- `test_build_features_import_is_safe()`：模块导入安全
+- `test_paper_broker_never_sells_more_than_position_when_t0()`：卖不超过持仓
+- `test_prepare_xy_drops_missing_targets()`：缺失目标自动丢弃
+- `test_model_evaluate_datetime_index_icir_does_not_crash()`：ICIR 计算不崩溃
+
+### 底层文件内化
+- **SOUL.md**: 新增「插件注册」(认知层)、「软约束硬化」「架构合约测试」(执行层) 三条哲学
+- **CLAUDE.md**: 文件树新增 strategy_plugins.py + tests 描述更新

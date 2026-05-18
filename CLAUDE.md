@@ -53,6 +53,7 @@
 │   ├── cleaner.py                # 6规则数据清洗
 │   ├── tushare_utils.py          # Token 统一管理
 │   ├── datahub.py                 # 数据中台: 统一路径/原子写入/追加去重/审计
+│   ├── strategy_plugins.py        # 策略运行时注册: 配置驱动dispatch, 动态import
 │   ├── db.py + results_db.py     # Parquet存储 + DuckDB视图
 │   ├── assets/{base,stock}.py    # 多资产架构 + StockAsset
 │   ├── fetchers/{moneyflow,holders,macro}.py  # 数据获取器
@@ -87,7 +88,7 @@
 ├── web/api/                      # FastAPI (routes + ws + jobs)
 ├── web/frontend/                 # Vue 3 SPA (Quantum Terminal)
 ├── wiki/                         # LLM Wiki (16页)
-├── tests/                        # 边界测试
+├── tests/                        # 合约测试 + 边界测试
 ├── docs/tushare-mcp-guide.md     # Tushare文档
 ├── config/workflows/*.yaml       # 研究/因子发现 pipeline
 ├── Makefile                      # 构建/扫描命令
