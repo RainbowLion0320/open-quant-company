@@ -58,8 +58,10 @@
             <th class="num">列数</th>
             <th class="num">文件数</th>
             <th class="num">大小</th>
-            <th class="num">缺失%</th>
-            <th class="num">异常值</th>
+            <th class="num">缺失(10y)</th>
+            <th class="num" style="opacity:0.5">缺失(10y+)</th>
+            <th class="num">异常(10y)</th>
+            <th class="num" style="opacity:0.5">异常(10y+)</th>
             <th class="num">新鲜度</th>
             <th>详情</th>
             <th>修复</th>
@@ -78,14 +80,16 @@
               <td class="num">{{ row.files || 1 }}</td>
               <td class="num mono">{{ fmtSize(row.size_mb) }}</td>
               <td class="num">
-                <span :class="missingClass(row.missing_pct)">
-                  {{ row.missing_pct?.toFixed(1) ?? '—' }}%
-                </span>
+                <span :class="missingClass(row.missing_pct_10y)">{{ fmtMiss10y(row) }}</span>
+              </td>
+              <td class="num" style="opacity:0.5">
+                <span class="val-dim">{{ fmtMiss10yPlus(row) }}</span>
               </td>
               <td class="num">
-                <span :class="outlierClass(row.outlier_count)">
-                  {{ fmtCount(row.outlier_count) }}
-                </span>
+                <span :class="outlierClass(row.outlier_count_10y)">{{ fmtCount(row.outlier_count_10y) }}</span>
+              </td>
+              <td class="num" style="opacity:0.5">
+                <span class="val-dim">{{ fmtCount(row.outlier_count_10y_plus) }}</span>
               </td>
               <td class="num">
                 <span :class="freshnessClass(row.freshness_days)">
@@ -117,7 +121,7 @@
 
             <!-- Expanded detail row -->
             <tr v-if="expanded === i" class="detail-row">
-              <td :colspan="11">
+              <td :colspan="13">
                 <div class="detail-panel">
                   <div v-if="row.missing_cols && Object.keys(row.missing_cols).length" class="detail-section">
                     <strong>缺失值 (按列)</strong>
@@ -251,6 +255,15 @@ function fmtTime(iso: string | undefined): string {
   }
 }
 
+function fmtMiss10y(row: HealthRow): string {
+  const v = (row as any).missing_pct_10y;
+  return v != null ? v.toFixed(1) + "%" : "—";
+}
+function fmtMiss10yPlus(row: HealthRow): string {
+  const v = (row as any).missing_pct_10y_plus;
+  return v != null ? v.toFixed(1) + "%" : "—";
+}
+
 function freshnessLabel(days: number | null): string {
   if (days == null) return "—";
   if (days < 0) return `${Math.abs(days)}天后`;
@@ -269,7 +282,23 @@ function missingClass(pct: number | null | undefined): string {
   return "val-bad";
 }
 
+function missingClassAny(pct: number | null | undefined): string {
+
+  if (pct == null) return "";
+  if (pct === 0) return "val-ok";
+  if (pct < 5) return "val-warn";
+  return "val-bad";
+}
+
 function outlierClass(cnt: number | null | undefined): string {
+  if (cnt == null) return "";
+  if (cnt === 0) return "val-ok";
+  if (cnt < 100) return "val-warn";
+  return "val-bad";
+}
+
+function outlierClassAny(cnt: number | null | undefined): string {
+
   if (cnt == null) return "";
   if (cnt === 0) return "val-ok";
   if (cnt < 100) return "val-warn";
@@ -463,6 +492,7 @@ td.mono { font-family: var(--font-mono, "JetBrains Mono", monospace); }
 
 /* Value colors */
 .val-ok { color: var(--positive); }
+.val-dim { color: var(--text-muted); }
 .val-warn { color: var(--warning); }
 .val-bad { color: var(--negative); }
 

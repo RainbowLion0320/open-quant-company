@@ -181,6 +181,20 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
         outliers = _outlier_count(df)
         freshness = _freshness_days(df)
         tb = _time_breakdown(df)
+        # Extract 10y split from time breakdown
+        miss_10y = 0.0
+        miss_10y_plus = 0.0
+        out_10y = 0
+        out_10y_plus = 0
+        if tb:
+            for period, info in tb.items():
+                if period == "20年前":
+                    miss_10y_plus += info.get("missing_pct", 0)
+                    out_10y_plus += sum(info.get("outliers", {}).values())
+                elif period in ("近1年","近5年","近10年","近20年"):
+                    miss_10y += info.get("missing_pct", 0)
+                    out_10y += sum(info.get("outliers", {}).values())
+            miss_10y = round(miss_10y / max(len([k for k in tb if k != "20年前"]), 1), 2)
         return {
             "table": label,
             "source": source,
@@ -189,8 +203,12 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
             "columns": len(df.columns),
             "size_mb": size_mb,
             "missing_pct": missing["overall_pct"],
+            "missing_pct_10y": miss_10y,
+            "missing_pct_10y_plus": miss_10y_plus,
             "missing_cols": json.dumps(missing["per_column"], ensure_ascii=False),
             "outlier_count": outliers["total"],
+            "outlier_count_10y": out_10y,
+            "outlier_count_10y_plus": out_10y_plus,
             "outlier_cols": json.dumps(outliers["per_column"], ensure_ascii=False),
             "freshness_days": freshness,
             "time_breakdown": json.dumps(tb, ensure_ascii=False) if tb else "{}",
@@ -205,8 +223,12 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
             "columns": 0,
             "size_mb": size_mb,
             "missing_pct": 100.0,
+            "missing_pct_10y": 0,
+            "missing_pct_10y_plus": 100.0,
             "missing_cols": "{}",
             "outlier_count": 0,
+            "outlier_count_10y": 0,
+            "outlier_count_10y_plus": 0,
             "outlier_cols": "{}",
             "freshness_days": None,
             "time_breakdown": "{}",
@@ -274,7 +296,11 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
         "size_mb": round(total_size / 1024 / 1024, 2),
         "missing_pct": round(total_missing / max(n, 1), 2),
         "missing_cols": json.dumps(missing_cols_agg, ensure_ascii=False),
+        "missing_pct_10y": 0,
+        "missing_pct_10y_plus": 0,
         "outlier_count": total_outliers,
+        "outlier_count_10y": 0,
+        "outlier_count_10y_plus": 0,
         "outlier_cols": json.dumps(outlier_cols_agg, ensure_ascii=False),
         "freshness_days": min_freshness,
         "time_breakdown": "{}",
@@ -416,7 +442,11 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         "size_mb": round(total_size, 2),
         "missing_pct": avg_missing,
         "missing_cols": "{}",
+        "missing_pct_10y": 0,
+        "missing_pct_10y_plus": 0,
         "outlier_count": total_outliers,
+        "outlier_count_10y": 0,
+        "outlier_count_10y_plus": 0,
         "outlier_cols": "{}",
         "freshness_days": None,
         "time_breakdown": "{}",
