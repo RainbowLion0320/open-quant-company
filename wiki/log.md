@@ -1,7 +1,7 @@
 ---
 title: Wiki Log
 created: 2026-05-13
-updated: 2026-05-18
+updated: 2026-05-19
 type: meta
 tags: [log]
 ---
@@ -679,3 +679,87 @@ Codex: `<strong>` + `<em>` + CSS 赋色
 ### 底层文件内化
 - **SOUL.md**: 新增「插件注册」(认知层)、「软约束硬化」「架构合约测试」(执行层) 三条哲学
 - **CLAUDE.md**: 文件树新增 strategy_plugins.py + tests 描述更新
+
+---
+
+## 2026-05-18 pm — 数据库健康检查系统
+
+### 需求
+用户要求对整个数据库的每项数据做定期健康检查（缺失值/异常值），周六执行一次，Web UI 有独立页签展示。
+
+### 实现 (commit 40abc6a)
+- `scripts/db_health_check.py`: 扫描 29 张逻辑表，检测缺失值%、异常值(IQR×3)、新鲜度天数
+- `web/api/routes/system.py`: `GET /api/system/db-health` + `POST /db-health/repair/{table}` + `GET /db-health/repair-status/{job_id}`
+- `DatabaseHealth.vue`: 4 格 hero 摘要 + 状态条 + 可展开详情表格 + 修复列
+- Cron: 每周六 08:00 自动扫描
+
+### 迭代 (commit 6c3b2ac → d4ec7d4)
+- 修复详情展开/收起 bug (v-for 作用域问题)
+- 添加数据源列 + 中文 hover tooltip (`label_zh` 字段存于 TABLE_META)
+- 修复按钮: 17 张可修复表（API源），12 张不可修复（计算值/模拟）。点修复 → 后台异步拉数据 → 轮询进度 → 自动刷新
+- 修复脚本 `scripts/repair_table.py`: 按表名映射到对应 fetcher 直接调用
+
+### wiki 补充
+- 新建 `wiki/reference/data-dimensions.md` — 32 维度注册表 + 文件树
+- 新建 `wiki/reference/data-schema.md` — 18 类 Parquet 表完整列定义
+- wiki 页数 16 → 18
+
+---
+
+## 2026-05-18 pm — Parquet-First 架构重构
+
+### 动机
+用户要求"地毯式重构数据系统"：日常使用全部读本地 parquet，API 只在 cron 中调用。摸底发现：
+- `data/fetcher.py` 有 14 处 AKShare 调用，被 15+ 模块在运行时直接调用
+- `data/financials.py` 有 2 处 AKShare 调用
+- 5 个核心维度有注册但无 parquet 存储
+- 14 个维度有 parquet 但无 cron 刷新
+
+### Phase 1: 落盘 (commit 4456c14)
+- 新建 `data/fetchers/stock_daily.py` — OHLCV fetch_one/read_one/fetch_all，写入 `data/store/stock/daily/{symbol}.parquet`
+- 新建 `data/fetchers/financial.py` — 财务摘要 + 估值 + 财务指标 fetch/read
+- `data/datahub.py`: 新增 `stock_daily_path()`, `stock_financial_path()`, `stock_fina_indicator_path()`, `stock_valuation_path()`
+
+### Phase 2: 统一读入口
+- `data/fetcher.py::get_stock_daily()` → 读 parquet，缺数据时 fallback API
+- `data/fetcher.py::get_financial_indicator()` → 同上
+- `data/financials.py::get_financial_summary()` → 同上
+
+### Phase 3: 补 cron
+- OHLCV Daily Fetch: 周一~五 15:31
+- Financial Monthly Refresh: 每月3号 02:00
+- Macro Monthly Refresh: 每月1号 03:00
+
+### 验证
+- 000001 OHLCV: 8351 行，343KB parquet，读写正常
+- 000001 财务: 121 行，28KB parquet，读写正常
+- 老接口 `get_stock_daily()` `get_financial_indicator()` 向后兼容
+
+---
+
+## 2026-05-18 pm — Codex 收紧 parquet 健康与修复路径 (commit 3c71b5c)
+
+### 核心保护: API 防触网
+新增 `QUANT_ALLOW_API_FALLBACK` 环境变量。未设置时 `get_stock_daily()` 和 `get_financial_indicator()` 在本地无数据时返回空 DataFrame，**禁止隐式触网**。
+
+### 修复脚本重写
+`repair_table.py` 从 subprocess 模式改为直接调用 fetcher 模块函数:
+- `stock_holders` → `HolderFetcher().batch_fetch(force=True)`
+- `repurchase` → 直接调 Tushare `pro_api().repurchase()`
+- `broker_recommend` → 按月拉取，支持 `--months` 参数
+- 新增 `--limit` (限制 symbol 数量) 和 `--days` (时间范围)
+
+### 质量提升
+- `_normalize_symbol()`: 统一处理 `000001`/`000001.SZ`/`sh000001` 等输入格式
+- `force` 参数: holders/moneyflow/macro fetchers 支持强制刷新
+- 线程安全: `_repair_jobs` 加 `threading.Lock()`
+- 健康检查采样: 优先选最近修改的文件
+- Hindsight 离线: `HF_HUB_OFFLINE=1` + `TRANSFORMERS_OFFLINE=1`
+- 前端: emoji 替换为纯文本 (`⟳`→`...`, `✓`→`OK`, `✗`→`ERR`)
+
+### 合约测试新增 2 条 (9/9 通过)
+- `test_stock_daily_read_path_does_not_implicitly_fetch_api`: 验证不触网
+- `test_repairable_tables_are_sourced_from_repair_map`: API 修复列表和脚本同步
+
+### wiki 更新
+- `data-sources.md`, `financial-cache.md`, `system-architecture.md`, `data-schema.md` 反映 parquet-first 新架构
