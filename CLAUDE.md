@@ -87,7 +87,7 @@
 │   └── cron_fetch_slow.py        # 限流数据日常填充
 ├── web/api/                      # FastAPI (routes + ws + jobs)
 ├── web/frontend/                 # Vue 3 SPA (Quantum Terminal)
-├── wiki/                         # LLM Wiki (17页)
+├── wiki/                         # LLM Wiki (18页)
 ├── tests/                        # 合约测试 + 边界测试
 ├── docs/tushare-mcp-guide.md     # Tushare文档
 ├── config/workflows/*.yaml       # 研究/因子发现 pipeline
