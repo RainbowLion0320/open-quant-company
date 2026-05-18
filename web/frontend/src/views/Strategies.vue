@@ -1,13 +1,10 @@
 <template>
   <div class="view-page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">策略中心</h1>
-        <p class="page-subtitle">扫描控制台 · 信号查看 · 手动触发</p>
-      </div>
+    <div class="flex items-center justify-between mb-2">
       <button @click="runAll" :disabled="store.running" class="btn btn-primary btn-sm">
         {{ store.running ? `运行中 ${store.progress}%` : '运行全部' }}
       </button>
+      <span v-if="loaded && store.strategies.length" class="text-2xs" style="color:var(--text-disabled)">{{ store.strategies.length }} strategies</span>
     </div>
 
     <!-- Progress Bar -->

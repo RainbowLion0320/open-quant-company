@@ -1,10 +1,7 @@
 <template>
   <div class="view-page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">模拟交易</h1>
-        <p class="page-subtitle">PaperBroker · T+1 制度 · 日频执行 · 持久化存储</p>
-      </div>
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-2xs" style="color:var(--text-disabled)">{{ summary.total_asset ? '¥' + summary.total_asset.toLocaleString() : '—' }}</span>
       <div class="flex gap-2">
         <button class="btn btn-sm" @click="refresh" :disabled="loading">
           {{ loading ? '刷新中...' : '刷新状态' }}

@@ -1,12 +1,5 @@
 <template>
   <div class="view-page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">个股深挖</h1>
-        <p class="page-subtitle">搜索股票代码或名称 · 查看基本面与信号</p>
-      </div>
-    </div>
-
     <!-- Search -->
     <div class="glass-card card-pad">
       <div class="flex gap-3">
