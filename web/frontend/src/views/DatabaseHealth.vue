@@ -39,6 +39,9 @@
     <div class="status-bar">
       <span class="status-dot" :class="statusClass"></span>
       <span v-if="statusText">{{ statusText }}</span>
+      <span class="env-tag" :class="apiFallback ? 'env-on' : 'env-off'">
+        API_FALLBACK: {{ apiFallback ? 'ON' : 'OFF' }}
+      </span>
       <span v-if="summary?.checked_at" class="checked-at">
         上次检查: {{ fmtTime(summary.checked_at) }}
       </span>
@@ -179,6 +182,7 @@ const rows = ref<HealthRow[]>([]);
 const summary = ref<HealthSummary | null>(null);
 const status = ref<"loading" | "ok" | "no_data" | "error">("loading");
 const expanded = ref<number | null>(null);
+const apiFallback = ref(false);
 const repairing = ref<Record<string, string>>({});  // table -> status
 
 const statusClass = computed(() => `dot-${status.value}`);
@@ -323,6 +327,7 @@ async function fetchData() {
       summary.value = null;
       return;
     }
+    apiFallback.value = !!data.api_fallback;
     rows.value = data.data || [];
     summary.value = data.summary || null;
     status.value = "ok";
@@ -547,4 +552,22 @@ td.mono { font-family: var(--font-mono, "JetBrains Mono", monospace); }
 .repair-na { color: var(--text-muted); font-size: 11px; }
 .spinning { display: inline-block; animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.env-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-weight: 500;
+}
+.env-on {
+  background: rgba(34,197,94,0.12);
+  color: var(--positive);
+  border: 1px solid rgba(34,197,94,0.25);
+}
+.env-off {
+  background: rgba(239,68,68,0.08);
+  color: var(--negative);
+  border: 1px solid rgba(239,68,68,0.2);
+}
 </style>

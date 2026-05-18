@@ -1,5 +1,6 @@
 """系统活动监视器 — SQLite 时序库 + 历史趋势"""
 import json
+import os
 import sys
 
 import numpy as np
@@ -191,6 +192,7 @@ async def db_health():
         "summary": summary,
         "status": "ok",
         "checked_at": summary["checked_at"] if summary else None,
+        "api_fallback": os.environ.get("QUANT_ALLOW_API_FALLBACK", "").lower() in {"1", "true", "yes", "on"},
     }
 
 
