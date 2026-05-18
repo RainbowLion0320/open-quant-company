@@ -61,70 +61,68 @@
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="(row, i) in rows"
-            :key="i"
-            :class="{ 'row-error': row.error }"
-          >
-            <td class="table-name">
-              <span class="name-text">{{ row.table }}</span>
-              <span v-if="row.error" class="error-badge" :title="row.error">⚠</span>
-            </td>
-            <td class="num">{{ fmtCount(row.rows) }}</td>
-            <td class="num">{{ row.columns }}</td>
-            <td class="num">{{ row.files || 1 }}</td>
-            <td class="num mono">{{ fmtSize(row.size_mb) }}</td>
-            <td class="num">
-              <span :class="missingClass(row.missing_pct)">
-                {{ row.missing_pct?.toFixed(1) ?? '—' }}%
-              </span>
-            </td>
-            <td class="num">
-              <span :class="outlierClass(row.outlier_count)">
-                {{ fmtCount(row.outlier_count) }}
-              </span>
-            </td>
-            <td class="num">
-              <span :class="freshnessClass(row.freshness_days)">
-                {{ freshnessLabel(row.freshness_days) }}
-              </span>
-            </td>
-            <td class="detail-cell">
-              <button
-                v-if="hasDetail(row)"
-                class="detail-btn"
-                @click="toggleDetail(i)"
-              >{{ expanded === i ? '收起' : '展开' }}</button>
-            </td>
-          </tr>
+          <template v-for="(row, i) in rows" :key="i">
+            <tr :class="{ 'row-error': row.error }">
+              <td class="table-name">
+                <span class="name-text">{{ row.table }}</span>
+                <span v-if="row.error" class="error-badge" :title="row.error">⚠</span>
+              </td>
+              <td class="num">{{ fmtCount(row.rows) }}</td>
+              <td class="num">{{ row.columns }}</td>
+              <td class="num">{{ row.files || 1 }}</td>
+              <td class="num mono">{{ fmtSize(row.size_mb) }}</td>
+              <td class="num">
+                <span :class="missingClass(row.missing_pct)">
+                  {{ row.missing_pct?.toFixed(1) ?? '—' }}%
+                </span>
+              </td>
+              <td class="num">
+                <span :class="outlierClass(row.outlier_count)">
+                  {{ fmtCount(row.outlier_count) }}
+                </span>
+              </td>
+              <td class="num">
+                <span :class="freshnessClass(row.freshness_days)">
+                  {{ freshnessLabel(row.freshness_days) }}
+                </span>
+              </td>
+              <td class="detail-cell">
+                <button
+                  v-if="hasDetail(row)"
+                  class="detail-btn"
+                  @click="toggleDetail(i)"
+                >{{ expanded === i ? '收起' : '展开' }}</button>
+              </td>
+            </tr>
 
-          <!-- Expanded detail row -->
-          <tr v-if="expanded === i" v-for="(row, i) in rows" :key="'d'+i" class="detail-row">
-            <td :colspan="9">
-              <div class="detail-panel">
-                <div v-if="row.missing_cols && Object.keys(row.missing_cols).length" class="detail-section">
-                  <strong>缺失值 (按列)</strong>
-                  <div class="tag-list">
-                    <span v-for="(pct, col) in row.missing_cols" :key="col" class="health-tag tag-warn">
-                      {{ col }}: {{ pct }}%
-                    </span>
+            <!-- Expanded detail row -->
+            <tr v-if="expanded === i" class="detail-row">
+              <td :colspan="9">
+                <div class="detail-panel">
+                  <div v-if="row.missing_cols && Object.keys(row.missing_cols).length" class="detail-section">
+                    <strong>缺失值 (按列)</strong>
+                    <div class="tag-list">
+                      <span v-for="(pct, col) in row.missing_cols" :key="col" class="health-tag tag-warn">
+                        {{ col }}: {{ pct }}%
+                      </span>
+                    </div>
+                  </div>
+                  <div v-if="row.outlier_cols && Object.keys(row.outlier_cols).length" class="detail-section">
+                    <strong>异常值 (按列, IQR×3)</strong>
+                    <div class="tag-list">
+                      <span v-for="(cnt, col) in row.outlier_cols" :key="col" class="health-tag tag-outlier">
+                        {{ col }}: {{ cnt }}
+                      </span>
+                    </div>
+                  </div>
+                  <div v-if="row.error" class="detail-section">
+                    <strong>错误</strong>
+                    <p class="error-text">{{ row.error }}</p>
                   </div>
                 </div>
-                <div v-if="row.outlier_cols && Object.keys(row.outlier_cols).length" class="detail-section">
-                  <strong>异常值 (按列, IQR×3)</strong>
-                  <div class="tag-list">
-                    <span v-for="(cnt, col) in row.outlier_cols" :key="col" class="health-tag tag-outlier">
-                      {{ col }}: {{ cnt }}
-                    </span>
-                  </div>
-                </div>
-                <div v-if="row.error" class="detail-section">
-                  <strong>错误</strong>
-                  <p class="error-text">{{ row.error }}</p>
-                </div>
-              </div>
-            </td>
-          </tr>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </div>
