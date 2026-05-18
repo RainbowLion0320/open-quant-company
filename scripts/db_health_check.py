@@ -186,13 +186,14 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     # ── Table metadata (label_zh live here, not in frontend) ──
     # format: (source, label_zh, repairable)
     TABLE_META = {
-        # Macro — all AKShare, repairable
-        "macro_cpi": ("AKShare", "居民消费价格指数", True),
+        # Macro — CPI/PPI/PMI via Tushare (AKShare Jin10 dead since 2025-09)
+        "macro_cpi": ("Tushare", "居民消费价格指数", True),
+        "macro_ppi": ("Tushare", "工业生产者出厂价格", True),
+        "macro_pmi": ("Tushare", "制造业采购经理指数", True),
+        # Macro — still AKShare
         "macro_gdp": ("AKShare", "国内生产总值", True),
         "macro_lpr": ("AKShare", "贷款基础利率", True),
         "macro_money_supply": ("AKShare", "货币供应量 M0/M1/M2", True),
-        "macro_pmi": ("AKShare", "制造业采购经理指数", True),
-        "macro_ppi": ("AKShare", "工业生产者出厂价格", True),
         "macro_shibor": ("AKShare", "上海银行间拆放利率", True),
         # Bonds
         "bond_treasury_yields": ("AKShare", "国债收益率曲线 (中美)", True),
