@@ -178,55 +178,84 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     records = []
     now = datetime.now().isoformat()
 
-    # ── Macro (single files) ──
-    macro_sources = {
-        "cpi": "AKShare", "gdp": "AKShare", "lpr": "AKShare",
-        "money_supply": "AKShare", "pmi": "AKShare", "ppi": "AKShare",
-        "shibor": "AKShare",
+    # ── Table metadata (label_zh live here, not in frontend) ──
+    TABLE_META = {
+        # Macro
+        "macro_cpi": ("AKShare", "居民消费价格指数"),
+        "macro_gdp": ("AKShare", "国内生产总值"),
+        "macro_lpr": ("AKShare", "贷款基础利率"),
+        "macro_money_supply": ("AKShare", "货币供应量 M0/M1/M2"),
+        "macro_pmi": ("AKShare", "制造业采购经理指数"),
+        "macro_ppi": ("AKShare", "工业生产者出厂价格"),
+        "macro_shibor": ("AKShare", "上海银行间拆放利率"),
+        # Bonds
+        "bond_treasury_yields": ("AKShare", "国债收益率曲线 (中美)"),
+        # Features
+        "features_2026-02": ("Computed (多源融合)", "PIT 特征切片 2026-02"),
+        "features_2026-03": ("Computed (多源融合)", "PIT 特征切片 2026-03"),
+        "features_2026-04": ("Computed (多源融合)", "PIT 特征切片 2026-04"),
+        # Signals
+        "signals_buffett": ("Computed (策略生成)", "巴菲特价值信号"),
+        "signals_buffett_scan": ("Computed (策略生成)", "巴菲特全量扫描"),
+        "signals_multifactor": ("Computed (策略生成)", "多因子打分信号"),
+        "signals_ml_lgbm": ("Computed (策略生成)", "LightGBM 机器学习信号"),
+        "signals_cybernetic": ("Computed (策略生成)", "控制论自适应信号"),
+        # Paper
+        "paper_trades": ("PaperBroker (模拟)", "模拟交易记录"),
+        "paper_nav": ("PaperBroker (模拟)", "模拟交易净值"),
+        "paper_state": ("PaperBroker (模拟)", "模拟账户状态"),
+        # System
+        "system_deepseek_usage": ("DeepSeek API", "DeepSeek Token 用量"),
+        # Per-symbol
+        "stock_holders": ("Tushare", "股东户数"),
+        "stock_holdertrade": ("Tushare", "股东增减持"),
+        "stock_moneyflow_daily": ("AKShare (近120日)", "日频资金流向"),
+        "stock_moneyflow_monthly": ("Tushare (全历史)", "月频资金流向"),
+        "stock_broker_recommend": ("Tushare", "券商月度金股"),
+        "stock_limit_list": ("Tushare", "涨跌停统计"),
+        "stock_research_report": ("Tushare", "券商研报"),
+        "share_float": ("Tushare", "限售股解禁"),
+        "repurchase": ("Tushare", "股票回购"),
     }
+
+    def _meta(table_name: str) -> tuple[str, str]:
+        return TABLE_META.get(table_name, ("", ""))
+
+    # ── Macro (single files) ──
     for name in ["cpi", "gdp", "lpr", "money_supply", "pmi", "ppi", "shibor"]:
         p = STORE / "macro" / f"{name}.parquet"
         if p.exists():
-            records.append(_scan_single(f"macro_{name}", p, source=macro_sources[name]))
+            records.append(_scan_single(f"macro_{name}", p))
 
     # ── Bonds ──
     tb = STORE / "bond" / "treasury_yields.parquet"
     if tb.exists():
-        records.append(_scan_single("bond_treasury_yields", tb, source="AKShare"))
+        records.append(_scan_single("bond_treasury_yields", tb))
 
     # ── Features (last 3 months) ──
     feat_dir = STORE / "features"
     feat_files = sorted(feat_dir.glob("*.parquet"))[-3:] if feat_dir.exists() else []
     for f in feat_files:
-        records.append(_scan_single(f"features_{f.stem}", f, source="Computed (多源融合)"))
+        records.append(_scan_single(f"features_{f.stem}", f))
 
     # ── Signals ──
     for name in ["buffett", "buffett_scan", "multifactor", "ml_lgbm", "cybernetic"]:
         p = STORE / "signals" / f"{name}.parquet"
         if p.exists():
-            records.append(_scan_single(f"signals_{name}", p, source="Computed (策略生成)"))
+            records.append(_scan_single(f"signals_{name}", p))
 
     # ── Paper ──
     for name in ["trades", "nav", "state"]:
         p = STORE / "paper" / f"{name}.parquet"
         if p.exists():
-            records.append(_scan_single(f"paper_{name}", p, source="PaperBroker (模拟)"))
+            records.append(_scan_single(f"paper_{name}", p))
 
     # ── DeepSeek ──
     ds = STORE / "deepseek" / "daily_usage.parquet"
     if ds.exists():
-        records.append(_scan_single("system_deepseek_usage", ds, source="DeepSeek API"))
+        records.append(_scan_single("system_deepseek_usage", ds))
 
     # ── Per-symbol tables (aggregate) ──
-    per_symbol_sources = {
-        "stock_holders": "Tushare",
-        "stock_holdertrade": "Tushare",
-        "stock_moneyflow_daily": "AKShare (近120日)",
-        "stock_moneyflow_monthly": "Tushare (全历史)",
-        "stock_broker_recommend": "Tushare",
-        "stock_limit_list": "Tushare",
-        "stock_research_report": "Tushare",
-    }
     for label, glob_pattern, max_s in [
         ("stock_holders", "holders/*.parquet", 30),
         ("stock_holdertrade", "holdertrade/*.parquet", 30),
@@ -241,15 +270,21 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         if pdir.exists():
             paths = sorted(pdir.glob(pattern))
             if paths:
-                records.append(_scan_many(label, paths, max_sample=max_s, source=per_symbol_sources[label]))
+                records.append(_scan_many(label, paths, max_sample=max_s))
 
     # ── Single file per-symbol tables ──
-    for p, src in [
-        (STORE / "stock" / "share_float" / "all.parquet", "Tushare"),
-        (STORE / "stock" / "repurchase" / "all.parquet", "Tushare"),
+    for p in [
+        STORE / "stock" / "share_float" / "all.parquet",
+        STORE / "stock" / "repurchase" / "all.parquet",
     ]:
         if p.exists():
-            records.append(_scan_single(p.parent.name, p, source=src))
+            records.append(_scan_single(p.parent.name, p))
+
+    # ── Inject source + label_zh from TABLE_META ──
+    for r in records:
+        src, zh = _meta(r["table"])
+        r["source"] = src
+        r["label_zh"] = zh
 
     # ── Summary ──
     n = len(records)
@@ -260,6 +295,7 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     summary = [{
         "table": "__SUMMARY__",
         "source": "",
+        "label_zh": "",
         "files": 0,
         "rows": 0,
         "columns": n,

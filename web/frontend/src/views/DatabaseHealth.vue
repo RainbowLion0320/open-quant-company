@@ -65,7 +65,7 @@
           <template v-for="(row, i) in rows" :key="i">
             <tr :class="{ 'row-error': row.error }">
               <td class="table-name">
-                <span class="name-text">{{ row.table }}</span>
+                <span class="name-text" :title="row.label_zh || undefined">{{ row.table }}</span>
                 <span v-if="row.error" class="error-badge" :title="row.error">⚠</span>
               </td>
               <td class="source-cell">{{ row.source || '—' }}</td>
