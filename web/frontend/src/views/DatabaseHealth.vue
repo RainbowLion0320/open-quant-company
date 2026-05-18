@@ -86,10 +86,10 @@
                 <span class="val-dim">{{ fmtMiss10yPlus(row) }}</span>
               </td>
               <td class="num">
-                <span :class="outlierClass(row.outlier_count_10y)">{{ fmtCount(row.outlier_count_10y) }}</span>
+                <span :class="outlierClass(row.outlier_count_10y)">{{ fmtCountOk(row.outlier_count_10y) }}</span>
               </td>
               <td class="num" style="opacity:0.5">
-                <span class="val-dim">{{ fmtCount(row.outlier_count_10y_plus) }}</span>
+                <span :class="okClass(row.outlier_count_10y_plus)">{{ fmtCountOk(row.outlier_count_10y_plus) }}</span>
               </td>
               <td class="num">
                 <span :class="freshnessClass(row.freshness_days)">
@@ -237,6 +237,14 @@ function fmtPercent(v: number | undefined | null): string {
   return `${v.toFixed(1)}%`;
 }
 
+function fmtCountOk(v: number | undefined | null): string {
+  if (v == null) return "—";
+  if (v === 0) return "OK";
+  if (v >= 1000000) return (v / 1000000).toFixed(1) + "M";
+  if (v >= 1000) return (v / 1000).toFixed(1) + "K";
+  return String(v);
+}
+
 function fmtCount(v: number | undefined | null): string {
   if (v == null) return "—";
   if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
@@ -257,11 +265,15 @@ function fmtTime(iso: string | undefined): string {
 
 function fmtMiss10y(row: HealthRow): string {
   const v = (row as any).missing_pct_10y;
-  return v != null ? v.toFixed(1) + "%" : "—";
+  if (v == null) return "—";
+  if (v === 0) return "OK";
+  return v.toFixed(1) + "%";
 }
 function fmtMiss10yPlus(row: HealthRow): string {
   const v = (row as any).missing_pct_10y_plus;
-  return v != null ? v.toFixed(1) + "%" : "—";
+  if (v == null) return "—";
+  if (v === 0) return "OK";
+  return v.toFixed(1) + "%";
 }
 
 function freshnessLabel(days: number | null): string {
@@ -280,6 +292,12 @@ function missingClass(pct: number | null | undefined): string {
   if (pct === 0) return "val-ok";
   if (pct < 5) return "val-warn";
   return "val-bad";
+}
+
+function okClass(v: number | null | undefined): string {
+  if (v == null) return "";
+  if (v === 0) return "val-ok";
+  return "";
 }
 
 function missingClassAny(pct: number | null | undefined): string {
