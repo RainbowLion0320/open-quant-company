@@ -50,6 +50,7 @@
         <thead>
           <tr>
             <th>表名</th>
+            <th>数据源</th>
             <th class="num">行数</th>
             <th class="num">列数</th>
             <th class="num">文件数</th>
@@ -67,6 +68,7 @@
                 <span class="name-text">{{ row.table }}</span>
                 <span v-if="row.error" class="error-badge" :title="row.error">⚠</span>
               </td>
+              <td class="source-cell">{{ row.source || '—' }}</td>
               <td class="num">{{ fmtCount(row.rows) }}</td>
               <td class="num">{{ row.columns }}</td>
               <td class="num">{{ row.files || 1 }}</td>
@@ -97,7 +99,7 @@
 
             <!-- Expanded detail row -->
             <tr v-if="expanded === i" class="detail-row">
-              <td :colspan="9">
+              <td :colspan="10">
                 <div class="detail-panel">
                   <div v-if="row.missing_cols && Object.keys(row.missing_cols).length" class="detail-section">
                     <strong>缺失值 (按列)</strong>
@@ -368,6 +370,15 @@ td.mono { font-family: var(--font-mono, "JetBrains Mono", monospace); }
 
 .row-error { background: rgba(239,68,68,0.03); }
 .row-error .name-text { color: var(--negative); }
+
+.source-cell {
+  font-size: 11px;
+  color: var(--text-secondary);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Value colors */
 .val-ok { color: var(--positive); }

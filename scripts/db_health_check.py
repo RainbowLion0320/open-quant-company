@@ -70,7 +70,7 @@ def _freshness_days(df: pd.DataFrame) -> Optional[int]:
     return None
 
 
-def _scan_single(label: str, path: Path) -> dict:
+def _scan_single(label: str, path: Path, source: str = "") -> dict:
     """Scan one parquet file."""
     size_mb = round(path.stat().st_size / 1024 / 1024, 3)
     try:
@@ -80,6 +80,7 @@ def _scan_single(label: str, path: Path) -> dict:
         freshness = _freshness_days(df)
         return {
             "table": label,
+            "source": source,
             "files": 1,
             "rows": len(df),
             "columns": len(df.columns),
@@ -94,6 +95,7 @@ def _scan_single(label: str, path: Path) -> dict:
     except Exception as e:
         return {
             "table": label,
+            "source": source,
             "files": 1,
             "rows": 0,
             "columns": 0,
@@ -107,11 +109,11 @@ def _scan_single(label: str, path: Path) -> dict:
         }
 
 
-def _scan_many(label: str, paths: list[Path], max_sample: int = 50) -> dict:
+def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str = "") -> dict:
     """Scan multiple files, sample if too many."""
     if not paths:
         return {
-            "table": label, "files": 0, "rows": 0, "columns": 0,
+            "table": label, "source": source, "files": 0, "rows": 0, "columns": 0,
             "size_mb": 0, "missing_pct": 0, "missing_cols": "{}",
             "outlier_count": 0, "outlier_cols": "{}",
             "freshness_days": None, "error": "no files",
@@ -155,6 +157,7 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50) -> dict:
 
     return {
         "table": label,
+        "source": source,
         "files": len(paths),
         "rows": total_rows,
         "columns": cols,
@@ -176,40 +179,54 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     now = datetime.now().isoformat()
 
     # ── Macro (single files) ──
+    macro_sources = {
+        "cpi": "AKShare", "gdp": "AKShare", "lpr": "AKShare",
+        "money_supply": "AKShare", "pmi": "AKShare", "ppi": "AKShare",
+        "shibor": "AKShare",
+    }
     for name in ["cpi", "gdp", "lpr", "money_supply", "pmi", "ppi", "shibor"]:
         p = STORE / "macro" / f"{name}.parquet"
         if p.exists():
-            records.append(_scan_single(f"macro_{name}", p))
+            records.append(_scan_single(f"macro_{name}", p, source=macro_sources[name]))
 
     # ── Bonds ──
     tb = STORE / "bond" / "treasury_yields.parquet"
     if tb.exists():
-        records.append(_scan_single("bond_treasury_yields", tb))
+        records.append(_scan_single("bond_treasury_yields", tb, source="AKShare"))
 
     # ── Features (last 3 months) ──
     feat_dir = STORE / "features"
     feat_files = sorted(feat_dir.glob("*.parquet"))[-3:] if feat_dir.exists() else []
     for f in feat_files:
-        records.append(_scan_single(f"features_{f.stem}", f))
+        records.append(_scan_single(f"features_{f.stem}", f, source="Computed (多源融合)"))
 
     # ── Signals ──
     for name in ["buffett", "buffett_scan", "multifactor", "ml_lgbm", "cybernetic"]:
         p = STORE / "signals" / f"{name}.parquet"
         if p.exists():
-            records.append(_scan_single(f"signals_{name}", p))
+            records.append(_scan_single(f"signals_{name}", p, source="Computed (策略生成)"))
 
     # ── Paper ──
     for name in ["trades", "nav", "state"]:
         p = STORE / "paper" / f"{name}.parquet"
         if p.exists():
-            records.append(_scan_single(f"paper_{name}", p))
+            records.append(_scan_single(f"paper_{name}", p, source="PaperBroker (模拟)"))
 
     # ── DeepSeek ──
     ds = STORE / "deepseek" / "daily_usage.parquet"
     if ds.exists():
-        records.append(_scan_single("system_deepseek_usage", ds))
+        records.append(_scan_single("system_deepseek_usage", ds, source="DeepSeek API"))
 
     # ── Per-symbol tables (aggregate) ──
+    per_symbol_sources = {
+        "stock_holders": "Tushare",
+        "stock_holdertrade": "Tushare",
+        "stock_moneyflow_daily": "AKShare (近120日)",
+        "stock_moneyflow_monthly": "Tushare (全历史)",
+        "stock_broker_recommend": "Tushare",
+        "stock_limit_list": "Tushare",
+        "stock_research_report": "Tushare",
+    }
     for label, glob_pattern, max_s in [
         ("stock_holders", "holders/*.parquet", 30),
         ("stock_holdertrade", "holdertrade/*.parquet", 30),
@@ -224,13 +241,15 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         if pdir.exists():
             paths = sorted(pdir.glob(pattern))
             if paths:
-                records.append(_scan_many(label, paths, max_sample=max_s))
+                records.append(_scan_many(label, paths, max_sample=max_s, source=per_symbol_sources[label]))
 
     # ── Single file per-symbol tables ──
-    for p in [STORE / "stock" / "share_float" / "all.parquet",
-              STORE / "stock" / "repurchase" / "all.parquet"]:
+    for p, src in [
+        (STORE / "stock" / "share_float" / "all.parquet", "Tushare"),
+        (STORE / "stock" / "repurchase" / "all.parquet", "Tushare"),
+    ]:
         if p.exists():
-            records.append(_scan_single(p.parent.name, p))
+            records.append(_scan_single(p.parent.name, p, source=src))
 
     # ── Summary ──
     n = len(records)
@@ -240,6 +259,7 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
 
     summary = [{
         "table": "__SUMMARY__",
+        "source": "",
         "files": 0,
         "rows": 0,
         "columns": n,
