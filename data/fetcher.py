@@ -14,9 +14,13 @@ import random
 import hashlib
 import functools
 import threading
+import socket
 from datetime import datetime, timedelta
 from typing import Optional, Callable
 import pandas as pd
+
+# SSL hang prevention: AKShare drops connections after ~100 sustained requests
+socket.setdefaulttimeout(30)
 
 from data.datahub import get_datahub
 

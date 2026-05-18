@@ -34,6 +34,9 @@ tags: [index]
 - [[datahub]] — DataHub 数据中台：统一路径、原子写入、最新批次、存储审计
 - [[web-architecture]] — Vue 3 + FastAPI，Quantum Terminal v4.0 设计系统
 
+## Reference
+- [[data-dimensions]] — ★ 数据维度全览：32 维度注册表, 文件树, 用法速查
+
 ## Comparisons
 - [[data-sources]] — AKShare(日线+财务+宏观+资金) vs Tushare(三张表+指标+moneyflow+holders)
 - [[strategy-evolution]] — 四策略回测对比：ML — 见 `data/tournament/`

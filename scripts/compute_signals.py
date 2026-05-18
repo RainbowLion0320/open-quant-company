@@ -26,6 +26,10 @@ for k in list(os.environ.keys()):
         del os.environ[k]
 os.environ['no_proxy'] = '*'
 
+# SSL hang prevention: AKShare drops connections after ~100 sustained requests
+import socket
+socket.setdefaulttimeout(30)
+
 PROJECT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT))
 
