@@ -131,17 +131,42 @@ tags: [data, parquet, schema, database]
 
 ## 4. 宏观数据
 
-### 4.1 CPI / PPI / GDP / PMI (统一格式)
+### 4.1 CPI (Tushare 源, 月频)
+
+**存储**: `data/store/macro/cpi.parquet`  
+**来源**: Tushare `cn_cpi` (国家统计局) → AKShare `macro_china_cpi_yearly`(金十, 已停更, 仅历史回退)
 
 | 列名 | 类型 | 说明 |
 |------|------|------|
-| 商品 | str | 指标名称 (如 "居民消费价格指数") |
-| date | datetime64 | 日期 |
-| 今值 | float64 | 当期值 |
-| 预测值 | float64 | 预测值 |
-| 前值 | float64 | 前一期值 |
+| date | datetime64 | 月份 (YYYY-MM-01) |
+| nt_val | float64 | 全国 CPI 当月值 |
+| nt_yoy | float64 | 全国 CPI 同比 (%) |
+| nt_mom | float64 | 全国 CPI 环比 (%) |
+| nt_accu | float64 | 全国 CPI 累计 |
+| town_val | float64 | 城市 CPI 当月值 |
+| town_yoy | float64 | 城市 CPI 同比 |
+| town_mom | float64 | 城市 CPI 环比 |
+| town_accu | float64 | 城市 CPI 累计 |
+| cnt_val | float64 | 农村 CPI 当月值 |
+| cnt_yoy | float64 | 农村 CPI 同比 |
+| cnt_mom | float64 | 农村 CPI 环比 |
+| cnt_accu | float64 | 农村 CPI 累计 |
 
-### 4.2 货币供应量
+> 注: AKShare 金十数据源已于 2025-09 停更。切换至 Tushare，数据范围 1990-01 ~ 至今。
+
+### 4.2 PPI / PMI (Tushare 源, 月频)
+
+**PPI 存储**: `data/store/macro/ppi.parquet`  
+**来源**: Tushare `cn_ppi` (国家统计局)  
+**主列**: date, ppi_yoy (同比), ppi_mp_yoy (生产资料), ppi_cg_yoy (生活资料) 等  
+
+**PMI 存储**: `data/store/macro/pmi.parquet`  
+**来源**: Tushare `cn_pmi` (国家统计局)  
+**主列**: date, pmi_mfg (制造业 PMI)
+
+> 注: PPI/PMI 同样从 AKShare 金十切换至 Tushare，数据范围 2005-01 ~ 至今。
+
+### 4.3 GDP / 货币供应量 / LPR / Shibor (AKShare 源)
 
 **存储**: `data/store/macro/money_supply.parquet`
 

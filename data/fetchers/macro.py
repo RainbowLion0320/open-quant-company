@@ -1,17 +1,14 @@
 """
-宏观经济指标数据获取器 — AKShare (免费, 央行/统计局/金十数据)
+宏观经济指标数据获取器 — Tushare 优先 (CPI/PPI/PMI) + AKShare 兜底
 
-AKShare macro APIs:
-  macro_china_money_supply()     — M0/M1/M2 (央行, 1998-)
-  macro_china_pmi_yearly()       — 官方制造业PMI (金十数据)
-  macro_china_cpi_yearly()       — CPI (金十数据)
-  macro_china_ppi_yearly()       — PPI (金十数据)
-  macro_china_gdp_yearly()       — GDP (统计局)
-  macro_china_shibor_all()       — Shibor全期限 (央行)
-  macro_china_lpr()              — LPR贷款利率 (央行)
+数据源:
+  Tushare cn_cpi/cn_ppi/cn_pmi — 国家统计局, 月频, 最新到上月
+  AKShare — 金十数据 (已停更, 仅作历史回退)
+  AKShare — 央行 (money_supply, shibor, lpr 仍正常)
 
 缓存: data/store/macro/{indicator}.parquet
 """
+
 import time
 import os
 from pathlib import Path
@@ -30,58 +27,79 @@ MACRO_INDICATORS = {
         "api": "macro_china_money_supply",
         "label": "货币供应量 M0/M1/M2",
         "freq": "monthly",
-        "columns": ["月份", "M2_数量_亿元", "M2_同比", "M1_数量_亿元", "M1_同比", "M0_数量_亿元", "M0_同比"],
     },
     "pmi": {
         "api": "macro_china_pmi_yearly",
+        "tushare_api": "cn_pmi",
         "label": "制造业PMI",
         "freq": "monthly",
-        "columns": ["日期", "PMI_制造业"],
     },
     "cpi": {
         "api": "macro_china_cpi_yearly",
+        "tushare_api": "cn_cpi",
         "label": "居民消费价格指数CPI",
         "freq": "monthly",
-        "columns": ["日期", "CPI_全国_同比", "CPI_全国_环比", "CPI_城市_同比", "CPI_农村_同比"],
     },
     "ppi": {
         "api": "macro_china_ppi_yearly",
+        "tushare_api": "cn_ppi",
         "label": "工业生产者出厂价格PPI",
         "freq": "monthly",
-        "columns": ["日期", "PPI_同比"],
     },
     "gdp": {
         "api": "macro_china_gdp_yearly",
         "label": "国内生产总值GDP",
         "freq": "quarterly",
-        "columns": ["日期", "GDP_累计值_亿元", "GDP_同比"],
     },
     "shibor": {
         "api": "macro_china_shibor_all",
         "label": "Shibor利率",
         "freq": "daily",
-        "columns": ["日期", "ON", "1W", "2W", "1M", "3M", "6M", "9M", "1Y"],
     },
     "lpr": {
         "api": "macro_china_lpr",
         "label": "LPR贷款基础利率",
         "freq": "monthly",
-        "columns": ["日期", "LPR_1Y", "LPR_5Y"],
     },
 }
 
 
 class MacroFetcher:
-    """宏观经济数据获取器 (AKShare, 免费无限)"""
+    """宏观经济数据获取器 (Tushare优先, AKShare兜底)"""
 
     def __init__(self):
         self.store_dir = HUB.store_dir("macro")
         self.store_dir.mkdir(parents=True, exist_ok=True)
 
+    def _tushare_fetch(self, api_name: str, **params) -> Optional[pd.DataFrame]:
+        """Call Tushare HTTP API directly, return DataFrame or None."""
+        import requests as _r
+        from data.tushare_utils import get_tushare_token
+        token = get_tushare_token()
+        if not token:
+            return None
+        try:
+            resp = _r.post("http://api.tushare.pro", json={
+                "api_name": api_name,
+                "token": token,
+                "params": params,
+                "fields": "",  # all fields
+            }, timeout=30)
+            data = resp.json()
+            items = data.get("data", {}).get("items", [])
+            fields = data.get("data", {}).get("fields", [])
+            if not items or not fields:
+                return None
+            df = pd.DataFrame(items, columns=fields)
+            return df
+        except Exception:
+            return None
+
     def fetch_indicator(self, name: str, force: bool = False) -> Optional[pd.DataFrame]:
         """
         Fetch one macro indicator.
-        Caches to Parquet. Returns normalized DataFrame.
+        Tushare priority for CPI/PPI/PMI; AKShare fallback.
+        Caches to Parquet.
         """
         if name not in MACRO_INDICATORS:
             print(f"  [macro] Unknown indicator: {name}")
@@ -90,57 +108,107 @@ class MacroFetcher:
         cache_path = HUB.macro_path(name)
         if cache_path.exists() and not force:
             try:
-                df = HUB.read_parquet(cache_path)
-                # Macro data updates monthly — cache for 7 days
-                return df
+                return HUB.read_parquet(cache_path)
             except Exception:
                 pass
+        elif cache_path.exists() and force:
+            cache_path.unlink(missing_ok=True)  # force: delete old cache, refetch
 
-        import akshare as ak
         info = MACRO_INDICATORS[name]
-        api_name = info["api"]
 
+        # ── Tushare path (CPI/PPI/PMI) ──
+        tushare_api = info.get("tushare_api")
+        if tushare_api:
+            # Try Tushare first for fresh data
+            try:
+                time.sleep(0.3)
+                df = self._tushare_fetch(tushare_api)
+                if df is not None and len(df) > 0:
+                    df = self._normalize(name, df, source="tushare")
+                    HUB.write_parquet(df, cache_path)
+                    return df
+            except Exception as e:
+                print(f"  [macro] Tushare {name}: {type(e).__name__}: {str(e)[:60]}")
+
+        # ── AKShare fallback ──
         try:
             time.sleep(0.5)
-            fn: Callable = getattr(ak, api_name)
+            import akshare as ak
+            fn: Callable = getattr(ak, info["api"])
             raw = fn()
-
             if raw is None or len(raw) == 0:
                 return None
-
-            # Normalize to standard format
-            df = self._normalize(name, raw)
+            df = self._normalize(name, raw, source="akshare")
             HUB.write_parquet(df, cache_path)
             return df
         except Exception as e:
             print(f"  [macro] {name}: {type(e).__name__}: {str(e)[:80]}")
             return None
 
-    def _normalize(self, name: str, raw: pd.DataFrame) -> pd.DataFrame:
-        """Normalize raw AKShare output to standard column names."""
-        info = MACRO_INDICATORS[name]
+    def _normalize(self, name: str, raw: pd.DataFrame, source: str = "akshare") -> pd.DataFrame:
+        """Normalize raw output to standard column names."""
 
         if name == "money_supply":
-            raw = raw.rename(columns={
-                "月份": "date",
-                "货币和准货币(M2)-数量(亿元)": "M2_stock",
-                "货币和准货币(M2)-同比增长": "M2_yoy",
-                "货币(M1)-数量(亿元)": "M1_stock",
-                "货币(M1)-同比增长": "M1_yoy",
-                "流通中的现金(M0)-数量(亿元)": "M0_stock",
-                "流通中的现金(M0)-同比增长": "M0_yoy",
-            })
+            if source == "akshare":
+                raw = raw.rename(columns={
+                    "月份": "date",
+                    "货币和准货币(M2)-数量(亿元)": "M2_stock",
+                    "货币和准货币(M2)-同比增长": "M2_yoy",
+                    "货币(M1)-数量(亿元)": "M1_stock",
+                    "货币(M1)-同比增长": "M1_yoy",
+                    "流通中的现金(M0)-数量(亿元)": "M0_stock",
+                    "流通中的现金(M0)-同比增长": "M0_yoy",
+                })
             raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
             return raw[[c for c in ["date", "M2_stock", "M2_yoy", "M1_stock", "M1_yoy", "M0_stock", "M0_yoy"] if c in raw.columns]]
 
         if name == "pmi":
+            if source == "tushare":
+                # Tushare returns UPPERCASE fields: MONTH, PMI010000, etc.
+                date_col = "MONTH" if "MONTH" in raw.columns else "month"
+                pmi_col = "PMI010000" if "PMI010000" in raw.columns else "pmi010000"
+                raw = raw.rename(columns={date_col: "date", pmi_col: "pmi_mfg"})
+                raw["date"] = pd.to_datetime(raw["date"].astype(str) + "01", format="%Y%m%d", errors="coerce")
+                for c in raw.columns:
+                    if c not in ("date",):
+                        raw[c] = pd.to_numeric(raw[c], errors="coerce")
+                return raw.sort_values("date").reset_index(drop=True)
+            # AKShare
             raw = raw.rename(columns={"日期": "date", "制造业-官方": "pmi_mfg"})
-            if "财新" in str(raw.columns):
-                raw = raw.rename(columns={c: "pmi_caixin" for c in raw.columns if "财新" in str(c)})
             raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
             return raw
 
-        if name in ("cpi", "ppi"):
+        if name == "cpi":
+            if source == "tushare":
+                # Tushare fields might be UPPERCASE: MONTH, NT_VAL, NT_YOY, etc.
+                date_col = "MONTH" if "MONTH" in raw.columns else "month"
+                raw = raw.rename(columns={
+                    date_col: "date",
+                    **{c: c.lower() for c in raw.columns if c != date_col},
+                })
+                raw["date"] = pd.to_datetime(raw["date"].astype(str) + "01", format="%Y%m%d", errors="coerce")
+                for c in raw.columns:
+                    if c not in ("date",):
+                        raw[c] = pd.to_numeric(raw[c], errors="coerce")
+                return raw.sort_values("date").reset_index(drop=True)
+            # AKShare fallback
+            raw = raw.rename(columns={c: c.replace("日期", "date") for c in raw.columns})
+            raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
+            return raw
+
+        if name == "ppi":
+            if source == "tushare":
+                date_col = "MONTH" if "MONTH" in raw.columns else "month"
+                raw = raw.rename(columns={
+                    date_col: "date",
+                    **{c: c.lower() for c in raw.columns if c != date_col},
+                })
+                raw["date"] = pd.to_datetime(raw["date"].astype(str) + "01", format="%Y%m%d", errors="coerce")
+                for c in raw.columns:
+                    if c not in ("date",):
+                        raw[c] = pd.to_numeric(raw[c], errors="coerce")
+                return raw.sort_values("date").reset_index(drop=True)
+            # AKShare fallback
             raw = raw.rename(columns={c: c.replace("日期", "date") for c in raw.columns})
             raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
             return raw
@@ -153,14 +221,9 @@ class MacroFetcher:
         if name == "shibor":
             raw = raw.rename(columns={
                 "日期": "date",
-                "O/N-定价": "ON",
-                "1W-定价": "1W",
-                "2W-定价": "2W",
-                "1M-定价": "1M",
-                "3M-定价": "3M",
-                "6M-定价": "6M",
-                "9M-定价": "9M",
-                "1Y-定价": "1Y",
+                "O/N-定价": "ON", "1W-定价": "1W", "2W-定价": "2W",
+                "1M-定价": "1M", "3M-定价": "3M", "6M-定价": "6M",
+                "9M-定价": "9M", "1Y-定价": "1Y",
             })
             raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
             return raw
@@ -231,10 +294,20 @@ def derive_macro_factors(macro_data: Dict[str, pd.DataFrame], date_str: str) -> 
             factors["macro_pmi_mfg"] = float(latest.get("pmi_mfg", 50) or 50)
 
         if name == "cpi":
-            for c in latest.index:
-                if "同比" in str(c):
-                    factors[f"macro_cpi_yoy"] = float(latest[c] or 0)
-                    break
+            # Tushare format: nt_yoy (Natl Total YoY); AKShare: columns with "同比"
+            if "nt_yoy" in latest.index:
+                factors["macro_cpi_yoy"] = float(latest.get("nt_yoy", 0) or 0)
+            elif "cpi_yoy" in latest.index:
+                factors["macro_cpi_yoy"] = float(latest.get("cpi_yoy", 0) or 0)
+            else:
+                for c in latest.index:
+                    if "同比" in str(c):
+                        factors["macro_cpi_yoy"] = float(latest[c] or 0)
+                        break
+
+        if name == "ppi":
+            if "ppi_yoy" in latest.index:
+                factors["macro_ppi_yoy"] = float(latest.get("ppi_yoy", 0) or 0)
 
         if name == "shibor":
             factors["macro_shibor_on"] = float(latest.get("ON", 0) or 0)
