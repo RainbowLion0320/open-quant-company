@@ -59,6 +59,7 @@
             <th class="num">异常值</th>
             <th class="num">新鲜度</th>
             <th>详情</th>
+            <th>修复</th>
           </tr>
         </thead>
         <tbody>
@@ -95,11 +96,25 @@
                   @click="toggleDetail(i)"
                 >{{ expanded === i ? '收起' : '展开' }}</button>
               </td>
+              <td class="repair-cell">
+                <button
+                  v-if="row.repairable"
+                  class="repair-btn"
+                  :disabled="repairing[row.table] === 'running'"
+                  @click="startRepair(row.table)"
+                >
+                  <span v-if="repairing[row.table] === 'running'" class="spinning">⟳</span>
+                  <span v-else-if="repairing[row.table] === 'done'">✓</span>
+                  <span v-else-if="repairing[row.table] === 'failed'">✗</span>
+                  <span v-else>修复</span>
+                </button>
+                <span v-else class="repair-na">—</span>
+              </td>
             </tr>
 
             <!-- Expanded detail row -->
             <tr v-if="expanded === i" class="detail-row">
-              <td :colspan="10">
+              <td :colspan="11">
                 <div class="detail-panel">
                   <div v-if="row.missing_cols && Object.keys(row.missing_cols).length" class="detail-section">
                     <strong>缺失值 (按列)</strong>
@@ -136,6 +151,9 @@ import { ref, computed, onMounted } from "vue";
 
 interface HealthRow {
   table: string;
+  source: string;
+  label_zh: string;
+  repairable: boolean;
   files: number;
   rows: number;
   columns: number;
@@ -161,6 +179,7 @@ const rows = ref<HealthRow[]>([]);
 const summary = ref<HealthSummary | null>(null);
 const status = ref<"loading" | "ok" | "no_data" | "error">("loading");
 const expanded = ref<number | null>(null);
+const repairing = ref<Record<string, string>>({});  // table -> status
 
 const statusClass = computed(() => `dot-${status.value}`);
 const statusText = computed(() => {
@@ -255,6 +274,40 @@ function hasDetail(row: HealthRow): boolean {
 
 function toggleDetail(i: number) {
   expanded.value = expanded.value === i ? null : i;
+}
+
+async function startRepair(table: string) {
+  repairing.value[table] = 'running';
+  try {
+    const resp = await fetch('/api/system/db-health/repair/' + encodeURIComponent(table), { method: 'POST' });
+    const data = await resp.json();
+    if (data.status !== 'started') {
+      repairing.value[table] = 'failed';
+      return;
+    }
+    // Poll for completion
+    const jobId = data.job_id;
+    const poll = async () => {
+      const sr = await fetch('/api/system/db-health/repair-status/' + jobId);
+      const sd = await sr.json();
+      if (sd.status === 'done') {
+        repairing.value[table] = 'done';
+        await fetchData();
+        setTimeout(() => { delete repairing.value[table]; }, 3000);
+      } else if (sd.status === 'failed') {
+        repairing.value[table] = 'failed';
+        setTimeout(() => { delete repairing.value[table]; }, 5000);
+      } else if (sd.status === 'running' || sd.status === 'pending') {
+        setTimeout(poll, 1000);
+      } else {
+        repairing.value[table] = 'failed';
+      }
+    };
+    setTimeout(poll, 500);
+  } catch {
+    repairing.value[table] = 'failed';
+    setTimeout(() => { delete repairing.value[table]; }, 5000);
+  }
 }
 
 async function fetchData() {
@@ -469,4 +522,27 @@ td.mono { font-family: var(--font-mono, "JetBrains Mono", monospace); }
   font-size: 13px;
   color: var(--text-secondary);
 }
+
+.repair-cell { text-align: center; }
+.repair-btn {
+  background: none;
+  border: 1px solid rgba(0,212,255,0.2);
+  color: var(--accent);
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.repair-btn:hover:not(:disabled) {
+  background: rgba(0,212,255,0.08);
+  border-color: var(--accent);
+}
+.repair-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.repair-na { color: var(--text-muted); font-size: 11px; }
+.spinning { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>

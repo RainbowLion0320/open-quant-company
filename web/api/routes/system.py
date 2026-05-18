@@ -3,6 +3,7 @@ import json
 
 import numpy as np
 from fastapi import APIRouter, Query
+from pathlib import Path
 import sqlite3
 import psutil
 
@@ -13,6 +14,7 @@ router = APIRouter(prefix="/api/system", tags=["System"])
 HUB = get_datahub()
 DB = HUB.system_monitor_path()
 TOKEN_CACHE = HUB.token_usage_path()
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent  # routes → api → web → quant-agent
 
 
 def _query(sql: str, params=()):
@@ -162,4 +164,74 @@ async def db_health():
         "summary": summary,
         "status": "ok",
         "checked_at": summary["checked_at"] if summary else None,
+    }
+
+
+# ── Repair job tracking (in-memory, cleared on restart) ──
+import threading
+import subprocess as _subprocess
+import uuid as _uuid
+
+_repair_jobs: dict[str, dict] = {}
+
+
+def _run_repair(table: str, job_id: str) -> None:
+    """Background repair worker."""
+    _repair_jobs[job_id]["status"] = "running"
+    try:
+        venv = str(Path.home() / ".hermes" / "hermes-agent" / "venv" / "bin" / "python3")
+        proc = _subprocess.run(
+            [venv, "scripts/repair_table.py", table],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True, text=True, timeout=600,
+        )
+        _repair_jobs[job_id]["stdout"] = proc.stdout[-500:]
+        _repair_jobs[job_id]["stderr"] = proc.stderr[-200:]
+        _repair_jobs[job_id]["exit_code"] = proc.returncode
+        _repair_jobs[job_id]["status"] = "done" if proc.returncode == 0 else "failed"
+    except Exception as e:
+        _repair_jobs[job_id]["status"] = "failed"
+        _repair_jobs[job_id]["error"] = str(e)
+
+
+@router.post("/db-health/repair/{table_name}")
+async def repair_table(table_name: str):
+    """触发单表数据修复 (后台异步)"""
+    REPAIRABLE_TABLES = {
+        "macro_cpi", "macro_gdp", "macro_lpr", "macro_money_supply",
+        "macro_pmi", "macro_ppi", "macro_shibor", "bond_treasury_yields",
+        "stock_holders", "stock_holdertrade", "stock_moneyflow_daily",
+        "stock_moneyflow_monthly", "stock_broker_recommend",
+        "stock_limit_list", "stock_research_report",
+        "share_float", "repurchase",
+    }
+    if table_name not in REPAIRABLE_TABLES:
+        return {"status": "error", "message": f"Table '{table_name}' is not repairable"}
+
+    # Cancel existing job for same table
+    for jid, info in list(_repair_jobs.items()):
+        if info.get("table") == table_name and info["status"] == "running":
+            return {"status": "error", "message": f"Repair already in progress for {table_name}", "job_id": jid}
+
+    job_id = _uuid.uuid4().hex[:12]
+    _repair_jobs[job_id] = {"table": table_name, "status": "pending", "stdout": "", "stderr": "", "exit_code": None}
+
+    t = threading.Thread(target=_run_repair, args=(table_name, job_id), daemon=True)
+    t.start()
+
+    return {"status": "started", "job_id": job_id, "table": table_name}
+
+
+@router.get("/db-health/repair-status/{job_id}")
+async def repair_status(job_id: str):
+    """查询修复进度"""
+    job = _repair_jobs.get(job_id)
+    if not job:
+        return {"status": "not_found"}
+    return {
+        "status": job["status"],
+        "table": job.get("table"),
+        "stdout": job.get("stdout", ""),
+        "stderr": job.get("stderr", ""),
+        "exit_code": job.get("exit_code"),
     }

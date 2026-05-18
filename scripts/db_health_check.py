@@ -179,47 +179,48 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     now = datetime.now().isoformat()
 
     # ── Table metadata (label_zh live here, not in frontend) ──
+    # format: (source, label_zh, repairable)
     TABLE_META = {
-        # Macro
-        "macro_cpi": ("AKShare", "居民消费价格指数"),
-        "macro_gdp": ("AKShare", "国内生产总值"),
-        "macro_lpr": ("AKShare", "贷款基础利率"),
-        "macro_money_supply": ("AKShare", "货币供应量 M0/M1/M2"),
-        "macro_pmi": ("AKShare", "制造业采购经理指数"),
-        "macro_ppi": ("AKShare", "工业生产者出厂价格"),
-        "macro_shibor": ("AKShare", "上海银行间拆放利率"),
+        # Macro — all AKShare, repairable
+        "macro_cpi": ("AKShare", "居民消费价格指数", True),
+        "macro_gdp": ("AKShare", "国内生产总值", True),
+        "macro_lpr": ("AKShare", "贷款基础利率", True),
+        "macro_money_supply": ("AKShare", "货币供应量 M0/M1/M2", True),
+        "macro_pmi": ("AKShare", "制造业采购经理指数", True),
+        "macro_ppi": ("AKShare", "工业生产者出厂价格", True),
+        "macro_shibor": ("AKShare", "上海银行间拆放利率", True),
         # Bonds
-        "bond_treasury_yields": ("AKShare", "国债收益率曲线 (中美)"),
-        # Features
-        "features_2026-02": ("Computed (多源融合)", "PIT 特征切片 2026-02"),
-        "features_2026-03": ("Computed (多源融合)", "PIT 特征切片 2026-03"),
-        "features_2026-04": ("Computed (多源融合)", "PIT 特征切片 2026-04"),
-        # Signals
-        "signals_buffett": ("Computed (策略生成)", "巴菲特价值信号"),
-        "signals_buffett_scan": ("Computed (策略生成)", "巴菲特全量扫描"),
-        "signals_multifactor": ("Computed (策略生成)", "多因子打分信号"),
-        "signals_ml_lgbm": ("Computed (策略生成)", "LightGBM 机器学习信号"),
-        "signals_cybernetic": ("Computed (策略生成)", "控制论自适应信号"),
-        # Paper
-        "paper_trades": ("PaperBroker (模拟)", "模拟交易记录"),
-        "paper_nav": ("PaperBroker (模拟)", "模拟交易净值"),
-        "paper_state": ("PaperBroker (模拟)", "模拟账户状态"),
-        # System
-        "system_deepseek_usage": ("DeepSeek API", "DeepSeek Token 用量"),
-        # Per-symbol
-        "stock_holders": ("Tushare", "股东户数"),
-        "stock_holdertrade": ("Tushare", "股东增减持"),
-        "stock_moneyflow_daily": ("AKShare (近120日)", "日频资金流向"),
-        "stock_moneyflow_monthly": ("Tushare (全历史)", "月频资金流向"),
-        "stock_broker_recommend": ("Tushare", "券商月度金股"),
-        "stock_limit_list": ("Tushare", "涨跌停统计"),
-        "stock_research_report": ("Tushare", "券商研报"),
-        "share_float": ("Tushare", "限售股解禁"),
-        "repurchase": ("Tushare", "股票回购"),
+        "bond_treasury_yields": ("AKShare", "国债收益率曲线 (中美)", True),
+        # Features — computed, not repairable
+        "features_2026-02": ("Computed (多源融合)", "PIT 特征切片 2026-02", False),
+        "features_2026-03": ("Computed (多源融合)", "PIT 特征切片 2026-03", False),
+        "features_2026-04": ("Computed (多源融合)", "PIT 特征切片 2026-04", False),
+        # Signals — computed, not repairable
+        "signals_buffett": ("Computed (策略生成)", "巴菲特价值信号", False),
+        "signals_buffett_scan": ("Computed (策略生成)", "巴菲特全量扫描", False),
+        "signals_multifactor": ("Computed (策略生成)", "多因子打分信号", False),
+        "signals_ml_lgbm": ("Computed (策略生成)", "LightGBM 机器学习信号", False),
+        "signals_cybernetic": ("Computed (策略生成)", "控制论自适应信号", False),
+        # Paper — simulated, not repairable
+        "paper_trades": ("PaperBroker (模拟)", "模拟交易记录", False),
+        "paper_nav": ("PaperBroker (模拟)", "模拟交易净值", False),
+        "paper_state": ("PaperBroker (模拟)", "模拟账户状态", False),
+        # System — manual import, not repairable
+        "system_deepseek_usage": ("DeepSeek API", "DeepSeek Token 用量", False),
+        # Per-symbol — all API-sourced, repairable
+        "stock_holders": ("Tushare", "股东户数", True),
+        "stock_holdertrade": ("Tushare", "股东增减持", True),
+        "stock_moneyflow_daily": ("AKShare (近120日)", "日频资金流向", True),
+        "stock_moneyflow_monthly": ("Tushare (全历史)", "月频资金流向", True),
+        "stock_broker_recommend": ("Tushare", "券商月度金股", True),
+        "stock_limit_list": ("Tushare", "涨跌停统计", True),
+        "stock_research_report": ("Tushare", "券商研报", True),
+        "share_float": ("Tushare", "限售股解禁", True),
+        "repurchase": ("Tushare", "股票回购", True),
     }
 
-    def _meta(table_name: str) -> tuple[str, str]:
-        return TABLE_META.get(table_name, ("", ""))
+    def _meta(table_name: str) -> tuple[str, str, bool]:
+        return TABLE_META.get(table_name, ("", "", False))
 
     # ── Macro (single files) ──
     for name in ["cpi", "gdp", "lpr", "money_supply", "pmi", "ppi", "shibor"]:
@@ -280,11 +281,12 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         if p.exists():
             records.append(_scan_single(p.parent.name, p))
 
-    # ── Inject source + label_zh from TABLE_META ──
+    # ── Inject source + label_zh + repairable from TABLE_META ──
     for r in records:
-        src, zh = _meta(r["table"])
+        src, zh, repairable = _meta(r["table"])
         r["source"] = src
         r["label_zh"] = zh
+        r["repairable"] = repairable
 
     # ── Summary ──
     n = len(records)
@@ -296,6 +298,7 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         "table": "__SUMMARY__",
         "source": "",
         "label_zh": "",
+        "repairable": False,
         "files": 0,
         "rows": 0,
         "columns": n,
