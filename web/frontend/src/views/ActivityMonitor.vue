@@ -141,6 +141,7 @@
     </section>
 
     <section class="system-settings">
+      <div class="settings-col">
       <div class="glass-card settings-card">
         <div class="panel-head">
           <span>TELEGRAM</span>
@@ -185,6 +186,8 @@
           <div v-else><span>API Health</span><em class="source-badge muted">加载中...</em></div>
         </div>
       </div>
+      </div>
+      <div class="settings-col">
       <div class="glass-card settings-card">
         <div class="panel-head">
           <span>CRON JOBS</span>
@@ -215,6 +218,7 @@
           <div><span>Features</span><strong>{{ featurePolicyText }}</strong></div>
           <div><span>Paper</span><strong>{{ paperExecutionText }}</strong></div>
         </div>
+      </div>
       </div>
     </section>
   </div>
@@ -593,9 +597,14 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
   align-items: start;
 }
 .system-settings {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 12px;
+}
+.settings-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
 }
 .telemetry-card,
 .deepseek-panel,
@@ -953,7 +962,7 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 @media (max-width: 900px) {
   .system-hero { grid-template-columns: 1fr; }
   .system-side { grid-template-columns: 1fr; }
-  .system-settings { grid-template-columns: 1fr; }
+  .system-settings { flex-direction: column; }
   .usage-summary { grid-template-columns: 1fr; }
   .panel-head {
     align-items: flex-start;
