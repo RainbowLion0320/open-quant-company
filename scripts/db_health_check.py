@@ -58,7 +58,7 @@ def _outlier_count(df: pd.DataFrame) -> dict:
 
 def _freshness_days(df: pd.DataFrame) -> Optional[int]:
     for dc in df.columns:
-        if dc.lower() not in ("date", "trade_date", "ann_date", "end_date", "ts"):
+        if dc.lower() not in ("date", "trade_date", "ann_date", "end_date", "ts", "quarter"):
             continue
         try:
             s = pd.to_datetime(df[dc], errors="coerce").dropna()
@@ -73,7 +73,7 @@ def _freshness_days(df: pd.DataFrame) -> Optional[int]:
 def _find_date_col(df: pd.DataFrame) -> Optional[str]:
     """Find a date-like column in the DataFrame."""
     for dc in df.columns:
-        if dc.lower() in ("date", "trade_date", "ann_date", "end_date", "ts"):
+        if dc.lower() in ("date", "trade_date", "ann_date", "end_date", "ts", "quarter"):
             try:
                 s = pd.to_datetime(df[dc], errors="coerce")
                 if s.notna().sum() > 0:
@@ -323,8 +323,8 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         "macro_ppi": ("Tushare", "工业生产者出厂价格", True),
         "macro_pmi": ("Tushare", "制造业采购经理指数", True),
         # Macro — still AKShare
-        "macro_gdp": ("AKShare", "国内生产总值", True),
-        "macro_lpr": ("AKShare", "贷款基础利率", True),
+        "macro_gdp": ("Tushare", "国内生产总值", True),
+        "macro_lpr": ("Tushare", "贷款基础利率", True),
         "macro_money_supply": ("AKShare", "货币供应量 M0/M1/M2", True),
         "macro_shibor": ("AKShare", "上海银行间拆放利率", True),
         # Bonds

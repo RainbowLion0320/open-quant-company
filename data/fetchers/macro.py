@@ -48,6 +48,7 @@ MACRO_INDICATORS = {
     },
     "gdp": {
         "api": "macro_china_gdp_yearly",
+        "tushare_api": "cn_gdp",
         "label": "国内生产总值GDP",
         "freq": "quarterly",
     },
@@ -58,6 +59,7 @@ MACRO_INDICATORS = {
     },
     "lpr": {
         "api": "macro_china_lpr",
+        "tushare_api": "shibor_lpr",
         "label": "LPR贷款基础利率",
         "freq": "monthly",
     },
@@ -214,6 +216,20 @@ class MacroFetcher:
             return raw
 
         if name == "gdp":
+            if source == "tushare":
+                raw = raw.rename(columns={
+                    "quarter": "quarter",
+                    "gdp": "gdp",
+                    "gdp_yoy": "gdp_yoy",
+                    "pi": "pi", "pi_yoy": "pi_yoy",
+                    "si": "si", "si_yoy": "si_yoy",
+                    "ti": "ti", "ti_yoy": "ti_yoy",
+                })
+                for c in raw.columns:
+                    if c != "quarter":
+                        raw[c] = pd.to_numeric(raw[c], errors="coerce")
+                return raw.sort_values("quarter").reset_index(drop=True)
+            # AKShare fallback
             raw = raw.rename(columns={c: c.replace("日期", "date") for c in raw.columns})
             raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
             return raw
@@ -229,6 +245,20 @@ class MacroFetcher:
             return raw
 
         if name == "lpr":
+            if source == "tushare":
+                # Tushare shibor_lpr: date (YYYYMMDD), 1y, 5y
+                date_col = "DATE" if "DATE" in raw.columns else "date"
+                raw = raw.rename(columns={
+                    date_col: "date", "1y": "LPR_1Y", "5y": "LPR_5Y",
+                })
+                raw["date"] = pd.to_datetime(raw["date"].astype(str), format="%Y%m%d", errors="coerce")
+                for c in raw.columns:
+                    if c not in ("date",):
+                        raw[c] = pd.to_numeric(raw[c], errors="coerce")
+                # Keep only rows where LPR changed (monthly cadence)
+                raw = raw.dropna(subset=["LPR_1Y"])
+                return raw.sort_values("date").reset_index(drop=True)
+            # AKShare fallback
             raw = raw.rename(columns={"TRADE_DATE": "date", "LPR1Y": "LPR_1Y", "LPR5Y": "LPR_5Y"})
             raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
             return raw

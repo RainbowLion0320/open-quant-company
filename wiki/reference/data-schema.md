@@ -166,7 +166,39 @@ tags: [data, parquet, schema, database]
 
 > 注: PPI/PMI 同样从 AKShare 金十切换至 Tushare，数据范围 2005-01 ~ 至今。
 
-### 4.3 GDP / 货币供应量 / LPR / Shibor (AKShare 源)
+### 4.3 GDP (Tushare 源, 季频)
+
+**存储**: `data/store/macro/gdp.parquet`  
+**来源**: Tushare `cn_gdp` (国家统计局) → AKShare fallback  
+**数据范围**: 2000Q1 ~ 2025Q4 (176 行)
+
+| 列名 | 类型 | 说明 |
+|------|------|------|
+| quarter | str | 季度 (如 2025Q4) |
+| gdp | float64 | GDP 累计值 (亿元) |
+| gdp_yoy | float64 | GDP 同比 (%) |
+| pi | float64 | 第一产业增加值 |
+| pi_yoy | float64 | 第一产业同比 |
+| si | float64 | 第二产业增加值 |
+| si_yoy | float64 | 第二产业同比 |
+| ti | float64 | 第三产业增加值 |
+| ti_yoy | float64 | 第三产业同比 |
+
+> 注: 原 AKShare 仅 61 行且无产业拆分。切换至 Tushare 后数据量 ×3，新增三大产业细节。
+
+### 4.4 LPR (Tushare 源, 日频)
+
+**存储**: `data/store/macro/lpr.parquet`  
+**来源**: Tushare `shibor_lpr` (央行)  
+**数据范围**: 2013-10 ~ 2026-03 (1527 行，每日报价)
+
+| 列名 | 类型 | 说明 |
+|------|------|------|
+| date | datetime64 | 日期 |
+| LPR_1Y | float64 | 1 年期 LPR |
+| LPR_5Y | float64 | 5 年期 LPR |
+
+### 4.5 货币供应量 (AKShare 源)
 
 **存储**: `data/store/macro/money_supply.parquet`
 
@@ -180,19 +212,7 @@ tags: [data, parquet, schema, database]
 | M0_stock | float64 | M0 存量 |
 | M0_yoy | float64 | M0 同比 |
 
-### 4.3 LPR
-
-**存储**: `data/store/macro/lpr.parquet`
-
-| 列名 | 类型 | 说明 |
-|------|------|------|
-| date | datetime64 | 日期 |
-| LPR_1Y | float64 | 1 年期 LPR |
-| LPR_5Y | float64 | 5 年期 LPR |
-| RATE_1 | float64 | 参考利率 1 |
-| RATE_2 | float64 | 参考利率 2 |
-
-### 4.4 Shibor
+### 4.6 Shibor
 
 **存储**: `data/store/macro/shibor.parquet`
 
