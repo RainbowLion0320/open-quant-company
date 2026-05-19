@@ -325,19 +325,18 @@ async def api_health():
     except Exception:
         results.append({"name": "Hindsight", "status": "warn", "detail": "端口 9177 无响应"})
 
-    # Telegram
+    # Telegram — config in notify.yaml (flat keys)
     try:
-        cfg_path = Path(__file__).resolve().parent.parent.parent.parent / "config" / "settings.yaml"
+        cfg_path = Path(__file__).resolve().parent.parent.parent.parent / "config" / "notify.yaml"
         import yaml
         with open(cfg_path) as f:
-            cfg = yaml.safe_load(f)
-        tg = cfg.get("notify", {}).get("telegram", {})
-        if tg.get("bot_token") and tg.get("chat_id"):
-            results.append({"name": "Telegram", "status": "ok", "detail": f"已配置 (chat_id={tg['chat_id']})"})
-        elif tg.get("enabled"):
-            results.append({"name": "Telegram", "status": "warn", "detail": "已启用但配置不完整"})
+            cfg = yaml.safe_load(f) or {}
+        if cfg.get("TELEGRAM_BOT_TOKEN") and cfg.get("TELEGRAM_CHAT_ID"):
+            results.append({"name": "Telegram", "status": "ok", "detail": f"已配置 (chat_id={cfg['TELEGRAM_CHAT_ID']})"})
+        elif cfg.get("TELEGRAM_BOT_TOKEN") or cfg.get("TELEGRAM_CHAT_ID"):
+            results.append({"name": "Telegram", "status": "warn", "detail": "配置不完整"})
         else:
-            results.append({"name": "Telegram", "status": "disabled", "detail": "未启用"})
+            results.append({"name": "Telegram", "status": "disabled", "detail": "未配置"})
     except Exception:
         results.append({"name": "Telegram", "status": "unknown", "detail": "无法读取配置"})
 
