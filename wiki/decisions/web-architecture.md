@@ -35,7 +35,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 - Regime 球体：CSS 动画光晕, 评分环形进度
 - 预警面板：多级颜色 (success/warning/danger/info)
 
-## 页面结构 (11 页)
+## 页面结构 (10 页)
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
@@ -47,6 +47,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 | 回测分析 | `/backtest` | N策略同屏叠加曲线 + 点击高亮 + 基准参照 |
 | 信号历史 | `/signals` | 信号变更追踪 |
 | 系统信息 | `/monitor` | CPU/内存/Token 仪表盘 + 历史趋势图 + 系统设置入口 |
+| 数据库健康 | `/db-health` | 29 表健康扫描 + 按时间分段 + 单表修复 |
 | 记忆图谱 | `/hindsight` | ★ Hindsight 知识图谱 — Canvas 力导向图, 悬浮/点击探索节点关系 |
 
 ### 指挥中心 (2026-05-16 Codex 升级)

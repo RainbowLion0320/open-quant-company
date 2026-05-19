@@ -28,7 +28,7 @@ Hermes Agent (deepseek-v4-pro)
 | LLM | deepseek-v4-flash (via DeepSeek API) |
 | 向量引擎 | pg0 v18.1.0 (嵌入式 PostgreSQL + pgvector) |
 | 嵌入模型 | sentence-transformers |
-| 活跃端口 | **9177** (注意: 启动脚本写的是 8888) |
+| 活跃端口 | **9177** |
 | Bank ID | `quant-agent` |
 | 召回预算 | mid |
 
@@ -73,8 +73,8 @@ memory:
 
 | 端口 | PID | 状态 | 数据 |
 |------|-----|------|------|
-| 8888 | (已关闭) | 由 `start_hindsight_daemon.py` 显式启动 | 仅14个自指节点 (空壳) |
-| **9177** | 活跃 | 由 Hermes 插件自动拉起 | **404 节点, 8000 链接** (真实数据) |
+| 8888 | (已关闭) | 历史遗留 (脚本已修复至 9177) | 仅14个自指节点 (空壳) |
+| **9177** | 活跃 | 由 `start_hindsight_daemon.py` 启动 | **~100+ 节点** (活跃增长中) |
 
 **根因**: `start_hindsight_daemon.py` 硬编码了 `port=8888`，但 Hermes 的 Hindsight 插件在 auto-start 时用了默认端口 9177。Web API 路由 (`web/api/routes/hindsight.py`) 原来 hardcode 了 `localhost:8888`，导致图谱只显示 14 个节点。
 
@@ -150,14 +150,14 @@ curl localhost:9177/v1/default/banks/quant-agent/stats
 
 ## 当前状态 (2026-05-17)
 
+> 注: 以下为历史快照，当前实时数据请查看 Web UI 记忆图谱页面或 `/api/hindsight/graph`。
+
 | 指标 | 值 |
 |------|-----|
-| 总节点 | 404 |
-| Observations | 94 |
-| Experiences | 101 |
-| 总链接 | 8000+ |
-| 语义链接 | 3616 |
-| 时序链接 | 2553 |
+| 总节点 | ~100+ (增长中) |
+| Observations | ~70+ |
+| Experiences / World | ~30+ |
+| 总链接 | 3000+ |
 | 文档 | 15 |
 | 最后合并 | 2026-05-17T03:06 UTC |
 

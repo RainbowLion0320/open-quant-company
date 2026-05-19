@@ -46,14 +46,14 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 | share_float | 限售股解禁 | tushare_free | event | stock |
 | repurchase | 股票回购 | tushare_free | event | stock |
 | macro_money_supply | 货币供应量 M0/M1/M2 | akshare | monthly | macro |
-| macro_pmi | 制造业 PMI | akshare | monthly | macro |
-| macro_cpi | CPI 居民消费价格 | akshare | monthly | macro |
-| macro_ppi | PPI 工业品出厂价 | akshare | monthly | macro |
-| macro_gdp | 国内生产总值 GDP | akshare | quarterly | macro |
+| macro_pmi | 制造业 PMI | tushare_free | monthly | macro |
+| macro_cpi | CPI 居民消费价格 | tushare_free | monthly | macro |
+| macro_ppi | PPI 工业品出厂价 | tushare_free | monthly | macro |
+| macro_gdp | 国内生产总值 GDP | tushare_free | quarterly | macro |
 | macro_shibor | Shibor 利率 | akshare | daily | macro |
-| macro_lpr | LPR 贷款基础利率 | akshare | monthly | macro |
+| macro_lpr | LPR 贷款基础利率 | tushare_free | monthly | macro |
 
-**来源分布**: akshare 10 | tushare_free 9
+**来源分布**: akshare 5 | tushare_free 14
 
 ### 限流未启用 (3)
 
@@ -231,7 +231,7 @@ def new_dim_path(self, symbol: str) -> Path:
 | `config/settings.yaml` | 维度定义 (data_registry 段) |
 | `data/data_registry.py` | 注册表单例 |
 | `data/datahub.py` | 存储中间层 |
-| `data/datahub_schema.sql` | DuckDB 视图定义 |
+| `data/db.py` | DuckDB 连接与视图管理 |
 | `data/fetcher.py` | AKShare 日线拉取 |
 | `data/feature_store.py` | PIT 特征构建 + enrich |
 | `scripts/build_features.py` | 批量特征构建 |
