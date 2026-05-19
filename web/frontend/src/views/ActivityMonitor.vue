@@ -164,14 +164,15 @@
             style="font-weight:400;cursor:default">{{ apiHealth.summary }}</em>
         </div>
         <div class="source-list">
+          <div class="section-label">Data Sources</div>
           <div v-for="src in sourceItems" :key="src.name">
             <span>{{ src.name }}</span>
             <em :class="['source-badge', sourceBadgeClass(src.status)]">{{ src.summary }}</em>
           </div>
           <div v-if="sourceItems.length === 0"><span>Registry</span><em class="source-badge muted">暂无配置</em></div>
           <template v-if="apiHealth && apiHealth.items.length">
-            <div class="api-divider"><span></span></div>
-            <div v-for="api in apiHealth.items" :key="api.name">
+            <div class="section-label">API Health</div>
+            <div v-for="api in apiHealthOrdered" :key="api.name">
               <span>{{ api.name }}</span>
               <em :class="['source-badge', apiBadgeClass(api.status)]">{{ api.detail }}</em>
             </div>
@@ -257,11 +258,11 @@ const sourceItems = computed(() => {
   const registry = sysSettings.data_registry || {};
   const grouped: Record<string, { name: string; total: number; enabled: number; status: string }> = {};
   const labels: Record<string, string> = {
+    parquet: "Parquet",
+    duckdb: "DuckDB",
     akshare: "AKShare",
     tushare_free: "Tushare Free",
     tushare_mcp: "Tushare MCP",
-    parquet: "Parquet",
-    duckdb: "DuckDB",
   };
   for (const entry of Object.values(registry) as any[]) {
     const key = String(entry?.source || "local");
@@ -270,10 +271,18 @@ const sourceItems = computed(() => {
     if (entry?.enabled !== false) grouped[key].enabled += 1;
     if (entry?.enabled !== false && entry?.status && entry.status !== "available") grouped[key].status = String(entry.status);
   }
-  return Object.values(grouped)
-    .sort((a, b) => b.enabled - a.enabled || a.name.localeCompare(b.name))
-    .slice(0, 5)
-    .map(item => ({ ...item, summary: item.enabled ? `${item.enabled}/${item.total} dims` : "disabled" }));
+  // Fixed order: local storage → external data vendors
+  const order = ["Parquet", "DuckDB", "AKShare", "Tushare Free", "Tushare MCP"];
+  const items = order.map(name => grouped[name]).filter(Boolean);
+  return items.map(item => ({ ...item!, summary: item!.enabled ? `${item!.enabled}/${item!.total} dims` : "disabled" }));
+});
+
+// Fixed API health display order: data → AI → infra → messaging
+const API_HEALTH_ORDER = ["AKShare", "Tushare", "DeepSeek", "Hindsight", "Telegram"];
+const apiHealthOrdered = computed(() => {
+  if (!apiHealth.value) return [];
+  const byName = new Map(apiHealth.value.items.map(i => [i.name, i]));
+  return API_HEALTH_ORDER.map(name => byName.get(name)).filter(Boolean) as { name: string; status: string; detail: string }[];
 });
 
 function sourceBadgeClass(status: string): string {
@@ -831,16 +840,17 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
   padding-bottom: 0;
   border-bottom: 0;
 }
-.api-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 2px 0;
+.section-label {
+  padding: 6px 0 2px 0;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+  border-bottom: none;
 }
-.api-divider span {
-  flex: 1;
-  height: 1px;
-  background: var(--border-subtle);
+.source-list .section-label:first-child {
+  padding-top: 0;
 }
 .info-grid {
   display: grid;
