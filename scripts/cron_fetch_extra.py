@@ -63,7 +63,7 @@ def fetch_limit_list(full_history=False):
     trade_days = sorted(cal[cal["is_open"] == 1]["cal_date"].tolist(), reverse=True)
 
     if not full_history:
-        trade_days = trade_days[:60]  # Last ~3 months
+        trade_days = trade_days[:2]  # 1/hr limit — cron accumulates daily
 
     fetched = 0
     for d in trade_days:
@@ -71,7 +71,7 @@ def fetch_limit_list(full_history=False):
         if pq.exists():
             continue
         try:
-            _throttle(65)  # 1/min
+            _throttle(3650)  # 1次/小时 限流, 留余量
             df = api_.limit_list_d(trade_date=d, limit_type="U")
             if df is not None and len(df) > 0:
                 HUB.write_parquet(df, pq)
