@@ -258,11 +258,10 @@ const sourceItems = computed(() => {
   const registry = sysSettings.data_registry || {};
   const grouped: Record<string, { name: string; total: number; enabled: number; status: string }> = {};
   const labels: Record<string, string> = {
-    parquet: "Parquet",
-    duckdb: "DuckDB",
     akshare: "AKShare",
     tushare_free: "Tushare Free",
-    tushare_mcp: "Tushare MCP",
+    tushare_paid: "Tushare Paid",
+    future: "Future",
   };
   for (const entry of Object.values(registry) as any[]) {
     const key = String(entry?.source || "local");
@@ -271,8 +270,8 @@ const sourceItems = computed(() => {
     if (entry?.enabled !== false) grouped[key].enabled += 1;
     if (entry?.enabled !== false && entry?.status && entry.status !== "available") grouped[key].status = String(entry.status);
   }
-  // Fixed order: local storage → external data vendors
-  const order = ["Parquet", "DuckDB", "AKShare", "Tushare Free", "Tushare MCP"];
+  // Fixed order: free tier first, then paid/future
+  const order = ["akshare", "tushare_free", "tushare_paid", "future"];
   const items = order.map(name => grouped[name]).filter(Boolean);
   return items.map(item => ({ ...item!, summary: item!.enabled ? `${item!.enabled}/${item!.total} dims` : "disabled" }));
 });
