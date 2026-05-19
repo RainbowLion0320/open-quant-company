@@ -348,3 +348,37 @@ async def api_health():
         "summary": f"{ok} OK, {warn} 警告, {err} 异常",
         "all_ok": err == 0 and warn == 0,
     }
+
+
+@router.get("/cron-jobs")
+async def cron_jobs():
+    """Cron job 状态 (读取 ~/.hermes/cron/jobs.json)"""
+    import json as _json
+    cron_path = Path.home() / ".hermes" / "cron" / "jobs.json"
+    if not cron_path.exists():
+        return {"jobs": [], "status": "no_data"}
+
+    with open(cron_path) as f:
+        data = _json.load(f)
+
+    compact = []
+    for job in data.get("jobs", []):
+        compact.append({
+            "name": job.get("name", ""),
+            "schedule": job.get("schedule_display", ""),
+            "last_run": job.get("last_run_at"),
+            "last_status": job.get("last_status"),
+            "next_run": job.get("next_run_at"),
+            "enabled": job.get("enabled", True),
+            "state": job.get("state", ""),
+            "no_agent": job.get("no_agent", False),
+        })
+
+    ok = sum(1 for j in compact if j["last_status"] == "ok")
+    err = sum(1 for j in compact if j["last_status"] == "error")
+    other = len(compact) - ok - err
+    return {
+        "jobs": compact,
+        "summary": f"{len(compact)} jobs, {ok} OK, {err} err" + (f", {other} other" if other else ""),
+        "checked_at": Path(cron_path).stat().st_mtime,
+    }

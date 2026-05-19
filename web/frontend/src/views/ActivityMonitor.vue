@@ -187,6 +187,24 @@
       </div>
       <div class="glass-card settings-card">
         <div class="panel-head">
+          <span>CRON JOBS</span>
+          <em v-if="cronSummary" class="source-badge ok" style="font-weight:400;cursor:default">{{ cronSummary }}</em>
+        </div>
+        <div class="source-list">
+          <template v-if="cronJobs.length">
+            <div v-for="job in cronJobs" :key="job.name">
+              <span>
+                <span class="cron-name">{{ jobLabel(job) }}</span>
+                <span class="cron-meta">{{ job.schedule }}  ·  {{ jobNextRun(job) }}</span>
+              </span>
+              <em :class="['source-badge', cronBadgeClass(job.last_status)]">{{ jobLastRun(job) }}</em>
+            </div>
+          </template>
+          <div v-else><span>Cron Jobs</span><em class="source-badge muted">加载中...</em></div>
+        </div>
+      </div>
+      <div class="glass-card settings-card">
+        <div class="panel-head">
           <span>SYSTEM INFO</span>
         </div>
         <div class="info-grid">
@@ -290,6 +308,52 @@ const apiHealthOrdered = computed(() => {
   return API_HEALTH_ORDER.map(name => byName.get(name)).filter(Boolean) as { name: string; status: string; detail: string }[];
 });
 
+// Cron jobs
+const cronJobs = ref<any[]>([]);
+const cronSummary = ref("");
+const cronSummaryBadge = computed(() => {
+  if (!cronSummary.value) return "muted";
+  return cronSummary.value.includes("err") ? "limited" : "ok";
+});
+
+function jobLabel(job: any): string {
+  const tag = job.no_agent ? " [script]" : "";
+  return job.name + tag;
+}
+function jobNextRun(job: any): string {
+  if (!job.next_run) return "—";
+  const d = new Date(job.next_run);
+  const now = Date.now();
+  const diffMin = Math.round((d.getTime() - now) / 60000);
+  if (diffMin < 0) return "pending";
+  if (diffMin < 60) return `in ${diffMin}m`;
+  if (diffMin < 1440) return `in ${Math.round(diffMin / 60)}h`;
+  return d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+}
+function jobLastRun(job: any): string {
+  if (!job.last_run) return "never";
+  const d = new Date(job.last_run);
+  const now = Date.now();
+  const diffMin = Math.round((now - d.getTime()) / 60000);
+  const ago = diffMin < 60 ? `${diffMin}m ago` : diffMin < 1440 ? `${Math.round(diffMin / 60)}h ago` : d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+  const st = job.last_status || "—";
+  return `${ago} (${st})`;
+}
+function cronBadgeClass(st: string | null): string {
+  if (!st) return "muted";
+  if (st === "ok") return "ok";
+  if (st === "error") return "muted";
+  return "muted";
+}
+
+async function fetchCronJobs() {
+  try {
+    const data = await api.cronJobs();
+    cronJobs.value = data.jobs || [];
+    cronSummary.value = data.summary || "";
+  } catch { cronJobs.value = []; cronSummary.value = ""; }
+}
+
 function sourceBadgeClass(status: string): string {
   if (status === "available") return "ok";
   if (status === "rate_limited") return "limited";
@@ -316,6 +380,7 @@ async function toggleNotify() {
 async function loadSettings() {
   try { const d = await api.settings(); Object.assign(sysSettings, d); } catch {}
   fetchApiHealth();
+  fetchCronJobs();
 }
 
 async function fetchApiHealth() {
@@ -844,6 +909,16 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 .source-list div:last-child {
   padding-bottom: 0;
   border-bottom: 0;
+}
+.cron-name {
+  display: block;
+  font-size: 11px;
+}
+.cron-meta {
+  display: block;
+  margin-top: 1px;
+  font-size: 10px;
+  color: var(--text-disabled);
 }
 .info-grid {
   display: grid;
