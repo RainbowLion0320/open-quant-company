@@ -159,24 +159,30 @@
       </div>
       <div class="glass-card settings-card">
         <div class="panel-head">
-          <span>DATA SOURCES & API</span>
-          <em v-if="apiHealth" :class="apiHealth.all_ok ? 'source-badge ok' : 'source-badge limited'"
-            style="font-weight:400;cursor:default">{{ apiHealth.summary }}</em>
+          <span>DATA SOURCES</span>
         </div>
         <div class="source-list">
-          <div class="section-label">Data Sources</div>
           <div v-for="src in sourceItems" :key="src.name">
             <span>{{ src.name }}</span>
             <em :class="['source-badge', sourceBadgeClass(src.status)]">{{ src.summary }}</em>
           </div>
           <div v-if="sourceItems.length === 0"><span>Registry</span><em class="source-badge muted">暂无配置</em></div>
+        </div>
+      </div>
+      <div class="glass-card settings-card">
+        <div class="panel-head">
+          <span>API HEALTH</span>
+          <em v-if="apiHealth" :class="apiHealth.all_ok ? 'source-badge ok' : 'source-badge limited'"
+            style="font-weight:400;cursor:default">{{ apiHealth.summary }}</em>
+        </div>
+        <div class="source-list">
           <template v-if="apiHealth && apiHealth.items.length">
-            <div class="section-label">API Health</div>
             <div v-for="api in apiHealthOrdered" :key="api.name">
               <span>{{ api.name }}</span>
               <em :class="['source-badge', apiBadgeClass(api.status)]">{{ api.detail }}</em>
             </div>
           </template>
+          <div v-else><span>API Health</span><em class="source-badge muted">加载中...</em></div>
         </div>
       </div>
       <div class="glass-card settings-card">
@@ -523,7 +529,7 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 }
 .system-settings {
   display: grid;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(280px, 1fr) minmax(320px, 1.15fr);
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
 .telemetry-card,
@@ -838,18 +844,6 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 .source-list div:last-child {
   padding-bottom: 0;
   border-bottom: 0;
-}
-.section-label {
-  padding: 6px 0 2px 0;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-disabled);
-  border-bottom: none;
-}
-.source-list .section-label:first-child {
-  padding-top: 0;
 }
 .info-grid {
   display: grid;
