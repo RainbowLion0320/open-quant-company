@@ -164,6 +164,10 @@ class PaperBroker(Broker):
     def set_prices(self, prices: Dict[str, float]):
         """设置当前行情 (策略需在调用下单前设置)"""
         self._prices.update(prices)
+        # ★ 同步更新持仓现价，否则 market_value 始终为 0
+        for code, price in prices.items():
+            if code in self._positions:
+                self._positions[code].current_price = price
 
     def _next_order_id(self) -> str:
         self._order_counter += 1

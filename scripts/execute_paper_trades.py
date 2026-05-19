@@ -62,7 +62,10 @@ def _get_close_prices(symbols: List[str], target_date: Optional[date] = None) ->
     """
     获取股票最近收盘价。
     通过 data.fetcher.get_stock_daily (含两层缓存) 获取，取最后一根K线收盘价。
+    Paper trading 需要实时价格 — 启用 API fallback，允许从 AKShare 拉取未缓存的股票。
     """
+    import os as _os
+    _os.environ.setdefault("QUANT_ALLOW_API_FALLBACK", "1")
     from data.fetcher import get_stock_daily
 
     prices: Dict[str, float] = {}
