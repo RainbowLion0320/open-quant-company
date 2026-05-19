@@ -1,0 +1,318 @@
+"""
+Cron: 批量拉取 Tushare Free 扩展数据
+
+拉取8个新启用的数据维度到本地 parquet:
+  - limit_list (涨跌停, 1次/分钟)
+  - top_list   (龙虎榜)
+  - research_report (券商研报)
+  - dividend   (分红送股)
+  - fund_daily (基金日线)
+  - fund_portfolio (基金持仓)
+  - fund_nav   (基金净值)
+  - futures_daily (期货日线)
+
+用法:
+  python scripts/cron_fetch_extra.py                # 增量拉取
+  python scripts/cron_fetch_extra.py --full-history # 全量拉取
+"""
+import sys, time, argparse
+from pathlib import Path
+from datetime import datetime, timedelta
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import pandas as pd
+import tushare as ts
+from data.datahub import get_datahub
+from data.tushare_utils import get_tushare_token
+
+HUB = get_datahub()
+TOKEN = get_tushare_token()
+
+# Paths
+STORE = HUB.store_root
+LIMIT_STORE    = STORE / "stock" / "limit_list"
+TOP_STORE      = STORE / "stock" / "top_list"
+RESEARCH_STORE = STORE / "stock" / "research_report"
+DIV_STORE      = STORE / "stock" / "dividend"
+FUND_D_STORE   = STORE / "fund" / "daily"
+FUND_P_STORE   = STORE / "fund" / "portfolio"
+FUND_N_STORE   = STORE / "fund" / "nav"
+FUT_STORE      = STORE / "futures" / "daily"
+
+for d in [LIMIT_STORE, TOP_STORE, RESEARCH_STORE, DIV_STORE,
+          FUND_D_STORE, FUND_P_STORE, FUND_N_STORE, FUT_STORE]:
+    d.mkdir(parents=True, exist_ok=True)
+
+
+def api():
+    return ts.pro_api(TOKEN)
+
+def _throttle(secs=0.5):
+    time.sleep(secs)
+
+# ═══════════════════════════════════════
+# 1. limit_list — 涨跌停 (1次/分钟, 只拉最近几天)
+# ═══════════════════════════════════════
+def fetch_limit_list(full_history=False):
+    """拉取涨跌停数据。full_history 时拉全部交易日。"""
+    api_ = api()
+    # Get trade calendar
+    today = datetime.now().strftime("%Y%m%d")
+    cal = api_.trade_cal(exchange="SSE", start_date="20150101", end_date=today)
+    trade_days = sorted(cal[cal["is_open"] == 1]["cal_date"].tolist(), reverse=True)
+
+    if not full_history:
+        trade_days = trade_days[:60]  # Last ~3 months
+
+    fetched = 0
+    for d in trade_days:
+        pq = LIMIT_STORE / f"{d}.parquet"
+        if pq.exists():
+            continue
+        try:
+            _throttle(65)  # 1/min
+            df = api_.limit_list_d(trade_date=d, limit_type="U")
+            if df is not None and len(df) > 0:
+                HUB.write_parquet(df, pq)
+                fetched += 1
+                if fetched % 5 == 0:
+                    print(f"  [limit_list] {fetched} days ...")
+        except Exception as e:
+            print(f"  [limit_list] {d}: {e}")
+    print(f"  [limit_list] done: {fetched} new days")
+    return fetched
+
+
+# ═══════════════════════════════════════
+# 2. top_list — 龙虎榜
+# ═══════════════════════════════════════
+def fetch_top_list(full_history=False):
+    api_ = api()
+    cal = api_.trade_cal(exchange="SSE", start_date="20150101", end_date=datetime.now().strftime("%Y%m%d"))
+    trade_days = sorted(cal[cal["is_open"] == 1]["cal_date"].tolist(), reverse=True)
+    if not full_history:
+        trade_days = trade_days[:60]
+
+    fetched = 0
+    for d in trade_days:
+        pq = TOP_STORE / f"{d}.parquet"
+        if pq.exists():
+            continue
+        try:
+            _throttle(0.5)
+            df = api_.top_list(trade_date=d)
+            if df is not None and len(df) > 0:
+                HUB.write_parquet(df, pq)
+                fetched += 1
+        except Exception as e:
+            print(f"  [top_list] {d}: {e}")
+    print(f"  [top_list] done: {fetched} new days")
+    return fetched
+
+
+# ═══════════════════════════════════════
+# 3. research_report — 券商研报
+# ═══════════════════════════════════════
+def fetch_research_report(full_history=False):
+    api_ = api()
+    now = datetime.now()
+    months = []
+    if full_history:
+        for y in range(2017, now.year + 1):
+            for m in range(1, 13):
+                if y == now.year and m > now.month:
+                    break
+                months.append(f"{y}{m:02d}")
+    else:
+        for i in range(3):
+            d = now - timedelta(days=90 * i)
+            months.append(d.strftime("%Y%m"))
+
+    fetched = 0
+    for mon in sorted(months):
+        pq = RESEARCH_STORE / f"{mon}.parquet"
+        if pq.exists():
+            continue
+        try:
+            _throttle(0.5)
+            df = api_.research_report(start_date=f"{mon}01", end_date=f"{mon}31")
+            if df is not None and len(df) > 0:
+                HUB.write_parquet(df, pq)
+                fetched += 1
+                print(f"  [research] {mon}: {len(df)} records")
+        except Exception as e:
+            print(f"  [research] {mon}: {e}")
+    print(f"  [research] done: {fetched} new months")
+    return fetched
+
+
+# ═══════════════════════════════════════
+# 4. dividend — 分红送股 (全量一次拉取)
+# ═══════════════════════════════════════
+def fetch_dividend(full_history=False):
+    api_ = api()
+    pq = DIV_STORE / "all_dividends.parquet"
+    if pq.exists() and not full_history:
+        print(f"  [dividend] already cached")
+        return 0
+    try:
+        dfs = []
+        for year in range(2010, 2027):
+            try:
+                _throttle(0.5)
+                df = api_.dividend(start_date=f"{year}0101", end_date=f"{year}1231")
+                if df is not None and len(df) > 0:
+                    dfs.append(df)
+                    print(f"  [dividend] {year}: {len(df)} records")
+            except Exception:
+                pass
+        if dfs:
+            all_df = pd.concat(dfs, ignore_index=True)
+            HUB.write_parquet(all_df, pq)
+            print(f"  [dividend] total {len(all_df)} records ({len(dfs)} years)")
+            return len(dfs)
+    except Exception as e:
+        print(f"  [dividend] error: {e}")
+    return 0
+
+
+# ═══════════════════════════════════════
+# 5. fund_daily — 基金日线 (分批拉取)
+# ═══════════════════════════════════════
+def fetch_fund_daily(full_history=False):
+    """拉取主流 ETF 日线 (上证50/沪深300/中证500/创业板/科创50)。"""
+    api_ = api()
+    # Top ETFs by AUM
+    codes = ["510050.SH", "510300.SH", "510500.SH", "159915.SZ", "588000.SH",
+             "512880.SH", "159949.SZ", "512100.SH", "512010.SH", "510880.SH"]
+    fetched = 0
+    for code in codes:
+        pq = FUND_D_STORE / f"{code}.parquet"
+        if pq.exists() and not full_history:
+            continue
+        try:
+            _throttle(0.5)
+            df = api_.fund_daily(ts_code=code)
+            if df is not None and len(df) > 0:
+                HUB.write_parquet(df, pq)
+                fetched += 1
+                print(f"  [fund_daily] {code}: {len(df)} rows")
+        except Exception as e:
+            print(f"  [fund_daily] {code}: {e}")
+    print(f"  [fund_daily] done: {fetched} funds")
+    return fetched
+
+
+# ═══════════════════════════════════════
+# 6. fund_portfolio — 基金持仓 (季度)
+# ═══════════════════════════════════════
+def fetch_fund_portfolio(full_history=False):
+    api_ = api()
+    pq = FUND_P_STORE / "20251231.parquet"
+    if pq.exists() and not full_history:
+        print(f"  [fund_portfolio] already cached")
+        return 0
+    try:
+        _throttle(0.5)
+        df = api_.fund_portfolio(period="20251231")  # Latest annual
+        if df is not None and len(df) > 0:
+            HUB.write_parquet(df, pq)
+            print(f"  [fund_portfolio] {len(df)} records")
+            return 1
+    except Exception as e:
+        print(f"  [fund_portfolio] error: {e}")
+    return 0
+
+
+# ═══════════════════════════════════════
+# 7. fund_nav — 基金净值
+# ═══════════════════════════════════════
+def fetch_fund_nav(full_history=False):
+    api_ = api()
+    codes = ["510050.SH", "510300.SH", "510500.SH", "159915.SZ", "588000.SH",
+             "512880.SH", "159949.SZ", "512100.SH", "512010.SH", "510880.SH"]
+    fetched = 0
+    for code in codes:
+        pq = FUND_N_STORE / f"{code}.parquet"
+        if pq.exists() and not full_history:
+            continue
+        try:
+            _throttle(0.5)
+            df = api_.fund_nav(ts_code=code)
+            if df is not None and len(df) > 0:
+                HUB.write_parquet(df, pq)
+                fetched += 1
+                print(f"  [fund_nav] {code}: {len(df)} rows")
+        except Exception as e:
+            print(f"  [fund_nav] {code}: {e}")
+    print(f"  [fund_nav] done: {fetched} funds")
+    return fetched
+
+
+# ═══════════════════════════════════════
+# 8. futures_daily — 期货日线
+# ═══════════════════════════════════════
+def fetch_futures_daily(full_history=False):
+    api_ = api()
+    # Main continuous contracts (well-known codes)
+    contracts = [
+        # Stock index futures (CFFEX)
+        "IF.CFX", "IC.CFX", "IH.CFX", "IM.CFX",
+        # Shanghai (SHFE) — active contracts
+        "CU.SHF", "AL.SHF", "ZN.SHF", "RB.SHF", "HC.SHF",
+        # Dalian (DCE)
+        "I.DCE", "J.DCE", "JM.DCE", "M.DCE", "Y.DCE", "P.DCE",
+        # Zhengzhou (CZCE)
+        "SR.CZC", "TA.CZC", "MA.CZC",
+        # INE
+        "SC.INE", "FU.INE",
+    ]
+
+    fetched = 0
+    for ct in contracts:
+        pq = FUT_STORE / f"{ct}.parquet"
+        if pq.exists() and not full_history:
+            continue
+        try:
+            _throttle(0.5)
+            df = api_.fut_daily(ts_code=ct)
+            if df is not None and len(df) > 0:
+                HUB.write_parquet(df, pq)
+                fetched += 1
+                print(f"  [futures] {ct}: {len(df)} rows")
+        except Exception as e:
+            print(f"  [futures] {ct}: {e}")
+    print(f"  [futures] done: {fetched} contracts")
+    return fetched
+
+
+# ═══════════════════════════════════════
+# Main
+# ═══════════════════════════════════════
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Fetch Tushare Free extra data dimensions")
+    parser.add_argument("--full-history", action="store_true", help="Full historical fetch")
+    parser.add_argument("--skip-slow", action="store_true", help="Skip rate-limited fetchers (limit_list/top_list)")
+    args = parser.parse_args()
+
+    full = args.full_history
+    print(f"Cron fetch extra data — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"Full history: {full}")
+    print("=" * 55)
+
+    results = {}
+    results["dividend"] = fetch_dividend(full)
+
+    if not args.skip_slow:
+        results["limit_list"] = fetch_limit_list(full)
+        results["top_list"] = fetch_top_list(full)
+
+    results["research_report"] = fetch_research_report(full)
+    results["fund_daily"] = fetch_fund_daily(full)
+    results["fund_portfolio"] = fetch_fund_portfolio(full)
+    results["fund_nav"] = fetch_fund_nav(full)
+    results["futures_daily"] = fetch_futures_daily(full)
+
+    total = sum(v for v in results.values() if isinstance(v, int))
+    print(f"\nDone: {total} new data points fetched")

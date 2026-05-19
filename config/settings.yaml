@@ -1,51 +1,39 @@
-# ═══════════════════════════════════════════════════════════
-# ★ Data Cleaning Layer (Phase 4.3)
-# 数据采集 → 清洗 → 特征构建。每条规则可独立开关和调参。
-# data/cleaner.py 从本段加载规则
-# ═══════════════════════════════════════════════════════════
 data_cleaning:
   ohlcv_integrity:
     enabled: true
   outlier_detection:
     enabled: true
-    sigma: 5                 # Z-score 阈值
-    max_daily_change_pct: 0.20
+    sigma: 5
+    max_daily_change_pct: 0.2
     max_volume_ratio: 15
   suspended_detection:
     enabled: true
-    max_flat_days: 60        # 价格连续不变≥60天 → 停牌标记
+    max_flat_days: 60
   missing_value:
     enabled: true
-    max_forward_fill: 5      # 前向填充最多5天
+    max_forward_fill: 5
   financial_validation:
     enabled: true
   winsorize:
     enabled: true
-    lower_pct: 0.01          # 1%缩尾
-    upper_pct: 0.99          # 99%缩尾
-
-# ═══════════════════════════════════════════════════════════
-# ★ Risk Control Layer (Phase 4.3)
-# 对标 vnpy RiskManager — 预检风控, 可插拔规则
-# broker/risk.py 从本段加载规则
-# ═══════════════════════════════════════════════════════════
+    lower_pct: 0.01
+    upper_pct: 0.99
 risk_control:
   max_single_position:
     enabled: true
-    max_pct: 0.25       # 单只股票仓位不超过总权益25%
+    max_pct: 0.25
   max_total_exposure:
     enabled: true
-    max_pct: 0.80       # 总敞口不超过80% (留20%现金/对冲)
+    max_pct: 0.8
   max_orders_per_day:
     enabled: true
-    max_count: 20       # 单日最多20笔订单
+    max_count: 20
   max_drawdown_circuit_breaker:
     enabled: true
-    max_drawdown_pct: -0.15  # 回撤超15%触发熔断
+    max_drawdown_pct: -0.15
   max_single_order_amount:
     enabled: true
-    max_amount: 500000  # 单笔订单最多50万
-
+    max_amount: 500000
 backtest:
   benchmark: sh000001
   benchmark_name: 上证指数
@@ -264,12 +252,6 @@ signals:
       quality: 0.4
       technical: 0.15
       valuation: 0.3
-
-# ═══════════════════════════════════════════════════════════
-# ★ Signal Selection
-# 策略先给全股票池打分，再按横截面排名把最强候选标记为 buy。
-# 这避免阈值过宽导致 paper trading 按原始股票顺序买入。
-# ═══════════════════════════════════════════════════════════
 signal_selection:
   top_pct: 0.05
   min_buys: 5
@@ -285,37 +267,24 @@ signal_selection:
     ml_lgbm:
       min_score: 52
       max_buys: 80
-
 ml:
   use_regime_models: true
   score_scale: 5.0
   max_feature_age_months: 3
   allow_stale_features: false
   allow_live_factor_fallback: false
-# ★ Multi-asset architecture (Phase 4.1)
-# Register all asset types. New types just add entries here.
-# Adapters: data/assets/stock.py, data/assets/fund.py, etc.
 assets:
   stock:
     enabled: true
     label: A股股票
-    universe: CIRCLE_STOCKS  # 5204只全A股
+    universe: CIRCLE_STOCKS
     features: true
   etf:
     enabled: true
     label: ETF基金
-    universe: ETF_UNIVERSE  # ~50只 (宽基/行业/债券/黄金/跨境)
+    universe: ETF_UNIVERSE
     features: true
     adapter: data/assets/etf.py
-  # fund:           # future
-  #   enabled: false
-  #   label: 公募基金
-  # futures:        # future
-  #   enabled: false
-  #   label: 期货
-  # crypto:         # future
-  #   enabled: false
-  #   label: 加密货币
   bond:
     enabled: false
     label: 债券
@@ -331,32 +300,27 @@ assets:
   crypto:
     enabled: false
     label: 加密货币
-    universe: CRYPTO_UNIVERSE  # placeholder
+    universe: CRYPTO_UNIVERSE
     adapter: data/assets/crypto.py
   macro:
     enabled: true
     label: 宏观经济
     features: true
-
-# ★ Asset Allocation (Phase 5.0)
-# Regime → dynamic weights → cross-asset orders
-# broker/allocator.py 从本段加载
 asset_allocation:
   max_positions_per_asset: 8
   regime_weights:
     bull:
-      stock: 0.60
-      etf: 0.30
-      cash: 0.10
+      stock: 0.6
+      etf: 0.3
+      cash: 0.1
     sideways:
       stock: 0.35
       etf: 0.35
-      cash: 0.30
+      cash: 0.3
     bear:
       stock: 0.15
       etf: 0.15
-      cash: 0.70
-
+      cash: 0.7
 strategies:
   buffett:
     color: '#06b6d4'
@@ -387,7 +351,6 @@ strategies:
     runner: signals.ml_signals:compute_ml_signals
     signal_name: ml_lgbm
 trading:
-  # 实际交易费率 (用于成本估算)
   commission:
     brokerage: 0.00025
     stamp_duty: 0.0005
@@ -396,40 +359,26 @@ trading:
     enabled: true
     require_confirmation: false
     signal_change_only: true
-
-# ═══════════════════════════════════════════════════════════
-# ★ Paper Trading (模拟交易) — Phase 5.2
-# 日频信号→次日开盘模拟成交→Parquet持久化→Web展示
-# broker/persistence.py + scripts/execute_paper_trades.py
-# ═══════════════════════════════════════════════════════════
 paper_trading:
   enabled: true
-  initial_cash: 1000000           # 初始资金
-  commission_rate: 0.00081        # 完整买卖成本(印花税+佣金+过户费)
-  t_plus_1: true                  # T+1限制
-  risk_enabled: true              # 启用RiskManager预检
-  store_dir: data/store/paper     # 持久化存储目录
+  initial_cash: 1000000
+  commission_rate: 0.00081
+  t_plus_1: true
+  risk_enabled: true
+  store_dir: data/store/paper
   lot_size: 100
-  order_value_pct: 0.05           # 单个buy信号最多使用总资产5%
-  max_order_value: 50000          # 单个buy信号最多5万元
-  max_orders_per_strategy: 5      # 每个策略每天最多执行前N个信号
+  order_value_pct: 0.05
+  max_order_value: 50000
+  max_orders_per_strategy: 5
   sell_all_on_sell_signal: true
-  strategies:                     # 参与模拟交易的策略
-    - buffett
-    - multifactor
-    - cybernetic
-    - ml_lgbm
-  execution_price: close          # 成交价: close(收盘价模拟) | open(开盘价)
-  auto_execute: false             # cron是否自动执行 (手动执行时false)
-
-# ═══════════════════════════════════════════════════════════
-# ★ Data Dimension Registry (Phase 4.1)
-# Single source of truth for ALL data dimensions across ALL asset types.
-# status: available | rate_limited | paid | planned
-# New dimensions: add an entry here + implement a fetcher.
-# ═══════════════════════════════════════════════════════════
+  strategies:
+  - buffett
+  - multifactor
+  - cybernetic
+  - ml_lgbm
+  execution_price: close
+  auto_execute: false
 data_registry:
-  # ── Stock: 行情 ──
   ohlcv_daily:
     source: akshare
     asset: stock
@@ -439,7 +388,6 @@ data_registry:
     label: 日线行情 OHLCV
     cache: stock/daily/{symbol}.parquet
     description: 全A股日线, 通过新浪源获取
-
   adj_factor:
     source: tushare_free
     asset: stock
@@ -448,8 +396,6 @@ data_registry:
     enabled: true
     label: 复权因子
     cache: stock/adj_factor/{symbol}.parquet
-
-  # ── Stock: 财务 ──
   financial_summary:
     source: akshare
     asset: stock
@@ -459,7 +405,6 @@ data_registry:
     label: 同花顺财务摘要
     cache: stock/financials/{symbol}.parquet
     description: ROE/毛利率/净利率/D-E/净利润
-
   fina_indicator:
     source: tushare_free
     asset: stock
@@ -469,8 +414,6 @@ data_registry:
     label: Tushare 财务指标
     cache: stock/fina_indicator/{symbol}.parquet
     description: 50+指标 EPS/ROA/ROIC/FCFF/FCFE等
-
-  # ── Stock: 估值 ──
   valuation_daily:
     source: tushare_free
     asset: stock
@@ -479,8 +422,6 @@ data_registry:
     enabled: true
     label: 每日估值 PE/PB/PS
     cache: stock/valuation/{symbol}.parquet
-
-  # ── Stock: 资金流向 (P0) ──
   moneyflow_monthly:
     source: tushare_free
     asset: stock
@@ -490,7 +431,6 @@ data_registry:
     label: 月频资金流向 (全历史)
     cache: stock/moneyflow/monthly/{YYYYMMDD}.parquet
     description: 主力/超大单/大单/中单/小单净流入, 136月全历史
-
   moneyflow_daily:
     source: akshare
     asset: stock
@@ -500,8 +440,6 @@ data_registry:
     label: 日频资金流向 (近120日)
     cache: stock/moneyflow/{symbol}.parquet
     description: 同花顺个股资金流向, 近100交易日
-
-  # ── Stock: 筹码 (P0) ──
   holder_number:
     source: tushare_free
     asset: stock
@@ -511,7 +449,6 @@ data_registry:
     label: 股东户数
     cache: stock/holders/{symbol}.parquet
     description: 全历史股东户数, 筹码集中度核心指标
-
   holder_trade:
     source: tushare_free
     asset: stock
@@ -520,27 +457,23 @@ data_registry:
     enabled: true
     label: 股东增减持
     cache: stock/holdertrade/{symbol}.parquet
-
-  # ── Stock: 市场情绪 ──
   limit_list:
     source: tushare_free
     asset: stock
     status: rate_limited
     freq: daily
-    enabled: false
+    enabled: true
     label: 涨跌停统计
     cache: stock/limit_list/{YYYYMMDD}.parquet
     description: 1次/分钟限流, cron后台拉取
-
   top_list:
     source: tushare_free
     asset: stock
     status: rate_limited
     freq: daily
-    enabled: false
+    enabled: true
     label: 龙虎榜
     cache: stock/top_list/{YYYYMMDD}.parquet
-
   broker_recommend:
     source: tushare_free
     asset: stock
@@ -549,17 +482,14 @@ data_registry:
     enabled: true
     label: 券商月度金股
     cache: stock/broker_recommend/{YYYYMM}.parquet
-
   research_report:
     source: tushare_free
     asset: stock
     status: rate_limited
     freq: monthly
-    enabled: false
+    enabled: true
     label: 券商研报
     cache: stock/research_report/{YYYYMM}.parquet
-
-  # ── Stock: 公司事件 ──
   share_float:
     source: tushare_free
     asset: stock
@@ -568,7 +498,6 @@ data_registry:
     enabled: true
     label: 限售股解禁
     cache: stock/share_float/all.parquet
-
   repurchase:
     source: tushare_free
     asset: stock
@@ -577,17 +506,14 @@ data_registry:
     enabled: true
     label: 股票回购
     cache: stock/repurchase/all.parquet
-
   dividend:
     source: tushare_free
     asset: stock
     status: planned
     freq: event
-    enabled: false
+    enabled: true
     label: 分红送股
     cache: stock/dividend/{symbol}.parquet
-
-  # ── Stock: 付费数据 (预留接口) ──
   cyq_chips:
     source: tushare_paid
     asset: stock
@@ -597,7 +523,6 @@ data_registry:
     label: 筹码分布 (需5000积分)
     cache: stock/cyq/{YYYYMMDD}.parquet
     description: 每日筹码分布, 各价位占比
-
   stk_factor_pro:
     source: tushare_paid
     asset: stock
@@ -607,7 +532,6 @@ data_registry:
     label: 技术面因子专业版 (需5000积分)
     cache: stock/factor_pro/{symbol}.parquet
     description: MACD/KDJ/RSI/BOLL等全量技术因子
-
   stk_mins:
     source: tushare_paid
     asset: stock
@@ -616,7 +540,6 @@ data_registry:
     enabled: false
     label: 分钟行情 (需5000积分)
     cache: stock/mins/{symbol}_{freq}.parquet
-
   moneyflow_daily_full:
     source: tushare_paid
     asset: stock
@@ -625,8 +548,6 @@ data_registry:
     enabled: false
     label: 日频资金流向全历史 (需5000积分)
     cache: stock/moneyflow/daily_full/{YYYYMMDD}.parquet
-
-  # ── Macro ──
   macro_money_supply:
     source: akshare
     asset: macro
@@ -635,7 +556,6 @@ data_registry:
     enabled: true
     label: 货币供应量 M0/M1/M2
     cache: macro/money_supply.parquet
-
   macro_pmi:
     source: akshare
     asset: macro
@@ -644,7 +564,6 @@ data_registry:
     enabled: true
     label: 制造业 PMI
     cache: macro/pmi.parquet
-
   macro_cpi:
     source: akshare
     asset: macro
@@ -653,7 +572,6 @@ data_registry:
     enabled: true
     label: CPI 居民消费价格
     cache: macro/cpi.parquet
-
   macro_ppi:
     source: akshare
     asset: macro
@@ -662,7 +580,6 @@ data_registry:
     enabled: true
     label: PPI 工业品出厂价
     cache: macro/ppi.parquet
-
   macro_gdp:
     source: akshare
     asset: macro
@@ -671,7 +588,6 @@ data_registry:
     enabled: true
     label: 国内生产总值 GDP
     cache: macro/gdp.parquet
-
   macro_shibor:
     source: akshare
     asset: macro
@@ -680,7 +596,6 @@ data_registry:
     enabled: true
     label: Shibor 利率
     cache: macro/shibor.parquet
-
   macro_lpr:
     source: akshare
     asset: macro
@@ -689,46 +604,38 @@ data_registry:
     enabled: true
     label: LPR 贷款基础利率
     cache: macro/lpr.parquet
-
-  # ── Fund (预留) ──
   fund_daily:
     source: tushare_free
     asset: fund
     status: planned
     freq: daily
-    enabled: false
+    enabled: true
     label: 基金日线
     cache: fund/daily/{symbol}.parquet
-
   fund_portfolio:
     source: tushare_free
     asset: fund
     status: planned
     freq: quarterly
-    enabled: false
+    enabled: true
     label: 基金持仓
     cache: fund/portfolio/{report_date}.parquet
-
   fund_nav:
     source: tushare_free
     asset: fund
     status: planned
     freq: daily
-    enabled: false
+    enabled: true
     label: 基金净值
     cache: fund/nav/{symbol}.parquet
-
-  # ── Futures (预留) ──
   futures_daily:
     source: tushare_free
     asset: futures
     status: planned
     freq: daily
-    enabled: false
+    enabled: true
     label: 期货日线
     cache: futures/daily/{symbol}.parquet
-
-  # ── Crypto (预留) ──
   crypto_daily:
     source: future
     asset: crypto

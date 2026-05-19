@@ -113,17 +113,59 @@ def repair_moneyflow_monthly(days: int = 365) -> None:
 
 
 def repair_limit_list() -> None:
-    from scripts.cron_fetch_slow import fetch_limit_list
+    from scripts.cron_fetch_extra import fetch_limit_list
 
-    fetched = fetch_limit_list(force=True)
+    fetched = fetch_limit_list(full_history=False)
     _require_rows("stock_limit_list", int(fetched))
 
 
 def repair_research_report() -> None:
-    from scripts.cron_fetch_slow import fetch_research_report
+    from scripts.cron_fetch_extra import fetch_research_report
 
-    fetched = fetch_research_report(force=True)
+    fetched = fetch_research_report(full_history=True)
     _require_rows("stock_research_report", int(fetched))
+
+
+def repair_top_list() -> None:
+    from scripts.cron_fetch_extra import fetch_top_list
+
+    fetched = fetch_top_list(full_history=False)
+    _require_rows("stock_top_list", int(fetched))
+
+
+def repair_dividend() -> None:
+    from scripts.cron_fetch_extra import fetch_dividend
+
+    fetched = fetch_dividend(full_history=True)
+    _require_rows("stock_dividend", int(fetched))
+
+
+def repair_fund_daily() -> None:
+    from scripts.cron_fetch_extra import fetch_fund_daily
+
+    fetched = fetch_fund_daily(full_history=True)
+    _require_rows("fund_daily", int(fetched))
+
+
+def repair_fund_portfolio() -> None:
+    from scripts.cron_fetch_extra import fetch_fund_portfolio
+
+    fetched = fetch_fund_portfolio(full_history=True)
+    _require_rows("fund_portfolio", int(fetched))
+
+
+def repair_fund_nav() -> None:
+    from scripts.cron_fetch_extra import fetch_fund_nav
+
+    fetched = fetch_fund_nav(full_history=True)
+    _require_rows("fund_nav", int(fetched))
+
+
+def repair_futures_daily() -> None:
+    from scripts.cron_fetch_extra import fetch_futures_daily
+
+    fetched = fetch_futures_daily(full_history=True)
+    _require_rows("futures_daily", int(fetched))
 
 
 def repair_broker_recommend(months: int = 6) -> None:
@@ -189,9 +231,17 @@ REPAIR_MAP = {
     "stock_moneyflow_monthly":    lambda limit=0, days=365: repair_moneyflow_monthly(days),
     "stock_broker_recommend":     lambda limit=0, days=365: repair_broker_recommend(months=max(1, min(24, days // 30))),
     "stock_limit_list":           lambda limit=0, days=365: repair_limit_list(),
+    "stock_top_list":             lambda limit=0, days=365: repair_top_list(),
     "stock_research_report":      lambda limit=0, days=365: repair_research_report(),
+    "stock_dividend":             lambda limit=0, days=365: repair_dividend(),
     "share_float":                lambda limit=0, days=365: repair_share_float(days),
     "repurchase":                 lambda limit=0, days=365: repair_repurchase(days),
+    # Fund
+    "fund_daily":                 lambda limit=0, days=365: repair_fund_daily(),
+    "fund_portfolio":             lambda limit=0, days=365: repair_fund_portfolio(),
+    "fund_nav":                   lambda limit=0, days=365: repair_fund_nav(),
+    # Futures
+    "futures_daily":              lambda limit=0, days=365: repair_futures_daily(),
 }
 
 
