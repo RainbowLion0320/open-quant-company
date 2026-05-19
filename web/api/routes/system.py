@@ -244,7 +244,6 @@ async def repair_table(table_name: str):
     if table_name not in _repairable_tables():
         return {"status": "error", "message": f"Table '{table_name}' is not repairable"}
 
-    # Cancel existing job for same table
     with _repair_lock:
         for jid, info in list(_repair_jobs.items()):
             if info.get("table") == table_name and info["status"] == "running":
@@ -272,4 +271,81 @@ async def repair_status(job_id: str):
         "stdout": job.get("stdout", ""),
         "stderr": job.get("stderr", ""),
         "exit_code": job.get("exit_code"),
+    }
+
+
+@router.get("/api-health")
+async def api_health():
+    """检查各 API 配置健康状态 (不含 token 值)。"""
+    results = []
+
+    # AKShare
+    try:
+        import akshare
+        results.append({"name": "AKShare", "status": "ok", "detail": f"v{akshare.__version__}"})
+    except ImportError:
+        results.append({"name": "AKShare", "status": "error", "detail": "未安装"})
+
+    # Tushare
+    token = os.environ.get("TUSHARE_TOKEN") or os.environ.get("TUSHARE_PRO_TOKEN")
+    if token:
+        try:
+            import requests as _r
+            resp = _r.post("http://api.tushare.pro", json={"api_name": "stock_basic", "token": token, "params": {"limit": 1, "list_status": "L"}, "fields": "ts_code,name"}, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("code") == 0:
+                    results.append({"name": "Tushare", "status": "ok", "detail": "已配置，API 正常"})
+                else:
+                    results.append({"name": "Tushare", "status": "error", "detail": data.get("msg", "未知错误")})
+            else:
+                results.append({"name": "Tushare", "status": "error", "detail": f"HTTP {resp.status_code}"})
+        except Exception as e:
+            results.append({"name": "Tushare", "status": "warn", "detail": f"已配置但无法连接: {str(e)[:60]}"})
+    else:
+        results.append({"name": "Tushare", "status": "missing", "detail": "未配置 TUSHARE_TOKEN"})
+
+    # DeepSeek
+    ds_key = os.environ.get("DEEPSEEK_API_KEY")
+    if ds_key:
+        masked = ds_key[:4] + "****" + ds_key[-4:] if len(ds_key) > 8 else "****"
+        results.append({"name": "DeepSeek", "status": "ok", "detail": f"已配置 ({masked})"})
+    else:
+        results.append({"name": "DeepSeek", "status": "missing", "detail": "未配置 DEEPSEEK_API_KEY"})
+
+    # Hindsight
+    try:
+        import httpx
+        with httpx.Client(timeout=3) as client:
+            r = client.get("http://localhost:9177/health")
+            if r.status_code == 200:
+                results.append({"name": "Hindsight", "status": "ok", "detail": "端口 9177 正常"})
+            else:
+                results.append({"name": "Hindsight", "status": "error", "detail": f"HTTP {r.status_code}"})
+    except Exception:
+        results.append({"name": "Hindsight", "status": "warn", "detail": "端口 9177 无响应"})
+
+    # Telegram
+    try:
+        cfg_path = Path(__file__).resolve().parent.parent.parent.parent / "config" / "settings.yaml"
+        import yaml
+        with open(cfg_path) as f:
+            cfg = yaml.safe_load(f)
+        tg = cfg.get("notify", {}).get("telegram", {})
+        if tg.get("bot_token") and tg.get("chat_id"):
+            results.append({"name": "Telegram", "status": "ok", "detail": f"已配置 (chat_id={tg['chat_id']})"})
+        elif tg.get("enabled"):
+            results.append({"name": "Telegram", "status": "warn", "detail": "已启用但配置不完整"})
+        else:
+            results.append({"name": "Telegram", "status": "disabled", "detail": "未启用"})
+    except Exception:
+        results.append({"name": "Telegram", "status": "unknown", "detail": "无法读取配置"})
+
+    ok = sum(1 for r in results if r["status"] == "ok")
+    warn = sum(1 for r in results if r["status"] == "warn")
+    err = sum(1 for r in results if r["status"] in ("error", "missing"))
+    return {
+        "items": results,
+        "summary": f"{ok} OK, {warn} 警告, {err} 异常",
+        "all_ok": err == 0 and warn == 0,
     }

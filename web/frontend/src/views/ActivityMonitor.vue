@@ -159,7 +159,9 @@
       </div>
       <div class="glass-card settings-card">
         <div class="panel-head">
-          <span>DATA SOURCES</span>
+          <span>DATA SOURCES & API</span>
+          <em v-if="apiHealth" :class="apiHealth.all_ok ? 'source-badge ok' : 'source-badge limited'"
+            style="font-weight:400;cursor:default">{{ apiHealth.summary }}</em>
         </div>
         <div class="source-list">
           <div v-for="src in sourceItems" :key="src.name">
@@ -167,6 +169,13 @@
             <em :class="['source-badge', sourceBadgeClass(src.status)]">{{ src.summary }}</em>
           </div>
           <div v-if="sourceItems.length === 0"><span>Registry</span><em class="source-badge muted">暂无配置</em></div>
+          <template v-if="apiHealth && apiHealth.items.length">
+            <div class="api-divider"><span></span></div>
+            <div v-for="api in apiHealth.items" :key="api.name">
+              <span>{{ api.name }}</span>
+              <em :class="['source-badge', apiBadgeClass(api.status)]">{{ api.detail }}</em>
+            </div>
+          </template>
         </div>
       </div>
       <div class="glass-card settings-card">
@@ -219,6 +228,7 @@ const dsCostRef = ref<HTMLCanvasElement | null>(null);
 const dsTotals = ref<{ pro: number; flash: number; cost: number } | null>(null);
 
 const sysSettings = reactive<Record<string, any>>({});
+const apiHealth = ref<{ items: { name: string; status: string; detail: string }[]; summary: string; all_ok: boolean } | null>(null);
 
 const versionText = computed(() => {
   const version = sysSettings.project?.version;
@@ -273,6 +283,14 @@ function sourceBadgeClass(status: string): string {
   return "muted";
 }
 
+function apiBadgeClass(status: string): string {
+  if (status === "ok") return "ok";
+  if (status === "warn") return "limited";
+  if (status === "error" || status === "missing") return "muted";
+  if (status === "disabled" || status === "unknown") return "muted";
+  return "muted";
+}
+
 async function toggleNotify() {
   const enabled = !sysSettings.trading?.notification?.enabled;
   sysSettings.trading = sysSettings.trading || {};
@@ -283,6 +301,11 @@ async function toggleNotify() {
 
 async function loadSettings() {
   try { const d = await api.settings(); Object.assign(sysSettings, d); } catch {}
+  fetchApiHealth();
+}
+
+async function fetchApiHealth() {
+  try { apiHealth.value = await api.apiHealth(); } catch { apiHealth.value = null; }
 }
 
 function fmtNum(n: number): string {
@@ -807,6 +830,17 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
 .source-list div:last-child {
   padding-bottom: 0;
   border-bottom: 0;
+}
+.api-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+}
+.api-divider span {
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
 }
 .info-grid {
   display: grid;

@@ -327,6 +327,9 @@ export const api = {
   // System Monitor
   systemMonitor: () => get<SystemMonitor>("/api/system/monitor"),
 
+  // System Monitor
+  apiHealth: () => get<{ items: { name: string; status: string; detail: string }[]; summary: string; all_ok: boolean }>("/api/system/api-health"),
+
   // Settings
   settings: async () => {
     const data = await get<any>("/api/settings");
