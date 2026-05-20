@@ -44,6 +44,9 @@ data/store/features/
 data/store/signals/
 data/store/macro/
 data/store/stock/
+data/store/fund/
+data/store/futures/
+data/store/deepseek/
 data/store/scan_meta.parquet
 data/models/*.pkl
 data/models/*.json
