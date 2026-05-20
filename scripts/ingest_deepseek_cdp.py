@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-DeepSeek Usage Daily Ingest via CDP — cost API interception.
+DeepSeek Usage Daily Ingest via CDP — dual API capture.
 
-Navigates to DeepSeek usage page, intercepts /api/v0/usage/cost
-response (DAILY per-model token breakdown), parses, saves to parquet.
+Key insight: /api/v0/usage/cost amounts are in CNY (元), not tokens.
+/api/v0/usage/amount has raw token counts (monthly).
+
+Computes daily tokens by distributing monthly totals proportionally
+to daily cost API values, and uses cost API values directly as CNY.
 
 Usage: python scripts/ingest_deepseek_cdp.py
 """
@@ -11,6 +14,7 @@ import json, sys, time
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
+import numpy as np
 import websocket
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -23,7 +27,6 @@ def _get_json(path):
         return json.loads(r.read().decode())
 
 def _recv_all(ws, timeout=2):
-    """Read all available messages from websocket."""
     messages = []
     ws.sock.settimeout(timeout)
     try:
@@ -32,23 +35,20 @@ def _recv_all(ws, timeout=2):
             raw = raw.decode() if isinstance(raw, bytes) else raw
             try: messages.append(json.loads(raw))
             except: pass
-    except websocket.WebSocketTimeoutException:
-        pass
-    except Exception:
+    except (websocket.WebSocketTimeoutException, OSError):
         pass
     return messages
 
 def ingest():
-    print(f"[{datetime.now():%H:%M:%S}] CDP -> daily cost API")
+    print(f"[{datetime.now():%H:%M:%S}] CDP → DeepSeek daily (dual API)")
 
-    # Connect
     pages = _get_json("/json")
-    ds = next((p for p in pages if "deepseek.com" in p.get("url", "").lower()), None)
+    ds = next((p for p in pages if "deepseek.com" in p.get("url","").lower()), None)
     if not ds:
         _get_json("/json/new?https://platform.deepseek.com/usage")
         time.sleep(4)
         pages = _get_json("/json")
-        ds = next((p for p in pages if "deepseek.com" in p.get("url", "").lower()), None)
+        ds = next((p for p in pages if "deepseek.com" in p.get("url","").lower()), None)
     if not ds:
         print("✗ No DeepSeek page"); sys.exit(1)
 
@@ -58,13 +58,9 @@ def ingest():
     def cmd(method, params=None):
         mid[0] += 1
         ws.send(json.dumps({"id": mid[0], "method": method, "params": params or {}}))
-        # Read until we get our response, collect all events
-        all_msgs = []
         while True:
-            try:
-                raw = ws.recv()
+            try: raw = ws.recv()
             except websocket.WebSocketTimeoutException:
-                # Resend and continue
                 ws.send(json.dumps({"id": mid[0], "method": method, "params": params or {}}))
                 continue
             raw = raw.decode() if isinstance(raw, bytes) else raw
@@ -72,164 +68,152 @@ def ingest():
             except: continue
             if msg.get("id") == mid[0]:
                 if "error" in msg: raise RuntimeError(f"CDP: {msg['error']}")
-                return msg.get("result", {}), all_msgs
-            all_msgs.append(msg)
+                return msg.get("result", {})
 
     ws.sock.settimeout(3)
 
     try:
-        _, _ = cmd("Runtime.enable")
-        _, _ = cmd("Page.enable")
-        _, _ = cmd("Network.enable", {"maxTotalBufferSize": 100000000})
+        cmd("Runtime.enable"); cmd("Page.enable"); cmd("Network.enable", {"maxTotalBufferSize": 100000000})
 
-        # Check auth
-        r, _ = cmd("Runtime.evaluate", {"expression": "window.location.href", "returnByValue": True})
+        r = cmd("Runtime.evaluate", {"expression": "window.location.href", "returnByValue": True})
         if "sign_in" in r.get("result", {}).get("value", ""):
             print("✗ Not logged in"); sys.exit(1)
 
-        # Clear network buffer then navigate to trigger fresh API calls
-        print(f"[{datetime.now():%H:%M:%S}] Navigating to usage page...")
-        _, _ = cmd("Page.navigate", {"url": "https://platform.deepseek.com/usage"})
+        print(f"[{datetime.now():%H:%M:%S}] Navigating...")
+        cmd("Page.navigate", {"url": "https://platform.deepseek.com/usage"})
 
-        # Read ALL events for the next few seconds in a loop
         all_events = []
         deadline = time.monotonic() + 8
         while time.monotonic() < deadline:
-            msgs = _recv_all(ws, timeout=1)
-            all_events.extend(msgs)
+            all_events.extend(_recv_all(ws, timeout=1))
 
-        # Find /api/v0/usage/cost responses
-        print(f"[{datetime.now():%H:%M:%S}] Searching {len(all_events)} events...")
-        cost_bodies = []
+        print(f"[{datetime.now():%H:%M:%S}] {len(all_events)} events, extracting...")
+
+        def _read_body(req_id):
+            hash_id = 90000 + abs(hash(req_id)) % 9999
+            ws.send(json.dumps({"id": hash_id, "method": "Network.getResponseBody", "params": {"requestId": req_id}}))
+            while True:
+                raw = ws.recv(); raw = raw.decode() if isinstance(raw, bytes) else raw
+                try: resp = json.loads(raw)
+                except: continue
+                if resp.get("id") == hash_id:
+                    return resp.get("result", {}).get("body", "")
+
+        amount_body = cost_body = None
         for evt in all_events:
             if evt.get("method") == "Network.responseReceived":
-                params = evt.get("params", {})
-                url = params.get("response", {}).get("url", "")
-                if "/api/v0/usage/cost" in url:
-                    req_id = params["requestId"]
-                    try:
-                        # Need to send a command to get body - use fresh ws state
-                        ws.send(json.dumps({"id": 9999, "method": "Network.getResponseBody", "params": {"requestId": req_id}}))
-                        while True:
-                            raw = ws.recv()
-                            raw = raw.decode() if isinstance(raw, bytes) else raw
-                            try: resp = json.loads(raw)
-                            except: continue
-                            if resp.get("id") == 9999:
-                                cost_bodies.append(resp.get("result", {}).get("body", ""))
-                                print(f"  ✓ captured: {url.split('?')[-1]}")
-                                break
-                    except Exception as e:
-                        print(f"  body read error: {e}")
+                url = evt.get("params", {}).get("response", {}).get("url", "")
+                req_id = evt["params"]["requestId"]
+                if "/api/v0/usage/amount" in url and amount_body is None:
+                    amount_body = _read_body(req_id)
+                    print(f"  ✓ amount: {url.split('?')[-1]}")
+                if "/api/v0/usage/cost" in url and cost_body is None:
+                    cost_body = _read_body(req_id)
+                    print(f"  ✓ cost: {url.split('?')[-1]}")
 
-        if not cost_bodies:
-            print("✗ No cost API response found in events")
-            # Try other months too - the page might load multiple
-            for month in [4, 3]:
-                _, evt_msgs = cmd("Page.navigate", {"url": f"https://platform.deepseek.com/usage?month={month}&year=2026"})
-                time.sleep(3)
-                msgs = _recv_all(ws, timeout=2)
-                all_events = evt_msgs + msgs
-                for evt in all_events:
-                    if evt.get("method") == "Network.responseReceived":
-                        params = evt.get("params", {})
-                        url = params.get("response", {}).get("url", "")
-                        if "/api/v0/usage/cost" in url:
-                            req_id = params["requestId"]
-                            try:
-                                ws.send(json.dumps({"id": 9998, "method": "Network.getResponseBody", "params": {"requestId": req_id}}))
-                                while True:
-                                    raw = ws.recv()
-                                    raw = raw.decode() if isinstance(raw, bytes) else raw
-                                    try: resp = json.loads(raw)
-                                    except: continue
-                                    if resp.get("id") == 9998:
-                                        body = resp.get("result", {}).get("body", "")
-                                        if body:
-                                            cost_bodies.append(body)
-                                            print(f"  ✓ month={month}: {url.split('?')[-1]}")
-                                        break
-                            except: pass
-            if not cost_bodies:
-                print("✗ Still no data"); sys.exit(1)
+        if not cost_body: print("✗ No cost API"); sys.exit(1)
+        if not amount_body: print("✗ No amount API"); sys.exit(1)
 
-        # Parse
-        dfs = []
-        for body in cost_bodies:
-            data = json.loads(body)
-            df = _parse(data)
-            if df is not None and len(df) > 0:
-                dfs.append(df)
-
-        if not dfs:
+        daily = _parse_daily(json.loads(cost_body), json.loads(amount_body))
+        if daily is None or len(daily) == 0:
             print("✗ Parse failed"); sys.exit(1)
 
-        all_df = pd.concat(dfs, ignore_index=True)
-        all_df = all_df.drop_duplicates(subset=["utc_date", "model"], keep="last")
-        _save(all_df)
+        _save(daily)
 
     finally:
         ws.close()
 
 
-def _parse(data):
-    """Parse /api/v0/usage/cost response — daily per-model data.
-    Structure: biz_data[{total: [...], days: [{date, data: [{model, usage}]}]}]
-    Amounts are DeepSeek cost units (token count / internal factor).
+def _parse_daily(cost_raw: dict, amount_raw: dict) -> pd.DataFrame | None:
     """
-    inner = data.get("data", data)
-    biz = inner.get("biz_data", inner)
-    if isinstance(biz, list):
-        biz = biz[0] if biz else {}
+    cost API:  daily per-model amounts in CNY (元)
+    amount API: monthly raw token counts per model
+    Result:    daily tokens (proportional to daily cost) + daily cost (CNY)
+    """
+    # ── Monthly raw tokens from amount API ──
+    amt_items = amount_raw.get("data", {}).get("biz_data", {}).get("total", [])
+    m_tokens = {}  # model -> {type: raw_tokens}
+    for item in amt_items:
+        tokens = {}
+        for u in item.get("usage", []):
+            tokens[u["type"]] = int(float(u.get("amount", 0) or 0))
+        m_tokens[item["model"]] = tokens
+
+    # ── Daily cost from cost API (amounts are CNY!) ──
+    cost_biz = cost_raw.get("data", {}).get("biz_data", {})
+    if isinstance(cost_biz, list): cost_biz = cost_biz[0] if cost_biz else {}
+    days = cost_biz.get("days", [])
+
+    # Compute monthly total cost per model (sum of daily costs)
+    m_cost_total = {}  # model -> total CNY for month
+    for day in days:
+        for m in day.get("data", []):
+            model = m.get("model", "")
+            d_sum = sum(float(u.get("amount", 0) or 0) for u in m.get("usage", []))
+            m_cost_total[model] = m_cost_total.get(model, 0) + d_sum
 
     rows = []
-    for day in biz.get("days", []):
+    for day in days:
         date_val = str(day.get("date", ""))[:10]
         if not date_val: continue
         for m in day.get("data", []):
             model = m.get("model", "")
-            usage = {}
+            if not model: continue
+
+            # Daily cost units (CNY amounts)
+            d_cost = {}
             for u in m.get("usage", []):
-                usage[u.get("type", "")] = int(float(u.get("amount", 0) or 0) * 1e7)  # scale to raw tokens
+                d_cost[u["type"]] = float(u.get("amount", 0) or 0)
 
-            rows.append({
-                "utc_date": date_val,
-                "model": model,
-                "input_cache_hit": usage.get("PROMPT_CACHE_HIT_TOKEN", 0),
-                "input_cache_miss": usage.get("PROMPT_CACHE_MISS_TOKEN", 0),
-                "input_tokens": usage.get("PROMPT_CACHE_MISS_TOKEN", 0) + usage.get("PROMPT_TOKEN", 0),
-                "output_tokens": usage.get("RESPONSE_TOKEN", 0),
-                "total_tokens": sum(usage.values()),
-                "requests": usage.get("REQUEST", 0),
-                "cost_cny": 0.0,
-            })
+            d_hit = d_cost.get("PROMPT_CACHE_HIT_TOKEN", 0)
+            d_miss = d_cost.get("PROMPT_CACHE_MISS_TOKEN", 0)
+            d_prompt = d_cost.get("PROMPT_TOKEN", 0)
+            d_out = d_cost.get("RESPONSE_TOKEN", 0)
+            d_req = d_cost.get("REQUEST", 0)
+            d_sum = d_hit + d_miss + d_prompt + d_out
+
+            daily_cost_cny = round(d_sum, 6)
+
+            # Distribute monthly tokens proportionally: daily_cost / monthly_total_cost
+            if model in m_tokens and model in m_cost_total:
+                mt = m_tokens[model]
+                mc = m_cost_total[model]
+                if d_sum > 0 and mc > 0:
+                    ratio = d_sum / mc
+                    rows.append({
+                        "utc_date": date_val,
+                        "model": model,
+                        "input_cache_hit": int(round(mt.get("PROMPT_CACHE_HIT_TOKEN", 0) * ratio)),
+                        "input_cache_miss": int(round(mt.get("PROMPT_CACHE_MISS_TOKEN", 0) * ratio)),
+                        "input_tokens": int(round((mt.get("PROMPT_CACHE_MISS_TOKEN", 0) + mt.get("PROMPT_TOKEN", 0)) * ratio)),
+                        "output_tokens": int(round(mt.get("RESPONSE_TOKEN", 0) * ratio)),
+                        "total_tokens": int(round((mt.get("PROMPT_CACHE_HIT_TOKEN", 0) + mt.get("PROMPT_CACHE_MISS_TOKEN", 0) + mt.get("PROMPT_TOKEN", 0) + mt.get("RESPONSE_TOKEN", 0)) * ratio)),
+                        "requests": int(round(mt.get("REQUEST", 0) * ratio)),
+                        "cost_cny": daily_cost_cny,
+                    })
+                else:
+                    rows.append({
+                        "utc_date": date_val, "model": model,
+                        "input_cache_hit": 0, "input_cache_miss": 0,
+                        "input_tokens": 0, "output_tokens": 0,
+                        "total_tokens": 0, "requests": 0,
+                        "cost_cny": daily_cost_cny,
+                    })
 
     if not rows:
-        # Try biz_data as list of items directly
-        items = biz if isinstance(biz, list) else biz.get("total", [])
-        if items:
-            # Fallback to monthly data
-            for item in items:
-                if isinstance(item, dict) and "days" in item:
-                    for day in item.get("days", []):
-                        date_val = str(day.get("date", ""))[:10]
-                        for m in day.get("data", []):
-                            usage = {u["type"]: int(float(u.get("amount",0) or 0) * 1e7) for u in m.get("usage", [])}
-                            rows.append({"utc_date": date_val, "model": m["model"], **usage, "cost_cny": 0.0})
-        
-    if not rows:
-        print(f"  Unknown format: {json.dumps(data)[:500]}")
-        return None
+        print("  No rows"); return None
 
     df = pd.DataFrame(rows)
-    if "cost_cny" in df.columns:
-        # Convert cost from API amounts to CNY (the amount field is usually in 0.0001 units)
-        pass  # keep as-is for now, cost not in this API
+    # Drop zero-all-tokens AND zero-cost days (future dates)
+    df = df[(df["total_tokens"] > 0) | (df["cost_cny"] > 0.001)]
+    df = df.sort_values(["utc_date", "model"])
     print(f"  Parsed: {len(df)} rows, {df['utc_date'].nunique()} days, {df['model'].nunique()} models")
+    print(f"  Total tokens: {df['total_tokens'].sum():,}")
+    print(f"  Total cost: ¥{df['cost_cny'].sum():.2f}")
     return df
 
 
-def _save(df):
+def _save(df: pd.DataFrame):
     from data.datahub import get_datahub
     hub = get_datahub()
     pq = hub.deepseek_usage_path()
@@ -237,8 +221,8 @@ def _save(df):
 
     existing = hub.read_parquet(pq, default=pd.DataFrame())
     if not existing.empty:
-        merged = pd.concat([existing, df], ignore_index=True)
-        merged = merged.drop_duplicates(subset=["utc_date", "model"], keep="last")
+        keep = existing[~existing["utc_date"].isin(df["utc_date"].unique())]
+        merged = pd.concat([keep, df], ignore_index=True)
         merged = merged.sort_values(["utc_date", "model"])
     else:
         merged = df
