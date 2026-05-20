@@ -53,7 +53,7 @@ for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy
 # 基础设施
 # ============================================================
 
-CACHE_DIR = str(_HUB.cache_dir())
+CACHE_DIR = str(_HUB.cache_root / "api")
 
 
 # ============================================================

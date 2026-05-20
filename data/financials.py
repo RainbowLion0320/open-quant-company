@@ -54,7 +54,7 @@ _FINANCIAL_CACHE_MAX_SIZE = 50  # LRU上限，防止OOM
 import os as _os
 import gc as _gc
 _HUB = get_datahub()
-_CACHE_DIR = _HUB.cache_dir() / "financials"
+_CACHE_DIR = _HUB.stock_data_dir("financials")
 
 
 def _evict_lru():

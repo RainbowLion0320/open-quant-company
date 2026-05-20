@@ -368,8 +368,7 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         # Features aggregate
         "features_all": ("Computed (多源融合)", "PIT 特征切片 (全量)", False),
         # Cache (derived)
-        "cache_financials": ("Cache (派生)", "财务摘要缓存", False),
-        "cache_valuation": ("Cache (派生)", "估值缓存", False),
+        "cache_api_calls": ("AKShare Cache (可重建)", "API 响应缓存 (MD5)", False),
     }
 
     def _meta(table_name: str) -> tuple[str, str, bool]:
@@ -455,18 +454,12 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         if p.exists():
             records.append(_scan_single(label, p))
 
-    # ── data/cache/ 派生缓存 ──
-    cache_dir = STORE.parent.parent / "data" / "cache"
-    if cache_dir.exists():
-        for sub, label, max_s in [
-            ("financials", "cache_financials", 30),
-            ("valuation", "cache_valuation", 30),
-        ]:
-            pdir = cache_dir / sub
-            if pdir.exists():
-                paths = sorted(pdir.glob("*.parquet"))
-                if paths:
-                    records.append(_scan_many(label, paths, max_sample=max_s, source="Cache"))
+    # ── data/cache/api/ (AKShare API response cache) ──
+    api_cache = STORE.parent / "cache" / "api"
+    if api_cache.exists():
+        paths = sorted(api_cache.glob("*.parquet"))
+        if paths:
+            records.append(_scan_many("cache_api_calls", paths, max_sample=50, source="AKShare Cache"))
 
     # ── Inject source + label_zh + repairable from TABLE_META ──
     for r in records:

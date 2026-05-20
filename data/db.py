@@ -166,10 +166,10 @@ def _register_views(db: Database):
             f"SELECT * FROM read_parquet('{meta_pq}')"
         )
 
-    # 盘后数据缓存视图 (兼容 create_cache_views)
-    cache_dir = _HUB.cache_dir()
-    if cache_dir.exists():
-        for pq in sorted(cache_dir.glob("*.parquet")):
+    # 盘后数据缓存视图 (兼容 create_cache_views) — now under data/cache/api/
+    api_cache_dir = _HUB.cache_root / "api"
+    if api_cache_dir.exists():
+        for pq in sorted(api_cache_dir.glob("*.parquet")):
             vname = "cache_" + pq.stem.replace("-", "_").replace(".", "_")
             try:
                 db.execute(

@@ -20,8 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 CLEAN_DIRS = [
-    "data/cache/financials",
-    "data/cache/valuation",
+    "data/cache/api",
 ]
 
 def main():

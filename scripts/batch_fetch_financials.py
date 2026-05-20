@@ -31,7 +31,7 @@ sys.path.insert(0, str(PROJECT))
 from data.datahub import get_datahub
 
 HUB = get_datahub()
-CACHE_DIR = HUB.cache_dir()
+CACHE_DIR = HUB.stock_data_dir("financials")
 UNIVERSE_PATH = PROJECT / 'data' / 'universe_raw.json'
 PROGRESS_PATH = PROJECT / 'data' / '.financials_progress.json'
 
