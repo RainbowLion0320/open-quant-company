@@ -12,7 +12,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import hashlib
 import uuid
+from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
@@ -39,6 +41,7 @@ def _safe_leaf(value: str, label: str = "name") -> str:
 
 
 _PLACEHOLDER_RE = re.compile(r"\{([A-Za-z0-9_]+)\}")
+_DATE_COLUMNS = ("date", "trade_date", "ann_date", "end_date", "ts", "quarter", "utc_date", "month")
 
 
 def _ensure_relative_store_pattern(pattern: str) -> Path:
@@ -83,6 +86,7 @@ class DataHub:
         for path in [
             self.store_root,
             self.cache_root,
+            self.manifest_dir(),
             self.signals_dir(),
             self.signals_prev_dir(),
             self.features_dir(),
@@ -187,6 +191,12 @@ class DataHub:
     def deepseek_usage_path(self) -> Path:
         return self.store_path("deepseek") / "daily_usage.parquet"
 
+    def manifest_dir(self) -> Path:
+        return self.store_root / "_manifest"
+
+    def manifest_path(self) -> Path:
+        return self.manifest_dir() / "datasets.parquet"
+
     # ── Registry-backed dimension paths ─────────────────────
 
     def dimension_root(self, key: str) -> Path:
@@ -245,7 +255,15 @@ class DataHub:
                 return default
             raise
 
-    def write_parquet(self, df: pd.DataFrame, path: str | os.PathLike, index: bool = False) -> Path:
+    def write_parquet(
+        self,
+        df: pd.DataFrame,
+        path: str | os.PathLike,
+        index: bool = False,
+        *,
+        producer: str | None = None,
+        record_manifest: bool = True,
+    ) -> Path:
         target = self.resolve_path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         tmp = target.with_name(f".tmp-{uuid.uuid4().hex}-{target.name}")
@@ -254,6 +272,8 @@ class DataHub:
             os.replace(tmp, target)
         finally:
             tmp.unlink(missing_ok=True)
+        if record_manifest and not self._is_manifest_path(target):
+            self._record_manifest(target, df, producer=producer)
         return target
 
     def append_parquet(
@@ -301,6 +321,92 @@ class DataHub:
             return []
         return sorted(path.glob(pattern))
 
+    # ── Manifest helpers ────────────────────────────────────
+
+    def read_manifest(self) -> pd.DataFrame:
+        manifest = self.read_parquet(self.manifest_path(), default=pd.DataFrame())
+        return manifest if manifest is not None else pd.DataFrame()
+
+    def manifest_for(self, path: str | os.PathLike) -> dict[str, Any]:
+        target = self.resolve_path(path)
+        rel = self._relative_to_project(target)
+        manifest = self.read_manifest()
+        if manifest.empty or "path" not in manifest.columns:
+            return {}
+        rows = manifest[manifest["path"] == rel]
+        if rows.empty:
+            return {}
+        return rows.iloc[-1].to_dict()
+
+    def _is_manifest_path(self, target: Path) -> bool:
+        try:
+            target.relative_to(self.manifest_dir())
+            return True
+        except ValueError:
+            return False
+
+    def _relative_to_project(self, target: Path) -> str:
+        try:
+            return str(target.relative_to(self.project_root))
+        except ValueError:
+            return str(target)
+
+    def _schema_hash(self, df: pd.DataFrame) -> str:
+        schema = "|".join(f"{col}:{df[col].dtype}" for col in df.columns)
+        return hashlib.sha256(schema.encode("utf-8")).hexdigest()[:16]
+
+    def _file_sha256(self, path: Path) -> str:
+        digest = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def _date_range(self, df: pd.DataFrame) -> tuple[str, str, str]:
+        for col in df.columns:
+            if str(col).lower() not in _DATE_COLUMNS:
+                continue
+            try:
+                series = pd.to_datetime(df[col], errors="coerce").dropna()
+            except Exception:
+                continue
+            if not series.empty:
+                return col, series.min().date().isoformat(), series.max().date().isoformat()
+        return "", "", ""
+
+    def _record_manifest(self, target: Path, df: pd.DataFrame, producer: str | None = None) -> None:
+        try:
+            date_col, date_min, date_max = self._date_range(df)
+            record = {
+                "path": self._relative_to_project(target),
+                "producer": producer or os.environ.get("QUANT_AGENT_PRODUCER", ""),
+                "row_count": int(len(df)),
+                "column_count": int(len(df.columns)),
+                "date_column": date_col,
+                "date_min": date_min,
+                "date_max": date_max,
+                "schema_hash": self._schema_hash(df),
+                "file_sha256": self._file_sha256(target),
+                "size_bytes": int(target.stat().st_size),
+                "updated_at": datetime.now().isoformat(),
+            }
+            manifest_path = self.manifest_path()
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            existing = pd.read_parquet(manifest_path) if manifest_path.exists() else pd.DataFrame()
+            next_df = pd.DataFrame([record])
+            if not existing.empty and "path" in existing.columns:
+                existing = existing[existing["path"] != record["path"]]
+                next_df = pd.concat([existing, next_df], ignore_index=True)
+            tmp = manifest_path.with_name(f".tmp-{uuid.uuid4().hex}-{manifest_path.name}")
+            try:
+                next_df.sort_values("path").to_parquet(tmp, index=False)
+                os.replace(tmp, manifest_path)
+            finally:
+                tmp.unlink(missing_ok=True)
+        except Exception:
+            # Manifest is observability metadata; it must never break data writes.
+            return
+
     # ── JSON helpers ────────────────────────────────────────
 
     def read_json(self, path: str | os.PathLike, default: Any = None) -> Any:
@@ -335,6 +441,7 @@ class DataHub:
             "features": DatasetSpec("features", self.features_dir(), "partitioned_parquet", "research", "Monthly PIT feature slices"),
             "paper": DatasetSpec("paper", self.paper_dir(), "directory", "broker", "Paper-trading state, NAV and trades"),
             "macro": DatasetSpec("macro", self.store_path("macro"), "directory", "macro", "Macro and rates datasets"),
+            "manifest": DatasetSpec("manifest", self.manifest_path(), "parquet", "datahub", "DataHub parquet write manifest"),
             "system_monitor": DatasetSpec("system_monitor", self.system_monitor_path(), "sqlite", "system", "System metrics time-series DB"),
             "token_usage": DatasetSpec("token_usage", self.token_usage_path(), "json", "system", "LLM token usage cache"),
             "deepseek_usage": DatasetSpec("deepseek_usage", self.deepseek_usage_path(), "parquet", "system", "DeepSeek daily token/cost summary"),
@@ -383,6 +490,9 @@ class DataHub:
                 item["bytes"] = sum(p.stat().st_size for p in files if p.exists())
             elif spec.path.exists():
                 item["bytes"] = spec.path.stat().st_size
+                manifest = self.manifest_for(spec.path)
+                if manifest:
+                    item["manifest"] = manifest
                 if include_rows and spec.kind == "parquet":
                     try:
                         item["rows"] = len(pd.read_parquet(spec.path))

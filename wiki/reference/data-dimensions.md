@@ -13,7 +13,7 @@ tags: [data, dimensions, registry, datahub, storage, parquet]
 ## 架构总览
 
 ```
-config/settings.yaml          ← 33 维度定义 (source/asset/status/freq)
+config/settings.yaml          ← 34 维度定义 (source/asset/status/freq)
         │
         ▼
 data/data_registry.py         ← 单例注册表, 加载 YAML → DataDimension[] 
@@ -37,9 +37,9 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 
 ## 维度总表
 
-共 33 个维度，按状态分类：
+共 34 个维度，按状态分类：
 
-### 已启用 (20)
+### 已启用 (21)
 
 | key | 标签 | 来源 | 频率 | 资产 |
 |-----|------|------|------|------|
@@ -63,8 +63,9 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 | macro_gdp | 国内生产总值 GDP | tushare_free | quarterly | macro |
 | macro_shibor | Shibor 利率 | akshare | daily | macro |
 | macro_lpr | LPR 贷款基础利率 | tushare_free | monthly | macro |
+| bond_treasury_yields | 国债收益率曲线 (中美) | akshare | daily | bond |
 
-**来源分布**: akshare 5 | tushare_free 23 | tushare_paid 4 | future 1
+**来源分布**: akshare 6 | tushare_free 23 | tushare_paid 4 | future 1
 
 ### 限流启用 (3)
 
@@ -171,6 +172,7 @@ store/
 │
 ├── deepseek/daily_usage.parquet         ← DeepSeek 日度用量 (CDP 自动)
 ├── bond/treasury_yields.parquet         ← 国债收益率
+├── _manifest/datasets.parquet           ← DataHub 写入清单
 ├── futures/daily/{contract}.parquet     ← 期货主连合约
 └── cache/api/*.parquet                  ← AKShare API 响应 MD5 缓存 (可再生)
 ```
@@ -216,8 +218,9 @@ df = hub.read_parquet(hub.feature_path("2026-04"))
 # 按 data_registry 生成具体维度路径
 path = hub.dimension_path("moneyflow_tushare_daily", YYYYMMDD="20260520")
 
-# 原子写入 (tmp + os.replace)
-hub.write_parquet(df, hub.signal_path("multifactor"))
+# 原子写入 (tmp + os.replace) 并记录 manifest
+hub.write_parquet(df, hub.signal_path("multifactor"), producer="compute_signals")
+manifest = hub.manifest_for(hub.signal_path("multifactor"))
 
 # 追加去重 (按月频数据)
 hub.append_parquet(

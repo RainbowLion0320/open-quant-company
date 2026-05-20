@@ -518,6 +518,14 @@ tags: [data, parquet, schema, database]
 
 ---
 
+## 19. DataHub Manifest
+
+**存储**: `data/store/_manifest/datasets.parquet`
+
+DataHub 每次 `write_parquet()` 成功后更新清单，记录 `path`, `producer`, `row_count`, `column_count`, `date_min`, `date_max`, `schema_hash`, `file_sha256`, `size_bytes`, `updated_at`。DB Health 会读取 manifest，用于判断数据写入来源、schema 是否变化和文件校验信息。
+
+---
+
 ## 速查命令
 
 ```python
@@ -535,4 +543,7 @@ df = hub.read_parquet(hub.signal_path("buffett"))
 
 # 读模拟交易
 df = hub.read_parquet(hub.paper_path("trades"))
+
+# 查写入清单
+manifest = hub.manifest_for(hub.signal_path("buffett"))
 ```

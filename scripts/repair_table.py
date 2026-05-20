@@ -98,6 +98,60 @@ def repair_holdertrade(limit: int = 0) -> None:
     print(f"  ✓ {len(rows)}/{len(symbols)} symbols")
 
 
+def repair_stock_daily(limit: int = 0) -> None:
+    from data.fetchers import stock_daily
+
+    symbols = _symbols(limit)
+    print(f"  Fetching OHLCV daily for {len(symbols)} symbols...")
+    rows = stock_daily.fetch_all(symbols)
+    count = sum(1 for df in rows.values() if df is not None and len(df) > 0)
+    _require_rows_or_cache("stock_daily", count, HUB.store_dir("stock") / "daily")
+    print(f"  ✓ {count}/{len(symbols)} symbols")
+
+
+def repair_financial_summary(limit: int = 0) -> None:
+    from data.fetchers.financial import fetch_all_financials
+
+    symbols = _symbols(limit)
+    print(f"  Fetching financial summaries for {len(symbols)} symbols...")
+    rows = fetch_all_financials(symbols)
+    count = sum(1 for df in rows.values() if df is not None and len(df) > 0)
+    _require_rows_or_cache("stock_financials", count, HUB.store_dir("stock") / "financials")
+    print(f"  ✓ {count}/{len(symbols)} symbols")
+
+
+def repair_fina_indicator(limit: int = 0) -> None:
+    from data.fetchers.financial import fetch_fina_indicator
+
+    symbols = _symbols(limit)
+    print(f"  Fetching Tushare fina_indicator for {len(symbols)} symbols...")
+    count = 0
+    for sym in symbols:
+        df = fetch_fina_indicator(sym)
+        if df is not None and len(df) > 0:
+            count += 1
+    _require_rows_or_cache("stock_fina_indicator", count, HUB.store_dir("stock") / "fina_indicator")
+    print(f"  ✓ {count}/{len(symbols)} symbols")
+
+
+def repair_valuation(limit: int = 0) -> None:
+    from data.fetchers.financial import fetch_all_valuations
+
+    symbols = _symbols(limit)
+    print(f"  Fetching valuations for {len(symbols)} symbols...")
+    rows = fetch_all_valuations(symbols)
+    count = sum(1 for df in rows.values() if df is not None and len(df) > 0)
+    _require_rows_or_cache("stock_valuation", count, HUB.store_dir("stock") / "valuation")
+    print(f"  ✓ {count}/{len(symbols)} symbols")
+
+
+def repair_adj_factor(limit: int = 0) -> None:
+    from scripts.cron_fetch_daily import fetch_adj_factor
+
+    fetched = fetch_adj_factor(pool_size=limit)
+    _require_rows_or_cache("stock_adj_factor", int(fetched), HUB.store_dir("stock") / "adj_factor")
+
+
 def repair_moneyflow_daily(limit: int = 0) -> None:
     from data.fetchers.moneyflow import MoneyflowFetcher
 
@@ -240,6 +294,11 @@ REPAIR_MAP = {
     "macro_shibor":          lambda limit=0, days=365: repair_macro("shibor"),
     "bond_treasury_yields":  lambda limit=0, days=365: repair_bond_treasury_yields(),
     # Stock — Tushare re-fetch
+    "stock_daily":                lambda limit=0, days=365: repair_stock_daily(limit),
+    "stock_adj_factor":           lambda limit=0, days=365: repair_adj_factor(limit),
+    "stock_financials":           lambda limit=0, days=365: repair_financial_summary(limit),
+    "stock_fina_indicator":       lambda limit=0, days=365: repair_fina_indicator(limit),
+    "stock_valuation":            lambda limit=0, days=365: repair_valuation(limit),
     "stock_holders":              lambda limit=0, days=365: repair_holders(limit),
     "stock_holdertrade":          lambda limit=0, days=365: repair_holdertrade(limit),
     "stock_moneyflow_daily":      lambda limit=0, days=365: repair_moneyflow_daily(limit),

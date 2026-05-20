@@ -215,11 +215,16 @@ async def db_health():
     summary = None
     if len(summary_rows) > 0:
         s = summary_rows.iloc[0].to_dict()
+        status_counts = data_rows.get("freshness_status", pd.Series(dtype=str)).value_counts() if len(data_rows) else {}
         summary = {
             "tables": _safe_int(s.get("columns", 0)),
             "total_size_mb": _safe_float(s.get("size_mb", 0)),
             "avg_missing_pct": _safe_float(s.get("missing_pct", 0)),
             "total_outliers": _safe_int(s.get("outlier_count", 0)),
+            "fresh_tables": _safe_int(status_counts.get("fresh", 0)),
+            "stale_tables": _safe_int(status_counts.get("stale", 0)),
+            "missing_tables": _safe_int(status_counts.get("missing", 0)),
+            "error_tables": _safe_int(status_counts.get("error", 0)),
             "checked_at": str(s.get("checked_at", "")),
         }
 

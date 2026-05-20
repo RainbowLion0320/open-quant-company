@@ -25,6 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from data.datahub import get_datahub
+from data.data_registry import HealthTableMeta, get_registry
 
 HUB = get_datahub()
 STORE = HUB.store_root
@@ -61,7 +62,7 @@ def _outlier_count(df: pd.DataFrame) -> dict:
 
 def _freshness_days(df: pd.DataFrame) -> Optional[int]:
     for dc in df.columns:
-        if dc.lower() not in ("date", "trade_date", "ann_date", "end_date", "ts", "quarter"):
+        if str(dc).lower() not in ("date", "trade_date", "ann_date", "end_date", "ts", "quarter", "utc_date", "month") and str(dc) not in ("日期", "报告期"):
             continue
         try:
             s = pd.to_datetime(df[dc], errors="coerce").dropna()
@@ -73,10 +74,53 @@ def _freshness_days(df: pd.DataFrame) -> Optional[int]:
     return None
 
 
+def _manifest_for_file(path: Path) -> dict:
+    manifest = HUB.manifest_for(path)
+    if not manifest:
+        return {
+            "manifest_files": 0, "manifest_updated_at": "",
+            "schema_hash": "", "file_sha256": "",
+        }
+    return {
+        "manifest_files": 1,
+        "manifest_updated_at": str(manifest.get("updated_at", "") or ""),
+        "schema_hash": str(manifest.get("schema_hash", "") or ""),
+        "file_sha256": str(manifest.get("file_sha256", "") or ""),
+    }
+
+
+def _manifest_for_many(paths: list[Path]) -> dict:
+    manifest = HUB.read_manifest()
+    if manifest.empty or "path" not in manifest.columns or not paths:
+        return {
+            "manifest_files": 0, "manifest_updated_at": "",
+            "schema_hash": "", "file_sha256": "",
+        }
+    rel_paths = set()
+    for path in paths:
+        try:
+            rel_paths.add(str(path.resolve().relative_to(HUB.project_root)))
+        except ValueError:
+            rel_paths.add(str(path.resolve()))
+    rows = manifest[manifest["path"].isin(rel_paths)]
+    if rows.empty:
+        return {
+            "manifest_files": 0, "manifest_updated_at": "",
+            "schema_hash": "", "file_sha256": "",
+        }
+    hashes = sorted({str(v) for v in rows.get("schema_hash", []) if str(v)})
+    return {
+        "manifest_files": int(len(rows)),
+        "manifest_updated_at": str(rows["updated_at"].max()) if "updated_at" in rows.columns else "",
+        "schema_hash": hashes[0] if len(hashes) == 1 else ("mixed" if hashes else ""),
+        "file_sha256": "",
+    }
+
+
 def _find_date_col(df: pd.DataFrame) -> Optional[str]:
     """Find a date-like column in the DataFrame."""
     for dc in df.columns:
-        if dc.lower() in ("date", "trade_date", "ann_date", "end_date", "ts", "quarter"):
+        if str(dc).lower() in ("date", "trade_date", "ann_date", "end_date", "ts", "quarter", "utc_date", "month") or str(dc) in ("日期", "报告期"):
             try:
                 s = pd.to_datetime(df[dc], errors="coerce")
                 if s.notna().sum() > 0:
@@ -216,6 +260,7 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
             "freshness_days": freshness,
             "time_breakdown": json.dumps(tb, ensure_ascii=False) if tb else "{}",
             "error": None,
+            **_manifest_for_file(path),
         }
     except Exception as e:
         return {
@@ -236,6 +281,7 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
             "freshness_days": None,
             "time_breakdown": "{}",
             "error": str(e),
+            **_manifest_for_file(path),
         }
 
 
@@ -249,6 +295,7 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
             "outlier_count": 0, "outlier_count_10y": 0, "outlier_count_10y_plus": 0,
             "outlier_cols": "{}", "freshness_days": None, "time_breakdown": "{}",
             "error": "no files",
+            "manifest_files": 0, "manifest_updated_at": "", "schema_hash": "", "file_sha256": "",
         }
 
     total_size = sum(f.stat().st_size for f in sorted(paths))
@@ -310,6 +357,7 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
         "freshness_days": min_freshness,
         "time_breakdown": "{}",
         "error": f"{errors} read errors" if errors else None,
+        **_manifest_for_many(paths),
     }
 
 
@@ -320,74 +368,39 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     records = []
     now = datetime.now().isoformat()
 
-    # ── Table metadata (label_zh live here, not in frontend) ──
-    # format: (source, label_zh, repairable)
-    TABLE_META = {
-        # Macro — CPI/PPI/PMI via Tushare (AKShare Jin10 dead since 2025-09)
-        "macro_cpi": ("Tushare", "居民消费价格指数", True),
-        "macro_ppi": ("Tushare", "工业生产者出厂价格", True),
-        "macro_pmi": ("Tushare", "制造业采购经理指数", True),
-        # Macro — still AKShare
-        "macro_gdp": ("Tushare", "国内生产总值", True),
-        "macro_lpr": ("Tushare", "贷款基础利率", True),
-        "macro_money_supply": ("AKShare", "货币供应量 M0/M1/M2", True),
-        "macro_shibor": ("AKShare", "上海银行间拆放利率", True),
-        # Bonds
-        "bond_treasury_yields": ("AKShare", "国债收益率曲线 (中美)", True),
-        # Signals — computed, not repairable
-        "signals_buffett": ("Computed (策略生成)", "巴菲特价值信号", False),
-        "signals_buffett_scan": ("Computed (策略生成)", "巴菲特全量扫描", False),
-        "signals_multifactor": ("Computed (策略生成)", "多因子打分信号", False),
-        "signals_ml_lgbm": ("Computed (策略生成)", "LightGBM 机器学习信号", False),
-        "signals_cybernetic": ("Computed (策略生成)", "控制论自适应信号", False),
-        # Paper — simulated, not repairable
-        "paper_trades": ("PaperBroker (模拟)", "模拟交易记录", False),
-        "paper_nav": ("PaperBroker (模拟)", "模拟交易净值", False),
-        "paper_state": ("PaperBroker (模拟)", "模拟账户状态", False),
-        # System — manual import, not repairable
-        "system_deepseek_usage": ("DeepSeek API", "DeepSeek Token 用量", False),
-        # Per-symbol — all API-sourced, repairable
-        "stock_holders": ("Tushare", "股东户数", True),
-        "stock_holdertrade": ("Tushare", "股东增减持", True),
-        "stock_moneyflow_daily": ("AKShare (近120日)", "日频资金流向", True),
-        "stock_moneyflow_tushare_daily": ("Tushare", "日频资金流向 (全市场)", True),
-        "stock_moneyflow_monthly": ("Tushare (全历史)", "月频资金流向", True),
-        "stock_broker_recommend": ("Tushare", "券商月度金股", True),
-        "stock_limit_list": ("Tushare", "涨跌停统计", True),
-        "stock_top_list": ("Tushare", "龙虎榜", True),
-        "stock_research_report": ("Tushare", "券商研报", True),
-        "stock_dividend": ("Tushare", "分红送股", True),
-        "share_float": ("Tushare", "限售股解禁", True),
-        "repurchase": ("Tushare", "股票回购", True),
-        # Funds / futures — Tushare Free extension dimensions
-        "fund_daily": ("Tushare", "基金日线", True),
-        "fund_portfolio": ("Tushare", "基金持仓", True),
-        "fund_nav": ("Tushare", "基金净值", True),
-        "futures_daily": ("Tushare", "期货日线", True),
-        # Daily OHLCV
-        "stock_daily": ("AKShare", "日线行情 OHLCV", True),
-        # Features aggregate
-        "features_all": ("Computed (多源融合)", "PIT 特征切片 (全量)", False),
-        # Cache (derived)
-        "cache_api_calls": ("AKShare Cache (可重建)", "API 响应缓存 (MD5)", False),
-    }
+    def _repairable_tables() -> set[str]:
+        try:
+            from scripts.repair_table import REPAIR_MAP
+            return set(REPAIR_MAP)
+        except Exception:
+            return set()
 
-    def _meta(table_name: str) -> tuple[str, str, bool]:
+    meta_map = get_registry().health_metadata(repairable_tables=_repairable_tables())
+
+    def _meta(table_name: str) -> HealthTableMeta:
         if table_name.startswith("features_"):
             month = table_name.removeprefix("features_")
-            return ("Computed (多源融合)", f"PIT 特征切片 {month}", False)
-        return TABLE_META.get(table_name, ("", "", False))
+            return HealthTableMeta("features_all", "Computed (多源融合)", f"PIT 特征切片 {month}", partition_key="month")
+        return meta_map.get(table_name, HealthTableMeta(table_name, "", ""))
 
-    # ── Macro (single files) ──
-    for name in ["cpi", "gdp", "lpr", "money_supply", "pmi", "ppi", "shibor"]:
-        p = STORE / "macro" / f"{name}.parquet"
-        if p.exists():
-            records.append(_scan_single(f"macro_{name}", p))
+    def _scan_dimension(dim) -> None:
+        if not dim.cache:
+            return
+        table = dim.health_table
+        root = HUB.dimension_root(dim.key)
+        if "{" not in dim.cache:
+            if root.exists() and root.is_file():
+                records.append(_scan_single(table, root))
+            else:
+                records.append(_scan_many(table, [], max_sample=dim.health_max_sample))
+            return
+        paths = sorted(root.glob("*.parquet")) if root.exists() else []
+        records.append(_scan_many(table, paths, max_sample=dim.health_max_sample))
 
-    # ── Bonds ──
-    tb = STORE / "bond" / "treasury_yields.parquet"
-    if tb.exists():
-        records.append(_scan_single("bond_treasury_yields", tb))
+    # ── Registry dimensions (source/path/label/SLA live in data_registry) ──
+    for dim in get_registry().get_enabled():
+        if dim.health_enabled:
+            _scan_dimension(dim)
 
     # ── Features (all, as aggregate) ──
     feat_dir = STORE / "features"
@@ -416,46 +429,6 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     if ds.exists():
         records.append(_scan_single("system_deepseek_usage", ds))
 
-    # ── Per-symbol tables (aggregate) ──
-    def _add_many(label: str, rel_glob: str, max_s: int) -> None:
-        pdir = STORE / Path(rel_glob).parent
-        pattern = Path(rel_glob).name
-        if pdir.exists():
-            paths = sorted(pdir.glob(pattern))
-            if paths:
-                records.append(_scan_many(label, paths, max_sample=max_s))
-
-    for label, glob_pattern, max_s in [
-        ("stock_daily", "daily/*.parquet", 30),
-        ("stock_holders", "holders/*.parquet", 30),
-        ("stock_holdertrade", "holdertrade/*.parquet", 30),
-        ("stock_moneyflow_daily", "moneyflow/*.parquet", 30),
-        ("stock_moneyflow_tushare_daily", "moneyflow/daily/*.parquet", 30),
-        ("stock_moneyflow_monthly", "moneyflow/monthly/*.parquet", 12),
-        ("stock_broker_recommend", "broker_recommend/*.parquet", 12),
-        ("stock_limit_list", "limit_list/*.parquet", 12),
-        ("stock_top_list", "top_list/*.parquet", 12),
-        ("stock_research_report", "research_report/*.parquet", 6),
-    ]:
-        _add_many(label, f"stock/{glob_pattern}", max_s)
-
-    for label, rel_glob, max_s in [
-        ("fund_daily", "fund/daily/*.parquet", 12),
-        ("fund_portfolio", "fund/portfolio/*.parquet", 8),
-        ("fund_nav", "fund/nav/*.parquet", 12),
-        ("futures_daily", "futures/daily/*.parquet", 12),
-    ]:
-        _add_many(label, rel_glob, max_s)
-
-    # ── Single file per-symbol tables ──
-    for label, p in [
-        ("share_float", STORE / "stock" / "share_float" / "all.parquet"),
-        ("repurchase", STORE / "stock" / "repurchase" / "all.parquet"),
-        ("stock_dividend", STORE / "stock" / "dividend" / "all_dividends.parquet"),
-    ]:
-        if p.exists():
-            records.append(_scan_single(label, p))
-
     # ── data/cache/api/ (AKShare API response cache) ──
     api_cache = STORE.parent / "cache" / "api"
     if api_cache.exists():
@@ -463,12 +436,29 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         if paths:
             records.append(_scan_many("cache_api_calls", paths, max_sample=50, source="AKShare Cache"))
 
-    # ── Inject source + label_zh + repairable from TABLE_META ──
+    def _freshness_status(row: dict, sla: Optional[int]) -> str:
+        if int(row.get("files") or 0) == 0:
+            return "missing"
+        if row.get("error"):
+            return "error"
+        days = row.get("freshness_days")
+        if days is None or pd.isna(days):
+            return "unknown"
+        if sla is None:
+            return "untracked"
+        return "fresh" if int(days) <= int(sla) else "stale"
+
+    # ── Inject source/label/SLA/repair metadata from data_registry ──
     for r in records:
-        src, zh, repairable = _meta(r["table"])
-        r["source"] = src
-        r["label_zh"] = zh
-        r["repairable"] = repairable
+        meta = _meta(r["table"])
+        r["source"] = meta.source
+        r["label_zh"] = meta.label_zh
+        r["repairable"] = meta.repairable
+        r["registry_key"] = meta.registry_key
+        r["freshness_sla_days"] = meta.freshness_sla_days
+        r["repair_policy"] = meta.repair_policy
+        r["partition_key"] = meta.partition_key
+        r["freshness_status"] = _freshness_status(r, meta.freshness_sla_days)
 
     # ── Summary ──
     n = len(records)
@@ -494,8 +484,17 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         "outlier_count_10y_plus": 0,
         "outlier_cols": "{}",
         "freshness_days": None,
+        "freshness_sla_days": None,
+        "freshness_status": "summary",
+        "registry_key": "",
+        "partition_key": "",
+        "repair_policy": "none",
         "time_breakdown": "{}",
         "error": None,
+        "manifest_files": sum(int(r.get("manifest_files") or 0) for r in records),
+        "manifest_updated_at": "",
+        "schema_hash": "",
+        "file_sha256": "",
     }]
 
     for r in records:

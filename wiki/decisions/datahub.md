@@ -31,6 +31,7 @@ DataHub 负责:
 - 统一路径: `signal_path(strategy)`, `feature_path(month)`, `macro_path(name)`, `paper_path(name)`。
 - 注册表路径展开: `dimension_root(key)` / `dimension_path(key, **values)` 从 `data_registry.cache` 生成真实路径，避免脚本各自拼深层目录。
 - 原子写入: Parquet/JSON 先写临时文件，再 `os.replace` 覆盖，降低半写入风险。
+- 写入清单: Parquet 写入后更新 `_manifest/datasets.parquet`，记录 producer、行数、日期范围、schema hash、文件 checksum。
 - 追加写入: `append_parquet(..., dedupe_subset=...)` 统一处理追加和去重。
 - 最新批次: `latest_batch(path, ts_col="computed_at")` 统一读取策略最新信号。
 - 轻量审计: `audit()` 返回已知逻辑数据集的存在性、文件数量和大小。
@@ -45,6 +46,7 @@ DataHub 负责:
 - `broker/persistence.py`: paper trading 状态目录改为 DataHub，并修复相对配置路径解析。
 - `scripts/execute_paper_trades.py`: 使用 `latest_batch` 读取最新信号。
 - `web/api/routes/system.py`, `scripts/collect_system_metrics.py`: 系统监控库和 token cache 不再写死绝对路径。
+- `scripts/db_health_check.py`: 健康扫描从 data registry 注入 source/label/SLA/repair/partition 元数据。
 - 多个离线脚本和 fetcher: 移除硬编码 `/Users/fushao/quant-agent/...`，逐步用 DataHub 管理。
 
 ## 后续扩展规则
@@ -53,7 +55,7 @@ DataHub 负责:
 
 1. 在 `config/settings.yaml -> data_registry` 描述维度来源、资产类别、频率、状态和缓存模式。
 2. 优先使用 `DataHub.dimension_path()` 生成维度路径；只有高频公共路径才增加明确 helper。
-3. 写入 Parquet/JSON 走 `DataHub.write_parquet/write_json`。
+3. 写入 Parquet/JSON 走 `DataHub.write_parquet/write_json`，并传入清晰的 `producer`。
 4. 追加型数据走 `append_parquet`，必须明确去重键或批次时间列。
 5. Web 查询继续走 DuckDB 只读视图，只有确实需要事务、并发写、多用户权限时再引入服务型数据库。
 

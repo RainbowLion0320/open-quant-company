@@ -8,7 +8,13 @@ import pytest
 def test_data_registry_contract_is_valid():
     from data.data_registry import get_registry
 
-    assert get_registry().validate() == []
+    reg = get_registry()
+    assert reg.validate() == []
+    meta = reg.health_metadata(repairable_tables={"stock_daily"})
+    assert meta["stock_daily"].registry_key == "ohlcv_daily"
+    assert meta["stock_daily"].freshness_sla_days == 5
+    assert meta["stock_daily"].partition_key == "symbol"
+    assert meta["stock_daily"].repairable is True
 
 
 def test_datahub_expands_registry_dimension_paths(tmp_path):
@@ -26,6 +32,22 @@ def test_datahub_expands_registry_dimension_paths(tmp_path):
         hub.dimension_path("ohlcv_daily")
     with pytest.raises(ValueError):
         hub.dimension_path("ohlcv_daily", symbol="../escape")
+
+
+def test_datahub_writes_manifest_for_parquet(tmp_path):
+    from data.datahub import DataHub
+
+    hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
+    path = hub.dimension_path("ohlcv_daily", symbol="000001")
+    hub.write_parquet(pd.DataFrame({"date": ["2026-05-20"], "close": [1.0]}), path, producer="unit-test")
+
+    manifest = hub.manifest_for(path)
+    assert manifest["producer"] == "unit-test"
+    assert manifest["row_count"] == 1
+    assert manifest["date_min"] == "2026-05-20"
+    assert manifest["date_max"] == "2026-05-20"
+    assert manifest["schema_hash"]
+    assert manifest["file_sha256"]
 
 
 def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatch):
@@ -53,8 +75,15 @@ def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatc
     result = health.run_health_check(output_path=store / "db_health.parquet")
     tables = set(result["table"])
 
+    daily = result[result["table"] == "stock_moneyflow_daily"].iloc[0].to_dict()
+    tushare_daily = result[result["table"] == "stock_moneyflow_tushare_daily"].iloc[0].to_dict()
+
     assert "stock_moneyflow_daily" in tables
     assert "stock_moneyflow_tushare_daily" in tables
+    assert daily["registry_key"] == "moneyflow_daily"
+    assert tushare_daily["partition_key"] == "trade_date"
+    assert daily["freshness_status"] in {"fresh", "stale"}
+    assert int(daily["manifest_files"]) == 1
     reset_datahub()
 
 

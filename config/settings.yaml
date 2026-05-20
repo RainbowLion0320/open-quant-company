@@ -613,6 +613,15 @@ data_registry:
     enabled: true
     label: LPR 贷款基础利率
     cache: macro/lpr.parquet
+  bond_treasury_yields:
+    source: akshare
+    asset: bond
+    status: available
+    freq: daily
+    enabled: true
+    label: 国债收益率曲线 (中美)
+    cache: bond/treasury_yields.parquet
+    freshness_sla_days: 7
   fund_daily:
     source: tushare_free
     asset: fund
