@@ -186,6 +186,26 @@
           <div v-else><span>API Health</span><em class="source-badge muted">加载中...</em></div>
         </div>
       </div>
+      <div class="glass-card settings-card">
+        <div class="panel-head">
+          <span>SERVICES</span>
+          <em v-if="serviceSummary" :class="['source-badge', serviceBadgeClass()]" style="font-weight:400;cursor:default">{{ serviceSummary }}</em>
+        </div>
+        <div class="source-list">
+          <template v-if="serviceItems.length">
+            <div v-for="svc in serviceItems" :key="svc.name">
+              <span>{{ svc.name }}</span>
+              <em :class="['source-badge', apiBadgeClass(svc.status)]">
+                {{ svc.detail }}
+                <span v-if="svc.cookie_remaining_days != null" style="margin-left:4px;opacity:0.85">
+                  ({{ svc.cookie_remaining_days < 7 ? '⚠ ' + svc.cookie_remaining_days.toFixed(0) + 'd' : svc.cookie_remaining_days.toFixed(0) + 'd' }})
+                </span>
+              </em>
+            </div>
+          </template>
+          <div v-else><span>Services</span><em class="source-badge muted">加载中...</em></div>
+        </div>
+      </div>
       </div>
       <div class="settings-col">
       <div class="glass-card settings-card">
@@ -358,6 +378,21 @@ async function fetchCronJobs() {
   } catch { cronJobs.value = []; cronSummary.value = ""; }
 }
 
+// Services (CDP, cookie)
+const serviceItems = ref<any[]>([]);
+const serviceSummary = ref("");
+function serviceBadgeClass(): string {
+  if (!serviceSummary.value) return "muted";
+  return serviceSummary.value.includes("异常") ? "limited" : "ok";
+}
+async function fetchServiceStatus() {
+  try {
+    const data = await api.serviceStatus();
+    serviceItems.value = data.items || [];
+    serviceSummary.value = data.summary || "";
+  } catch { serviceItems.value = []; serviceSummary.value = ""; }
+}
+
 function sourceBadgeClass(status: string): string {
   if (status === "available") return "ok";
   if (status === "rate_limited") return "limited";
@@ -385,6 +420,7 @@ async function loadSettings() {
   try { const d = await api.settings(); Object.assign(sysSettings, d); } catch {}
   fetchApiHealth();
   fetchCronJobs();
+  fetchServiceStatus();
 }
 
 async function fetchApiHealth() {

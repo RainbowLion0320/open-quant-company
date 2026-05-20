@@ -5,6 +5,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+from datetime import datetime
 from fastapi import APIRouter, Query
 from pathlib import Path
 import sqlite3
@@ -383,4 +384,106 @@ async def cron_jobs():
         "jobs": compact,
         "summary": f"{len(compact)} jobs, {ok} OK, {err} err" + (f", {other} other" if other else ""),
         "checked_at": Path(cron_path).stat().st_mtime,
+    }
+
+
+@router.get("/service-status")
+async def service_status():
+    """CDP / MCP / Cookie 状态检查"""
+    import json as _json
+    import httpx
+
+    items = []
+
+    # ── Chrome CDP (port 9222) ──
+    cdp_ok = False
+    cdp_detail = "端口 9222 无响应"
+    try:
+        with httpx.Client(timeout=3) as client:
+            r = client.get("http://localhost:9222/json/version")
+            if r.status_code == 200:
+                data = r.json()
+                browser = data.get("Browser", "Chrome")
+                cdp_ok = True
+                cdp_detail = f"{browser}, CDP v{data.get('Protocol-Version','?')}"
+    except Exception:
+        pass
+
+    items.append({
+        "name": "Chrome CDP",
+        "status": "ok" if cdp_ok else "error",
+        "detail": cdp_detail,
+    })
+
+    # ── DeepSeek cookie ──
+    cookie_ok = False
+    cookie_age_days = None
+    cookie_remaining = None
+    cookie_detail = "未检测"
+
+    if cdp_ok:
+        try:
+            with httpx.Client(timeout=3) as client:
+                pages_r = client.get("http://localhost:9222/json")
+                pages = pages_r.json()
+                ds_page = next((p for p in pages if "deepseek.com" in p.get("url", "").lower()), None)
+                if ds_page:
+                    ws_url = ds_page["webSocketDebuggerUrl"]
+                    import websocket
+                    ws = websocket.create_connection(ws_url, timeout=5)
+                    try:
+                        mid = [0]
+                        def _cmd(method, params=None):
+                            mid[0] += 1
+                            ws.send(_json.dumps({"id": mid[0], "method": method, "params": params or {}}))
+                            while True:
+                                raw = ws.recv()
+                                if isinstance(raw, bytes): raw = raw.decode()
+                                try: msg = _json.loads(raw)
+                                except: continue
+                                if msg.get("id") == mid[0]:
+                                    return msg.get("result", {})
+
+                        _cmd("Runtime.enable")
+                        r = _cmd("Runtime.evaluate", {"expression": "window.location.href", "returnByValue": True})
+                        url = r.get("result", {}).get("value", "")
+                        is_auth = "sign_in" not in url and "login" not in url.lower()
+                    finally:
+                        ws.close()
+
+                    # Cookie file age
+                    cookie_path = Path("/tmp/chrome-cdp/Default/Cookies")
+                    if cookie_path.exists():
+                        cookie_mtime = cookie_path.stat().st_mtime
+                        cookie_age_days = (datetime.now().timestamp() - cookie_mtime) / 86400
+                        cookie_remaining = max(0, 30 - cookie_age_days)
+
+                    if is_auth:
+                        cookie_ok = True
+                        cookie_detail = f"已认证"
+                        if cookie_remaining is not None:
+                            cookie_detail += f", 剩余约 {cookie_remaining:.0f} 天"
+                    else:
+                        cookie_detail = "未登录 (需扫码)"
+                else:
+                    cookie_detail = "DeepSeek 页面未打开"
+        except Exception as e:
+            cookie_detail = f"检测失败: {str(e)[:50]}"
+    else:
+        cookie_detail = "CDP 不可用"
+
+    items.append({
+        "name": "DeepSeek Cookie",
+        "status": "ok" if cookie_ok else "warn",
+        "detail": cookie_detail,
+        "cookie_remaining_days": round(cookie_remaining, 1) if cookie_remaining else None,
+    })
+
+    ok = sum(1 for i in items if i["status"] == "ok")
+    warn = sum(1 for i in items if i["status"] == "warn")
+    err = sum(1 for i in items if i["status"] == "error")
+    return {
+        "items": items,
+        "summary": f"{ok} OK, {warn} 警告, {err} 异常",
+        "all_ok": err == 0 and warn == 0,
     }
