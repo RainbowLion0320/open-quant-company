@@ -92,11 +92,6 @@ class DataHub:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
-    def cache_dir(self) -> Path:
-        """@deprecated — use stock_data_dir('financials') or stock_data_dir('valuation')."""
-        self.cache_root.mkdir(parents=True, exist_ok=True)
-        return self.cache_root
-
     def stock_data_dir(self, name: str) -> Path:
         """Stock-level data directory under data/store/stock/{name}/."""
         path = self.store_root / "stock" / _safe_leaf(name, "name")
