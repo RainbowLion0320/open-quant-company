@@ -171,8 +171,8 @@ store/
 │   └── trades.parquet
 │
 ├── deepseek/daily_usage.parquet         ← DeepSeek 日度用量 (CDP 自动)
-├── bond/treasury_yields.parquet         ← 国债收益率
-├── _manifest/datasets.parquet           ← DataHub 写入清单
+├── bond/treasury_yields.parquet         ← 国债收益率曲线 (中美)
+├── _manifest/datasets.parquet           ← DataHub 写入清单 (自动)
 ├── futures/daily/{contract}.parquet     ← 期货主连合约
 └── cache/api/*.parquet                  ← AKShare API 响应 MD5 缓存 (可再生)
 ```

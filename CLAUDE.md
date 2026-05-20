@@ -49,15 +49,15 @@
 │   ├── financials.py             # 财务数据提取 (三层缓存)
 │   ├── symbols.py                # 5517只全A股 + 申万31行业
 │   ├── feature_store.py          # PIT 特征存储 + enrich
-│   ├── data_registry.py          # 28维度注册表
+│   ├── data_registry.py          # ★ 维度+健康注册表: source/label/SLA/repair/partition 单源
 │   ├── cleaner.py                # 6规则数据清洗
 │   ├── tushare_utils.py          # Token 统一管理
-│   ├── datahub.py                 # 数据中台: 统一路径/原子写入/追加去重/审计
+│   ├── datahub.py                 # ★ 数据中台: dimension_path()/manifest/原子写入/追加去重/审计
 │   ├── strategy_plugins.py        # 策略运行时注册: 配置驱动dispatch, 动态import
 │   ├── db.py + results_db.py     # Parquet存储 + DuckDB视图
 │   ├── assets/{base,stock}.py    # 多资产架构 + StockAsset
 │   ├── fetchers/{moneyflow,holders,macro}.py  # 数据获取器
-│   └── store/                    # Parquet: stock/ macro/ signals/ features/
+│   └── store/                    # Parquet: stock/macro/signals/features/_manifest/
 ├── signals/
 │   ├── expression.py             # 因子 DSL 表达式引擎
 │   ├── dsl_parser.py             # LLM公式→计算

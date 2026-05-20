@@ -1,7 +1,7 @@
 ---
 title: System Architecture (系统架构总览)
 created: 2026-05-12
-updated: 2026-05-21
+updated: 2026-05-22
 type: concept
 tags: [architecture, system-overview, extensibility, strategy-registry, ML, Factor-DSL, PIT, LightGBM, LLM]
 ---
@@ -101,50 +101,54 @@ strategies:
 
 ```
 1. 数据采集 (按频率分组的 cron 体系)
-   日频: scripts/cron_fetch_daily.py → OHLCV + Shibor + 估值 + 复权 + 资金流 + 基金 + 期货
-   慢速: scripts/cron_fetch_extra.py --slow-only → limit_list(1/hr) + top_list(日积月累)
-   月频: Macro Monthly Refresh (1日) + Financial Monthly Refresh (3日) → 宏观+基本面全量
-   DeepSeek: scripts/ingest_deepseek_cdp.py → Chrome CDP → /api/v0/usage/cost → 日度用量
+   日频: scripts/cron_fetch_daily.py → dimension_path("ohlcv_daily", symbol=...)
+   慢速: scripts/cron_fetch_extra.py --slow-only
+   月频: Macro Monthly Refresh (1日) + Financial Monthly Refresh (3日)
+   DeepSeek: scripts/ingest_deepseek_cdp.py → Chrome CDP
 
-   存储路径:
-   data/store/stock/daily/{symbol}.parquet          ← OHLCV 日线
-   data/store/stock/financials/{symbol}.parquet     ← 财务摘要 (原 data/cache/financials/)
-   data/store/stock/valuation/{symbol}.parquet      ← PE/PB 估值 (原 data/cache/valuation/)
-   data/store/stock/holders/、moneyflow/、...       ← Tushare 扩展维度
-   data/store/fund/、futures/、macro/               ← 基金/期货/宏观
-   data/cache/api/*.parquet                          ← AKShare API 响应 MD5 缓存 (可再生)
-   data/store/deepseek/daily_usage.parquet           ← DeepSeek 日度 Token 用量
+   路径统一由 DataHub.dimension_path() 从 data_registry 的 cache 模式展开:
+   data/store/stock/daily/{symbol}.parquet        ← "stock/daily/{symbol}.parquet"
+   data/store/stock/moneyflow/daily/{YYYYMMDD}.parquet  ← 占位符自动展开
+   所有脚本不再自行拼接深层路径。
 
-2. 数据清洗 (data/cleaner.py)
+2. 写入清单 (DataHub manifest, 自动)
+   每次 write_parquet() → 记录到 data/store/_manifest/datasets.parquet:
+   producer / row_count / date_range / schema_hash / file_sha256 / size_bytes
+   manifest 写入失败不抛异常——可观测性不阻塞主数据流。
+
+3. 数据清洗 (data/cleaner.py)
    OHLCV 完整性 → 异常值检测(保留涨跌停) → 停牌过滤 → 缺失值填充
    → 清洗报告 (丢弃/填充/缩尾统计)
 
-3. 特征构建 (scripts/build_features.py)
-   因子 × 股票 × 月数 → data/store/features/YYYY-MM.parquet (PIT, 零前视, 严格20交易日前向收益)
+4. 特征构建 (scripts/build_features.py)
+   因子 × 股票 × 月数 → data/store/features/YYYY-MM.parquet (PIT, 零前视)
 
-4. 模型训练 (scripts/tune_model.py)
+5. 模型训练 (scripts/tune_model.py)
    LightGBM + Optuna + 滚动窗口CV (48月训练/6月测试)
-   → data/models/lgbm_best.pkl
 
-5. 策略计算 (scripts/compute_signals.py, 由 workflow/cron 触发)
-   for each strategy in Registry:
-     scorer → signals → data/store/signals/{strategy}.parquet
+6. 策略计算 (scripts/compute_signals.py, cron 触发)
+   for each strategy in Registry → signals → data/store/signals/{strategy}.parquet
 
-6. 信号推送 → Telegram @buffett0320_bot
+7. 数据库健康检查 (scripts/db_health_check.py, 每周六)
+   从 data_registry.health_metadata() 获取 source/label/SLA/repair/partition
+   → 按维度迭代扫描 → freshness_status (fresh/stale/missing/error)
+   SLA 由 FRESHNESS_SLA_BY_FREQ 规则驱动 (daily=5d, monthly=45d, quarterly=140d)
+   repair_policy 由 status 驱动 (available→auto, rate_limited→rate_limited)
+   partition_key 由 cache 模式占位符推断 ({YYYYMMDD}→trade_date, {YYYYMM}→month)
 
-7. 因子研究 (factor_hypothesis.py)
-   LLM (deepseek-v4-pro) → 因子假说 → DSL解析器计算 → IC评估 → 多轮迭代 + OOS验证
-   通过因子自动注册到 alpha_factors()
+8. 信号推送 → Telegram @buffett0320_bot
 
-8. 信号选择 (signals/selection.py)
-   全池子打分 → 横截面排名取前 N% → apply_ranked_buys() 标记 buy。
-   替代旧简单阈值 (score>=45→buy)，避免阈值过宽导致按代码顺序买入。
+9. 因子研究 (factor_hypothesis.py)
+   LLM → 因子假说 → DSL解析器计算 → IC评估 → OOS验证
 
-9. 缓存轮转 (scripts/cleanup_cache.py, 每周六)
-   清理 data/cache/api/ 中 >90 天未访问的 MD5 缓存文件 (API 响应可再生)
+10. 信号选择 (signals/selection.py)
+    横截面排名取前 N% → apply_ranked_buys()
 
-10. Web 展示
-   FastAPI ← DuckDB(:memory:) + read_parquet() views → Vue 3 SPA
+11. 缓存轮转 (scripts/cleanup_cache.py, 每周六)
+    --dir 安全约束: 必须解析到 cache_root 内, 防止误删 store 数据
+
+12. Web 展示
+    FastAPI ← DuckDB(:memory:) + read_parquet() views → Vue 3 SPA
 ```
 
 ## 关键模块
@@ -164,7 +168,7 @@ strategies:
 | 特征存储 | `data/feature_store.py` | PIT特征 + enrich_from_registry |
 | 模型层 | `models/__init__.py` | LightGBM + 注册表 |
 | 数据清洗 | `data/cleaner.py` | DataCleaner 规则化清洗 |
-| 数据注册 | `data/data_registry.py` | 数据维度统一管理 |
+| 数据注册 | `data/data_registry.py` | ★ 维度+健康元数据: source/label/SLA/repair/partition 单源管理 |
 | Tushare工具 | `data/tushare_utils.py` | Token统一(环境变量优先→config兜底) |
 | 多资产基类 | `data/assets/base.py` | AssetAdapter ABC + AssetRegistry |
 | 股票适配器 | `data/assets/stock.py` | StockAsset |
@@ -173,7 +177,7 @@ strategies:
 | 期货适配器 | `data/assets/futures.py` | FuturesAsset (主力合约) |
 | 数据获取 | `data/fetcher.py` | AKShare 3源 fallback, API缓存→data/cache/api/ |
 | 财务数据 | `data/financials.py` | 同花顺 → ROE/毛利/D-E, 存储→data/store/stock/financials/ |
-| 数据中台 | `data/datahub.py` | ★ 统一路径 + manifest: dimension_path()/manifest_for()/signal_path() |
+| 数据中台 | `data/datahub.py` | ★ 路径合约 + 写入清单: dimension_path()/manifest_for()/write_parquet(producer=) |
 | 股票池 | `data/symbols.py` | A股 universe 与行业映射，当前数量以源码为准 |
 | 资金流获取 | `data/fetchers/moneyflow.py` | 资金流向 |
 | 筹码获取 | `data/fetchers/holders.py` | 股东户数+增减持 |
@@ -255,6 +259,25 @@ strategies:
 - **PIT零前视**: 所有特征按月切片, `as_of` 参数严格限制数据可用范围
 - **因子可组合**: DSL表达式声明式, 可缓存, 可序列化
 - **ML可重现**: 模型版本化 (registry.json), 训练参数全记录
+- **注册表驱动**: 维度路径通过 `DataHub.dimension_path(key, **placeholders)` 从 `data_registry.cache` 展开, 路径只定义一次; DB Health 的 source/label/SLA/repair/partition 全从 DataDimension 字段派生, 不硬编码
+- **写入可观测**: `DataHub.write_parquet(..., producer=)` → `_manifest/datasets.parquet` 记录 producer/row_count/date_range/schema_hash/file_sha256, 写入失败不抛异常不阻塞主路径
+- **副作用分离**: `store_path()` 纯路径计算 vs `store_dir()` 创建目录, `_ensure_relative_store_pattern()` 拒绝 `..` 和绝对路径
+
+## Manifest 子系统
+
+`data/store/_manifest/datasets.parquet` 是 DataHub 自动维护的写入清单。每次 `write_parquet()` 成功后追加一条记录（upsert by path），记录：
+
+| 字段 | 来源 | 用途 |
+|------|------|------|
+| producer | `producer=` 参数 / `QUANT_AGENT_PRODUCER` 环境变量 | 追溯写入来源 |
+| row_count / column_count | DataFrame | 数据量统计 |
+| date_column / date_min / date_max | 自动检测 date 列 | 日期范围 |
+| schema_hash | 列名+dtype SHA256 | 检测 schema 变更 |
+| file_sha256 | 文件内容 SHA256 | 文件完整性校验 |
+| size_bytes | `os.stat` | 磁盘占用 |
+| updated_at | `datetime.now()` | 最后写入时间 |
+
+DB Health 读取 manifest 后注入 `schema_hash`、`manifest_files` 等字段，Web API 的 `db_health` 端点通过 manifest 提供更精确的数据新鲜度和完整性信息。
 
 ## See Also
 

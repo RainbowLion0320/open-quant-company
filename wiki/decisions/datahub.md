@@ -29,9 +29,10 @@ DataHub 负责:
 
 - 统一目录: `store_root`, `cache_root`, `signals`, `features`, `macro`, `paper`, `system_monitor`, token cache。
 - 统一路径: `signal_path(strategy)`, `feature_path(month)`, `macro_path(name)`, `paper_path(name)`。
-- 注册表路径展开: `dimension_root(key)` / `dimension_path(key, **values)` 从 `data_registry.cache` 生成真实路径，避免脚本各自拼深层目录。
+- 注册表路径展开: `dimension_root(key)` / `dimension_path(key, **values)` 从 `data_registry.cache` 占位符模式生成真实路径。**设计理由**: 路径只定义一次（config.yaml），消费脚本不硬编码深层目录。占位符 `{symbol}`/`{YYYYMMDD}` 在调用点展开，`validate()` 拒绝 `..` 和绝对路径。
+- 路径 vs 创建分离: `store_path(asset)` 纯路径计算（dimension 展开用），`store_dir(asset)` 创建目录（init 用）。**设计理由**: dimension 路径展开不应产生空目录副作用。
 - 原子写入: Parquet/JSON 先写临时文件，再 `os.replace` 覆盖，降低半写入风险。
-- 写入清单: Parquet 写入后更新 `_manifest/datasets.parquet`，记录 producer、行数、日期范围、schema hash、文件 checksum。
+- 写入清单: `write_parquet(..., producer=)` 成功后更新 `_manifest/datasets.parquet`，记录 producer/行数/日期范围/schema_hash/file_sha256。**设计理由**: 每次写入可追溯来源、可检测 schema 变更、可校验文件完整性。manifest 写入失败不抛异常——可观测性不阻塞主数据流。
 - 追加写入: `append_parquet(..., dedupe_subset=...)` 统一处理追加和去重。
 - 最新批次: `latest_batch(path, ts_col="computed_at")` 统一读取策略最新信号。
 - 轻量审计: `audit()` 返回已知逻辑数据集的存在性、文件数量和大小。
