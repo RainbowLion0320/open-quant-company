@@ -1,3 +1,11 @@
+---
+title: DataHub 数据中台决策
+created: 2026-05-17
+updated: 2026-05-21
+type: decision
+tags: [datahub, storage, parquet, duckdb, architecture]
+---
+
 # DataHub 数据中台决策
 
 日期: 2026-05-17

@@ -1,7 +1,7 @@
 ---
 title: Web Architecture (Vue 3 + FastAPI)
 created: 2026-05-12
-updated: 2026-05-18
+updated: 2026-05-21
 type: decision
 tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-center, monitor]
 ---
@@ -46,8 +46,8 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 | 个股深挖 | `/stocks/:code` | K线 + DCF计算器 + 巴菲特评分 + 策略信号 |
 | 回测分析 | `/backtest` | N策略同屏叠加曲线 + 点击高亮 + 基准参照 |
 | 信号历史 | `/signals` | 信号变更追踪 |
-| 系统信息 | `/monitor` | CPU/内存/Token 仪表盘 + 历史趋势图 + 系统设置入口 |
-| 数据库健康 | `/db-health` | 32 维度健康扫描 + 按时间分段 + 单表修复 |
+| 系统信息 | `/monitor` | CPU/内存/Token/Top进程 + 5 设置卡片: TELEGRAM/Data Sources/API Health/Services/Cron Jobs/System Info |
+| 数据库健康 | `/db-health` | 多维度健康扫描 (含 OHLCV/Features/Cache API) + 全量大小统计 + 按时间分段 + 单表修复 |
 | 记忆图谱 | `/hindsight` | ★ Hindsight 知识图谱 — Canvas 力导向图, 悬浮/点击探索节点关系 |
 
 ### 指挥中心 (2026-05-16 Codex 升级)
@@ -61,12 +61,15 @@ Market API 新增字段：
 
 前端 Market.vue 完全重写：从4张简单卡片升级为 Command Center 布局，含 animated regime orb、4资产跟踪器、宏观快照行、策略矩阵卡片、预警面板。仅读 Parquet 缓存，无网络阻塞。
 
-### 活动监视器 (2026-05-16)
+### 系统信息 (2026-05-21 升级)
 
 独立 SQLite WAL 时序库 `system_monitor.db`：
-- 每分钟 cron 采集 CPU/内存/磁盘/电池/Token
 - API: `/api/system/monitor` (实时快照) + `/api/system/history` (趋势)
-- 前端: ActivityMonitor.vue, canvas 迷你趋势图
+- 新增: `/api/system/api-health` (AKShare/Tushare/DeepSeek/Hindsight/Telegram 配置状态)
+- 新增: `/api/system/cron-jobs` (cron job 状态, 读 ~/.hermes/cron/jobs.json)
+- 新增: `/api/system/service-status` (Chrome CDP + DeepSeek cookie 倒计时)
+- 新增: `/api/system/deepseek-usage` (CDP 日度 Token 用量)
+- 前端: ActivityMonitor.vue, 左列(TELEGRAM/Data Sources/API Health) + 右列(Services/Cron Jobs/System Info)
 - Token 三来源覆盖: Hermes state.db + factor_hypothesis log + Hindsight /metrics
 
 ### 记忆图谱 (2026-05-17)

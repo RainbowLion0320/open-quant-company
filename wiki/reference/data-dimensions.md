@@ -1,4 +1,14 @@
+---
+title: Data Dimensions — 量化数据维度全览
+created: 2026-05-13
+updated: 2026-05-21
+type: reference
+tags: [data, dimensions, registry, datahub, storage, parquet]
+---
+
 # Data Dimensions — 量化数据维度全览
+
+> 最后更新: 2026-05-21. 维度定义在 `config/settings.yaml` → `data_registry`.
 
 ## 架构总览
 
@@ -102,20 +112,23 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 
 ```
 store/
-├── scan_meta.parquet                3KB   扫描元数据
-├── system_monitor.db               388KB   系统指标时序 (SQLite, 365d 保留)
+├── scan_meta.parquet                 扫描元数据
+├── system_monitor.db                 系统指标时序 (SQLite, 365d 保留)
 │
 ├── stock/                                ← 个股维度
-│   ├── broker_recommend/                 ← 月度金股 (按月: 202401.parquet)
+│   ├── daily/{symbol}.parquet            ← OHLCV 日线
+│   ├── financials/{symbol}.parquet       ← 财务摘要 (原 cache/)
+│   ├── valuation/{symbol}.parquet        ← PE/PB 估值 (原 cache/)
+│   ├── broker_recommend/                 ← 月度金股 (按月分区)
 │   ├── moneyflow/                        ← 资金流向
-│   │   ├── {symbol}.parquet             ← 日频 (近120日, 单只 20KB)
-│   │   └── monthly/{date}.parquet       ← 月频 (全历史, 单月 ~500KB)
-│   ├── holders/{symbol}.parquet         ← 股东户数 (单只 ~6KB)
-│   ├── holdertrade/{symbol}.parquet     ← 股东增减持 (单只 ~8KB)
-│   ├── share_float/all.parquet    134KB  ← 限售股解禁
-│   ├── repurchase/all.parquet      52KB  ← 股票回购
+│   │   ├── {date}.parquet               ← 日频
+│   │   └── monthly/{date}.parquet       ← 月频 (全历史)
+│   ├── holders/{symbol}.parquet         ← 股东户数
+│   ├── holdertrade/{symbol}.parquet     ← 股东增减持
+│   ├── share_float/all.parquet          ← 限售股解禁
+│   ├── repurchase/all.parquet           ← 股票回购
 │   ├── dividend/all_dividends.parquet    ← 分红送股
-│   ├── research_report/{month}.parquet   ← 券商研报 (~95KB/月)
+│   ├── research_report/{month}.parquet   ← 券商研报
 │   ├── top_list/{date}.parquet           ← 龙虎榜
 │   └── limit_list/{date}.parquet         ← 涨跌停统计
 │
@@ -128,39 +141,37 @@ store/
 │   └── daily/{symbol}.parquet            ← 期货日线
 │
 ├── macro/                                ← 宏观数据
-│   ├── cpi.parquet                   10KB
-│   ├── gdp.parquet                    5KB
-│   ├── lpr.parquet                   16KB
-│   ├── money_supply.parquet          12KB
-│   ├── pmi.parquet                    7KB
-│   ├── ppi.parquet                    9KB
-│   └── shibor.parquet               142KB
+│   ├── cpi.parquet
+│   ├── gdp.parquet
+│   ├── lpr.parquet
+│   ├── money_supply.parquet
+│   ├── pmi.parquet
+│   ├── ppi.parquet
+│   └── shibor.parquet
 │
 ├── features/                             ← PIT 特征 (月度切片)
-│   └── 2018-01.parquet ~ 2026-04.parquet  (100个文件, 1.0~1.7MB/月)
+│   └── YYYY-MM.parquet                   ← 按月分区
 │
 ├── signals/                              ← 策略信号
-│   ├── buffett.parquet                10KB
-│   ├── buffett_scan.parquet           16KB
-│   ├── cybernetic.parquet             18KB
-│   ├── ml_lgbm.parquet                10KB
-│   └── multifactor.parquet            13KB
+│   ├── buffett.parquet
+│   ├── buffett_scan.parquet
+│   ├── cybernetic.parquet
+│   ├── ml_lgbm.parquet
+│   └── multifactor.parquet
 │
 ├── signals_prev/                         ← 上一期信号快照
 │   └── (同上)
 │
 ├── paper/                                ← 模拟交易
-│   ├── nav.parquet                     3KB
-│   ├── state.parquet                   9KB
-│   └── trades.parquet                  5KB
+│   ├── nav.parquet
+│   ├── state.parquet
+│   └── trades.parquet
 │
-├── deepseek/daily_usage.parquet    6KB    ← DeepSeek Token 用量
-├── bond/treasury_yields.parquet   396KB   ← 国债收益率
-├── futures/daily/RB.parquet       146KB   ← 期货 (螺纹钢示例)
-└── financials/                            ← 财务数据缓存 (空, 按需拉取)
+├── deepseek/daily_usage.parquet         ← DeepSeek 日度用量 (CDP 自动)
+├── bond/treasury_yields.parquet         ← 国债收益率
+├── futures/daily/{contract}.parquet     ← 期货主连合约
+└── cache/api/*.parquet                  ← AKShare API 响应 MD5 缓存 (可再生)
 ```
-
-**总量**: ~120MB (100 个月特征切片占 90%+)
 
 ---
 

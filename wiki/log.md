@@ -1,12 +1,52 @@
 ---
 title: Wiki Log
 created: 2026-05-13
-updated: 2026-05-19
+updated: 2026-05-21
 type: meta
-tags: [log]
----
 
-# Wiki Log
+## 2026-05-21 — Cron 重组 + 数据目录重整 + DB Health 强化 + DeepSeek CDP 流水
+
+### Cron 按频率重组
+- 新建 `scripts/cron_fetch_daily.py`: OHLCV+估值+复权+资金流+基金+期货+Shibor 日频一站式拉取
+- `scripts/cron_fetch_extra.py`: 加 `--slow-only`, Slow Data Daily 只拉 rate-limited 维度
+- 月频拆分: Macro Monthly (1日) + Financial Monthly (3日), 避免同日 Tushare 配额争抢
+- 删除冗余 Shibor Daily Refresh (并入 Market Data Daily)
+- 整体 cron 按 Daily/Monthly/Weekly/Infra 频率分组
+
+### 数据目录重整
+- `data/cache/financials/` → `data/store/stock/financials/` (财务摘要落位主存储)
+- `data/cache/valuation/` → `data/store/stock/valuation/` (PE/PB 估值落位主存储)
+- `data/cache/*.parquet` → `data/cache/api/` (AKShare MD5 响应缓存, 可再生, 与不可再生数据分离)
+- `datahub.py`: 删除 `cache_dir()`, 新增 `stock_data_dir(name)`
+- 更新引用: financials.py, fetcher.py, db.py, batch_fetch_financials.py
+
+### DB Health 健康检查强化
+- 全量文件大小统计替换采样统计 (此前遗漏 stock_daily/features_all/cache_api)
+- 新增扫描表: stock_daily (OHLCV), features_all (PIT特征汇总), cache_api_calls (AKShare缓存)
+- 数据总量从此前的漏报状态修复为真实值
+
+### 缓存轮转机制
+- 新建 `scripts/cleanup_cache.py`: 按文件访问时间清理, 支持 --days + --execute (默认 dry-run)
+- 新建 cron: Cache Cleanup Weekly (周六), 默认保留 90 天
+- 仅清理 `data/cache/api/` (AKShare MD5 响应, API 可再生), data/store/ 数据永不删除
+
+### DeepSeek CDP 日度流水
+- `scripts/ingest_deepseek_cdp.py`: Chrome CDP → Network 拦截 /api/v0/usage/cost + /api/v0/usage/amount
+- 双 API 比例分配: 日度 token = 月度总量 × (日度 cost / 月度总 cost)
+- cron: DeepSeek usage CDP ingest (daily 00:15, no_agent)
+- Web: `/api/system/deepseek-usage` 端点
+- Chrome 常驻: `--remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir=/tmp/chrome-cdp`
+
+### API Health + Services 卡片
+- `/api/system/api-health`: AKShare/Tushare/DeepSeek/Hindsight/Telegram 配置状态 (不暴露 token)
+- `/api/system/cron-jobs`: 读 ~/.hermes/cron/jobs.json
+- `/api/system/service-status`: Chrome CDP + DeepSeek cookie 倒计时
+- 前端: DATA SOURCES & API → 拆为独立卡片
+
+### Tushare Free 维度扩展
+- 新接入: limit_list, top_list, research_report, dividend, fund_daily, fund_portfolio, fund_nav, futures_daily
+- `scripts/cron_fetch_extra.py` 含全量拉取函数
+- `scripts/repair_table.py` 增加对应修复入口
 
 > 操作日志。追加模式。
 
@@ -114,7 +154,7 @@ tags: [log]
 
 ## [2026-05-12] fix | Buffett backtest look-ahead bias — v1 (PE/PB)
 - Problem: `buffett_scorer` used today's filter results → fake +258%, 1 trade
-- Fix: `backtest/buffett_rolling.py` — Tushare daily_basic PE/PB per stock → parquet
+- Fix: `backtest/buffett_real_scorer.py` — Tushare daily_basic PE/PB per stock → parquet
 - Result: +10.03%, 548 trades, MaxDD -16.8%
 - Pitfall: `if not hasattr(fn, "_attr")` bug discovered
 

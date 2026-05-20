@@ -1,7 +1,7 @@
 ---
 title: System Architecture (系统架构总览)
 created: 2026-05-12
-updated: 2026-05-18
+updated: 2026-05-21
 type: concept
 tags: [architecture, system-overview, extensibility, strategy-registry, ML, Factor-DSL, PIT, LightGBM, LLM]
 ---
@@ -100,10 +100,20 @@ strategies:
 ## 数据流
 
 ```
-1. 数据采集
-   scripts/cron_fetch_ohlcv.py → data/store/stock/daily/{symbol}.parquet
-   scripts/cron_fetch_financials.py → data/store/stock/financials/{symbol}.parquet
-   Tushare → daily_basic (PE/PB/市值) → data/store/stock/valuation/{symbol}.parquet
+1. 数据采集 (按频率分组的 cron 体系)
+   日频: scripts/cron_fetch_daily.py → OHLCV + Shibor + 估值 + 复权 + 资金流 + 基金 + 期货
+   慢速: scripts/cron_fetch_extra.py --slow-only → limit_list(1/hr) + top_list(日积月累)
+   月频: Macro Monthly Refresh (1日) + Financial Monthly Refresh (3日) → 宏观+基本面全量
+   DeepSeek: scripts/ingest_deepseek_cdp.py → Chrome CDP → /api/v0/usage/cost → 日度用量
+
+   存储路径:
+   data/store/stock/daily/{symbol}.parquet          ← OHLCV 日线
+   data/store/stock/financials/{symbol}.parquet     ← 财务摘要 (原 data/cache/financials/)
+   data/store/stock/valuation/{symbol}.parquet      ← PE/PB 估值 (原 data/cache/valuation/)
+   data/store/stock/holders/、moneyflow/、...       ← Tushare 扩展维度
+   data/store/fund/、futures/、macro/               ← 基金/期货/宏观
+   data/cache/api/*.parquet                          ← AKShare API 响应 MD5 缓存 (可再生)
+   data/store/deepseek/daily_usage.parquet           ← DeepSeek 日度 Token 用量
 
 2. 数据清洗 (data/cleaner.py)
    OHLCV 完整性 → 异常值检测(保留涨跌停) → 停牌过滤 → 缺失值填充
@@ -130,7 +140,10 @@ strategies:
    全池子打分 → 横截面排名取前 N% → apply_ranked_buys() 标记 buy。
    替代旧简单阈值 (score>=45→buy)，避免阈值过宽导致按代码顺序买入。
 
-9. Web 展示
+9. 缓存轮转 (scripts/cleanup_cache.py, 每周六)
+   清理 data/cache/api/ 中 >90 天未访问的 MD5 缓存文件 (API 响应可再生)
+
+10. Web 展示
    FastAPI ← DuckDB(:memory:) + read_parquet() views → Vue 3 SPA
 ```
 
@@ -157,14 +170,14 @@ strategies:
 | 股票适配器 | `data/assets/stock.py` | StockAsset |
 | ETF适配器 | `data/assets/etf.py` | ETFAsset (宽基/行业/黄金/债券/货币) |
 | 债券适配器 | `data/assets/bond.py` | BondAsset (国债收益率+可转债) |
-| 期货适配器 | `data/assets/futures.py` | FuturesAsset (11只主力合约) |
-| 加密适配器 | `data/assets/crypto.py` | CryptoAsset (占位, CCXT待接入) |
-| 数据获取 | `data/fetcher.py` | AKShare 3源 fallback |
-| 财务数据 | `data/financials.py` | 同花顺 → ROE/毛利/D-E |
+| 期货适配器 | `data/assets/futures.py` | FuturesAsset (主力合约) |
+| 数据获取 | `data/fetcher.py` | AKShare 3源 fallback, API缓存→data/cache/api/ |
+| 财务数据 | `data/financials.py` | 同花顺 → ROE/毛利/D-E, 存储→data/store/stock/financials/ |
+| 数据中台 | `data/datahub.py` | ★ 统一路径: stock_data_dir()/store_dir()/signal_path() |
 | 股票池 | `data/symbols.py` | A股 universe 与行业映射，当前数量以源码为准 |
 | 资金流获取 | `data/fetchers/moneyflow.py` | 资金流向 |
 | 筹码获取 | `data/fetchers/holders.py` | 股东户数+增减持 |
-| 宏观获取 | `data/fetchers/macro.py` | PMI/M2/Shibor等7指标 |
+| 宏观获取 | `data/fetchers/macro.py` | PMI/M2/Shibor等7指标, Tushare优先 |
 | 数据库 | `data/db.py` + `data/results_db.py` | Parquet存储 + DuckDB视图 |
 | 控制论 | `cybernetics/orchestrator.py` | 月线Regime检测 + 自适应参数 |
 | 工作流 | `scripts/run_workflow.py` | qrun-style pipeline |
