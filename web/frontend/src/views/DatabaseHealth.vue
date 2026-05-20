@@ -429,7 +429,7 @@ onMounted(fetchData);
 </script>
 
 <style scoped>
-.db-health { padding: 20px 24px; max-width: 1200px; }
+.db-health { padding: 20px 24px; }
 
 /* Hero */
 .health-hero {
