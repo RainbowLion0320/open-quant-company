@@ -47,7 +47,10 @@ data/store/stock/
 data/store/fund/
 data/store/futures/
 data/store/deepseek/
+data/store/bond/
+data/store/signals_prev/
 data/store/scan_meta.parquet
+data/store/db_health.parquet
 data/models/*.pkl
 data/models/*.json
 data/tournament/
