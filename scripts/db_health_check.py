@@ -251,7 +251,8 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
             "error": "no files",
         }
 
-    total_size = 0
+    total_size = sum(f.stat().st_size for f in sorted(paths))
+
     total_rows = 0
     total_missing = 0.0
     total_outliers = 0
@@ -268,7 +269,6 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
         sample = sorted(paths, key=lambda p: p.stat().st_mtime, reverse=True)[:max_sample]
         sample = sorted(sample)
     for f in sample:
-        total_size += f.stat().st_size
         try:
             df = pd.read_parquet(f)
             total_rows += len(df)
@@ -363,6 +363,13 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         "fund_portfolio": ("Tushare", "基金持仓", True),
         "fund_nav": ("Tushare", "基金净值", True),
         "futures_daily": ("Tushare", "期货日线", True),
+        # Daily OHLCV
+        "stock_daily": ("AKShare", "日线行情 OHLCV", True),
+        # Features aggregate
+        "features_all": ("Computed (多源融合)", "PIT 特征切片 (全量)", False),
+        # Cache (derived)
+        "cache_financials": ("Cache (派生)", "财务摘要缓存", False),
+        "cache_valuation": ("Cache (派生)", "估值缓存", False),
     }
 
     def _meta(table_name: str) -> tuple[str, str, bool]:
@@ -382,11 +389,15 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     if tb.exists():
         records.append(_scan_single("bond_treasury_yields", tb))
 
-    # ── Features (last 3 months) ──
+    # ── Features (all, as aggregate) ──
     feat_dir = STORE / "features"
-    feat_files = sorted(feat_dir.glob("*.parquet"))[-3:] if feat_dir.exists() else []
-    for f in feat_files:
-        records.append(_scan_single(f"features_{f.stem}", f))
+    if feat_dir.exists():
+        feat_files = sorted(feat_dir.glob("*.parquet"))
+        if feat_files:
+            records.append(_scan_many("features_all", feat_files, max_sample=20, source="Computed"))
+        # Also keep 3 recent individual entries for per-month detail
+        for f in feat_files[-3:]:
+            records.append(_scan_single(f"features_{f.stem}", f, source="Computed"))
 
     # ── Signals ──
     for name in ["buffett", "buffett_scan", "multifactor", "ml_lgbm", "cybernetic"]:
@@ -415,6 +426,7 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
                 records.append(_scan_many(label, paths, max_sample=max_s))
 
     for label, glob_pattern, max_s in [
+        ("stock_daily", "daily/*.parquet", 30),
         ("stock_holders", "holders/*.parquet", 30),
         ("stock_holdertrade", "holdertrade/*.parquet", 30),
         ("stock_moneyflow_daily", "moneyflow/??????.parquet", 30),
@@ -442,6 +454,19 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     ]:
         if p.exists():
             records.append(_scan_single(label, p))
+
+    # ── data/cache/ 派生缓存 ──
+    cache_dir = STORE.parent.parent / "data" / "cache"
+    if cache_dir.exists():
+        for sub, label, max_s in [
+            ("financials", "cache_financials", 30),
+            ("valuation", "cache_valuation", 30),
+        ]:
+            pdir = cache_dir / sub
+            if pdir.exists():
+                paths = sorted(pdir.glob("*.parquet"))
+                if paths:
+                    records.append(_scan_many(label, paths, max_sample=max_s, source="Cache"))
 
     # ── Inject source + label_zh + repairable from TABLE_META ──
     for r in records:
