@@ -320,25 +320,31 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch Tushare Free extra data dimensions")
     parser.add_argument("--full-history", action="store_true", help="Full historical fetch")
     parser.add_argument("--skip-slow", action="store_true", help="Skip rate-limited fetchers (limit_list/top_list)")
+    parser.add_argument("--slow-only", action="store_true", help="ONLY fetch rate-limited slow dimensions (cron_accumulate)")
     args = parser.parse_args()
 
     full = args.full_history
     print(f"Cron fetch extra data — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    print(f"Full history: {full}")
+    print(f"Full history: {full}, slow-only: {args.slow_only}")
     print("=" * 55)
 
     results = {}
-    results["dividend"] = fetch_dividend(full)
 
-    if not args.skip_slow:
+    if args.slow_only:
+        # Only the slow, rate-limited dimensions (daily cron accumulation)
         results["limit_list"] = fetch_limit_list(full)
         results["top_list"] = fetch_top_list(full)
+    else:
+        results["dividend"] = fetch_dividend(full)
+        results["research_report"] = fetch_research_report(full)
+        results["fund_daily"] = fetch_fund_daily(full)
+        results["fund_portfolio"] = fetch_fund_portfolio(full)
+        results["fund_nav"] = fetch_fund_nav(full)
+        results["futures_daily"] = fetch_futures_daily(full)
 
-    results["research_report"] = fetch_research_report(full)
-    results["fund_daily"] = fetch_fund_daily(full)
-    results["fund_portfolio"] = fetch_fund_portfolio(full)
-    results["fund_nav"] = fetch_fund_nav(full)
-    results["futures_daily"] = fetch_futures_daily(full)
+        if not args.skip_slow:
+            results["limit_list"] = fetch_limit_list(full)
+            results["top_list"] = fetch_top_list(full)
 
     total = sum(v for v in results.values() if isinstance(v, int))
     print(f"\nDone: {total} new data points fetched")
