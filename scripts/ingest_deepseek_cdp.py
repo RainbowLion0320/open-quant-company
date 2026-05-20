@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
-"""DeepSeek Usage Auto-Ingest via CDP — synchronous version."""
-import json, sys, time, threading
+"""
+DeepSeek Usage Daily Ingest via CDP — cost API interception.
+
+Navigates to DeepSeek usage page, intercepts /api/v0/usage/cost
+response (DAILY per-model token breakdown), parses, saves to parquet.
+
+Usage: python scripts/ingest_deepseek_cdp.py
+"""
+import json, sys, time
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
@@ -10,183 +17,215 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 CDP = "http://localhost:9222"
 
-def _target_month(now: datetime | None = None) -> tuple[int, int]:
-    current = now or datetime.utcnow()
-    return current.year, current.month
-
-
 def _get_json(path):
     import urllib.request
     with urllib.request.urlopen(f"{CDP}{path}") as r:
         return json.loads(r.read().decode())
 
-def _cdp(ws, method, params=None):
-    """Send CDP command, collect events into global list, return result."""
-    mid = getattr(_cdp, "_id", 0) + 1; _cdp._id = mid
-    ws.send(json.dumps({"id": mid, "method": method, "params": params or {}}))
-    # Read until we get our response, collecting events
-    _raw_events = []
-    while True:
-        try:
+def _recv_all(ws, timeout=2):
+    """Read all available messages from websocket."""
+    messages = []
+    ws.sock.settimeout(timeout)
+    try:
+        while True:
             raw = ws.recv()
-        except websocket.WebSocketTimeoutException:
-            continue
-        if isinstance(raw, bytes): raw = raw.decode()
-        try:
-            msg = json.loads(raw)
-        except json.JSONDecodeError:
-            continue
-        if msg.get("id") == mid:
-            with _evt_lock:
-                _events.extend(_raw_events)
-            if "error" in msg:
-                raise RuntimeError(f"CDP error: {msg['error']}")
-            return msg.get("result", {})
-        else:
-            _raw_events.append(msg)
-
-_events = []
-_evt_lock = threading.Lock()
+            raw = raw.decode() if isinstance(raw, bytes) else raw
+            try: messages.append(json.loads(raw))
+            except: pass
+    except websocket.WebSocketTimeoutException:
+        pass
+    except Exception:
+        pass
+    return messages
 
 def ingest():
-    year, month = _target_month()
-    print(f"[{datetime.now():%H:%M:%S}] CDP → DeepSeek usage")
+    print(f"[{datetime.now():%H:%M:%S}] CDP -> daily cost API")
+
+    # Connect
     pages = _get_json("/json")
-    page = next((p for p in pages if "deepseek.com" in p.get("url", "")), None)
-    if not page:
+    ds = next((p for p in pages if "deepseek.com" in p.get("url", "").lower()), None)
+    if not ds:
+        _get_json("/json/new?https://platform.deepseek.com/usage")
+        time.sleep(4)
+        pages = _get_json("/json")
+        ds = next((p for p in pages if "deepseek.com" in p.get("url", "").lower()), None)
+    if not ds:
         print("✗ No DeepSeek page"); sys.exit(1)
 
-    ws = websocket.create_connection(page["webSocketDebuggerUrl"], timeout=30)
+    ws = websocket.create_connection(ds["webSocketDebuggerUrl"], timeout=30)
+    mid = [0]
+
+    def cmd(method, params=None):
+        mid[0] += 1
+        ws.send(json.dumps({"id": mid[0], "method": method, "params": params or {}}))
+        # Read until we get our response, collect all events
+        all_msgs = []
+        while True:
+            try:
+                raw = ws.recv()
+            except websocket.WebSocketTimeoutException:
+                # Resend and continue
+                ws.send(json.dumps({"id": mid[0], "method": method, "params": params or {}}))
+                continue
+            raw = raw.decode() if isinstance(raw, bytes) else raw
+            try: msg = json.loads(raw)
+            except: continue
+            if msg.get("id") == mid[0]:
+                if "error" in msg: raise RuntimeError(f"CDP: {msg['error']}")
+                return msg.get("result", {}), all_msgs
+            all_msgs.append(msg)
+
     ws.sock.settimeout(3)
 
     try:
-        _cdp(ws, "Runtime.enable")
-        _cdp(ws, "Page.enable")
+        _, _ = cmd("Runtime.enable")
+        _, _ = cmd("Page.enable")
+        _, _ = cmd("Network.enable", {"maxTotalBufferSize": 100000000})
 
-        # Check if logged in
-        r = _cdp(ws, "Runtime.evaluate", {
-            "expression": "document.title + ' | ' + (document.querySelector('[class*=balance]')?.textContent || 'no balance')",
-            "returnByValue": True,
-        })
-        print(f"  {r['result']['value']}")
+        # Check auth
+        r, _ = cmd("Runtime.evaluate", {"expression": "window.location.href", "returnByValue": True})
+        if "sign_in" in r.get("result", {}).get("value", ""):
+            print("✗ Not logged in"); sys.exit(1)
 
-        # Enable Network with large buffer
-        _cdp(ws, "Network.enable", {"maxTotalBufferSize": 50000000, "maxResourceBufferSize": 25000000})
-        with _evt_lock: _events.clear()
+        # Clear network buffer then navigate to trigger fresh API calls
+        print(f"[{datetime.now():%H:%M:%S}] Navigating to usage page...")
+        _, _ = cmd("Page.navigate", {"url": "https://platform.deepseek.com/usage"})
 
-        # Navigate to usage
-        _cdp(ws, "Page.navigate", {"url": "https://platform.deepseek.com/usage"})
-        time.sleep(2)
+        # Read ALL events for the next few seconds in a loop
+        all_events = []
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            msgs = _recv_all(ws, timeout=1)
+            all_events.extend(msgs)
 
-        # Wait for complete
-        for _ in range(10):
-            r = _cdp(ws, "Runtime.evaluate", {"expression": "document.readyState", "returnByValue": True})
-            if r.get("result", {}).get("value") == "complete":
-                break
-            time.sleep(1)
-        time.sleep(2)
-
-        # Click current month to trigger API
-        month_label = f"{year}.*{month}月?$"
-        _cdp(ws, "Runtime.evaluate", {
-            "expression": f"(()=>{{ const re = /{month_label}/; for(let el of document.querySelectorAll('div,span,button')){{ if(el.textContent.trim().match(re)){{ el.click(); break; }} }} }})()",
-            "returnByValue": True,
-        })
-        time.sleep(4)
-
-        # Collect network events
-        with _evt_lock:
-            evts = list(_events)
-
-        # Find usage API calls and read bodies
-        api_bodies = []
-        for evt in evts:
+        # Find /api/v0/usage/cost responses
+        print(f"[{datetime.now():%H:%M:%S}] Searching {len(all_events)} events...")
+        cost_bodies = []
+        for evt in all_events:
             if evt.get("method") == "Network.responseReceived":
                 params = evt.get("params", {})
                 url = params.get("response", {}).get("url", "")
-                req_id = params.get("requestId", "")
-                if "/api/v0/usage/" in url and "amount" in url:
+                if "/api/v0/usage/cost" in url:
+                    req_id = params["requestId"]
                     try:
-                        body = _cdp(ws, "Network.getResponseBody", {"requestId": req_id})
-                        api_bodies.append({"url": url, "body": body.get("body", ""), "year": year, "month": month})
-                        print(f"  ✓ {url.split('?')[-1]}")
+                        # Need to send a command to get body - use fresh ws state
+                        ws.send(json.dumps({"id": 9999, "method": "Network.getResponseBody", "params": {"requestId": req_id}}))
+                        while True:
+                            raw = ws.recv()
+                            raw = raw.decode() if isinstance(raw, bytes) else raw
+                            try: resp = json.loads(raw)
+                            except: continue
+                            if resp.get("id") == 9999:
+                                cost_bodies.append(resp.get("result", {}).get("body", ""))
+                                print(f"  ✓ captured: {url.split('?')[-1]}")
+                                break
                     except Exception as e:
-                        print(f"  ✗ body read failed: {e}")
+                        print(f"  body read error: {e}")
 
-        if not api_bodies:
-            # Fallback: page might have loaded data without click
-            r = _cdp(ws, "Runtime.evaluate", {
-                "expression": """
-                (async () => {
-                    try {
-                        const r = await (await fetch('/api/v0/usage/amount?month=%d&year=%d', {credentials: 'include'})).text();
-                        return r.substring(0, 5000);
-                    } catch(e) { return 'ERR:'+e.message; }
-                })()
-                """ % (month, year),
-                "returnByValue": True,
-                "awaitPromise": True,
-            })
-            body = r.get("result", {}).get("value", "")
-            if body and not body.startswith("ERR:"):
-                api_bodies.append({"url": f"fetch(month={month},year={year})", "body": body, "year": year, "month": month})
+        if not cost_bodies:
+            print("✗ No cost API response found in events")
+            # Try other months too - the page might load multiple
+            for month in [4, 3]:
+                _, evt_msgs = cmd("Page.navigate", {"url": f"https://platform.deepseek.com/usage?month={month}&year=2026"})
+                time.sleep(3)
+                msgs = _recv_all(ws, timeout=2)
+                all_events = evt_msgs + msgs
+                for evt in all_events:
+                    if evt.get("method") == "Network.responseReceived":
+                        params = evt.get("params", {})
+                        url = params.get("response", {}).get("url", "")
+                        if "/api/v0/usage/cost" in url:
+                            req_id = params["requestId"]
+                            try:
+                                ws.send(json.dumps({"id": 9998, "method": "Network.getResponseBody", "params": {"requestId": req_id}}))
+                                while True:
+                                    raw = ws.recv()
+                                    raw = raw.decode() if isinstance(raw, bytes) else raw
+                                    try: resp = json.loads(raw)
+                                    except: continue
+                                    if resp.get("id") == 9998:
+                                        body = resp.get("result", {}).get("body", "")
+                                        if body:
+                                            cost_bodies.append(body)
+                                            print(f"  ✓ month={month}: {url.split('?')[-1]}")
+                                        break
+                            except: pass
+            if not cost_bodies:
+                print("✗ Still no data"); sys.exit(1)
 
-        if not api_bodies:
-            print("✗ No usage API data captured"); sys.exit(1)
-
-        # Parse and save
+        # Parse
         dfs = []
-        for r in api_bodies:
-            try:
-                data = json.loads(r["body"])
-                df = _parse_monthly(data, year=int(r.get("year") or year), month=int(r.get("month") or month))
-                if df is not None: dfs.append(df)
-            except Exception as e:
-                print(f"  Parse error: {e}")
+        for body in cost_bodies:
+            data = json.loads(body)
+            df = _parse(data)
+            if df is not None and len(df) > 0:
+                dfs.append(df)
 
         if not dfs:
             print("✗ Parse failed"); sys.exit(1)
 
-        df = pd.concat(dfs, ignore_index=True)
-        df = df.drop_duplicates(subset=["utc_date", "model"], keep="last")
-        _save(df)
+        all_df = pd.concat(dfs, ignore_index=True)
+        all_df = all_df.drop_duplicates(subset=["utc_date", "model"], keep="last")
+        _save(all_df)
 
     finally:
         ws.close()
 
 
-def _parse_monthly(data, year: int | None = None, month: int | None = None):
-    """Parse monthly usage API response into DataFrame."""
-    default_year, default_month = _target_month()
-    year = year or default_year
-    month = month or default_month
+def _parse(data):
+    """Parse /api/v0/usage/cost response — daily per-model data.
+    Structure: biz_data[{total: [...], days: [{date, data: [{model, usage}]}]}]
+    Amounts are DeepSeek cost units (token count / internal factor).
+    """
     inner = data.get("data", data)
     biz = inner.get("biz_data", inner)
-    total = biz.get("total", [])
-    if not total:
-        print(f"  Unknown format: {json.dumps(data)[:200]}")
-        return None
+    if isinstance(biz, list):
+        biz = biz[0] if biz else {}
 
     rows = []
-    for item in total:
-        model = item.get("model", "")
-        usage = {u["type"]: int(float(u.get("amount", 0) or 0)) for u in item.get("usage", [])}
-        item_year = int(item.get("year") or year)
-        item_month = int(item.get("month") or month)
-        rows.append({
-            "utc_date": f"{item_year:04d}-{item_month:02d}-01",
-            "model": model,
-            "input_cache_hit": usage.get("PROMPT_CACHE_HIT_TOKEN", 0),
-            "input_cache_miss": usage.get("PROMPT_CACHE_MISS_TOKEN", 0),
-            "input_tokens": usage.get("PROMPT_CACHE_MISS_TOKEN", 0) + usage.get("PROMPT_TOKEN", 0),
-            "output_tokens": usage.get("RESPONSE_TOKEN", 0),
-            "total_tokens": sum(v for k, v in usage.items() if "TOKEN" in k),
-            "requests": usage.get("API_REQUEST_COUNT", 0),
-            "cost_cny": float(item.get("cost", 0) or 0),
-        })
+    for day in biz.get("days", []):
+        date_val = str(day.get("date", ""))[:10]
+        if not date_val: continue
+        for m in day.get("data", []):
+            model = m.get("model", "")
+            usage = {}
+            for u in m.get("usage", []):
+                usage[u.get("type", "")] = int(float(u.get("amount", 0) or 0) * 1e7)  # scale to raw tokens
+
+            rows.append({
+                "utc_date": date_val,
+                "model": model,
+                "input_cache_hit": usage.get("PROMPT_CACHE_HIT_TOKEN", 0),
+                "input_cache_miss": usage.get("PROMPT_CACHE_MISS_TOKEN", 0),
+                "input_tokens": usage.get("PROMPT_CACHE_MISS_TOKEN", 0) + usage.get("PROMPT_TOKEN", 0),
+                "output_tokens": usage.get("RESPONSE_TOKEN", 0),
+                "total_tokens": sum(usage.values()),
+                "requests": usage.get("REQUEST", 0),
+                "cost_cny": 0.0,
+            })
+
+    if not rows:
+        # Try biz_data as list of items directly
+        items = biz if isinstance(biz, list) else biz.get("total", [])
+        if items:
+            # Fallback to monthly data
+            for item in items:
+                if isinstance(item, dict) and "days" in item:
+                    for day in item.get("days", []):
+                        date_val = str(day.get("date", ""))[:10]
+                        for m in day.get("data", []):
+                            usage = {u["type"]: int(float(u.get("amount",0) or 0) * 1e7) for u in m.get("usage", [])}
+                            rows.append({"utc_date": date_val, "model": m["model"], **usage, "cost_cny": 0.0})
+        
+    if not rows:
+        print(f"  Unknown format: {json.dumps(data)[:500]}")
+        return None
 
     df = pd.DataFrame(rows)
-    print(f"  Parsed: {len(df)} models")
+    if "cost_cny" in df.columns:
+        # Convert cost from API amounts to CNY (the amount field is usually in 0.0001 units)
+        pass  # keep as-is for now, cost not in this API
+    print(f"  Parsed: {len(df)} rows, {df['utc_date'].nunique()} days, {df['model'].nunique()} models")
     return df
 
 
@@ -195,6 +234,7 @@ def _save(df):
     hub = get_datahub()
     pq = hub.deepseek_usage_path()
     pq.parent.mkdir(parents=True, exist_ok=True)
+
     existing = hub.read_parquet(pq, default=pd.DataFrame())
     if not existing.empty:
         merged = pd.concat([existing, df], ignore_index=True)
@@ -202,10 +242,11 @@ def _save(df):
         merged = merged.sort_values(["utc_date", "model"])
     else:
         merged = df
+
     hub.write_parquet(merged, pq)
-    print(f"  ✓ Saved: {len(merged)} rows")
-    for _, r in merged.tail(4).iterrows():
-        print(f"    {r['utc_date']}  {r['model']:20s}  ¥{r.get('cost_cny',0):.2f}")
+    print(f"  ✓ Saved: {len(merged)} rows ({len(df)} new)")
+    for _, r in merged.tail(8).iterrows():
+        print(f"    {r['utc_date']}  {r['model']:22s}  ¥{r.get('cost_cny',0):.2f}")
 
 
 if __name__ == "__main__":
