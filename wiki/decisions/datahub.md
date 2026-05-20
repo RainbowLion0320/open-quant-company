@@ -29,6 +29,7 @@ DataHub 负责:
 
 - 统一目录: `store_root`, `cache_root`, `signals`, `features`, `macro`, `paper`, `system_monitor`, token cache。
 - 统一路径: `signal_path(strategy)`, `feature_path(month)`, `macro_path(name)`, `paper_path(name)`。
+- 注册表路径展开: `dimension_root(key)` / `dimension_path(key, **values)` 从 `data_registry.cache` 生成真实路径，避免脚本各自拼深层目录。
 - 原子写入: Parquet/JSON 先写临时文件，再 `os.replace` 覆盖，降低半写入风险。
 - 追加写入: `append_parquet(..., dedupe_subset=...)` 统一处理追加和去重。
 - 最新批次: `latest_batch(path, ts_col="computed_at")` 统一读取策略最新信号。
@@ -51,7 +52,7 @@ DataHub 负责:
 新增数据维度时优先遵循:
 
 1. 在 `config/settings.yaml -> data_registry` 描述维度来源、资产类别、频率、状态和缓存模式。
-2. 在 DataHub 增加明确路径 helper，避免业务脚本自己拼深层目录。
+2. 优先使用 `DataHub.dimension_path()` 生成维度路径；只有高频公共路径才增加明确 helper。
 3. 写入 Parquet/JSON 走 `DataHub.write_parquet/write_json`。
 4. 追加型数据走 `append_parquet`，必须明确去重键或批次时间列。
 5. Web 查询继续走 DuckDB 只读视图，只有确实需要事务、并发写、多用户权限时再引入服务型数据库。

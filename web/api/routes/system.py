@@ -258,6 +258,7 @@ def _repairable_tables() -> set[str]:
             "macro_cpi", "macro_gdp", "macro_lpr", "macro_money_supply",
             "macro_pmi", "macro_ppi", "macro_shibor", "bond_treasury_yields",
             "stock_limit_list", "stock_top_list", "stock_research_report", "stock_dividend",
+            "stock_moneyflow_daily", "stock_moneyflow_tushare_daily", "stock_moneyflow_monthly",
             "fund_daily", "fund_portfolio", "fund_nav", "futures_daily",
         }
 

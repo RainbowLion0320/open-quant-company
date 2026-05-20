@@ -111,10 +111,10 @@ def test_limit_list_fetch_does_not_sleep_before_first_request(tmp_path, monkeypa
     assert sleeps == []
 
 
-def test_deepseek_cdp_parser_uses_target_month():
-    from scripts.ingest_deepseek_cdp import _parse_monthly
+def test_deepseek_cdp_parser_joins_daily_cost_with_monthly_tokens():
+    from scripts.ingest_deepseek_cdp import _parse_daily
 
-    payload = {
+    amount_payload = {
         "data": {
             "biz_data": {
                 "total": [
@@ -123,7 +123,7 @@ def test_deepseek_cdp_parser_uses_target_month():
                         "usage": [
                             {"type": "PROMPT_CACHE_MISS_TOKEN", "amount": "10"},
                             {"type": "RESPONSE_TOKEN", "amount": "5"},
-                            {"type": "API_REQUEST_COUNT", "amount": "2"},
+                            {"type": "REQUEST", "amount": "2"},
                         ],
                         "cost": "0.12",
                     }
@@ -131,9 +131,30 @@ def test_deepseek_cdp_parser_uses_target_month():
             }
         }
     }
+    cost_payload = {
+        "data": {
+            "biz_data": {
+                "days": [
+                    {
+                        "date": "2026-06-02",
+                        "data": [
+                            {
+                                "model": "deepseek-v4-pro",
+                                "usage": [
+                                    {"type": "PROMPT_CACHE_MISS_TOKEN", "amount": "0.08"},
+                                    {"type": "RESPONSE_TOKEN", "amount": "0.04"},
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            }
+        }
+    }
 
-    df = _parse_monthly(payload, year=2026, month=6)
+    df = _parse_daily(cost_payload, amount_payload)
     row = df.iloc[0].to_dict()
-    assert row["utc_date"] == "2026-06-01"
+    assert row["utc_date"] == "2026-06-02"
     assert row["total_tokens"] == 15
     assert row["requests"] == 2
+    assert row["cost_cny"] == 0.12

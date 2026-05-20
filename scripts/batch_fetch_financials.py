@@ -54,12 +54,9 @@ def save_progress(progress: dict):
         json.dump(progress, f, ensure_ascii=False)
 
 
-def cache_path(symbol: str) -> str:
-    """MD5-based cache path (same as fetcher.py)"""
-    import hashlib
-    key = f"financial_{symbol}"
-    h = hashlib.md5(key.encode()).hexdigest()
-    return CACHE_DIR / f"{h}.parquet"
+def cache_path(symbol: str) -> Path:
+    """Canonical financial summary path: data/store/stock/financials/{symbol}.parquet."""
+    return HUB.stock_financial_path(symbol)
 
 
 def fetch_one(symbol: str, name: str) -> bool:

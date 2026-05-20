@@ -13,7 +13,7 @@ tags: [data, dimensions, registry, datahub, storage, parquet]
 ## 架构总览
 
 ```
-config/settings.yaml          ← 32 维度定义 (source/asset/status/freq)
+config/settings.yaml          ← 33 维度定义 (source/asset/status/freq)
         │
         ▼
 data/data_registry.py         ← 单例注册表, 加载 YAML → DataDimension[] 
@@ -37,9 +37,9 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 
 ## 维度总表
 
-共 32 个维度，按状态分类：
+共 33 个维度，按状态分类：
 
-### 已启用 (19)
+### 已启用 (20)
 
 | key | 标签 | 来源 | 频率 | 资产 |
 |-----|------|------|------|------|
@@ -50,6 +50,7 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 | valuation_daily | 每日估值 PE/PB/PS | tushare_free | daily | stock |
 | moneyflow_monthly | 月频资金流向 (全历史) | tushare_free | monthly | stock |
 | moneyflow_daily | 日频资金流向 (近120日) | akshare | daily | stock |
+| moneyflow_tushare_daily | 日频资金流向 (Tushare全市场) | tushare_free | daily | stock |
 | holder_number | 股东户数 | tushare_free | quarterly | stock |
 | holder_trade | 股东增减持 | tushare_free | event | stock |
 | broker_recommend | 券商月度金股 | tushare_free | monthly | stock |
@@ -63,7 +64,7 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 | macro_shibor | Shibor 利率 | akshare | daily | macro |
 | macro_lpr | LPR 贷款基础利率 | tushare_free | monthly | macro |
 
-**来源分布**: akshare 5 | tushare_free 22 | tushare_paid 4 | future 1
+**来源分布**: akshare 5 | tushare_free 23 | tushare_paid 4 | future 1
 
 ### 限流启用 (3)
 
@@ -121,8 +122,9 @@ store/
 │   ├── valuation/{symbol}.parquet        ← PE/PB 估值 (原 cache/)
 │   ├── broker_recommend/                 ← 月度金股 (按月分区)
 │   ├── moneyflow/                        ← 资金流向
-│   │   ├── {date}.parquet               ← 日频
-│   │   └── monthly/{date}.parquet       ← 月频 (全历史)
+│   │   ├── {symbol}.parquet              ← AKShare 个股近120日
+│   │   ├── daily/{date}.parquet          ← Tushare 全市场日频
+│   │   └── monthly/{date}.parquet        ← Tushare 月频 (全历史)
 │   ├── holders/{symbol}.parquet         ← 股东户数
 │   ├── holdertrade/{symbol}.parquet     ← 股东增减持
 │   ├── share_float/all.parquet          ← 限售股解禁
@@ -210,6 +212,9 @@ df = hub.read_parquet(hub.macro_path("cpi"))
 
 # 读特征切片
 df = hub.read_parquet(hub.feature_path("2026-04"))
+
+# 按 data_registry 生成具体维度路径
+path = hub.dimension_path("moneyflow_tushare_daily", YYYYMMDD="20260520")
 
 # 原子写入 (tmp + os.replace)
 hub.write_parquet(df, hub.signal_path("multifactor"))

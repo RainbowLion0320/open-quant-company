@@ -440,6 +440,15 @@ data_registry:
     label: 日频资金流向 (近120日)
     cache: stock/moneyflow/{symbol}.parquet
     description: 同花顺个股资金流向, 近100交易日
+  moneyflow_tushare_daily:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: daily
+    enabled: true
+    label: 日频资金流向 (Tushare全市场)
+    cache: stock/moneyflow/daily/{YYYYMMDD}.parquet
+    description: Tushare moneyflow, 按交易日全市场分区
   holder_number:
     source: tushare_free
     asset: stock

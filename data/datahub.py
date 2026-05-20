@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +36,16 @@ def _safe_leaf(value: str, label: str = "name") -> str:
     if not text or "/" in text or "\\" in text or text in {".", ".."}:
         raise ValueError(f"Invalid {label}: {value!r}")
     return text
+
+
+_PLACEHOLDER_RE = re.compile(r"\{([A-Za-z0-9_]+)\}")
+
+
+def _ensure_relative_store_pattern(pattern: str) -> Path:
+    path = Path(str(pattern).strip())
+    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        raise ValueError(f"Invalid registry cache pattern: {pattern!r}")
+    return path
 
 
 @dataclass(frozen=True)
@@ -76,19 +87,27 @@ class DataHub:
             self.signals_prev_dir(),
             self.features_dir(),
             self.paper_dir(),
-            self.store_dir("stock"),
-            self.store_dir("macro"),
-            self.store_dir("financials"),
+            self.store_path("stock"),
+            self.store_path("macro"),
+            self.store_path("fund"),
+            self.store_path("futures"),
+            self.store_path("bond"),
         ]:
             path.mkdir(parents=True, exist_ok=True)
 
     def resolve_path(self, path: str | os.PathLike, base: Path | None = None) -> Path:
         return _resolve_path(path, base or self.project_root)
 
+    def store_path(self, asset_type: str | None = None) -> Path:
+        """Return a store path without creating directories."""
+        if asset_type is None:
+            return self.store_root
+        return self.store_root / _safe_leaf(asset_type, "asset_type")
+
     def store_dir(self, asset_type: str | None = None) -> Path:
         if asset_type is None:
             return self.store_root
-        path = self.store_root / _safe_leaf(asset_type, "asset_type")
+        path = self.store_path(asset_type)
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -129,26 +148,26 @@ class DataHub:
         return self.paper_dir() / f"{_safe_leaf(name, 'paper dataset')}.parquet"
 
     def macro_path(self, name: str) -> Path:
-        return self.store_dir("macro") / f"{_safe_leaf(name, 'macro dataset')}.parquet"
+        return self.store_path("macro") / f"{_safe_leaf(name, 'macro dataset')}.parquet"
 
     def asset_daily_path(self, asset_type: str, symbol: str) -> Path:
-        return self.store_dir(asset_type) / "daily" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+        return self.store_path(asset_type) / "daily" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
 
     def stock_daily_path(self, symbol: str) -> Path:
         """OHLCV 日线 per-symbol parquet."""
-        return self.store_dir("stock") / "daily" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+        return self.store_path("stock") / "daily" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
 
     def stock_financial_path(self, symbol: str) -> Path:
         """财务摘要 per-symbol parquet."""
-        return self.store_dir("stock") / "financials" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+        return self.store_path("stock") / "financials" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
 
     def stock_fina_indicator_path(self, symbol: str) -> Path:
         """Tushare 财务指标 per-symbol parquet."""
-        return self.store_dir("stock") / "fina_indicator" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+        return self.store_path("stock") / "fina_indicator" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
 
     def stock_valuation_path(self, symbol: str) -> Path:
         """每日估值 PE/PB/PS per-symbol parquet."""
-        return self.store_dir("stock") / "valuation" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+        return self.store_path("stock") / "valuation" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
 
     def model_path(self, name: str) -> Path:
         return self.project_root / "data" / "models" / f"{_safe_leaf(name, 'model dataset')}.parquet"
@@ -166,7 +185,47 @@ class DataHub:
         return self.cache_root / "hindsight_tokens.json"
 
     def deepseek_usage_path(self) -> Path:
-        return self.store_dir("deepseek") / "daily_usage.parquet"
+        return self.store_path("deepseek") / "daily_usage.parquet"
+
+    # ── Registry-backed dimension paths ─────────────────────
+
+    def dimension_root(self, key: str) -> Path:
+        """Return the stable root directory/file prefix for a data_registry dimension."""
+        from data.data_registry import get_registry
+
+        dim = get_registry().get(key)
+        if dim is None or not dim.cache:
+            raise KeyError(f"Unknown or uncached data dimension: {key}")
+        return self._registry_cache_root(dim.cache)
+
+    def dimension_path(self, key: str, **values: Any) -> Path:
+        """
+        Expand a data_registry cache pattern into a concrete path.
+
+        Example:
+          dimension_path("ohlcv_daily", symbol="000001")
+          -> data/store/stock/daily/000001.parquet
+        """
+        from data.data_registry import get_registry
+
+        dim = get_registry().get(key)
+        if dim is None or not dim.cache:
+            raise KeyError(f"Unknown or uncached data dimension: {key}")
+        pattern = str(_ensure_relative_store_pattern(dim.cache))
+        missing: list[str] = []
+
+        def repl(match: re.Match[str]) -> str:
+            name = match.group(1)
+            if name not in values:
+                missing.append(name)
+                return match.group(0)
+            return _safe_leaf(str(values[name]), name)
+
+        expanded = _PLACEHOLDER_RE.sub(repl, pattern)
+        if missing:
+            raise KeyError(f"Missing cache placeholder(s) for {key}: {', '.join(sorted(set(missing)))}")
+        rel = _ensure_relative_store_pattern(expanded)
+        return self.store_root.joinpath(*rel.parts)
 
     # ── Parquet helpers ──────────────────────────────────────
 
@@ -275,7 +334,7 @@ class DataHub:
             "scan_meta": DatasetSpec("scan_meta", self.scan_meta_path(), "parquet", "strategies", "Strategy scan metadata"),
             "features": DatasetSpec("features", self.features_dir(), "partitioned_parquet", "research", "Monthly PIT feature slices"),
             "paper": DatasetSpec("paper", self.paper_dir(), "directory", "broker", "Paper-trading state, NAV and trades"),
-            "macro": DatasetSpec("macro", self.store_dir("macro"), "directory", "macro", "Macro and rates datasets"),
+            "macro": DatasetSpec("macro", self.store_path("macro"), "directory", "macro", "Macro and rates datasets"),
             "system_monitor": DatasetSpec("system_monitor", self.system_monitor_path(), "sqlite", "system", "System metrics time-series DB"),
             "token_usage": DatasetSpec("token_usage", self.token_usage_path(), "json", "system", "LLM token usage cache"),
             "deepseek_usage": DatasetSpec("deepseek_usage", self.deepseek_usage_path(), "parquet", "system", "DeepSeek daily token/cost summary"),
@@ -283,7 +342,7 @@ class DataHub:
         try:
             from data.data_registry import get_registry
 
-            for dim in get_registry().get_enabled():
+            for dim in get_registry().all.values():
                 if not dim.cache:
                     continue
                 root = self._registry_cache_root(dim.cache)
@@ -299,8 +358,9 @@ class DataHub:
         return catalog
 
     def _registry_cache_root(self, pattern: str) -> Path:
+        rel = _ensure_relative_store_pattern(pattern)
         parts = []
-        for part in Path(pattern).parts:
+        for part in rel.parts:
             if "{" in part and "}" in part:
                 break
             parts.append(part)

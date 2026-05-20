@@ -10,11 +10,16 @@ Like StrategyRegistry: single source of truth for what data exists.
   dims = reg.get_enabled()  # 所有已启用的维度
   reg.get("holder_number")  # 单个维度详情
 """
-import os
 import yaml
 from pathlib import Path
 from typing import Dict, List, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+
+
+ALLOWED_SOURCES = {"akshare", "tushare_free", "tushare_paid", "future", "computed", "system"}
+ALLOWED_ASSETS = {"stock", "macro", "fund", "futures", "crypto", "bond", "system"}
+ALLOWED_STATUSES = {"available", "rate_limited", "paid", "planned"}
+ALLOWED_FREQS = {"daily", "monthly", "quarterly", "event", "minute", "intraday", "system"}
 
 
 @dataclass
@@ -119,6 +124,26 @@ class DataRegistry:
                     lines.append(f"    ... and {len(dims)-3} more")
         return "\n".join(lines)
 
+    def validate(self) -> List[str]:
+        """Return registry contract issues. Empty list means the config is valid."""
+        issues: List[str] = []
+        for key, dim in self._dimensions.items():
+            if dim.source and dim.source not in ALLOWED_SOURCES:
+                issues.append(f"{key}: invalid source {dim.source!r}")
+            if dim.asset and dim.asset not in ALLOWED_ASSETS:
+                issues.append(f"{key}: invalid asset {dim.asset!r}")
+            if dim.status not in ALLOWED_STATUSES:
+                issues.append(f"{key}: invalid status {dim.status!r}")
+            if dim.freq not in ALLOWED_FREQS:
+                issues.append(f"{key}: invalid freq {dim.freq!r}")
+            if dim.cache:
+                path = Path(dim.cache)
+                if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+                    issues.append(f"{key}: cache must be a relative path inside data/store")
+            elif dim.enabled and dim.status != "planned":
+                issues.append(f"{key}: enabled non-planned dimension has no cache path")
+        return issues
+
     def __repr__(self) -> str:
         return f"<DataRegistry: {len(self._dimensions)} dimensions>"
 
@@ -132,6 +157,11 @@ def get_registry() -> DataRegistry:
     if _registry is None:
         _registry = DataRegistry()
     return _registry
+
+
+def reset_registry() -> None:
+    global _registry
+    _registry = None
 
 
 def is_available(key: str) -> bool:

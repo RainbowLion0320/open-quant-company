@@ -109,13 +109,22 @@ def repair_moneyflow_daily(limit: int = 0) -> None:
 
 
 def repair_moneyflow_monthly(days: int = 365) -> None:
-    from scripts.fetch_moneyflow_full import fetch_daily_recent, fetch_monthly_only
+    from scripts.fetch_moneyflow_full import fetch_monthly_only
 
-    if days > 0:
-        fetch_daily_recent(days)
     start = (datetime.now() - timedelta(days=max(days, 365) * 2)).strftime("%Y%m%d")
     end = datetime.now().strftime("%Y%m%d")
     fetch_monthly_only(start=start, end=end)
+
+
+def repair_moneyflow_tushare_daily(days: int = 60) -> None:
+    from scripts.fetch_moneyflow_full import fetch_daily_recent
+
+    fetch_daily_recent(max(1, days))
+    _require_rows_or_cache(
+        "stock_moneyflow_tushare_daily",
+        0,
+        HUB.store_dir("stock") / "moneyflow" / "daily",
+    )
 
 
 def repair_limit_list() -> None:
@@ -234,6 +243,7 @@ REPAIR_MAP = {
     "stock_holders":              lambda limit=0, days=365: repair_holders(limit),
     "stock_holdertrade":          lambda limit=0, days=365: repair_holdertrade(limit),
     "stock_moneyflow_daily":      lambda limit=0, days=365: repair_moneyflow_daily(limit),
+    "stock_moneyflow_tushare_daily": lambda limit=0, days=365: repair_moneyflow_tushare_daily(days),
     "stock_moneyflow_monthly":    lambda limit=0, days=365: repair_moneyflow_monthly(days),
     "stock_broker_recommend":     lambda limit=0, days=365: repair_broker_recommend(months=max(1, min(24, days // 30))),
     "stock_limit_list":           lambda limit=0, days=365: repair_limit_list(),

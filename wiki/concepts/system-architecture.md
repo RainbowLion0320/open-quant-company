@@ -173,7 +173,7 @@ strategies:
 | 期货适配器 | `data/assets/futures.py` | FuturesAsset (主力合约) |
 | 数据获取 | `data/fetcher.py` | AKShare 3源 fallback, API缓存→data/cache/api/ |
 | 财务数据 | `data/financials.py` | 同花顺 → ROE/毛利/D-E, 存储→data/store/stock/financials/ |
-| 数据中台 | `data/datahub.py` | ★ 统一路径: stock_data_dir()/store_dir()/signal_path() |
+| 数据中台 | `data/datahub.py` | ★ 统一路径: dimension_path()/stock_data_dir()/signal_path() |
 | 股票池 | `data/symbols.py` | A股 universe 与行业映射，当前数量以源码为准 |
 | 资金流获取 | `data/fetchers/moneyflow.py` | 资金流向 |
 | 筹码获取 | `data/fetchers/holders.py` | 股东户数+增减持 |

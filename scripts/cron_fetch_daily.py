@@ -36,6 +36,8 @@ def _throttle(secs=0.5):
     time.sleep(secs)
 
 def _tushare_api():
+    if not TOKEN:
+        raise RuntimeError("TUSHARE_TOKEN is not configured")
     import tushare as ts
     return ts.pro_api(TOKEN)
 
@@ -48,11 +50,14 @@ def _today_str():
 
 def fetch_ohlcv(pool_size=0):
     """Fetch latest daily OHLCV for pool stocks."""
-    from data.fetchers.stock_daily import StockDailyFetcher
-    f = StockDailyFetcher()
-    print(f"  [ohlcv] pool={pool_size or 'all'}")
-    f.fetch_all(limit=pool_size)
-    return 1
+    from data.fetchers import stock_daily
+
+    symbols = _load_pool(pool_size)
+    print(f"  [ohlcv] pool={len(symbols)}")
+    results = stock_daily.fetch_all(symbols)
+    fetched = sum(1 for df in results.values() if df is not None and len(df) > 0)
+    print(f"  [ohlcv] {fetched}/{len(symbols)} stocks available")
+    return fetched
 
 # ═══════════════════════════════════════
 # 2. Shibor (AKShare)
@@ -153,7 +158,7 @@ def fetch_adj_factor(pool_size=0):
 def fetch_moneyflow_daily():
     """Fetch latest daily moneyflow for all stocks (one API call per day)."""
     api = _tushare_api()
-    store = HUB.store_dir("stock") / "moneyflow" / "daily"
+    store = HUB.dimension_root("moneyflow_tushare_daily")
     store.mkdir(parents=True, exist_ok=True)
 
     # Get last 5 trade days, fetch missing

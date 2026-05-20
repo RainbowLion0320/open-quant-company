@@ -35,7 +35,7 @@ tags: [index]
 - [[web-architecture]] — Vue 3 + FastAPI，Quantum Terminal v4.0 设计系统
 
 ## Reference
-- [[data-dimensions]] — ★ 数据维度全览：32 维度注册表, 文件树, 用法速查
+- [[data-dimensions]] — ★ 数据维度全览：33 维度注册表, 文件树, 用法速查
 - [[data-schema]] — ★ 数据库完整结构：18 类 Parquet 表的列定义、类型、说明
 
 ## Comparisons

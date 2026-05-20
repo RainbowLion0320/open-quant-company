@@ -313,7 +313,7 @@ tags: [data, parquet, schema, database]
 | 小单净流入-净额 | float64 | |
 | 小单净流入-净占比 | float64 | |
 
-> 月频版: `data/store/stock/moneyflow/monthly/{date}.parquet` (全历史，来源 Tushare)
+> Tushare 全市场日频版: `data/store/stock/moneyflow/daily/{date}.parquet`; 月频版: `data/store/stock/moneyflow/monthly/{date}.parquet`。
 
 ---
 

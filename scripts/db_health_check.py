@@ -179,7 +179,7 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
     """Scan one parquet file."""
     size_mb = round(path.stat().st_size / 1024 / 1024, 3)
     try:
-        df = pd.read_parquet(path)
+        df = HUB.read_parquet(path)
         missing = _missing_pct(df)
         outliers = _outlier_count(df)
         freshness = _freshness_days(df)
@@ -270,7 +270,7 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
         sample = sorted(sample)
     for f in sample:
         try:
-            df = pd.read_parquet(f)
+            df = HUB.read_parquet(f)
             total_rows += len(df)
             cols = max(cols, len(df.columns))
             m = _missing_pct(df)
@@ -350,6 +350,7 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         "stock_holders": ("Tushare", "股东户数", True),
         "stock_holdertrade": ("Tushare", "股东增减持", True),
         "stock_moneyflow_daily": ("AKShare (近120日)", "日频资金流向", True),
+        "stock_moneyflow_tushare_daily": ("Tushare", "日频资金流向 (全市场)", True),
         "stock_moneyflow_monthly": ("Tushare (全历史)", "月频资金流向", True),
         "stock_broker_recommend": ("Tushare", "券商月度金股", True),
         "stock_limit_list": ("Tushare", "涨跌停统计", True),
@@ -428,7 +429,8 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         ("stock_daily", "daily/*.parquet", 30),
         ("stock_holders", "holders/*.parquet", 30),
         ("stock_holdertrade", "holdertrade/*.parquet", 30),
-        ("stock_moneyflow_daily", "moneyflow/??????.parquet", 30),
+        ("stock_moneyflow_daily", "moneyflow/*.parquet", 30),
+        ("stock_moneyflow_tushare_daily", "moneyflow/daily/*.parquet", 30),
         ("stock_moneyflow_monthly", "moneyflow/monthly/*.parquet", 12),
         ("stock_broker_recommend", "broker_recommend/*.parquet", 12),
         ("stock_limit_list", "limit_list/*.parquet", 12),
