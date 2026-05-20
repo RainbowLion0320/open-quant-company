@@ -55,46 +55,72 @@ export const useStrategyStore = defineStore("strategy", () => {
   const jobId = ref("");
   const progress = ref(0);
   const progressMsg = ref("");
+  const error = ref("");
 
   async function fetchList() {
-    const data = await (await window.fetch("/api/strategies")).json();
-    strategies.value = data.strategies || [];
+    loading.value = true;
+    error.value = "";
+    try {
+      const res = await window.fetch("/api/strategies");
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      strategies.value = data.strategies || [];
+    } catch (e: any) {
+      error.value = e?.message || "策略列表加载失败";
+    } finally {
+      loading.value = false;
+    }
   }
 
   async function fetchSignals(name: string) {
-    const data = await (await window.fetch(`/api/strategies/${name}`)).json();
-    signals.value[name] = data.signals || data || [];
+    error.value = "";
+    try {
+      const res = await window.fetch(`/api/strategies/${name}`);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      signals.value[name] = data.signals || data || [];
+    } catch (e: any) {
+      error.value = e?.message || "策略信号加载失败";
+      signals.value[name] = [];
+    }
   }
 
   async function run(strategy: string, limit = 0, params?: any) {
     running.value = true;
     progress.value = 0;
-    const res = await fetch("/api/strategies/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ strategy, limit, params }),
-    });
-    const data = await res.json();
-    jobId.value = data.job_id;
+    progressMsg.value = "";
+    try {
+      const res = await fetch("/api/strategies/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ strategy, limit, params }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      jobId.value = data.job_id;
 
-    // WebSocket 监听进度
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/strategies/ws/${data.job_id}`);
-    ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
-      progress.value = msg.progress ?? progress.value;
-      progressMsg.value = msg.message || "";
-      if (msg.status === "done" || msg.status === "error" || progress.value >= 100) {
-        ws.close();
+      // WebSocket 监听进度
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}/api/strategies/ws/${data.job_id}`);
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        progress.value = msg.progress ?? progress.value;
+        progressMsg.value = msg.message || "";
+        if (msg.status === "done" || msg.status === "error" || progress.value >= 100) {
+          ws.close();
+          running.value = false;
+          fetchList();
+        }
+      };
+      ws.onerror = () => {
         running.value = false;
-        fetchList();
-      }
-    };
-    ws.onerror = () => {
+        progressMsg.value = "进度连接失败";
+      };
+    } catch (e: any) {
       running.value = false;
-      progressMsg.value = "进度连接失败";
-    };
+      progressMsg.value = e?.message || "策略运行启动失败";
+    }
   }
 
-  return { strategies, signals, loading, running, jobId, progress, progressMsg, fetchList, fetchSignals, run };
+  return { strategies, signals, loading, running, jobId, progress, progressMsg, error, fetchList, fetchSignals, run };
 });

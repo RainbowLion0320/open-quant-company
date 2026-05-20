@@ -10,6 +10,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 CDP = "http://localhost:9222"
 
+def _target_month(now: datetime | None = None) -> tuple[int, int]:
+    current = now or datetime.utcnow()
+    return current.year, current.month
+
+
 def _get_json(path):
     import urllib.request
     with urllib.request.urlopen(f"{CDP}{path}") as r:
@@ -44,6 +49,7 @@ _events = []
 _evt_lock = threading.Lock()
 
 def ingest():
+    year, month = _target_month()
     print(f"[{datetime.now():%H:%M:%S}] CDP → DeepSeek usage")
     pages = _get_json("/json")
     page = next((p for p in pages if "deepseek.com" in p.get("url", "")), None)
@@ -81,8 +87,9 @@ def ingest():
         time.sleep(2)
 
         # Click current month to trigger API
+        month_label = f"{year}.*{month}月?$"
         _cdp(ws, "Runtime.evaluate", {
-            "expression": "(()=>{ for(let el of document.querySelectorAll('div,span,button')){ if(el.textContent.trim().match(/2026.*5月?$/)){ el.click(); break; } } })()",
+            "expression": f"(()=>{{ const re = /{month_label}/; for(let el of document.querySelectorAll('div,span,button')){{ if(el.textContent.trim().match(re)){{ el.click(); break; }} }} }})()",
             "returnByValue": True,
         })
         time.sleep(4)
@@ -101,7 +108,7 @@ def ingest():
                 if "/api/v0/usage/" in url and "amount" in url:
                     try:
                         body = _cdp(ws, "Network.getResponseBody", {"requestId": req_id})
-                        api_bodies.append({"url": url, "body": body.get("body", "")})
+                        api_bodies.append({"url": url, "body": body.get("body", ""), "year": year, "month": month})
                         print(f"  ✓ {url.split('?')[-1]}")
                     except Exception as e:
                         print(f"  ✗ body read failed: {e}")
@@ -112,17 +119,17 @@ def ingest():
                 "expression": """
                 (async () => {
                     try {
-                        const r = await (await fetch('/api/v0/usage/amount?month=5&year=2026', {credentials: 'include'})).text();
+                        const r = await (await fetch('/api/v0/usage/amount?month=%d&year=%d', {credentials: 'include'})).text();
                         return r.substring(0, 5000);
                     } catch(e) { return 'ERR:'+e.message; }
                 })()
-                """,
+                """ % (month, year),
                 "returnByValue": True,
                 "awaitPromise": True,
             })
             body = r.get("result", {}).get("value", "")
             if body and not body.startswith("ERR:"):
-                api_bodies.append({"url": "fetch(month=5)", "body": body})
+                api_bodies.append({"url": f"fetch(month={month},year={year})", "body": body, "year": year, "month": month})
 
         if not api_bodies:
             print("✗ No usage API data captured"); sys.exit(1)
@@ -132,7 +139,7 @@ def ingest():
         for r in api_bodies:
             try:
                 data = json.loads(r["body"])
-                df = _parse_monthly(data)
+                df = _parse_monthly(data, year=int(r.get("year") or year), month=int(r.get("month") or month))
                 if df is not None: dfs.append(df)
             except Exception as e:
                 print(f"  Parse error: {e}")
@@ -148,8 +155,11 @@ def ingest():
         ws.close()
 
 
-def _parse_monthly(data):
+def _parse_monthly(data, year: int | None = None, month: int | None = None):
     """Parse monthly usage API response into DataFrame."""
+    default_year, default_month = _target_month()
+    year = year or default_year
+    month = month or default_month
     inner = data.get("data", data)
     biz = inner.get("biz_data", inner)
     total = biz.get("total", [])
@@ -161,10 +171,10 @@ def _parse_monthly(data):
     for item in total:
         model = item.get("model", "")
         usage = {u["type"]: int(float(u.get("amount", 0) or 0)) for u in item.get("usage", [])}
-        # Extract month from API URL or item metadata
-        month_str = str(item.get("month", "")).zfill(2) or "05"
+        item_year = int(item.get("year") or year)
+        item_month = int(item.get("month") or month)
         rows.append({
-            "utc_date": f"2026-{month_str}-15",
+            "utc_date": f"{item_year:04d}-{item_month:02d}-01",
             "model": model,
             "input_cache_hit": usage.get("PROMPT_CACHE_HIT_TOKEN", 0),
             "input_cache_miss": usage.get("PROMPT_CACHE_MISS_TOKEN", 0),

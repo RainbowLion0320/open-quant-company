@@ -141,10 +141,10 @@ def _multi_asset_cards(bench: pd.DataFrame) -> list[dict]:
 
 def _macro_cards() -> list[dict]:
     return [
-        _macro_card("gdp", "GDP YoY", _load_macro("gdp"), ["今值", "GDP_同比"]),
-        _macro_card("pmi", "制造业 PMI", _load_macro("pmi"), ["今值", "pmi_mfg"]),
-        _macro_card("cpi", "CPI YoY", _load_macro("cpi"), ["今值", "CPI_全国_同比"]),
-        _macro_card("shibor", "SHIBOR 7D", _load_macro("shibor"), ["1W-定价", "1W"]),
+        _macro_card("gdp", "GDP YoY", _load_macro("gdp"), ["gdp_yoy", "GDP_同比", "今值"]),
+        _macro_card("pmi", "制造业 PMI", _load_macro("pmi"), ["pmi_mfg", "PMI010000", "今值"]),
+        _macro_card("cpi", "CPI YoY", _load_macro("cpi"), ["nt_yoy", "cpi_yoy", "CPI_全国_同比", "今值"]),
+        _macro_card("shibor", "SHIBOR 7D", _load_macro("shibor"), ["1W", "1W-定价"]),
     ]
 
 

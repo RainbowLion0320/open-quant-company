@@ -2,7 +2,7 @@
 Cron: 批量拉取 Tushare Free 扩展数据
 
 拉取8个新启用的数据维度到本地 parquet:
-  - limit_list (涨跌停, 1次/分钟)
+  - limit_list (涨跌停, 1次/小时)
   - top_list   (龙虎榜)
   - research_report (券商研报)
   - dividend   (分红送股)
@@ -15,7 +15,7 @@ Cron: 批量拉取 Tushare Free 扩展数据
   python scripts/cron_fetch_extra.py                # 增量拉取
   python scripts/cron_fetch_extra.py --full-history # 全量拉取
 """
-import sys, time, argparse
+import sys, time, argparse, calendar
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -52,9 +52,9 @@ def _throttle(secs=0.5):
     time.sleep(secs)
 
 # ═══════════════════════════════════════
-# 1. limit_list — 涨跌停 (1次/分钟, 只拉最近几天)
+# 1. limit_list — 涨跌停 (1次/小时, 增量每次最多请求1天)
 # ═══════════════════════════════════════
-def fetch_limit_list(full_history=False):
+def fetch_limit_list(full_history=False, max_requests: int | None = None):
     """拉取涨跌停数据。full_history 时拉全部交易日。"""
     api_ = api()
     # Get trade calendar
@@ -64,14 +64,20 @@ def fetch_limit_list(full_history=False):
 
     if not full_history:
         trade_days = trade_days[:2]  # 1/hr limit — cron accumulates daily
+        max_requests = 1 if max_requests is None else max_requests
 
     fetched = 0
+    attempted = 0
     for d in trade_days:
+        if max_requests is not None and attempted >= max_requests:
+            break
         pq = LIMIT_STORE / f"{d}.parquet"
         if pq.exists():
             continue
         try:
-            _throttle(3650)  # 1次/小时 限流, 留余量
+            if attempted:
+                _throttle(3650)  # 1次/小时 限流, 留余量
+            attempted += 1
             df = api_.limit_list_d(trade_date=d, limit_type="U")
             if df is not None and len(df) > 0:
                 HUB.write_parquet(df, pq)
@@ -136,7 +142,9 @@ def fetch_research_report(full_history=False):
             continue
         try:
             _throttle(0.5)
-            df = api_.research_report(start_date=f"{mon}01", end_date=f"{mon}31")
+            year, month = int(mon[:4]), int(mon[4:6])
+            last_day = calendar.monthrange(year, month)[1]
+            df = api_.research_report(start_date=f"{mon}01", end_date=f"{mon}{last_day:02d}")
             if df is not None and len(df) > 0:
                 HUB.write_parquet(df, pq)
                 fetched += 1
@@ -158,7 +166,7 @@ def fetch_dividend(full_history=False):
         return 0
     try:
         dfs = []
-        for year in range(2010, 2027):
+        for year in range(2010, datetime.now().year + 1):
             try:
                 _throttle(0.5)
                 df = api_.dividend(start_date=f"{year}0101", end_date=f"{year}1231")
@@ -209,20 +217,38 @@ def fetch_fund_daily(full_history=False):
 # ═══════════════════════════════════════
 def fetch_fund_portfolio(full_history=False):
     api_ = api()
-    pq = FUND_P_STORE / "20251231.parquet"
-    if pq.exists() and not full_history:
+    today = datetime.now()
+    quarter_ends = [(3, 31), (6, 30), (9, 30), (12, 31)]
+    periods = []
+    for year in range(2020 if full_history else today.year - 1, today.year + 1):
+        for month, day in quarter_ends:
+            dt = datetime(year, month, day)
+            if dt.date() <= today.date():
+                periods.append(dt.strftime("%Y%m%d"))
+    periods = sorted(periods, reverse=True)
+    if not full_history:
+        periods = periods[:4]
+
+    fetched = 0
+    missing = [p for p in periods if not (FUND_P_STORE / f"{p}.parquet").exists()]
+    if not missing and not full_history:
         print(f"  [fund_portfolio] already cached")
         return 0
     try:
-        _throttle(0.5)
-        df = api_.fund_portfolio(period="20251231")  # Latest annual
-        if df is not None and len(df) > 0:
-            HUB.write_parquet(df, pq)
-            print(f"  [fund_portfolio] {len(df)} records")
-            return 1
+        for period in periods:
+            pq = FUND_P_STORE / f"{period}.parquet"
+            if pq.exists() and not full_history:
+                continue
+            _throttle(0.5)
+            df = api_.fund_portfolio(period=period)
+            if df is not None and len(df) > 0:
+                HUB.write_parquet(df, pq)
+                fetched += 1
+                print(f"  [fund_portfolio] {period}: {len(df)} records")
     except Exception as e:
         print(f"  [fund_portfolio] error: {e}")
-    return 0
+    print(f"  [fund_portfolio] done: {fetched} periods")
+    return fetched
 
 
 # ═══════════════════════════════════════

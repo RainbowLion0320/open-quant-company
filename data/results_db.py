@@ -11,6 +11,7 @@
 """
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict
@@ -158,6 +159,8 @@ def get_buffett_meta() -> dict:
 
 def load_strategy_signals(strategy: str, sort: str = "score", order: str = "desc", limit: int = 0) -> List[dict]:
     """加载某策略的全部信号"""
+    if not re.fullmatch(r"[A-Za-z0-9_]+", str(strategy)):
+        return []
     db = get_db(read_only=True)
     view = f"{strategy}_signals"
     valid_sorts = {"score", "symbol", "name", "computed_at"}

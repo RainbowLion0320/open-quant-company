@@ -81,7 +81,25 @@ def _json_value(value):
         pass
     if isinstance(value, np.generic):
         return value.item()
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
     return value
+
+
+def _safe_int(value, default: int = 0) -> int:
+    value = _json_value(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value, default: float = 0.0) -> float:
+    value = _json_value(value)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
 @router.get("/monitor")
@@ -143,18 +161,36 @@ async def system_history(hours: int = Query(default=24, ge=1, le=720)):
 @router.get("/deepseek-usage")
 async def deepseek_usage():
     """DeepSeek daily token/cost summary from Parquet."""
-    import pandas as pd
     pq = HUB.deepseek_usage_path()
     if not pq.exists():
         return {"data": [], "status": "no_data"}
 
-    df = pd.read_parquet(pq)
-    df = df.sort_values("utc_date").tail(28)
+    try:
+        df = HUB.read_parquet(pq, default=pd.DataFrame())
+    except Exception as exc:
+        return {"data": [], "status": "error", "message": f"DeepSeek usage parquet read failed: {str(exc)[:120]}"}
+    if df is None or df.empty or not {"utc_date", "model"}.issubset(df.columns):
+        return {"data": [], "status": "no_data"}
+
+    numeric_cols = [
+        "input_cache_hit", "input_cache_miss", "input_tokens", "output_tokens",
+        "total_tokens", "requests", "cost_cny",
+    ]
+    for col in numeric_cols:
+        if col not in df.columns:
+            df[col] = 0
+        else:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    df["utc_date"] = df["utc_date"].astype(str).str.slice(0, 10)
+    df["model"] = df["model"].astype(str)
+    df = df.sort_values(["utc_date", "model"]).tail(60)
+    records = [{k: _json_value(v) for k, v in row.items()} for row in df.to_dict(orient="records")]
     return {
-        "data": df.to_dict(orient="records"),
+        "data": records,
         "models": df["model"].unique().tolist(),
         "dates": sorted(df["utc_date"].unique().tolist()),
         "total_cost": float(df["cost_cny"].sum()),
+        "status": "ok",
     }
 
 
@@ -166,7 +202,13 @@ async def db_health():
     if not pq.exists():
         return {"data": [], "summary": None, "status": "no_data", "message": "尚未运行健康检查，请等待周六自动扫描或手动触发"}
 
-    df = pd.read_parquet(pq)
+    try:
+        df = HUB.read_parquet(pq, default=pd.DataFrame())
+    except Exception as exc:
+        return {"data": [], "summary": None, "status": "error", "message": f"健康检查结果读取失败: {str(exc)[:120]}"}
+    if df is None or df.empty or "table" not in df.columns:
+        return {"data": [], "summary": None, "status": "no_data", "message": "健康检查结果为空或结构不完整"}
+
     summary_rows = df[df["table"] == "__SUMMARY__"]
     data_rows = df[df["table"] != "__SUMMARY__"]
 
@@ -174,10 +216,10 @@ async def db_health():
     if len(summary_rows) > 0:
         s = summary_rows.iloc[0].to_dict()
         summary = {
-            "tables": int(s.get("columns", 0)),
-            "total_size_mb": float(s.get("size_mb", 0)),
-            "avg_missing_pct": float(s.get("missing_pct", 0)),
-            "total_outliers": int(s.get("outlier_count", 0)),
+            "tables": _safe_int(s.get("columns", 0)),
+            "total_size_mb": _safe_float(s.get("size_mb", 0)),
+            "avg_missing_pct": _safe_float(s.get("missing_pct", 0)),
+            "total_outliers": _safe_int(s.get("outlier_count", 0)),
             "checked_at": str(s.get("checked_at", "")),
         }
 
@@ -361,8 +403,11 @@ async def cron_jobs():
     if not cron_path.exists():
         return {"jobs": [], "status": "no_data"}
 
-    with open(cron_path) as f:
-        data = _json.load(f)
+    try:
+        with open(cron_path) as f:
+            data = _json.load(f)
+    except Exception as exc:
+        return {"jobs": [], "status": "error", "message": f"无法读取 cron jobs: {str(exc)[:120]}"}
 
     compact = []
     for job in data.get("jobs", []):
@@ -383,7 +428,7 @@ async def cron_jobs():
     return {
         "jobs": compact,
         "summary": f"{len(compact)} jobs, {ok} OK, {err} err" + (f", {other} other" if other else ""),
-        "checked_at": Path(cron_path).stat().st_mtime,
+        "checked_at": datetime.fromtimestamp(Path(cron_path).stat().st_mtime).isoformat(),
     }
 
 
@@ -476,7 +521,7 @@ async def service_status():
         "name": "DeepSeek Cookie",
         "status": "ok" if cookie_ok else "warn",
         "detail": cookie_detail,
-        "cookie_remaining_days": round(cookie_remaining, 1) if cookie_remaining else None,
+        "cookie_remaining_days": round(cookie_remaining, 1) if cookie_remaining is not None else None,
     })
 
     ok = sum(1 for i in items if i["status"] == "ok")

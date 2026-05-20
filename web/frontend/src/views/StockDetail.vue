@@ -148,11 +148,11 @@ function renderKline() {
     ],
     series: [
       {
-        type: "candlestick", data: ohlc, sampling: false,
+        type: "candlestick", data: ohlc,
         itemStyle: { color: "#22c55e", color0: "#ef4444", borderColor: "#22c55e", borderColor0: "#ef4444" },
       },
       {
-        type: "bar", data: volumes, sampling: false, xAxisIndex: 1, yAxisIndex: 1,
+        type: "bar", data: volumes, xAxisIndex: 1, yAxisIndex: 1,
         itemStyle: { color: "rgba(0,212,255,0.15)" },
       },
     ],

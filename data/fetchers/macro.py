@@ -11,6 +11,7 @@
 
 import time
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Callable
 
@@ -64,6 +65,22 @@ MACRO_INDICATORS = {
         "freq": "monthly",
     },
 }
+
+
+def _quarter_to_date(value) -> pd.Timestamp:
+    """Convert Tushare quarter labels such as 2025Q4/20254 to quarter-end date."""
+    text = str(value).strip().upper()
+    match = re.match(r"^(\d{4})Q([1-4])$", text)
+    if not match:
+        match = re.match(r"^(\d{4})([1-4])$", text)
+    if match:
+        year = int(match.group(1))
+        month = int(match.group(2)) * 3
+        return pd.Timestamp(year=year, month=month, day=1) + pd.offsets.MonthEnd(0)
+    parsed = pd.to_datetime(text, errors="coerce")
+    if pd.isna(parsed):
+        return pd.NaT
+    return parsed
 
 
 class MacroFetcher:
@@ -217,18 +234,21 @@ class MacroFetcher:
 
         if name == "gdp":
             if source == "tushare":
+                quarter_col = "QUARTER" if "QUARTER" in raw.columns else "quarter"
                 raw = raw.rename(columns={
-                    "quarter": "quarter",
+                    quarter_col: "quarter",
                     "gdp": "gdp",
                     "gdp_yoy": "gdp_yoy",
                     "pi": "pi", "pi_yoy": "pi_yoy",
                     "si": "si", "si_yoy": "si_yoy",
                     "ti": "ti", "ti_yoy": "ti_yoy",
                 })
+                raw = raw.rename(columns={c: c.lower() for c in raw.columns if c != "quarter"})
+                raw["date"] = raw["quarter"].map(_quarter_to_date)
                 for c in raw.columns:
-                    if c != "quarter":
+                    if c not in ("quarter", "date"):
                         raw[c] = pd.to_numeric(raw[c], errors="coerce")
-                return raw.sort_values("quarter").reset_index(drop=True)
+                return raw.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
             # AKShare fallback
             raw = raw.rename(columns={c: c.replace("日期", "date") for c in raw.columns})
             raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
@@ -247,9 +267,11 @@ class MacroFetcher:
         if name == "lpr":
             if source == "tushare":
                 # Tushare shibor_lpr: date (YYYYMMDD), 1y, 5y
-                date_col = "DATE" if "DATE" in raw.columns else "date"
+                date_col = next((c for c in raw.columns if str(c).lower() == "date"), "date")
+                one_y_col = next((c for c in raw.columns if str(c).lower() == "1y"), "1y")
+                five_y_col = next((c for c in raw.columns if str(c).lower() == "5y"), "5y")
                 raw = raw.rename(columns={
-                    date_col: "date", "1y": "LPR_1Y", "5y": "LPR_5Y",
+                    date_col: "date", one_y_col: "LPR_1Y", five_y_col: "LPR_5Y",
                 })
                 raw["date"] = pd.to_datetime(raw["date"].astype(str), format="%Y%m%d", errors="coerce")
                 for c in raw.columns:
@@ -339,8 +361,16 @@ def derive_macro_factors(macro_data: Dict[str, pd.DataFrame], date_str: str) -> 
             if "ppi_yoy" in latest.index:
                 factors["macro_ppi_yoy"] = float(latest.get("ppi_yoy", 0) or 0)
 
+        if name == "gdp":
+            if "gdp_yoy" in latest.index:
+                factors["macro_gdp_yoy"] = float(latest.get("gdp_yoy", 0) or 0)
+
         if name == "shibor":
             factors["macro_shibor_on"] = float(latest.get("ON", 0) or 0)
             factors["macro_shibor_3m"] = float(latest.get("3M", 0) or 0)
+
+        if name == "lpr":
+            factors["macro_lpr_1y"] = float(latest.get("LPR_1Y", 0) or 0)
+            factors["macro_lpr_5y"] = float(latest.get("LPR_5Y", 0) or 0)
 
     return factors

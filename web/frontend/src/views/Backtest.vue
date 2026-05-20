@@ -108,7 +108,6 @@ function initAllCharts() {
       name: s.label,
       type: "line",
       data: values,
-      sampling: false,
       lineStyle: { color: s.color, width: 1.5 },
       itemStyle: { color: s.color },
       symbol: "none",
@@ -126,7 +125,6 @@ function initAllCharts() {
         name: "上证指数",
         type: "line",
         data: curve.bench.map((d: any) => d.value),
-        sampling: false,
         lineStyle: { color: "rgba(255,255,255,0.08)", width: 1, type: "dashed" },
         itemStyle: { color: "rgba(255,255,255,0.08)" },
         symbol: "none",
@@ -175,6 +173,9 @@ onMounted(async () => {
       }));
     }
     await loadAllDetails();
+  } catch {
+    strategyList.value = [];
+    overview.value = {};
   } finally {
     loaded.value = true;
   }

@@ -53,16 +53,16 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 | macro_shibor | Shibor 利率 | akshare | daily | macro |
 | macro_lpr | LPR 贷款基础利率 | tushare_free | monthly | macro |
 
-**来源分布**: akshare 5 | tushare_free 14
+**来源分布**: akshare 5 | tushare_free 22 | tushare_paid 4 | future 1
 
-### 限流未启用 (3)
+### 限流启用 (3)
 
-这些维度需要后台 cron 逐日拉取，当前未启用以免触发 Tushare 速率限制。
+这些维度需要后台 cron 逐日拉取，Web 健康页支持单表修复，但 `limit_list` 必须遵守 1次/小时节流。
 
 | key | 标签 | 原因 |
 |-----|------|------|
-| limit_list | 涨跌停统计 | 每日全量拉取, 频率高 |
-| top_list | 龙虎榜 | 每日全量拉取, 频率高 |
+| limit_list | 涨跌停统计 | 1次/小时, 每次最多请求1天 |
+| top_list | 龙虎榜 | 每日全量拉取, 后台增量 |
 | research_report | 券商研报 | 数据量大, 月频更新 |
 
 ### 付费 (4)
@@ -76,9 +76,9 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 | stk_mins | 分钟行情 | 5000 |
 | moneyflow_daily_full | 日频资金流向全历史 | 5000 |
 
-### 规划中 (6)
+### 扩展可用 (5)
 
-未实现，预留接口。
+已接入 Tushare Free 拉取脚本、DB 健康扫描和单表修复。
 
 | key | 标签 | 资产类型 |
 |-----|------|---------|
@@ -87,6 +87,13 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 | fund_portfolio | 基金持仓 | fund |
 | fund_nav | 基金净值 | fund |
 | futures_daily | 期货日线 | futures |
+
+### 规划中 (1)
+
+未实现，预留接口。
+
+| key | 标签 | 资产类型 |
+|-----|------|---------|
 | crypto_daily | 加密货币日线 | crypto |
 
 ---
@@ -107,8 +114,18 @@ store/
 │   ├── holdertrade/{symbol}.parquet     ← 股东增减持 (单只 ~8KB)
 │   ├── share_float/all.parquet    134KB  ← 限售股解禁
 │   ├── repurchase/all.parquet      52KB  ← 股票回购
+│   ├── dividend/all_dividends.parquet    ← 分红送股
 │   ├── research_report/{month}.parquet   ← 券商研报 (~95KB/月)
-│   └── limit_list/{date}.parquet        ← 涨跌停统计
+│   ├── top_list/{date}.parquet           ← 龙虎榜
+│   └── limit_list/{date}.parquet         ← 涨跌停统计
+│
+├── fund/                                 ← 基金维度
+│   ├── daily/{symbol}.parquet            ← 基金日线
+│   ├── portfolio/{period}.parquet        ← 基金持仓
+│   └── nav/{symbol}.parquet              ← 基金净值
+│
+├── futures/                              ← 期货维度
+│   └── daily/{symbol}.parquet            ← 期货日线
 │
 ├── macro/                                ← 宏观数据
 │   ├── cpi.parquet                   10KB

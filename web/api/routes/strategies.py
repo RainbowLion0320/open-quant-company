@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from web.api.models import StrategyRunRequest, StrategyRunResponse, JobStatus
-from web.api.errors import DataNotFoundError, StrategyRunError
+from web.api.errors import DataNotFoundError, InvalidParameterError, StrategyRunError
 
 router = APIRouter(prefix="/api/strategies", tags=["Strategies"])
 
@@ -21,28 +21,6 @@ async def list_strategies():
         "strategies": strategies,
         "registry": registry,  # 前端动态渲染用
         "total": len(strategies),
-    }
-
-
-# ── 策略信号 ──────────────────────────────────────────────
-
-@router.get("/{name}")
-async def get_strategy_signals(
-    name: str,
-    sort: str = Query(default="score", description="score / symbol / name"),
-    order: str = Query(default="desc", description="desc / asc"),
-):
-    """加载某策略的全部信号"""
-    from data.results_db import load_strategy_signals
-
-    signals = load_strategy_signals(name, sort=sort, order=order)
-    if not signals:
-        raise DataNotFoundError("strategy", name)
-    return {
-        "strategy": name,
-        "total": len(signals),
-        "buys": sum(1 for s in signals if s.get("signal") == "buy"),
-        "signals": signals,
     }
 
 
@@ -76,6 +54,33 @@ async def get_job_status(job_id: str):
     if not job:
         raise DataNotFoundError("job", job_id)
     return JobStatus(**{k: job.get(k) for k in ("job_id", "status", "progress", "message", "result")})
+
+
+# ── 策略信号 ──────────────────────────────────────────────
+
+@router.get("/{name}")
+async def get_strategy_signals(
+    name: str,
+    sort: str = Query(default="score", description="score / symbol / name"),
+    order: str = Query(default="desc", description="desc / asc"),
+):
+    """加载某策略的全部信号"""
+    from data.registry import list_strategy_names
+    from data.results_db import load_strategy_signals
+
+    valid = set(list_strategy_names())
+    if name not in valid:
+        raise InvalidParameterError("strategy", name, f"Choose from: {', '.join(sorted(valid))}")
+
+    signals = load_strategy_signals(name, sort=sort, order=order)
+    if not signals:
+        raise DataNotFoundError("strategy", name)
+    return {
+        "strategy": name,
+        "total": len(signals),
+        "buys": sum(1 for s in signals if s.get("signal") == "buy"),
+        "signals": signals,
+    }
 
 
 # ── WebSocket 进度 ────────────────────────────────────────

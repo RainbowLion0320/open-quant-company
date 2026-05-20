@@ -309,14 +309,13 @@ function renderChart() {
         xAxisIndex: 0,
         yAxisIndex: 0,
         data: closes,
-        sampling: false,
         smooth: false,
         showSymbol: false,
         connectNulls: true,
         lineStyle: { width: 2, color: "#7dd3fc" },
         itemStyle: { color: "#7dd3fc" },
       },
-      { type: "bar", data: volumes, sampling: false, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: "rgba(0,212,255,0.18)" } },
+      { type: "bar", data: volumes, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: "rgba(0,212,255,0.18)" } },
     ],
   });
 }

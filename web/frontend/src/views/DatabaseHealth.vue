@@ -50,6 +50,21 @@
     <!-- Table -->
     <div class="table-wrap glass-card">
       <table>
+        <colgroup>
+          <col style="width:180px">
+          <col style="width:128px">
+          <col style="width:86px">
+          <col style="width:64px">
+          <col style="width:72px">
+          <col style="width:88px">
+          <col style="width:92px">
+          <col style="width:92px">
+          <col style="width:92px">
+          <col style="width:92px">
+          <col style="width:92px">
+          <col style="width:72px">
+          <col style="width:72px">
+        </colgroup>
         <thead>
           <tr>
             <th>表名</th>
@@ -180,9 +195,14 @@ interface HealthRow {
   columns: number;
   size_mb: number;
   missing_pct: number;
+  missing_pct_10y: number;
+  missing_pct_10y_plus: number;
   missing_cols: Record<string, number>;
   outlier_count: number;
+  outlier_count_10y: number;
+  outlier_count_10y_plus: number;
   outlier_cols: Record<string, number>;
+  time_breakdown: Record<string, { rows: number; missing_pct: number; missing_cols: Record<string, number>; outliers: Record<string, number> }>;
   freshness_days: number | null;
   error: string | null;
   checked_at: string;
@@ -342,6 +362,7 @@ function hasDetail(row: HealthRow): boolean {
   return !!(
     (row.missing_cols && Object.keys(row.missing_cols).length) ||
     (row.outlier_cols && Object.keys(row.outlier_cols).length) ||
+    (row.time_breakdown && Object.keys(row.time_breakdown).length) ||
     row.error
   );
 }
@@ -451,8 +472,10 @@ onMounted(fetchData);
 }
 
 table {
-  width: 100%;
+  width: max(100%, 1324px);
+  min-width: 1324px;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 13px;
 }
 

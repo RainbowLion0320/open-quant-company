@@ -465,7 +465,7 @@ data_registry:
     enabled: true
     label: 涨跌停统计
     cache: stock/limit_list/{YYYYMMDD}.parquet
-    description: 1次/分钟限流, cron后台拉取
+    description: 1次/小时限流, cron后台逐日积累
   top_list:
     source: tushare_free
     asset: stock
@@ -509,11 +509,11 @@ data_registry:
   dividend:
     source: tushare_free
     asset: stock
-    status: planned
+    status: available
     freq: event
     enabled: true
     label: 分红送股
-    cache: stock/dividend/{symbol}.parquet
+    cache: stock/dividend/all_dividends.parquet
   cyq_chips:
     source: tushare_paid
     asset: stock
@@ -557,7 +557,7 @@ data_registry:
     label: 货币供应量 M0/M1/M2
     cache: macro/money_supply.parquet
   macro_pmi:
-    source: akshare
+    source: tushare_free
     asset: macro
     status: available
     freq: monthly
@@ -565,7 +565,7 @@ data_registry:
     label: 制造业 PMI
     cache: macro/pmi.parquet
   macro_cpi:
-    source: akshare
+    source: tushare_free
     asset: macro
     status: available
     freq: monthly
@@ -573,7 +573,7 @@ data_registry:
     label: CPI 居民消费价格
     cache: macro/cpi.parquet
   macro_ppi:
-    source: akshare
+    source: tushare_free
     asset: macro
     status: available
     freq: monthly
@@ -581,7 +581,7 @@ data_registry:
     label: PPI 工业品出厂价
     cache: macro/ppi.parquet
   macro_gdp:
-    source: akshare
+    source: tushare_free
     asset: macro
     status: available
     freq: quarterly
@@ -597,7 +597,7 @@ data_registry:
     label: Shibor 利率
     cache: macro/shibor.parquet
   macro_lpr:
-    source: akshare
+    source: tushare_free
     asset: macro
     status: available
     freq: monthly
@@ -607,7 +607,7 @@ data_registry:
   fund_daily:
     source: tushare_free
     asset: fund
-    status: planned
+    status: available
     freq: daily
     enabled: true
     label: 基金日线
@@ -615,7 +615,7 @@ data_registry:
   fund_portfolio:
     source: tushare_free
     asset: fund
-    status: planned
+    status: available
     freq: quarterly
     enabled: true
     label: 基金持仓
@@ -623,7 +623,7 @@ data_registry:
   fund_nav:
     source: tushare_free
     asset: fund
-    status: planned
+    status: available
     freq: daily
     enabled: true
     label: 基金净值
@@ -631,7 +631,7 @@ data_registry:
   futures_daily:
     source: tushare_free
     asset: futures
-    status: planned
+    status: available
     freq: daily
     enabled: true
     label: 期货日线

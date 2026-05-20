@@ -34,6 +34,12 @@ def _require_rows(label: str, count: int) -> None:
         raise RuntimeError(f"{label} returned no rows")
 
 
+def _require_rows_or_cache(label: str, count: int, path: Path, pattern: str = "*.parquet") -> None:
+    cached = len(list(path.glob(pattern))) if path.exists() else 0
+    if count <= 0 and cached <= 0:
+        raise RuntimeError(f"{label} returned no rows and no cached parquet files exist")
+
+
 def _symbols(limit: int = 0) -> list[str]:
     return list(CIRCLE_STOCKS[:limit]) if limit > 0 else list(CIRCLE_STOCKS)
 
@@ -49,8 +55,8 @@ def _tushare_api():
 
 
 def repair_macro(name: str) -> None:
-    """Re-fetch macro indicator from AKShare."""
-    print(f"  Fetching macro/{name} from AKShare...")
+    """Re-fetch macro indicator through MacroFetcher (Tushare first where configured)."""
+    print(f"  Fetching macro/{name}...")
     fetcher = MacroFetcher()
     df = fetcher.fetch_indicator(name, force=True)
     if df is not None and len(df) > 0:
@@ -116,56 +122,56 @@ def repair_limit_list() -> None:
     from scripts.cron_fetch_extra import fetch_limit_list
 
     fetched = fetch_limit_list(full_history=False)
-    _require_rows("stock_limit_list", int(fetched))
+    _require_rows_or_cache("stock_limit_list", int(fetched), HUB.store_dir("stock") / "limit_list")
 
 
 def repair_research_report() -> None:
     from scripts.cron_fetch_extra import fetch_research_report
 
     fetched = fetch_research_report(full_history=True)
-    _require_rows("stock_research_report", int(fetched))
+    _require_rows_or_cache("stock_research_report", int(fetched), HUB.store_dir("stock") / "research_report")
 
 
 def repair_top_list() -> None:
     from scripts.cron_fetch_extra import fetch_top_list
 
     fetched = fetch_top_list(full_history=False)
-    _require_rows("stock_top_list", int(fetched))
+    _require_rows_or_cache("stock_top_list", int(fetched), HUB.store_dir("stock") / "top_list")
 
 
 def repair_dividend() -> None:
     from scripts.cron_fetch_extra import fetch_dividend
 
     fetched = fetch_dividend(full_history=True)
-    _require_rows("stock_dividend", int(fetched))
+    _require_rows_or_cache("stock_dividend", int(fetched), HUB.store_dir("stock") / "dividend")
 
 
 def repair_fund_daily() -> None:
     from scripts.cron_fetch_extra import fetch_fund_daily
 
     fetched = fetch_fund_daily(full_history=True)
-    _require_rows("fund_daily", int(fetched))
+    _require_rows_or_cache("fund_daily", int(fetched), HUB.store_dir("fund") / "daily")
 
 
 def repair_fund_portfolio() -> None:
     from scripts.cron_fetch_extra import fetch_fund_portfolio
 
     fetched = fetch_fund_portfolio(full_history=True)
-    _require_rows("fund_portfolio", int(fetched))
+    _require_rows_or_cache("fund_portfolio", int(fetched), HUB.store_dir("fund") / "portfolio")
 
 
 def repair_fund_nav() -> None:
     from scripts.cron_fetch_extra import fetch_fund_nav
 
     fetched = fetch_fund_nav(full_history=True)
-    _require_rows("fund_nav", int(fetched))
+    _require_rows_or_cache("fund_nav", int(fetched), HUB.store_dir("fund") / "nav")
 
 
 def repair_futures_daily() -> None:
     from scripts.cron_fetch_extra import fetch_futures_daily
 
     fetched = fetch_futures_daily(full_history=True)
-    _require_rows("futures_daily", int(fetched))
+    _require_rows_or_cache("futures_daily", int(fetched), HUB.store_dir("futures") / "daily")
 
 
 def repair_broker_recommend(months: int = 6) -> None:

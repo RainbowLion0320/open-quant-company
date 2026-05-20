@@ -55,7 +55,7 @@
     <section class="system-grid">
       <div class="deepseek-panel glass-card">
         <div class="panel-head">
-          <span>DEEPSEEK USAGE · 30D</span>
+          <span>DEEPSEEK USAGE · RECENT</span>
         </div>
 
         <div class="usage-summary">
@@ -174,7 +174,7 @@
         <div class="panel-head">
           <span>API HEALTH</span>
           <em v-if="apiHealth" :class="apiHealth.all_ok ? 'source-badge ok' : 'source-badge limited'"
-            style="font-weight:400;cursor:default">{{ apiHealth.summary }}</em>
+            class="summary-badge">{{ apiHealth.summary }}</em>
         </div>
         <div class="source-list">
           <template v-if="apiHealth && apiHealth.items.length">
@@ -189,7 +189,7 @@
       <div class="glass-card settings-card">
         <div class="panel-head">
           <span>SERVICES</span>
-          <em v-if="serviceSummary" :class="['source-badge', serviceBadgeClass()]" style="font-weight:400;cursor:default">{{ serviceSummary }}</em>
+          <em v-if="serviceSummary" :class="['source-badge', serviceBadgeClass(), 'summary-badge']">{{ serviceSummary }}</em>
         </div>
         <div class="source-list">
           <template v-if="serviceItems.length">
@@ -197,8 +197,8 @@
               <span>{{ svc.name }}</span>
               <em :class="['source-badge', apiBadgeClass(svc.status)]">
                 {{ svc.detail }}
-                <span v-if="svc.cookie_remaining_days != null" style="margin-left:4px;opacity:0.85">
-                  ({{ svc.cookie_remaining_days < 7 ? '⚠ ' + svc.cookie_remaining_days.toFixed(0) + 'd' : svc.cookie_remaining_days.toFixed(0) + 'd' }})
+                <span v-if="svc.cookie_remaining_days != null" class="badge-note">
+                  ({{ formatCookieDays(svc.cookie_remaining_days) }})
                 </span>
               </em>
             </div>
@@ -211,7 +211,7 @@
       <div class="glass-card settings-card">
         <div class="panel-head">
           <span>CRON JOBS</span>
-          <em v-if="cronSummary" class="source-badge ok" style="font-weight:400;cursor:default">{{ cronSummary }}</em>
+          <em v-if="cronSummary" :class="['source-badge', cronSummaryBadge, 'summary-badge']">{{ cronSummary }}</em>
         </div>
         <div class="source-list">
           <template v-if="cronJobs.length">
@@ -254,6 +254,7 @@ const elapsed = ref(0);
 const historyHours = ref(24);
 let timer: number | undefined;
 let elapTimer: number | undefined;
+let slowTimer: number | undefined;
 
 const cpuColor = computed(() => {
   const p = monitor.value?.cpu?.percent ?? 0;
@@ -385,6 +386,10 @@ function serviceBadgeClass(): string {
   if (!serviceSummary.value) return "muted";
   return serviceSummary.value.includes("异常") ? "limited" : "ok";
 }
+function formatCookieDays(days: number): string {
+  const whole = Number(days || 0).toFixed(0);
+  return Number(days) < 7 ? `${whole}d low` : `${whole}d`;
+}
 async function fetchServiceStatus() {
   try {
     const data = await api.serviceStatus();
@@ -449,9 +454,12 @@ async function fetchData() {
     const next = await api.systemMonitor();
     monitor.value = (next as any).status === "no_data" ? null : next;
     lastFetch.value = Date.now();
-    drawCharts();
-    drawDSChart();
   } catch (e) { /* silent */ }
+}
+
+function fetchSlowData() {
+  drawCharts();
+  drawDSChart();
 }
 
 function drawCharts() {
@@ -495,13 +503,12 @@ async function drawDSChart() {
     const d = await res.json();
     if (!d.data || d.data.length === 0) return;
     const rows: any[] = d.data;
-    if (rows.length < 2) return;
-    const dates: string[] = [];
-    const today = new Date();
-    for (let i = 29; i >= 0; i--) {
-      const dt = new Date(today); dt.setDate(dt.getDate() - i);
-      dates.push(dt.toISOString().slice(0, 10));
+    if (!rows.length) {
+      dsTotals.value = { pro: 0, flash: 0, cost: 0 };
+      return;
     }
+    const dates = Array.from(new Set(rows.map((r: any) => String(r.utc_date || "").slice(0, 10)).filter(Boolean))).sort();
+    if (!dates.length) return;
     const rowByDate: Record<string, any> = {};
     for (const r of rows) rowByDate[r.utc_date + "|" + r.model] = r;
     const proRows = rows.filter((r: any) => r.model === "deepseek-v4-pro");
@@ -533,7 +540,7 @@ async function drawDSChart() {
       const leftPad = 34, botPad = 16;
       const chartH = H - 6 - botPad;
       const slotW = (W - leftPad - 2) / dates.length;
-      const barW = Math.max(1, slotW * 0.20);
+      const barW = Math.max(2, Math.min(16, slotW * 0.38));
 
       ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
       for (let t = 0; t <= maxVal; t += maxVal / 3) {
@@ -554,7 +561,8 @@ async function drawDSChart() {
           ctx.fillRect(x0, yBottom - h, barW, h);
           yBottom -= h;
         });
-        if (di % 3 === 0) { ctx.fillStyle = "#64748b"; ctx.font = "7px monospace"; ctx.fillText(date.slice(5), x0, H-3); }
+        const labelEvery = Math.max(1, Math.ceil(dates.length / 8));
+        if (di % labelEvery === 0) { ctx.fillStyle = "#64748b"; ctx.font = "7px monospace"; ctx.fillText(date.slice(5), x0, H-3); }
       });
     }
 
@@ -571,7 +579,7 @@ async function drawDSChart() {
         const maxCost = Math.max(...costs.map((r: any) => r.cost_cny), 1);
         const leftPad = 34, botPad = 14, chartH = H - 8 - botPad;
         const slotWc = (W - leftPad - 2) / dates.length;
-        const barWc = Math.max(1, slotWc * 0.20);
+        const barWc = Math.max(2, Math.min(16, slotWc * 0.38));
         ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
         for (let t = 0; t <= maxCost; t += maxCost / 3) {
           const y = H - botPad - (t / maxCost) * chartH;
@@ -598,8 +606,9 @@ async function drawDSChart() {
           }
           ctx.stroke();
         }
+        const labelEvery = Math.max(1, Math.ceil(dates.length / 8));
         dates.forEach((date, di) => {
-          if (di % 3 === 0) { ctx.fillStyle = "#64748b"; ctx.font = "7px monospace"; ctx.fillText(date.slice(5), leftPad + di*slotWc, H-2); }
+          if (di % labelEvery === 0) { ctx.fillStyle = "#64748b"; ctx.font = "7px monospace"; ctx.fillText(date.slice(5), leftPad + di*slotWc, H-2); }
         });
       }
     }
@@ -608,11 +617,17 @@ async function drawDSChart() {
 
 onMounted(() => {
   fetchData();
+  fetchSlowData();
   loadSettings();
   timer = window.setInterval(fetchData, 10_000);
+  slowTimer = window.setInterval(fetchSlowData, 60_000);
   elapTimer = window.setInterval(() => { elapsed.value = Math.round((Date.now() - lastFetch.value) / 1000); }, 1000);
 });
-onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterval(elapTimer); });
+onUnmounted(() => {
+  if (timer) clearInterval(timer);
+  if (slowTimer) clearInterval(slowTimer);
+  if (elapTimer) clearInterval(elapTimer);
+});
 </script>
 
 <style scoped>
@@ -874,6 +889,14 @@ onUnmounted(() => { if (timer) clearInterval(timer); if (elapTimer) clearInterva
   border-radius: 3px;
   font-style: normal;
   white-space: nowrap;
+}
+.summary-badge {
+  font-weight: 400;
+  cursor: default;
+}
+.badge-note {
+  margin-left: 4px;
+  opacity: 0.85;
 }
 .source-badge.ok {
   background: rgba(16,185,129,0.15);

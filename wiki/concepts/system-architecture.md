@@ -218,7 +218,7 @@ strategies:
 |------|:--:|------|------|
 | 资金流向 | 3 | Tushare moneyflow | mf_net_amount, mf_inst_net, mf_smart_ratio |
 | 筹码集中 | 2 | Tushare holders | holder_change_pct, holder_concentration |
-| 宏观经济 | 4 | AKShare macro | macro_pmi, macro_shibor_3m, macro_shibor_on, macro_cpi |
+| 宏观经济 | 4+ | Data Registry macro (Tushare优先, AKShare兜底/补充) | macro_pmi, macro_shibor_3m, macro_shibor_on, macro_cpi, macro_gdp_yoy |
 
 ### 基本面+估值 (14, scripts/build_features.py)
 

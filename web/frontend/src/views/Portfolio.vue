@@ -220,6 +220,9 @@ function fmtReturn(v: number | undefined) {
   if (v == null || v === 0) return "0.00%";
   return (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
 }
+function isTransientFetchError(e: unknown) {
+  return e instanceof TypeError && /failed to fetch|load failed|network/i.test(e.message);
+}
 
 async function loadAll() {
   loading.value = true;
@@ -256,7 +259,7 @@ async function loadAll() {
     await nextTick();
     renderChart();
   } catch (e) {
-    console.error("Load portfolio failed:", e);
+    if (!isTransientFetchError(e)) console.error("Load portfolio failed:", e);
   } finally {
     loading.value = false;
   }
@@ -284,7 +287,7 @@ async function submitOrder() {
     order.shares = 100;
     await loadAll();
   } catch (e) {
-    console.error("Order failed:", e);
+    if (!isTransientFetchError(e)) console.error("Order failed:", e);
   }
 }
 
@@ -306,7 +309,6 @@ function renderChart() {
       splitLine: { lineStyle: { color: "rgba(148,163,184,0.06)" } } },
     series: [{
       type: "line", data: assets, showSymbol: false, smooth: true,
-      sampling: false,
       lineStyle: { color: "#00d4ff", width: 1.5 },
       areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
         { offset: 0, color: "rgba(0,212,255,0.12)" },

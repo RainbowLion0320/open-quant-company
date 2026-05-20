@@ -24,7 +24,10 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-STORE = PROJECT_ROOT / "data" / "store"
+from data.datahub import get_datahub
+
+HUB = get_datahub()
+STORE = HUB.store_root
 
 
 def _missing_pct(df: pd.DataFrame) -> dict:
@@ -242,8 +245,10 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
         return {
             "table": label, "source": source, "files": 0, "rows": 0, "columns": 0,
             "size_mb": 0, "missing_pct": 0, "missing_cols": "{}",
-            "outlier_count": 0, "outlier_cols": "{}",
-            "freshness_days": None, "error": "no files",
+            "missing_pct_10y": 0, "missing_pct_10y_plus": 0,
+            "outlier_count": 0, "outlier_count_10y": 0, "outlier_count_10y_plus": 0,
+            "outlier_cols": "{}", "freshness_days": None, "time_breakdown": "{}",
+            "error": "no files",
         }
 
     total_size = 0
@@ -348,9 +353,16 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         "stock_moneyflow_monthly": ("Tushare (全历史)", "月频资金流向", True),
         "stock_broker_recommend": ("Tushare", "券商月度金股", True),
         "stock_limit_list": ("Tushare", "涨跌停统计", True),
+        "stock_top_list": ("Tushare", "龙虎榜", True),
         "stock_research_report": ("Tushare", "券商研报", True),
+        "stock_dividend": ("Tushare", "分红送股", True),
         "share_float": ("Tushare", "限售股解禁", True),
         "repurchase": ("Tushare", "股票回购", True),
+        # Funds / futures — Tushare Free extension dimensions
+        "fund_daily": ("Tushare", "基金日线", True),
+        "fund_portfolio": ("Tushare", "基金持仓", True),
+        "fund_nav": ("Tushare", "基金净值", True),
+        "futures_daily": ("Tushare", "期货日线", True),
     }
 
     def _meta(table_name: str) -> tuple[str, str, bool]:
@@ -394,6 +406,14 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         records.append(_scan_single("system_deepseek_usage", ds))
 
     # ── Per-symbol tables (aggregate) ──
+    def _add_many(label: str, rel_glob: str, max_s: int) -> None:
+        pdir = STORE / Path(rel_glob).parent
+        pattern = Path(rel_glob).name
+        if pdir.exists():
+            paths = sorted(pdir.glob(pattern))
+            if paths:
+                records.append(_scan_many(label, paths, max_sample=max_s))
+
     for label, glob_pattern, max_s in [
         ("stock_holders", "holders/*.parquet", 30),
         ("stock_holdertrade", "holdertrade/*.parquet", 30),
@@ -401,22 +421,27 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         ("stock_moneyflow_monthly", "moneyflow/monthly/*.parquet", 12),
         ("stock_broker_recommend", "broker_recommend/*.parquet", 12),
         ("stock_limit_list", "limit_list/*.parquet", 12),
+        ("stock_top_list", "top_list/*.parquet", 12),
         ("stock_research_report", "research_report/*.parquet", 6),
     ]:
-        pdir = STORE / "stock" / Path(glob_pattern).parent
-        pattern = Path(glob_pattern).name
-        if pdir.exists():
-            paths = sorted(pdir.glob(pattern))
-            if paths:
-                records.append(_scan_many(label, paths, max_sample=max_s))
+        _add_many(label, f"stock/{glob_pattern}", max_s)
+
+    for label, rel_glob, max_s in [
+        ("fund_daily", "fund/daily/*.parquet", 12),
+        ("fund_portfolio", "fund/portfolio/*.parquet", 8),
+        ("fund_nav", "fund/nav/*.parquet", 12),
+        ("futures_daily", "futures/daily/*.parquet", 12),
+    ]:
+        _add_many(label, rel_glob, max_s)
 
     # ── Single file per-symbol tables ──
-    for p in [
-        STORE / "stock" / "share_float" / "all.parquet",
-        STORE / "stock" / "repurchase" / "all.parquet",
+    for label, p in [
+        ("share_float", STORE / "stock" / "share_float" / "all.parquet"),
+        ("repurchase", STORE / "stock" / "repurchase" / "all.parquet"),
+        ("stock_dividend", STORE / "stock" / "dividend" / "all_dividends.parquet"),
     ]:
         if p.exists():
-            records.append(_scan_single(p.parent.name, p))
+            records.append(_scan_single(label, p))
 
     # ── Inject source + label_zh + repairable from TABLE_META ──
     for r in records:
@@ -459,7 +484,7 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         s["checked_at"] = now
 
     result = pd.DataFrame(summary + records)
-    result.to_parquet(output_path, index=False)
+    HUB.write_parquet(result, output_path)
     print(f"Health check done: {n} logical tables, avg missing {avg_missing}%, saved to {output_path}")
     return result
 
