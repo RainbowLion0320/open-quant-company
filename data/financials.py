@@ -9,7 +9,7 @@ import yaml
 import os
 
 from data.datahub import get_datahub
-from .fetcher import get_financial_indicator, retry_with_backoff
+from .fetcher import retry_with_backoff
 
 # ---- 配置加载 ----
 _CONFIG = None

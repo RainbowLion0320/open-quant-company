@@ -5,27 +5,27 @@ from pathlib import Path
 
 import py_compile
 
-for mod in ['signals/factors.py', 'backtest/analytics.py', 'backtest/pipeline.py', 'broker/__init__.py']:
+for mod in ['signals/expression.py', 'signals/dsl_parser.py', 'backtest/analytics.py', 'backtest/pipeline.py', 'broker/__init__.py']:
     py_compile.compile(mod, doraise=True)
     print(f'SYNTAX OK: {mod}')
 
 print()
-from signals.factors import RawFactor as F, Factor
+from signals.expression import Ret, Delta, MA
 import pandas as pd
 
 df = pd.DataFrame({
     'close': [10, 11, 12, 11, 13, 14, 15, 14, 16, 17],
-    'roe': [0.12, 0.12, 0.15, 0.15, 0.18, 0.18, 0.20, 0.20, 0.22, 0.22],
-    'pe_ttm': [25, 24, 22, 23, 20, 19, 18, 19, 16, 15],
 }, index=pd.date_range('2025-01-01', periods=10, freq='B'))
 
-close = F('close')
-mom = Factor.pct_change(close, 3)
-mom_result = mom.load(df)
+def compute_series(factor, df):
+    return pd.Series([factor.compute(df, i) for i in range(len(df))], index=df.index)
+
+close = Ret("close")
+mom_factor = Delta(close, 3) / close
+mom_result = compute_series(mom_factor, df)
 print(f'Factor DSL: momentum 3d mean = {mom_result.mean():.4f}')
 
-ma3 = Factor.rolling(close, 3, 'mean')
-ma_result = ma3.load(df)
+ma_result = compute_series(MA(close, 3), df)
 print(f'Factor DSL: MA3 = {[round(v,1) for v in ma_result.dropna().values]}')
 
 from backtest.analytics import RiskAnalytics

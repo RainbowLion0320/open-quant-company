@@ -18,7 +18,7 @@ from datetime import datetime
 
 from data.fetcher import get_stock_daily, get_index_daily
 from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
-from backtest.analytics import RiskAnalytics, FullReport
+from backtest.analytics import RiskAnalytics
 
 DATA_DIR = ROOT / "data"
 
@@ -107,7 +107,6 @@ def run_backtest(name, pool, prices, bench_close, score_fn, start, end, cash=1_0
 
     total_days = len(prices)
     rebal_count = 0
-    rebal_indicator = getattr(score_fn, "rebal_indicator", lambda dt: ".")  # 显示调仓节奏
     daily_values = []
     
     for day_idx in range(total_days):

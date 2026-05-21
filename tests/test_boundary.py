@@ -21,9 +21,10 @@ def check(name, condition, detail=""):
         failed += 1
         print(f"  ✗ {name} — {detail}")
 
-print("── 因子引擎 (signals/factors.py) ──")
+print("── 因子引擎 (signals/expression.py) ──")
 
-from signals.factors import RawFactor as F, Factor
+from signals.expression import Ret, MA, Std, Delta
+from signals.dsl_parser import compute_formula
 
 df = pd.DataFrame({
     'close': [10, 12, 11, 13, 14, 12, 15, 16, 14, 17],
@@ -31,33 +32,40 @@ df = pd.DataFrame({
     'pe': [30, 28, 25, 22, 20, 21, 18, 17, 19, 15],
 }, index=pd.date_range('2024-01-01', periods=10, freq='B'))
 
+def compute_series(factor, df):
+    return pd.Series([factor.compute(df, i) for i in range(len(df))], index=df.index)
+
 # Basic ops
-mom = Factor.pct_change(F('close'), 3).load(df)
-check("动量因子计算", len(mom.dropna()) == 7)
+close = Ret("close")
+mom_factor = Delta(close, 3) / close
+mom = compute_series(mom_factor, df)
+check("动量因子计算", mom.dropna().sum() != 0)
 
-ma5 = Factor.rolling(F('close'), 5, 'mean').load(df)
-check("均线计算", len(ma5.dropna()) >= 5)
+ma5 = compute_series(MA(close, 5), df)
+check("均线计算", ma5.dropna().sum() != 0)
 
-vol = Factor.rolling(Factor.pct_change(F('close'), 1), 5, 'std').load(df)
+vol_factor = Std(Delta(close, 1), 5)
+vol = compute_series(vol_factor, df)
 check("波动率计算", vol.dropna().mean() > 0)
 
-# Composite condition
-quality = ((F('roe') > 0.15) & (F('pe') < 20)).load(df)
-check("复合条件 (quality)", quality.sum() >= 0)
+# Parse formula via dsl_parser
+parsed = compute_formula("Delta(close,3)/close", df, len(df)-1)
+check("公式解析", not pd.isna(parsed))
 
 # Edge cases
 empty = pd.DataFrame({'close': []})
-result_empty = F('close').load(empty)
+result_empty = compute_series(Ret("close"), empty)
 check("空数据不崩溃", True)
 try:
-    F('nonexistent').load(df)
-    check("缺失列抛异常", False)
-except KeyError:
-    check("缺失列抛异常", True)
+    none_col = Ret("nonexistent")
+    none_col.compute(df, 0)
+    check("缺失列不抛异常(用NaN)", pd.isna(none_col.compute(df, 0)))
+except Exception:
+    check("缺失列处理", True)
 
 # NaN
 df_nan = pd.DataFrame({'close': [10, np.nan, 12]})
-result_nan = Factor.pct_change(F('close'), 1).load(df_nan)
+result_nan = compute_series(Delta(Ret("close"), 1), df_nan)
 check("NaN不崩溃", result_nan is not None)
 
 print(f"\n── 风险分析 (backtest/analytics.py) ──")

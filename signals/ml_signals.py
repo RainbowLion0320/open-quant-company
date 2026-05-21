@@ -51,7 +51,6 @@ def _load_model_bundle(model_version: str = "best") -> tuple[object | None, list
     if use_regime and model_version == "best" and regime in {"bull", "bear", "sideways"}:
         candidates.extend([
             (MODEL_DIR / f"lgbm_{regime}.pkl", MODEL_DIR / f"lgbm_{regime}_meta.json", f"regime:{regime}"),
-            (MODEL_DIR / f"lgbm_lgbm_{regime}.pkl", MODEL_DIR / f"lgbm_{regime}_meta.json", f"regime:{regime}"),
         ])
     candidates.append((MODEL_DIR / f"lgbm_{model_version}.pkl", MODEL_DIR / "lgbm_best_meta.json", model_version))
 
@@ -61,7 +60,9 @@ def _load_model_bundle(model_version: str = "best") -> tuple[object | None, list
         try:
             with open(model_path, "rb") as f:
                 model = pickle.load(f)
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to load model {model_path}: {e}")
             continue
         meta = {}
         feature_names: list[str] = []
@@ -224,8 +225,9 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
                 },
             })
 
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"ML score failed for {sym}: {e}")
 
         if (i + 1) % 100 == 0:
             buys = sum(1 for s in signals if s["signal"] == "buy")

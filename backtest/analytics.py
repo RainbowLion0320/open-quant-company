@@ -174,7 +174,10 @@ class RiskAnalytics:
 
     @staticmethod
     def annual_return(r: np.ndarray, periods: int = 252) -> float:
-        return (1 + np.mean(r)) ** periods - 1
+        if len(r) == 0:
+            return 0.0
+        total = np.prod(1 + r)
+        return total ** (periods / len(r)) - 1
 
     # ── 风险指标 ──
 
@@ -278,11 +281,5 @@ class RiskAnalytics:
         """IC Information Ratio: mean(IC) / std(IC)"""
         ic = np.array(ic_series)
         return np.mean(ic) / np.std(ic, ddof=1) if len(ic) > 1 and np.std(ic, ddof=1) > 0 else 0
-
-
-# ── 简化函数（方便直接import） ──
-
-sharpe = RiskAnalytics.sharpe_ratio
-max_dd = lambda r: RiskAnalytics.max_drawdown_metrics(r)[0]
 annual_return = RiskAnalytics.annual_return
 volatility = RiskAnalytics.volatility

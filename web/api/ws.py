@@ -48,25 +48,3 @@ async def ws_endpoint(websocket: WebSocket, job_id: str = None):
             _connections[job_id].discard(websocket)
             if not _connections[job_id]:
                 del _connections[job_id]
-
-
-async def broadcast_progress(job_id: str, progress: int, message: str):
-    """向订阅该 job 的所有 WebSocket 广播进度"""
-    if job_id not in _connections:
-        return
-
-    payload = json.dumps({
-        "job_id": job_id,
-        "progress": progress,
-        "message": message,
-    })
-
-    dead = set()
-    for ws in list(_connections[job_id]):
-        try:
-            await ws.send_text(payload)
-        except Exception:
-            dead.add(ws)
-
-    for ws in dead:
-        _connections[job_id].discard(ws)

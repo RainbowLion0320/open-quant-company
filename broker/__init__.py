@@ -261,7 +261,7 @@ class PaperBroker(Broker):
             if code not in self._positions:
                 self._positions[code] = Position(code=code, volume=0, avg_cost=0)
             pos = self._positions[code]
-            total_cost_basis = pos.avg_cost * pos.volume + price * volume
+            total_cost_basis = pos.avg_cost * pos.volume + total_cost
             pos.volume += volume
             pos.avg_cost = total_cost_basis / pos.volume if pos.volume > 0 else 0
             pos.current_price = price  # 默认以成交价标记现价

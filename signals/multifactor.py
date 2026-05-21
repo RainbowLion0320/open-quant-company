@@ -123,7 +123,7 @@ class MultiFactorScorer:
         # Prefer intermediate momentum with the most recent month skipped.
         # This follows the mature 3-12 month momentum convention and avoids
         # over-weighting short-term reversal noise.
-        mom_3m_skip = f.get("momentum_3m_skip_1m", mom_1m)
+        mom_3m_skip = f.get("momentum_3m_skip_1m", mom_3m)
         mom_6m_skip = f.get("momentum_6m_skip_1m", mom_3m)
         trend_strength = f.get("trend_strength", 0)
         volatility = f.get("volatility", tc.get("default_volatility", 0.30))
@@ -208,30 +208,6 @@ def compute_trend_strength(df: pd.DataFrame, window: int = 120) -> float:
         return 0.0
     ma = df["close"].tail(window).mean()
     return float(df["close"].iloc[-1] / ma - 1) if ma else 0.0
-
-
-def rank_stocks(scores: Dict[str, float], top_n: int = 10,
-                max_per_sector: int = 3, sectors: Dict[str, str] = None) -> List[str]:
-    """
-    排名选股
-    - top_n: 最多持仓数
-    - max_per_sector: 每个板块最多持仓数
-    """
-    sorted_stocks = sorted(scores.items(), key=lambda x: -x[1])
-
-    selected = []
-    sector_counts = {}
-
-    for symbol, score in sorted_stocks:
-        if len(selected) >= top_n:
-            break
-        sec = sectors.get(symbol, "consumer") if sectors else "all"
-        cnt = sector_counts.get(sec, 0)
-        if cnt < max_per_sector:
-            selected.append(symbol)
-            sector_counts[sec] = cnt + 1
-
-    return selected
 
 
 def compute_roe_trend(roe_history: List[float]) -> str:

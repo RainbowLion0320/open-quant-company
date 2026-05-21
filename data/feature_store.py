@@ -34,9 +34,22 @@ FEATURES_DIR.mkdir(parents=True, exist_ok=True)
 class FeatureStoreBuilder:
     """逐月构建 PIT 特征"""
 
+    _MAX_CACHE_SIZE = 128
+
     def __init__(self, factors: Optional[Dict[str, Factor]] = None):
         self.factors = factors or alpha_factors()
         self._price_cache: Dict[str, pd.DataFrame] = {}
+        self._cache_order: list[str] = []
+
+    def _cache_put(self, key: str, df: pd.DataFrame):
+        if len(self._price_cache) >= self._MAX_CACHE_SIZE:
+            oldest = self._cache_order.pop(0)
+            self._price_cache.pop(oldest, None)
+        self._price_cache[key] = df
+        self._cache_order.append(key)
+
+    def _cache_get(self, key: str) -> Optional[pd.DataFrame]:
+        return self._price_cache.get(key)
 
     def build_month(
         self,
@@ -58,7 +71,8 @@ class FeatureStoreBuilder:
         rows = []
         for sym in symbols:
             # 拉取该股票的历史日线 (截断到 month_end)
-            if sym not in self._price_cache:
+            df = self._cache_get(sym)
+            if df is None:
                 try:
                     df = get_stock_daily(sym)
                     if df is None or len(df) == 0:
@@ -66,11 +80,9 @@ class FeatureStoreBuilder:
                     df["date"] = pd.to_datetime(df["date"])
                     df = df.set_index("date").sort_index()
                     df = df[df.index >= start_date]
-                    self._price_cache[sym] = df
+                    self._cache_put(sym, df)
                 except Exception:
                     continue
-
-            df = self._price_cache[sym]
             # PIT 约束: 只用 month_end 及之前的数据
             df_pit = df[df.index <= month_end]
             if len(df_pit) < 60:  # 至少需要60天数据
@@ -234,7 +246,8 @@ def enrich_from_registry(
                         total_abs = abs(buy_lg) + abs(sell_lg) + abs(buy_elg) + abs(sell_elg) + 1
                         df.loc[mask, "mf_net_amount"] = net_mf
                         df.loc[mask, "mf_inst_net"] = buy_lg + buy_elg - sell_lg - sell_elg
-                        df.loc[mask, "mf_smart_ratio"] = (buy_lg + buy_elg) / max(sell_lg + sell_elg, 1)
+                        sell_total = sell_lg + sell_elg
+                        df.loc[mask, "mf_smart_ratio"] = (buy_lg + buy_elg) / sell_total if sell_total > 0 else 50.0
         except Exception as e:
             pass  # Non-critical enrichment
 

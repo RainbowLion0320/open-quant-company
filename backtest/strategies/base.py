@@ -56,6 +56,7 @@ class BaseStrategy(ABC):
         dt: datetime,
         regime: str,
         last_regime: Optional[str] = None,
+        *args, **kwargs,
     ) -> bool:
         """
         判断是否调仓日。默认每月初调仓。

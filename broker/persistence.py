@@ -131,16 +131,8 @@ def append_nav(run_date: DateType, total_asset: float, cash: float, market_value
         "market_value": market_value,
     }])
 
-    if nav_file.exists():
-        existing = HUB.read_parquet(nav_file, default=pd.DataFrame())
-        # 同一天不重复写
-        target = pd.Timestamp(run_date)
-        if not existing[existing["date"] == target].empty:
-            return
-        df = pd.concat([existing, row], ignore_index=True)
-    else:
-        df = row
-    HUB.write_parquet(df, nav_file)
+    # fcntl-locked append with date dedup for concurrent safety
+    HUB.append_parquet(nav_file, row, dedupe_subset=["date"])
 
 
 def load_nav() -> pd.DataFrame:

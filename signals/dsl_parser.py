@@ -49,70 +49,30 @@ def _eval_expr(expr: str, df: pd.DataFrame, idx: int) -> float:
     def __ref(col: str, offset: int):
         i = idx + offset
         if i < 0 or i >= len(df):
-            return 0.0
+            return np.nan
         v = df[col].iloc[i]
-        return float(v) if not pd.isna(v) else 0.0
-    
+        return float(v) if not pd.isna(v) else np.nan
+
     def __ma(col: str, window: int):
         s = df[col].iloc[max(0, idx - window + 1):idx + 1]
-        return float(s.mean()) if len(s) > 0 else 0.0
-    
+        return float(s.mean()) if len(s) > 0 else np.nan
+
     def __std(col: str, window: int):
         s = df[col].iloc[max(0, idx - window + 1):idx + 1]
-        return float(s.std()) if len(s) > 1 else 0.0
-    
+        return float(s.std()) if len(s) > 1 else np.nan
+
     def __delta(col: str, window: int):
         cur = __ref(col, 0)
         prev = __ref(col, -window)
         return cur - prev
-    
+
     ns = {
         "__ref": __ref, "__ma": __ma, "__std": __std, "__delta": __delta,
         "abs": abs, "max": max, "min": min,
     }
-    
+
     try:
-        return float(eval(expr, {"__builtins__": {}}, ns))
+        result = eval(expr, {"__builtins__": {}}, ns)
+        return float(result) if not (isinstance(result, float) and np.isnan(result)) else np.nan
     except Exception:
-        return 0.0
-
-
-def evaluate_factor(name: str, formula: str, features_df: pd.DataFrame) -> dict:
-    """计算因子 IC — 使用 DSL 解析器动态计算因子值"""
-    from data.fetcher import get_stock_daily
-    
-    valid = features_df.dropna(subset=["ret_fwd_20d"])
-    if len(valid) < 100:
-        return {"ic": 0, "icir": 0, "valid": False}
-    
-    syms = valid["symbol"].unique()[:80]  # 80只采样
-    factor_vals = []
-    targets = []
-    
-    for sym in syms:
-        try:
-            df = get_stock_daily(sym)
-            if df is None or len(df) < 60:
-                continue
-            df["date"] = pd.to_datetime(df["date"])
-            df = df.set_index("date").sort_index()
-            idx = len(df) - 1
-            
-            val = compute_formula(formula, df, idx)
-            if not np.isnan(val) and abs(val) < 1e10:
-                sym_data = valid[valid["symbol"] == sym]
-                if len(sym_data) > 0:
-                    factor_vals.append(val)
-                    targets.append(sym_data["ret_fwd_20d"].iloc[0])
-        except Exception:
-            pass
-    
-    if len(factor_vals) < 10:
-        return {"ic": 0, "icir": 0, "valid": False}
-    
-    from scipy.stats import spearmanr
-    y = pd.Series(targets)
-    fv = pd.Series(factor_vals)
-    ic, _ = spearmanr(fv, y)
-    ic = ic if not np.isnan(ic) else 0.0
-    return {"ic": ic, "icir": 0, "valid": True}
+        return np.nan

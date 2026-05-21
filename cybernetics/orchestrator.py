@@ -208,15 +208,11 @@ def detect_market_regime(
 
     # 均线计算
     ma5 = close[-5:].mean()
-    ma10 = close[-10:].mean() if len(close) >= 10 else close.mean()
     ma20 = close[-20:].mean()
     ma60 = close[-60:].mean() if len(close) >= 60 else close.mean()
 
-    # MA200 用于长期趋势
-    ma200 = close.mean() if len(close) >= 200 else close[-window:].mean()
-
-    # 多头排列: price > ma5 > ma10 > ma20 > ma60
-    # 空头排列: price < ma5 < ma10 < ma20 < ma60
+    # 多头排列: price > ma5 > ma20 > ma60
+    # 空头排列: price < ma5 < ma20 < ma60
     current = close[-1]
     if current > ma5 > ma20 > ma60:
         return MarketRegime.BULL
@@ -320,7 +316,6 @@ class QuantOrchestrator:
 
         current = close[-1]
         ma5 = close[-5:].mean()
-        ma10 = close[-10:].mean()
         ma20 = close[-20:].mean()
         ma60 = close[-60:].mean() if len(close) >= 60 else close.mean()
 

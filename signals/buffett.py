@@ -84,8 +84,11 @@ def calc_margin_of_safety(
     # 两阶段DCF: 高增长期(5年) + 永续期
     cashflows = [fcf * (1 + growth_rate) ** i for i in range(1, 6)]
 
-    # 永续价值
-    terminal_value = cashflows[-1] * (1 + terminal_g) / (discount - terminal_g)
+    # 永续价值 (当 discount ≈ terminal_g 时用有限PE近似)
+    if abs(discount - terminal_g) < 1e-10:
+        terminal_value = cashflows[-1] * 20  # 20倍市盈率作为 fallback
+    else:
+        terminal_value = cashflows[-1] * (1 + terminal_g) / (discount - terminal_g)
 
     # 折现
     pv_cashflows = sum(cf / (1 + discount) ** i for i, cf in enumerate(cashflows, 1))

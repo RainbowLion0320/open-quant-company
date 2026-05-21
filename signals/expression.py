@@ -150,8 +150,15 @@ class BinOp(Factor):
         r = self.right.compute(df, idx)
         if pd.isna(l) or pd.isna(r):
             return np.nan
-        ops = {"+": l + r, "-": l - r, "*": l * r, "/": l / r if r != 0 else np.nan}
-        return ops[self.op]
+        if self.op == "+":
+            return l + r
+        elif self.op == "-":
+            return l - r
+        elif self.op == "*":
+            return l * r
+        elif self.op == "/":
+            return l / r if r != 0 else np.nan
+        return np.nan
 
     def __repr__(self):
         return f"({self.left} {self.op} {self.right})"

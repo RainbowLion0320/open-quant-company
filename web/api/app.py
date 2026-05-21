@@ -19,7 +19,6 @@ os.environ["no_proxy"] = "eastmoney.com,10jqka.com.cn,sina.com.cn,qianlong.com,1
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 
 from web.api.routes import market, strategies, stocks, portfolio, signals, settings, backtest, system, hindsight
 from web.api.errors import register_error_handlers
@@ -77,10 +76,6 @@ def create_app() -> FastAPI:
             "strategies": strategies_count,
             "version": "2.0.0",
         }
-
-    @app.on_event("startup")
-    async def startup():
-        pass  # DB连接按需打开，不持有持久锁
 
     # 静态文件 (前端)
     static_dir = Path(__file__).resolve().parent.parent / "frontend" / "dist"

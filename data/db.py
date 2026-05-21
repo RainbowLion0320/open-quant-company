@@ -191,7 +191,7 @@ def _register_views(db: Database):
                 vname = f"{atype}_{pq.stem}_signals"
                 try:
                     db.execute(
-                        f"CREATE OR REPLACE VIEW IF NOT EXISTS {vname} AS "
+                        f"CREATE OR REPLACE VIEW {vname} AS "
                         f"SELECT * FROM read_parquet('{pq}')"
                     )
                 except Exception:

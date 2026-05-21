@@ -101,12 +101,10 @@ def test_daily_cron_ohlcv_uses_stock_daily_module(monkeypatch):
     assert daily.fetch_ohlcv(pool_size=2) == 2
 
 
-def test_batch_financials_uses_canonical_symbol_path(tmp_path, monkeypatch):
+def test_financials_uses_canonical_symbol_path(tmp_path):
     from data.datahub import DataHub
-    import scripts.batch_fetch_financials as batch
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
-    monkeypatch.setattr(batch, "HUB", hub)
-    monkeypatch.setattr(batch, "CACHE_DIR", hub.stock_data_dir("financials"))
+    expected = tmp_path / "store" / "stock" / "financials" / "000001.parquet"
 
-    assert batch.cache_path("000001") == tmp_path / "store" / "stock" / "financials" / "000001.parquet"
+    assert hub.stock_financial_path("000001") == expected
