@@ -70,13 +70,21 @@ def _evict_lru():
 
 
 def _parse_pct(val) -> float:
-    """解析百分比字符串 '54.27%' → 0.5427"""
+    """解析百分比字符串 '54.27%' → 0.5427, 纯数字按百分比处理"""
+    if val is None or val == "False" or val == "":
+        return 0.0
     if isinstance(val, (int, float)):
-        return float(val) / 100 if abs(float(val)) > 1 else float(val)
+        v = float(val)
+        if pd.isna(v):
+            return 0.0
+        return v / 100 if abs(v) > 1 else v
     if isinstance(val, str):
+        has_pct = "%" in val
         val = val.replace("%", "").replace(",", "")
         try:
             f = float(val)
+            if has_pct:
+                return f / 100
             return f / 100 if abs(f) > 1 else f
         except ValueError:
             return 0.0

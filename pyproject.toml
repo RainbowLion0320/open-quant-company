@@ -1,0 +1,25 @@
+[project]
+name = "quant-agent"
+version = "0.1.0"
+description = "个人A股量化AI — 巴菲特价值投资 + 钱学森控制论"
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = [
+    "backtest*",
+    "broker*",
+    "cybernetics*",
+    "data*",
+    "models*",
+    "notify*",
+    "scripts*",
+    "signals*",
+    "web*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

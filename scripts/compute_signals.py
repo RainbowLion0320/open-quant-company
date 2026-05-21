@@ -465,4 +465,6 @@ def _load_prev_signals(strategy: str) -> list[dict] | None:
 
 
 if __name__ == '__main__':
-    main()
+    from data.cron_logger import cron_run
+    with cron_run("compute_signals"):
+        main()

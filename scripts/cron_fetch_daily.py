@@ -269,3 +269,6 @@ if __name__ == "__main__":
         results["adj_factor"] = fetch_adj_factor(pool_size=args.pool)
 
     print(f"\nDone. Results: { {k: v for k, v in results.items() if v} }")
+
+    from data.cron_logger import log_cron_success
+    log_cron_success("cron_fetch_daily", **{k: v for k, v in results.items() if v})

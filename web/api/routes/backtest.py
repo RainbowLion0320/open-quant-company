@@ -1,7 +1,7 @@
 """回测分析路由 — 多策略对比"""
 
+import json
 from fastapi import APIRouter
-import pickle
 from pathlib import Path
 
 router = APIRouter(prefix="/api/backtest", tags=["Backtest"])
@@ -9,40 +9,53 @@ router = APIRouter(prefix="/api/backtest", tags=["Backtest"])
 _DATA = Path(__file__).resolve().parent.parent.parent.parent / "data"
 
 
+def _safe_load(path: Path) -> dict:
+    """安全加载回测结果 — 优先 JSON, fallback pickle (仅限已知文件)"""
+    json_path = path.with_suffix(".json")
+    if json_path.exists():
+        with open(json_path) as f:
+            return json.load(f)
+    if path.exists() and path.suffix == ".pkl":
+        import pickle
+        with open(path, "rb") as f:
+            return pickle.load(f)
+    return {}
+
+
 @router.get("")
 async def backtest_overview():
     """三策略对比概览"""
     cmp_path = _DATA / "backtest_comparison.pkl"
-    if not cmp_path.exists():
-        # fallback to old single-strategy result
-        old = _DATA / "backtest_monthly_result.pkl"
-        if old.exists():
-            with open(old, "rb") as f:
-                d = pickle.load(f)
-            return {"strategies": {"multifactor": _extract(d)}, "bench_return": d.get("bench_return", 0)}
+    data = _safe_load(cmp_path)
+    if data:
+        return {
+            "strategies": data.get("strategies", {}),
+            "bench_return": data.get("bench_return", 0),
+            "start": data.get("start", ""),
+            "end": data.get("end", ""),
+        }
 
-        return {"error": "No backtest results. Run backtest/run_all_strategies.py first."}
+    # fallback to old single-strategy result
+    old = _DATA / "backtest_monthly_result.pkl"
+    d = _safe_load(old)
+    if d:
+        return {"strategies": {"multifactor": _extract(d)}, "bench_return": d.get("bench_return", 0)}
 
-    with open(cmp_path, "rb") as f:
-        cmp = pickle.load(f)
-
-    return {
-        "strategies": cmp.get("strategies", {}),
-        "bench_return": cmp.get("bench_return", 0),
-        "start": cmp.get("start", ""),
-        "end": cmp.get("end", ""),
-    }
+    return {"error": "No backtest results. Run backtest/run_all_strategies.py first."}
 
 
 @router.get("/{strategy}")
 async def strategy_detail(strategy: str):
     """单个策略详细数据（净值曲线）"""
-    path = _DATA / f"backtest_{strategy}.pkl"
-    if not path.exists():
-        return {"error": f"No backtest results for {strategy}"}
+    from data.registry import list_strategy_names
+    valid = list_strategy_names()
+    if strategy not in valid:
+        return {"error": f"Unknown strategy: {strategy}"}
 
-    with open(path, "rb") as f:
-        data = pickle.load(f)
+    path = _DATA / f"backtest_{strategy}.pkl"
+    data = _safe_load(path)
+    if not data:
+        return {"error": f"No backtest results for {strategy}"}
 
     daily = data.get("daily_returns")
     bench = data.get("bench_returns")

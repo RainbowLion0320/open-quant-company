@@ -14,6 +14,7 @@ import os
 import re
 import hashlib
 import uuid
+import fcntl
 from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
@@ -291,19 +292,27 @@ class DataHub:
         else:
             new_df = pd.DataFrame(list(rows))
 
-        existing = self.read_parquet(target, default=pd.DataFrame())
-        merged = pd.concat([existing, new_df], ignore_index=True) if existing is not None and len(existing) else new_df
+        lock_path = target.with_suffix(".lock")
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(lock_path, "w") as lock_f:
+            fcntl.flock(lock_f, fcntl.LOCK_EX)
+            try:
+                existing = self.read_parquet(target, default=pd.DataFrame())
+                merged = pd.concat([existing, new_df], ignore_index=True) if existing is not None and len(existing) else new_df
 
-        if dedupe_subset:
-            subset = [c for c in dedupe_subset if c in merged.columns]
-            if subset:
-                merged = merged.drop_duplicates(subset=subset, keep="last")
-        if sort_by:
-            cols = [c for c in sort_by if c in merged.columns]
-            if cols:
-                merged = merged.sort_values(cols)
+                if dedupe_subset:
+                    subset = [c for c in dedupe_subset if c in merged.columns]
+                    if subset:
+                        merged = merged.drop_duplicates(subset=subset, keep="last")
+                if sort_by:
+                    cols = [c for c in sort_by if c in merged.columns]
+                    if cols:
+                        merged = merged.sort_values(cols)
 
-        return self.write_parquet(merged, target)
+                result = self.write_parquet(merged, target)
+            finally:
+                fcntl.flock(lock_f, fcntl.LOCK_UN)
+        return result
 
     def latest_batch(self, path: str | os.PathLike, ts_col: str = "computed_at") -> pd.DataFrame:
         df = self.read_parquet(path, default=pd.DataFrame())

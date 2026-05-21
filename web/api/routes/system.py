@@ -251,6 +251,17 @@ import uuid as _uuid
 
 _repair_jobs: dict[str, dict] = {}
 _repair_lock = threading.Lock()
+_REPAIR_JOBS_MAX = 50
+
+
+def _cleanup_old_repair_jobs():
+    """Evict completed jobs when the dict exceeds max size."""
+    if len(_repair_jobs) <= _REPAIR_JOBS_MAX:
+        return
+    completed = [(jid, info) for jid, info in _repair_jobs.items()
+                 if info.get("status") in ("done", "failed")]
+    for jid, _ in completed[:len(completed) - 10]:
+        del _repair_jobs[jid]
 
 
 def _repairable_tables() -> set[str]:
@@ -299,6 +310,7 @@ async def repair_table(table_name: str):
             if info.get("table") == table_name and info["status"] == "running":
                 return {"status": "error", "message": f"Repair already in progress for {table_name}", "job_id": jid}
 
+        _cleanup_old_repair_jobs()
         job_id = _uuid.uuid4().hex[:12]
         _repair_jobs[job_id] = {"table": table_name, "status": "pending", "stdout": "", "stderr": "", "exit_code": None}
 

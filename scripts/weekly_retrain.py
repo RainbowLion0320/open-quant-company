@@ -43,4 +43,6 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    from data.cron_logger import cron_run
+    with cron_run("weekly_retrain"):
+        sys.exit(main())

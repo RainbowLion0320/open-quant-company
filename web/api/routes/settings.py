@@ -75,9 +75,19 @@ async def update_settings(config: dict):
 
     请求体应为完整的 YAML 配置字典。
     写入前会自动备份原文件到 config/settings.yaml.bak。
+    必须包含核心配置段，防止误删关键配置。
     """
     if not config:
         raise HTTPException(status_code=400, detail="Empty config body")
+
+    REQUIRED_SECTIONS = {"strategies", "risk_control"}
+    missing = REQUIRED_SECTIONS - set(config.keys())
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required config sections: {missing}. "
+                   f"Use PATCH /api/settings/section for partial updates.",
+        )
 
     try:
         _write_config(config)
@@ -91,3 +101,15 @@ async def update_settings(config: dict):
         "path": _config_path(),
         "top_level_keys": list(config.keys()),
     }
+
+
+@router.patch("/section/{section}")
+async def update_section(section: str, data: dict):
+    """部分更新：只修改指定配置段，不影响其他段"""
+    config = _read_config()
+    config[section] = data
+    try:
+        _write_config(config)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write config: {e}")
+    return {"status": "saved", "section": section}

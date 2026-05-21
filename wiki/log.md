@@ -4,7 +4,37 @@ created: 2026-05-13
 updated: 2026-05-21
 type: meta
 
-## 2026-05-21 — Cron 重组 + 数据目录重整 + DB Health 强化 + DeepSeek CDP 流水
+## 2026-05-21 — 全面 Bug 审查 + 架构优化 (claudecode)
+
+### 已修复 (20+ 项)
+详见 git commit `claudecode: 地毯式bug审查修复 20 项`
+
+### 后续迭代注意事项 (Tech Debt / Known Issues)
+
+#### 1. `_parse_pct` 数据源格式依赖
+- **现状**: 已修复为"有 % 符号则一定除以 100"，但纯数字路径仍用 `abs > 1` 启发式
+- **风险**: 如果未来接入新数据源（如 Tushare fina_indicator 返回小数形式 0.15 表示 15%），需要在入库时统一格式
+- **建议**: 在 `data/fetchers/` 各 fetcher 的入库层做格式标准化，而非在读取层猜测
+
+#### 2. 回测引擎缺乏系统性前视防护
+- **现状**: 已修复 `build_monthly_regime` 和 `multi_asset_tournament` 的前视偏差
+- **建议**: 在 `run_backtest` 入口加 `assert prices.index.max() <= end` 防护；`get_stock_daily` 加 `as_of` 参数截断未来数据
+
+#### 3. Web API 无认证
+- **现状**: 所有 API 端点无鉴权，settings PUT 已加 schema 校验但仍可被任意客户端调用
+- **建议**: Phase 3 实盘前必须加 API Key 或 JWT 认证中间件
+
+#### 4. Pickle 序列化遗留
+- **现状**: `backtest.py` 路由已加策略白名单校验，但仍使用 pickle 加载
+- **建议**: 回测结果改为 JSON 序列化（净值曲线用 parquet），逐步淘汰 .pkl 文件
+
+#### 5. sys.path.insert 散布
+- **现状**: 已添加 `pyproject.toml` 支持 `pip install -e .`，但 20+ 个文件仍有 sys.path.insert
+- **建议**: 逐步移除各文件的 sys.path 操作，统一用包导入。优先级低，不影响正确性
+
+#### 6. DuckDB 连接管理
+- **现状**: `get_db()` 改为单例不再每次重建，但读写模式切换未处理
+- **建议**: 如需写操作，应调用 `reset_db()` 后再 `get_db(read_only=False)`，或分离读写连接
 
 ### Cron 按频率重组
 - 新建 `scripts/cron_fetch_daily.py`: OHLCV+估值+复权+资金流+基金+期货+Shibor 日频一站式拉取

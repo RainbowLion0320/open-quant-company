@@ -379,8 +379,10 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # 普通日执行
-    run_date = date.fromisoformat(args.date) if args.date else None
-    execute_daily(run_date=run_date, dry_run=args.dry_run,
-                  init_cash=args.init_cash, limit=args.limit)
+    from data.cron_logger import cron_run
+    with cron_run("execute_paper_trades"):
+        run_date = date.fromisoformat(args.date) if args.date else None
+        execute_daily(run_date=run_date, dry_run=args.dry_run,
+                      init_cash=args.init_cash, limit=args.limit)
 
     sys.exit(0)
