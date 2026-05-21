@@ -6,7 +6,6 @@ import os, sys, pickle
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
 for k in list(os.environ.keys()):
     if k.lower() in ('http_proxy','https_proxy','all_proxy'):
         del os.environ[k]

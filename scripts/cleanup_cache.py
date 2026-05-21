@@ -17,7 +17,6 @@ Cache cleanup — remove stale parquet files beyond retention.
 import sys, os, time, argparse
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data.datahub import get_datahub
 

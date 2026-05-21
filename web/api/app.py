@@ -11,7 +11,6 @@ if _env_path.exists():
     from dotenv import load_dotenv
     load_dotenv(_env_path)
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
     os.environ.pop(key, None)

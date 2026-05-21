@@ -10,7 +10,6 @@ from typing import List, Dict
 import pandas as pd
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data.symbols import CIRCLE_STOCKS, SYMBOL_NAME, SYMBOL_INDUSTRY
 from data.fetcher import get_stock_daily

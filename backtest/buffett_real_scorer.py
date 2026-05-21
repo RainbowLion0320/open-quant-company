@@ -12,7 +12,6 @@ import pandas as pd
 import numpy as np
 
 # 项目根
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def create_buffett_real_scorer(pool):

@@ -13,7 +13,6 @@ from typing import Dict, List, Optional
 import pandas as pd
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from backtest.strategies.base import BaseStrategy
 from signals.expression import alpha_factors

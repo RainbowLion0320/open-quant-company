@@ -6,7 +6,6 @@ Optuna 超参数优化 + 模型训练 + 评估
 """
 import os, sys, time, json
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 for k in list(os.environ.keys()):
     if k.lower() in ('http_proxy', 'https_proxy', 'all_proxy'):

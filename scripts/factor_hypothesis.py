@@ -19,7 +19,6 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
 
 from data.datahub import get_datahub
 

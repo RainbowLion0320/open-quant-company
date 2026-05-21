@@ -8,7 +8,6 @@ for k in list(os.environ.keys()):
         del os.environ[k]
 os.environ['no_proxy'] = '*'
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
 
 import pandas as pd
 import numpy as np

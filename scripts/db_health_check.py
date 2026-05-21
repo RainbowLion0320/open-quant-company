@@ -22,7 +22,6 @@ import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
 from data.datahub import get_datahub
 from data.data_registry import HealthTableMeta, get_registry

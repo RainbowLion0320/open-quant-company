@@ -35,7 +35,6 @@ import yaml
 
 # 项目根
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
 
 from broker import PaperBroker
 from broker.persistence import (

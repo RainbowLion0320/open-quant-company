@@ -26,7 +26,6 @@ import pandas as pd
 import akshare as ak
 
 PROJECT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT))
 
 from data.datahub import get_datahub
 

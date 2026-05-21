@@ -17,7 +17,6 @@ from pathlib import Path
 socket.setdefaulttimeout(30)
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
 
 for key in list(os.environ):
     if key.lower() in ("http_proxy", "https_proxy", "all_proxy"):

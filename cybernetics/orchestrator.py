@@ -193,7 +193,6 @@ def detect_market_regime(
     if index_data is None or symbol not in index_data:
         try:
             import sys, os
-            sys.path.insert(0, os.path.expanduser("~/quant-agent"))
             from data.fetcher import get_index_daily
             df = get_index_daily(symbol, force_refresh=False)
         except Exception:
@@ -309,7 +308,6 @@ class QuantOrchestrator:
         import sys, os
 
         # 获取真实指数数据
-        sys.path.insert(0, os.path.expanduser("~/quant-agent"))
         from data.fetcher import get_index_daily
         df = get_index_daily("sh000001", force_refresh=False)
 

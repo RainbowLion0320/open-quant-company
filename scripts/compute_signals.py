@@ -31,7 +31,6 @@ import socket
 socket.setdefaulttimeout(30)
 
 PROJECT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT))
 
 import pandas as pd
 import numpy as np

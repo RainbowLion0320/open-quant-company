@@ -4,10 +4,22 @@ created: 2026-05-13
 updated: 2026-05-21
 type: meta
 
-## 2026-05-21 — 全面 Bug 审查 + 架构优化 (claudecode)
+## 2026-05-21 — 全面 Bug 审查 + 架构优化 + 锦标赛重跑 (claudecode)
 
 ### 已修复 (20+ 项)
-详见 git commit `claudecode: 地毯式bug审查修复 20 项`
+详见 git commit:
+- `claudecode: 地毯式bug审查修复 20 项 — 回测前视偏差/指标公式/数据层/风控`
+- `claudecode: 二轮修复 + 架构优化 — 安全/可观测性/包管理/竞态`
+- `claudecode: 清理37处 sys.path.insert + 重跑锦标赛`
+
+### 锦标赛重跑 (50股, 基准修复后)
+- 🥇 多因子: +91.98% | MaxDD -23.8%
+- 🥈 LightGBM: +70.28% | MaxDD -13.2%
+- 🥉 控制论: +54.61% | MaxDD -17.6%
+- 基准 (上证): +35.48%
+
+### sys.path 清理
+移除全部 37 处 sys.path.insert，统一用 pyproject.toml + pip install -e .
 
 ### 后续迭代注意事项 (Tech Debt / Known Issues)
 

@@ -22,7 +22,6 @@ from typing import Optional
 import pandas as pd
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data.datahub import get_datahub
 from data.symbols import CIRCLE_STOCKS

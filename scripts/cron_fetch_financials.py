@@ -11,7 +11,6 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
 from data.fetchers.financial import fetch_financial_summary, fetch_valuation
 from data.symbols import CIRCLE_STOCKS
