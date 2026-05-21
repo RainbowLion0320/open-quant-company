@@ -56,6 +56,7 @@ class SectorStrength(Enum):
 class MarketContext:
     """市场环境快照 — 顶层"""
     regime: MarketRegime = MarketRegime.UNKNOWN
+    regime_score: float = 50.0      # 0-100 市场健康度连续评分
     index_ma_trend: str = ""        # 均线排列（多头/空头）
     volume_trend: str = ""          # 放量/缩量
     breadth: float = 0.0            # 市场宽度（涨跌比）
@@ -177,6 +178,34 @@ def generate_feedback(
 # =====================================================================
 # 3. 自适应机制 (Adaptive)
 # =====================================================================
+
+def _compute_regime_score(close, ma5, ma20, ma60, breadth, regime: MarketRegime) -> float:
+    """Compute a 0-100 continuous market health score from MA alignment, momentum, and breadth."""
+    current = close[-1]
+
+    # Trend alignment (0-50): how well are MAs ordered
+    if current > ma5 > ma20 > ma60:
+        trend_score = 50.0
+    elif current < ma5 < ma20 < ma60:
+        trend_score = 0.0
+    else:
+        # Partial alignment: count how many pairwise relations are bullish
+        pairs = [(current, ma5), (ma5, ma20), (ma20, ma60)]
+        bullish = sum(1 for a, b in pairs if a > b)
+        trend_score = bullish / 3 * 50.0
+
+    # Short-term momentum (0-25): price vs MA20
+    if ma20 > 0:
+        pct_from_ma20 = (current / ma20 - 1) * 100
+        momentum_score = min(25.0, max(0.0, 12.5 + pct_from_ma20 * 2.5))
+    else:
+        momentum_score = 12.5
+
+    # Breadth (0-25)
+    breadth_score = breadth * 25.0
+
+    return round(trend_score + momentum_score + breadth_score, 1)
+
 
 def detect_market_regime(
     index_data: dict = None,  # 指数数据 {symbol: df}，不传则自动拉取
@@ -356,6 +385,7 @@ class QuantOrchestrator:
 
         self.market_snapshot = MarketContext(
             regime=self.regime,
+            regime_score=_compute_regime_score(close, ma5, ma20, ma60, breadth, self.regime),
             index_ma_trend=f"MA5:{ma5:.0f} MA20:{ma20:.0f} MA60:{ma60:.0f} → {ma_trend}",
             volume_trend=vol_trend,
             breadth=breadth,

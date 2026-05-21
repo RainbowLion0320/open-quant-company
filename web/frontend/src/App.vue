@@ -88,15 +88,15 @@ import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import { useParticles } from "./charts/particles";
 import { api } from "./api";
-import type { MarketResponse } from "./api";
+import type { RegimeResponse } from "./api";
 
 const route = useRoute();
 const hovered = ref("");
 const clock = ref("");
 let clockTimer = 0;
 let regimeTimer = 0;
-const regime = ref<{ value: string }>({ value: "sideways" });
-const marketMeta = ref<Partial<MarketResponse>>({});
+const regime = ref<{ value: string; score?: number }>({ value: "sideways" });
+const marketMeta = ref<Partial<RegimeResponse>>({});
 
 const nav = [
   { path: "/", label: "市场总览", pathData: "M4 17V7l8-4 8 4v10l-8 4-8-4Zm4-1 4 2 4-2V9l-4-2-4 2v7Zm2-1.5h4M10 11h4" },
@@ -147,7 +147,7 @@ function isActive(path: string) {
 
 async function fetchRegime() {
   try {
-    const data = await api.market();
+    const data = await api.marketRegime();
     regime.value = data.regime;
     marketMeta.value = data;
   } catch {}

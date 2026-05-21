@@ -111,15 +111,20 @@ export interface MarketAlert {
 export interface MarketResponse {
   regime: RegimeData;
   kline: KlinePoint[];
-  config: Record<string, any>;
-  registry: StrategyMeta[];
+  range?: string;
   multi_asset?: MarketAssetCard[];
   macro?: MacroCard[];
   strategy_matrix?: StrategyMatrixRow[];
-  alerts?: MarketAlert[];
   freshness?: { market: string; macro: string };
   pool_size?: number;
   updated?: string;
+}
+
+export interface RegimeResponse {
+  regime: RegimeData & { score?: number };
+  multi_asset: MarketAssetCard[];
+  freshness: { market: string };
+  updated: string;
 }
 
 export interface StrategySignal {
@@ -240,6 +245,7 @@ function pct(v: unknown): number | undefined {
 export const api = {
   // Market
   market: () => get<MarketResponse>("/api/market"),
+  marketRegime: () => get<RegimeResponse>("/api/market/regime"),
 
   // Strategies
   strategies: () => get<StrategiesResponse>("/api/strategies"),

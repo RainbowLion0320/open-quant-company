@@ -48,8 +48,8 @@ vol_factor = Std(Delta(close, 1), 5)
 vol = compute_series(vol_factor, df)
 check("波动率计算", vol.dropna().mean() > 0)
 
-# Parse formula via dsl_parser
-parsed = compute_formula("Delta(close,3)/close", df, len(df)-1)
+# Parse formula via dsl_parser (bare column names, no _t suffix)
+parsed = compute_formula("Delta(close,3)/close_t", df, len(df)-1)
 check("公式解析", not pd.isna(parsed))
 
 # Edge cases

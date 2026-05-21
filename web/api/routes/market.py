@@ -1,9 +1,8 @@
 """市场数据路由"""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from datetime import datetime
 import pandas as pd
-import yaml
 from pathlib import Path
 
 from data.datahub import get_datahub
@@ -12,6 +11,9 @@ router = APIRouter(prefix="/api/market", tags=["Market"])
 
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
 HUB = get_datahub()
+
+# Kline range → tail rows mapping
+_RANGE_TAIL = {"1D": 2, "1M": 22, "6M": 126, "YTD": 252}
 
 
 def _num(v, default=0.0) -> float:
@@ -91,9 +93,20 @@ def _load_macro(name: str) -> pd.DataFrame | None:
     try:
         df = HUB.read_parquet(path)
         if "date" not in df.columns:
+            # Try date-like columns: "date", "日期", "quarter" (e.g. "2024Q4")
             date_col = next((c for c in df.columns if "date" in str(c).lower() or "日期" in str(c)), None)
             if date_col:
                 df = df.rename(columns={date_col: "date"})
+            elif "quarter" in df.columns:
+                def _quarter_to_date(q: str) -> str:
+                    """Convert '2024Q4' → '2024-10-01'"""
+                    q = str(q).strip()
+                    m = {"Q1": "01", "Q2": "04", "Q3": "07", "Q4": "10"}
+                    for suffix, month in m.items():
+                        if suffix in q:
+                            return q.replace(suffix, "") + "-" + month + "-01"
+                    return q
+                df["date"] = df["quarter"].apply(_quarter_to_date)
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
         return df.dropna(subset=["date"]).sort_values("date")
     except Exception:
@@ -134,8 +147,6 @@ def _multi_asset_cards(bench: pd.DataFrame) -> list[dict]:
     bond = _load_bond_yield()
     cards.append(_series_card("bond10y", "10Y国债", "CN10Y", bond, "中国国债收益率10年", "%"))
 
-    shibor = _load_macro("shibor")
-    cards.append(_series_card("cash", "资金利率", "SHIBOR 1W", shibor, "1W-定价", "%"))
     return cards
 
 
@@ -177,54 +188,49 @@ def _strategy_matrix() -> list[dict]:
     return rows
 
 
-def _alerts(regime: dict, macro: list[dict], multi_asset: list[dict], strategies: list[dict]) -> list[dict]:
-    items = []
-    items.append({
-        "level": "success" if regime["value"] == "bull" else "warning" if regime["value"] == "sideways" else "danger",
-        "title": f"市场状态: {regime['value']}",
-        "detail": regime["ma_trend"],
-        "time": datetime.now().strftime("%H:%M"),
-    })
-    gold = next((x for x in multi_asset if x["key"] == "gold"), None)
-    if gold and abs(gold.get("change_pct") or 0) >= 0.01:
-        items.append({
-            "level": "success" if gold["change_pct"] > 0 else "danger",
-            "title": "黄金ETF波动扩大",
-            "detail": f"{gold['symbol']} {gold['change_pct'] * 100:+.2f}%",
-            "time": datetime.now().strftime("%H:%M"),
-        })
-    pmi = next((x for x in macro if x["key"] == "pmi"), None)
-    if pmi and pmi.get("value") is not None and pmi["value"] < 50:
-        items.append({
-            "level": "warning",
-            "title": "制造业PMI低于荣枯线",
-            "detail": f"最新 {pmi['value']:.1f}, 前值 {pmi['prev']:.1f}",
-            "time": pmi.get("date", "")[-5:],
-        })
-    if strategies:
-        best = max(strategies, key=lambda x: x.get("buy_ratio", 0))
-        items.append({
-            "level": "info",
-            "title": "策略扫描完成",
-            "detail": f"{best['label']} 买入占比 {best['buy_ratio'] * 100:.1f}%",
-            "time": (best.get("last_computed") or "")[11:16],
-        })
-    return items[:6]
+@router.get("/regime")
+async def market_regime():
+    """轻量端点: 仅返回顶栏遥测所需数据 (regime + 跨资产 + 新鲜度)。App.vue 每60s轮询。"""
+    from cybernetics.orchestrator import QuantOrchestrator
+    from data.fetcher import get_index_daily
+
+    orch = QuantOrchestrator()
+    snapshot = orch.detect()
+
+    bench = get_index_daily("sh000001")
+    bench["date"] = pd.to_datetime(bench["date"])
+    multi_asset = _multi_asset_cards(bench)
+
+    return {
+        "regime": {
+            "value": snapshot.regime.value,
+            "score": snapshot.regime_score,
+            "ma_trend": snapshot.index_ma_trend,
+            "volume_trend": snapshot.volume_trend,
+            "breadth": round(snapshot.breadth, 2),
+        },
+        "multi_asset": multi_asset,
+        "freshness": {
+            "market": str(bench.iloc[-1]["date"])[:10] if len(bench) else "",
+        },
+        "updated": datetime.now().strftime("%H:%M"),
+    }
 
 
 @router.get("")
-async def market_overview():
-    """市场总览: regime + K线 + 策略配置"""
+async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|YTD)$")):
+    """市场总览: regime + K线 + 跨资产 + 宏观 + 策略矩阵"""
     from cybernetics.orchestrator import QuantOrchestrator
 
     orch = QuantOrchestrator()
     snapshot = orch.detect()
-    params = orch.get_params()
 
     from data.fetcher import get_index_daily
     bench = get_index_daily("sh000001")
     bench["date"] = pd.to_datetime(bench["date"])
-    recent = bench.tail(120)
+
+    tail = _RANGE_TAIL.get(range, 126)
+    recent = bench.tail(tail)
 
     kline = []
     for _, row in recent.iterrows():
@@ -237,15 +243,9 @@ async def market_overview():
             "volume": int(row["volume"]),
         })
 
-    config_path = ROOT / "config" / "settings.yaml"
-    with open(config_path) as f:
-        cfg = yaml.safe_load(f)
-
-    from data.registry import get_enabled_strategies
-    from data.symbols import CIRCLE_STOCKS
-
     regime = {
         "value": snapshot.regime.value,
+        "score": snapshot.regime_score,
         "ma_trend": snapshot.index_ma_trend,
         "volume_trend": snapshot.volume_trend,
         "breadth": round(snapshot.breadth, 2),
@@ -256,25 +256,15 @@ async def market_overview():
 
     return {
         "regime": regime,
-        "params": params,
         "kline": kline,
+        "range": range,
         "multi_asset": multi_asset,
         "macro": macro,
         "strategy_matrix": strategy_matrix,
-        "alerts": _alerts(regime, macro, multi_asset, strategy_matrix),
         "freshness": {
             "market": str(recent.iloc[-1]["date"])[:10] if len(recent) else "",
             "macro": max([m.get("date", "") for m in macro] or [""]),
         },
-        "config": {
-            "project": cfg.get("project", {}),
-            "buffett": cfg.get("buffett", {}),
-            "cybernetics": cfg.get("cybernetics", {}),
-            "multifactor": cfg.get("signals", {}).get("multifactor", {}),
-            "backtest": cfg.get("backtest", {}),
-            "trading": cfg.get("trading", {}),
-        },
-        "registry": get_enabled_strategies(),
-        "pool_size": len(CIRCLE_STOCKS),
+        "pool_size": orch.params.get("max_positions", 0),
         "updated": datetime.now().strftime("%H:%M"),
     }

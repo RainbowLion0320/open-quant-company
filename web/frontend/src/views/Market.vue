@@ -31,7 +31,9 @@
       <div class="index-panel glass-card">
         <div class="panel-head">
           <span>SHANGHAI COMPOSITE INDEX</span>
-          <div class="time-tabs"><span class="active">1D</span><span>1M</span><span>6M</span><span>YTD</span></div>
+          <div class="time-tabs">
+            <span v-for="t in timeRanges" :key="t.key" :class="{ active: selectedRange === t.key }" @click="switchRange(t.key)">{{ t.label }}</span>
+          </div>
         </div>
         <div class="index-summary">
           <strong>{{ latestClose }}</strong>
@@ -46,22 +48,22 @@
         </div>
       </div>
 
-      <div class="alerts-panel glass-card">
+      <div class="macro-panel glass-card">
         <div class="panel-head">
-          <span>ALERTS</span>
-          <small>{{ alerts.length }} active</small>
+          <span>MACRO INDICATORS</span>
+          <small>GDP · PMI · CPI · SHIBOR</small>
         </div>
-        <div v-if="alerts.length" class="alerts-list">
-          <div v-for="item in alerts" :key="item.title + item.time" class="alert-row" :class="`alert-${item.level}`">
-            <i></i>
-            <div>
-              <strong>{{ item.title }}</strong>
-              <span>{{ item.detail }}</span>
-            </div>
-            <em>{{ item.time || '—' }}</em>
-          </div>
+        <div class="macro-grid">
+          <article v-for="m in macro" :key="m.key">
+            <span>{{ m.label }}</span>
+            <strong :style="{ color: macroColor(m) }">{{ fmtValue(m.value, m.unit) }}</strong>
+            <em>prev {{ fmtValue(m.prev, m.unit) }}</em>
+            <svg viewBox="0 0 120 34" preserveAspectRatio="none" class="microline">
+              <polyline :points="sparkPoints(m.series, 120, 34)" :stroke="macroColor(m)" />
+            </svg>
+          </article>
         </div>
-        <div v-else class="panel-empty">暂无活跃告警</div>
+        <div v-if="!macro.length" class="panel-empty">暂无宏观指标数据</div>
       </div>
     </section>
 
@@ -89,7 +91,7 @@
       </article>
     </section>
 
-    <section class="lower-grid">
+    <section class="strategy-section">
       <div class="strategy-panel glass-card">
         <div class="panel-head">
           <span>STRATEGY SIGNAL MATRIX</span>
@@ -133,104 +135,31 @@
         </table>
         <div v-if="!matrix.length" class="panel-empty table-empty">暂无策略矩阵，等待扫描结果</div>
       </div>
-
-      <aside class="right-stack">
-        <div class="activity-panel glass-card">
-          <div class="panel-head">
-            <span>HERMES ACTIVITY</span>
-            <small>{{ systemAge }}</small>
-          </div>
-          <div class="token-row">
-            <div><span>Tokens</span><strong>{{ fmtNum(system?.token?.total?.total_tokens || 0) }}</strong></div>
-            <div><span>Cost</span><strong>${{ (system?.token?.total?.cost_usd || 0).toFixed(4) }}</strong></div>
-            <div><span>Sessions</span><strong>{{ system?.token?.hermes?.sessions || 0 }}</strong></div>
-          </div>
-          <div class="resource-grid">
-            <div v-for="r in resources" :key="r.label" class="resource-gauge">
-              <span>{{ r.label }}</span>
-              <strong>{{ r.value }}%</strong>
-              <div><i :style="{ width: `${Math.min(100, r.value)}%`, background: r.color }"></i></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="macro-panel glass-card">
-          <div class="panel-head">
-            <span>MACRO INDICATORS</span>
-            <small>GDP · PMI · CPI · SHIBOR</small>
-          </div>
-          <div class="macro-grid">
-            <article v-for="m in macro" :key="m.key">
-              <span>{{ m.label }}</span>
-              <strong :style="{ color: macroColor(m) }">{{ fmtValue(m.value, m.unit) }}</strong>
-              <em>prev {{ fmtValue(m.prev, m.unit) }}</em>
-              <svg viewBox="0 0 120 34" preserveAspectRatio="none" class="microline">
-                <polyline :points="sparkPoints(m.series, 120, 34)" :stroke="macroColor(m)" />
-              </svg>
-            </article>
-          </div>
-          <div v-if="!macro.length" class="panel-empty">暂无宏观指标数据</div>
-        </div>
-      </aside>
     </section>
-
-    <details class="control-deck glass-card">
-      <summary>
-        <span>STRATEGY PARAMETER BAY</span>
-        <em>保留原始策略调参能力，避免占用首屏决策区</em>
-      </summary>
-      <div v-if="registry.length" class="param-grid">
-        <div v-for="s in registry" :key="s.name" class="param-block">
-          <div class="param-title" :style="{ color: s.color }">{{ s.label }}</div>
-
-          <template v-if="s.name === 'buffett'">
-            <SliderGroup label="ROE ≥" :val="fmtPct(edit.buffett_roe)" :model="edit.buffett_roe" @u="v=>edit.buffett_roe=v" :min="5" :max="30" color="var(--accent)" />
-            <SliderGroup label="毛利率 ≥" :val="fmtPct(edit.buffett_gm)" :model="edit.buffett_gm" @u="v=>edit.buffett_gm=v" :min="5" :max="50" color="var(--accent)" />
-            <SliderGroup label="D/E ≤" :val="edit.buffett_de.toFixed(1)" :model="edit.buffett_de" @u="v=>edit.buffett_de=v" :min="0.5" :max="3" :step="0.1" color="var(--accent)" />
-          </template>
-
-          <template v-if="s.name === 'multifactor'">
-            <SliderGroup label="质量" :val="fmtPct(edit.mf_quality)" :model="edit.mf_quality" @u="v=>edit.mf_quality=v" :min="10" :max="60" :step="5" color="var(--positive)" />
-            <SliderGroup label="估值" :val="fmtPct(edit.mf_valuation)" :model="edit.mf_valuation" @u="v=>edit.mf_valuation=v" :min="10" :max="60" :step="5" color="var(--positive)" />
-            <SliderGroup label="买入阈值" :val="edit.mf_threshold.toString()" :model="edit.mf_threshold" @u="v=>edit.mf_threshold=v" :min="30" :max="75" :step="5" color="var(--positive)" />
-          </template>
-
-          <template v-if="s.name === 'cybernetic'">
-            <SliderGroup label="牛市仓位" :val="fmtPct(edit.cy_bull_pos)" :model="edit.cy_bull_pos" @u="v=>edit.cy_bull_pos=v" :min="10" :max="50" :step="5" color="var(--positive)" />
-            <SliderGroup label="震荡仓位" :val="fmtPct(edit.cy_side_pos)" :model="edit.cy_side_pos" @u="v=>edit.cy_side_pos=v" :min="5" :max="30" :step="5" color="var(--warning)" />
-            <SliderGroup label="熊市仓位" :val="fmtPct(edit.cy_bear_pos)" :model="edit.cy_bear_pos" @u="v=>edit.cy_bear_pos=v" :min="1" :max="15" color="var(--negative)" />
-          </template>
-
-          <template v-if="s.name === 'ml_lgbm'">
-            <p class="param-note">Regime-aware LightGBM 由周度训练管线更新，参数记录在模型注册表。</p>
-          </template>
-        </div>
-      </div>
-      <div class="param-actions">
-        <button @click="resetParams" class="btn btn-ghost btn-sm">重置</button>
-        <button @click="saveParams" class="btn btn-primary btn-sm">保存参数</button>
-      </div>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, reactive, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useMarketStore } from "../stores";
 import { useECharts, QUANTUM_THEME } from "../charts/useECharts";
-import SliderGroup from "../components/SliderGroup.vue";
-import { api, type SystemMonitor, type MarketSeriesPoint, type MacroCard } from "../api";
+import type { MacroCard, MarketSeriesPoint } from "../api";
 
 const store = useMarketStore();
-const system = ref<SystemMonitor | null>(null);
 const chartRef = ref<HTMLElement | null>(null);
 const { init: initChart, setOption } = useECharts(chartRef);
+const selectedRange = ref("6M");
+
+const timeRanges = [
+  { key: "1D", label: "1D" },
+  { key: "1M", label: "1M" },
+  { key: "6M", label: "6M" },
+  { key: "YTD", label: "YTD" },
+];
 
 const assets = computed(() => store.multiAsset || []);
 const macro = computed(() => store.macro || []);
 const matrix = computed(() => store.strategyMatrix || []);
-const alerts = computed(() => store.alerts || []);
-const registry = computed(() => store.registry || []);
 
 const latestClose = computed(() => {
   const k = store.kline?.at?.(-1);
@@ -263,23 +192,9 @@ const regimeColor = computed(() => {
   return "var(--warning)";
 });
 const regimeScore = computed(() => {
-  const r = store.regime?.value;
-  if (r === "bull") return 82;
-  if (r === "bear") return 24;
-  return 56;
-});
-const systemAge = computed(() => system.value?.timestamp?.slice?.(11, 19) || "no telemetry");
-const resources = computed(() => [
-  { label: "CPU", value: Math.round(system.value?.cpu?.percent || 0), color: "var(--accent)" },
-  { label: "MEM", value: Math.round(system.value?.memory?.percent || 0), color: "var(--positive)" },
-  { label: "DISK", value: Math.round(system.value?.disk?.percent || 0), color: "var(--warning)" },
-]);
-
-const edit = reactive({
-  buffett_roe: 15, buffett_gm: 30, buffett_de: 1.5,
-  dcf_discount: 8, dcf_terminal: 3, dcf_margin: 30,
-  mf_quality: 40, mf_valuation: 30, mf_technical: 15, mf_market: 15, mf_threshold: 45,
-  cy_bull_pos: 30, cy_bull_stop: -8, cy_side_pos: 15, cy_bear_pos: 5,
+  const s = store.regime?.score;
+  if (s != null) return Math.round(s);
+  return 50;
 });
 
 function renderChart() {
@@ -321,7 +236,12 @@ function renderChart() {
 }
 watch(() => store.kline, renderChart);
 
-function fmtPct(v: number) { return v.toFixed(0) + "%"; }
+async function switchRange(range: string) {
+  selectedRange.value = range;
+  await store.fetchMarket(range);
+  renderChart();
+}
+
 function fmtValue(v: number | null | undefined, unit = "") {
   if (v == null || Number.isNaN(Number(v))) return "—";
   const n = Number(v);
@@ -331,11 +251,6 @@ function fmtValue(v: number | null | undefined, unit = "") {
 function fmtPctChange(v: number | null | undefined) {
   const n = Number(v || 0) * 100;
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
-}
-function fmtNum(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
 }
 function shortTime(s: string) { return s ? s.slice(5, 16).replace("T", " ") : "—"; }
 function signalLabel(s: string) { return s === "buy" ? "BUY" : s === "sell" ? "SELL" : "HOLD"; }
@@ -359,64 +274,13 @@ function sparkPoints(series: MarketSeriesPoint[] = [], width = 160, height = 44)
   }).join(" ");
 }
 
-function loadFromConfig() {
-  const c = store.config; if (!c.buffett) return;
-  const b = c.buffett?.moat || {};
-  const d = c.buffett?.margin_of_safety || {};
-  edit.buffett_roe = (b.min_roe || 0.15) * 100;
-  edit.buffett_gm = (b.min_gross_margin || 0.30) * 100;
-  edit.buffett_de = b.max_debt_equity || 1.5;
-  edit.dcf_discount = (d.dcf_discount_rate || 0.08) * 100;
-  edit.dcf_terminal = (d.growth_rate_terminal || 0.03) * 100;
-  edit.dcf_margin = (d.safety_margin_pct || 0.30) * 100;
-  const m = c.signals?.multifactor || c.multifactor || {}; const w = m.weights || {};
-  edit.mf_quality = (w.quality || 0.40) * 100;
-  edit.mf_valuation = (w.valuation || 0.30) * 100;
-  edit.mf_technical = (w.technical || 0.15) * 100;
-  edit.mf_market = (w.market || 0.15) * 100;
-  const cy = c.cybernetics?.adaptive || {};
-  edit.cy_bull_pos = (cy.bull?.position_size || 0.30) * 100;
-  edit.cy_bull_stop = (cy.bull?.stop_loss || -0.08) * 100;
-  edit.cy_side_pos = (cy.sideways?.position_size || 0.15) * 100;
-  edit.cy_bear_pos = (cy.bear?.position_size || 0.05) * 100;
-}
-
-async function saveParams() {
-  try {
-    const d = await api.settings();
-    d.buffett = d.buffett || {}; d.buffett.moat = d.buffett.moat || {};
-    d.buffett.moat.min_roe = edit.buffett_roe / 100;
-    d.buffett.moat.min_gross_margin = edit.buffett_gm / 100;
-    d.buffett.moat.max_debt_equity = edit.buffett_de;
-    d.signals = d.signals || {}; d.signals.multifactor = d.signals.multifactor || {};
-    d.signals.multifactor.weights = d.signals.multifactor.weights || {};
-    d.signals.multifactor.weights.quality = edit.mf_quality / 100;
-    d.signals.multifactor.weights.valuation = edit.mf_valuation / 100;
-    d.signals.multifactor.weights.technical = edit.mf_technical / 100;
-    d.signals.multifactor.weights.market = edit.mf_market / 100;
-    d.cybernetics = d.cybernetics || {}; d.cybernetics.adaptive = d.cybernetics.adaptive || {};
-    d.cybernetics.adaptive.bull = d.cybernetics.adaptive.bull || {};
-    d.cybernetics.adaptive.bull.position_size = edit.cy_bull_pos / 100;
-    d.cybernetics.adaptive.bull.stop_loss = edit.cy_bull_stop / 100;
-    d.cybernetics.adaptive.sideways = d.cybernetics.adaptive.sideways || {};
-    d.cybernetics.adaptive.sideways.position_size = edit.cy_side_pos / 100;
-    d.cybernetics.adaptive.bear = d.cybernetics.adaptive.bear || {};
-    d.cybernetics.adaptive.bear.position_size = edit.cy_bear_pos / 100;
-    await api.saveSettings(d);
-    await refresh();
-  } catch {}
-}
-function resetParams() { loadFromConfig(); }
 async function refresh() {
-  await store.fetchMarket();
-  loadFromConfig();
-  try { system.value = await api.systemMonitor(); } catch {}
+  await store.fetchMarket(selectedRange.value);
   renderChart();
 }
 
-watch(() => store.config, loadFromConfig, { immediate: true });
 onMounted(async () => {
-  await refresh();
+  await store.fetchMarket(selectedRange.value);
   initChart();
   renderChart();
 });
@@ -431,7 +295,7 @@ onMounted(async () => {
 }
 .market-hero {
   display: grid;
-  grid-template-columns: 340px minmax(480px, 1fr) 360px;
+  grid-template-columns: 280px minmax(480px, 1fr) 340px;
   gap: 12px;
 }
 .panel-head {
@@ -469,19 +333,19 @@ onMounted(async () => {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.regime-panel, .index-panel, .alerts-panel, .strategy-panel, .activity-panel, .macro-panel, .control-deck {
+.regime-panel, .index-panel, .macro-panel, .strategy-panel {
   padding: 14px;
 }
 .regime-core {
   display: grid;
-  grid-template-columns: 128px 1fr;
+  grid-template-columns: 110px 1fr;
   align-items: center;
-  gap: 16px;
-  padding: 18px 0;
+  gap: 14px;
+  padding: 14px 0;
 }
 .regime-orb {
-  width: 118px;
-  height: 118px;
+  width: 100px;
+  height: 100px;
   position: relative;
   display: grid;
   place-items: center;
@@ -498,23 +362,23 @@ onMounted(async () => {
   border: 1px solid var(--border-default);
 }
 .regime-orb-inner {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   z-index: 1;
   border-radius: 50%;
   border: 1px solid var(--border-strong);
   background: radial-gradient(circle, var(--orb-color), transparent 65%);
 }
 .regime-name {
-  font-size: 25px;
+  font-size: 22px;
   line-height: 1;
   font-weight: 750;
   letter-spacing: 0.03em;
 }
 .regime-subtitle {
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 11px;
 }
 .regime-metrics {
   display: grid;
@@ -522,12 +386,12 @@ onMounted(async () => {
   gap: 8px;
 }
 .regime-metrics div {
-  padding: 9px;
+  padding: 8px;
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: rgba(0,0,0,0.12);
 }
-.regime-metrics span, .asset-top span, .resource-gauge span, .macro-grid span {
+.regime-metrics span, .asset-top span, .macro-grid span {
   display: block;
   color: var(--text-disabled);
   font-size: 9px;
@@ -572,6 +436,12 @@ onMounted(async () => {
   color: var(--text-disabled);
   border: 1px solid transparent;
   font-size: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.time-tabs span:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
 }
 .time-tabs .active {
   color: var(--accent);
@@ -603,42 +473,9 @@ onMounted(async () => {
   border-top: 0;
   border-radius: 0 0 7px 7px;
 }
-.alerts-list {
-  display: flex;
-  flex-direction: column;
-}
-.alert-row {
-  display: grid;
-  grid-template-columns: 26px 1fr 42px;
-  gap: 10px;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.alert-row i {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid currentColor;
-  opacity: 0.72;
-}
-.alert-row strong {
-  display: block;
-  color: var(--text-primary);
-  font-size: 12px;
-}
-.alert-row span, .alert-row em {
-  color: var(--text-tertiary);
-  font-size: 10px;
-  font-style: normal;
-}
-.alert-success { color: var(--positive); }
-.alert-warning { color: var(--warning); }
-.alert-danger { color: var(--negative); }
-.alert-info { color: var(--accent); }
 .asset-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 .asset-card {
@@ -697,15 +534,8 @@ onMounted(async () => {
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
-.lower-grid {
-  display: grid;
-  grid-template-columns: minmax(620px, 1fr) 420px;
-  gap: 12px;
-}
-.right-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.strategy-section {
+  display: block;
 }
 .command-table {
   width: 100%;
@@ -767,56 +597,6 @@ onMounted(async () => {
 .signal-buy { color: var(--positive); }
 .signal-sell { color: var(--negative); }
 .signal-hold { color: var(--warning); }
-.token-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding: 14px 0;
-}
-.token-row div {
-  padding: 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-}
-.token-row span {
-  display: block;
-  color: var(--text-disabled);
-  font-size: 9px;
-  text-transform: uppercase;
-}
-.token-row strong {
-  display: block;
-  margin-top: 4px;
-  color: var(--text-primary);
-  font-family: "JetBrains Mono", monospace;
-}
-.resource-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.resource-gauge {
-  padding: 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-}
-.resource-gauge strong {
-  display: block;
-  margin: 3px 0 8px;
-  color: var(--text-primary);
-  font-family: "JetBrains Mono", monospace;
-}
-.resource-gauge div {
-  height: 4px;
-  border-radius: 4px;
-  background: rgba(125,211,252,0.08);
-  overflow: hidden;
-}
-.resource-gauge i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-}
 .macro-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -824,7 +604,7 @@ onMounted(async () => {
   margin-top: 12px;
 }
 .macro-grid article {
-  min-height: 116px;
+  min-height: 108px;
   padding: 10px;
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
@@ -842,63 +622,13 @@ onMounted(async () => {
   font-size: 10px;
   font-style: normal;
 }
-.control-deck {
-  padding: 0;
-  overflow: hidden;
-}
-.control-deck summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 13px 16px;
-  cursor: pointer;
-  list-style: none;
-}
-.control-deck summary::-webkit-details-marker { display: none; }
-.control-deck summary span {
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-.control-deck summary em {
-  color: var(--text-disabled);
-  font-size: 11px;
-  font-style: normal;
-}
-.param-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  padding: 0 16px 16px;
-}
-.param-block {
-  padding: 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-}
-.param-title {
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 700;
-}
-.param-note {
-  color: var(--text-tertiary);
-  font-size: 12px;
-}
-.param-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px 16px;
-}
 @media (max-width: 1180px) {
-  .market-hero, .lower-grid { grid-template-columns: 1fr; }
-  .asset-strip, .param-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .market-hero { grid-template-columns: 1fr; }
+  .asset-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 720px) {
   .market-command { padding: 12px; }
-  .asset-strip, .param-grid, .macro-grid { grid-template-columns: 1fr; }
+  .asset-strip, .macro-grid { grid-template-columns: 1fr; }
   .regime-core { grid-template-columns: 1fr; justify-items: center; text-align: center; }
   .command-table { min-width: 720px; }
   .strategy-panel { overflow-x: auto; }

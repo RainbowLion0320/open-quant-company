@@ -30,10 +30,10 @@ def compute_formula(formula: str, df: pd.DataFrame, idx: int) -> float:
 
 def _translate_formula(formula: str) -> str:
     """将 LLM 公式翻译为可 eval 的 Python 表达式"""
-    # 1. 函数调用: MA(close,20) → __ma(close,20)
-    formula = re.sub(r'MA\(\s*(\w+)\s*,\s*(\d+)\s*\)', r'__ma("\1",\2)', formula)
-    formula = re.sub(r'Std\(\s*(\w+)\s*,\s*(\d+)\s*\)', r'__std("\1",\2)', formula)
-    formula = re.sub(r'Delta\(\s*(\w+)\s*,\s*(\d+)\s*\)', r'__delta("\1",\2)', formula)
+    # 1. 函数调用: 列名可能带 _t 后缀，统一剥离
+    formula = re.sub(r'MA\(\s*(\w+?)(?:_t)?\s*,\s*(\d+)\s*\)', r'__ma("\1",\2)', formula)
+    formula = re.sub(r'Std\(\s*(\w+?)(?:_t)?\s*,\s*(\d+)\s*\)', r'__std("\1",\2)', formula)
+    formula = re.sub(r'Delta\(\s*(\w+?)(?:_t)?\s*,\s*(\d+)\s*\)', r'__delta("\1",\2)', formula)
     
     # 2. 变量: close_t → __ref("close",0), close_t-5 → __ref("close",-5)
     for col in ["close", "open", "high", "low", "volume"]:

@@ -4,33 +4,28 @@ import { ref } from "vue";
 export const useMarketStore = defineStore("market", () => {
   const regime = ref<any>(null);
   const kline = ref<any[]>([]);
-  const config = ref<any>({});
-  const registry = ref<any[]>([]);
   const multiAsset = ref<any[]>([]);
   const macro = ref<any[]>([]);
   const strategyMatrix = ref<any[]>([]);
-  const alerts = ref<any[]>([]);
   const freshness = ref<any>({});
   const updated = ref("");
   const poolSize = ref(0);
   const loading = ref(false);
   const error = ref("");
 
-  async function fetchMarket() {
+  async function fetchMarket(range?: string) {
     loading.value = true;
     error.value = "";
     try {
-      const res = await window.fetch("/api/market");
+      const url = range ? `/api/market?range=${range}` : "/api/market";
+      const res = await window.fetch(url);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       regime.value = data.regime;
       kline.value = data.kline;
-      config.value = data.config;
-      registry.value = data.registry || [];
       multiAsset.value = data.multi_asset || [];
       macro.value = data.macro || [];
       strategyMatrix.value = data.strategy_matrix || [];
-      alerts.value = data.alerts || [];
       freshness.value = data.freshness || {};
       updated.value = data.updated || "";
       poolSize.value = data.pool_size || 0;
@@ -42,8 +37,8 @@ export const useMarketStore = defineStore("market", () => {
   }
 
   return {
-    regime, kline, config, registry, multiAsset, macro, strategyMatrix,
-    alerts, freshness, updated, poolSize, loading, error, fetchMarket,
+    regime, kline, multiAsset, macro, strategyMatrix,
+    freshness, updated, poolSize, loading, error, fetchMarket,
   };
 });
 
