@@ -66,3 +66,4 @@ backtest/results/
 *.html
 .streamlit/
 data/store/paper/
+data/store/_cron_log/
