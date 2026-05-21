@@ -66,7 +66,8 @@ def detect_regime(close, i):
 
 
 def build_monthly_regime(bench_close_series):
-    """用月度K线预计算市场状态，每月一个 regime，避免日频噪声"""
+    """用月度K线预计算市场状态，每月一个 regime，避免日频噪声。
+    使用上月末收盘价判断当月 regime，避免前视偏差。"""
     monthly = bench_close_series.resample("ME").last().dropna()
     regimes = {}
     for i in range(len(monthly)):
@@ -74,7 +75,7 @@ def build_monthly_regime(bench_close_series):
         if i < 2:
             regimes[key] = "sideways"
             continue
-        c = monthly.values[i]
+        c = monthly.values[i - 1]
         ma5 = np.mean(monthly.values[max(0, i - 5) : i])
         ma20 = np.mean(monthly.values[max(0, i - 20) : i])
         ma60 = np.mean(monthly.values[max(0, i - 60) : i])
@@ -89,6 +90,9 @@ def build_monthly_regime(bench_close_series):
 
 def run_backtest(name, pool, prices, bench_close, score_fn, start, end, cash=1_000_000):
     """通用回测引擎 — 逐日评估，策略自主决定调仓日"""
+    global _last_buffett_year
+    _last_buffett_year = 0
+
     # 策略调仓规则：默认月初，可通过 score_fn.should_rebalance 自定义
     # should_rebalance 签名: (dt, regime, last_regime, holdings, current_price) → bool
     should_rebal = getattr(score_fn, "should_rebalance", None)
@@ -296,6 +300,13 @@ buffett_scorer.should_rebalance = _buffett_rebal
 
 # ── 多因子财务缓存（避免每只股票每次调仓都拉取同花顺） ──
 _multifactor_fin_cache = {}
+
+
+def _estimate_buffett_score(inputs: dict) -> float:
+    """从财务指标估算巴菲特评分 (0-100)"""
+    roe = (sum(inputs.get("roe_history", [0])[-5:]) / max(1, len(inputs.get("roe_history", [0])[-5:])))
+    return min(100, roe * 500)
+
 
 def _get_multifactor_fin_inputs(sym, ind):
     """缓存式获取财务数据，首次拉取后复用"""

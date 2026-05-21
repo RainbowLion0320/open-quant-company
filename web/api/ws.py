@@ -62,7 +62,7 @@ async def broadcast_progress(job_id: str, progress: int, message: str):
     })
 
     dead = set()
-    for ws in _connections[job_id]:
+    for ws in list(_connections[job_id]):
         try:
             await ws.send_text(payload)
         except Exception:

@@ -320,11 +320,11 @@ def _compute_factor_values(formula: str, symbols: List[str]) -> Tuple[List[float
                     scores.append(val)
 
             if scores:
-                factor_vals.append(np.mean(scores))
                 # Forward return: 20-day from 10 days ago (to avoid look-ahead)
                 idx_10d = len(df) - 11
                 if idx_10d > 20:
                     ret = df["close"].iloc[-1] / df["close"].iloc[idx_10d] - 1
+                    factor_vals.append(np.mean(scores))
                     targets.append(ret)
         except Exception:
             pass
@@ -362,7 +362,7 @@ def get_feature_importance_hints() -> Optional[Dict[str, float]]:
         if meta_path.exists():
             with open(meta_path) as f:
                 meta = json.load(f)
-            feature_names = meta.get("feature_names", [])
+            feature_names = meta.get("features", meta.get("feature_names", []))
         else:
             feature_names = [f"f{i}" for i in range(len(importances))]
 

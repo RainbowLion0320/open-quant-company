@@ -16,6 +16,9 @@ import yaml
 from pathlib import Path
 
 
+import copy
+
+
 @dataclass
 class AssetAllocation:
     """单个资产类型的分配结果"""
@@ -63,7 +66,7 @@ class AssetAllocator:
 
     def __init__(self, config_path: Optional[Path] = None):
         self._config_path = config_path or Path("~/quant-agent/config/settings.yaml").expanduser()
-        self._regime_weights = dict(REGIME_WEIGHTS_DEFAULT)
+        self._regime_weights = copy.deepcopy(REGIME_WEIGHTS_DEFAULT)
         self._load_config()
 
     def _load_config(self):

@@ -212,8 +212,8 @@ class RiskAnalytics:
 
     @staticmethod
     def downside_risk(r: np.ndarray, periods: int = 252) -> float:
-        neg = r[r < 0]
-        return np.std(neg, ddof=1) * np.sqrt(periods) if len(neg) > 0 else 0
+        downside = np.minimum(r, 0)
+        return np.sqrt(np.mean(downside**2)) * np.sqrt(periods) if len(r) > 0 else 0
 
     @staticmethod
     def var_95(r: np.ndarray) -> float:
@@ -258,7 +258,7 @@ class RiskAnalytics:
         cov = np.cov(r, benchmark_r)
         if cov.shape != (2, 2):
             return 0.0, 1.0
-        beta = cov[0, 1] / np.var(benchmark_r) if np.var(benchmark_r) > 0 else 1.0
+        beta = cov[0, 1] / cov[1, 1] if cov[1, 1] > 0 else 1.0
         ann_r = RiskAnalytics.annual_return(r, periods)
         ann_b = RiskAnalytics.annual_return(benchmark_r, periods)
         alpha = ann_r - rf - beta * (ann_b - rf)

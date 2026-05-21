@@ -357,8 +357,9 @@ class QuantOrchestrator:
 
         # 涨跌比（从OHLC近似: 收盘>开盘为涨）
         lookback = min(breadth_w, len(close))
-        up_count = sum(1 for i in range(len(close) - lookback, len(close)) if close[i] > close[i-1])
-        breadth = up_count / lookback if lookback > 0 else 0.5
+        start = max(1, len(close) - lookback)
+        up_count = sum(1 for i in range(start, len(close)) if close[i] > close[i-1])
+        breadth = up_count / (len(close) - start) if (len(close) - start) > 0 else 0.5
 
         self.market_snapshot = MarketContext(
             regime=self.regime,

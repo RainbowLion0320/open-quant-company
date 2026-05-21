@@ -229,8 +229,10 @@ class Delta(Factor):
         self.window = window
 
     def _compute(self, df: pd.DataFrame, idx: int) -> float:
+        if idx < self.window:
+            return np.nan
         cur = self.child.compute(df, idx)
-        prev = self.child.compute(df, max(0, idx - self.window))
+        prev = self.child.compute(df, idx - self.window)
         if pd.isna(cur) or pd.isna(prev):
             return np.nan
         return cur - prev

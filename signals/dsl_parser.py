@@ -100,9 +100,9 @@ def evaluate_factor(name: str, formula: str, features_df: pd.DataFrame) -> dict:
             
             val = compute_formula(formula, df, idx)
             if not np.isnan(val) and abs(val) < 1e10:
-                factor_vals.append(val)
                 sym_data = valid[valid["symbol"] == sym]
                 if len(sym_data) > 0:
+                    factor_vals.append(val)
                     targets.append(sym_data["ret_fwd_20d"].iloc[0])
         except Exception:
             pass
@@ -115,4 +115,4 @@ def evaluate_factor(name: str, formula: str, features_df: pd.DataFrame) -> dict:
     fv = pd.Series(factor_vals)
     ic, _ = spearmanr(fv, y)
     ic = ic if not np.isnan(ic) else 0.0
-    return {"ic": abs(ic), "icir": 0, "valid": True}
+    return {"ic": ic, "icir": 0, "valid": True}

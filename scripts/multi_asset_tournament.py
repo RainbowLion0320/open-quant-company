@@ -254,14 +254,42 @@ results["etf_only"] = ("纯ETF 动量", r, t)
 print(f"  etf-only:   {r:+.2f}% ({t} trades)")
 
 # Multi-asset: regime → weights → split capital
+# Build monthly regime map from historical index data (avoid look-ahead bias)
+_bench_for_regime = get_index_daily("sh000001")
+if _bench_for_regime is not None and len(_bench_for_regime) > 60:
+    _bench_for_regime["date"] = pd.to_datetime(_bench_for_regime["date"])
+    _bench_for_regime = _bench_for_regime.set_index("date").sort_index()
+    _bench_close = _bench_for_regime["close"]
+else:
+    _bench_close = None
+
+def _historical_regime(dt):
+    """Detect regime using only data available up to dt."""
+    if _bench_close is None:
+        return "unknown"
+    hist = _bench_close.loc[:dt]
+    if len(hist) < 60:
+        return "unknown"
+    monthly = hist.resample("ME").last().dropna()
+    if len(monthly) < 3:
+        return "sideways"
+    c = monthly.values[-2]
+    ma5 = monthly.values[max(0, len(monthly)-6):len(monthly)-1].mean()
+    ma20 = monthly.values[max(0, len(monthly)-21):len(monthly)-1].mean()
+    ma60 = monthly.values[max(0, len(monthly)-61):len(monthly)-1].mean()
+    if c > ma5 > ma20 > ma60:
+        return "bull"
+    elif c < ma5 < ma20 < ma60:
+        return "bear"
+    return "sideways"
+
 holdings = {}
 cash = CASH
 vals2, trades2 = [], 0
 for di, dt in enumerate(dates):
     if di == 0 or dt.month != dates[di-1].month:
         try:
-            regime = detect_market_regime()
-            rs = regime.value if hasattr(regime, 'value') else 'unknown'
+            rs = _historical_regime(dt)
         except Exception:
             rs = 'unknown'
         w = allocator.get_weights(rs)

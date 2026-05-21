@@ -97,6 +97,7 @@ def fetch_valuation(pool_size=0):
     fetched = 0
     for sym in symbols[:max(1, pool_size or 5200)]:
         pq = store / f"{sym}.parquet"
+        existing = pd.DataFrame()
         try:
             # Check if already has today's data
             existing = HUB.read_parquet(pq, default=pd.DataFrame())

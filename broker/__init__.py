@@ -276,7 +276,7 @@ class PaperBroker(Broker):
         self._orders.append(order)
 
         # ★ Record order for daily limit tracking
-        if self._risk_mgr and side == "buy":
+        if self._risk_mgr:
             self._risk_mgr.record_order()
 
         # ★ Update peak equity

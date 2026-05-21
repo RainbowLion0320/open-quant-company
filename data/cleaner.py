@@ -148,8 +148,9 @@ class OutlierDetectionRule(CleanRule):
             mask_lower = df["_ret"] < lower
             n = mask_upper.sum() + mask_lower.sum()
             if n > 0:
-                df.loc[mask_upper, "close"] = df.loc[mask_upper, "close"].shift(1) * (1 + upper)
-                df.loc[mask_lower, "close"] = df.loc[mask_lower, "close"].shift(1) * (1 + lower)
+                prev_close = df["close"].shift(1)
+                df.loc[mask_upper, "close"] = prev_close[mask_upper] * (1 + upper)
+                df.loc[mask_lower, "close"] = prev_close[mask_lower] * (1 + lower)
                 capped += n
 
         # 单日涨跌幅超过 max_change；保留常见涨跌停幅度附近的真实行情。
@@ -162,7 +163,8 @@ class OutlierDetectionRule(CleanRule):
         mask_big = (abs_ret > max_change) & ~limit_like
         if mask_big.any():
             n = mask_big.sum()
-            df.loc[mask_big, "close"] = df.loc[mask_big, "close"].shift(1)
+            prev_close = df["close"].shift(1)
+            df.loc[mask_big, "close"] = prev_close[mask_big]
             capped += n
 
         # 成交量暴增

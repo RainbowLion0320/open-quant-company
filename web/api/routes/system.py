@@ -25,12 +25,11 @@ def _query(sql: str, params=()):
     if not DB.exists():
         return []
     try:
-        conn = sqlite3.connect(str(DB))
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(sql, params).fetchall()
-        conn.close()
-        return [dict(r) for r in rows]
-    except sqlite3.Error:
+        with sqlite3.connect(str(DB)) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(sql, params).fetchall()
+            return [dict(r) for r in rows]
+    except Exception:
         return []
 
 

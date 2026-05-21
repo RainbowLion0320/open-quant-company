@@ -235,7 +235,7 @@ def extract_latest_net_profit(df: pd.DataFrame) -> float:
             return float(val.replace("亿", "").replace(",", ""))
         if "万" in val:
             return float(val.replace("万", "").replace(",", "")) / 10000
-        return float(val.replace(",", ""))
+        return float(val.replace(",", "")) / 1e8
     # 已经是数字（元）
     return float(val) / 1e8
 

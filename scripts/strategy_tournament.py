@@ -109,9 +109,9 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
     # 加载基准 (用上证综指日线, get_stock_daily兼容指数代码)
     print("\n加载数据...")
     try:
-        bench = get_index_daily("000001")
+        bench = get_index_daily("sh000001")
     except Exception:
-        bench = get_stock_daily("000001")
+        bench = get_stock_daily("sh000001")
     bench["date"] = pd.to_datetime(bench["date"])
     bench = bench.set_index("date").sort_index()
     bench = bench.loc[pd.Timestamp(start):pd.Timestamp(end)]

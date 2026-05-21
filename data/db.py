@@ -173,7 +173,7 @@ def _register_views(db: Database):
             vname = "cache_" + pq.stem.replace("-", "_").replace(".", "_")
             try:
                 db.execute(
-                    f"CREATE OR REPLACE VIEW IF NOT EXISTS {vname} AS "
+                    f"CREATE OR REPLACE VIEW {vname} AS "
                     f"SELECT * FROM read_parquet('{pq}')"
                 )
             except Exception:
@@ -206,11 +206,7 @@ def get_db(backend: str = "duckdb", read_only: bool = True) -> Database:
     """获取数据库实例。默认只读（Web安全），写操作需显式传 read_only=False。"""
     global _db
     if _db is not None:
-        try:
-            _db.close()
-        except Exception:
-            pass
-        _db = None
+        return _db
     _db = Database(backend=backend)
     _db.connect(read_only=read_only)
     return _db

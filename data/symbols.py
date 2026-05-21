@@ -250,6 +250,9 @@ def set_pool(pool_name: str):
         CIRCLE_STOCKS = sorted(set(s["code"] for s in POOL_CSI500))
     elif pool_name == "all":
         CIRCLE_STOCKS = sorted(set(s["code"] for s in ALL_STOCKS_RAW))
+    elif pool_name == "top500":
+        sorted_all = sorted(ALL_STOCKS_RAW, key=lambda x: -x.get("mktcap", 0))
+        CIRCLE_STOCKS = sorted(set(s["code"] for s in sorted_all[:500]))
     else:
         CIRCLE_STOCKS = sorted(set(s["code"] for s in POOL_HS300))
     SYMBOL_NAME = {c: _get_name(c) for c in CIRCLE_STOCKS}
