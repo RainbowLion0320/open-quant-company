@@ -139,6 +139,38 @@ def sector_exposure():
 
 
 # ═══════════════════════════════════════
+# GET /api/sectors/{industry}/stocks  (MUST be before /{industry} to avoid capture)
+# ═══════════════════════════════════════
+
+@router.get("/{industry:path}/stocks")
+def sector_stocks(industry: str):
+    """Return member stocks for a sector with signal status."""
+    from urllib.parse import unquote
+    industry = unquote(industry)
+
+    mem_path = HUB.dimension_path("sector_membership")
+    if not mem_path.exists():
+        return {"industry": industry, "stocks": [], "data_source": "missing"}
+
+    mem = HUB.read_parquet(mem_path, default=pd.DataFrame())
+    if mem.empty:
+        return {"industry": industry, "stocks": [], "data_source": "missing"}
+
+    sector_symbols = mem[mem["sector_name"] == industry]["symbol"].tolist()
+
+    stocks = []
+    for symbol in sector_symbols[:50]:  # cap response size
+        stocks.append({"symbol": symbol})
+
+    return {
+        "industry": industry,
+        "stocks": stocks,
+        "total": len(sector_symbols),
+        "data_source": "real",
+    }
+
+
+# ═══════════════════════════════════════
 # GET /api/sectors/{industry}
 # ═══════════════════════════════════════
 
@@ -187,36 +219,4 @@ def sector_detail(industry: str):
         "performance": perf_row,
         "signals": signals,
         "data_source": perf_row.get("data_source", "missing"),
-    }
-
-
-# ═══════════════════════════════════════
-# GET /api/sectors/{industry}/stocks
-# ═══════════════════════════════════════
-
-@router.get("/{industry:path}/stocks")
-def sector_stocks(industry: str):
-    """Return member stocks for a sector with signal status."""
-    from urllib.parse import unquote
-    industry = unquote(industry)
-
-    mem_path = HUB.dimension_path("sector_membership")
-    if not mem_path.exists():
-        return {"industry": industry, "stocks": [], "data_source": "missing"}
-
-    mem = HUB.read_parquet(mem_path, default=pd.DataFrame())
-    if mem.empty:
-        return {"industry": industry, "stocks": [], "data_source": "missing"}
-
-    sector_symbols = mem[mem["sector_name"] == industry]["symbol"].tolist()
-
-    stocks = []
-    for symbol in sector_symbols[:50]:  # cap response size
-        stocks.append({"symbol": symbol})
-
-    return {
-        "industry": industry,
-        "stocks": stocks,
-        "total": len(sector_symbols),
-        "data_source": "real",
     }
