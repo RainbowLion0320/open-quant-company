@@ -9,6 +9,9 @@ def test_strategy_jobs_route_is_not_shadowed(monkeypatch):
     from web.api.app import create_app
     from web.api import jobs
 
+    # Disable auth for this test (empty key = open mode)
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+
     monkeypatch.setattr(
         jobs,
         "get_job",

@@ -1,9 +1,8 @@
-"""系统配置路由 — 读写 config/settings.yaml"""
+"""系统配置路由 — 读写 config/settings.yaml (auth + audit)"""
 
 import os
 import yaml
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(prefix="/api/settings", tags=["Settings"])
 
@@ -55,6 +54,54 @@ def _write_config(data: dict):
         os.remove(bak)
 
 
+# ── Run mode check ──
+
+RUN_MODE_READONLY_SECTIONS = frozenset({
+    "risk_control", "strategies", "data_registry", "backtest",
+    "buffett", "cybernetics", "signals", "signal_selection",
+    "ml", "assets", "asset_allocation", "trading", "data_cleaning",
+})
+
+
+def _check_writable(section: str) -> None:
+    """Raise 403 if current run mode disallows writing to this section."""
+    from web.api.auth import get_run_mode
+
+    mode = get_run_mode()
+    if mode == "live":
+        raise HTTPException(
+            status_code=403,
+            detail="Settings are read-only in live mode. "
+                   "Switch to research or paper mode in config file."
+        )
+    if mode == "paper" and section != "paper_trading":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Only 'paper_trading' section is writable in paper mode. "
+                   f"Section '{section}' requires research mode."
+        )
+
+
+def _audit_change(request: Request, section: str, method: str, old_data: dict, new_data: dict):
+    """Record config change to audit ledger."""
+    try:
+        from data.audit import ConfigAuditLedger
+        from web.api.auth import get_run_mode
+
+        ledger = ConfigAuditLedger()
+        ledger.record(
+            section=section,
+            method=method,
+            old_data=old_data,
+            new_data=new_data,
+            source_ip=request.client.host if request.client else "",
+            user_agent=request.headers.get("user-agent", ""),
+            run_mode=get_run_mode(),
+        )
+    except Exception:
+        pass  # audit failure must not block config writes
+
+
 # ── GET ────────────────────────────────────────────────────
 
 @router.get("")
@@ -70,7 +117,7 @@ async def get_settings():
 # ── PUT ────────────────────────────────────────────────────
 
 @router.put("")
-async def update_settings(config: dict):
+async def update_settings(config: dict, request: Request):
     """完全替换系统配置（谨慎操作）
 
     请求体应为完整的 YAML 配置字典。
@@ -89,12 +136,19 @@ async def update_settings(config: dict):
                    f"Use PATCH /api/settings/section for partial updates.",
         )
 
+    # Check run mode
+    _check_writable("*")
+
+    old_config = _read_config()
+
     try:
         _write_config(config)
     except yaml.YAMLError as e:
         raise HTTPException(status_code=400, detail=f"YAML error: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write config: {e}")
+
+    _audit_change(request, "*", "PUT", old_config, config)
 
     return {
         "status": "saved",
@@ -104,12 +158,19 @@ async def update_settings(config: dict):
 
 
 @router.patch("/section/{section}")
-async def update_section(section: str, data: dict):
+async def update_section(section: str, data: dict, request: Request):
     """部分更新：只修改指定配置段，不影响其他段"""
+    _check_writable(section)
+
     config = _read_config()
+    old_section = config.get(section, {})
+
     config[section] = data
     try:
         _write_config(config)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write config: {e}")
+
+    _audit_change(request, section, "PATCH", old_section, data)
+
     return {"status": "saved", "section": section}

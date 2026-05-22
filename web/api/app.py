@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 
 from web.api.routes import market, strategies, stocks, portfolio, signals, settings, backtest, system, hindsight
 from web.api.errors import register_error_handlers
+from web.api.auth import AuthMiddleware
 
 
 def create_app() -> FastAPI:
@@ -42,6 +43,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # API Key auth (after CORS so preflight requests skip auth)
+    app.add_middleware(AuthMiddleware)
 
     app.include_router(market.router)
     app.include_router(strategies.router)

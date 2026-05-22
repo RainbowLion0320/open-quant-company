@@ -3,16 +3,25 @@
  *
  * Every API call goes through here. No raw fetch() scattered across views.
  * Auto error handling, type-safe return values.
+ * Auth: reads api_key from localStorage, attaches Bearer token.
  */
 
 const BASE = ""; // Vite proxy handles /api → localhost:8501
 
+function authHeaders(): Record<string, string> {
+  const key = localStorage.getItem("quant_api_key");
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
 async function req<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(BASE + url, {
-    headers: { "Content-Type": "application/json", ...opts?.headers },
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...opts?.headers },
     ...opts,
   });
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem("quant_api_key"); // clear stale key
+    }
     const text = await res.text().catch(() => "Unknown error");
     throw new Error(`[${res.status}] ${text}`);
   }
@@ -344,4 +353,9 @@ export const api = {
     return data.config || {};
   },
   saveSettings: (data: Record<string, any>) => put<Record<string, any>>("/api/settings", data),
+
+  // Audit & Run Mode
+  auditHistory: (section = "", limit = 50) =>
+    get<{ entries: any[]; summary: any; total: number }>(`/api/system/audit?section=${encodeURIComponent(section)}&limit=${limit}`),
+  systemMode: () => get<{ mode: string; has_api_key: boolean; allows_settings_write: boolean; allows_paper_trading: boolean; readonly_sections: string[] }>("/api/system/mode"),
 };

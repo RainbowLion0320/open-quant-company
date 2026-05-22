@@ -44,6 +44,10 @@
             <strong class="is-live">Operational</strong>
           </div>
           <div class="telemetry-cell">
+            <span>Mode</span>
+            <strong :style="{ color: modeColor }">{{ runMode }}</strong>
+          </div>
+          <div class="telemetry-cell">
             <span>Regime</span>
             <strong :style="{ color: regimeColor }">{{ regimeLabel }}</strong>
           </div>
@@ -97,6 +101,7 @@ let clockTimer = 0;
 let regimeTimer = 0;
 const regime = ref<{ value: string; score?: number }>({ value: "sideways" });
 const marketMeta = ref<Partial<RegimeResponse>>({});
+const runMode = ref("research");
 
 const nav = [
   { path: "/", label: "市场总览", pathData: "M4 17V7l8-4 8 4v10l-8 4-8-4Zm4-1 4 2 4-2V9l-4-2-4 2v7Zm2-1.5h4M10 11h4" },
@@ -108,6 +113,7 @@ const nav = [
   { path: "/monitor", label: "系统信息", pathData: "M4 13h3l2-6 4 12 2-6h5M4 20h16M4 4h16" },
   { path: "/db-health", label: "数据库健康", pathData: "M4 6h16M4 12h16M4 18h16M8 2v4m0 4v4m8-12v4m0 4v4M4 22h16" },
   { path: "/hindsight", label: "记忆图谱", pathData: "M12 2a5 5 0 0 0-5 5v1a5 5 0 0 0 0 10v1a5 5 0 0 0 10 0v-1a5 5 0 0 0 0-10V7a5 5 0 0 0-5-5Zm-3 5a3 3 0 1 1 6 0v1h-6V7Zm6 10a3 3 0 1 1-6 0v-1h6v1ZM9 16a4 4 0 0 1 6 0M8 10h8M8 14h8" },
+  { path: "/settings", label: "系统设置", pathData: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-7.5-2.2-.7-.7a1.5 1.5 0 0 1 0-2.1l.7-.7L3 7.8l-.7.7a1.5 1.5 0 0 1-2.1 0l-.7-.7-.7.7 1.5 1.5-.7.7a1.5 1.5 0 0 1 0 2.1l.7.7.7-.7L3 15.3l1.5 1.5ZM21 15a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" },
 ];
 
 const routeTitle = computed(() => nav.find(item => isActive(item.path))?.label || "Quant Terminal");
@@ -128,6 +134,11 @@ const regimeColor = computed(() => {
   if (regime.value.value === "bull") return "var(--positive)";
   if (regime.value.value === "bear") return "var(--negative)";
   return "var(--warning)";
+});
+const modeColor = computed(() => {
+  if (runMode.value === "live") return "var(--negative)";
+  if (runMode.value === "paper") return "var(--warning)";
+  return "var(--positive)";
 });
 const coreVersion = computed(() => {
   const version = (marketMeta.value.config as any)?.project?.version;
@@ -153,6 +164,13 @@ async function fetchRegime() {
   } catch {}
 }
 
+async function fetchMode() {
+  try {
+    const data = await api.systemMode();
+    runMode.value = data.mode;
+  } catch {}
+}
+
 // Particles
 useParticles();
 
@@ -160,6 +178,7 @@ onMounted(() => {
   tickClock();
   clockTimer = window.setInterval(tickClock, 1000);
   fetchRegime();
+  fetchMode();
   regimeTimer = window.setInterval(fetchRegime, 60000);
 });
 

@@ -5,7 +5,56 @@
         <h1 class="page-title">系统设置</h1>
         <p class="page-subtitle">通知配置 · 数据源状态 · 系统信息</p>
       </div>
-      <button @click="save" class="btn btn-primary btn-sm">保存</button>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span :class="['mode-badge', `mode-${mode}`]">{{ modeLabel }}</span>
+        <button @click="saveWithConfirm" class="btn btn-primary btn-sm">保存</button>
+      </div>
+    </div>
+
+    <!-- Run Mode -->
+    <div class="glass-card card-pad-lg">
+      <div class="section-heading mb-4">运行模式</div>
+      <div class="settings-list">
+        <div>
+          <span>当前模式</span>
+          <span :class="['badge', modeBadgeClass]">{{ modeLabel }}</span>
+        </div>
+        <div>
+          <span>Settings 写入</span>
+          <span v-if="modeStatus.allows_settings_write" class="badge badge-green">允许</span>
+          <span v-else class="badge badge-red">只读</span>
+        </div>
+        <div>
+          <span>Paper Trading</span>
+          <span v-if="modeStatus.allows_paper_trading" class="badge badge-green">允许</span>
+          <span v-else class="badge badge-red">禁止</span>
+        </div>
+        <div v-if="modeStatus.readonly_sections?.length">
+          <span>只读段</span>
+          <span class="badge badge-amber">{{ modeStatus.readonly_sections.join(", ") }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Key -->
+    <div class="glass-card card-pad-lg">
+      <div class="section-heading mb-4">API 密钥</div>
+      <div class="setting-row">
+        <div>
+          <strong>认证状态</strong>
+          <span>{{ apiKeyStatus }}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input
+            v-model="apiKeyInput"
+            type="password"
+            placeholder="输入 API Key"
+            class="key-input"
+            @keyup.enter="saveApiKey"
+          />
+          <button @click="saveApiKey" class="btn btn-sm" :class="apiKeyInput ? 'btn-primary' : 'btn-muted'">设置</button>
+        </div>
+      </div>
     </div>
 
     <!-- Notification -->
@@ -74,14 +123,48 @@
         </div>
       </div>
     </div>
+
+    <!-- Confirm Dialog -->
+    <Teleport to="body">
+      <div v-if="showConfirm" class="confirm-overlay" @click.self="showConfirm = false">
+        <div class="confirm-box glass-card card-pad-lg">
+          <h3>确认保存配置?</h3>
+          <p>修改系统配置可能影响策略运行和风险控制。请确认你了解这些变更的影响。</p>
+          <div class="confirm-actions">
+            <button @click="showConfirm = false" class="btn btn-muted">取消</button>
+            <button @click="doSave" class="btn btn-primary">确认保存</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, onMounted } from "vue";
+import { computed, reactive, ref, onMounted } from "vue";
 import { api } from "../api";
 
 const settings = reactive<Record<string, any>>({});
+const showConfirm = ref(false);
+const mode = ref("research");
+const modeStatus = ref<Record<string, any>>({});
+const apiKeyInput = ref("");
+
+const modeLabel = computed(() => {
+  if (mode.value === "live") return "LIVE";
+  if (mode.value === "paper") return "PAPER";
+  return "RESEARCH";
+});
+const modeBadgeClass = computed(() => {
+  if (mode.value === "live") return "badge-red";
+  if (mode.value === "paper") return "badge-amber";
+  return "badge-green";
+});
+const apiKeyStatus = computed(() => {
+  const has = modeStatus.value?.has_api_key;
+  if (has === undefined) return "检查中...";
+  return has ? "已设置" : "未设置 — 首次启动自动生成";
+});
 
 const versionText = computed(() => {
   const version = settings.project?.version;
@@ -141,11 +224,30 @@ async function toggleNotify() {
   settings.trading = settings.trading || {};
   settings.trading.notification = settings.trading.notification || {};
   settings.trading.notification.enabled = enabled;
-  await save();
+  await saveWithConfirm();
 }
 
-async function save() {
+function saveWithConfirm() {
+  showConfirm.value = true;
+}
+
+async function doSave() {
+  showConfirm.value = false;
   try { await api.saveSettings(settings); } catch {}
+}
+
+async function saveApiKey() {
+  if (!apiKeyInput.value.trim()) return;
+  localStorage.setItem("quant_api_key", apiKeyInput.value.trim());
+  apiKeyInput.value = "";
+}
+
+async function loadMode() {
+  try {
+    const data = await api.systemMode();
+    mode.value = data.mode;
+    modeStatus.value = data;
+  } catch {}
 }
 
 onMounted(async () => {
@@ -153,6 +255,10 @@ onMounted(async () => {
     const data = await api.settings();
     Object.assign(settings, data);
   } catch {}
+  await loadMode();
+  // Restore saved API key
+  const saved = localStorage.getItem("quant_api_key");
+  if (saved) apiKeyInput.value = "";
 });
 </script>
 
@@ -160,6 +266,28 @@ onMounted(async () => {
 .settings-page {
   max-width: 980px;
 }
+.mode-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.mode-research { background: rgba(34,197,94,0.12); color: var(--positive); border: 1px solid rgba(34,197,94,0.2); }
+.mode-paper { background: rgba(250,176,5,0.12); color: var(--warning); border: 1px solid rgba(250,176,5,0.2); }
+.mode-live { background: rgba(239,68,68,0.12); color: var(--negative); border: 1px solid rgba(239,68,68,0.2); }
+.key-input {
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  background: rgba(0,0,0,0.3);
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  width: 200px;
+}
+.key-input::placeholder { color: var(--text-disabled); }
 .setting-row,
 .settings-list div {
   display: flex;
@@ -250,6 +378,39 @@ onMounted(async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.badge-red { background: rgba(239,68,68,0.12); color: var(--negative); border: 1px solid rgba(239,68,68,0.2); }
+
+/* Confirm dialog */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+}
+.confirm-box {
+  max-width: 420px;
+  width: 90%;
+}
+.confirm-box h3 {
+  margin: 0 0 10px;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+.confirm-box p {
+  margin: 0 0 20px;
+  color: var(--text-disabled);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 @media (max-width: 720px) {
   .settings-info-grid {

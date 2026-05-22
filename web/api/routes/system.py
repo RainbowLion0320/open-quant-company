@@ -831,3 +831,61 @@ async def get_contracts(dimension: str = Query(default="", description="Filter b
         "total": len(contracts),
         "status": "ok",
     }
+
+
+# ── P1-11: Audit Log & Run Mode ──
+
+
+@router.get("/audit")
+async def get_audit_history(
+    section: str = Query(default="", description="Filter by config section"),
+    limit: int = Query(default=50, ge=1, le=200),
+):
+    """查询配置变更审计日志 — 从 ConfigAuditLedger 读取。
+
+    每次 PUT/PATCH /api/settings 都会记录变更:
+    哪个 section, 哪些 key 变了, 来自哪个 IP, 在什么 run_mode 下。
+    """
+    from data.audit import ConfigAuditLedger
+    ledger = ConfigAuditLedger()
+
+    entries = ledger.history(section=section, limit=limit)
+    summary = ledger.summary()
+
+    return {
+        "entries": [
+            {
+                "change_id": e.change_id,
+                "timestamp": e.timestamp,
+                "section": e.section,
+                "method": e.method,
+                "changed_keys": e.changed_keys,
+                "source_ip": e.source_ip,
+                "run_mode": e.run_mode,
+            }
+            for e in entries
+        ],
+        "summary": summary,
+        "total": len(entries),
+        "status": "ok",
+    }
+
+
+@router.get("/mode")
+async def get_system_mode():
+    """当前系统运行模式 — research | paper | live。"""
+    from web.api.auth import get_run_mode, get_api_key
+    mode = get_run_mode()
+    has_key = bool(get_api_key())
+    return {
+        "mode": mode,
+        "has_api_key": has_key,
+        "allows_settings_write": mode != "live",
+        "allows_paper_trading": mode in ("research", "paper"),
+        "readonly_sections": sorted({
+            "live": ["all"],
+            "paper": ["all except paper_trading"],
+            "research": [],
+        }.get(mode, [])),
+        "status": "ok",
+    }

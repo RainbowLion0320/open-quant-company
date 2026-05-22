@@ -13,6 +13,7 @@ const router = createRouter({
     { path: "/monitor", name: "monitor", component: () => import("../views/ActivityMonitor.vue") },
     { path: "/db-health", name: "db-health", component: () => import("../views/DatabaseHealth.vue") },
     { path: "/hindsight", name: "hindsight", component: () => import("../views/HindsightGraph.vue") },
+    { path: "/settings", name: "settings", component: () => import("../views/Settings.vue") },
   ],
 });
 
