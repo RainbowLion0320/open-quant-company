@@ -52,9 +52,14 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import * as echarts from "echarts";
 import { api } from "../api";
 import { fmtReturn, QUANTUM_THEME } from "../charts/useECharts";
+
+let echarts: any = null;
+async function getECharts() {
+  if (!echarts) echarts = await import("echarts");
+  return echarts;
+}
 
 const overview = ref<any>({});
 const strategyList = ref<Array<{ key: string; label: string; color: string }>>([]);
@@ -71,7 +76,7 @@ const allCurves = ref<Record<string, { equity: any[]; bench: any[] }>>({});
 
 // Multi-chart management
 const chartRefs: Record<string, HTMLElement> = {};
-const charts: Record<string, echarts.ECharts> = {};
+const charts: Record<string, any> = {};
 
 function setChartRef(key: string, el: HTMLElement | null) {
   if (el) chartRefs[key] = el;
@@ -89,7 +94,8 @@ async function loadAllDetails() {
   setTimeout(() => initAllCharts(), 50);
 }
 
-function initAllCharts() {
+async function initAllCharts() {
+  const ec = await getECharts();
   for (const s of strategyList.value) {
     const el = chartRefs[s.key];
     if (!el) continue;
@@ -98,7 +104,7 @@ function initAllCharts() {
 
     if (charts[s.key]) charts[s.key].dispose();
 
-    const chart = echarts.init(el);
+    const chart = ec.init(el);
     charts[s.key] = chart;
 
     const dates = curve.equity.map((d: any) => d.date);
@@ -113,7 +119,7 @@ function initAllCharts() {
       symbol: "none",
       smooth: true,
       areaStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        color: new ec.graphic.LinearGradient(0, 0, 0, 1, [
           { offset: 0, color: s.color + "20" },
           { offset: 1, color: "rgba(0,0,0,0)" },
         ]),

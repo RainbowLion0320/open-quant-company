@@ -2,29 +2,30 @@
  * Quantum Terminal — ECharts Composable
  *
  * Single shared wrapper for all ECharts instances across the app.
- * No more scattered init/dispose — one composable, one pattern.
+ * ECharts is dynamically imported — only loaded when a chart is first rendered.
  */
-import { ref, onMounted, onUnmounted, watch, type Ref } from "vue";
-import * as echarts from "echarts";
+import { ref, onUnmounted, type Ref } from "vue";
 
-export interface ChartOptions {
-  /** ECharts option object */
-  option: echarts.EChartsOption;
-  /** Whether to notMerge (default: true — replaces entire option) */
-  replace?: boolean;
+let _echarts: any = null;
+
+async function loadECharts() {
+  if (!_echarts) {
+    const mod = await import("echarts");
+    _echarts = mod;
+  }
+  return _echarts;
 }
 
 export function useECharts(elRef: Ref<HTMLElement | null>) {
-  const instance = ref<echarts.ECharts | null>(null);
+  const instance = ref<any>(null);
   let resizeObserver: ResizeObserver | null = null;
 
-  function init() {
+  async function init() {
     const el = elRef.value;
     if (!el || instance.value) return;
 
-    instance.value = echarts.init(el, undefined, {
-      // Custom dark theme inline
-    });
+    const echarts = await loadECharts();
+    instance.value = echarts.init(el, undefined, {});
 
     resizeObserver = new ResizeObserver(() => {
       instance.value?.resize();
@@ -32,7 +33,7 @@ export function useECharts(elRef: Ref<HTMLElement | null>) {
     resizeObserver.observe(el);
   }
 
-  function setOption(option: echarts.EChartsOption, replace = true) {
+  function setOption(option: Record<string, any>, replace = true) {
     instance.value?.setOption(option, { notMerge: replace });
   }
 
@@ -41,10 +42,6 @@ export function useECharts(elRef: Ref<HTMLElement | null>) {
     instance.value?.dispose();
     instance.value = null;
   }
-
-  onMounted(() => {
-    // init called explicitly by consumer when ready
-  });
 
   onUnmounted(() => dispose());
 

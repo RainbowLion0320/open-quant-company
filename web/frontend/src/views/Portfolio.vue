@@ -181,7 +181,12 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from "vue";
-import * as echarts from "echarts";
+
+let echarts: any = null;
+async function getECharts() {
+  if (!echarts) echarts = await import("echarts");
+  return echarts;
+}
 
 interface Position {
   code: string; name: string; volume: number; avg_cost: number;
@@ -209,7 +214,7 @@ const summary = ref<Summary>({
 const loading = ref(false);
 const order = reactive({ symbol: "", side: "buy" as "buy" | "sell", shares: 100 });
 const chartRef = ref<HTMLElement | null>(null);
-let chart: echarts.ECharts | null = null;
+let chart: any = null;
 
 function fmtPnl(v: number | undefined) {
   if (v == null) return "—";
@@ -291,11 +296,12 @@ async function submitOrder() {
   }
 }
 
-function renderChart() {
+async function renderChart() {
   if (!chartRef.value || !navData.value.length) return;
 
+  const ec = await getECharts();
   if (!chart) {
-    chart = echarts.init(chartRef.value);
+    chart = ec.init(chartRef.value);
   }
 
   const dates = navData.value.map(d => d.date);
@@ -310,7 +316,7 @@ function renderChart() {
     series: [{
       type: "line", data: assets, showSymbol: false, smooth: true,
       lineStyle: { color: "#00d4ff", width: 1.5 },
-      areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+      areaStyle: { color: new ec.graphic.LinearGradient(0, 0, 0, 1, [
         { offset: 0, color: "rgba(0,212,255,0.12)" },
         { offset: 1, color: "rgba(0,212,255,0.01)" },
       ]) },
