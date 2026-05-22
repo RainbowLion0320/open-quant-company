@@ -1,7 +1,8 @@
 # Quant Agent — PRD/Spec 验收矩阵
 
-> 日期: 2026-05-22 | 来源: 开发计划 P0-2
+> 日期: 2026-05-23 | 来源: 新开发计划 P0-1
 > 用途: 追踪 6 个能力域从 PRD/spec → 代码 → 测试 → API/Web → 手工验收的完整链路
+> 本轮刷新: 标记 P0-3/P1-10/P2-13 已完成, 新增行业/板块缺口, 更新汇总
 
 ## 1. 数据管道 (Data Pipeline)
 
@@ -69,26 +70,30 @@
 | 5.2 | FastAPI 9 路由模块 | `web/api/routes/` (9 文件) | `test_web_system_contracts.py` (strategy jobs 路由) | 全部 9 路由模块 | `python -m uvicorn web.api.app:create_app --factory` 启动无报错 | OK | — |
 | 5.3 | WebSocket 实时进度推送 | `web/api/ws.py`, `web/api/jobs.py` | — | Strategy run/backtest 进度条 | 触发回测 → 前端进度条实时更新 | OK | 待补 WebSocket 合约测试 |
 | 5.4 | DuckDB :memory: 零锁查询 | `web/api/db.py` / `data/db.py` | `test_boundary.py` (DuckDB CRUD) | 所有数据查询端点 | Web 页面数据加载无延迟 | OK | — |
-| 5.5 | API 响应 envelope `{data, error}` | 各路由文件 | — | — | 检查所有 200/4xx/5xx 响应格式一致 | **缺口** | **P0-3: 混用 3 种错误格式，仅 3 个端点有 response_model** |
-| 5.6 | Settings API YAML 读写 + 校验 | `web/api/routes/settings.py` | — | `Settings.vue` | 修改配置 → 保存 → 重启后生效 | OK | P1-11 待加安全边界 |
-| 5.7 | 市场总览 (regime + index + macro) | `web/api/routes/market.py` | — | `Market.vue` | 3 行布局正常渲染 / regime score 是真实数字 / 时间 tab 可切换 | OK (已优化) | — |
+| 5.5 | API 响应 envelope `{data, error}` | 各路由文件 + `web/api/errors.py` | `test_web_system_contracts.py` | — | 检查所有 200/4xx/5xx 响应格式一致 | OK | P0-3 已完成 (f344dc0) |
+| 5.6 | Settings API YAML 读写 + 审计 | `web/api/routes/settings.py` | `test_audit.py`, `test_auth.py` | `Settings.vue` | 修改配置 → 确认弹窗 → 保存 → audit ledger 有记录 | OK | P1-11 已完成 |
+| 5.7 | 市场总览 (regime + multi_asset + macro) | `web/api/routes/market.py` | — | `Market.vue` | 多资产卡片含 data_source 标识 + 策略矩阵 + 预警面板 | OK | P2-13 已加 data_source |
 | 5.8 | DB Health 34 维度监控 | `web/api/routes/system.py` | `test_web_system_contracts.py:test_db_health_scans_new_registry_dimensions` | `DatabaseHealth.vue` | 34 维度状态表格 + 修复操作 | OK | — |
 | 5.9 | Hindsight 记忆查询 | `web/api/routes/hindsight.py` | — | `HindsightGraph.vue` | LLM 记忆图谱可查询 | OK | — |
-| 5.10 | 前端构建无大 chunk 警告 | `web/frontend/vite.config.ts` | — | — | `npm run build` 无 >500KB chunk 警告 | **缺口** | **P1-10: 当前最大 chunk ~1MB** |
-| 5.11 | System monitor (CPU/MEM/DISK) | `web/api/routes/system.py` | `test_web_system_contracts.py:test_deepseek_cdp_parser_joins_daily_cost_with_monthly_tokens` | `ActivityMonitor.vue` | 资源使用面板数据正确 | OK | — |
+| 5.10 | 前端构建无大 chunk 警告 | `web/frontend/vite.config.ts` | — | — | `npm run build` 无 >500KB chunk 警告 | OK | P1-10 已完成 (94ab769, 9e7f8ff 加固) |
+| 5.11 | System monitor (CPU/MEM/DISK) | `web/api/routes/system.py` | `test_web_system_contracts.py` | `ActivityMonitor.vue` | 资源面板 + DeepSeek 用量 + Top 进程 | OK | — |
+| 5.12 | Monitor/Settings 职责边界清晰 | `ActivityMonitor.vue` + `Settings.vue` | — | `/monitor` `/settings` | Monitor 只读观测, Settings 含策略状态/风控/审计 | OK | P1-1/P1-2 已完成 |
+| 5.13 | 行业雷达 Web 页面 | `Sectors.vue` + `web/api/routes/sectors.py` | — | `GET /api/sectors/*` | 31行业排名表 + 信号分布 + 组合敞口柱状图 | OK | P2+P3 已完成 |
 
 ## 6. 多资产架构 (Multi-Asset)
 
 | # | PRD/Spec 条目 | 代码文件 | 测试 | API / Web | 手工验收 | 状态 | 缺口 |
 |---|--------------|---------|------|-----------|---------|------|------|
-| 6.1 | AssetAdapter ABC 统一接口 | `data/assets/base.py` | — | — | `StockAsset` / `ETFAsset` 实现所有抽象方法 | OK | 待补合约测试 |
+| 6.1 | AssetAdapter ABC 统一接口 | `data/assets/base.py` | `test_asset_contracts.py` (27 tests) | — | `StockAsset` / `ETFAsset` 实现所有抽象方法 | OK | P2-13 已补合约测试 |
 | 6.2 | Stock 资产 (AKShare + Tushare) | `data/assets/stock.py` | — | `GET /stocks` → `Stocks.vue` | 全量 5517 只股票可查询 | OK | — |
-| 6.3 | ETF 资产 (AKShare `fund_etf_hist_em`) | `data/assets/etf.py` | — | — | ETF 数据可用或回退到 proxy | **缺口** | AKShare 接口不稳定，当前用 proxy |
-| 6.4 | Bond/Futures/Crypto 适配器 | `data/assets/{bond,futures,crypto}.py` | — | — | — | **缺口** | 框架就绪但适配器未实现 |
+| 6.3 | ETF 资产 (AKShare `fund_etf_hist_em`) | `data/assets/etf.py` | `test_asset_contracts.py::TestETFAssetContracts` | — | fetch_daily 返回标准 OHLCV, data_source="real" | OK | P2-13 已完成 |
+| 6.4 | Bond/Futures/Crypto 适配器 | `data/assets/{bond,futures,crypto}.py` | `test_asset_contracts.py` (5 classes) | — | Bond=proxy, Futures=real, Crypto=placeholder | OK | P2-13 已完成 |
 | 6.5 | AssetAllocator regime 动态权重 | `broker/allocator.py` | — | — | bull: stock 60%, bear: stock 10%, sideways: 35% | OK | 待补自动化测试 |
 | 6.6 | 资产开关控制 (enabled: true/false) | `config/settings.yaml` assets.*.enabled | — | — | 关闭 stock 后 `AssetRegistry.get_enabled()` 不含 stock | OK | — |
 | 6.7 | 多资产回测对比 | `backtest/multi_asset_tournament.py` | — | — | stock-only vs ETF-only vs multi 三组对比 | OK | ETF 用 proxy，非真实行情 |
 | 6.8 | 差异化费率 (A股/ETF/债券) | `broker/exchange.py` | — | — | A股印花税 0.1% vs ETF 免印花税 | OK | — |
+| 6.9 | 行业/板块数据维度 | `data/sectors.py` + `scripts/build_sector_snapshots.py` | — | `GET /api/sectors/*` | 申万行业指数 + 行业映射 + 信号聚合 + 敞口 | OK | P2 已完成 |
+| 6.10 | 行业 Web 雷达页面 | `web/frontend/src/views/Sectors.vue` | — | `/sectors` 路由 | 31行业排名表 + 信号分布 + 组合敞口柱状图 | OK | P3 已完成 |
 
 ## 汇总
 
@@ -98,15 +103,19 @@
 | 信号系统 | 9 | 9 | 0 | 3 |
 | 回测引擎 | 8 | 8 | 0 | 3 |
 | 执行层 | 8 | 8 | 0 | 5 |
-| Web 平台 | 11 | 9 | 2 | 2 |
-| 多资产架构 | 8 | 6 | 2 | 3 |
-| **合计** | **57** | **53** | **4** | **20** |
+| Web 平台 | 13 | 13 | 0 | 2 |
+| 多资产架构 | 10 | 10 | 0 | 3 |
+| **合计** | **62** | **62** | **0** | **20** |
 
-**关键缺口 (4 项):**
+**本轮已完成 (2026-05-23):**
 
-1. **P0-3: API 合约不统一** — 混用 `{"error": ...}`, `{"data": [], "status": "error"}`, 裸对象; 仅 3/50+ 端点有 `response_model`
-2. **P1-10: 前端大 chunk** — 当前 ~1MB，需 route-level dynamic import
-3. **ETF 真实行情缺失** — AKShare `fund_etf_hist_em` 不稳定，当前 proxy 方案有偏差
-4. **Bond/Futures/Crypto 未实现** — 框架就绪，适配器待开发
+- P0-3 API 合约 (f344dc0): 统一错误处理 + 7 端点 response_model
+- P1-10 前端 chunk (94ab769, 9e7f8ff): manualChunks + vendor split
+- P1-1 Monitor 只读 (e73d43f): 移除 toggleNotify/saveSettings/sysSettings
+- P1-2 Settings 配置管理 (e73d43f): 策略状态 + 风控 + 审计日志
+- P2-13 多资产契约 (44bae92): ETF/Bond/Futures/Crypto adapter + 27 合约测试
+- P1-11 Settings 安全边界 (e73d43f): API Key + audit ledger + run mode
+- P2 行业数据中台: registry + contracts + provider + sectors.py + build_sector_snapshots
+- P3 行业雷达页面: Sectors.vue + sector API types + 路由 + 导航
 
-**下一步:** P0-3 统一 API 合约 → P0-4 ResearchRun → P0-5 PIT/lookahead → P1 架构升级
+**下一步:** P4 策略/行业集成 → P5 自动化测试 → P6 文档终审

@@ -259,6 +259,70 @@ export interface SystemMonitor {
   };
 }
 
+export interface SectorSignal {
+  total: number;
+  buy_count: number;
+  buy_ratio: number;
+  avg_score: number;
+  top_symbol: string;
+}
+
+export interface SectorCard {
+  sector_code: string;
+  sector_name: string;
+  rank: number;
+  return_1d: number;
+  return_5d: number;
+  return_20d: number;
+  return_60d: number;
+  volatility: number;
+  member_count: number;
+  data_source: string;
+  signals: Record<string, SectorSignal>;
+}
+
+export interface SectorOverviewResponse {
+  sectors: SectorCard[];
+  total_sectors: number;
+  top_performers: SectorCard[];
+  bottom_performers: SectorCard[];
+  signal_concentration: number;
+  data_source: string;
+  freshness: { performance: string; signals: string };
+}
+
+export interface SectorExposureItem {
+  sector: string;
+  date: string;
+  weight: number;
+  market_value: number;
+  position_count: number;
+}
+
+export interface SectorExposureResponse {
+  exposure: SectorExposureItem[];
+  total_sectors: number;
+  data_source: string;
+}
+
+export interface SectorDetailResponse {
+  sector_name: string;
+  performance: Record<string, any>;
+  signals: Record<string, SectorSignal>;
+  data_source: string;
+}
+
+export interface SectorStock {
+  symbol: string;
+}
+
+export interface SectorStocksResponse {
+  industry: string;
+  stocks: SectorStock[];
+  total: number;
+  data_source: string;
+}
+
 function pct(v: unknown): number | undefined {
   if (v == null) return undefined;
   const n = Number(v);
@@ -373,6 +437,12 @@ export const api = {
     return data.config || {};
   },
   saveSettings: (data: Record<string, any>) => put<Record<string, any>>("/api/settings", data),
+
+  // Sectors
+  sectorOverview: () => get<SectorOverviewResponse>("/api/sectors/overview"),
+  sectorExposure: () => get<SectorExposureResponse>("/api/sectors/exposure"),
+  sectorDetail: (industry: string) => get<SectorDetailResponse>(`/api/sectors/${encodeURIComponent(industry)}`),
+  sectorStocks: (industry: string) => get<SectorStocksResponse>(`/api/sectors/${encodeURIComponent(industry)}/stocks`),
 
   // Audit & Run Mode
   auditHistory: (section = "", limit = 50) =>

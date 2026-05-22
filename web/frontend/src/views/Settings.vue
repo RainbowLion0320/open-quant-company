@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h1 class="page-title">系统设置</h1>
-        <p class="page-subtitle">通知配置 · 数据源状态 · 系统信息</p>
+        <p class="page-subtitle">运行模式 · 认证 · 通知 · 数据源 · 策略 · 风控</p>
       </div>
       <div style="display:flex;gap:10px;align-items:center;">
         <span :class="['mode-badge', `mode-${mode}`]">{{ modeLabel }}</span>
@@ -89,37 +89,61 @@
       </div>
     </div>
 
-    <!-- System Info -->
+    <!-- Strategy Status -->
     <div class="glass-card card-pad-lg">
-      <div class="section-heading mb-4">系统信息</div>
-      <div class="settings-info-grid">
-        <div>
-          <span>版本</span>
-          <strong>{{ versionText }}</strong>
+      <div class="section-heading mb-4">策略状态</div>
+      <div class="settings-list">
+        <div v-for="s in strategyStatuses" :key="s.name">
+          <span>{{ s.label }}</span>
+          <span :class="['badge', `badge-${s.color}`]">{{ s.status_label }}</span>
         </div>
-        <div>
-          <span>API 路由</span>
-          <strong>/api</strong>
+        <div v-if="strategyStatuses.length === 0">
+          <span>策略</span>
+          <span class="badge badge-muted">加载中...</span>
         </div>
-        <div>
-          <span>股票池</span>
-          <strong>{{ stockUniverseText }}</strong>
+      </div>
+    </div>
+
+    <!-- Risk Control -->
+    <div class="glass-card card-pad-lg">
+      <div class="section-heading mb-4">风控参数</div>
+      <div class="settings-list">
+        <div v-if="risk.max_single_position?.enabled">
+          <span>单仓位上限</span>
+          <strong>{{ fmtPct(risk.max_single_position?.max_pct) }}</strong>
         </div>
-        <div>
-          <span>策略数</span>
-          <strong>{{ strategyCountText }}</strong>
+        <div v-if="risk.max_total_exposure?.enabled">
+          <span>总敞口上限</span>
+          <strong>{{ fmtPct(risk.max_total_exposure?.max_pct) }}</strong>
         </div>
-        <div>
-          <span>特征策略</span>
-          <strong>{{ featurePolicyText }}</strong>
+        <div v-if="risk.max_orders_per_day?.enabled">
+          <span>单日最大单数</span>
+          <strong>{{ risk.max_orders_per_day?.max_count ?? '—' }}</strong>
         </div>
-        <div>
-          <span>ML 模型</span>
-          <strong>{{ mlModeText }}</strong>
+        <div v-if="risk.max_drawdown_circuit_breaker?.enabled">
+          <span>回撤熔断</span>
+          <strong>{{ fmtPct(risk.max_drawdown_circuit_breaker?.max_dd_pct) }}</strong>
         </div>
-        <div>
-          <span>模拟交易</span>
-          <strong>{{ paperExecutionText }}</strong>
+        <div v-if="!hasRiskConfig">
+          <span>风控</span>
+          <span class="badge badge-muted">未配置</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit Log -->
+    <div class="glass-card card-pad-lg">
+      <div class="section-heading mb-4">最近配置变更</div>
+      <div class="source-list">
+        <div v-for="entry in auditEntries" :key="entry.timestamp">
+          <span>
+            <span class="audit-time">{{ fmtAuditTime(entry.timestamp) }}</span>
+            <span class="audit-summary">{{ entry.summary || entry.action || '配置更新' }}</span>
+          </span>
+        </div>
+        <div v-if="auditEntries.length === 0">
+          <span>审计日志</span>
+          <span class="badge badge-muted">暂无记录</span>
         </div>
       </div>
     </div>
@@ -149,6 +173,8 @@ const showConfirm = ref(false);
 const mode = ref("research");
 const modeStatus = ref<Record<string, any>>({});
 const apiKeyInput = ref("");
+const strategyStatuses = ref<{ name: string; label: string; status: string; status_label: string; color: string }[]>([]);
+const auditEntries = ref<any[]>([]);
 
 const modeLabel = computed(() => {
   if (mode.value === "live") return "LIVE";
@@ -166,25 +192,8 @@ const apiKeyStatus = computed(() => {
   return has ? "已设置" : "未设置 — 本地开放模式";
 });
 
-const versionText = computed(() => {
-  const version = settings.project?.version;
-  return version ? `v${version} Quantum Terminal` : "Quantum Terminal";
-});
-const stockUniverseText = computed(() => {
-  const stock = settings.assets?.stock || {};
-  return String(stock.universe || stock.label || "—");
-});
-const strategyCountText = computed(() => {
-  const strategies = Object.values(settings.strategies || {}).filter((item: any) => item?.enabled !== false);
-  return strategies.length ? `${strategies.length} active` : "—";
-});
-const featurePolicyText = computed(() => {
-  const months = Number(settings.ml?.max_feature_age_months);
-  if (settings.ml?.allow_stale_features) return "stale allowed";
-  return Number.isFinite(months) && months > 0 ? `fresh ≤ ${months}m` : "fresh only";
-});
-const mlModeText = computed(() => settings.ml?.use_regime_models ? "LightGBM · regime-aware" : "LightGBM");
-const paperExecutionText = computed(() => settings.paper_trading?.auto_execute ? "auto execute" : "manual execute");
+const risk = computed(() => settings.risk_control || {});
+const hasRiskConfig = computed(() => Object.keys(risk.value).length > 0 && Object.values(risk.value).some((v: any) => v?.enabled));
 const notificationText = computed(() => {
   const enabled = settings.trading?.notification?.enabled ? "已启用" : "已关闭";
   const changeOnly = settings.trading?.notification?.signal_change_only !== false ? "仅信号变化" : "全部信号";
@@ -212,6 +221,30 @@ const sourceItems = computed(() => {
     .slice(0, 6)
     .map(item => ({ ...item, summary: item.enabled ? `${item.enabled}/${item.total} dims` : "disabled" }));
 });
+
+function fmtPct(v: number | undefined): string {
+  if (v == null) return '—';
+  return `${(v * 100).toFixed(0)}%`;
+}
+function fmtAuditTime(ts: string): string {
+  if (!ts) return '—';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  } catch { return ts.slice(0, 16); }
+}
+async function fetchStrategyStatuses() {
+  try {
+    const data = await api.strategyStatuses();
+    strategyStatuses.value = data.strategies || [];
+  } catch {}
+}
+async function fetchAudit() {
+  try {
+    const data = await api.auditHistory("settings", 5);
+    auditEntries.value = data.entries || [];
+  } catch {}
+}
 
 function sourceBadgeClass(status: string): string {
   if (status === "available") return "badge-green";
@@ -256,6 +289,8 @@ onMounted(async () => {
     Object.assign(settings, data);
   } catch {}
   await loadMode();
+  fetchStrategyStatuses();
+  fetchAudit();
   // Restore saved API key
   const saved = localStorage.getItem("quant_api_key");
   if (saved) apiKeyInput.value = "";
@@ -411,6 +446,17 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+.audit-time {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.audit-summary {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--text-disabled);
 }
 @media (max-width: 720px) {
   .settings-info-grid {

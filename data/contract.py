@@ -382,6 +382,27 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
             "low": "float64", "close": "float64", "volume": "float64",
             "open_interest": "float64",
         },
+        # P2: Sector / Industry dimensions
+        "sector_sw_daily": {
+            "ts_code": "object", "trade_date": "datetime64[ns]",
+            "open": "float64", "high": "float64", "low": "float64",
+            "close": "float64", "vol": "float64", "amount": "float64",
+            "pct_chg": "float64",
+        },
+        "sector_membership": {
+            "symbol": "object", "sector_code": "object",
+            "sector_name": "object", "sector_level": "int64",
+        },
+        "sector_signal_snapshot": {
+            "sector": "object", "date": "object", "strategy": "object",
+            "total": "int64", "buy_count": "int64", "buy_ratio": "float64",
+            "avg_score": "float64", "top_symbol": "object",
+        },
+        "sector_exposure_snapshot": {
+            "sector": "object", "date": "object",
+            "weight": "float64", "market_value": "float64",
+            "position_count": "int64",
+        },
     }
 
     for key, dim in registry.all.items():

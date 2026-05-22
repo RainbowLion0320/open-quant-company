@@ -1,15 +1,16 @@
 # Spec: Web 平台 (Web Platform)
 
-> 版本: 1.0 | 日期: 2026-05-21 | 关联: [[PRD.md]] [[01-data-pipeline.md]] [[02-signal-system.md]]
+> 版本: 2.0 | 日期: 2026-05-23 | 关联: [[PRD.md]] [[01-data-pipeline.md]] [[02-signal-system.md]]
 
 ## 1. 概述
 
-Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 实时推送。覆盖数据健康监控、策略信号浏览、回测结果对比、模拟交易状态、系统设置管理。
+Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 实时推送。覆盖市场总览、策略信号浏览、行业雷达、回测结果对比、模拟交易状态、系统设置管理、数据库健康监控。
 
 **设计原则：**
 - **前后端分离** — Vue 3 (Vite) + FastAPI，独立开发/部署
 - **零锁查询** — DuckDB :memory: 模式直接读 Parquet，不经过数据库锁
-- **实时推送** — WebSocket 推送长时间任务（数据拉取/回测/训练）的进度
+- **实时推送** — WebSocket 推送长时间任务（回测/训练）的进度
+- **职责分离** — `/monitor` 只读观测, `/settings` 配置管理, 不交叉
 
 ## 2. 组件架构
 
@@ -23,7 +24,7 @@ Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSoc
 ┌──────────────────────▼──────────────────────────────┐
 │              web/api/ (FastAPI)                        │
 │   create_app() → CORS → Router → Error Handler        │
-│   routes/ (9 modules) + ws.py + jobs.py               │
+│   routes/ (10 modules) + ws.py + jobs.py               │
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
@@ -35,38 +36,45 @@ Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSoc
 
 ### 2.1 前端架构 (Vue 3 SPA)
 
-**技术栈：** Vue 3 + Pinia (状态管理) + ECharts (图表) + Tailwind CSS (样式) + Vite (构建)
+**技术栈：** Vue 3 (Composition API) + ECharts (图表) + Tailwind CSS (样式) + Vite (构建)
 
-**路由表：**
+**路由表 (12 页):**
 
 | 路由 | 页面 | 功能 |
 |------|------|------|
-| `/` | Dashboard | 系统概览：数据健康总览 + 最新信号 + NAV 曲线 |
-| `/health` | DB Health | 34 维度注册表状态 + 修复操作 |
-| `/signals` | 信号浏览 | 各策略信号表格 + 详情面板 |
-| `/backtest` | 回测结果 | 锦标赛对比图 + 15 指标雷达图 |
-| `/portfolio` | 模拟持仓 | PaperBroker 持仓 + 交易历史 + NAV 曲线 |
-| `/settings` | 系统设置 | YAML 配置编辑器 + 校验 |
-
-**Pinia Store：** 每个页面独立 store（`useHealthStore`, `useSignalsStore`, `useBacktestStore`, `usePortfolioStore`, `useSettingsStore`）
+| `/` | 市场总览 | Regime 球体 + 多资产卡片(含 data_source) + 宏观快照 + 策略矩阵 + 预警面板 |
+| `/strategies` | 策略中心 | 生命周期状态徽章 + 信号表格 + WebSocket 进度 |
+| `/stocks` | 个股搜索 | 全量股票搜索入口 |
+| `/stocks/:code` | 个股深挖 | K线 + DCF + 巴菲特评分 + 策略信号 + 财务数据 |
+| `/backtest` | 回测分析 | N策略同屏叠加曲线 + 15 指标 + 基准参照 |
+| `/portfolio` | 模拟持仓 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
+| `/sectors` | 行业雷达 | 申万31行业排名表 + 1/5/20/60日动量 + 信号分布 + 组合敞口 |
+| `/signals` | 信号历史 | 信号变更追踪 (strategy/symbol/old_signal/new_signal) |
+| `/monitor` | 系统信息 | 只读观测: CPU/MEM/DISK + DeepSeek 用量 + API Health + Services + Cron Jobs |
+| `/db-health` | 数据库健康 | 34 维度健康扫描 + 大小统计 + 单表修复 |
+| `/hindsight` | 记忆图谱 | Canvas 力导向图, 悬浮/点击探索 Hindsight 节点 |
+| `/settings` | 系统设置 | 配置管理: 运行模式 + API Key + 通知 + 数据源 + 审计日志 |
 
 ### 2.2 后端架构 (FastAPI)
 
 **应用工厂：** `web/api/__init__.py` → `create_app()` → 注册路由 + CORS + 异常处理
 
-**9 个路由模块：**
+**12 个路由模块：**
 
 | 模块 | 文件 | 端点 |
 |------|------|------|
-| Stocks | `routes/stocks.py` | `GET /stocks`, `GET /stocks/{symbol}`, `GET /stocks/{symbol}/ohlcv` |
-| Signals | `routes/signals.py` | `GET /signals`, `GET /signals/{strategy}`, `POST /signals/scan` |
-| Backtest | `routes/backtest.py` | `GET /backtest`, `POST /backtest/run`, `GET /backtest/{run_id}` |
-| Portfolio | `routes/portfolio.py` | `GET /portfolio`, `GET /portfolio/nav`, `POST /portfolio/order` |
-| Market | `routes/market.py` | `GET /market/index`, `GET /market/breadth`, `GET /market/regime` |
-| Settings | `routes/settings.py` | `GET /settings`, `PUT /settings`, `PATCH /settings/section/{section}` |
-| System | `routes/system.py` | `GET /system/health`, `POST /system/repair`, `GET /system/cron-log` |
-| Hindsight | `routes/hindsight.py` | `POST /hindsight/query` (LLM 记忆查询) |
-| Strategies | `routes/strategies.py` | `GET /strategies`, `GET /strategies/{name}` |
+| Market | `routes/market.py` | `GET /market`, `GET /market/regime` |
+| Stocks | `routes/stocks.py` | `GET /stocks/{code}`, `GET /stocks/{code}/kline` |
+| Signals | `routes/signals.py` | `GET /signals/changes`, `GET /signals/{strategy}` |
+| Strategies | `routes/strategies.py` | `GET /strategies`, `GET /strategies/{name}`, `GET /strategies/statuses`, `POST /strategies/run` |
+| Backtest | `routes/backtest.py` | `GET /backtest`, `GET /backtest/{key}` |
+| Portfolio | `routes/portfolio.py` | `GET /portfolio/positions`, `GET /portfolio/balance`, `POST /portfolio/order` |
+| Sectors | `routes/sectors.py` | `GET /sectors/overview`, `GET /sectors/exposure`, `GET /sectors/{industry}`, `GET /sectors/{industry}/stocks` |
+| Settings | `routes/settings.py` | `GET /settings`, `PUT /settings` |
+| System | `routes/system.py` | `GET /system/monitor`, `GET /system/history`, `GET /system/api-health`, `GET /system/cron-jobs`, `GET /system/service-status`, `GET /system/audit`, `GET /system/mode` |
+| Hindsight | `routes/hindsight.py` | `POST /hindsight/query` |
+| Market (续) | `routes/market.py` | `GET /market` 含 `multi_asset[]`, `macro[]`, `strategy_matrix[]`, `alerts[]`, `freshness` |
+| Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
 
 **WebSocket：** `ws.py` → `/ws/{job_id}` — 任务进度实时推送。`broadcast_progress()` 使用 `list()` 拍平连接集合避免并发修改异常。
 
@@ -182,7 +190,8 @@ ALLOWED_STRATEGIES = list_strategy_names()
 
 ## 8. 已知限制 & 未来方向
 
-- **无用户认证：** 单用户本地运行，不需要登录系统
-- **无移动端适配：** 当前仅桌面浏览器布局
-- **DuckDB 只读：** 所有写操作通过 API 触发 Python 端 DataHub，不经过 DuckDB
-- **未来：** 回测结果交互式下钻（点击策略 → 逐月收益明细）、策略参数热调（滑块调节权重 → 实时重算回测）
+- **行业/板块雷达页面** — 下一阶段 (P2-P3) 新增 `/sectors` 路由，含热力图 + 排名 + 信号分布
+- **Monitor/Settings 职责同步** — 当前 Monitor 仍含写配置逻辑 (P1-1 待重构)
+- **无移动端适配** — 当前仅桌面浏览器布局
+- **DuckDB 只读** — 所有写操作通过 API 触发 Python 端 DataHub，不经过 DuckDB
+- **未来：** 行业雷达页面、策略参数热调、回测结果交互式下钻、前端 smoke/e2e 自动化

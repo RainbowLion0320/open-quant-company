@@ -18,7 +18,7 @@ from typing import Dict, Iterable, List, Optional
 
 
 ALLOWED_SOURCES = {"akshare", "tushare_free", "tushare_paid", "future", "computed", "system"}
-ALLOWED_ASSETS = {"stock", "macro", "fund", "futures", "crypto", "bond", "system"}
+ALLOWED_ASSETS = {"stock", "macro", "fund", "futures", "crypto", "bond", "system", "sector"}
 ALLOWED_STATUSES = {"available", "rate_limited", "paid", "planned"}
 ALLOWED_FREQS = {"daily", "monthly", "quarterly", "event", "minute", "intraday", "system"}
 ALLOWED_REPAIR_POLICIES = {"auto", "rate_limited", "manual", "none"}
@@ -48,6 +48,10 @@ DEFAULT_HEALTH_TABLES = {
     "broker_recommend": "stock_broker_recommend",
     "research_report": "stock_research_report",
     "dividend": "stock_dividend",
+    "sector_sw_daily": "sector_sw_daily",
+    "sector_membership": "sector_membership",
+    "sector_signal_snapshot": "sector_signal_snapshot",
+    "sector_exposure_snapshot": "sector_exposure_snapshot",
 }
 
 FRESHNESS_SLA_BY_FREQ = {

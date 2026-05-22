@@ -8,7 +8,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 
 # Decision: Quantum Terminal Web SPA
 
-- **Date**: 2026-05-12 (initial), 2026-05-16 (command center upgrade)
+- **Date**: 2026-05-12 (initial), 2026-05-16 (command center upgrade), 2026-05-23 (refresh)
 - **Status**: Implemented
 - **Author**: Quant Agent + Codex
 
@@ -35,20 +35,22 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 - Regime 球体：CSS 动画光晕, 评分环形进度
 - 预警面板：多级颜色 (success/warning/danger/info)
 
-## 页面结构 (10 页)
+## 页面结构 (12 页)
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
-| 指挥中心 | `/` | Regime 球体 + 多资产跟踪器 + 宏观快照 + 策略矩阵 + 智能预警 |
-| 策略中心 | `/strategies` | 信号表格 + WebSocket 进度 |
+| 市场总览 | `/` | Regime 球体 + 多资产跟踪器 (data_source 标识) + 宏观快照 + 策略矩阵 + 智能预警 |
+| 策略中心 | `/strategies` | 策略生命周期状态徽章 + 信号表格 + WebSocket 进度 |
 | 模拟交易 | `/portfolio` | ★ PaperBroker 日频模拟: NAV权益曲线 + 持仓 + 交易记录 + 手动下单 |
 | 个股搜索 | `/stocks` | 搜索入口 |
 | 个股深挖 | `/stocks/:code` | K线 + DCF计算器 + 巴菲特评分 + 策略信号 |
 | 回测分析 | `/backtest` | N策略同屏叠加曲线 + 点击高亮 + 基准参照 |
-| 信号历史 | `/signals` | 信号变更追踪 |
-| 系统信息 | `/monitor` | CPU/内存/Token/Top进程 + 5 设置卡片: TELEGRAM/Data Sources/API Health/Services/Cron Jobs/System Info |
-| 数据库健康 | `/db-health` | 多维度健康扫描 (含 OHLCV/Features/Cache API) + 全量大小统计 + 按时间分段 + 单表修复 |
-| 记忆图谱 | `/hindsight` | ★ Hindsight 知识图谱 — Canvas 力导向图, 悬浮/点击探索节点关系 |
+| 行业雷达 | `/sectors` | 申万31行业排名表 + 1/5/20/60日动量 + 信号分布 + 组合敞口 |
+| 信号历史 | `/signals` | 信号变更追踪 (含 strategy/old_signal/new_signal) |
+| 系统信息 | `/monitor` | 只读观测: CPU/MEM/DISK + DeepSeek 用量 + Top 进程 + API Health + Services + Cron Jobs (不写配置) |
+| 数据库健康 | `/db-health` | 34 维度健康扫描 + 全量大小统计 + 按时间分段 + 单表修复 |
+| 记忆图谱 | `/hindsight` | Hindsight 知识图谱 — Canvas 力导向图, 悬浮/点击探索节点关系 |
+| 系统设置 | `/settings` | 配置管理: 运行模式 + API Key + Telegram 通知 + 数据源 + 策略/风控参数 + 审计日志 |
 
 ### 指挥中心 (2026-05-16 Codex 升级)
 
@@ -61,7 +63,7 @@ Market API 新增字段：
 
 前端 Market.vue 完全重写：从4张简单卡片升级为 Command Center 布局，含 animated regime orb、4资产跟踪器、宏观快照行、策略矩阵卡片、预警面板。仅读 Parquet 缓存，无网络阻塞。
 
-### 系统信息 (2026-05-21 升级)
+### 系统信息 (2026-05-21 升级, 2026-05-23 边界明确)
 
 独立 SQLite WAL 时序库 `system_monitor.db`：
 - API: `/api/system/monitor` (实时快照) + `/api/system/history` (趋势)
@@ -69,8 +71,9 @@ Market API 新增字段：
 - 新增: `/api/system/cron-jobs` (cron job 状态, 读 ~/.hermes/cron/jobs.json)
 - 新增: `/api/system/service-status` (Chrome CDP + DeepSeek cookie 倒计时)
 - 新增: `/api/system/deepseek-usage` (CDP 日度 Token 用量)
-- 前端: ActivityMonitor.vue, 左列(TELEGRAM/Data Sources/API Health) + 右列(Services/Cron Jobs/System Info)
+- 前端: ActivityMonitor.vue, CPU/MEM/DISK + DeepSeek 用量 + Top 进程 + API Health + Services + Cron Jobs
 - Token 三来源覆盖: Hermes state.db + factor_hypothesis log + Hindsight /metrics
+- **职责边界 (2026-05-23):** Monitor 为只读观测页，不调用 `api.saveSettings()`。配置操作通过"去设置"入口引导到 `/settings`。
 
 ### 记忆图谱 (2026-05-17)
 

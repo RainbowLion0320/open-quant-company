@@ -144,34 +144,6 @@
       <div class="settings-col">
       <div class="glass-card settings-card">
         <div class="panel-head">
-          <span>TELEGRAM</span>
-        </div>
-        <div class="settings-row main">
-          <div>
-            <strong>信号推送</strong>
-            <span>{{ notificationText }}</span>
-          </div>
-          <button @click="toggleNotify"
-            class="toggle-switch"
-            :class="{ active: sysSettings.trading?.notification?.enabled }">
-            <span></span>
-          </button>
-        </div>
-      </div>
-      <div class="glass-card settings-card">
-        <div class="panel-head">
-          <span>DATA SOURCES</span>
-        </div>
-        <div class="source-list">
-          <div v-for="src in sourceItems" :key="src.name">
-            <span>{{ src.name }}</span>
-            <em :class="['source-badge', sourceBadgeClass(src.status)]">{{ src.summary }}</em>
-          </div>
-          <div v-if="sourceItems.length === 0"><span>Registry</span><em class="source-badge muted">暂无配置</em></div>
-        </div>
-      </div>
-      <div class="glass-card settings-card">
-        <div class="panel-head">
           <span>API HEALTH</span>
           <em v-if="apiHealth" :class="apiHealth.all_ok ? 'source-badge ok' : 'source-badge limited'"
             class="summary-badge">{{ apiHealth.summary }}</em>
@@ -228,15 +200,17 @@
       </div>
       <div class="glass-card settings-card">
         <div class="panel-head">
-          <span>SYSTEM INFO</span>
+          <span>QUICK LINKS</span>
         </div>
-        <div class="info-grid">
-          <div><span>Version</span><strong>{{ versionText }}</strong></div>
-          <div><span>API Route</span><strong>/api</strong></div>
-          <div><span>Universe</span><strong>{{ stockUniverseText }}</strong></div>
-          <div><span>Strategies</span><strong>{{ strategyCountText }}</strong></div>
-          <div><span>Features</span><strong>{{ featurePolicyText }}</strong></div>
-          <div><span>Paper</span><strong>{{ paperExecutionText }}</strong></div>
+        <div class="source-list">
+          <router-link to="/settings" class="quick-link-item">
+            <span>系统设置</span>
+            <em class="source-badge ok">配置</em>
+          </router-link>
+          <router-link to="/db-health" class="quick-link-item">
+            <span>数据库健康</span>
+            <em class="source-badge ok">→</em>
+          </router-link>
         </div>
       </div>
       </div>
@@ -245,7 +219,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { api, type SystemMonitor } from "../api";
 
 const monitor = ref<SystemMonitor | null>(null);
@@ -277,53 +251,8 @@ const dsFlashRef = ref<HTMLCanvasElement | null>(null);
 const dsCostRef = ref<HTMLCanvasElement | null>(null);
 const dsTotals = ref<{ pro: number; flash: number; cost: number } | null>(null);
 
-const sysSettings = reactive<Record<string, any>>({});
 const apiHealth = ref<{ items: { name: string; status: string; detail: string }[]; summary: string; all_ok: boolean } | null>(null);
 
-const versionText = computed(() => {
-  const version = sysSettings.project?.version;
-  return version ? `v${version} Quantum Terminal` : "Quantum Terminal";
-});
-const stockUniverseText = computed(() => {
-  const stock = sysSettings.assets?.stock || {};
-  return String(stock.universe || stock.label || "—");
-});
-const strategyCountText = computed(() => {
-  const strategies = Object.values(sysSettings.strategies || {}).filter((item: any) => item?.enabled !== false);
-  return strategies.length ? `${strategies.length} active` : "—";
-});
-const featurePolicyText = computed(() => {
-  const months = Number(sysSettings.ml?.max_feature_age_months);
-  if (sysSettings.ml?.allow_stale_features) return "stale allowed";
-  return Number.isFinite(months) && months > 0 ? `fresh ≤ ${months}m` : "fresh only";
-});
-const paperExecutionText = computed(() => sysSettings.paper_trading?.auto_execute ? "auto execute" : "manual execute");
-const notificationText = computed(() => {
-  const enabled = sysSettings.trading?.notification?.enabled ? "enabled" : "disabled";
-  const changeOnly = sysSettings.trading?.notification?.signal_change_only !== false ? "signal changes" : "all signals";
-  return `Telegram ${enabled} · ${changeOnly}`;
-});
-const sourceItems = computed(() => {
-  const registry = sysSettings.data_registry || {};
-  const grouped: Record<string, { name: string; total: number; enabled: number; status: string }> = {};
-  const labels: Record<string, string> = {
-    akshare: "AKShare",
-    tushare_free: "Tushare Free",
-    tushare_paid: "Tushare Paid",
-    future: "Future",
-  };
-  for (const entry of Object.values(registry) as any[]) {
-    const key = String(entry?.source || "local");
-    grouped[key] = grouped[key] || { name: labels[key] || key, total: 0, enabled: 0, status: "available" };
-    grouped[key].total += 1;
-    if (entry?.enabled !== false) grouped[key].enabled += 1;
-    if (entry?.enabled !== false && entry?.status && entry.status !== "available") grouped[key].status = String(entry.status);
-  }
-  // Fixed order: free tier first, then paid/future
-  const order = ["akshare", "tushare_free", "tushare_paid", "future"];
-  const items = order.map(name => grouped[name]).filter(Boolean);
-  return items.map(item => ({ ...item!, summary: item!.enabled ? `${item!.enabled}/${item!.total} dims` : "disabled" }));
-});
 
 // Fixed API health display order: data → AI → infra → messaging
 const API_HEALTH_ORDER = ["AKShare", "Tushare", "DeepSeek", "Hindsight", "Telegram"];
@@ -398,13 +327,6 @@ async function fetchServiceStatus() {
   } catch { serviceItems.value = []; serviceSummary.value = ""; }
 }
 
-function sourceBadgeClass(status: string): string {
-  if (status === "available") return "ok";
-  if (status === "rate_limited") return "limited";
-  if (status === "paid") return "paid";
-  return "muted";
-}
-
 function apiBadgeClass(status: string): string {
   if (status === "ok") return "ok";
   if (status === "warn") return "limited";
@@ -413,20 +335,6 @@ function apiBadgeClass(status: string): string {
   return "muted";
 }
 
-async function toggleNotify() {
-  const enabled = !sysSettings.trading?.notification?.enabled;
-  sysSettings.trading = sysSettings.trading || {};
-  sysSettings.trading.notification = sysSettings.trading.notification || {};
-  sysSettings.trading.notification.enabled = enabled;
-  try { await api.saveSettings(sysSettings); } catch {}
-}
-
-async function loadSettings() {
-  try { const d = await api.settings(); Object.assign(sysSettings, d); } catch {}
-  fetchApiHealth();
-  fetchCronJobs();
-  fetchServiceStatus();
-}
 
 async function fetchApiHealth() {
   try { apiHealth.value = await api.apiHealth(); } catch { apiHealth.value = null; }
@@ -618,7 +526,9 @@ async function drawDSChart() {
 onMounted(() => {
   fetchData();
   fetchSlowData();
-  loadSettings();
+  fetchApiHealth();
+  fetchCronJobs();
+  fetchServiceStatus();
   timer = window.setInterval(fetchData, 10_000);
   slowTimer = window.setInterval(fetchSlowData, 60_000);
   elapTimer = window.setInterval(() => { elapsed.value = Math.round((Date.now() - lastFetch.value) / 1000); }, 1000);
@@ -939,6 +849,25 @@ onUnmounted(() => {
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+.quick-link-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.quick-link-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.quick-link-item:hover {
+  color: var(--accent);
 }
 .settings-row.main {
   display: flex;

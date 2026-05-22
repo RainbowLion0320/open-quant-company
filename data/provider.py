@@ -190,6 +190,7 @@ class TushareAdapter(ProviderAdapter):
         "top_list":          ("top_list",          {}),
         "broker_recommend":  ("broker_recommend",  {}),
         "moneyflow_tushare_daily": ("moneyflow_mkt_dc", {}),
+        "sector_sw_daily":     ("sw_daily",          {}),
     }
 
     def __init__(self, token: str | None = None):

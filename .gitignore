@@ -68,6 +68,7 @@ backtest/results/
 data/store/paper/
 data/store/_cron_log/
 data/store/_backfill/
+data/store/sector/
 data/store/_contracts/
 data/store/_audit/
 data/store/runs.lock

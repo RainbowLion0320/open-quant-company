@@ -109,6 +109,7 @@ const nav = [
   { path: "/stocks", label: "个股深挖", pathData: "M4 18l5-5 4 3 7-9M4 6h16M4 21h16" },
   { path: "/portfolio", label: "模拟交易", pathData: "M5 7h14v12H5V7Zm3 0V5h8v2M8 13h3m2 0h3" },
   { path: "/backtest", label: "回测分析", pathData: "M4 19V5m0 14h16M7 15l3-4 3 2 5-7" },
+  { path: "/sectors", label: "行业雷达", pathData: "M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Zm4 2v7h2v-7H7Zm4 0v7h2v-7h-2Zm4 0v7h2v-7h-2Z" },
   { path: "/signals", label: "信号历史", pathData: "M12 20a8 8 0 1 0-8-8m8 8V9m0 0 4 4m-4-4-4 4" },
   { path: "/monitor", label: "系统信息", pathData: "M4 13h3l2-6 4 12 2-6h5M4 20h16M4 4h16" },
   { path: "/db-health", label: "数据库健康", pathData: "M4 6h16M4 12h16M4 18h16M8 2v4m0 4v4m8-12v4m0 4v4M4 22h16" },

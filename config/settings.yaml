@@ -666,3 +666,40 @@ data_registry:
     enabled: false
     label: 加密货币日线
     cache: crypto/daily/{symbol}.parquet
+  # ── P2: Sector / Industry Dimensions ──
+  sector_sw_daily:
+    source: tushare_free
+    asset: sector
+    status: available
+    freq: daily
+    enabled: true
+    label: 申万行业指数日行情
+    cache: sector/sw_daily/{symbol}.parquet
+    description: 28个申万一级行业指数, 来自 Tushare sw_daily
+  sector_membership:
+    source: computed
+    asset: sector
+    status: available
+    freq: event
+    enabled: true
+    label: 股票-行业映射
+    cache: sector/membership.parquet
+    description: 每只股票归属的申万一/二级行业, 基于 stock_basic 行业字段
+  sector_signal_snapshot:
+    source: computed
+    asset: sector
+    status: available
+    freq: daily
+    enabled: true
+    label: 策略信号按行业聚合
+    cache: sector/signal_snapshot/{YYYYMMDD}.parquet
+    description: 各策略 buy_ratio/avg_score/top_symbol 按行业汇总
+  sector_exposure_snapshot:
+    source: computed
+    asset: sector
+    status: available
+    freq: daily
+    enabled: true
+    label: 组合持仓按行业暴露
+    cache: sector/exposure_snapshot/{YYYYMMDD}.parquet
+    description: Paper/Portfolio 持仓按行业权重/市值/数量汇总
