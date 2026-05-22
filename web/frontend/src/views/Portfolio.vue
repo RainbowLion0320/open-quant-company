@@ -59,6 +59,22 @@
       </div>
     </div>
 
+    <!-- Sector Exposure -->
+    <div v-if="sectorExposure.length" class="glass-card card-pad-lg">
+      <div class="text-xs font-semibold tracking-wide mb-3" style="color:var(--text-secondary)">
+        行业敞口 ({{ sectorExposure.length }} 个行业)
+      </div>
+      <div class="exposure-bars">
+        <div v-for="e in sectorExposure" :key="e.sector" class="exposure-row">
+          <span class="exposure-label">{{ e.sector }}</span>
+          <div class="exposure-track">
+            <div class="exposure-fill" :style="{ width: Math.max((e.weight * 100), 0.5) + '%' }"></div>
+          </div>
+          <span class="exposure-val">{{ (e.weight * 100).toFixed(1) }}%</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Positions -->
     <div class="glass-card card-pad-lg">
       <div class="text-xs font-semibold tracking-wide mb-4" style="color:var(--text-secondary)">
@@ -207,6 +223,7 @@ const positions = ref<Position[]>([]);
 const navData = ref<NavPoint[]>([]);
 const trades = ref<Trade[]>([]);
 const tradeTotal = ref(0);
+const sectorExposure = ref<{ sector: string; weight: number; market_value: number; position_count: number }[]>([]);
 const summary = ref<Summary>({
   total_asset: 0, cash: 0, market_value: 0, total_return: 0,
   total_return_pct: 0, positions_count: 0, peak_equity: 0, nav_days: 0,
@@ -248,6 +265,12 @@ async function loadAll() {
     navData.value = navRes.nav || [];
     trades.value = tradeRes.trades || [];
     tradeTotal.value = tradeRes.total || 0;
+
+    // Sector exposure
+    try {
+      const expRes = await fetch("/api/portfolio/sector-exposure").then(r => r.json());
+      sectorExposure.value = expRes.exposure || [];
+    } catch {}
 
     const s = sumRes;
     summary.value = {
@@ -331,3 +354,44 @@ watch(navData, () => nextTick(renderChart));
 onMounted(loadAll);
 onUnmounted(() => { chart?.dispose(); });
 </script>
+
+<style scoped>
+.exposure-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.exposure-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.exposure-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  width: 72px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.exposure-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(0, 212, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.exposure-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--positive));
+  border-radius: 3px;
+  min-width: 2px;
+  transition: width 0.4s ease;
+}
+.exposure-val {
+  font-size: 11px;
+  font-family: "JetBrains Mono", monospace;
+  color: var(--text-primary);
+  width: 48px;
+  flex-shrink: 0;
+}
+</style>

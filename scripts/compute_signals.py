@@ -164,6 +164,7 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
                 "trend_strength": tech["trend_strength"],
                 "volatility": tech["volatility"],
                 "sector": inputs.get("sector", ""),
+                "symbol": sym,
             }
 
             components = scorer.score_components(factors)
@@ -178,6 +179,7 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
                     "valuation": components["valuation"],
                     "technical": components["technical"],
                     "market": components["market"],
+                    "industry": components.get("industry", 50.0),
                     "momentum_3m_skip_1m": round(tech.get("momentum_3m_skip_1m", 0), 4),
                     "momentum_6m_skip_1m": round(tech.get("momentum_6m_skip_1m", 0), 4),
                     "trend_strength": round(tech.get("trend_strength", 0), 4),

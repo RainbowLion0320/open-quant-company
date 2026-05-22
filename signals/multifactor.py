@@ -1,7 +1,7 @@
 """
-多因子打分引擎 — 融合四维数据
+多因子打分引擎 — 融合五维数据
 
-质量分(40%) + 估值分(30%) + 技术分(15%) + 市场分(15%)
+质量分(35%) + 估值分(25%) + 技术分(15%) + 市场分(10%) + 行业动量(15%)
 每月重打分, 买Top-N, 卖跌出Top-N的
 """
 import pandas as pd
@@ -34,7 +34,7 @@ class MultiFactorScorer:
 
     def score_components(self, factors: dict) -> dict:
         """
-        返回四维组件分 + 综合分 (0-100).
+        返回五维组件分 + 综合分 (0-100).
 
         factors = {
             "buffett_score": 0-100,   # 巴菲特综合评分
@@ -45,23 +45,27 @@ class MultiFactorScorer:
             "momentum_3m": float,      # 3月动量
             "volatility": float,       # 波动率
             "sector": str,             # 板块类型
+            "symbol": str,             # 股票代码 (用于行业动量查表)
         }
         """
         quality = self._bounded(self._quality_score(factors))
         valuation = self._bounded(self._valuation_score(factors))
         technical = self._bounded(self._technical_score(factors))
         market = self._bounded(self._market_score(factors))
+        industry = self._bounded(self._industry_score(factors))
 
         w = MFC.get("weights", {})
-        total = (quality * w.get("quality", 0.40)
-                 + valuation * w.get("valuation", 0.30)
+        total = (quality * w.get("quality", 0.35)
+                 + valuation * w.get("valuation", 0.25)
                  + technical * w.get("technical", 0.15)
-                 + market * w.get("market", 0.15))
+                 + market * w.get("market", 0.10)
+                 + industry * w.get("industry_momentum", 0.15))
         return {
             "quality": round(quality, 2),
             "valuation": round(valuation, 2),
             "technical": round(technical, 2),
             "market": round(market, 2),
+            "industry": round(industry, 2),
             "total": round(self._bounded(total), 2),
         }
 
@@ -175,6 +179,114 @@ class MultiFactorScorer:
             sector_bonus = cfg_bonus.get(sector, 10)  # 震荡均等
 
         return min(100, 50 + sector_bonus)
+
+    def _industry_score(self, f: dict) -> float:
+        """行业动量分: 所属申万行业近期动量映射到个股。
+
+        从 sector_performance 快照读取行业 20d/60d 动量，
+        正动量行业加分，负动量行业减分。
+        """
+        symbol = f.get("symbol", "")
+        sector = f.get("sector", "")
+        if not symbol and not sector:
+            return 50.0
+
+        # Lazy-load sector momentum data (module-level cache)
+        sector_ret = _get_sector_momentum()
+        if not sector_ret:
+            return 50.0
+
+        # Look up this stock's sector name
+        sector_name = _lookup_sector(symbol, sector)
+        if not sector_name or sector_name not in sector_ret:
+            return 50.0
+
+        ret_20d = sector_ret[sector_name].get("return_20d", 0)
+        ret_60d = sector_ret[sector_name].get("return_60d", 0)
+
+        ic = MFC.get("industry", {})
+        # Composite: 20d (faster) + 60d (slower trend confirmation)
+        mom = ret_20d * ic.get("weight_20d", 0.6) + ret_60d * ic.get("weight_60d", 0.4)
+
+        # Map momentum to score: 0% → 50 base, each 1% momentum → ~2.5 points
+        base = ic.get("base", 50.0)
+        mult = ic.get("multiplier", 250.0)
+        cap_low = ic.get("cap_low", 20.0)
+        cap_high = ic.get("cap_high", 80.0)
+        scored = base + mom * mult
+        return max(cap_low, min(cap_high, scored))
+
+
+# ── Sector momentum helpers (module-level cache) ──
+
+_sector_ret_cache: dict | None = None
+_symbol_sector_cache: dict | None = None
+
+
+def _get_sector_momentum() -> dict:
+    """Load latest sector performance, indexed by sector_name → {return_20d, return_60d}."""
+    global _sector_ret_cache
+    if _sector_ret_cache is not None:
+        return _sector_ret_cache
+
+    try:
+        from data.datahub import get_datahub
+        hub = get_datahub()
+        store = hub.store_root / "sector"
+        if not store.exists():
+            _sector_ret_cache = {}
+            return _sector_ret_cache
+
+        candidates = sorted(store.glob("sector_performance_*.parquet"), reverse=True)
+        if not candidates:
+            _sector_ret_cache = {}
+            return _sector_ret_cache
+
+        df = hub.read_parquet(candidates[0], default=pd.DataFrame())
+        if df.empty or "sector_name" not in df.columns:
+            _sector_ret_cache = {}
+            return _sector_ret_cache
+
+        _sector_ret_cache = {}
+        for _, row in df.iterrows():
+            _sector_ret_cache[str(row["sector_name"])] = {
+                "return_1d": float(row.get("return_1d", 0)),
+                "return_5d": float(row.get("return_5d", 0)),
+                "return_20d": float(row.get("return_20d", 0)),
+                "return_60d": float(row.get("return_60d", 0)),
+            }
+        return _sector_ret_cache
+    except Exception:
+        _sector_ret_cache = {}
+        return _sector_ret_cache
+
+
+def _lookup_sector(symbol: str, fallback_sector: str) -> str:
+    """Map symbol → sector_name using sector_membership snapshot."""
+    global _symbol_sector_cache
+    if _symbol_sector_cache is not None and symbol in _symbol_sector_cache:
+        return _symbol_sector_cache[symbol]
+    if _symbol_sector_cache is not None:
+        return fallback_sector
+
+    try:
+        from data.datahub import get_datahub
+        hub = get_datahub()
+        mem_path = hub.dimension_path("sector_membership")
+        if not mem_path.exists():
+            _symbol_sector_cache = {}
+            return fallback_sector
+
+        mem = hub.read_parquet(mem_path, default=pd.DataFrame())
+        if mem.empty:
+            _symbol_sector_cache = {}
+            return fallback_sector
+
+        _symbol_sector_cache = dict(zip(mem["symbol"], mem["sector_name"]))
+    except Exception:
+        _symbol_sector_cache = {}
+
+    return _symbol_sector_cache.get(symbol, fallback_sector) if _symbol_sector_cache else fallback_sector
 
 
 def compute_momentum(df: pd.DataFrame, periods: List[int], skip_recent: int = 0) -> Dict[int, float]:

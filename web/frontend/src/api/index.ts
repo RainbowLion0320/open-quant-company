@@ -382,6 +382,7 @@ export const api = {
       volume: order.shares,
       price: order.price ?? 0,
     }),
+  portfolioSectorExposure: () => get<SectorExposureResponse>("/api/portfolio/sector-exposure"),
 
   // Stocks
   stock: async (code: string) => {

@@ -256,6 +256,46 @@ async def get_orders():
     }
 
 
+# ── 行业敞口 ──────────────────────────────────────────────
+
+@router.get("/sector-exposure")
+async def get_sector_exposure():
+    """按申万一级行业汇总的持仓敞口。
+
+    读取 sector_exposure 快照 parquet，返回各行业权重/市值/持仓数。
+    """
+    from pathlib import Path
+    from data.datahub import get_datahub
+    hub = get_datahub()
+    store = hub.store_root / "sector"
+    if not store.exists():
+        return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
+
+    candidates = sorted(store.glob("sector_exposure_*.parquet"), reverse=True)
+    if not candidates:
+        return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
+
+    import pandas as pd
+    df = hub.read_parquet(candidates[0], default=pd.DataFrame())
+    if df.empty:
+        return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
+
+    exposure = []
+    for _, row in df.iterrows():
+        exposure.append({
+            "sector": str(row.get("sector", "")),
+            "weight": float(row.get("weight", 0)),
+            "market_value": float(row.get("market_value", 0)),
+            "position_count": int(row.get("position_count", 0)),
+        })
+
+    return {
+        "exposure": sorted(exposure, key=lambda x: x["weight"], reverse=True),
+        "total_sectors": len(exposure),
+        "data_source": "real",
+    }
+
+
 # ── 刷新状态 ──────────────────────────────────────────────
 
 

@@ -35,6 +35,7 @@
 | 2.7 | 横截面排名 → buy/sell/hold 信号 | `signals/selection.py` | `test_boundary.py` (apply_ranked_buys) | — | 验证信号文件符合 schema (symbol, score, signal) | OK | — |
 | 2.8 | 策略插件注册表 (动态 import) | `data/strategy_plugins.py` | `test_architecture_contracts.py:test_enabled_strategy_plugins_have_runners` | `GET /strategies` → `Strategies.vue` | 新增策略只需改 yaml 配置 | OK | — |
 | 2.9 | Regime 自适应权重调整 | `signals/multifactor.py` | — | — | bull/bear/sideways 三种 regime 下权重分布不同 | OK | 待补自动化测试 |
+| 2.10 | 行业动量因子集成 | `signals/multifactor.py:_industry_score()` | — | 多因子评分含 industry 维度, 组合敞口 API | 行业动量已纳入五维评分, detail 含 industry 分 | OK | P4 已完成 |
 
 ## 3. 回测引擎 (Backtest Engine)
 
@@ -100,12 +101,12 @@
 | 能力域 | 总条目 | OK | 有缺口 | 待补测试 |
 |--------|-------|-----|--------|---------|
 | 数据管道 | 13 | 13 | 0 | 4 |
-| 信号系统 | 9 | 9 | 0 | 3 |
+| 信号系统 | 10 | 10 | 0 | 3 |
 | 回测引擎 | 8 | 8 | 0 | 3 |
 | 执行层 | 8 | 8 | 0 | 5 |
 | Web 平台 | 13 | 13 | 0 | 2 |
 | 多资产架构 | 10 | 10 | 0 | 3 |
-| **合计** | **62** | **62** | **0** | **20** |
+| **合计** | **63** | **63** | **0** | **20** |
 
 **本轮已完成 (2026-05-23):**
 
@@ -117,5 +118,6 @@
 - P1-11 Settings 安全边界 (e73d43f): API Key + audit ledger + run mode
 - P2 行业数据中台: registry + contracts + provider + sectors.py + build_sector_snapshots
 - P3 行业雷达页面: Sectors.vue + sector API types + 路由 + 导航
+- P4 策略/行业集成: 行业动量因子 (_industry_score) + 五维评分 + 组合行业敞口 API
 
-**下一步:** P4 策略/行业集成 → P5 自动化测试 → P6 文档终审
+**下一步:** P5 自动化测试 → P6 文档终审
