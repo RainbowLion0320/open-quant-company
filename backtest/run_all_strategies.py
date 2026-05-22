@@ -506,7 +506,74 @@ ml_lgbm_scorer._last_rebalance_date = None
 
 
 # ══════════════════════════════════════════════════════════
+# Pipeline-based backtest — uses the same Alpha→Portfolio→Risk→Execution
+# stages as paper trading, replacing the hand-rolled run_backtest() loop.
+# ══════════════════════════════════════════════════════════
+
+def run_pipeline_backtest(name, pool, prices, bench_close, scorer_fn, start, end,
+                          cash=1_000_000, monthly_regimes=None):
+    """Run backtest via the pipeline stages shared with paper trading."""
+    from pipeline.alpha import StrategyAlphaAdapter
+    from pipeline.portfolio import EqualWeightConstructor
+    from pipeline.scheduler import RebalanceScheduler, RebalanceConfig
+
+    # Pre-compute monthly regimes if not provided
+    if monthly_regimes is None:
+        monthly_regimes = build_monthly_regime(bench_close)
+
+    # Strategy-specific rebalance triggers
+    _rebal_triggers = {
+        "buffett": (lambda d, r, h:
+                    d.month in (4, 5) and getattr(run_pipeline_backtest, '_last_buffett_year', 0) != d.year
+                    and not setattr(run_pipeline_backtest, '_last_buffett_year', d.year)),
+        "multifactor": None,  # uses scheduler built-in logic
+        "cybernetic": None,
+        "ml_lgbm": None,
+    }
+
+    _sched_configs = {
+        "buffett": RebalanceConfig(schedule="drift", force_months=[4, 5], max_idle_days=365),
+        "multifactor": RebalanceConfig(schedule="monthly", drift_threshold=0.75, min_overlap_pct=0.50),
+        "cybernetic": RebalanceConfig(schedule="regime_change", drift_threshold=0.75),
+        "ml_lgbm": RebalanceConfig(schedule="monthly", drift_threshold=0.75),
+    }
+
+    _max_pos = {"buffett": 8, "multifactor": 10, "cybernetic": 5, "ml_lgbm": 8}
+
+    trigger = _rebal_triggers.get(name)
+    sched_cfg = _sched_configs.get(name, RebalanceConfig())
+
+    alpha = StrategyAlphaAdapter(
+        name=name,
+        label=name,
+        scorer=scorer_fn,
+        min_score=30,
+        rebalance_trigger=trigger,
+    )
+
+    portfolio = EqualWeightConstructor(max_positions=_max_pos.get(name, 8))
+    scheduler = RebalanceScheduler(sched_cfg)
+
+    from backtest.pipeline_runner import PipelineBacktest
+    runner = PipelineBacktest(
+        alpha=alpha,
+        portfolio=portfolio,
+        scheduler=scheduler,
+        cash=cash,
+    )
+
+    return runner.run(prices, bench_close, universe=pool, monthly_regimes=monthly_regimes)
+
+
+# ══════════════════════════════════════════════════════════
 if __name__ == "__main__":
+    import argparse as _ap
+    _parser = _ap.ArgumentParser()
+    _parser.add_argument("--pipeline", action="store_true", help="Use pipeline-based backtest runner")
+    _parser.add_argument("--legacy", action="store_true", help="Use legacy hand-rolled backtest runner")
+    _args = _parser.parse_args()
+    _use_pipeline = _args.pipeline or not _args.legacy  # default to pipeline
+
     import yaml
     cfg_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
     with open(cfg_path) as f:
@@ -517,12 +584,14 @@ if __name__ == "__main__":
     if pool_size > 0:
         pool = pool[:pool_size]
     start, end = "2015-01-01", "2026-05-10"
-    print(f"四策略对比回测: {len(pool)} stocks, {start} ~ {end}")
+    runner_label = "pipeline" if _use_pipeline else "legacy"
+    print(f"四策略对比回测 [{runner_label}]: {len(pool)} stocks, {start} ~ {end}")
 
     prices = load_prices(pool, start, end)
     bench = get_index_daily("sh000001")
     bench["date"] = pd.to_datetime(bench["date"]); bench = bench.set_index("date").sort_index()
     bc = bench["close"].loc[pd.Timestamp(start):pd.Timestamp(end)]
+    monthly_regimes = build_monthly_regime(bc)
 
     print(f"基准: {bc.iloc[0]:.0f} → {bc.iloc[-1]:.0f} ({((bc.iloc[-1]/bc.iloc[0]-1)*100):+.2f}%)")
 
@@ -544,8 +613,20 @@ if __name__ == "__main__":
             continue
         if name == "buffett":
             scorer._pool = pool
-        print(f"\n  {s['label']} (调仓: { '年报季' if name=='buffett' else '月度复评+信号+漂移' if name=='multifactor' else 'regime+漂移' if name=='cybernetic' else '月度复评+regime' })")
-        results[name] = run_backtest(name, pool, prices, bc, scorer, start, end)
+
+        _sched_desc = {
+            "buffett": "年报季+漂移", "multifactor": "月度+漂移",
+            "cybernetic": "regime+漂移", "ml_lgbm": "月度+漂移",
+        }
+        print(f"\n  {s['label']} (调仓: {_sched_desc.get(name, 'default')})")
+
+        if _use_pipeline:
+            results[name] = run_pipeline_backtest(
+                name, pool, prices, bc, scorer, start, end,
+                monthly_regimes=monthly_regimes,
+            )
+        else:
+            results[name] = run_backtest(name, pool, prices, bc, scorer, start, end)
 
     comparison = {
         "strategies": {
@@ -556,12 +637,13 @@ if __name__ == "__main__":
         },
         "bench_return": (bc.iloc[-1] / bc.iloc[0] - 1),
         "start": start, "end": end,
+        "runner": runner_label,
     }
     with open(DATA_DIR / "backtest_comparison.pkl", "wb") as f:
         pickle.dump(comparison, f)
 
     print(f"\n{'='*60}")
-    print("四策略对比:")
+    print(f"四策略对比 [{runner_label}]:")
     print(f"基准: {comparison['bench_return']*100:+.2f}%")
     for name, r in comparison["strategies"].items():
         print(f"  {name}: {r['total_return']*100:+.2f}%  Sharpe {r['sharpe']:.2f}  MaxDD {r['max_drawdown']*100:.1f}%  Win {r['win_rate']*100:.0f}%  {r['trade_count']}笔")

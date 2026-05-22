@@ -161,9 +161,122 @@ def _calc_order_volume(broker: PaperBroker, code: str, side: str, price: float, 
 
 # ── 主逻辑 ──
 
+def _execute_signals_via_pipeline(
+    broker: PaperBroker,
+    run_date: date,
+    cfg: dict,
+    limit: int = 0,
+    dry_run: bool = False,
+) -> int:
+    """Execute signals using the pipeline stages (Alpha→Portfolio→Risk→Execution)."""
+    from pipeline.types import PipelineContext
+    from pipeline.alpha import SignalParquetAlphaModel
+    from pipeline.portfolio import EqualWeightConstructor
+    from pipeline.risk import RiskAdjuster
+    from pipeline.execution import ExecutionRouter, ExecutionConfig
+    from pipeline.scheduler import RebalanceScheduler, RebalanceConfig
+
+    balance = broker.get_balance()
+    holdings = {p.code: p.volume for p in broker.get_positions()}
+    prices = {p.code: p.current_price for p in broker.get_positions()}
+    cost_basis = {p.code: p.avg_cost for p in broker.get_positions()}
+
+    ctx = PipelineContext(
+        date=run_date,
+        universe=list(set(list(holdings.keys()))),
+        prices=prices,
+        regime="sideways",
+        cash=balance.cash,
+        holdings=holdings,
+        cost_basis=cost_basis,
+    )
+
+    strategies = cfg.get("strategies", {})
+    paper_cfg = cfg.get("paper_trading", {})
+    max_signals = int(paper_cfg.get("max_orders_per_strategy", 5))
+
+    exec_cfg = ExecutionConfig(
+        commission_rate=0.00081,
+        lot_size=int(paper_cfg.get("lot_size", 100)),
+    )
+    router = ExecutionRouter(exec_cfg)
+    portfolio = EqualWeightConstructor(
+        max_positions=int(paper_cfg.get("max_positions", 8)),
+        position_pct=float(paper_cfg.get("order_value_pct", 0.05)),
+    )
+    risk = RiskAdjuster()
+
+    all_fills = []
+    total_trades = 0
+
+    for strat_name, strat_cfg in strategies.items():
+        if not strat_cfg.get("enabled", True):
+            continue
+        signal_name = strat_cfg.get("signal_name", strat_name)
+        sig_file = HUB.signal_path(signal_name)
+        if not sig_file.exists():
+            continue
+
+        alpha = SignalParquetAlphaModel(
+            name=strat_name,
+            label=strat_cfg.get("label", strat_name),
+            signal_path=sig_file,
+            max_signals=max_signals,
+        )
+
+        ctx.signals = alpha.generate_alpha([], pd.DataFrame(), 0, "sideways")
+        if not ctx.signals:
+            continue
+
+        # Extend universe and prices with signal symbols
+        for s in ctx.signals:
+            if s.symbol not in ctx.universe:
+                ctx.universe.append(s.symbol)
+                if s.symbol not in ctx.prices:
+                    try:
+                        from data.fetcher import get_stock_daily
+                        df = get_stock_daily(s.symbol)
+                        if df is not None and len(df):
+                            ctx.prices[s.symbol] = float(df.iloc[-1]["close"])
+                    except Exception:
+                        ctx.prices[s.symbol] = 0
+
+        ctx.targets = portfolio.construct(ctx.signals, ctx)
+        ctx.adjusted_targets = risk.adjust(ctx.targets, ctx)
+        ctx.intents = router.targets_to_intents(ctx.adjusted_targets, ctx)
+
+        for intent in ctx.intents:
+            if limit > 0 and total_trades >= limit:
+                break
+            price = ctx.prices.get(intent.symbol, intent.price)
+            if price <= 0:
+                continue
+
+            print(f"  {'买' if intent.side=='buy' else '卖'} {intent.symbol} "
+                  f"{intent.shares}股 @{price:.2f} [{strat_name}]")
+
+            if dry_run:
+                total_trades += 1
+                continue
+
+            result = broker.submit_order(
+                code=intent.symbol, price=price,
+                volume=intent.shares, side=intent.side,
+            )
+            if result and str(result).startswith("PAPER_"):
+                amount = price * intent.shares
+                append_trade(run_date, intent.symbol, intent.side, price,
+                            intent.shares, amount, strat_name)
+                total_trades += 1
+            else:
+                print(f"    ✗ {result}")
+
+    return total_trades
+
+
 def execute_daily(run_date: Optional[date] = None, dry_run: bool = False,
                   init_cash: float = 1_000_000, initial_setup: bool = False,
-                  limit: int = 0):
+                  limit: int = 0, use_pipeline: bool = False):
     """执行一个模拟交易日"""
 
     if run_date is None:
@@ -219,39 +332,44 @@ def execute_daily(run_date: Optional[date] = None, dry_run: bool = False,
     print(f"  价格覆盖: {len(prices)}/{len(all_symbols)} 只")
 
     # 3) 处理信号 → 下单
-    total_trades = 0
-    trade_count = 0
-    for strat_name, items in signals.items():
-        if limit > 0 and trade_count >= limit:
-            break
-        for code, side, score in items:
+    if use_pipeline:
+        total_trades = _execute_signals_via_pipeline(
+            broker, run_date, cfg, limit=limit, dry_run=dry_run,
+        )
+    else:
+        total_trades = 0
+        trade_count = 0
+        for strat_name, items in signals.items():
             if limit > 0 and trade_count >= limit:
                 break
-            if code not in prices:
-                print(f"  ⚠ {code} 无价格，跳过")
-                continue
+            for code, side, score in items:
+                if limit > 0 and trade_count >= limit:
+                    break
+                if code not in prices:
+                    print(f"  ⚠ {code} 无价格，跳过")
+                    continue
 
-            price = prices[code]
-            shares = _calc_order_volume(broker, code, side, price, paper_cfg)
-            if shares <= 0:
-                print(f"  ⚠ {code} 无可执行数量，跳过")
-                continue
-            amount = price * shares
+                price = prices[code]
+                shares = _calc_order_volume(broker, code, side, price, paper_cfg)
+                if shares <= 0:
+                    print(f"  ⚠ {code} 无可执行数量，跳过")
+                    continue
+                amount = price * shares
 
-            print(f"  {'买' if side == 'buy' else '卖'} {code} {shares}股 @{price:.2f} score={score:.1f} [{strat_name}]")
+                print(f"  {'买' if side == 'buy' else '卖'} {code} {shares}股 @{price:.2f} score={score:.1f} [{strat_name}]")
 
-            if dry_run:
-                total_trades += 1
-                trade_count += 1
-                continue
+                if dry_run:
+                    total_trades += 1
+                    trade_count += 1
+                    continue
 
-            result = broker.submit_order(code=code, price=price, volume=shares, side=side)
-            if result and result.startswith("PAPER_"):
-                append_trade(run_date, code, side, price, shares, amount, strat_name)
-                total_trades += 1
-                trade_count += 1
-            else:
-                print(f"    ✗ {result}")
+                result = broker.submit_order(code=code, price=price, volume=shares, side=side)
+                if result and result.startswith("PAPER_"):
+                    append_trade(run_date, code, side, price, shares, amount, strat_name)
+                    total_trades += 1
+                    trade_count += 1
+                else:
+                    print(f"    ✗ {result}")
 
     if dry_run:
         print(f"\n  [DRY RUN] 将执行 {total_trades} 笔交易")
@@ -354,6 +472,7 @@ if __name__ == "__main__":
                         help="历史回放: YYYY-MM-DD,YYYY-MM-DD 或 YYYY-MM-DD(从该日到今日)")
     parser.add_argument("--setup", action="store_true", help="初始化账户(清空所有历史)")
     parser.add_argument("--limit", type=int, default=0, help="限制交易笔数 (0=全部)")
+    parser.add_argument("--pipeline", action="store_true", help="使用流水线 Alpha→Portfolio→Risk→Execution 执行")
 
     args = parser.parse_args()
 
@@ -382,6 +501,7 @@ if __name__ == "__main__":
     with cron_run("execute_paper_trades"):
         run_date = date.fromisoformat(args.date) if args.date else None
         execute_daily(run_date=run_date, dry_run=args.dry_run,
-                      init_cash=args.init_cash, limit=args.limit)
+                      init_cash=args.init_cash, limit=args.limit,
+                      use_pipeline=args.pipeline)
 
     sys.exit(0)
