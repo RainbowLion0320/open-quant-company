@@ -190,8 +190,8 @@ ALLOWED_STRATEGIES = list_strategy_names()
 
 ## 8. 已知限制 & 未来方向
 
-- **行业/板块雷达页面** — 下一阶段 (P2-P3) 新增 `/sectors` 路由，含热力图 + 排名 + 信号分布
+- **行业/板块雷达页面** — 已新增 `/sectors` 路由，展示申万行业动量排名、策略信号分布和组合行业敞口；数据只读本地 `sector/*_snapshot` 缓存。
 - **Monitor/Settings 职责同步** — 当前 Monitor 仍含写配置逻辑 (P1-1 待重构)
 - **无移动端适配** — 当前仅桌面浏览器布局
 - **DuckDB 只读** — 所有写操作通过 API 触发 Python 端 DataHub，不经过 DuckDB
-- **未来：** 行业雷达页面、策略参数热调、回测结果交互式下钻、前端 smoke/e2e 自动化
+- **未来：** 策略参数热调、回测结果交互式下钻、前端 smoke/e2e 自动化继续扩大到视觉回归。

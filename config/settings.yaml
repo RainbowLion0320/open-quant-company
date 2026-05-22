@@ -693,6 +693,15 @@ data_registry:
     label: 股票-行业映射
     cache: sector/membership.parquet
     description: 每只股票归属的申万一/二级行业, 基于 stock_basic 行业字段
+  sector_performance_snapshot:
+    source: computed
+    asset: sector
+    status: available
+    freq: daily
+    enabled: true
+    label: 行业动量绩效快照
+    cache: sector/performance_snapshot/{YYYYMMDD}.parquet
+    description: 申万一级行业 1D/5D/20D/60D 涨跌幅、波动率和数据来源
   sector_signal_snapshot:
     source: computed
     asset: sector

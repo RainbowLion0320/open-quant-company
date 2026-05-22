@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Query
 import pandas as pd
 from pathlib import Path
-from datetime import date
+from typing import Any
 
 from data.datahub import get_datahub
 
@@ -16,13 +16,50 @@ def _sector_store() -> Path:
     return HUB.store_root / "sector"
 
 
-def _latest_parquet(pattern: str) -> Path | None:
-    """Find the most recent parquet file matching a prefix."""
+def _latest_snapshot(dimension: str, legacy_prefix: str) -> Path | None:
+    """Find the latest registry-backed snapshot, with legacy flat-file fallback."""
+    try:
+        root = HUB.dimension_root(dimension)
+        if root.exists():
+            registry_candidates = sorted(root.glob("*.parquet"), reverse=True)
+            if registry_candidates:
+                return registry_candidates[0]
+    except Exception:
+        pass
+
     store = _sector_store()
     if not store.exists():
         return None
-    candidates = sorted(store.glob(f"{pattern}*.parquet"), reverse=True)
-    return candidates[0] if candidates else None
+    legacy_candidates = sorted(store.glob(f"{legacy_prefix}*.parquet"), reverse=True)
+    return legacy_candidates[0] if legacy_candidates else None
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        n = float(value)
+        if pd.isna(n):
+            return default
+        return n
+    except Exception:
+        return default
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        if pd.isna(value):
+            return default
+        return int(value)
+    except Exception:
+        return default
+
+
+def _source_summary(sectors: list[dict]) -> str:
+    sources = {str(s.get("data_source", "missing")) for s in sectors}
+    if "real" in sources:
+        return "real"
+    if "proxy" in sources:
+        return "proxy"
+    return "missing"
 
 
 # ═══════════════════════════════════════
@@ -32,8 +69,8 @@ def _latest_parquet(pattern: str) -> Path | None:
 @router.get("/overview")
 def sector_overview():
     """Return sector performance ranking + signal summary."""
-    perf_path = _latest_parquet("sector_performance_")
-    sig_path = _latest_parquet("sector_signals_")
+    perf_path = _latest_snapshot("sector_performance_snapshot", "sector_performance_")
+    sig_path = _latest_snapshot("sector_signal_snapshot", "sector_signals_")
 
     perf = pd.DataFrame()
     sigs = pd.DataFrame()
@@ -53,13 +90,13 @@ def sector_overview():
                 "sector_code": row.get("sector_code", ""),
                 "sector_name": row.get("sector_name", ""),
                 "rank": rank,
-                "return_1d": float(row.get("return_1d", 0)),
-                "return_5d": float(row.get("return_5d", 0)),
-                "return_20d": float(row.get("return_20d", 0)),
-                "return_60d": float(row.get("return_60d", 0)),
-                "volatility": float(row.get("volatility", 0)),
-                "member_count": int(row.get("member_count", 0)),
-                "data_source": row.get("data_source", "missing"),
+                "return_1d": _safe_float(row.get("return_1d", 0)),
+                "return_5d": _safe_float(row.get("return_5d", 0)),
+                "return_20d": _safe_float(row.get("return_20d", 0)),
+                "return_60d": _safe_float(row.get("return_60d", 0)),
+                "volatility": _safe_float(row.get("volatility", 0)),
+                "member_count": _safe_int(row.get("member_count", 0)),
+                "data_source": str(row.get("data_source", "missing")),
             }
             # Strategy signals for this sector
             sector_sigs = {}
@@ -68,10 +105,10 @@ def sector_overview():
                 for _, sr in sec_sigs.iterrows():
                     strategy = str(sr.get("strategy", ""))
                     sector_sigs[strategy] = {
-                        "total": int(sr.get("total", 0)),
-                        "buy_count": int(sr.get("buy_count", 0)),
-                        "buy_ratio": float(sr.get("buy_ratio", 0)),
-                        "avg_score": float(sr.get("avg_score", 0)),
+                        "total": _safe_int(sr.get("total", 0)),
+                        "buy_count": _safe_int(sr.get("buy_count", 0)),
+                        "buy_ratio": _safe_float(sr.get("buy_ratio", 0)),
+                        "avg_score": _safe_float(sr.get("avg_score", 0)),
                         "top_symbol": str(sr.get("top_symbol", "")),
                     }
             sector_data["signals"] = sector_sigs
@@ -98,7 +135,7 @@ def sector_overview():
         "top_performers": top_performers,
         "bottom_performers": bottom_performers,
         "signal_concentration": signal_concentration,
-        "data_source": "real" if sectors else "missing",
+        "data_source": _source_summary(sectors),
         "freshness": {
             "performance": perf_path.name if perf_path else "",
             "signals": sig_path.name if sig_path else "",
@@ -113,7 +150,7 @@ def sector_overview():
 @router.get("/exposure")
 def sector_exposure():
     """Return portfolio exposure by sector."""
-    exp_path = _latest_parquet("sector_exposure_")
+    exp_path = _latest_snapshot("sector_exposure_snapshot", "sector_exposure_")
     if not exp_path:
         return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
 
@@ -126,9 +163,9 @@ def sector_exposure():
         exposure.append({
             "sector": row.get("sector", ""),
             "date": str(row.get("date", "")),
-            "weight": float(row.get("weight", 0)),
-            "market_value": float(row.get("market_value", 0)),
-            "position_count": int(row.get("position_count", 0)),
+            "weight": _safe_float(row.get("weight", 0)),
+            "market_value": _safe_float(row.get("market_value", 0)),
+            "position_count": _safe_int(row.get("position_count", 0)),
         })
 
     return {
@@ -180,8 +217,8 @@ def sector_detail(industry: str):
     from urllib.parse import unquote
     industry = unquote(industry)
 
-    perf_path = _latest_parquet("sector_performance_")
-    sig_path = _latest_parquet("sector_signals_")
+    perf_path = _latest_snapshot("sector_performance_snapshot", "sector_performance_")
+    sig_path = _latest_snapshot("sector_signal_snapshot", "sector_signals_")
 
     perf = pd.DataFrame()
     sigs = pd.DataFrame()
@@ -197,9 +234,14 @@ def sector_detail(industry: str):
         match = perf[perf["sector_name"] == industry]
         if not match.empty:
             r = match.iloc[0].to_dict()
-            perf_row = {k: (float(v) if isinstance(v, (float, int, bool)) and k != "member_count" else v)
-                        for k, v in r.items()}
-            perf_row["member_count"] = int(r.get("member_count", 0))
+            perf_row = {}
+            for k, v in r.items():
+                if k == "member_count":
+                    perf_row[k] = _safe_int(v)
+                elif k.startswith("return_") or k in {"volatility"}:
+                    perf_row[k] = _safe_float(v)
+                else:
+                    perf_row[k] = "" if pd.isna(v) else v
 
     signals = {}
     if not sigs.empty:
@@ -207,10 +249,10 @@ def sector_detail(industry: str):
         for _, sr in match.iterrows():
             strategy = str(sr.get("strategy", ""))
             signals[strategy] = {
-                "total": int(sr.get("total", 0)),
-                "buy_count": int(sr.get("buy_count", 0)),
-                "buy_ratio": float(sr.get("buy_ratio", 0)),
-                "avg_score": float(sr.get("avg_score", 0)),
+                "total": _safe_int(sr.get("total", 0)),
+                "buy_count": _safe_int(sr.get("buy_count", 0)),
+                "buy_ratio": _safe_float(sr.get("buy_ratio", 0)),
+                "avg_score": _safe_float(sr.get("avg_score", 0)),
                 "top_symbol": str(sr.get("top_symbol", "")),
             }
 

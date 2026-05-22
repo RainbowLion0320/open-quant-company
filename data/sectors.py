@@ -7,36 +7,98 @@ All computation reads from local parquet caches; no live API calls.
 
 from __future__ import annotations
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from pathlib import Path
-from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional
+from datetime import date
 
 from data.datahub import DataHub
-from data.data_registry import get_registry
 
 
 # ── 申万一级行业 ──
 
 SW_INDUSTRIES: dict[str, str] = {
-    "801010": "农林牧渔", "801020": "采掘",      "801030": "化工",
-    "801040": "钢铁",     "801050": "有色金属",  "801080": "电子",
-    "801110": "家用电器", "801120": "食品饮料",  "801130": "纺织服装",
-    "801140": "轻工制造", "801150": "医药生物",  "801160": "公用事业",
-    "801170": "交通运输", "801180": "房地产",    "801200": "商贸零售",
-    "801210": "休闲服务", "801230": "综合",      "801710": "建筑材料",
-    "801720": "建筑装饰", "801730": "电力设备",  "801740": "国防军工",
-    "801750": "计算机",   "801760": "传媒",      "801770": "通信",
-    "801880": "汽车",     "801890": "机械设备",
-    "801970": "银行",     "801980": "非银金融",
+    "801010": "农林牧渔", "801030": "基础化工",  "801040": "钢铁",
+    "801050": "有色金属", "801080": "电子",      "801110": "家用电器",
+    "801120": "食品饮料", "801130": "纺织服饰",  "801140": "轻工制造",
+    "801150": "医药生物", "801160": "公用事业",  "801170": "交通运输",
+    "801180": "房地产",   "801200": "商贸零售",  "801210": "社会服务",
+    "801230": "综合",     "801710": "建筑材料",  "801720": "建筑装饰",
+    "801730": "电力设备", "801740": "国防军工",  "801750": "计算机",
+    "801760": "传媒",     "801770": "通信",      "801780": "银行",
+    "801790": "非银金融", "801880": "汽车",      "801890": "机械设备",
+    "801950": "石油石化", "801960": "煤炭",      "801970": "环保",
+    "801980": "美容护理",
 }
 
 
-def _store() -> Path:
-    store = Path(__file__).resolve().parent / "store" / "sector"
+_LEGACY_SW_ALIASES: dict[str, str] = {
+    "采掘": "煤炭",
+    "化工": "基础化工",
+    "纺织服装": "纺织服饰",
+    "休闲服务": "社会服务",
+}
+
+
+def _store(hub: DataHub | None = None) -> Path:
+    """Compatibility helper: sector store under the active DataHub."""
+    hub = hub or DataHub()
+    store = hub.store_path("sector")
     store.mkdir(parents=True, exist_ok=True)
     return store
+
+
+def _snapshot_path(hub: DataHub, dimension: str, run_date: date) -> Path:
+    return hub.dimension_path(dimension, YYYYMMDD=run_date.strftime("%Y%m%d"))
+
+
+def _canonical_sector_name(name: str) -> str:
+    return _LEGACY_SW_ALIASES.get(str(name).strip(), str(name).strip())
+
+
+def _period_return(returns: pd.Series, days: int) -> float:
+    if len(returns) < days:
+        return 0.0
+    window = pd.to_numeric(returns.tail(days), errors="coerce").dropna()
+    if window.empty:
+        return 0.0
+    return float((1.0 + window).prod() - 1.0)
+
+
+def _normalize_return_series(df: pd.DataFrame) -> pd.Series:
+    if "pct_chg" in df.columns:
+        series = pd.to_numeric(df["pct_chg"], errors="coerce")
+        if series.abs().median(skipna=True) > 1:
+            series = series / 100.0
+        return series
+    if "return_1d" in df.columns:
+        return pd.to_numeric(df["return_1d"], errors="coerce")
+    if "close" in df.columns:
+        return pd.to_numeric(df["close"], errors="coerce").pct_change()
+    return pd.Series(dtype="float64")
+
+
+def _normalize_date_series(df: pd.DataFrame) -> pd.Series:
+    date_col = next((c for c in ("date", "trade_date") if c in df.columns), "")
+    if not date_col:
+        return pd.Series([""] * len(df), index=df.index, dtype="object")
+    raw = df[date_col]
+    raw_str = raw.astype(str).str.replace(r"\.0$", "", regex=True)
+    yyyymmdd = raw_str.str.fullmatch(r"\d{8}")
+    if yyyymmdd.any():
+        normalized = raw_str.copy()
+        normalized.loc[yyyymmdd] = (
+            raw_str.loc[yyyymmdd].str.slice(0, 4)
+            + "-"
+            + raw_str.loc[yyyymmdd].str.slice(4, 6)
+            + "-"
+            + raw_str.loc[yyyymmdd].str.slice(6, 8)
+        )
+        return normalized
+    parsed = pd.to_datetime(raw_str, errors="coerce")
+    if parsed.notna().any():
+        return parsed.dt.date.astype(str)
+    return raw_str.str.slice(0, 10)
 
 
 # ═══════════════════════════════════════
@@ -51,25 +113,21 @@ def build_membership(hub: DataHub | None = None) -> pd.DataFrame:
     if hub is None:
         hub = DataHub()
 
-    from data.symbols import SYMBOL_INDUSTRY, StockUniverse
+    from data.symbols import SYMBOL_INDUSTRY
 
-    universe = StockUniverse()
+    name_to_code = {name: code for code, name in SW_INDUSTRIES.items()}
     rows = []
     for symbol, industry in SYMBOL_INDUSTRY.items():
         if not industry or industry == "待分类":
             continue
-        # Find sector code by name
-        sector_code = ""
-        for code, name in SW_INDUSTRIES.items():
-            if name == industry:
-                sector_code = code
-                break
+        sector_name = _canonical_sector_name(industry)
+        sector_code = name_to_code.get(sector_name, "")
         if not sector_code:
             continue
         rows.append({
             "symbol": symbol,
             "sector_code": sector_code,
-            "sector_name": industry,
+            "sector_name": sector_name,
             "sector_level": 1,
         })
 
@@ -88,15 +146,15 @@ def build_sector_performance(
     hub: DataHub | None = None,
     lookback_days: int = 120,
 ) -> pd.DataFrame:
-    """Aggregate member stock returns to compute sector-level performance.
+    """Build sector-level performance from cached SW index data or stock proxy.
 
-    Uses the membership table and individual stock OHLCV data.
-    Falls back to empty DataFrame if OHLCV data is missing.
+    The preferred input is ``sector_sw_daily``.  When that cache is absent, the
+    builder falls back to equal-weighted member stock returns and explicitly
+    labels the result as ``data_source=proxy``.
     """
     if hub is None:
         hub = DataHub()
 
-    # Load membership
     mem_path = hub.dimension_path("sector_membership")
     if not mem_path.exists():
         return pd.DataFrame()
@@ -109,68 +167,115 @@ def build_sector_performance(
     rows = []
     for sector_code, sector_name in SW_INDUSTRIES.items():
         sector_symbols = mem[mem["sector_code"] == sector_code]["symbol"].tolist()
-        if not sector_symbols:
+        sector_ret, latest_date, data_source, data_count = _load_sector_index_returns(
+            hub, sector_code, lookback_days
+        )
+        if data_source == "real":
+            data_count = len(sector_symbols)
+
+        if sector_ret.empty:
+            sector_ret, latest_date, data_count = _build_proxy_returns(
+                hub, sector_symbols, lookback_days
+            )
+            data_source = "proxy" if not sector_ret.empty else "missing"
+
+        if sector_ret.empty:
             rows.append(_empty_sector_row(sector_code, sector_name, today))
             continue
 
-        sector_returns = []
-        symbol_count = 0
-        latest_date = ""
-        for symbol in sector_symbols[:100]:  # cap per sector for performance
-            ohlcv_path = hub.dimension_path("ohlcv_daily", symbol=symbol)
-            if not ohlcv_path.exists():
-                continue
-            df = hub.read_parquet(ohlcv_path, default=pd.DataFrame())
-            if df.empty or "close" not in df.columns:
-                continue
-            df = df.sort_values("date")
-            if "return_1d" not in df.columns and "close" in df.columns:
-                df["return_1d"] = df["close"].pct_change()
-            # Use most recent N days
-            recent = df.tail(lookback_days)
-            if recent.empty:
-                continue
-            sector_returns.append(recent.set_index("date")["return_1d"])
-            symbol_count += 1
-            if not latest_date or str(recent["date"].iloc[-1]) > latest_date:
-                latest_date = str(recent["date"].iloc[-1])[:10]
-
-        if not sector_returns:
-            rows.append(_empty_sector_row(sector_code, sector_name, today))
-            continue
-
-        # Equal-weighted sector return
-        ret_df = pd.concat(sector_returns, axis=1)
-        sector_ret = ret_df.mean(axis=1).dropna()
-
-        # Volatility
-        sector_vol = sector_ret.std() * np.sqrt(252) if len(sector_ret) > 1 else 0.0
-
-        # Momentum windows
-        ret_1d = float(sector_ret.iloc[-1]) if len(sector_ret) > 0 else 0.0
-        ret_5d = float(sector_ret.iloc[-5:].sum()) if len(sector_ret) >= 5 else 0.0
-        ret_20d = float(sector_ret.iloc[-20:].sum()) if len(sector_ret) >= 20 else 0.0
-        ret_60d = float(sector_ret.iloc[-60:].sum()) if len(sector_ret) >= 60 else 0.0
+        sector_vol = float(sector_ret.std() * np.sqrt(252)) if len(sector_ret) > 1 else 0.0
+        ret_1d = float(sector_ret.iloc[-1]) if len(sector_ret) else 0.0
 
         rows.append({
             "sector_code": sector_code,
             "sector_name": sector_name,
             "date": today.isoformat(),
             "return_1d": round(ret_1d, 6),
-            "return_5d": round(ret_5d, 6),
-            "return_20d": round(ret_20d, 6),
-            "return_60d": round(ret_60d, 6),
+            "return_5d": round(_period_return(sector_ret, 5), 6),
+            "return_20d": round(_period_return(sector_ret, 20), 6),
+            "return_60d": round(_period_return(sector_ret, 60), 6),
             "volatility": round(sector_vol, 4),
-            "member_count": symbol_count,
+            "member_count": int(data_count),
             "latest_date": latest_date,
-            "data_source": "real" if symbol_count > 0 else "missing",
+            "data_source": data_source,
         })
 
     df = pd.DataFrame(rows)
     if not df.empty:
-        dest = _store() / f"sector_performance_{today.isoformat()}.parquet"
+        dest = _snapshot_path(hub, "sector_performance_snapshot", today)
         hub.write_parquet(df, dest, producer="sectors.build_performance")
     return df
+
+
+def _load_sector_index_returns(
+    hub: DataHub,
+    sector_code: str,
+    lookback_days: int,
+) -> tuple[pd.Series, str, str, int]:
+    candidates: list[Path] = []
+    for symbol in (sector_code, f"{sector_code}.SI"):
+        try:
+            candidates.append(hub.dimension_path("sector_sw_daily", symbol=symbol))
+        except Exception:
+            continue
+
+    for path in candidates:
+        if not path.exists():
+            continue
+        df = hub.read_parquet(path, default=pd.DataFrame())
+        if df.empty:
+            continue
+        dates = _normalize_date_series(df)
+        work = df.copy()
+        work["_date"] = dates
+        sort_col = "trade_date" if "trade_date" in work.columns else "_date"
+        work = work.sort_values(sort_col).tail(lookback_days)
+        returns = _normalize_return_series(work).dropna()
+        if returns.empty:
+            continue
+        latest_date = str(work["_date"].iloc[-1])[:10]
+        return returns.reset_index(drop=True), latest_date, "real", len(work)
+    return pd.Series(dtype="float64"), "", "missing", 0
+
+
+def _build_proxy_returns(
+    hub: DataHub,
+    symbols: list[str],
+    lookback_days: int,
+) -> tuple[pd.Series, str, int]:
+    sector_returns = []
+    latest_date = ""
+    data_count = 0
+    for symbol in symbols[:100]:
+        try:
+            ohlcv_path = hub.dimension_path("ohlcv_daily", symbol=symbol)
+        except Exception:
+            continue
+        if not ohlcv_path.exists():
+            continue
+        df = hub.read_parquet(ohlcv_path, default=pd.DataFrame())
+        if df.empty or "close" not in df.columns:
+            continue
+        dates = _normalize_date_series(df)
+        work = df.copy()
+        work["_date"] = dates
+        sort_col = "date" if "date" in work.columns else "_date"
+        work = work.sort_values(sort_col).tail(lookback_days)
+        if work.empty:
+            continue
+        returns = _normalize_return_series(work)
+        sector_returns.append(pd.Series(returns.to_numpy(), index=work["_date"]))
+        data_count += 1
+        last_date = str(work["_date"].iloc[-1])[:10]
+        if not latest_date or last_date > latest_date:
+            latest_date = last_date
+
+    if not sector_returns:
+        return pd.Series(dtype="float64"), "", 0
+
+    ret_df = pd.concat(sector_returns, axis=1)
+    sector_ret = ret_df.mean(axis=1).dropna()
+    return sector_ret.reset_index(drop=True), latest_date, data_count
 
 
 # ═══════════════════════════════════════
@@ -207,6 +312,7 @@ def build_signal_aggregation(hub: DataHub | None = None) -> pd.DataFrame:
             continue
 
         sym_to_sector = dict(zip(mem["symbol"], mem["sector_name"]))
+        name_to_code = dict(zip(mem["sector_name"], mem["sector_code"]))
         sector_stats: dict[str, dict] = {}
 
         for _, row_data in sig_df.iterrows():
@@ -230,6 +336,7 @@ def build_signal_aggregation(hub: DataHub | None = None) -> pd.DataFrame:
         for sector_name, stats in sector_stats.items():
             rows.append({
                 "sector": sector_name,
+                "sector_code": name_to_code.get(sector_name, ""),
                 "date": today,
                 "strategy": strategy,
                 "total": stats["total"],
@@ -241,7 +348,7 @@ def build_signal_aggregation(hub: DataHub | None = None) -> pd.DataFrame:
 
     df = pd.DataFrame(rows)
     if not df.empty:
-        dest = _store() / f"sector_signals_{today}.parquet"
+        dest = _snapshot_path(hub, "sector_signal_snapshot", date.today())
         hub.write_parquet(df, dest, producer="sectors.build_signal_aggregation")
     return df
 
@@ -258,12 +365,7 @@ def build_exposure(hub: DataHub | None = None) -> pd.DataFrame:
     if hub is None:
         hub = DataHub()
 
-    # Load positions
-    pos_path = hub.store_root / "paper" / "positions.parquet"
-    if not pos_path.exists():
-        return pd.DataFrame()
-
-    pos_df = hub.read_parquet(pos_path, default=pd.DataFrame())
+    pos_df = _load_position_snapshot(hub)
     if pos_df.empty or "symbol" not in pos_df.columns:
         return pd.DataFrame()
 
@@ -301,9 +403,67 @@ def build_exposure(hub: DataHub | None = None) -> pd.DataFrame:
 
     df = pd.DataFrame(rows)
     if not df.empty:
-        dest = _store() / f"sector_exposure_{today}.parquet"
+        dest = _snapshot_path(hub, "sector_exposure_snapshot", date.today())
         hub.write_parquet(df, dest, producer="sectors.build_exposure")
     return df
+
+
+def _load_position_snapshot(hub: DataHub) -> pd.DataFrame:
+    """Load positions from canonical paper state, with legacy positions fallback."""
+    legacy_path = hub.paper_path("positions")
+    if legacy_path.exists():
+        legacy = hub.read_parquet(legacy_path, default=pd.DataFrame())
+        if legacy is not None and not legacy.empty:
+            return legacy.copy()
+
+    state_path = hub.paper_path("state")
+    if not state_path.exists():
+        return pd.DataFrame()
+
+    state = hub.read_parquet(state_path, default=pd.DataFrame())
+    if state.empty or "positions" not in state.columns:
+        return pd.DataFrame()
+
+    raw_positions = state.iloc[0].get("positions", {})
+    if isinstance(raw_positions, str):
+        try:
+            import json
+            raw_positions = json.loads(raw_positions)
+        except Exception:
+            raw_positions = {}
+    if not isinstance(raw_positions, dict) or not raw_positions:
+        return pd.DataFrame()
+
+    rows = []
+    for symbol, pos in raw_positions.items():
+        if not isinstance(pos, dict):
+            continue
+        volume = float(pos.get("volume", 0) or 0)
+        avg_cost = float(pos.get("avg_cost", 0) or 0)
+        market_value = pos.get("market_value")
+        if market_value is None or pd.isna(market_value):
+            market_value = _latest_market_value(hub, str(symbol), volume, avg_cost)
+        rows.append({
+            "symbol": str(symbol),
+            "market_value": float(market_value or 0),
+            "volume": volume,
+            "avg_cost": avg_cost,
+            "name": str(pos.get("name", "")),
+        })
+    return pd.DataFrame(rows)
+
+
+def _latest_market_value(hub: DataHub, symbol: str, volume: float, avg_cost: float) -> float:
+    try:
+        ohlcv_path = hub.dimension_path("ohlcv_daily", symbol=symbol)
+        if ohlcv_path.exists():
+            df = hub.read_parquet(ohlcv_path, default=pd.DataFrame())
+            if not df.empty and "close" in df.columns:
+                price = float(pd.to_numeric(df["close"], errors="coerce").dropna().iloc[-1])
+                return volume * price
+    except Exception:
+        pass
+    return volume * avg_cost
 
 
 # ═══════════════════════════════════════

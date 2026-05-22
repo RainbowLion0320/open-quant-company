@@ -161,3 +161,23 @@ def test_deepseek_cdp_parser_joins_daily_cost_with_monthly_tokens():
     assert row["total_tokens"] == 15
     assert row["requests"] == 2
     assert row["cost_cny"] == 0.12
+
+
+def test_monitor_is_read_only_but_keeps_system_status_cards():
+    monitor = Path("web/frontend/src/views/ActivityMonitor.vue").read_text()
+
+    assert "api.saveSettings" not in monitor
+    assert "saveWithConfirm" not in monitor
+    assert "TELEGRAM" in monitor
+    assert "DATA SOURCES" in monitor
+    assert "SYSTEM INFO" in monitor
+    assert "api.settings()" in monitor
+
+
+def test_settings_cancel_reverts_pending_toggle():
+    settings = Path("web/frontend/src/views/Settings.vue").read_text()
+
+    assert "confirmSnapshot" in settings
+    assert "cancelConfirm" in settings
+    assert "restoreConfig" in settings
+    assert "@click.self=\"cancelConfirm\"" in settings

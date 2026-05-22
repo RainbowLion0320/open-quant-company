@@ -112,7 +112,7 @@
 
 - P0-3 API 合约 (f344dc0): 统一错误处理 + 7 端点 response_model
 - P1-10 前端 chunk (94ab769, 9e7f8ff): manualChunks + vendor split
-- P1-1 Monitor 只读 (e73d43f): 移除 toggleNotify/saveSettings/sysSettings
+- P1-1 Monitor 只读 (e73d43f + Codex 复核): 移除 toggleNotify/saveSettings；保留 Telegram/Data Sources/System Info 只读状态卡
 - P1-2 Settings 配置管理 (e73d43f): 策略状态 + 风控 + 审计日志
 - P2-13 多资产契约 (44bae92): ETF/Bond/Futures/Crypto adapter + 27 合约测试
 - P1-11 Settings 安全边界 (e73d43f): API Key + audit ledger + run mode
@@ -120,4 +120,4 @@
 - P3 行业雷达页面: Sectors.vue + sector API types + 路由 + 导航
 - P4 策略/行业集成: 行业动量因子 (_industry_score) + 五维评分 + 组合行业敞口 API
 
-**下一步:** P5 自动化测试 → P6 文档终审
+**下一步:** 扩大 P5 自动化到真实浏览器 smoke/e2e 和视觉回归；P6 文档随代码继续滚动校准

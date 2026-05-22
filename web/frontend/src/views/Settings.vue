@@ -150,12 +150,12 @@
 
     <!-- Confirm Dialog -->
     <Teleport to="body">
-      <div v-if="showConfirm" class="confirm-overlay" @click.self="showConfirm = false">
+      <div v-if="showConfirm" class="confirm-overlay" @click.self="cancelConfirm">
         <div class="confirm-box glass-card card-pad-lg">
           <h3>确认保存配置?</h3>
           <p>修改系统配置可能影响策略运行和风险控制。请确认你了解这些变更的影响。</p>
           <div class="confirm-actions">
-            <button @click="showConfirm = false" class="btn btn-muted">取消</button>
+            <button @click="cancelConfirm" class="btn btn-muted">取消</button>
             <button @click="doSave" class="btn btn-primary">确认保存</button>
           </div>
         </div>
@@ -170,6 +170,7 @@ import { api } from "../api";
 
 const settings = reactive<Record<string, any>>({});
 const showConfirm = ref(false);
+const confirmSnapshot = ref<Record<string, any> | null>(null);
 const mode = ref("research");
 const modeStatus = ref<Record<string, any>>({});
 const apiKeyInput = ref("");
@@ -253,20 +254,43 @@ function sourceBadgeClass(status: string): string {
 }
 
 async function toggleNotify() {
+  const snapshot = cloneConfig(settings);
   const enabled = !settings.trading?.notification?.enabled;
   settings.trading = settings.trading || {};
   settings.trading.notification = settings.trading.notification || {};
   settings.trading.notification.enabled = enabled;
-  await saveWithConfirm();
+  saveWithConfirm(snapshot);
 }
 
-function saveWithConfirm() {
+function saveWithConfirm(snapshot?: Record<string, any> | Event) {
+  const isEvent = snapshot && typeof snapshot === "object" && "target" in snapshot;
+  confirmSnapshot.value = snapshot && !isEvent ? snapshot as Record<string, any> : cloneConfig(settings);
   showConfirm.value = true;
 }
 
-async function doSave() {
+function cloneConfig(value: Record<string, any>) {
+  return JSON.parse(JSON.stringify(value || {}));
+}
+
+function restoreConfig(snapshot: Record<string, any>) {
+  for (const key of Object.keys(settings)) delete settings[key];
+  Object.assign(settings, snapshot);
+}
+
+function cancelConfirm() {
+  if (confirmSnapshot.value) restoreConfig(confirmSnapshot.value);
+  confirmSnapshot.value = null;
   showConfirm.value = false;
-  try { await api.saveSettings(settings); } catch {}
+}
+
+async function doSave() {
+  try {
+    await api.saveSettings(settings);
+    confirmSnapshot.value = null;
+    showConfirm.value = false;
+  } catch {
+    showConfirm.value = false;
+  }
 }
 
 async function saveApiKey() {

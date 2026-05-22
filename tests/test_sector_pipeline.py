@@ -5,6 +5,7 @@ Covers: data/sectors.py builders, signals/multifactor.py industry factor,
 sector API endpoints, portfolio sector-exposure API.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -60,6 +61,7 @@ def test_build_membership_columns(tmp_path, monkeypatch):
 
 def test_build_membership_uses_sw_industries(tmp_path, monkeypatch):
     from data import sectors
+    from data.symbols import SW_INDUSTRY_FIRST
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
     mem_path = tmp_path / "sector_membership.parquet"
@@ -69,6 +71,7 @@ def test_build_membership_uses_sw_industries(tmp_path, monkeypatch):
     valid_names = set(sectors.SW_INDUSTRIES.values())
     for name in df["sector_name"].unique():
         assert name in valid_names, f"unexpected sector name: {name}"
+    assert sectors.SW_INDUSTRIES == SW_INDUSTRY_FIRST
 
 
 # ═══════════════════════════════════════════════════════════
@@ -82,7 +85,7 @@ def test_build_sector_performance_with_mock_data(tmp_path, monkeypatch):
 
     # Mock membership
     mem = pd.DataFrame([
-        {"symbol": "000001", "sector_code": "801970", "sector_name": "银行"},
+        {"symbol": "000001", "sector_code": "801780", "sector_name": "银行"},
         {"symbol": "000002", "sector_code": "801180", "sector_name": "房地产"},
     ])
     mem_path = tmp_path / "sector_membership.parquet"
@@ -102,16 +105,51 @@ def test_build_sector_performance_with_mock_data(tmp_path, monkeypatch):
         return tmp_path / f"{dim}.parquet"
 
     monkeypatch.setattr(hub, "dimension_path", mock_dim_path)
-    monkeypatch.setattr(sectors, "_store", lambda: tmp_path / "sector")
 
     df = sectors.build_sector_performance(hub, lookback_days=120)
     assert len(df) > 0
     for col in ("sector_code", "return_20d", "volatility", "member_count"):
         assert col in df.columns, f"missing {col}"
 
-    bank_row = df[df["sector_code"] == "801970"]
+    bank_row = df[df["sector_code"] == "801780"]
     if not bank_row.empty:
         assert bank_row.iloc[0]["return_20d"] > 0
+        assert bank_row.iloc[0]["data_source"] == "proxy"
+
+
+def test_build_sector_performance_prefers_sw_daily_real_data(tmp_path, monkeypatch):
+    from data import sectors
+
+    hub = _patch_hub_store(tmp_path, monkeypatch)
+
+    mem = pd.DataFrame([
+        {"symbol": "000001", "sector_code": "801780", "sector_name": "银行"},
+    ])
+    mem_path = tmp_path / "sector" / "membership.parquet"
+    hub.write_parquet(mem, mem_path)
+
+    sw_path = tmp_path / "sector" / "sw_daily" / "801780.parquet"
+    sw_daily = pd.DataFrame({
+        "trade_date": pd.date_range("2026-01-01", periods=80, freq="B"),
+        "close": 100 * np.cumprod(np.full(80, 1.002)),
+        "pct_chg": np.full(80, 0.2),  # Tushare pct_chg is percent, not fraction.
+    })
+    hub.write_parquet(sw_daily, sw_path)
+
+    def mock_dim_path(dim, **kw):
+        if dim == "sector_membership":
+            return mem_path
+        if dim == "sector_sw_daily" and kw.get("symbol") == "801780":
+            return sw_path
+        return tmp_path / dim / f"{kw.get('YYYYMMDD', kw.get('symbol', 'data'))}.parquet"
+
+    monkeypatch.setattr(hub, "dimension_path", mock_dim_path)
+
+    df = sectors.build_sector_performance(hub, lookback_days=80)
+    bank_row = df[df["sector_code"] == "801780"].iloc[0]
+    assert bank_row["data_source"] == "real"
+    assert bank_row["return_20d"] > 0
+    assert bank_row["member_count"] == 1
 
 
 def test_build_performance_empty_membership_returns_empty(tmp_path, monkeypatch):
@@ -133,7 +171,7 @@ def test_build_signal_aggregation_with_mock_data(tmp_path, monkeypatch):
     hub = _patch_hub_store(tmp_path, monkeypatch)
 
     mem = pd.DataFrame([
-        {"symbol": "000001", "sector_code": "801970", "sector_name": "银行"},
+        {"symbol": "000001", "sector_code": "801780", "sector_name": "银行"},
         {"symbol": "000002", "sector_code": "801180", "sector_name": "房地产"},
     ])
     mem_path = tmp_path / "sector_membership.parquet"
@@ -154,7 +192,6 @@ def test_build_signal_aggregation_with_mock_data(tmp_path, monkeypatch):
         return p
 
     monkeypatch.setattr(hub, "signal_path", mock_signal_path)
-    monkeypatch.setattr(sectors, "_store", lambda: tmp_path / "sector")
 
     df = sectors.build_signal_aggregation(hub)
     assert len(df) > 0
@@ -193,7 +230,6 @@ def test_build_exposure_with_mock_positions(tmp_path, monkeypatch):
     hub.write_parquet(mem, mem_path)
 
     monkeypatch.setattr(hub, "dimension_path", lambda dim, **kw: mem_path)
-    monkeypatch.setattr(sectors, "_store", lambda: tmp_path / "sector")
 
     df = sectors.build_exposure(hub)
     assert len(df) == 2
@@ -210,6 +246,38 @@ def test_build_exposure_no_positions(tmp_path, monkeypatch):
     hub = _patch_hub_store(tmp_path, monkeypatch)
     df = sectors.build_exposure(hub)
     assert df.empty
+
+
+def test_build_exposure_reads_canonical_paper_state(tmp_path, monkeypatch):
+    from data import sectors
+
+    hub = _patch_hub_store(tmp_path, monkeypatch)
+
+    state = pd.DataFrame([{
+        "cash": 900000.0,
+        "frozen_cash": 0.0,
+        "peak_equity": 1000000.0,
+        "positions": json.dumps({
+            "000001": {"volume": 1000, "avg_cost": 10.0, "name": "平安银行"},
+            "000002": {"volume": 500, "avg_cost": 20.0, "name": "万科A"},
+        }, ensure_ascii=False),
+        "order_counter": 0,
+        "updated_at": "2026-05-23T00:00:00",
+    }])
+    hub.write_parquet(state, hub.paper_path("state"))
+
+    mem = pd.DataFrame([
+        {"symbol": "000001", "sector_name": "银行"},
+        {"symbol": "000002", "sector_name": "房地产"},
+    ])
+    mem_path = tmp_path / "sector" / "membership.parquet"
+    hub.write_parquet(mem, mem_path)
+
+    monkeypatch.setattr(hub, "dimension_path", lambda dim, **kw: mem_path if dim == "sector_membership" else tmp_path / f"{dim}.parquet")
+
+    df = sectors.build_exposure(hub)
+    assert set(df["sector"]) == {"银行", "房地产"}
+    assert abs(df["weight"].sum() - 1.0) < 0.01
 
 
 # ═══════════════════════════════════════════════════════════
@@ -271,14 +339,16 @@ def test_get_sector_momentum_cache(tmp_path, monkeypatch):
     store = tmp_path / "sector"
     store.mkdir(exist_ok=True)
     perf = pd.DataFrame({
-        "sector_code": ["801970", "801180"],
+        "sector_code": ["801780", "801180"],
         "sector_name": ["银行", "房地产"],
         "return_1d": [0.005, -0.003], "return_5d": [0.01, -0.02],
         "return_20d": [0.03, -0.05], "return_60d": [0.08, -0.10],
         "volatility": [0.15, 0.25], "member_count": [20, 30],
         "date": "2026-05-23", "latest_date": "2026-05-23", "data_source": "real",
     })
-    hub.write_parquet(perf, store / "sector_performance_2026-05-23.parquet")
+    perf_dir = tmp_path / "sector" / "performance_snapshot"
+    perf_dir.mkdir(parents=True, exist_ok=True)
+    hub.write_parquet(perf, perf_dir / "20260523.parquet")
 
     result = mf._get_sector_momentum()
     assert len(result) == 2
@@ -299,7 +369,7 @@ def test_lookup_sector_from_membership(tmp_path, monkeypatch):
 
     mem = pd.DataFrame({
         "symbol": ["000001", "000002"],
-        "sector_code": ["801970", "801180"],
+        "sector_code": ["801780", "801180"],
         "sector_name": ["银行", "房地产"],
     })
     mem_path = tmp_path / "sector_membership.parquet"
@@ -414,7 +484,6 @@ def test_all_builders_run_without_exception(tmp_path, monkeypatch):
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
     monkeypatch.setattr(hub, "dimension_path", lambda dim, **kw: tmp_path / f"{dim}.parquet")
-    monkeypatch.setattr(sectors, "_store", lambda: tmp_path / "sector")
 
     results = {}
     for name, builder in [
@@ -457,6 +526,16 @@ def test_sector_sw_daily_contract():
     assert "close" in sc.columns
 
 
+def test_sector_performance_snapshot_contract():
+    from data.contract import derive_contracts_from_registry
+    contracts = derive_contracts_from_registry()
+    pc = contracts.get("sector_performance_snapshot")
+    assert pc is not None, "sector_performance_snapshot contract missing"
+    assert "sector_code" in pc.columns
+    assert "return_20d" in pc.columns
+    assert "data_source" in pc.columns
+
+
 # ═══════════════════════════════════════════════════════════
 # Integration
 # ═══════════════════════════════════════════════════════════
@@ -465,8 +544,6 @@ def test_full_sector_flow_membership_to_performance(tmp_path, monkeypatch):
     from data import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
-    monkeypatch.setattr(sectors, "_store", lambda: tmp_path / "sector")
-
     # 1. Build membership
     mem_path = tmp_path / "sector_membership.parquet"
     monkeypatch.setattr(hub, "dimension_path", lambda dim, **kw: mem_path)
@@ -488,7 +565,7 @@ def test_full_sector_flow_membership_to_performance(tmp_path, monkeypatch):
     perf = sectors.build_sector_performance(hub, lookback_days=120)
     assert len(perf) > 0
 
-    saved = sorted((tmp_path / "sector").glob("sector_performance_*.parquet"))
+    saved = sorted(tmp_path.glob("sector_performance_snapshot.parquet"))
     assert len(saved) >= 1, "performance should be persisted"
 
 

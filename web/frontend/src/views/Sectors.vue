@@ -7,7 +7,7 @@
       </div>
       <div v-if="overview" class="flex items-center gap-4">
         <span class="text-2xs" style="color:var(--text-disabled)">
-          {{ overview.total_sectors }} 行业 · {{ overview.data_source === 'real' ? '真实数据' : '数据缺失' }}
+          {{ overview.total_sectors }} 行业 · {{ dataSourceLabel(overview.data_source) }}
         </span>
       </div>
     </div>
@@ -75,7 +75,7 @@
               <td class="text-right font-mono" :style="{ color: colorPct(s.return_5d) }">{{ fmtPct(s.return_5d) }}</td>
               <td class="text-right font-mono" :style="{ color: colorPct(s.return_20d), fontWeight: '600' }">{{ fmtPct(s.return_20d) }}</td>
               <td class="text-right font-mono" :style="{ color: colorPct(s.return_60d) }">{{ fmtPct(s.return_60d) }}</td>
-              <td class="text-right font-mono" style="color:var(--text-secondary)">{{ s.volatility.toFixed(2) }}%</td>
+              <td class="text-right font-mono" style="color:var(--text-secondary)">{{ fmtPct(s.volatility) }}</td>
               <td class="text-right" style="color:var(--text-secondary)">{{ s.member_count }}</td>
             </tr>
           </tbody>
@@ -159,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { api } from "../api";
 import type {
   SectorOverviewResponse,
@@ -196,9 +196,10 @@ const bottom5Return = computed(() => {
 
 const perfDate = computed(() => {
   const f = overview.value?.freshness?.performance || "";
-  // Extract date from filename like sector_performance_2026-05-23.parquet
-  const m = f.match(/(\d{4}-\d{2}-\d{2})/);
-  return m ? m[1] : "—";
+  const m = f.match(/(\d{4}-\d{2}-\d{2})|(\d{8})/);
+  if (!m) return "—";
+  const raw = m[1] || m[2];
+  return raw.length === 8 ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6)}` : raw;
 });
 
 const activeDetail = computed(() => {
@@ -219,6 +220,12 @@ function colorPct(v: number) {
   if (v > 0.005) return "var(--positive)";
   if (v < -0.005) return "var(--negative)";
   return "var(--text-secondary)";
+}
+
+function dataSourceLabel(source: string) {
+  if (source === "real") return "真实数据";
+  if (source === "proxy") return "代理数据";
+  return "数据缺失";
 }
 
 async function toggleSector(s: SectorCard) {

@@ -264,19 +264,26 @@ async def get_sector_exposure():
 
     读取 sector_exposure 快照 parquet，返回各行业权重/市值/持仓数。
     """
-    from pathlib import Path
     from data.datahub import get_datahub
     hub = get_datahub()
-    store = hub.store_root / "sector"
-    if not store.exists():
-        return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
-
-    candidates = sorted(store.glob("sector_exposure_*.parquet"), reverse=True)
-    if not candidates:
-        return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
+    latest_path = None
+    try:
+        root = hub.dimension_root("sector_exposure_snapshot")
+        if root.exists():
+            candidates = sorted(root.glob("*.parquet"), reverse=True)
+            if candidates:
+                latest_path = candidates[0]
+    except Exception:
+        latest_path = None
+    if latest_path is None:
+        legacy = hub.store_root / "sector"
+        candidates = sorted(legacy.glob("sector_exposure_*.parquet"), reverse=True) if legacy.exists() else []
+        if not candidates:
+            return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
+        latest_path = candidates[0]
 
     import pandas as pd
-    df = hub.read_parquet(candidates[0], default=pd.DataFrame())
+    df = hub.read_parquet(latest_path, default=pd.DataFrame())
     if df.empty:
         return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
 

@@ -1,7 +1,7 @@
 ---
 title: Data Schema — 数据库完整结构
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-05-23
 type: reference
 tags: [data, parquet, schema, database]
 ---
@@ -129,9 +129,38 @@ tags: [data, parquet, schema, database]
 
 ---
 
-## 4. 宏观数据
+## 4. 行业/板块数据中台
 
-### 4.1 CPI (Tushare 源, 月频)
+### 4.1 申万行业指数日行情
+
+**存储**: `data/store/sector/sw_daily/{symbol}.parquet`
+**来源**: Tushare `sw_daily` → `sector_sw_daily`
+
+| 列名 | 类型 | 说明 |
+|------|------|------|
+| ts_code | str | 申万行业指数代码 |
+| trade_date | datetime/str | 交易日 |
+| open/high/low/close | float64 | OHLC |
+| vol | float64 | 成交量 |
+| amount | float64 | 成交额 |
+| pct_chg | float64 | 日涨跌幅，Tushare 原始值为百分比 |
+
+### 4.2 行业快照
+
+| 维度 | 存储 | 核心列 |
+|------|------|------|
+| sector_membership | `data/store/sector/membership.parquet` | symbol, sector_code, sector_name, sector_level |
+| sector_performance_snapshot | `data/store/sector/performance_snapshot/{YYYYMMDD}.parquet` | sector_code, sector_name, date, return_1d/5d/20d/60d, volatility, member_count, latest_date, data_source |
+| sector_signal_snapshot | `data/store/sector/signal_snapshot/{YYYYMMDD}.parquet` | sector, sector_code, date, strategy, total, buy_count, buy_ratio, avg_score, top_symbol |
+| sector_exposure_snapshot | `data/store/sector/exposure_snapshot/{YYYYMMDD}.parquet` | sector, date, weight, market_value, position_count |
+
+`data_source` 必须显式标记: `real` 表示申万行业指数缓存，`proxy` 表示按成分股本地 OHLCV 等权聚合，`missing` 表示无可用缓存。
+
+---
+
+## 5. 宏观数据
+
+### 5.1 CPI (Tushare 源, 月频)
 
 **存储**: `data/store/macro/cpi.parquet`  
 **来源**: Tushare `cn_cpi` (国家统计局) → AKShare `macro_china_cpi_yearly`(金十, 已停更, 仅历史回退)

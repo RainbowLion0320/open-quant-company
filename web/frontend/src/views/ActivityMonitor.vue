@@ -144,6 +144,37 @@
       <div class="settings-col">
       <div class="glass-card settings-card">
         <div class="panel-head">
+          <span>TELEGRAM</span>
+          <router-link to="/settings" class="source-badge ok summary-badge">设置</router-link>
+        </div>
+        <div class="source-list">
+          <div>
+            <span>Signal Push</span>
+            <em :class="['source-badge', notificationEnabled ? 'ok' : 'muted']">{{ notificationText }}</em>
+          </div>
+          <div>
+            <span>Signal Change Only</span>
+            <em :class="['source-badge', signalChangeOnly ? 'ok' : 'limited']">{{ signalChangeOnly ? 'enabled' : 'all signals' }}</em>
+          </div>
+        </div>
+      </div>
+      <div class="glass-card settings-card">
+        <div class="panel-head">
+          <span>DATA SOURCES</span>
+          <small>{{ sourceItems.length }} groups</small>
+        </div>
+        <div class="source-list">
+          <template v-if="sourceItems.length">
+            <div v-for="src in sourceItems" :key="src.name">
+              <span>{{ src.name }}</span>
+              <em :class="['source-badge', src.status === 'available' ? 'ok' : 'limited']">{{ src.summary }}</em>
+            </div>
+          </template>
+          <div v-else><span>Registry</span><em class="source-badge muted">暂无配置</em></div>
+        </div>
+      </div>
+      <div class="glass-card settings-card">
+        <div class="panel-head">
           <span>API HEALTH</span>
           <em v-if="apiHealth" :class="apiHealth.all_ok ? 'source-badge ok' : 'source-badge limited'"
             class="summary-badge">{{ apiHealth.summary }}</em>
@@ -200,6 +231,26 @@
       </div>
       <div class="glass-card settings-card">
         <div class="panel-head">
+          <span>SYSTEM INFO</span>
+          <small>{{ systemInfo.version }}</small>
+        </div>
+        <div class="source-list">
+          <div>
+            <span>Universe</span>
+            <em class="source-badge ok">{{ systemInfo.universe }}</em>
+          </div>
+          <div>
+            <span>Strategies</span>
+            <em class="source-badge ok">{{ systemInfo.strategies }}</em>
+          </div>
+          <div>
+            <span>Feature Policy</span>
+            <em class="source-badge muted">{{ systemInfo.featurePolicy }}</em>
+          </div>
+        </div>
+      </div>
+      <div class="glass-card settings-card">
+        <div class="panel-head">
           <span>QUICK LINKS</span>
         </div>
         <div class="source-list">
@@ -219,10 +270,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, reactive, onMounted, onUnmounted } from "vue";
 import { api, type SystemMonitor } from "../api";
 
 const monitor = ref<SystemMonitor | null>(null);
+const settings = reactive<Record<string, any>>({});
 const lastFetch = ref(Date.now());
 const elapsed = ref(0);
 const historyHours = ref(24);
@@ -252,6 +304,46 @@ const dsCostRef = ref<HTMLCanvasElement | null>(null);
 const dsTotals = ref<{ pro: number; flash: number; cost: number } | null>(null);
 
 const apiHealth = ref<{ items: { name: string; status: string; detail: string }[]; summary: string; all_ok: boolean } | null>(null);
+
+const notificationEnabled = computed(() => !!settings.trading?.notification?.enabled);
+const signalChangeOnly = computed(() => settings.trading?.notification?.signal_change_only !== false);
+const notificationText = computed(() => notificationEnabled.value ? "enabled" : "disabled");
+const sourceItems = computed(() => {
+  const registry = settings.data_registry || {};
+  const grouped: Record<string, { name: string; total: number; enabled: number; status: string }> = {};
+  const labels: Record<string, string> = {
+    akshare: "AKShare",
+    tushare_free: "Tushare Free",
+    tushare_paid: "Tushare Paid",
+    future: "Future",
+    computed: "Computed",
+    system: "System",
+  };
+  for (const entry of Object.values(registry) as any[]) {
+    const key = String(entry?.source || "local");
+    grouped[key] = grouped[key] || { name: labels[key] || key, total: 0, enabled: 0, status: "available" };
+    grouped[key].total += 1;
+    if (entry?.enabled !== false) grouped[key].enabled += 1;
+    if (entry?.enabled !== false && entry?.status && entry.status !== "available") grouped[key].status = String(entry.status);
+  }
+  return Object.values(grouped)
+    .sort((a, b) => b.enabled - a.enabled || a.name.localeCompare(b.name))
+    .slice(0, 6)
+    .map(item => ({ ...item, summary: item.enabled ? `${item.enabled}/${item.total} dims` : "disabled" }));
+});
+const systemInfo = computed(() => {
+  const project = settings.project || {};
+  const strategies = settings.signals || {};
+  const registry = settings.data_registry || {};
+  const enabledStrategies = Object.values(strategies).filter((v: any) => v?.enabled !== false).length;
+  const enabledDims = Object.values(registry).filter((v: any) => v?.enabled !== false).length;
+  return {
+    version: project.version ? `v${project.version}` : "v—",
+    universe: `${enabledDims} data dims`,
+    strategies: `${enabledStrategies} enabled`,
+    featurePolicy: settings.feature_store?.point_in_time ? "PIT enforced" : "standard",
+  };
+});
 
 
 // Fixed API health display order: data → AI → infra → messaging
@@ -338,6 +430,13 @@ function apiBadgeClass(status: string): string {
 
 async function fetchApiHealth() {
   try { apiHealth.value = await api.apiHealth(); } catch { apiHealth.value = null; }
+}
+
+async function fetchSettings() {
+  try {
+    const data = await api.settings();
+    Object.assign(settings, data);
+  } catch {}
 }
 
 function fmtNum(n: number): string {
@@ -526,6 +625,7 @@ async function drawDSChart() {
 onMounted(() => {
   fetchData();
   fetchSlowData();
+  fetchSettings();
   fetchApiHealth();
   fetchCronJobs();
   fetchServiceStatus();

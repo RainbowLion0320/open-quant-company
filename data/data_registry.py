@@ -50,6 +50,7 @@ DEFAULT_HEALTH_TABLES = {
     "dividend": "stock_dividend",
     "sector_sw_daily": "sector_sw_daily",
     "sector_membership": "sector_membership",
+    "sector_performance_snapshot": "sector_performance_snapshot",
     "sector_signal_snapshot": "sector_signal_snapshot",
     "sector_exposure_snapshot": "sector_exposure_snapshot",
 }

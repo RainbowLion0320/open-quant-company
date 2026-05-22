@@ -393,8 +393,15 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
             "symbol": "object", "sector_code": "object",
             "sector_name": "object", "sector_level": "int64",
         },
+        "sector_performance_snapshot": {
+            "sector_code": "object", "sector_name": "object", "date": "object",
+            "return_1d": "float64", "return_5d": "float64",
+            "return_20d": "float64", "return_60d": "float64",
+            "volatility": "float64", "member_count": "int64",
+            "latest_date": "object", "data_source": "object",
+        },
         "sector_signal_snapshot": {
-            "sector": "object", "date": "object", "strategy": "object",
+            "sector": "object", "sector_code": "object", "date": "object", "strategy": "object",
             "total": "int64", "buy_count": "int64", "buy_ratio": "float64",
             "avg_score": "float64", "top_symbol": "object",
         },

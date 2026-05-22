@@ -232,12 +232,17 @@ def _get_sector_momentum() -> dict:
     try:
         from data.datahub import get_datahub
         hub = get_datahub()
-        store = hub.store_root / "sector"
-        if not store.exists():
-            _sector_ret_cache = {}
-            return _sector_ret_cache
-
-        candidates = sorted(store.glob("sector_performance_*.parquet"), reverse=True)
+        candidates = []
+        try:
+            root = hub.dimension_root("sector_performance_snapshot")
+            if root.exists():
+                candidates = sorted(root.glob("*.parquet"), reverse=True)
+        except Exception:
+            pass
+        if not candidates:
+            legacy = hub.store_root / "sector"
+            if legacy.exists():
+                candidates = sorted(legacy.glob("sector_performance_*.parquet"), reverse=True)
         if not candidates:
             _sector_ret_cache = {}
             return _sector_ret_cache

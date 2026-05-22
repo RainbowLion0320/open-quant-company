@@ -1,19 +1,19 @@
 ---
 title: Data Dimensions — 量化数据维度全览
 created: 2026-05-13
-updated: 2026-05-21
+updated: 2026-05-23
 type: reference
 tags: [data, dimensions, registry, datahub, storage, parquet]
 ---
 
 # Data Dimensions — 量化数据维度全览
 
-> 最后更新: 2026-05-21. 维度定义在 `config/settings.yaml` → `data_registry`.
+> 最后更新: 2026-05-23. 维度定义在 `config/settings.yaml` → `data_registry`.
 
 ## 架构总览
 
 ```
-config/settings.yaml          ← 34 维度定义 (source/asset/status/freq)
+config/settings.yaml          ← 39+ 维度定义 (source/asset/status/freq)
         │
         ▼
 data/data_registry.py         ← 单例注册表, 加载 YAML → DataDimension[] 
@@ -37,7 +37,7 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 
 ## 维度总表
 
-共 34 个维度，按状态分类：
+按状态分类：
 
 ### 已启用 (21)
 
@@ -64,6 +64,11 @@ data/db.py → DuckDB :memory:  ← 只读视图, 零文件锁冲突
 | macro_shibor | Shibor 利率 | akshare | daily | macro |
 | macro_lpr | LPR 贷款基础利率 | tushare_free | monthly | macro |
 | bond_treasury_yields | 国债收益率曲线 (中美) | akshare | daily | bond |
+| sector_sw_daily | 申万行业指数日行情 | tushare_free | daily | sector |
+| sector_membership | 股票-行业映射 | computed | event | sector |
+| sector_performance_snapshot | 行业动量绩效快照 | computed | daily | sector |
+| sector_signal_snapshot | 策略信号按行业聚合 | computed | daily | sector |
+| sector_exposure_snapshot | 组合持仓按行业暴露 | computed | daily | sector |
 
 **来源分布**: akshare 6 | tushare_free 23 | tushare_paid 4 | future 1
 
@@ -169,6 +174,13 @@ store/
 │   ├── nav.parquet
 │   ├── state.parquet
 │   └── trades.parquet
+│
+├── sector/                               ← 申万行业数据中台
+│   ├── sw_daily/{symbol}.parquet         ← 申万行业指数日行情
+│   ├── membership.parquet                ← 股票-行业映射
+│   ├── performance_snapshot/{YYYYMMDD}.parquet ← 行业动量绩效快照
+│   ├── signal_snapshot/{YYYYMMDD}.parquet      ← 策略信号行业聚合
+│   └── exposure_snapshot/{YYYYMMDD}.parquet    ← 组合行业暴露
 │
 ├── deepseek/daily_usage.parquet         ← DeepSeek 日度用量 (CDP 自动)
 ├── bond/treasury_yields.parquet         ← 国债收益率曲线 (中美)

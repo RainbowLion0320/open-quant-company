@@ -97,6 +97,7 @@ class DataHub:
             self.store_path("fund"),
             self.store_path("futures"),
             self.store_path("bond"),
+            self.store_path("sector"),
         ]:
             path.mkdir(parents=True, exist_ok=True)
 

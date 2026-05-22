@@ -333,6 +333,11 @@ class DataQualityGate:
             "fina_indicator": ["ann_date", "end_date", "roe", "roa", "eps", "bps"],
             "valuation_daily": ["trade_date", "pe", "pb", "ps", "total_mv"],
             "moneyflow_daily": ["日期", "主力净流入-净额", "小单净流入-净额"],
+            "sector_sw_daily": ["trade_date", "close"],
+            "sector_membership": ["symbol", "sector_code", "sector_name", "sector_level"],
+            "sector_performance_snapshot": ["sector_code", "sector_name", "date", "return_20d", "data_source"],
+            "sector_signal_snapshot": ["sector", "date", "strategy", "buy_ratio", "avg_score"],
+            "sector_exposure_snapshot": ["sector", "date", "weight", "market_value", "position_count"],
         }
         return SCHEMA_MAP.get(key)
 

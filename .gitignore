@@ -40,6 +40,8 @@ data/*.pkl
 data/*.duckdb
 data/*.db
 data/**/*.db
+data/**/*.db-shm
+data/**/*.db-wal
 data/store/features/
 data/store/signals/
 data/store/macro/
@@ -54,6 +56,7 @@ data/store/scan_meta.parquet
 data/store/db_health.parquet
 data/models/*.pkl
 data/models/*.json
+data/models/*.jsonl
 data/tournament/
 
 # ── Web 构建产物 ──
