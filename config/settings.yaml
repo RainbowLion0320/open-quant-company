@@ -201,7 +201,7 @@ data:
     token: ''
 project:
   name: quant-agent
-  version: 5.1.0
+  version: 2.0.0
   description: 个人A股量化交易系统 — 日频 · 自托管 · AI增强
 signals:
   multifactor:

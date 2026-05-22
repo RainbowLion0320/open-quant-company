@@ -1,22 +1,37 @@
 # Quant Agent — 维护命令
 PYTHON = /Users/fushao/.hermes/hermes-agent/venv/bin/python3
 
-.PHONY: clean cache-clean pyc-clean dist-clean
+.PHONY: install test lint ci clean scan backtest regime web web-build web-dev web-stop
+
+# 安装依赖
+install:
+	pip install -r requirements.txt
+
+install-dev: install
+	pip install -r requirements-dev.txt
+
+install-ml: install
+	pip install lightgbm scikit-learn optuna
+
+# 运行测试
+test:
+	$(PYTHON) -m pytest tests/ -v
+
+test-quick:
+	$(PYTHON) -m pytest tests/ -q
+
+# 代码风格检查
+lint:
+	$(PYTHON) -m flake8 data/ signals/ backtest/ broker/ cybernetics/ scripts/ web/api/ --max-line-length=120 --ignore=E203,W503 2>/dev/null || echo "flake8 未安装，跳过 lint"
+
+# CI 完整检查
+ci: test web-build
+	@echo "CI 通过: 测试 + 前端构建"
 
 # 清理 Python 字节码缓存
 pyc-clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name '*.pyc' -delete
-
-# 清理数据缓存（超过 365 天的 parquet 文件，即真正的僵尸缓存）
-cache-clean:
-	find data/cache -name '*.parquet' -mtime +365 -delete
-	@echo "清理完成: $$(find data/cache -name '*.parquet' | wc -l) 个文件保留"
-
-# 强制清空全部缓存（重新拉全量数据前使用）
-cache-reset:
-	rm -f data/cache/*.parquet
-	@echo "缓存已清空"
 
 # 清理临时文件
 tmp-clean:
@@ -24,10 +39,6 @@ tmp-clean:
 
 # 日常清理（安全，不删数据）
 clean: pyc-clean tmp-clean
-
-# 深度清理（含数据缓存）
-dist-clean: clean cache-clean
-	@echo "深度清理完成"
 
 # 扫描全量股票 (日频 cron 标准入口)
 scan:
@@ -39,15 +50,20 @@ backtest:
 
 # 市场状态检测
 regime:
-	$(PYTHON) -c "from cybernetics.orchestrator import QuantOrchestrator; o=QuantOrchestrator(); s=o.detect(); print(f'Regime: {s.regime.value} | {s.index_ma_trend}')"
+	$(PYTHON) -c "from cybernetics.orchestrator import QuantOrchestrator; o=QuantOrchestrator(); s=o.detect(); print(f'Regime: {s.regime.value} Score: {s.regime_score} | {s.index_ma_trend}')"
 
-# Web 仪表盘 (Vue 3 + FastAPI)
-web:
-	cd web/frontend && npm run build
-	$(PYTHON) -m web.api
+# Web 仪表盘 (生产构建 + 启动)
+web: web-build
+	$(PYTHON) -m uvicorn web.api.app:create_app --factory --port 8501 --host 0.0.0.0
 
+# Web 开发模式 (直接启动，使用 Vite 前端)
 web-dev:
-	$(PYTHON) -m web.api
+	$(PYTHON) -m uvicorn web.api.app:create_app --factory --port 8501 --host 0.0.0.0 --reload
 
+# 前端构建
+web-build:
+	cd web/frontend && npm run build
+
+# 停止 Web
 web-stop:
-	pkill -f "web.api" || true
+	pkill -f "uvicorn web.api" 2>/dev/null || echo "无运行中的 Web 进程"

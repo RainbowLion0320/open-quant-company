@@ -20,8 +20,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install akshare pandas numpy pyarrow duckdb pyyaml requests fastapi uvicorn scipy scikit-learn lightgbm tushare
+        run: pip install -r requirements.txt
 
       - name: Run strategy scan
         env:
