@@ -82,6 +82,12 @@
         <svg viewBox="0 0 160 44" preserveAspectRatio="none" class="sparkline">
           <polyline :points="sparkPoints(asset.series, 160, 44)" :stroke="sparkColor(asset.change_pct)" />
         </svg>
+        <div class="asset-source" :title="asset.source_detail || ''">
+          <span v-if="asset.data_source === 'real'" class="source-dot source-real"></span>
+          <span v-else-if="asset.data_source === 'proxy'" class="source-badge source-proxy">PROXY</span>
+          <span v-else-if="asset.data_source === 'missing'" class="source-badge source-missing">NO DATA</span>
+          <span v-else class="source-dot source-unknown"></span>
+        </div>
       </article>
     </section>
     <section v-else class="asset-strip">
@@ -481,6 +487,36 @@ onMounted(async () => {
 .asset-card {
   padding: 12px 14px;
   min-height: 126px;
+}
+.asset-source {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+}
+.source-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.source-real { background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,0.4); }
+.source-unknown { background: #64748b; }
+.source-badge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1.6;
+}
+.source-proxy {
+  color: #f59e0b;
+  background: rgba(245,158,11,0.10);
+  border: 1px solid rgba(245,158,11,0.20);
+}
+.source-missing {
+  color: #94a3b8;
+  background: rgba(148,163,184,0.10);
+  border: 1px solid rgba(148,163,184,0.20);
 }
 .asset-empty {
   grid-column: 1 / -1;

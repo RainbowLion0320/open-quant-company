@@ -147,12 +147,26 @@ class SignalChange(BaseModel):
     to_signal: str
     score: Optional[float] = None
 
+# ── Multi-Asset (P2-13) ──
+
+class MultiAssetCard(BaseModel):
+    key: str
+    label: str
+    symbol: str
+    value: Optional[float] = None
+    change: float = 0.0
+    change_pct: float = 0.0
+    unit: str = ""
+    series: List[Dict[str, Any]] = []
+    data_source: str = Field(default="real", description="real | proxy | placeholder | cached | missing")
+    source_detail: str = Field(default="", description="Human-readable detail about the data origin")
+
 # ── Regime ──
 
 class RegimeSnapshot(BaseModel):
     regime: str = "unknown"
     regime_score: float = 50.0
-    multi_asset: List[Dict[str, Any]] = []
+    multi_asset: List[MultiAssetCard] = []
     freshness: Dict[str, Any] = {}
     updated: str = ""
 

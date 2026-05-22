@@ -41,7 +41,8 @@ def _date_value_series(df: pd.DataFrame, value_col: str = "close", limit: int = 
     return [{"date": str(r["date"])[:10], "value": round(_num(r[value_col]), 4)} for _, r in data.iterrows()]
 
 
-def _series_card(key: str, label: str, symbol: str, df: pd.DataFrame | None, value_col: str = "close", unit: str = "") -> dict:
+def _series_card(key: str, label: str, symbol: str, df: pd.DataFrame | None, value_col: str = "close", unit: str = "",
+                 data_source: str = "real", source_detail: str = "") -> dict:
     series = _date_value_series(df, value_col=value_col)
     latest = series[-1]["value"] if series else None
     prev = series[-2]["value"] if len(series) > 1 else latest
@@ -56,6 +57,8 @@ def _series_card(key: str, label: str, symbol: str, df: pd.DataFrame | None, val
         "change_pct": round(change_pct, 4),
         "unit": unit,
         "series": series,
+        "data_source": data_source,
+        "source_detail": source_detail,
     }
 
 
@@ -139,13 +142,16 @@ def _macro_card(key: str, label: str, df: pd.DataFrame | None, candidates: list[
 
 
 def _multi_asset_cards(bench: pd.DataFrame) -> list[dict]:
-    cards = [_series_card("ashare", "A股核心", "000001.SH", bench, "close", "")]
+    cards = [_series_card("ashare", "A股核心", "000001.SH", bench, "close", "",
+                         data_source="real", source_detail="上证综指 OHLCV")]
 
     gold = _load_etf("518880")
-    cards.append(_series_card("gold", "黄金ETF", "518880.SH", gold, "close", ""))
+    cards.append(_series_card("gold", "黄金ETF", "518880.SH", gold, "close", "",
+                             data_source="real", source_detail="AKShare fund_etf_hist_em"))
 
     bond = _load_bond_yield()
-    cards.append(_series_card("bond10y", "10Y国债", "CN10Y", bond, "中国国债收益率10年", "%"))
+    cards.append(_series_card("bond10y", "10Y国债", "CN10Y", bond, "中国国债收益率10年", "%",
+                             data_source="proxy", source_detail="收益率曲线 → 近似价格 (久期=7)"))
 
     return cards
 

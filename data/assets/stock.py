@@ -23,6 +23,9 @@ class StockAsset(AssetAdapter):
     asset_type = "stock"
     label = "A股股票"
     description = "沪深A股，1000只股票池，申万31行业分类"
+    DATA_SOURCE = "real"
+    DATA_SOURCE_DETAIL = "AKShare + Tushare OHLCV (新浪/东方财富/腾讯3源fallback)"
+    TRADING_CALENDAR = "SSE"
 
     def fetch_daily(
         self,

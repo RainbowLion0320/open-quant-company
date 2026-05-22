@@ -84,6 +84,8 @@ export interface MarketAssetCard {
   change_pct: number;
   unit: string;
   series: MarketSeriesPoint[];
+  data_source: string;       // "real" | "proxy" | "placeholder" | "cached" | "missing"
+  source_detail?: string;    // human-readable detail
 }
 
 export interface MacroCard {

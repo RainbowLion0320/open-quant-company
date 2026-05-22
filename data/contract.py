@@ -357,6 +357,25 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
             "super_large_net_inflow": "float64", "large_net_inflow": "float64",
             "medium_net_inflow": "float64", "small_net_inflow": "float64",
         },
+        # P2-13: Multi-asset dimensions
+        "fund_daily": {
+            "date": "object", "open": "float64", "high": "float64",
+            "low": "float64", "close": "float64", "volume": "float64",
+            "amount": "float64",
+        },
+        "bond_treasury_yields": {
+            "date": "object",
+            "中国国债收益率2年": "float64", "中国国债收益率5年": "float64",
+            "中国国债收益率10年": "float64", "中国国债收益率30年": "float64",
+            "中国国债收益率3月": "float64", "中国国债收益率1年": "float64",
+            "美国国债收益率2年": "float64", "美国国债收益率5年": "float64",
+            "美国国债收益率10年": "float64", "美国国债收益率30年": "float64",
+        },
+        "futures_daily": {
+            "date": "object", "open": "float64", "high": "float64",
+            "low": "float64", "close": "float64", "volume": "float64",
+            "open_interest": "float64",
+        },
     }
 
     for key, dim in registry.all.items():

@@ -35,6 +35,15 @@ class AssetAdapter(ABC):
     label: str = ""            # "A股股票", "公募基金", etc.
     description: str = ""
 
+    # P2-13: Data provenance and asset-class metadata
+    DATA_SOURCE: str = "unknown"       # real | proxy | placeholder | cached
+    DATA_SOURCE_DETAIL: str = ""
+    TRADING_CALENDAR: str = ""         # SSE | CFFEX | SHFE | DCE | 24x7
+    CURRENCY: str = "CNY"
+    CONTRACT_MULTIPLIER: float = 1.0
+    ROLLOVER_RULE: str = ""            # continuous_main | expiry_based
+    FX_PAIR: str = ""                  # USD/CNY for cross-border assets
+
     def __init__(self, store_root: Path | str | None = None):
         """
         Args:
@@ -75,6 +84,21 @@ class AssetAdapter(ABC):
         Returns empty dict if unknown.
         """
         ...
+
+    # ── Data provenance (P2-13) ──
+
+    def get_data_source(self, symbol: str = "") -> dict:
+        """Return data provenance info: real/proxy/placeholder + detail + asset metadata.
+        Subclasses with per-symbol variation can override with symbol-dependent logic."""
+        return {
+            "data_source": self.DATA_SOURCE,
+            "detail": self.DATA_SOURCE_DETAIL,
+            "currency": self.CURRENCY,
+            "multiplier": self.CONTRACT_MULTIPLIER,
+            "calendar": self.TRADING_CALENDAR,
+            "rollover": self.ROLLOVER_RULE,
+            "fx_pair": self.FX_PAIR,
+        }
 
     # ── Optional extensions ──
 

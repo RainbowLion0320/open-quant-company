@@ -61,10 +61,30 @@ class FuturesAsset(AssetAdapter):
     asset_type: str = "futures"
     label: str = "期货"
     description: str = "股指/国债/商品主力连续合约"
+    DATA_SOURCE: str = "real"
+    DATA_SOURCE_DETAIL: str = "AKShare futures_main_sina (主力连续合约, 日频)"
+    TRADING_CALENDAR: str = "CFFEX/SHFE/DCE"
+    ROLLOVER_RULE: str = "continuous_main"
+    # Contract multipliers for margin and PnL calculation
+    CONTRACT_MULTIPLIER: float = 1.0  # per-symbol; use get_metadata() for specific
+    _MULTIPLIERS: dict = {
+        "IF": 300, "IC": 200, "IH": 300, "IM": 200,  # equity index
+        "T": 10000, "TF": 10000, "TS": 20000,         # government bond
+        "RB": 10, "AU": 1000, "CU": 5, "SC": 1000,    # commodity
+    }
 
     def __init__(self, store_root: Path | str | None = None):
         super().__init__(store_root)
         self._universe = list(FUTURES_UNIVERSE)
+
+    def get_data_source(self, symbol: str = "") -> dict:
+        """Override: per-symbol contract multiplier."""
+        base = super().get_data_source(symbol)
+        m = self._MULTIPLIERS.get(symbol)
+        if m:
+            base["multiplier"] = m
+            base["detail"] = f"{base['detail']} (乘数={m})"
+        return base
 
     def fetch_daily(
         self, symbol: str, start_date: str = "20180101", end_date: str = "",

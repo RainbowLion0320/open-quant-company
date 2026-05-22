@@ -77,7 +77,7 @@
       <footer class="market-ticker">
         <span class="ticker-label">MARKET TICKER</span>
         <span v-for="item in ticker" :key="item.symbol" class="ticker-item">
-          <em>{{ item.symbol }}</em>
+          <em>{{ item.symbol }}<b v-if="item.data_source === 'proxy'" class="ticker-proxy">p</b></em>
           <strong :style="{ color: item.change >= 0 ? 'var(--positive)' : 'var(--negative)' }">{{ item.value }}</strong>
           <small :style="{ color: item.change >= 0 ? 'var(--positive)' : 'var(--negative)' }">{{ item.change >= 0 ? '+' : '' }}{{ item.change.toFixed(2) }}%</small>
         </span>
@@ -122,6 +122,7 @@ const ticker = computed(() => (marketMeta.value.multi_asset || []).map((item: an
   symbol: item.symbol,
   value: item.value == null ? "—" : `${Number(item.value).toFixed(item.unit === "%" ? 3 : 2)}${item.unit || ""}`,
   change: (item.change_pct || 0) * 100,
+  data_source: item.data_source || "real",
 })));
 
 const regimeLabel = computed(() => {

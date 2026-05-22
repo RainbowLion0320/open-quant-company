@@ -63,11 +63,29 @@ class BondAsset(AssetAdapter):
     asset_type: str = "bond"
     label: str = "债券"
     description: str = "国债收益率曲线 + 可转债"
+    DATA_SOURCE: str = "proxy"
+    DATA_SOURCE_DETAIL: str = "国债收益率 → 合成价格 (-duration * yield_change); 可转债为实时快照"
+    TRADING_CALENDAR: str = "SSE"
+
+    # Per-symbol source classification
+    _PROXY_SYMBOLS = {"CN2Y", "CN5Y", "CN10Y", "CN30Y"}  # yield-based proxy
+    _REAL_CONVERTIBLES = {"110059", "113044", "110079", "113050", "127018"}  # real snapshots
 
     def __init__(self, store_root: Path | str | None = None):
         super().__init__(store_root)
         self._universe = list(BOND_UNIVERSE)
         self._yield_cache: Optional[pd.DataFrame] = None
+
+    def get_data_source(self, symbol: str = "") -> dict:
+        """Override: per-symbol source — treasury=proxy, convertible=real."""
+        base = super().get_data_source(symbol)
+        if symbol in self._PROXY_SYMBOLS:
+            base["data_source"] = "proxy"
+            base["detail"] = "国债收益率曲线 → 合成价格 (-duration × Δyield)"
+        elif symbol in self._REAL_CONVERTIBLES:
+            base["data_source"] = "real"
+            base["detail"] = "可转债实时快照 (bond_cb_jsl)"
+        return base
 
     def _load_yields(self) -> Optional[pd.DataFrame]:
         """Load full treasury yield curve, cached."""

@@ -93,6 +93,9 @@ class ETFAsset(AssetAdapter):
     asset_type: str = "etf"
     label: str = "ETF基金"
     description: str = "A股场内ETF (宽基/行业/债券/黄金/跨境)"
+    DATA_SOURCE: str = "real"
+    DATA_SOURCE_DETAIL: str = "AKShare fund_etf_hist_em (日线OHLCV) + fund_etf_spot_em (实时行情)"
+    TRADING_CALENDAR: str = "SSE"
 
     def __init__(self, store_root: Path | str | None = None):
         super().__init__(store_root)

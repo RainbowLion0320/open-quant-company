@@ -31,6 +31,10 @@ class CryptoAsset(AssetAdapter):
     asset_type: str = "crypto"
     label: str = "加密货币"
     description: str = "BTC/ETH现货 (CCXT接入, 待实现)"
+    DATA_SOURCE: str = "placeholder"
+    DATA_SOURCE_DETAIL: str = "CCXT integration pending; fetch_daily returns None"
+    TRADING_CALENDAR: str = "24x7"
+    CURRENCY: str = "USDT"
 
     def __init__(self, store_root: Path):
         super().__init__(store_root)
