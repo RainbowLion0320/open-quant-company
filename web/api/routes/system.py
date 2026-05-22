@@ -592,3 +592,134 @@ async def get_run(run_id: str):
     if run is None:
         raise DataNotFoundError("run", run_id)
     return run
+
+
+# ── P1-7: Order Lifecycle ──
+
+
+@router.get("/orders")
+async def get_orders(
+    date: str = Query(default="", description="Filter by date YYYY-MM-DD"),
+    symbol: str = Query(default="", description="Filter by stock code"),
+    status: str = Query(default="", description="Filter by status: pending/partial_filled/filled/rejected/cancelled/expired"),
+    limit: int = Query(default=50, ge=1, le=500),
+):
+    """查询订单生命周期事件 — 从 EventLedger 读取。
+
+    支持按日期、股票代码、状态过滤。
+    返回订单列表，每个订单包含完整的状态变更历史。
+    """
+    from broker.ledger import EventLedger, EventType
+
+    ledger = EventLedger()
+    all_events = ledger.replay()
+
+    if not all_events:
+        return {"orders": [], "total": 0, "status": "ok"}
+
+    # Group events by order_id
+    orders: dict[str, dict] = {}
+    for e in all_events:
+        if date and e.run_date != date:
+            continue
+        if symbol and e.symbol != symbol:
+            continue
+
+        oid = e.order_id
+        if oid not in orders:
+            orders[oid] = {
+                "order_id": oid,
+                "symbol": e.symbol,
+                "strategy": e.strategy,
+                "run_date": e.run_date,
+                "events": [],
+                "current_state": "unknown",
+                "transitions": [],
+            }
+
+        orders[oid]["events"].append({
+            "event_id": e.event_id,
+            "event_type": e.event_type.value,
+            "timestamp": e.timestamp,
+            "sequence": e.sequence,
+            "payload": e.payload,
+        })
+
+        # Track state transitions
+        from_s = e.payload.get("from_state", "")
+        to_s = e.payload.get("to_state", e.event_type.value)
+        if from_s and to_s:
+            orders[oid]["transitions"].append({
+                "timestamp": e.timestamp,
+                "from_state": from_s,
+                "to_state": to_s,
+                "reason": e.payload.get("reason", ""),
+            })
+        orders[oid]["current_state"] = to_s
+
+    # Apply status filter after grouping
+    result = list(orders.values())
+    if status:
+        result = [o for o in result if o["current_state"] == status]
+
+    # Sort by most recent first, limit
+    result.sort(key=lambda o: o.get("run_date", ""), reverse=True)
+    result = result[:limit]
+
+    return {
+        "orders": result,
+        "total": len(result),
+        "status": "ok",
+    }
+
+
+@router.get("/orders/{order_id}/trace")
+async def trace_order(order_id: str):
+    """追溯单个订单的完整生命周期链。
+
+    从订单创建 → 部分成交 → 完全成交 → NAV 快照,
+    每一步都有 event_id、timestamp 和 parent 关联。
+    可以反向追溯到触发该订单的信号。
+    """
+    from broker.ledger import EventLedger
+
+    ledger = EventLedger()
+    trace = ledger.trace_order(order_id)
+
+    if not trace["events"]:
+        from web.api.errors import DataNotFoundError
+        raise DataNotFoundError("order", order_id)
+
+    # Enrich: find related NAV snapshots on the same date
+    order_events = trace["events"]
+    if order_events:
+        run_date = order_events[0].run_date
+        nav_events = ledger.events_by_type(EventType.NAV_SNAPSHOT, limit=200)
+        related_nav = [
+            {"event_id": e.event_id, "timestamp": e.timestamp, "payload": e.payload}
+            for e in nav_events if e.run_date == run_date
+        ]
+    else:
+        related_nav = []
+
+    return {
+        "order_id": order_id,
+        "current_state": trace["current_state"],
+        "transitions": trace["transitions"],
+        "signal_info": trace["signal_info"],
+        "events": [
+            {
+                "event_id": e.event_id,
+                "event_type": e.event_type.value,
+                "timestamp": e.timestamp,
+                "sequence": e.sequence,
+                "parent_event_id": e.parent_event_id,
+                "symbol": e.symbol,
+                "strategy": e.strategy,
+                "payload": e.payload,
+            }
+            for e in order_events
+        ],
+        "related_nav": related_nav,
+        "status": "ok",
+    }

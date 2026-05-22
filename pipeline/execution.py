@@ -6,31 +6,55 @@ Stage 4 of the pipeline. Two execution modes:
   - LiveExecutor (via PaperBroker): submitted to the paper broker
 
 Both share the same target→intent→fill transformation.
+
+P1-7: Unified cost model via AShareExchange. Commission/slippage calculations
+are delegated to the exchange, ensuring backtest and paper trading use the same costs.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
 from pipeline.types import PortfolioTarget, OrderIntent, FillResult, PipelineContext
+from broker.exchange import AShareExchange, Exchange, OrderSide
 
 
 @dataclass
 class ExecutionConfig:
+    """Execution configuration.
+
+    Prefer passing an `exchange` for unified cost model (P1-7).
+    Raw commission_rate/stamp_duty are fallbacks for backward compatibility.
+    """
     commission_rate: float = 0.00081
     stamp_duty: float = 0.0005  # sell only
     lot_size: int = 100
     t_plus_1: bool = True
     today_buys: dict[str, int] | None = None
+    exchange: Exchange | None = None  # P1-7: unified cost model
+
+    def get_exchange(self) -> Exchange:
+        if self.exchange is not None:
+            return self.exchange
+        return AShareExchange(
+            commission=self.commission_rate,
+            stamp_tax=self.stamp_duty,
+            lot_size=self.lot_size,
+        )
 
 
 class ExecutionRouter:
-    """Turn adjusted portfolio targets into order intents and fills."""
+    """Turn adjusted portfolio targets into order intents and fills.
+
+    P1-7: Uses AShareExchange for cost calculation, ensuring consistency
+    between backtest and paper trading.
+    """
 
     def __init__(self, config: ExecutionConfig | None = None):
         self.config = config or ExecutionConfig()
+        self._exchange = self.config.get_exchange()
         self._today_buys: dict[str, int] = {}
 
     def targets_to_intents(
@@ -89,12 +113,18 @@ class ExecutionRouter:
         intents: list[OrderIntent],
         broker=None,
     ) -> list[FillResult]:
-        """Execute order intents and return fills."""
+        """Execute order intents and return fills.
+
+        When broker is provided, delegates to broker.submit_order() and
+        lets the broker handle cost calculation. In backtest mode (no broker),
+        uses the Exchange directly.
+        """
         fills: list[FillResult] = []
         ts = datetime.now().isoformat()
 
         for intent in intents:
             if broker is not None:
+                # Paper/Live mode: delegate to broker (which uses its own exchange)
                 result = broker.submit_order(
                     code=intent.symbol,
                     price=intent.price,
@@ -102,6 +132,8 @@ class ExecutionRouter:
                     side=intent.side,
                 )
                 if result and str(result).startswith("PAPER_"):
+                    order_id = result
+                    intent.order_id = order_id
                     fills.append(FillResult(
                         symbol=intent.symbol,
                         side=intent.side,
@@ -111,6 +143,7 @@ class ExecutionRouter:
                         commission=self._calc_commission(intent),
                         status="filled",
                         timestamp=ts,
+                        order_id=order_id,
                     ))
                     if intent.side == "buy":
                         self._today_buys[intent.symbol] = (
@@ -128,14 +161,18 @@ class ExecutionRouter:
                         timestamp=ts,
                     ))
             else:
-                # Backtest mode: immediate fill at market
+                # Backtest mode: immediate fill at market using unified exchange cost
+                side_enum = OrderSide.BUY if intent.side == "buy" else OrderSide.SELL
+                commission = self._exchange.calc_cost(
+                    intent.price, intent.shares, side_enum
+                )
                 fills.append(FillResult(
                     symbol=intent.symbol,
                     side=intent.side,
                     requested_shares=intent.shares,
                     filled_shares=intent.shares,
                     fill_price=intent.price,
-                    commission=self._calc_commission(intent),
+                    commission=round(commission, 2),
                     status="filled",
                     timestamp=ts,
                 ))
@@ -143,11 +180,9 @@ class ExecutionRouter:
         return fills
 
     def _calc_commission(self, intent: OrderIntent) -> float:
-        amount = intent.price * intent.shares
-        c = amount * self.config.commission_rate
-        if intent.side == "sell":
-            c += amount * self.config.stamp_duty
-        return round(c, 2)
+        """Calculate commission via the unified exchange model."""
+        side = OrderSide.BUY if intent.side == "buy" else OrderSide.SELL
+        return round(self._exchange.calc_cost(intent.price, intent.shares, side), 2)
 
     def end_of_day(self):
         """Reset daily buy tracking."""

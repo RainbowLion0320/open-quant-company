@@ -64,6 +64,8 @@ class OrderIntent:
     max_slippage: float = 0.02
     strategy: str = ""
     target_ref: str = ""  # PortfolioTarget symbol for traceability
+    order_id: str = ""  # assigned by broker on submission (P1-7)
+    event_id: str = ""  # ledger event_id for traceability (P1-7)
 
 
 @dataclass
@@ -80,6 +82,10 @@ class FillResult:
     status: str = "filled"  # "filled" | "partial" | "rejected"
     reject_reason: str = ""
     timestamp: str = ""
+    # P1-7: event sourcing traceability
+    order_id: str = ""
+    event_id: str = ""
+    parent_event_id: str = ""
 
     @property
     def fill_pct(self) -> float:
