@@ -147,6 +147,45 @@ class SignalChange(BaseModel):
     to_signal: str
     score: Optional[float] = None
 
+# ── Regime ──
+
+class RegimeSnapshot(BaseModel):
+    regime: str = "unknown"
+    regime_score: float = 50.0
+    multi_asset: List[Dict[str, Any]] = []
+    freshness: Dict[str, Any] = {}
+    updated: str = ""
+
+# ── 回测 ──
+
+class BacktestOverview(BaseModel):
+    strategies: Dict[str, Dict[str, Any]] = {}
+    bench_return: float = 0.0
+    start: str = ""
+    end: str = ""
+
+class BacktestDetail(BaseModel):
+    total_return: float = 0.0
+    sharpe: float = 0.0
+    max_drawdown: float = 0.0
+    win_rate: float = 0.0
+    trade_count: int = 0
+    equity_curve: List[Dict[str, Any]] = []
+    bench_curve: List[Dict[str, Any]] = []
+
+# ── 策略列表 ──
+
+class StrategyListResponse(BaseModel):
+    strategies: List[Dict[str, Any]] = []
+    registry: List[Dict[str, Any]] = []
+    total: int = 0
+
+class StrategySignalsResponse(BaseModel):
+    strategy: str = ""
+    total: int = 0
+    buys: int = 0
+    signals: List[Dict[str, Any]] = []
+
 # ── 通用 ──
 
 class ErrorResponse(BaseModel):
@@ -158,4 +197,6 @@ class HealthResponse(BaseModel):
     status: str = "ok"
     backend: str = "duckdb"
     data_updated: str = ""
+    stocks_scanned: int = 0
+    strategies: int = 0
     version: str = "2.0.0"

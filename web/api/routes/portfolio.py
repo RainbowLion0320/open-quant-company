@@ -83,7 +83,7 @@ async def get_positions():
 # ── 资金 ──────────────────────────────────────────────────
 
 
-@router.get("/balance")
+@router.get("/balance", response_model=AccountInfo)
 async def get_balance():
     broker = get_broker()
     balance = broker.get_balance()

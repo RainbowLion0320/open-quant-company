@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/stocks", tags=["Stocks"])
 
 # ── 个股全景 ──────────────────────────────────────────────
 
-@router.get("/{code}")
+@router.get("/{code}", response_model=StockResponse)
 async def get_stock_detail(code: str):
     """个股全景视图: 基本信息 + 财务 + 巴菲特结果 + 策略信号 + K线"""
     from data.symbols import SYMBOL_NAME, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR

@@ -3,6 +3,7 @@
 import json
 from fastapi import APIRouter
 from pathlib import Path
+from web.api.errors import DataNotFoundError, InvalidParameterError
 
 router = APIRouter(prefix="/api/backtest", tags=["Backtest"])
 
@@ -41,7 +42,7 @@ async def backtest_overview():
     if d:
         return {"strategies": {"multifactor": _extract(d)}, "bench_return": d.get("bench_return", 0)}
 
-    return {"error": "No backtest results. Run backtest/run_all_strategies.py first."}
+    raise DataNotFoundError("backtest results", "run backtest/run_all_strategies.py first")
 
 
 @router.get("/{strategy}")
@@ -50,12 +51,12 @@ async def strategy_detail(strategy: str):
     from data.registry import list_strategy_names
     valid = list_strategy_names()
     if strategy not in valid:
-        return {"error": f"Unknown strategy: {strategy}"}
+        raise InvalidParameterError("strategy", strategy, f"Choose from: {', '.join(sorted(valid))}")
 
     path = _DATA / f"backtest_{strategy}.pkl"
     data = _safe_load(path)
     if not data:
-        return {"error": f"No backtest results for {strategy}"}
+        raise DataNotFoundError("backtest results", strategy)
 
     daily = data.get("daily_returns")
     bench = data.get("bench_returns")

@@ -1,7 +1,7 @@
 """策略中心路由 — 策略列表 / 信号 / 异步运行 / 进度"""
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from web.api.models import StrategyRunRequest, StrategyRunResponse, JobStatus
+from web.api.models import StrategyRunRequest, StrategyRunResponse, JobStatus, StrategyListResponse, StrategySignalsResponse
 from web.api.errors import DataNotFoundError, InvalidParameterError, StrategyRunError
 
 router = APIRouter(prefix="/api/strategies", tags=["Strategies"])
@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/strategies", tags=["Strategies"])
 
 # ── 策略列表 ──────────────────────────────────────────────
 
-@router.get("")
+@router.get("", response_model=StrategyListResponse)
 async def list_strategies():
     """列出所有已计算策略及统计 + 策略注册表元数据"""
     from data.results_db import list_strategies as db_list
@@ -58,7 +58,7 @@ async def get_job_status(job_id: str):
 
 # ── 策略信号 ──────────────────────────────────────────────
 
-@router.get("/{name}")
+@router.get("/{name}", response_model=StrategySignalsResponse)
 async def get_strategy_signals(
     name: str,
     sort: str = Query(default="score", description="score / symbol / name"),

@@ -12,6 +12,7 @@ import sqlite3
 import psutil
 
 from data.datahub import get_datahub
+from web.api.errors import InvalidParameterError
 
 router = APIRouter(prefix="/api/system", tags=["System"])
 
@@ -303,12 +304,12 @@ def _run_repair(table: str, job_id: str) -> None:
 async def repair_table(table_name: str):
     """触发单表数据修复 (后台异步)"""
     if table_name not in _repairable_tables():
-        return {"status": "error", "message": f"Table '{table_name}' is not repairable"}
+        raise InvalidParameterError("table_name", table_name, "Not a repairable table")
 
     with _repair_lock:
         for jid, info in list(_repair_jobs.items()):
             if info.get("table") == table_name and info["status"] == "running":
-                return {"status": "error", "message": f"Repair already in progress for {table_name}", "job_id": jid}
+                return {"status": "conflict", "message": f"Repair already in progress for {table_name}", "job_id": jid}
 
         _cleanup_old_repair_jobs()
         job_id = _uuid.uuid4().hex[:12]
