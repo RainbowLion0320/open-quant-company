@@ -13,14 +13,43 @@ router = APIRouter(prefix="/api/strategies", tags=["Strategies"])
 async def list_strategies():
     """列出所有已计算策略及统计 + 策略注册表元数据"""
     from data.results_db import list_strategies as db_list
-    from data.registry import get_enabled_strategies
+    from data.registry import get_enabled_strategies, ALLOWED_STATUSES
 
     strategies = db_list()
     registry = get_enabled_strategies()
+
+    # Enrich with status metadata for frontend lifecycle display
+    for s in registry:
+        st = s.get("status", "candidate")
+        s["status_rank"] = list(ALLOWED_STATUSES).index(st) if st in ALLOWED_STATUSES else 0
+
     return {
         "strategies": strategies,
-        "registry": registry,  # 前端动态渲染用
+        "registry": registry,
         "total": len(strategies),
+        "statuses": list(ALLOWED_STATUSES),
+    }
+
+
+@router.get("/statuses")
+async def get_strategy_statuses():
+    """所有策略的当前生命周期状态."""
+    from data.registry import get_enabled_strategies, status_label, ALLOWED_STATUSES
+    registry = get_enabled_strategies()
+    return {
+        "strategies": [
+            {
+                "name": s["name"],
+                "label": s["label"],
+                "status": s.get("status", "candidate"),
+                "status_label": status_label(s.get("status", "candidate")),
+                "color": s["color"],
+            }
+            for s in registry
+        ],
+        "statuses": list(ALLOWED_STATUSES),
+        "status_labels": {s: status_label(s) for s in ALLOWED_STATUSES},
+        "status": "ok",
     }
 
 

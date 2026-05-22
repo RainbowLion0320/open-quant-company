@@ -25,7 +25,10 @@
         <div class="flex items-center gap-3">
           <div class="w-2 h-2 rounded-full" :style="{ background: colorFor(s.name), boxShadow: `0 0 6px ${colorFor(s.name)}` }"></div>
           <div>
-            <h2 class="text-sm font-semibold" style="color:var(--text-primary)">{{ s.label }}</h2>
+            <h2 class="text-sm font-semibold" style="color:var(--text-primary)">
+              {{ s.label }}
+              <span :class="['status-badge', `status-${statusFor(s.name)}`]">{{ statusLabelFor(s.name) }}</span>
+            </h2>
             <div class="text-[11px] mt-0.5" style="color:var(--text-disabled)">
               {{ s.total }} 只扫描 · {{ s.buys }} 只买入
               <span v-if="s.last_computed" class="ml-3">updated {{ s.last_computed?.slice(0, 16) }}</span>
@@ -85,11 +88,24 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useStrategyStore } from "../stores";
+import { api } from "../api";
 
 const store = useStrategyStore();
 const currentStrategy = ref("");
 const signals = ref<any[]>([]);
 const loaded = ref(false);
+const strategyStatuses = ref<Record<string, string>>({});
+
+const STATUS_LABELS: Record<string, string> = {
+  candidate: "候选",
+  validated: "已验证",
+  paper: "模拟盘",
+  production: "生产",
+  retired: "已退役",
+};
+
+function statusFor(name: string) { return strategyStatuses.value[name] || "candidate"; }
+function statusLabelFor(name: string) { return STATUS_LABELS[statusFor(name)] || statusFor(name); }
 
 const strategyColors: Record<string, string> = {
   buffett: "#00d4ff",
@@ -109,8 +125,19 @@ async function toggleSignals(name: string) {
 function runAll() { store.run("all"); }
 function runSingle(name: string) { store.run(name); }
 
+async function loadStatuses() {
+  try {
+    const data = await api.strategyStatuses();
+    const map: Record<string, string> = {};
+    for (const s of data.strategies) {
+      map[s.name] = s.status;
+    }
+    strategyStatuses.value = map;
+  } catch {}
+}
+
 onMounted(async () => {
-  try { await store.fetchList(); }
+  try { await Promise.all([store.fetchList(), loadStatuses()]); }
   finally { loaded.value = true; }
 });
 </script>

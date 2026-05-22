@@ -377,71 +377,140 @@ def get_feature_importance_hints() -> Optional[Dict[str, float]]:
 
 
 # ══════════════════════════════════════════════════════════
-# 6. 自注入库 — 自动写入 alpha_factors()
+# 6. 候选因子池 — P2-12: LLM 因子门禁
+#
+# LLM 生成的因子不再直接写入 expression.py，
+# 而是进入 config/candidate_factors.yaml 候选池。
+# 回测验证通过后, 手动调用 promote_candidate_factor() 晋级。
 # ══════════════════════════════════════════════════════════
+
+CANDIDATE_POOL_PATH = Path(__file__).resolve().parent.parent / "config" / "candidate_factors.yaml"
 
 AUTO_REGISTER_START = "# ── LLM 自动注册因子 — AUTO-REGISTER START (do not edit manually) ──"
 AUTO_REGISTER_END = "# ── AUTO-REGISTER END ──"
 
 
-def auto_register_factors(accepted: List[FactorCandidate]) -> bool:
+def save_to_candidate_pool(accepted: List[FactorCandidate]) -> bool:
     """
-    Automatically insert accepted factors into signals/expression.py::alpha_factors().
+    Save LLM-discovered factors to the candidate pool (config/candidate_factors.yaml).
 
-    Finds the AUTO-REGISTER block and replaces/adds factor definitions.
-    Creates the block if it doesn't exist.
+    Candidates must pass OOS validation before being promoted to expression.py.
+    This prevents unvalidated factors from entering production strategy scans.
     """
+    # Load existing pool
+    existing: dict[str, dict] = {}
+    if CANDIDATE_POOL_PATH.exists():
+        import yaml as _yaml
+        with open(CANDIDATE_POOL_PATH) as f:
+            existing = _yaml.safe_load(f) or {}
+
+    pool = existing.get("candidates", {}) if isinstance(existing, dict) else {}
+
+    added = 0
+    for c in accepted:
+        if c.name in pool:
+            continue
+        pool[c.name] = {
+            "formula": c.formula,
+            "ic": c.ic,
+            "icir": c.icir,
+            "oos_ic": c.oos_ic,
+            "passed_oos": c.passed_oos,
+            "status": "candidate",
+            "discovered_at": datetime.now().isoformat(),
+        }
+        added += 1
+
+    if added == 0:
+        print("  (all factors already in candidate pool)")
+        return True
+
+    import yaml as _yaml
+    CANDIDATE_POOL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(CANDIDATE_POOL_PATH, "w") as f:
+        _yaml.dump({"candidates": pool}, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+    print(f"  ✅ Saved {added} factors to candidate pool: {CANDIDATE_POOL_PATH}")
+    print(f"  📋 Run promote_candidate_factor('<name>') to promote after validation.")
+    return True
+
+
+def list_candidate_factors(status: str = "") -> dict[str, dict]:
+    """List factors in the candidate pool, optionally filtered by status."""
+    if not CANDIDATE_POOL_PATH.exists():
+        return {}
+    import yaml as _yaml
+    with open(CANDIDATE_POOL_PATH) as f:
+        data = _yaml.safe_load(f) or {}
+    pool = data.get("candidates", {})
+    if status:
+        return {k: v for k, v in pool.items() if v.get("status") == status}
+    return pool
+
+
+def promote_candidate_factor(name: str) -> bool:
+    """
+    Promote a candidate factor from the pool into expression.py.
+    After promotion, the factor status changes to 'promoted' in the pool.
+
+    Returns True on success, False if factor not found or already promoted.
+    """
+    import yaml as _yaml
+
+    pool = list_candidate_factors()
+    if name not in pool:
+        print(f"  ✗ Factor '{name}' not found in candidate pool.")
+        return False
+    if pool[name].get("status") == "promoted":
+        print(f"  ✗ Factor '{name}' is already promoted.")
+        return False
+
+    factor = pool[name]
+    dsl = _formula_to_dsl(factor["formula"], name)
+
     expr_path = Path(__file__).resolve().parent.parent / "signals" / "expression.py"
     content = expr_path.read_text()
 
-    # Build factor code
-    factor_lines = []
-    for c in accepted:
-        # Convert formula to Factor DSL expression
-        dsl = _formula_to_dsl(c.formula, c.name)
-        factor_lines.append(f'        "{c.name}": {dsl},')
-    factor_block = "\n".join(factor_lines)
+    factor_line = f'        "{name}": {dsl},'
 
     if AUTO_REGISTER_START in content:
-        # Replace existing block
         start_idx = content.index(AUTO_REGISTER_START)
-        end_idx = content.index(AUTO_REGISTER_END, start_idx) + len(AUTO_REGISTER_END)
-
-        # Merge with existing factors in block
+        end_idx = content.index(AUTO_REGISTER_END, start_idx)
         old_block = content[start_idx + len(AUTO_REGISTER_START):content.index(AUTO_REGISTER_END, start_idx)]
-        existing_names = set(re.findall(r'"(\w+)"\s*:', old_block))
 
-        new_lines = []
-        for c in accepted:
-            if c.name not in existing_names:
-                dsl = _formula_to_dsl(c.formula, c.name)
-                new_lines.append(f'        "{c.name}": {dsl},')
-
-        if not new_lines:
-            print("  (all factors already registered)")
-            return True
-
-        # Extract existing factor lines
-        existing_factor_lines = [l for l in old_block.split("\n") if l.strip().startswith('"')]
-        all_lines = existing_factor_lines + new_lines
-        new_block = AUTO_REGISTER_START + "\n" + "\n".join(all_lines) + "\n        " + AUTO_REGISTER_END
+        existing_lines = [l for l in old_block.split("\n") if l.strip().startswith('"')]
+        existing_lines.append(factor_line)
+        new_block = AUTO_REGISTER_START + "\n" + "\n".join(existing_lines) + "\n        " + AUTO_REGISTER_END
 
         content = content[:start_idx] + new_block + content[end_idx:]
     else:
-        # Create new block before "return factors"
         block = (
             f"\n        {AUTO_REGISTER_START}\n"
-            f"{factor_block}\n"
+            f"{factor_line}\n"
             f"        {AUTO_REGISTER_END}\n"
         )
-        content = content.replace(
-            "    return factors",
-            block + "    return factors"
-        )
+        content = content.replace("    return factors", block + "    return factors")
 
     expr_path.write_text(content)
-    print(f"  ✅ Auto-registered {len(accepted)} factors in signals/expression.py")
+
+    # Mark as promoted in pool
+    pool[name]["status"] = "promoted"
+    pool[name]["promoted_at"] = datetime.now().isoformat()
+    CANDIDATE_POOL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(CANDIDATE_POOL_PATH, "w") as f:
+        _yaml.dump({"candidates": pool}, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+    print(f"  ✅ Promoted '{name}' to expression.py")
     return True
+
+
+def auto_register_factors(accepted: List[FactorCandidate]) -> bool:
+    """
+    [DEPRECATED — P2-12] Redirects to candidate pool instead of direct registration.
+    Use save_to_candidate_pool() + promote_candidate_factor() instead.
+    """
+    print("  ⚠️  auto_register_factors is deprecated. Saving to candidate pool instead.")
+    return save_to_candidate_pool(accepted)
 
 
 def _formula_to_dsl(formula: str, name: str) -> str:
@@ -489,12 +558,12 @@ def run_research_loop(
     Round 1: Generate → OOS evaluate → select
     Round 2-N: Load model importance → feedback to LLM → generate → evaluate
     """
-    print(f"🧪 LLM Factor Research Engine v4.2")
+    print(f"🧪 LLM Factor Research Engine v4.3 (P2-12: candidate pool gate)")
     print(f"   Candidates/round: {n_candidates}")
     print(f"   IC threshold: {ic_threshold}")
     print(f"   Max rounds: {max_rounds}")
     print(f"   Model: deepseek-v4-pro")
-    print(f"   Auto-register: {auto_register}")
+    print(f"   Auto-save to candidate pool: {auto_register}")
     print(f"{'='*60}")
 
     # Load existing factors
@@ -555,9 +624,9 @@ def run_research_loop(
         # Update existing list for next round
         existing.extend([c.name for c in round_accepted])
 
-        # Auto-register after each round if requested
+        # Save to candidate pool after each round if requested
         if auto_register and round_accepted:
-            auto_register_factors(round_accepted)
+            save_to_candidate_pool(round_accepted)
 
         # Early stop: no new factors
         if not round_accepted:

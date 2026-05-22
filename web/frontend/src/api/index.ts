@@ -158,6 +158,23 @@ export interface StrategyInfo {
 export interface StrategiesResponse {
   strategies: StrategyInfo[];
   registry?: StrategyMeta[];
+  total?: number;
+  statuses?: string[];
+}
+
+export interface StrategyStatusItem {
+  name: string;
+  label: string;
+  status: string;
+  status_label: string;
+  color: string;
+}
+
+export interface StrategyStatusesResponse {
+  strategies: StrategyStatusItem[];
+  statuses: string[];
+  status_labels: Record<string, string>;
+  status: string;
 }
 
 export interface StrategyDetailResponse {
@@ -258,6 +275,7 @@ export const api = {
 
   // Strategies
   strategies: () => get<StrategiesResponse>("/api/strategies"),
+  strategyStatuses: () => get<StrategyStatusesResponse>("/api/strategies/statuses"),
   strategyDetail: (name: string) => get<StrategyDetailResponse>(`/api/strategies/${name}`),
   strategyRun: (strategy: string, limit = 0, params?: any) =>
     post<RunResponse>("/api/strategies/run", { strategy, limit, params }),

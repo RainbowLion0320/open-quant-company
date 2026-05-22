@@ -329,6 +329,7 @@ strategies:
     label: 巴菲特价值精选
     runner: scripts.compute_signals:compute_buffett
     signal_name: buffett
+    status: production
   cybernetic:
     color: '#f59e0b'
     config_key: cybernetics
@@ -336,6 +337,7 @@ strategies:
     label: 控制论自适应
     runner: scripts.compute_signals:compute_cybernetic
     signal_name: cybernetic
+    status: production
   multifactor:
     color: '#10b981'
     config_key: signals.multifactor
@@ -343,6 +345,7 @@ strategies:
     label: 多因子月度调仓
     runner: scripts.compute_signals:compute_multifactor
     signal_name: multifactor
+    status: production
   ml_lgbm:
     color: '#8b5cf6'
     config_key: ml
@@ -350,6 +353,7 @@ strategies:
     label: LightGBM ML
     runner: signals.ml_signals:compute_ml_signals
     signal_name: ml_lgbm
+    status: production
 trading:
   commission:
     brokerage: 0.00025

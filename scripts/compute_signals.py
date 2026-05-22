@@ -327,7 +327,7 @@ def compute_cybernetic(limit: int = 0) -> list[dict]:
 
 
 def main():
-    from data.registry import list_strategy_names
+    from data.registry import list_strategy_names, get_status, can_run_production, status_label
     from data.strategy_plugins import run_registered_strategies
 
     parser = argparse.ArgumentParser()
@@ -335,10 +335,20 @@ def main():
     parser.add_argument('--strategy', default='all', choices=['all'] + all_names)
     parser.add_argument('--limit', type=int, default=0, help='Limit to N stocks (0=all)')
     parser.add_argument('--skip-quality-gate', action='store_true', help='Skip pre-scan data freshness check')
+    parser.add_argument('--allow-candidate', action='store_true', help='Allow candidate/validated strategies (dev/testing)')
     args = parser.parse_args()
 
     start = time.time()
     print(f"Compute signals: strategy={args.strategy}")
+
+    # P2-12: Status gate — only production strategies produce production signals
+    if args.strategy != "all" and not args.allow_candidate:
+        st = get_status(args.strategy)
+        if not can_run_production(args.strategy):
+            print(f"  ⛔ Strategy '{args.strategy}' status={st} ({status_label(st)}) — not production. Skipping.")
+            print(f"  Use --allow-candidate to bypass this gate for development/testing.")
+            return
+        print(f"  ✅ Strategy '{args.strategy}' status={st} ({status_label(st)}) — production ✓")
 
     # Pre-scan data quality gate
     if not args.skip_quality_gate:
