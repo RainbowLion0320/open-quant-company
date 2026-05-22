@@ -552,6 +552,29 @@ async def service_status():
     }
 
 
+@router.get("/quality-gate")
+async def quality_gate(dimension: str = Query(default="", description="Check a single dimension (empty = all critical)")):
+    """数据质量门禁 — freshness SLA / completeness / consistency."""
+    from data.quality import DataQualityGate
+    gate = DataQualityGate()
+    if dimension:
+        report = gate.check_dimension(dimension)
+        return {
+            "dimension": report.dimension,
+            "label": report.label,
+            "status": report.status,
+            "health_score": report.health_score,
+            "freshness_days": report.freshness_days,
+            "sla_days": report.sla_days,
+            "row_count": report.row_count,
+            "null_pct": report.null_pct,
+            "date_min": report.date_min,
+            "date_max": report.date_max,
+            "issues": report.issues,
+        }
+    return gate.summary_report()
+
+
 @router.get("/runs")
 async def list_runs(limit: int = Query(default=20, ge=1, le=100), run_type: str = Query(default="", description="workflow / tournament / train")):
     """列出最近的实验 runs (workflow / tournament / train)"""

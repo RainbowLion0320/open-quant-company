@@ -334,14 +334,30 @@ def main():
     all_names = list_strategy_names()
     parser.add_argument('--strategy', default='all', choices=['all'] + all_names)
     parser.add_argument('--limit', type=int, default=0, help='Limit to N stocks (0=all)')
+    parser.add_argument('--skip-quality-gate', action='store_true', help='Skip pre-scan data freshness check')
     args = parser.parse_args()
 
     start = time.time()
     print(f"Compute signals: strategy={args.strategy}")
 
+    # Pre-scan data quality gate
+    if not args.skip_quality_gate:
+        from data.quality import pre_scan_gate
+        ok, reports = pre_scan_gate()
+        stale_dims = [r for r in reports if r.status in ("stale", "missing", "error")]
+        if stale_dims:
+            print(f"\n  Data quality gate WARNING — {len(stale_dims)} dimension(s) not fresh:")
+            for r in stale_dims:
+                print(f"    {r.dimension} [{r.status}] score={r.health_score} freshness={r.freshness_days}d SLA={r.sla_days}d")
+            print(f"  Scan will proceed with degraded data confidence.\n")
+        else:
+            print(f"  Data quality gate: {len(reports)} dimensions fresh ✓\n")
+    else:
+        print("  Data quality gate: skipped (--skip-quality-gate)\n")
+
     from data.results_db import init
     from data.db import reset_db
-    reset_db()  # 清除可能持有的只读连接，获取写锁
+    reset_db()
     init()
 
     run_registered_strategies(args.strategy, limit=args.limit)
