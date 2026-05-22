@@ -27,6 +27,7 @@ lint:
 # CI 完整检查
 ci: test web-build
 	@echo "CI 通过: 测试 + 前端构建"
+	@$(PYTHON) scripts/lookahead_check.py --quick --n 5 2>/dev/null || echo "  (lookahead check skipped — no data)"
 
 # 清理 Python 字节码缓存
 pyc-clean:
