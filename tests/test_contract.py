@@ -283,8 +283,14 @@ class TestDeriveContracts:
         contracts = derive_contracts_from_registry()
         assert "financial_summary" in contracts
         c = contracts["financial_summary"]
-        assert "roe" in c.columns
-        assert "eps" in c.columns
+        assert "报告期" in c.columns
+        assert "净资产收益率" in c.columns
+        assert "基本每股收益" in c.columns
+
+    def test_derive_trade_date_primary_key(self):
+        contracts = derive_contracts_from_registry()
+        c = contracts["valuation_daily"]
+        assert c.primary_key == ["ts_code", "trade_date"]
 
     def test_derive_returns_empty_for_unknown_dimension(self):
         contracts = derive_contracts_from_registry()

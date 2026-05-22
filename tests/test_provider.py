@@ -28,6 +28,7 @@ class TestAKShareAdapter:
     def test_can_serve_known_dimensions(self):
         adapter = AKShareAdapter()
         assert adapter.can_serve("ohlcv_daily")
+        assert adapter.can_serve("financial_summary")
         assert adapter.can_serve("macro_pmi")
         assert adapter.can_serve("bond_treasury_yields")
 
@@ -45,12 +46,46 @@ class TestAKShareAdapter:
         assert health.provider == "akshare"
         assert health.status in ("ok", "error", "degraded")
 
+    def test_financial_summary_dispatch_uses_existing_function(self, monkeypatch):
+        import pandas as pd
+        import data.financials as financials
+
+        monkeypatch.setattr(
+            financials,
+            "get_financial_summary",
+            lambda symbol, **kwargs: pd.DataFrame({"symbol": [symbol], "roe": [0.12]}),
+        )
+
+        df = AKShareAdapter().fetch("financial_summary", symbol="000001")
+        assert df is not None
+        assert df.iloc[0]["symbol"] == "000001"
+
+    def test_macro_dispatch_uses_fetch_indicator(self, monkeypatch):
+        import pandas as pd
+        from data.fetchers.macro import MacroFetcher
+
+        calls = []
+
+        def fake_fetch(self, name, **kwargs):
+            calls.append(name)
+            return pd.DataFrame({"date": ["2026-05-01"], "value": [50.1]})
+
+        monkeypatch.setattr(MacroFetcher, "fetch_indicator", fake_fetch)
+
+        df = AKShareAdapter().fetch("macro_pmi")
+        assert calls == ["pmi"]
+        assert df is not None
+        assert df.iloc[0]["value"] == 50.1
+
 
 class TestTushareAdapter:
     def test_can_serve_known_dimensions(self):
         adapter = TushareAdapter()
         assert adapter.can_serve("fina_indicator")
+        assert adapter.can_serve("adj_factor")
         assert adapter.can_serve("daily_basic")
+        assert adapter.can_serve("valuation_daily")
+        assert adapter.can_serve("moneyflow_tushare_daily")
 
     def test_cannot_serve_unknown_dimension(self):
         adapter = TushareAdapter()
@@ -172,3 +207,9 @@ class TestProviderRegistry:
         # Should include akshare or tushare
         names = [r["provider"] for r in report]
         assert "akshare" in names or "tushare" in names
+
+    def test_macro_dimensions_use_macro_fetcher_override(self):
+        reset_providers()
+        provider = get_provider(source="tushare_free", dimension="macro_pmi")
+        assert isinstance(provider, AKShareAdapter)
+        assert provider.can_serve("macro_pmi")

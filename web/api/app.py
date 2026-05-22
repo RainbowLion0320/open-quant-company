@@ -84,7 +84,9 @@ def create_app() -> FastAPI:
     # 静态文件 (前端)
     static_dir = Path(__file__).resolve().parent.parent / "frontend" / "dist"
     if static_dir.exists():
-        app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
+        assets_dir = static_dir / "assets"
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
         
         # SPA fallback: 非 API 路径回退到 index.html
         from fastapi.responses import FileResponse

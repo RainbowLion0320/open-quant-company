@@ -330,10 +330,11 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
             "low": "float64", "close": "float64", "volume": "float64",
         },
         "financial_summary": {
-            "symbol": "object", "date": "object", "report_date": "object",
-            "revenue": "float64", "net_profit": "float64",
-            "total_assets": "float64", "total_equity": "float64",
-            "roe": "float64", "eps": "float64", "bps": "float64",
+            "报告期": "object", "净利润": "object", "净利润同比增长率": "object",
+            "营业总收入": "object", "营业总收入同比增长率": "object",
+            "基本每股收益": "object", "每股净资产": "object",
+            "销售净利率": "object", "销售毛利率": "object",
+            "净资产收益率": "object",
         },
         "fina_indicator": {
             "ts_code": "object", "ann_date": "object", "end_date": "object",
@@ -342,20 +343,25 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
             "netprofit_margin": "float64", "debt_to_assets": "float64",
         },
         "valuation_daily": {
-            "date": "object", "pe": "float64", "pb": "float64", "ps": "float64",
-            "total_mv": "float64", "circ_mv": "float64",
+            "ts_code": "object", "trade_date": "datetime64[ns]", "close": "float64",
+            "pe": "float64", "pe_ttm": "float64", "pb": "float64",
+            "ps": "float64", "ps_ttm": "float64", "total_mv": "float64",
+            "circ_mv": "float64",
         },
         "adj_factor": {
-            "date": "object", "adj_factor": "float64",
+            "ts_code": "object", "trade_date": "object", "adj_factor": "float64",
         },
         "holder_number": {
             "ts_code": "object", "ann_date": "object", "end_date": "object",
             "holder_num": "float64",
         },
         "moneyflow_daily": {
-            "date": "object", "main_net_inflow": "float64",
-            "super_large_net_inflow": "float64", "large_net_inflow": "float64",
-            "medium_net_inflow": "float64", "small_net_inflow": "float64",
+            "日期": "datetime64[ns]", "收盘价": "float64", "涨跌幅": "float64",
+            "主力净流入-净额": "float64", "主力净流入-净占比": "float64",
+            "超大单净流入-净额": "float64", "超大单净流入-净占比": "float64",
+            "大单净流入-净额": "float64", "大单净流入-净占比": "float64",
+            "中单净流入-净额": "float64", "中单净流入-净占比": "float64",
+            "小单净流入-净额": "float64", "小单净流入-净占比": "float64",
         },
         # P2-13: Multi-asset dimensions
         "fund_daily": {
@@ -384,10 +390,15 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
 
         columns = _known_columns.get(key, {})
         pk = []
-        if "date" in columns or "trade_date" in columns:
-            pk = ["symbol", "date"] if "symbol" in columns else ["date"]
+        date_key = next(
+            (c for c in ("date", "trade_date", "ann_date", "end_date", "报告期", "日期") if c in columns),
+            "",
+        )
+        symbol_key = next((c for c in ("symbol", "ts_code") if c in columns), "")
+        if date_key:
+            pk = [symbol_key, date_key] if symbol_key else [date_key]
             if dim.freq in ("monthly", "quarterly") and "report_date" in columns:
-                pk = ["symbol", "report_date"] if "symbol" in columns else ["report_date"]
+                pk = [symbol_key, "report_date"] if symbol_key else ["report_date"]
 
         contracts[key] = DataContract(
             dimension=key,

@@ -16,6 +16,7 @@ import json
 import hashlib
 import subprocess
 import traceback
+import uuid
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Any
@@ -63,7 +64,7 @@ def _manifest_snapshot() -> Dict[str, str]:
 
 def _run_id(prefix: str = "run") -> str:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"{prefix}_{ts}"
+    return f"{prefix}_{ts}_{uuid.uuid4().hex[:6]}"
 
 
 def _store() -> Path:
@@ -100,6 +101,7 @@ class RunTracker:
             "config_hash": _config_hash(),
             "manifest_snapshot": json.dumps(_manifest_snapshot(), ensure_ascii=False),
         }
+        self._persist()
 
     def log_step(self, name: str, status: str = "done", detail: str = ""):
         self._steps.append({

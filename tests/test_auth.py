@@ -90,6 +90,16 @@ class TestAuthMiddleware:
         assert resp.status_code == 200
         assert resp.json()["status"] == "saved"
 
+    def test_cors_preflight_is_not_blocked_by_auth(self, client):
+        resp = client.options(
+            "/api/settings",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert resp.status_code in (200, 204)
+
 
 class TestRunModeEnforcement:
     @pytest.fixture
@@ -284,6 +294,32 @@ class TestAuditOnSettingsWrite:
 
 
 class TestAuthHelpers:
+    def test_no_api_key_does_not_autogenerate_or_block(self, tmp_path):
+        import yaml
+
+        cfg_path = tmp_path / "settings.yaml"
+        cfg = {"project": {"name": "test", "run_mode": "research"}, "strategies": {}, "risk_control": {}}
+        cfg_path.write_text(yaml.dump(cfg), encoding="utf-8")
+
+        with patch("web.api.auth._settings_path", return_value=cfg_path), \
+             patch("web.api.routes.settings._config_path", return_value=str(cfg_path)):
+            from web.api.auth import get_api_key
+            from web.api.app import create_app
+
+            assert get_api_key() == ""
+            client = TestClient(create_app())
+            resp = client.get("/api/settings")
+            assert resp.status_code == 200
+
+        saved = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        assert "api_key" not in saved["project"]
+
+    def test_api_key_can_come_from_env(self, monkeypatch):
+        monkeypatch.setenv("QUANT_AGENT_API_KEY", "env-secret")
+        from web.api.auth import get_api_key
+
+        assert get_api_key() == "env-secret"
+
     def test_get_run_mode_default(self):
         """get_run_mode returns 'research' when no config."""
         with patch("web.api.auth._read_settings", return_value={}):

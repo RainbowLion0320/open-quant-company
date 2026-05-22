@@ -53,7 +53,7 @@ class QualityReport:
     @property
     def is_blocking(self) -> bool:
         """True if this report indicates a problem that blocks strategy scans."""
-        return self.status in ("stale", "missing", "error", "provider_error")
+        return self.status in ("stale", "missing", "error", "provider_error", "schema_mismatch")
 
 
 # Critical dimensions that MUST be fresh for strategy scans
@@ -151,17 +151,16 @@ class DataQualityGate:
 
         # Consistency: validate against DataContract (P1-8) or fallback
         contract_issues = self._check_contract(key, df)
+        contract_failed = bool(contract_issues)
         if contract_issues:
             issues.extend(contract_issues)
-            # Downgrade to schema_mismatch if contract validation fails hard
-            if any("Required column" in i for i in contract_issues):
-                status = "schema_mismatch"
 
         expected_cols = self._expected_columns(key) if not contract_issues else None
         if expected_cols:
             missing_cols = [c for c in expected_cols if c not in df.columns]
             if missing_cols:
                 issues.append(f"Missing columns: {missing_cols}")
+                contract_failed = True
 
         # Freshness
         date_col, date_min, date_max = self._find_date_range(df)
@@ -187,13 +186,18 @@ class DataQualityGate:
             status = "fresh"
         else:
             status = "stale"
+        if contract_failed:
+            status = "schema_mismatch"
 
         # Health score: weighted average of freshness + completeness + consistency
         freshness_score = max(0, 100 - max(0, (freshness_days or 0) - sla) * 5)
         completeness_score = max(0, 100 - null_pct * 2)
-        consistency_score = 100 if not (expected_cols and any(
-            c not in df.columns for c in expected_cols
-        )) else 50
+        if contract_failed:
+            consistency_score = 40
+        else:
+            consistency_score = 100 if not (expected_cols and any(
+                c not in df.columns for c in expected_cols
+            )) else 50
 
         health_score = round(
             freshness_score * 0.5 + completeness_score * 0.3 + consistency_score * 0.2, 1
@@ -256,13 +260,14 @@ class DataQualityGate:
         stale = sum(1 for r in reports if r.status == "stale")
         missing = sum(1 for r in reports if r.status == "missing")
         error = sum(1 for r in reports if r.status == "error")
+        schema_mismatch = sum(1 for r in reports if r.status == "schema_mismatch")
         skipped = sum(1 for r in reports if r.status == "skipped")
 
         scores = [r.health_score for r in reports if r.status not in ("skipped",)]
         avg_score = round(sum(scores) / len(scores), 1) if scores else 0
 
         worst = sorted(
-            [r for r in reports if r.status in ("stale", "missing", "error")],
+            [r for r in reports if r.status in ("stale", "missing", "error", "schema_mismatch")],
             key=lambda r: r.health_score,
         )[:5]
 
@@ -273,9 +278,10 @@ class DataQualityGate:
             "stale": stale,
             "missing": missing,
             "error": error,
+            "schema_mismatch": schema_mismatch,
             "skipped": skipped,
             "avg_health_score": avg_score,
-            "all_critical_fresh": stale == 0 and missing == 0 and error == 0,
+            "all_critical_fresh": stale == 0 and missing == 0 and error == 0 and schema_mismatch == 0,
             "worst_offenders": [
                 {
                     "dimension": r.dimension,
@@ -303,7 +309,7 @@ class DataQualityGate:
         }
 
     def _find_date_range(self, df: pd.DataFrame) -> tuple[str, str, str]:
-        _DATE_COLS = ("date", "trade_date", "ann_date", "end_date", "ts", "quarter")
+        _DATE_COLS = ("date", "trade_date", "ann_date", "end_date", "ts", "quarter", "日期", "报告期")
         for col in df.columns:
             if str(col).lower() not in _DATE_COLS:
                 continue
@@ -322,11 +328,11 @@ class DataQualityGate:
     def _expected_columns(self, key: str) -> list[str] | None:
         SCHEMA_MAP: dict[str, list[str]] = {
             "ohlcv_daily": ["date", "open", "high", "low", "close", "volume"],
-            "adj_factor": ["date", "adj_factor"],
-            "financial_summary": ["date", "roe", "roa", "gross_margin", "net_margin", "eps", "bps"],
+            "adj_factor": ["trade_date", "adj_factor"],
+            "financial_summary": ["报告期", "净利润", "营业总收入", "销售毛利率", "销售净利率", "净资产收益率"],
             "fina_indicator": ["ann_date", "end_date", "roe", "roa", "eps", "bps"],
-            "valuation_daily": ["date", "pe", "pb", "ps", "total_mv"],
-            "moneyflow_daily": ["date", "net_buy_amount", "net_sell_amount"],
+            "valuation_daily": ["trade_date", "pe", "pb", "ps", "total_mv"],
+            "moneyflow_daily": ["日期", "主力净流入-净额", "小单净流入-净额"],
         }
         return SCHEMA_MAP.get(key)
 

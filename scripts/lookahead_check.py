@@ -83,7 +83,12 @@ def find_surge_events(symbol: str, min_gain_pct: float = 15.0, lookback_days: in
 
 def check_single_stock_lookahead(symbol: str) -> dict:
     """
-    Check if strategy scores change materially when run with vs without as-of constraint.
+    Check whether future data can leak through the as-of view.
+
+    The check mutates prices after the checkpoint date by a huge factor.  A
+    PIT-safe calculation through MarketDataView must be identical before and
+    after that mutation.  The unsafe full-tail calculation is reported only as
+    a diagnostic and is expected to differ.
     Returns lookahead indicators.
     """
     from data.fetcher import get_stock_daily
@@ -102,30 +107,47 @@ def check_single_stock_lookahead(symbol: str) -> dict:
     check_date = df.iloc[mid_idx]["date"]
     check_str = str(check_date)[:10]
 
+    def momentum_from_view(source_df: pd.DataFrame) -> float:
+        view = as_of_reader(lambda: source_df, as_of=check_date)
+        close = view.close()
+        if len(close) < 21:
+            return float("nan")
+        mom = compute_momentum(pd.DataFrame({"close": close.values}), [21])
+        return round(float(mom.get(21, np.nan)), 6)
+
     # ---- With PIT (correct) ----
     view = as_of_reader(lambda: df, as_of=check_date)
     pit_close = view.close()
     if len(pit_close) < 21:
         return {"symbol": symbol, "status": "skip", "reason": "too few pre-checkpoint data"}
 
-    pit_mom = compute_momentum(pd.DataFrame({"close": pit_close.values}), [21])
-    pit_mom_val = round(float(pit_mom.get(21, np.nan)), 6)
+    pit_mom_val = momentum_from_view(df)
 
-    # ---- Without PIT (full history) ----
-    full_mom = compute_momentum(pd.DataFrame({"close": df["close"].values}), [21])
-    full_mom_val = round(float(full_mom.get(21, np.nan)), 6)
+    # ---- Mutate future rows; as-of view must be unchanged ----
+    mutated = df.copy()
+    future_mask = mutated["date"] > check_date
+    if future_mask.any():
+        mutated.loc[future_mask, "close"] = mutated.loc[future_mask, "close"] * 100.0
+    protected_mom_val = momentum_from_view(mutated)
+
+    # ---- Unsafe diagnostic: full-tail calculation should now differ ----
+    unsafe_mom = compute_momentum(pd.DataFrame({"close": mutated["close"].values}), [21])
+    unsafe_mom_val = round(float(unsafe_mom.get(21, np.nan)), 6)
 
     # ---- Difference ----
-    mom_diff = abs(pit_mom_val - full_mom_val) if not (np.isnan(pit_mom_val) or np.isnan(full_mom_val)) else 0
+    mom_diff = abs(pit_mom_val - protected_mom_val) if not (np.isnan(pit_mom_val) or np.isnan(protected_mom_val)) else 0
+    unsafe_diff = abs(pit_mom_val - unsafe_mom_val) if not (np.isnan(pit_mom_val) or np.isnan(unsafe_mom_val)) else 0
 
     return {
         "symbol": symbol,
         "check_date": check_str,
         "status": "ok",
         "pit_momentum": pit_mom_val,
-        "full_momentum": full_mom_val,
+        "protected_momentum": protected_mom_val,
+        "unsafe_full_momentum": unsafe_mom_val,
         "mom_diff": round(mom_diff, 6),
-        "lookahead_flag": mom_diff > 0.01,
+        "unsafe_tail_diff": round(unsafe_diff, 6),
+        "lookahead_flag": mom_diff > 1e-9,
     }
 
 
@@ -146,11 +168,11 @@ def run_quick_check(n_stocks: int = 10):
         results.append(r)
         if r.get("lookahead_flag"):
             flags += 1
-            print(f"  [{i:2d}/{len(symbols)}] {sym:6s} ⚠️  PIT={r['pit_momentum']} vs Full={r['full_momentum']} diff={r['mom_diff']}")
+            print(f"  [{i:2d}/{len(symbols)}] {sym:6s} ⚠️  PIT={r['pit_momentum']} protected={r['protected_momentum']} diff={r['mom_diff']}")
         elif r["status"] == "skip":
             print(f"  [{i:2d}/{len(symbols)}] {sym:6s} ⊘ {r['reason']}")
         else:
-            print(f"  [{i:2d}/{len(symbols)}] {sym:6s} ✓  PIT={r['pit_momentum']} Full={r['full_momentum']}")
+            print(f"  [{i:2d}/{len(symbols)}] {sym:6s} ✓  PIT={r['pit_momentum']} unsafe_tail_diff={r['unsafe_tail_diff']}")
 
     print(f"\n{'='*60}")
     print(f"结果: {flags}/{len(symbols)} 只有差异 (可能的前视偏差)")
@@ -200,8 +222,11 @@ def run_deep_check(symbol: str = "600519"):
             continue
         from signals.multifactor import compute_momentum
         pit_mom = compute_momentum(pd.DataFrame({"close": pit_close.values}), [21])
-        full_mom = compute_momentum(pd.DataFrame({"close": df[df["date"] <= df["date"].max()]["close"].values}), [21])
-        d = abs(pit_mom.get(21, 0) - full_mom.get(21, 0)) if 21 in pit_mom else 0
+        mutated = df.copy()
+        mutated.loc[mutated["date"] > dt, "close"] = mutated.loc[mutated["date"] > dt, "close"] * 100.0
+        protected = MarketDataView(mutated, as_of=dt).close()
+        protected_mom = compute_momentum(pd.DataFrame({"close": protected.values}), [21])
+        d = abs(pit_mom.get(21, 0) - protected_mom.get(21, 0)) if 21 in pit_mom else 0
         diffs.append(d)
 
     if diffs:

@@ -166,6 +166,46 @@ class TestDataQualityGate:
         assert ok
         assert all(r.status == "fresh" for r in reports)
 
+    def test_schema_mismatch_blocks_even_when_recent(self, tmp_path, monkeypatch):
+        from data.datahub import DataHub, reset_datahub
+        from data.data_registry import reset_registry
+
+        store = tmp_path / "store"
+        monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
+        monkeypatch.setenv("QUANT_AGENT_CACHE", str(tmp_path / "cache"))
+        reset_datahub()
+        reset_registry()
+
+        hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
+        hub.write_parquet(
+            pd.DataFrame({
+                "date": ["2026-05-21"],
+                "open": [10.0],
+                "high": [11.0],
+                "low": [9.0],
+                # close is required by the ohlcv_daily contract.
+                "volume": [1000.0],
+            }),
+            hub.dimension_path("ohlcv_daily", symbol="000001"),
+            producer="test",
+        )
+
+        from data.quality import DataQualityGate, pre_scan_gate
+        gate = DataQualityGate(today=date(2026, 5, 21), hub=hub)
+        report = gate.check_dimension("ohlcv_daily", symbol="000001")
+
+        assert report.status == "schema_mismatch"
+        assert report.is_blocking
+        assert any("Required column 'close'" in i for i in report.issues)
+
+        ok, reports = pre_scan_gate(
+            required_dims=["ohlcv_daily"],
+            symbol="000001",
+            hub=hub,
+        )
+        assert not ok
+        assert reports[0].status == "schema_mismatch"
+
     def test_pre_scan_gate_stale_blocks(self, tmp_path, monkeypatch):
         from data.datahub import DataHub, reset_datahub
         from data.data_registry import reset_registry
@@ -232,7 +272,7 @@ class TestDataQualityGate:
         assert len(reports) > 0
         for r in reports:
             assert r.dimension
-            assert r.status in ("fresh", "stale", "missing", "error", "skipped")
+            assert r.status in ("fresh", "stale", "missing", "error", "skipped", "schema_mismatch")
             assert 0 <= r.health_score <= 100
 
     def test_summary_report_structure(self):
@@ -299,9 +339,16 @@ def write_daily(hub, symbol: str) -> None:
 def write_financial(hub, symbol: str) -> None:
     hub.write_parquet(
         pd.DataFrame({
-            "date": ["2026-05-21"],
-            "roe": [0.15], "roa": [0.08], "gross_margin": [0.35],
-            "net_margin": [0.12], "eps": [2.5], "bps": [15.0],
+            "报告期": ["2026-05-21"],
+            "净利润": ["120亿"],
+            "净利润同比增长率": ["8%"],
+            "营业总收入": ["960亿"],
+            "营业总收入同比增长率": ["6%"],
+            "基本每股收益": ["2.5"],
+            "每股净资产": ["15.0"],
+            "销售净利率": ["12%"],
+            "销售毛利率": ["35%"],
+            "净资产收益率": ["15%"],
         }),
         hub.dimension_path("financial_summary", symbol=symbol),
         producer="test",

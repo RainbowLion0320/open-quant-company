@@ -537,10 +537,13 @@ class PaperBroker(Broker):
         })
 
         # Record event in ledger
+        prior_events = self._ledger.events_for_order(sm.order_id)
+        parent_event_id = prior_events[-1].event_id if prior_events else ""
         event = LedgerEvent(
             event_id=self._new_event_id(t.event_type, sm.order_id),
             event_type=EventType(t.event_type),
             timestamp=t.timestamp,
+            parent_event_id=parent_event_id,
             order_id=sm.order_id,
             run_date=run_date,
             symbol=code,

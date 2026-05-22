@@ -163,7 +163,7 @@ const modeBadgeClass = computed(() => {
 const apiKeyStatus = computed(() => {
   const has = modeStatus.value?.has_api_key;
   if (has === undefined) return "检查中...";
-  return has ? "已设置" : "未设置 — 首次启动自动生成";
+  return has ? "已设置" : "未设置 — 本地开放模式";
 });
 
 const versionText = computed(() => {

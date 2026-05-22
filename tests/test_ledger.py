@@ -237,6 +237,17 @@ class TestLedgerTrace:
         assert traces[0]["signal_info"] == {"strategy": "multifactor", "score": 85}
         assert traces[0]["symbol"] == "000001"
 
+    def test_paper_broker_generated_events_are_parent_linked(self, ledger):
+        from broker import PaperBroker
+
+        broker = PaperBroker(initial_cash=100000, enable_risk=False, ledger=ledger)
+        broker.set_prices({"000001": 10.0})
+        order_id = broker.submit_order("000001", price=10.0, volume=100, side="buy")
+
+        events = ledger.events_for_order(order_id)
+        assert [e.event_type for e in events] == [EventType.ORDER_CREATED, EventType.ORDER_FILLED]
+        assert events[1].parent_event_id == events[0].event_id
+
 
 class TestLedgerReconstruct:
     def test_reconstruct_empty(self, ledger):

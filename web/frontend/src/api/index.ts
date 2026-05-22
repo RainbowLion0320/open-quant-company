@@ -19,10 +19,10 @@ async function req<T>(url: string, opts?: RequestInit): Promise<T> {
     ...opts,
   });
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
-      localStorage.removeItem("quant_api_key"); // clear stale key
-    }
     const text = await res.text().catch(() => "Unknown error");
+    if (res.status === 401 || (res.status === 403 && /Invalid API key/i.test(text))) {
+      localStorage.removeItem("quant_api_key"); // clear stale key only on auth failure
+    }
     throw new Error(`[${res.status}] ${text}`);
   }
   return res.json();

@@ -15,16 +15,21 @@ class MarketDataView:
     """Wraps a DataFrame with an as-of constraint — rows with date > as_of are invisible."""
 
     def __init__(self, df: pd.DataFrame, as_of: Union[str, datetime, pd.Timestamp], date_col: str = "date"):
+        self.as_of = pd.Timestamp(as_of)
         if df is None or df.empty:
             self._df = pd.DataFrame()
         else:
             df = df.copy()
+            if date_col not in df.columns and isinstance(df.index, pd.DatetimeIndex):
+                df = df.reset_index()
+                index_col = df.columns[0]
+                if index_col != date_col:
+                    df = df.rename(columns={index_col: date_col})
             if date_col in df.columns:
-                df[date_col] = pd.to_datetime(df[date_col])
-                cutoff = pd.Timestamp(as_of)
-                df = df[df[date_col] <= cutoff]
+                df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+                df = df.dropna(subset=[date_col])
+                df = df[df[date_col] <= self.as_of].sort_values(date_col)
             self._df = df
-        self.as_of = pd.Timestamp(as_of)
         self.date_col = date_col
 
     @property
@@ -39,19 +44,25 @@ class MarketDataView:
         """Return the most recent row (closest to as_of)."""
         if self._df.empty:
             return None
-        return self._df.sort_values(self.date_col).iloc[-1]
+        if self.date_col in self._df.columns:
+            return self._df.sort_values(self.date_col).iloc[-1]
+        return self._df.iloc[-1]
 
     def close(self) -> pd.Series:
         """Return close prices as a time-indexed Series."""
         if self._df.empty or "close" not in self._df.columns:
             return pd.Series(dtype=float)
-        return self._df.set_index(self.date_col)["close"].sort_index()
+        if self.date_col in self._df.columns:
+            return self._df.set_index(self.date_col)["close"].sort_index()
+        return self._df["close"]
 
     def ohlcv(self) -> pd.DataFrame:
         """Return OHLCV data with date index."""
         if self._df.empty:
             return pd.DataFrame()
-        return self._df.set_index(self.date_col).sort_index()
+        if self.date_col in self._df.columns:
+            return self._df.set_index(self.date_col).sort_index()
+        return self._df
 
     def __len__(self) -> int:
         return len(self._df)

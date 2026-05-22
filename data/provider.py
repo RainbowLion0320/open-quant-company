@@ -93,16 +93,14 @@ class AKShareAdapter(ProviderAdapter):
     # Dimension → (fetcher_module, function_name, default_kwargs)
     _DISPATCH: dict[str, tuple[str, str, dict]] = {
         "ohlcv_daily":       ("data.fetcher",           "get_stock_daily",    {}),
-        "adj_factor":        ("scripts.cron_fetch_daily", "fetch_adj_factor", {}),
-        "financial_summary": ("data.financials",         "get_financials",     {}),
-        "valuation_daily":   ("data.financials",         "get_valuation",      {}),
-        "macro_cpi":         ("data.fetchers.macro",     "MacroFetcher",       {"indicator": "cpi"}),
-        "macro_gdp":         ("data.fetchers.macro",     "MacroFetcher",       {"indicator": "gdp"}),
-        "macro_lpr":         ("data.fetchers.macro",     "MacroFetcher",       {"indicator": "lpr"}),
-        "macro_money_supply":("data.fetchers.macro",     "MacroFetcher",       {"indicator": "money_supply"}),
-        "macro_pmi":         ("data.fetchers.macro",     "MacroFetcher",       {"indicator": "pmi"}),
-        "macro_ppi":         ("data.fetchers.macro",     "MacroFetcher",       {"indicator": "ppi"}),
-        "macro_shibor":      ("data.fetchers.macro",     "MacroFetcher",       {"indicator": "shibor"}),
+        "financial_summary": ("data.financials",         "get_financial_summary", {}),
+        "macro_cpi":         ("data.fetchers.macro",     "MacroFetcher",       {"method": "fetch_indicator", "indicator": "cpi"}),
+        "macro_gdp":         ("data.fetchers.macro",     "MacroFetcher",       {"method": "fetch_indicator", "indicator": "gdp"}),
+        "macro_lpr":         ("data.fetchers.macro",     "MacroFetcher",       {"method": "fetch_indicator", "indicator": "lpr"}),
+        "macro_money_supply":("data.fetchers.macro",     "MacroFetcher",       {"method": "fetch_indicator", "indicator": "money_supply"}),
+        "macro_pmi":         ("data.fetchers.macro",     "MacroFetcher",       {"method": "fetch_indicator", "indicator": "pmi"}),
+        "macro_ppi":         ("data.fetchers.macro",     "MacroFetcher",       {"method": "fetch_indicator", "indicator": "ppi"}),
+        "macro_shibor":      ("data.fetchers.macro",     "MacroFetcher",       {"method": "fetch_indicator", "indicator": "shibor"}),
         "bond_treasury_yields": ("data.assets.bond",     "BondAsset",          {"method": "_load_yields"}),
     }
 
@@ -178,10 +176,12 @@ class TushareAdapter(ProviderAdapter):
     # Dimension → (api_method_name, default_kwargs)
     _DISPATCH: dict[str, tuple[str, dict]] = {
         "fina_indicator":    ("fina_indicator",    {}),
+        "adj_factor":        ("adj_factor",        {}),
         "income_statement":  ("income",            {}),
         "balance_sheet":     ("balancesheet",      {}),
         "cashflow_statement":("cashflow",          {}),
         "daily_basic":       ("daily_basic",       {}),
+        "valuation_daily":   ("daily_basic",       {}),
         "margin_detail":     ("margin_detail",     {}),
         "hk_hold":           ("hk_hold",           {}),
         "sw_daily":          ("sw_daily",          {}),
@@ -189,7 +189,7 @@ class TushareAdapter(ProviderAdapter):
         "limit_list":        ("limit_list_d",      {}),
         "top_list":          ("top_list",          {}),
         "broker_recommend":  ("broker_recommend",  {}),
-        "moneyflow_daily_tushare": ("moneyflow_mkt_dc", {}),
+        "moneyflow_tushare_daily": ("moneyflow_mkt_dc", {}),
     }
 
     def __init__(self, token: str | None = None):
@@ -346,6 +346,8 @@ def get_provider(source: str = "", dimension: str = "") -> ProviderAdapter:
 
     Resolution order: dimension override → source mapping → composite default.
     """
+    if not _SOURCE_PROVIDERS:
+        _init_defaults()
     if dimension and dimension in _DIMENSION_OVERRIDES:
         return _DIMENSION_OVERRIDES[dimension]
     if source and source in _SOURCE_PROVIDERS:
@@ -362,7 +364,11 @@ def _default_provider() -> CompositeProvider:
 
 def _init_defaults():
     """Register the default AKShare + Tushare adapters."""
-    register_provider("akshare", AKShareAdapter())
+    akshare = AKShareAdapter()
+    register_provider("akshare", akshare)
+    for dimension in akshare._supported_keys():
+        if dimension.startswith("macro_") or dimension == "bond_treasury_yields":
+            _DIMENSION_OVERRIDES[dimension] = akshare
     register_provider("tushare_free", TushareAdapter())
     register_provider("tushare_paid", TushareAdapter())
 

@@ -1,11 +1,12 @@
 """
 API Authentication — lightweight Bearer token middleware for local single-user.
 
-Reads project.api_key from config/settings.yaml. On first startup, if no
-api_key is configured, auto-generates one and writes it back.
+Reads the API key from ``QUANT_AGENT_API_KEY`` or ``project.api_key`` in
+``config/settings.yaml``.  If neither is configured, auth is disabled so the
+local dashboard keeps working in the default single-user setup.
 
 Whitelist: /api/health, static /assets, and SPA fallback paths are public.
-All other /api/* routes require Authorization: Bearer <key>.
+All other /api/* routes require Authorization: Bearer <key> when a key exists.
 
 Also provides run_mode guard: research (full), paper (partial), live (read-only).
 """
@@ -36,29 +37,17 @@ def _read_settings() -> dict:
         return yaml.safe_load(f) or {}
 
 
-def _write_settings(data: dict):
-    path = _settings_path()
-    os.makedirs(path.parent, exist_ok=True)
-    with open(path, "w") as f:
-        yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-
-
 # ── API Key management ──
 
 def get_api_key() -> str:
-    """Read API key from config, auto-generate if missing."""
+    """Read API key from env/config without mutating tracked settings."""
+    env_key = os.environ.get("QUANT_AGENT_API_KEY", "").strip()
+    if env_key:
+        return env_key
+
     cfg = _read_settings()
     project = cfg.get("project") or {}
-    key = project.get("api_key", "").strip()
-    if key:
-        return key
-
-    # Auto-generate on first startup
-    key = secrets.token_urlsafe(24)
-    project["api_key"] = key
-    cfg["project"] = project
-    _write_settings(cfg)
-    return key
+    return str(project.get("api_key", "") or "").strip()
 
 
 def get_run_mode() -> str:
@@ -100,12 +89,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
     """Validate Bearer token on all /api/* routes except whitelist."""
 
     async def dispatch(self, request: Request, call_next):
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         if _is_public(request.url.path):
             return await call_next(request)
 
         token = get_api_key()
         if not token:
-            # No API key configured at all — allow all (degraded open mode)
+            # No API key configured — local open mode.
             return await call_next(request)
 
         auth = request.headers.get("Authorization", "")

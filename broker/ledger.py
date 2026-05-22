@@ -19,6 +19,7 @@ Event chain for a trade:
 from __future__ import annotations
 
 import uuid
+import fcntl
 from dataclasses import dataclass, field
 from datetime import date as DateType, datetime
 from enum import Enum
@@ -130,25 +131,39 @@ class EventLedger:
 
     def append(self, event: LedgerEvent) -> LedgerEvent:
         """Append a single event to the ledger. Assigns sequence number."""
-        if event.sequence <= 0:
-            event.sequence = self._next_seq()
-
-        row = pd.DataFrame([event.to_row()])
-
-        if self._file.exists():
-            existing = self._hub.read_parquet(self._file, default=pd.DataFrame())
-            df = pd.concat([existing, row], ignore_index=True)
-        else:
-            df = row
-
-        self._hub.write_parquet(df, self._file)
-        self._next_sequence = event.sequence + 1
+        self.append_batch([event])
         return event
 
     def append_batch(self, events: list[LedgerEvent]) -> list[LedgerEvent]:
         """Append multiple events atomically."""
-        for e in events:
-            self.append(e)
+        if not events:
+            return []
+
+        lock_path = self._file.with_suffix(".lock")
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(lock_path, "w") as lock_f:
+            fcntl.flock(lock_f, fcntl.LOCK_EX)
+            try:
+                existing = self._hub.read_parquet(self._file, default=pd.DataFrame())
+                next_seq = 1
+                if existing is not None and not existing.empty and "sequence" in existing.columns:
+                    next_seq = int(existing["sequence"].max()) + 1
+
+                for e in events:
+                    if e.sequence <= 0:
+                        e.sequence = next_seq
+                    next_seq = max(next_seq, int(e.sequence) + 1)
+
+                rows = pd.DataFrame([e.to_row() for e in events])
+                if existing is not None and not existing.empty:
+                    df = pd.concat([existing, rows], ignore_index=True)
+                else:
+                    df = rows
+                df = df.sort_values("sequence")
+                self._hub.write_parquet(df, self._file)
+                self._next_sequence = next_seq
+            finally:
+                fcntl.flock(lock_f, fcntl.LOCK_UN)
         return events
 
     # ── sequence ──
