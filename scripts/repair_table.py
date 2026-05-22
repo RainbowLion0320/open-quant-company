@@ -328,7 +328,17 @@ def repair(table: str, limit: int = 0, days: int = 365) -> None:
     print(f"REPAIR: {table}")
     print(f"{'='*60}")
 
-    REPAIR_MAP[table](limit=limit, days=days)
+    # P1-8: Record backfill operation in ledger
+    from data.backfill import BackfillLedger
+    ledger = BackfillLedger()
+    run_id = ledger.start(table, date_start="", date_end="", triggered_by="manual")
+
+    try:
+        REPAIR_MAP[table](limit=limit, days=days)
+        ledger.complete(run_id)
+    except Exception as e:
+        ledger.fail(run_id, error=str(e))
+        raise
 
     # Re-run health check
     import subprocess

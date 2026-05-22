@@ -140,6 +140,9 @@ class DataDimension:
     partition_key: str = ""
     health_enabled: bool = True
     health_max_sample: int = 30
+    # P1-8: DataContract integration
+    schema_version: int = 1
+    contract_path: str = ""
 
     @property
     def is_available(self) -> bool:

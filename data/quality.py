@@ -32,7 +32,7 @@ REGISTRY = get_registry()
 class QualityReport:
     dimension: str
     label: str
-    status: str  # fresh | stale | missing | error | skipped
+    status: str  # fresh | stale | missing | error | skipped | provider_error | schema_mismatch
     health_score: float  # 0-100
     freshness_days: int | None
     sla_days: int | None
@@ -49,6 +49,11 @@ class QualityReport:
     @property
     def is_stale(self) -> bool:
         return self.status == "stale"
+
+    @property
+    def is_blocking(self) -> bool:
+        """True if this report indicates a problem that blocks strategy scans."""
+        return self.status in ("stale", "missing", "error", "provider_error")
 
 
 # Critical dimensions that MUST be fresh for strategy scans
@@ -144,8 +149,15 @@ class DataQualityGate:
         if null_pct > 20:
             issues.append(f"High null ratio: {null_pct:.1f}%")
 
-        # Consistency: check expected columns exist (minimal check)
-        expected_cols = self._expected_columns(key)
+        # Consistency: validate against DataContract (P1-8) or fallback
+        contract_issues = self._check_contract(key, df)
+        if contract_issues:
+            issues.extend(contract_issues)
+            # Downgrade to schema_mismatch if contract validation fails hard
+            if any("Required column" in i for i in contract_issues):
+                status = "schema_mismatch"
+
+        expected_cols = self._expected_columns(key) if not contract_issues else None
         if expected_cols:
             missing_cols = [c for c in expected_cols if c not in df.columns]
             if missing_cols:
@@ -232,7 +244,7 @@ class DataQualityGate:
         for key in required:
             report = self.check_dimension(key, symbol=symbol)
             reports.append(report)
-            if report.status in ("stale", "missing", "error"):
+            if report.status in ("stale", "missing", "error", "provider_error", "schema_mismatch"):
                 all_fresh = False
 
         return all_fresh, reports
@@ -317,6 +329,21 @@ class DataQualityGate:
             "moneyflow_daily": ["date", "net_buy_amount", "net_sell_amount"],
         }
         return SCHEMA_MAP.get(key)
+
+    def _check_contract(self, key: str, df: pd.DataFrame) -> list[str]:
+        """Validate df against the DataContract for this dimension. (P1-8)"""
+        try:
+            from data.contract import load_contract
+            contract = load_contract(key)
+            if contract is None:
+                return []
+            violations = contract.validate(df)
+            return [
+                f"[{v.severity}] {v.rule}: {v.detail}"
+                for v in violations if v.severity == "error"
+            ]
+        except Exception:
+            return []
 
 
 def pre_scan_gate(

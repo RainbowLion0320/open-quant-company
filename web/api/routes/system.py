@@ -723,3 +723,111 @@ async def trace_order(order_id: str):
         "related_nav": related_nav,
         "status": "ok",
     }
+
+
+# ── P1-8: Backfill & Provider Health ──
+
+
+@router.get("/backfill")
+async def get_backfill_history(
+    dimension: str = Query(default="", description="Filter by dimension key"),
+    status: str = Query(default="", description="Filter: done/failed/running"),
+    limit: int = Query(default=20, ge=1, le=200),
+):
+    """查询数据补数/修复历史 — 从 BackfillLedger 读取。
+
+    每次 repair_table.py 执行都会在此留下记录，
+    可追溯每个维度的补数时间、范围、结果。
+    """
+    from data.backfill import BackfillLedger
+    ledger = BackfillLedger()
+
+    entries = ledger.history(dimension=dimension, status=status, limit=limit)
+    summary = ledger.summary()
+
+    return {
+        "entries": [
+            {
+                "run_id": e.run_id,
+                "dimension": e.dimension,
+                "status": e.status,
+                "date_start": e.date_start,
+                "date_end": e.date_end,
+                "rows_fetched": e.rows_fetched,
+                "error": e.error,
+                "retry_count": e.retry_count,
+                "started_at": e.started_at,
+                "completed_at": e.completed_at,
+                "duration_seconds": e.duration_seconds,
+                "triggered_by": e.triggered_by,
+            }
+            for e in entries
+        ],
+        "summary": summary,
+        "total": len(entries),
+        "status": "ok",
+    }
+
+
+@router.get("/backfill/{dimension}/last")
+async def get_last_backfill(dimension: str):
+    """查询某个维度的最近一次补数记录。"""
+    from data.backfill import BackfillLedger
+    ledger = BackfillLedger()
+
+    last = ledger.last_run(dimension)
+    last_ok = ledger.last_successful(dimension)
+
+    return {
+        "dimension": dimension,
+        "last_run": {
+            "run_id": last.run_id, "status": last.status,
+            "started_at": last.started_at, "completed_at": last.completed_at,
+            "rows_fetched": last.rows_fetched, "error": last.error,
+        } if last else None,
+        "last_successful": {
+            "run_id": last_ok.run_id, "started_at": last_ok.started_at,
+            "rows_fetched": last_ok.rows_fetched,
+        } if last_ok else None,
+        "status": "ok",
+    }
+
+
+@router.get("/providers/health")
+async def get_provider_health():
+    """各数据源的连接健康状态 — AKShare / Tushare。"""
+    from data.provider import provider_health_report
+    return {
+        "providers": provider_health_report(),
+        "status": "ok",
+    }
+
+
+@router.get("/contracts")
+async def get_contracts(dimension: str = Query(default="", description="Filter by dimension")):
+    """数据维度契约列表 — schema/PK/PIT规则/sla。"""
+    from data.contract import list_contracts
+    contracts = list_contracts()
+
+    if dimension:
+        contracts = [c for c in contracts if c.dimension == dimension]
+
+    return {
+        "contracts": [
+            {
+                "dimension": c.dimension,
+                "schema_version": c.schema_version,
+                "columns": c.columns,
+                "primary_key": c.primary_key,
+                "freq": c.freq,
+                "sla_days": c.sla_days,
+                "pit_rule": c.pit_rule,
+                "owner": c.owner,
+                "description": c.description,
+                "migration_count": len(c.migrations),
+            }
+            for c in contracts
+        ],
+        "total": len(contracts),
+        "status": "ok",
+    }
