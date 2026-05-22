@@ -38,6 +38,7 @@ include = [
     "data*",
     "models*",
     "notify*",
+    "research*",
     "scripts*",
     "signals*",
     "web*",

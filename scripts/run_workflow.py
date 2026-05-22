@@ -109,7 +109,9 @@ def run_step(step: Dict, step_index: int, total_steps: int) -> bool:
 
 
 def run_workflow(name: str) -> bool:
-    """Execute a complete workflow."""
+    """Execute a complete workflow with experiment tracking."""
+    from research.runs import RunTracker
+
     wf = load_workflow(name)
     if wf is None:
         return False
@@ -117,8 +119,16 @@ def run_workflow(name: str) -> bool:
     steps = wf.get("steps", [])
     total = len(steps)
 
+    run = RunTracker(
+        run_type="workflow",
+        label=wf.get("name", name),
+        params={"workflow": name, "steps": [s["name"] for s in steps]},
+    )
+    run.start()
+
     print(f"{'='*60}")
     print(f"🚀 Workflow: {wf.get('name', name)}")
+    print(f"   Run ID: {run.run_id}")
     print(f"   {wf.get('description', '')}")
     print(f"   Steps: {total}")
     print(f"{'='*60}")
@@ -126,16 +136,24 @@ def run_workflow(name: str) -> bool:
     t_start = time.time()
     for i, step in enumerate(steps, 1):
         ok = run_step(step, i, total)
+        run.log_step(step["name"], "done" if ok else "failed",
+                     f"exit=0" if ok else "non-zero exit or timeout")
         if not ok:
             elapsed = time.time() - t_start
             print(f"\n{'='*60}")
             print(f"✗ Workflow FAILED after {elapsed:.0f}s")
             print(f"{'='*60}")
+            run.fail(f"Step '{step['name']}' failed")
             return False
 
     elapsed = time.time() - t_start
+    run.add_metric("elapsed_seconds", round(elapsed, 1))
+    run.add_metric("total_steps", total)
+    run.finish()
+
     print(f"\n{'='*60}")
     print(f"✓ Workflow COMPLETE — {elapsed/60:.1f} minutes")
+    print(f"   Run: {run.run_id}")
     print(f"{'='*60}")
     return True
 

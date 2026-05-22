@@ -78,8 +78,18 @@ def register_all_strategies() -> StrategyRegistry:
 
 def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2026-05-10"):
     """运行锦标赛: 所有策略统一回测对比"""
+    from research.runs import RunTracker
+
+    run = RunTracker(
+        run_type="tournament",
+        label=f"策略锦标赛 {pool_size}股",
+        params={"pool_size": pool_size, "start": start, "end": end},
+    )
+    run.start()
+
     print(f"\n{'='*60}")
     print(f"策略锦标赛: {pool_size} stocks, {start} → {end}")
+    print(f"   Run ID: {run.run_id}")
     print(f"{'='*60}")
 
     # 注册策略
@@ -241,6 +251,17 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
     report_path = TOURNAMENT_DIR / f"tournament_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
     json.dump(report, report_path.open("w"), indent=2, ensure_ascii=False)
     print(f"\n报告已保存: {report_path}")
+
+    # Experiment tracking
+    for name, r in results.items():
+        run.add_metric(f"{name}_return", r.get("total_return", 0))
+        run.add_metric(f"{name}_sharpe", r.get("sharpe", 0))
+        run.add_metric(f"{name}_maxdd", r.get("max_drawdown", 0))
+    run.add_metric("bench_return", round(bench_ret_total * 100, 2))
+    run.add_metric("strategies_count", len(results))
+    run.add_artifact(str(report_path))
+    run.finish()
+    print(f"   Run: {run.run_id}")
 
     return results
 

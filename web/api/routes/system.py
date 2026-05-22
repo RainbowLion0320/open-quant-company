@@ -550,3 +550,22 @@ async def service_status():
         "summary": f"{ok} OK, {warn} 警告, {err} 异常",
         "all_ok": err == 0 and warn == 0,
     }
+
+
+@router.get("/runs")
+async def list_runs(limit: int = Query(default=20, ge=1, le=100), run_type: str = Query(default="", description="workflow / tournament / train")):
+    """列出最近的实验 runs (workflow / tournament / train)"""
+    from research.runs import list_runs as _list_runs
+    runs = _list_runs(limit=limit, run_type=run_type)
+    return {"runs": runs, "total": len(runs)}
+
+
+@router.get("/runs/{run_id}")
+async def get_run(run_id: str):
+    """获取单个 run 的详细信息"""
+    from research.runs import get_run as _get_run
+    from web.api.errors import DataNotFoundError
+    run = _get_run(run_id)
+    if run is None:
+        raise DataNotFoundError("run", run_id)
+    return run

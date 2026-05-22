@@ -154,11 +154,38 @@ if __name__ == "__main__":
     ap.add_argument("--train-only", action="store_true")
     args = ap.parse_args()
 
-    if args.train_only:
-        train_best_model()
-    else:
-        best_params = optimize_hyperparams(args.n_trials)
-        if best_params:
-            train_best_model(best_params)
+    from research.runs import RunTracker
+
+    run = RunTracker(
+        run_type="train",
+        label="LightGBM 模型训练",
+        params={"n_trials": args.n_trials, "optimize": args.optimize, "train_only": args.train_only},
+    )
+    run.start()
+    print(f"Run ID: {run.run_id}")
+
+    try:
+        if args.train_only:
+            path = train_best_model()
         else:
-            train_best_model()
+            best_params = optimize_hyperparams(args.n_trials)
+            if best_params:
+                path = train_best_model(best_params)
+            else:
+                path = train_best_model()
+
+        run.add_artifact(path)
+        # 读取训练元数据
+        meta_path = MODEL_DIR / "lgbm_best_meta.json"
+        if meta_path.exists():
+            with open(meta_path) as f:
+                meta = json.load(f)
+            run.add_metric("ic_in_sample", meta.get("ic_in_sample", 0))
+            run.add_metric("n_samples", meta.get("n_samples", 0))
+            run.add_metric("n_features", meta.get("n_features", 0))
+            run.params["best_params"] = meta.get("params", {})
+        run.finish()
+    except Exception as e:
+        import traceback
+        run.fail(f"{e}\n{traceback.format_exc()}")
+        raise
