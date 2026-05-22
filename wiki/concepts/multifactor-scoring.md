@@ -1,13 +1,13 @@
 ---
 title: 多因子打分引擎
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-05-23
 type: concept
 tags: [multifactor, strategy]
 confidence: medium
 ---
 
-## 四维打分模型
+## 五维打分模型
 
 因子和权重定义在 `config/settings.yaml` → `signals.multifactor.weights`。
 
@@ -16,7 +16,11 @@ confidence: medium
 | Quality | 基本面质量 | 巴菲特评分 + ROE水平 + ROE趋势 |
 | Valuation | 估值折扣 | 安全边际大小 |
 | Technical | 技术面 | 动量 + 波动率 |
-| Market | 市场环境 | Regime × 行业轮动 |
+| Market | 市场环境 | Regime × 市场状态 |
+| Industry Momentum | 行业动量 | 申万行业20d/60d动量 → 个股映射 |
+
+权重: quality=0.35, valuation=0.25, technical=0.15, market=0.10, industry_momentum=0.15。
+行业动量从 `data/store/sector/sector_performance_*.parquet` 读取，通过 `sector_membership.parquet` 映射个股→行业。
 
 各维度的具体因子和权重在 config 中配置，可按市场状态自适应调整。
 

@@ -1,10 +1,52 @@
 ---
 title: Wiki Log
 created: 2026-05-13
-updated: 2026-05-21
+updated: 2026-05-23
 type: meta
 
-## 2026-05-21 — 全面 Bug 审查 + 架构优化 + 锦标赛重跑 (claudecode)
+## 2026-05-23 — 行业数据中台 + 雷达Web + 策略集成 + 测试 (claudecode)
+
+### P0: 文档刷新
+- `docs/acceptance-matrix.md`: 更新到 63/63 OK (0 gaps), 含本轮新增条目
+- `wiki/decisions/web-architecture.md`: 11→12 页, 新增行业雷达路由
+- `docs/specs/05-web-platform.md`: 路由模块 10→12, 含 sectors 端点
+
+### P1: Monitor/Settings 职责分离
+- `ActivityMonitor.vue`: 移除 toggleNotify/saveSettings, 改为只读观测页
+- `Settings.vue`: 新增策略状态/风控参数/审计日志, 移除系统信息
+- 两个页面边界清晰: Monitor 不写配置, Settings 不含系统监控
+
+### P2: 行业数据中台
+- `config/settings.yaml`: 新增 4 个 sector 数据维度 registry 条目
+- `data/data_registry.py`: `ALLOWED_ASSETS` 加 `"sector"`, 4 个 health table 条目
+- `data/provider.py`: TushareAdapter 加 `sector_sw_daily` dispatch
+- `data/contract.py`: 4 个 sector 维度 `_known_columns` 定义
+- `data/sectors.py`: 新建 340 行 — 31申万行业 + 4 builder (membership/performance/信号聚合/敞口)
+- `scripts/build_sector_snapshots.py`: CLI (--membership/--performance/--signals/--exposure/--dry-run)
+- 首次运行: membership=4669, performance=28, signals=96, exposure=0
+
+### P3: 行业雷达 Web UI
+- `web/api/routes/sectors.py`: 4 端点 (overview/exposure/{industry}/{industry}/stocks)
+- `web/frontend/src/views/Sectors.vue`: 31行业排名表+1/5/20/60日动量色彩+信号分布+组合敞口
+- 路由 `/sectors` + App.vue 导航 + API types
+
+### P4: 策略/行业集成
+- `signals/multifactor.py`: 四维→五维评分, 新增 `_industry_score()` 维 (行业20d/60d动量→个股评分)
+- `config/settings.yaml`: weights 新增 `industry_momentum: 0.15`, 其他四维权重按比例调整
+- `web/api/routes/portfolio.py`: 新增 `GET /api/portfolio/sector-exposure`
+- `web/frontend/src/views/Portfolio.vue`: 行业敞口柱状图
+
+### P5: 自动化测试
+- `tests/test_sector_pipeline.py`: 25 new tests (builder/API/contract/integration/regime)
+- **Bug fix**: `/{industry}/stocks` 路由必须在 `/{industry:path}` 之前注册 (path通配符会捕获所有)
+- 全量: 314 passing (289 + 25 new)
+
+### 知识沉淀
+- 内存文件 6 项: end_to_end_verify / data_contract_columns / provider_dispatch / race_condition_ledger / pit_mutation_test / auth_no_autogen
+- 所有反馈固化到 `~/.claude/projects/.../memory/` 持久化
+
+---
+
 
 ### 已修复 (20+ 项)
 详见 git commit:

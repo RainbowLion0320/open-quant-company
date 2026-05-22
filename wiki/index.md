@@ -1,7 +1,7 @@
 ---
 title: Wiki Index
 created: 2026-05-13
-updated: 2026-05-18
+updated: 2026-05-23
 type: meta
 tags: [index]
 ---
@@ -18,7 +18,7 @@ tags: [index]
 - [[buffett-rolling-backtest]] — 滚动回测：按年重新过滤，消除前视偏差
 - [[cybernetics-regime]] — 市场状态检测：月线MA排列，日频→月频修复
 - [[dcf-valuation]] — DCF估值方法
-- [[multifactor-scoring]] — 四维打分引擎（已演进为四策略对比体系）
+- [[multifactor-scoring]] — 五维打分引擎（含行业动量），四策略对比体系
 - [[financial-cache]] — 三层财务缓存 + PIT基本面/估值/资金/筹码/宏观因子提取
 
 - [[hindsight-architecture]] — Hindsight 记忆引擎深层架构：配置详解, 端口陷阱, 生命周期, 检索策略

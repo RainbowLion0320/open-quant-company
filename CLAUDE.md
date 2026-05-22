@@ -58,6 +58,7 @@
 │   ├── datahub.py                 # ★ 数据中台: dimension_path()/manifest/原子写入/追加去重/审计
 │   ├── strategy_plugins.py        # 策略运行时注册: 配置驱动dispatch, 动态import
 │   ├── db.py + results_db.py     # Parquet存储 + DuckDB视图
+│   ├── sectors.py                 # 行业流水线: membership/performance/signals/exposure
 │   ├── assets/{base,stock}.py    # 多资产架构 + StockAsset
 │   ├── fetchers/{moneyflow,holders,macro}.py  # 数据获取器
 │   └── store/                    # Parquet: stock/macro/signals/features/_manifest/
@@ -65,7 +66,7 @@
 │   ├── expression.py             # 因子 DSL 表达式引擎
 │   ├── dsl_parser.py             # LLM公式→计算
 │   ├── buffett.py                # 巴菲特价值过滤 (安全边际/DCF)
-│   ├── multifactor.py            # 多因子打分 (四维加权)
+│   ├── multifactor.py            # 多因子打分 (五维加权含行业动量)
 │   ├── ml_signals.py             # ML信号生成
 │   └── selection.py              # 横截面排名→交易信号
 ├── cybernetics/
@@ -79,8 +80,9 @@
 │   └── strategies/{base,ml_strategy}.py
 ├── broker/{__init__,exchange,risk,persistence,allocator}.py  # PaperBroker + 持久化 + 风控
 ├── scripts/
-│   ├── compute_signals.py        # Cron 15:30 日频扫描
+│   ├── compute_signals.py        # Cron 15:30 日频扫描 (五维评分含行业动量)
 │   ├── execute_paper_trades.py   # Cron 09:30 模拟交易执行
+│   ├── build_sector_snapshots.py # 行业快照: membership/performance/signals/exposure
 │   ├── build_features.py         # 批量PIT特征构建
 │   ├── tune_model.py             # Optuna训练
 │   ├── weekly_retrain.py         # Cron 周六 模型重训
@@ -88,8 +90,8 @@
 │   ├── factor_hypothesis.py      # LLM因子发现
 │   ├── run_workflow.py           # qrun YAML工作流
 │   └── cron_fetch_slow.py        # 限流数据日常填充
-├── web/api/                      # FastAPI (routes + ws + jobs)
-├── web/frontend/                 # Vue 3 SPA (Quantum Terminal)
+├── web/api/routes/{market,strategies,stocks,portfolio,signals,sectors,settings,backtest,system,hindsight}.py
+├── web/frontend/                 # Vue 3 SPA (Quantum Terminal, 12页含行业雷达)
 ├── wiki/                         # LLM Wiki (18页)
 ├── tests/                        # 合约测试 + 边界测试
 ├── docs/tushare-mcp-guide.md     # Tushare文档
