@@ -2,7 +2,6 @@
   <header class="section-switcher">
     <div class="section-copy">
       <span>{{ eyebrow }}</span>
-      <h1>{{ title }}</h1>
       <p>{{ subtitle }}</p>
     </div>
     <nav class="section-tabs" :aria-label="`${title} tabs`">
@@ -68,7 +67,7 @@ function tabTo(tab: string) {
 }
 
 .section-copy {
-  min-width: 220px;
+  min-width: 260px;
 }
 
 .section-copy span {
@@ -80,18 +79,11 @@ function tabTo(tab: string) {
   text-transform: uppercase;
 }
 
-.section-copy h1 {
-  margin-top: 4px;
-  color: var(--text-primary);
-  font-size: 17px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
-}
-
 .section-copy p {
-  margin-top: 3px;
+  margin-top: 6px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .section-tabs {
