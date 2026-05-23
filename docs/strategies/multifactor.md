@@ -42,7 +42,7 @@
 
 - `data/tournament/` 下的锦标赛 JSON
 - `data/store/signals/multifactor.parquet`
-- Web `/backtest` 与 `/strategies` 页面
+- Web `/strategy-lab` 页面
 
 ## 成本敏感性
 

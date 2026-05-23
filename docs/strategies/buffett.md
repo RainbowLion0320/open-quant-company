@@ -36,7 +36,7 @@
 
 - `data/store/signals/buffett*.parquet`
 - `data/tournament/` 下的锦标赛 JSON
-- Web `/strategies` 与 `/backtest` 页面
+- Web `/strategy-lab` 页面
 
 小样本股票池可能无法触发巴菲特筛选，正式扫描应使用当前配置中的全量股票池。
 

@@ -67,19 +67,19 @@
 
 | # | PRD/Spec 条目 | 代码文件 | 测试 | API / Web | 手工验收 | 状态 | 缺口 |
 |---|--------------|---------|------|-----------|---------|------|------|
-| 5.1 | Vue 3 SPA + Pinia + ECharts + Tailwind | `web/frontend/` | — | 12 个页面视图 | `npm run build` 通过 | OK | — |
+| 5.1 | Vue 3 SPA + Pinia + ECharts + Tailwind | `web/frontend/` | — | 6 个一级入口 + 二级 tab 工作区 | `npm run build` 通过 | OK | — |
 | 5.2 | FastAPI 10 业务路由模块 | `web/api/routes/` (10 文件) | `test_web_system_contracts.py` (strategy jobs 路由) | 全部业务路由模块 | `python -m uvicorn web.api.app:create_app --factory` 启动无报错 | OK | — |
 | 5.3 | WebSocket 实时进度推送 | `web/api/ws.py`, `web/api/jobs.py` | — | Strategy run/backtest 进度条 | 触发回测 → 前端进度条实时更新 | OK | 待补 WebSocket 合约测试 |
 | 5.4 | DuckDB :memory: 零锁查询 | `web/api/db.py` / `data/db.py` | `test_boundary.py` (DuckDB CRUD) | 所有数据查询端点 | Web 页面数据加载无延迟 | OK | — |
 | 5.5 | API 错误响应统一 + 稳定端点 response_model | 各路由文件 + `web/api/errors.py` | `test_web_system_contracts.py` | — | 4xx/5xx 错误结构一致，关键成功响应有 Pydantic schema | OK | 继续扩大 response_model 覆盖 |
-| 5.6 | Settings API YAML 读写 + 审计 | `web/api/routes/settings.py` | `test_audit.py`, `test_auth.py` | `Settings.vue` | 修改配置 → 确认弹窗 → 保存 → audit ledger 有记录 | OK | — |
+| 5.6 | Settings API YAML 读写 + 审计 | `web/api/routes/settings.py` | `test_audit.py`, `test_auth.py` | `/system?tab=settings` → `Settings.vue` | 修改配置 → 确认弹窗 → 保存 → audit ledger 有记录 | OK | — |
 | 5.7 | 市场总览 (regime + multi_asset + macro) | `web/api/routes/market.py` | — | `Market.vue` | 多资产卡片含 data_source 标识 + 策略矩阵 + 预警面板 | OK | — |
-| 5.8 | DB Health 注册表维度监控 | `web/api/routes/system.py` | `test_web_system_contracts.py:test_db_health_scans_new_registry_dimensions` | `DatabaseHealth.vue` | DataRegistry 维度状态表格 + 修复操作 | OK | — |
-| 5.9 | Hindsight 记忆查询 | `web/api/routes/hindsight.py` | — | `HindsightGraph.vue` | LLM 记忆图谱可查询 | OK | — |
+| 5.8 | DB Health 注册表维度监控 | `web/api/routes/system.py` | `test_web_system_contracts.py:test_db_health_scans_new_registry_dimensions` | `/datahub?tab=health` → `DatabaseHealth.vue` | DataRegistry 维度状态表格 + 修复操作 | OK | — |
+| 5.9 | Hindsight 记忆查询 | `web/api/routes/hindsight.py` | — | `/system?tab=hindsight` → `HindsightGraph.vue` | LLM 记忆图谱可查询 | OK | — |
 | 5.10 | 前端构建无大 chunk 警告 | `web/frontend/vite.config.ts` | — | — | `npm run build` 无 >500KB chunk 警告 | OK | — |
-| 5.11 | System monitor (CPU/MEM/DISK) | `web/api/routes/system.py` | `test_web_system_contracts.py` | `ActivityMonitor.vue` | 资源面板 + DeepSeek 用量 + Top 进程 | OK | — |
-| 5.12 | Monitor/Settings 职责边界清晰 | `ActivityMonitor.vue` + `Settings.vue` | — | `/monitor` `/settings` | Monitor 只读观测, Settings 含策略状态/风控/审计 | OK | — |
-| 5.13 | 行业雷达 Web 页面 | `Sectors.vue` + `web/api/routes/sectors.py` | — | `GET /api/sectors/*` | 申万行业排名表 + 信号分布 + 组合敞口柱状图 | OK | — |
+| 5.11 | System monitor (CPU/MEM/DISK) | `web/api/routes/system.py` | `test_web_system_contracts.py` | `/system?tab=monitor` → `ActivityMonitor.vue` | 资源面板 + DeepSeek 用量 + Top 进程 | OK | — |
+| 5.12 | Monitor/Settings 职责边界清晰 | `ActivityMonitor.vue` + `Settings.vue` | — | `/system` tabs | Monitor 只读观测, Settings 含策略状态/风控/审计 | OK | — |
+| 5.13 | 行业雷达 Web 页面 | `Sectors.vue` + `web/api/routes/sectors.py` | — | `/research?tab=sectors` + `GET /api/sectors/*` | 申万行业排名表 + 信号分布 + 组合敞口柱状图 | OK | — |
 
 ## 6. 多资产架构 (Multi-Asset)
 
@@ -94,7 +94,7 @@
 | 6.7 | 多资产回测对比 | `backtest/multi_asset_tournament.py` | — | — | stock-only vs ETF-only vs multi 三组对比 | OK | proxy fallback 场景需持续标注 data_source |
 | 6.8 | 差异化费率 (A股/ETF/债券) | `broker/exchange.py` | — | — | A股印花税 0.1% vs ETF 免印花税 | OK | — |
 | 6.9 | 行业/板块数据维度 | `data/sectors.py` + `scripts/build_sector_snapshots.py` | — | `GET /api/sectors/*` | 申万行业指数 + 行业映射 + 信号聚合 + 敞口 | OK | — |
-| 6.10 | 行业 Web 雷达页面 | `web/frontend/src/views/Sectors.vue` | — | `/sectors` 路由 | 申万行业排名表 + 信号分布 + 组合敞口柱状图 | OK | — |
+| 6.10 | 行业 Web 雷达页面 | `web/frontend/src/views/Sectors.vue` | — | `/research?tab=sectors` | 申万行业排名表 + 信号分布 + 组合敞口柱状图 | OK | — |
 
 ## 汇总
 

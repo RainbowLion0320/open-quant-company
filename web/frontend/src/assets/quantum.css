@@ -261,7 +261,7 @@ html, body {
 }
 .telemetry-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(118px, auto));
+  grid-template-columns: repeat(6, minmax(112px, auto));
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   overflow: hidden;

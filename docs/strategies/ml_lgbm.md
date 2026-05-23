@@ -37,7 +37,7 @@
 - `data/models/` 下的模型元数据
 - `data/store/signals/ml_lgbm.parquet`
 - `data/tournament/` 下的锦标赛 JSON
-- Web `/strategies` 与 `/backtest` 页面
+- Web `/strategy-lab` 页面
 
 ## 成本敏感性
 

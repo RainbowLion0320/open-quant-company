@@ -34,7 +34,7 @@
 
 - `data/store/signals/cybernetic.parquet`
 - `data/tournament/` 下的锦标赛 JSON
-- Web `/strategies` 与 `/backtest` 页面
+- Web `/strategy-lab` 页面
 
 ## 成本敏感性
 

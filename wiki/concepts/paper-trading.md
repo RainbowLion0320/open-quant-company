@@ -138,6 +138,6 @@ paper_trading:
 ## See Also
 
 - [[system-architecture]] — 系统分层 + 关键模块表
-- [[web-architecture]] — Web 11 页结构
+- [[web-architecture]] — Web 6 个一级入口结构
 - [[buffett-filter]] — 巴菲特信号来源
 - [[ml-pipeline]] — ML 信号来源

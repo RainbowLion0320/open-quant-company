@@ -4,13 +4,13 @@
 
 ## 1. 概述
 
-Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 实时推送。覆盖市场总览、策略信号浏览、行业雷达、回测结果对比、模拟交易状态、系统设置管理、数据库健康监控。
+Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 实时推送。一级导航收敛为市场总览、市场研究、策略实验室、组合执行、数据中台、系统控制；原子功能通过二级 tab 或兼容 redirect 访问。
 
 **设计原则：**
 - **前后端分离** — Vue 3 (Vite) + FastAPI，独立开发/部署
 - **零锁查询** — DuckDB :memory: 模式直接读 Parquet，不经过数据库锁
 - **实时推送** — WebSocket 推送长时间任务（回测/训练）的进度
-- **职责分离** — `/monitor` 只读观测, `/settings` 配置管理, 不交叉
+- **职责分离** — `/system?tab=monitor` 只读观测, `/system?tab=settings` 配置管理, 不交叉
 
 ## 2. 组件架构
 
@@ -18,8 +18,8 @@ Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSoc
 ┌─────────────────────────────────────────────────────┐
 │              web/frontend/ (Vue 3 + Vite)             │
 │   Pinia Store → Components → ECharts + Tailwind       │
-│   Router: market / strategies / stocks / portfolio     │
-│           sectors / monitor / db-health / settings     │
+│   Router: market / research / strategy-lab             │
+│           portfolio / datahub / system                 │
 └──────────────────────┬──────────────────────────────┘
                        │ HTTP REST + WebSocket
 ┌──────────────────────▼──────────────────────────────┐
@@ -39,22 +39,18 @@ Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSoc
 
 **技术栈：** Vue 3 (Composition API) + ECharts (图表) + Tailwind CSS (样式) + Vite (构建)
 
-**路由表 (12 页):**
+**一级导航 (6 个入口):**
 
 | 路由 | 页面 | 功能 |
 |------|------|------|
 | `/` | 市场总览 | Regime 球体 + 多资产卡片(含 data_source) + 宏观快照 + 策略矩阵 + 预警面板 |
-| `/strategies` | 策略中心 | 生命周期状态徽章 + 信号表格 + WebSocket 进度 |
-| `/stocks` | 个股搜索 | 全量股票搜索入口 |
-| `/stocks/:code` | 个股深挖 | K线 + DCF + 巴菲特评分 + 策略信号 + 财务数据 |
-| `/backtest` | 回测分析 | N策略同屏叠加曲线 + 15 指标 + 基准参照 |
-| `/portfolio` | 模拟持仓 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
-| `/sectors` | 行业雷达 | 申万31行业排名表 + 1/5/20/60日动量 + 信号分布 + 组合敞口 |
-| `/signals` | 信号历史 | 信号变更追踪 (strategy/symbol/old_signal/new_signal) |
-| `/monitor` | 系统信息 | 只读观测: CPU/MEM/DISK + DeepSeek 用量 + API Health + Services + Cron Jobs |
-| `/db-health` | 数据库健康 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
-| `/hindsight` | 记忆图谱 | Canvas 力导向图, 悬浮/点击探索 Hindsight 节点 |
-| `/settings` | 系统设置 | 配置管理: 运行模式 + API Key + 通知 + 数据源 + 审计日志 |
+| `/research` | 市场研究 | 二级 tab: 行业雷达、个股搜索；个股详情仍使用隐藏路由 `/stocks/:code` |
+| `/strategy-lab` | 策略实验室 | 二级 tab: 策略中心、信号历史、回测分析 |
+| `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
+| `/datahub` | 数据中台 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
+| `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、记忆图谱 |
+
+**兼容 redirect：** `/strategies`、`/signals`、`/backtest`、`/stocks`、`/sectors`、`/monitor`、`/settings`、`/db-health`、`/hindsight` 保留为旧入口重定向，不作为一级导航展示。
 
 ### 2.2 后端架构 (FastAPI)
 
@@ -191,7 +187,7 @@ ALLOWED_STRATEGIES = list_strategy_names()
 
 ## 8. 已知限制 & 未来方向
 
-- **行业/板块雷达页面** — 已新增 `/sectors` 路由，展示申万行业动量排名、策略信号分布和组合行业敞口；数据只读本地 `sector/*_snapshot` 缓存。
+- **行业/板块雷达页面** — 已合入 `/research?tab=sectors`，展示申万行业动量排名、策略信号分布和组合行业敞口；数据只读本地 `sector/*_snapshot` 缓存。
 - **无移动端适配** — 当前仅桌面浏览器布局
 - **DuckDB 只读** — 所有写操作通过 API 触发 Python 端 DataHub，不经过 DuckDB
 - **未来：** 策略参数热调、回测结果交互式下钻、前端 smoke/e2e 自动化继续扩大到视觉回归。

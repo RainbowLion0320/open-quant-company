@@ -105,19 +105,24 @@ const runMode = ref("research");
 
 const nav = [
   { path: "/", label: "市场总览", pathData: "M4 17V7l8-4 8 4v10l-8 4-8-4Zm4-1 4 2 4-2V9l-4-2-4 2v7Zm2-1.5h4M10 11h4" },
-  { path: "/strategies", label: "策略中心", pathData: "M12 3l8 4v10l-8 4-8-4V7l8-4Zm0 4v10M7 9.5l5 2.5 5-2.5" },
-  { path: "/stocks", label: "个股深挖", pathData: "M4 18l5-5 4 3 7-9M4 6h16M4 21h16" },
-  { path: "/portfolio", label: "模拟交易", pathData: "M5 7h14v12H5V7Zm3 0V5h8v2M8 13h3m2 0h3" },
-  { path: "/backtest", label: "回测分析", pathData: "M4 19V5m0 14h16M7 15l3-4 3 2 5-7" },
-  { path: "/sectors", label: "行业雷达", pathData: "M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Zm4 2v7h2v-7H7Zm4 0v7h2v-7h-2Zm4 0v7h2v-7h-2Z" },
-  { path: "/signals", label: "信号历史", pathData: "M12 20a8 8 0 1 0-8-8m8 8V9m0 0 4 4m-4-4-4 4" },
-  { path: "/monitor", label: "系统信息", pathData: "M4 13h3l2-6 4 12 2-6h5M4 20h16M4 4h16" },
-  { path: "/db-health", label: "数据库健康", pathData: "M4 6h16M4 12h16M4 18h16M8 2v4m0 4v4m8-12v4m0 4v4M4 22h16" },
-  { path: "/hindsight", label: "记忆图谱", pathData: "M12 2a5 5 0 0 0-5 5v1a5 5 0 0 0 0 10v1a5 5 0 0 0 10 0v-1a5 5 0 0 0 0-10V7a5 5 0 0 0-5-5Zm-3 5a3 3 0 1 1 6 0v1h-6V7Zm6 10a3 3 0 1 1-6 0v-1h6v1ZM9 16a4 4 0 0 1 6 0M8 10h8M8 14h8" },
-  { path: "/settings", label: "系统设置", pathData: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-7.5-2.2-.7-.7a1.5 1.5 0 0 1 0-2.1l.7-.7L3 7.8l-.7.7a1.5 1.5 0 0 1-2.1 0l-.7-.7-.7.7 1.5 1.5-.7.7a1.5 1.5 0 0 1 0 2.1l.7.7.7-.7L3 15.3l1.5 1.5ZM21 15a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" },
+  { path: "/research", label: "市场研究", pathData: "M3 18l5-5 4 3 7-9M4 6h16M4 21h16M7 11h3m4 7h3" },
+  { path: "/strategy-lab", label: "策略实验室", pathData: "M12 3l8 4v10l-8 4-8-4V7l8-4Zm0 4v10M7 9.5l5 2.5 5-2.5M8 17l4-2 4 2" },
+  { path: "/portfolio", label: "组合执行", pathData: "M5 7h14v12H5V7Zm3 0V5h8v2M8 13h3m2 0h3M8 16h8" },
+  { path: "/datahub", label: "数据中台", pathData: "M4 6c0-2 16-2 16 0v12c0 2-16 2-16 0V6Zm0 0c0 2 16 2 16 0M4 12c0 2 16 2 16 0M4 18c0 2 16 2 16 0" },
+  { path: "/system", label: "系统控制", pathData: "M4 13h3l2-6 4 12 2-6h5M4 20h16M4 4h16M17 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" },
 ];
 
-const routeTitle = computed(() => nav.find(item => isActive(item.path))?.label || "Quant Terminal");
+const activeSectionPath = computed(() => {
+  if (route.path === "/") return "/";
+  if (route.path.startsWith("/research") || route.path.startsWith("/stocks") || route.path.startsWith("/sectors")) return "/research";
+  if (route.path.startsWith("/strategy-lab") || route.path.startsWith("/strategies") || route.path.startsWith("/signals") || route.path.startsWith("/backtest")) return "/strategy-lab";
+  if (route.path.startsWith("/portfolio")) return "/portfolio";
+  if (route.path.startsWith("/datahub") || route.path.startsWith("/db-health")) return "/datahub";
+  if (route.path.startsWith("/system") || route.path.startsWith("/monitor") || route.path.startsWith("/settings") || route.path.startsWith("/hindsight")) return "/system";
+  return route.path;
+});
+
+const routeTitle = computed(() => nav.find(item => item.path === activeSectionPath.value)?.label || "Quant Terminal");
 
 const ticker = computed(() => (marketMeta.value.multi_asset || []).map((item: any) => ({
   symbol: item.symbol,
@@ -154,8 +159,7 @@ function tickClock() {
 }
 
 function isActive(path: string) {
-  if (path === "/") return route.path === "/";
-  return route.path.startsWith(path);
+  return activeSectionPath.value === path;
 }
 
 async function fetchRegime() {

@@ -145,7 +145,7 @@
       <div class="glass-card settings-card">
         <div class="panel-head">
           <span>TELEGRAM</span>
-          <router-link to="/settings" class="source-badge ok summary-badge">设置</router-link>
+          <router-link :to="{ path: '/system', query: { tab: 'settings' } }" class="source-badge ok summary-badge">设置</router-link>
         </div>
         <div class="source-list">
           <div>
@@ -254,11 +254,11 @@
           <span>QUICK LINKS</span>
         </div>
         <div class="source-list">
-          <router-link to="/settings" class="quick-link-item">
+          <router-link :to="{ path: '/system', query: { tab: 'settings' } }" class="quick-link-item">
             <span>系统设置</span>
             <em class="source-badge ok">配置</em>
           </router-link>
-          <router-link to="/db-health" class="quick-link-item">
+          <router-link :to="{ path: '/datahub', query: { tab: 'health' } }" class="quick-link-item">
             <span>数据库健康</span>
             <em class="source-badge ok">→</em>
           </router-link>
