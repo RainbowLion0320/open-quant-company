@@ -1,6 +1,6 @@
 # Spec: 多资产架构 (Multi-Asset Architecture)
 
-> 版本: 1.0 | 日期: 2026-05-21 | 关联: [[PRD.md]] [[04-execution-layer.md]]
+> 版本: 1.0 | 日期: 2026-05-21 | 关联: [PRD](../PRD.md) [Execution Layer](04-execution-layer.md)
 
 ## 1. 概述
 
@@ -106,9 +106,9 @@ ETFExchange:     佣金 0.01% + 印花税 0%(免)  + 滑点 0.05%
 BondExchange:    佣金 0.001% + 无印花税      + 滑点 0.02%
 ```
 
-### 2.5 ETF 代理价格 — 短期方案
+### 2.5 ETF 价格 fallback
 
-由于 AKShare ETF 历史行情接口（`fund_etf_hist_em`）网络不稳定，`multi_asset_tournament.py` 中使用 proxy 构造 ETF 近似价格：
+ETF 适配器优先使用 AKShare `fund_etf_hist_em` 真实行情。`multi_asset_tournament.py` 在缺少本地 ETF 缓存或接口不可用时，可使用 proxy 构造近似价格，并必须在结果中保留 `data_source` 标识：
 
 | ETF | Proxy | 方法 |
 |-----|-------|------|
@@ -119,7 +119,7 @@ BondExchange:    佣金 0.001% + 无印花税      + 滑点 0.02%
 | 511010 (国债ETF) | 10Y 收益率 | 价格变化 ≈ -久期 × 收益率变化 |
 | 511880 (货币ETF) | Shibor 隔夜 | 日复利累积 |
 
-**长期方案：** 等 AKShare `fund_etf_hist_em` 接口恢复后切换为真实 ETF 行情，或接入 Wind/Tushare ETF 数据。
+**长期方案：** 多资产回测应默认优先真实 ETF 行情，并把 proxy 场景作为显式降级路径；后续可接入 Wind/Tushare ETF 数据作为补充。
 
 ## 3. 数据流
 
@@ -218,8 +218,8 @@ portfolio = allocator.allocate(
 
 ## 8. 已知限制 & 未来方向
 
-- **ETF 真实行情缺失：** 当前使用 proxy 方案，收益计算有偏差（见 2.5 节）
+- **ETF proxy fallback：** ETF 适配器已有真实行情路径，但多资产回测在缺少本地缓存时仍可能回退 proxy，收益计算需标注 data_source
 - **Bond/Futures/Crypto 未实现：** 框架已就绪，需要数据源接入
 - **无跨资产对冲：** 当前各资产独立选标的，未考虑资产间相关性
 - **无动态风险预算：** 当前 regime 权重是静态矩阵，未来可基于波动率动态调整
-- **未来：** Phase 5 实盘中多资产联合执行、T+0 ETF 日内轮动
+- **未来：** 半自动实盘中多资产联合执行、T+0 ETF 日内轮动

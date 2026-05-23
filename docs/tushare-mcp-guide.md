@@ -1,6 +1,7 @@
 # Tushare MCP 数据模块指南
 
-> 更新时间: 2026-05-11 | 积分: 2000 | MCP Server: tushare v0.0.1
+> 更新时间: 2026-05-23 | 积分: 2000 | MCP Server: tushare v0.0.1
+> 定位: 数据源能力参考；当前接入状态以 `config/settings.yaml` → `data_registry` 和 `data/provider.py` 为准。
 
 ## 接入方式
 
@@ -11,18 +12,18 @@ Tushare MCP Server 通过 Streamable HTTP 协议运行:
 
 ## 数据等级与用途
 
-### 一级：核心（量化必需，替换当前AKShare/同花顺方案）
+### 一级：核心（量化必需，AKShare/同花顺互补）
 
-| MCP工具 | 提供内容 | 替代方案 | 接入优先级 |
+| MCP工具 | 提供内容 | 项目用途 | 接入优先级 |
 |---------|----------|----------|:--:|
-| `daily_basic` | PE/PB/PS/市值/换手率/流通股本 | 当前Baidu估值 + Sina股本 | P0 |
-| `fina_indicator` | ROE/ROA/毛利率/净利率/FCFF/FCFE/eps/每股净资产等50+字段 | 当前同花顺摘要（字段少、解析脆弱） | P0 |
-| `income` | 完整利润表（100+字段） | 当前无 | P0 |
-| `balancesheet` | 完整资产负债表（200+字段） | 当前无 | P0 |
-| `cashflow` | 完整现金流量表（80+字段） | 当前同花顺现金流(72字段) | P0 |
-| `stock_basic` | 全A股列表+行业+上市日期+是否ST | 当前AKShare stock_info_a_code_name | P1 |
+| `daily_basic` | PE/PB/PS/市值/换手率/流通股本 | 每日估值与市场因子 | P0 |
+| `fina_indicator` | ROE/ROA/毛利率/净利率/FCFF/FCFE/eps/每股净资产等50+字段 | 财务质量因子和 Buffett/ML 特征 | P0 |
+| `income` | 完整利润表（100+字段） | 财报深挖和未来因子扩展 | P0 |
+| `balancesheet` | 完整资产负债表（200+字段） | 杠杆、资产质量和风控因子 | P0 |
+| `cashflow` | 完整现金流量表（80+字段） | FCF/现金质量因子 | P0 |
+| `stock_basic` | 全A股列表+行业+上市日期+是否ST | 股票池和基础元数据补充 | P1 |
 | `index_classify` | 申万2014/2021版行业分类（三级） | `data/symbols.py`已内置 | - |
-| `sw_daily` | 申万行业指数日行情 | 当前无（只用个股） | P1 |
+| `sw_daily` | 申万行业指数日行情 | 行业雷达和多因子行业动量；已接入 provider/registry | P1 |
 
 ### 二级：策略增强（2000积分解锁，AKShare没有）
 

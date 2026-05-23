@@ -48,7 +48,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 | 行业雷达 | `/sectors` | 申万31行业排名表 + 1/5/20/60日动量 + 信号分布 + 组合敞口 |
 | 信号历史 | `/signals` | 信号变更追踪 (含 strategy/old_signal/new_signal) |
 | 系统信息 | `/monitor` | 只读观测: CPU/MEM/DISK + DeepSeek 用量 + Top 进程 + API Health + Services + Cron Jobs (不写配置) |
-| 数据库健康 | `/db-health` | 34 维度健康扫描 + 全量大小统计 + 按时间分段 + 单表修复 |
+| 数据库健康 | `/db-health` | DataRegistry 启用维度健康扫描 + 全量大小统计 + 按时间分段 + 单表修复 |
 | 记忆图谱 | `/hindsight` | Hindsight 知识图谱 — Canvas 力导向图, 悬浮/点击探索节点关系 |
 | 系统设置 | `/settings` | 配置管理: 运行模式 + API Key + Telegram 通知 + 数据源 + 策略/风控参数 + 审计日志 |
 

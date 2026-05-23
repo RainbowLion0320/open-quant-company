@@ -1,6 +1,6 @@
 # Spec: Web 平台 (Web Platform)
 
-> 版本: 2.0 | 日期: 2026-05-23 | 关联: [[PRD.md]] [[01-data-pipeline.md]] [[02-signal-system.md]]
+> 版本: 2.1 | 更新: 2026-05-23 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
@@ -18,13 +18,14 @@ Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSoc
 ┌─────────────────────────────────────────────────────┐
 │              web/frontend/ (Vue 3 + Vite)             │
 │   Pinia Store → Components → ECharts + Tailwind       │
-│   Router: /health /signals /backtest /portfolio /sys  │
+│   Router: market / strategies / stocks / portfolio     │
+│           sectors / monitor / db-health / settings     │
 └──────────────────────┬──────────────────────────────┘
                        │ HTTP REST + WebSocket
 ┌──────────────────────▼──────────────────────────────┐
 │              web/api/ (FastAPI)                        │
 │   create_app() → CORS → Router → Error Handler        │
-│   routes/ (10 modules) + ws.py + jobs.py               │
+│   routes/ (10 domain modules) + ws.py + jobs.py        │
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
@@ -51,7 +52,7 @@ Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSoc
 | `/sectors` | 行业雷达 | 申万31行业排名表 + 1/5/20/60日动量 + 信号分布 + 组合敞口 |
 | `/signals` | 信号历史 | 信号变更追踪 (strategy/symbol/old_signal/new_signal) |
 | `/monitor` | 系统信息 | 只读观测: CPU/MEM/DISK + DeepSeek 用量 + API Health + Services + Cron Jobs |
-| `/db-health` | 数据库健康 | 34 维度健康扫描 + 大小统计 + 单表修复 |
+| `/db-health` | 数据库健康 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
 | `/hindsight` | 记忆图谱 | Canvas 力导向图, 悬浮/点击探索 Hindsight 节点 |
 | `/settings` | 系统设置 | 配置管理: 运行模式 + API Key + 通知 + 数据源 + 审计日志 |
 
@@ -59,7 +60,7 @@ Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSoc
 
 **应用工厂：** `web/api/__init__.py` → `create_app()` → 注册路由 + CORS + 异常处理
 
-**12 个路由模块：**
+**10 个业务路由模块 + Auth/WS/Jobs：**
 
 | 模块 | 文件 | 端点 |
 |------|------|------|
@@ -73,7 +74,6 @@ Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSoc
 | Settings | `routes/settings.py` | `GET /settings`, `PUT /settings` |
 | System | `routes/system.py` | `GET /system/monitor`, `GET /system/history`, `GET /system/api-health`, `GET /system/cron-jobs`, `GET /system/service-status`, `GET /system/audit`, `GET /system/mode` |
 | Hindsight | `routes/hindsight.py` | `POST /hindsight/query` |
-| Market (续) | `routes/market.py` | `GET /market` 含 `multi_asset[]`, `macro[]`, `strategy_matrix[]`, `alerts[]`, `freshness` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
 
 **WebSocket：** `ws.py` → `/ws/{job_id}` — 任务进度实时推送。`broadcast_progress()` 使用 `list()` 拍平连接集合避免并发修改异常。
@@ -139,7 +139,8 @@ Vue Component 实时更新进度条
 
 ### REST API 约定
 
-- 所有响应包裹在 `{"data": ..., "error": null}` 或 `{"data": null, "error": "message"}`
+- 成功响应优先使用页面/领域 payload shape；有稳定 schema 的端点使用 Pydantic `response_model`
+- 错误响应由 `web/api/errors.py` 统一为 `{"error": ..., "detail": ..., "timestamp": ...}`
 - 分页：`?page=1&page_size=50`
 - 过滤：`?strategy=buffett&date=2026-05-20`
 - 排序：`?sort_by=score&order=desc`
@@ -174,11 +175,11 @@ ALLOWED_STRATEGIES = list_strategy_names()
 
 ## 6. 错误处理
 
-- **404：** 资源不存在 → `{"data": null, "error": "Stock 999999 not found"}`
+- **404：** 资源不存在 → `{"error": "Stock not found: 999999", "timestamp": "..."}`
 - **422：** Pydantic 校验失败 → FastAPI 自动返回字段级错误
 - **500：** 未捕获异常 → `errors.py` 全局处理器统一格式化
 - **WebSocket 断连：** 前端指数退避重连（1s → 2s → 4s，最多 5 次）
-- **Settings 更新非法：** PATCH 端点校验 sectors 必须包含 `strategies` 或 `risk_control`
+- **Settings 更新非法：** 更新端点校验 section 白名单和关键字段，非法配置返回 4xx
 
 ## 7. 测试策略
 
@@ -191,7 +192,6 @@ ALLOWED_STRATEGIES = list_strategy_names()
 ## 8. 已知限制 & 未来方向
 
 - **行业/板块雷达页面** — 已新增 `/sectors` 路由，展示申万行业动量排名、策略信号分布和组合行业敞口；数据只读本地 `sector/*_snapshot` 缓存。
-- **Monitor/Settings 职责同步** — 当前 Monitor 仍含写配置逻辑 (P1-1 待重构)
 - **无移动端适配** — 当前仅桌面浏览器布局
 - **DuckDB 只读** — 所有写操作通过 API 触发 Python 端 DataHub，不经过 DuckDB
 - **未来：** 策略参数热调、回测结果交互式下钻、前端 smoke/e2e 自动化继续扩大到视觉回归。

@@ -1,6 +1,6 @@
 # Spec: 信号系统 (Signal System)
 
-> 版本: 1.0 | 日期: 2026-05-21 | 关联: [[PRD.md]] [[01-data-pipeline.md]] [[03-backtest-engine.md]]
+> 版本: 1.1 | 更新: 2026-05-23 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Backtest Engine](03-backtest-engine.md)
 
 ## 1. 概述
 
@@ -24,7 +24,7 @@
        │               │               │               │
 ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
 │  buffett    │ │multifactor  │ │ ml_signals  │ │cybernetics  │
-│ 三重过滤     │ │ 四维加权     │ │ LightGBM    │ │ 控制论自适应  │
+│ 三重过滤     │ │ 五维加权     │ │ LightGBM    │ │ 控制论自适应  │
 │ 价值约束层   │ │ 打分排名     │ │ PIT 特征    │ │ regime 检测  │
 └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
        │               │               │               │
@@ -61,18 +61,21 @@
 
 ### 2.2 多因子打分 (multifactor.py)
 
-**四维加权模型：**
+**五维加权模型：**
 
 | 维度 | 权重 | 因子 |
 |------|------|------|
-| 质量 (Quality) | 40% | 巴菲特综合评分 + 5Y ROE + ROE 趋势 |
-| 估值 (Valuation) | 30% | 安全边际 + PE/PB 分位数 |
+| 质量 (Quality) | 35% | 巴菲特综合评分 + 5Y ROE + ROE 趋势 |
+| 估值 (Valuation) | 25% | 安全边际 + PE/PB 分位数 |
 | 技术 (Technical) | 15% | 1M/3M 动量 + 波动率 |
-| 市场 (Market) | 15% | 市值 + 换手率 + 资金流向 |
+| 市场 (Market) | 10% | 市场状态下的板块适配 |
+| 行业动量 (Industry Momentum) | 15% | 申万行业 20D/60D 动量，经行业成员映射到个股 |
 
-**regime 自适应：** 牛市中质量权重提高 10%，熊市中估值权重提高 10%，波动市中技术权重降低 5%。
+权重来源为 `config/settings.yaml` → `signals.multifactor.weights`，文档中的百分比只描述当前默认配置。
 
-**输出：** `MultiFactorScorer.score_components()` → `{quality, valuation, technical, market, total}`，每维度 0-100 分。
+**行业动量数据源：** 优先读取 `DataHub.dimension_root("sector_performance_snapshot")` 下的最新快照，并通过行业成员维度完成个股→行业映射。缺少行业快照或映射时回退到中性分 50，不阻断信号生成。
+
+**输出：** `MultiFactorScorer.score_components()` → `{quality, valuation, technical, market, industry, total}`，每维度 0-100 分。
 
 ### 2.3 ML 信号 (ml_signals.py)
 

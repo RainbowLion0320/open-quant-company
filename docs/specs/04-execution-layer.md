@@ -1,13 +1,13 @@
 # Spec: 执行层 (Execution Layer)
 
-> 版本: 1.0 | 日期: 2026-05-21 | 关联: [[PRD.md]] [[03-backtest-engine.md]] [[06-multi-asset.md]]
+> 版本: 1.0 | 日期: 2026-05-21 | 关联: [PRD](../PRD.md) [Backtest Engine](03-backtest-engine.md) [Multi-Asset](06-multi-asset.md)
 
 ## 1. 概述
 
 执行层负责将信号转化为模拟交易——PaperBroker 本地模拟撮合、RiskManager 5 规则风控、Persistence 层 Parquet 持久化状态和净值。Cron 日频调度：15:30 扫描信号，09:30 执行模拟交易。
 
 **设计原则：**
-- **Facade Pattern** — Broker 抽象接口 → PaperBroker (当前) / MiniQMTBroker (Phase 5 实盘)
+- **Facade Pattern** — Broker 抽象接口 → PaperBroker (当前) / MiniQMTBroker (未来半自动实盘)
 - **配置驱动风控** — 规则在 `settings.yaml` 中可开关、可调参
 - **状态持久化** — 所有持仓/订单/NAV 写入 Parquet，重启不丢失
 
@@ -158,7 +158,7 @@ class ETFExchange:
 
 | 决策 | 选择 | 原因 |
 |------|------|------|
-| Broker 抽象接口 | Facade Pattern | Phase 5 对接 MiniQMT 时只需实现新 Broker，策略代码零改动 |
+| Broker 抽象接口 | Facade Pattern | 对接 MiniQMT 时只需实现新 Broker，策略代码零改动 |
 | 风控预检 (pre-trade) | 下单前执行，非下单后 | 阻止违规订单进入执行队列 |
 | 熔断只阻止买入 | 允许卖出不允许买入 | 熔断期间应允许减仓止损 |
 | Parquet 持久化 | 非 SQLite | 与数据层统一格式，DuckDB 可直接查询 |
@@ -215,4 +215,4 @@ rm.reset_circuit_breaker()
 - **无日内成交模型：** 全部以收盘价成交，未考虑日内价格波动
 - **无部分成交：** 模拟全额成交，实盘中限价单可能部分成交
 - **风控无组合层面：** 未计算组合 VaR/CVaR 作为动态风控阈值
-- **未来 Phase 5：** 对接 MiniQMT 实盘接口，增加人工确认环节（弹窗确认 → 下单）
+- **未来方向：** 对接 MiniQMT 实盘接口，增加人工确认环节（弹窗确认 → 下单）

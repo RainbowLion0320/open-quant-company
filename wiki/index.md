@@ -10,6 +10,7 @@ tags: [index]
 
 > Quant Agent — 个人A股量化交易系统知识库。每行 = wikilink + 一句话概括。
 > This index lists stable knowledge pages. Current counts, metrics, and phase status live in code/config/data outputs, not in wiki prose.
+> Documentation ownership: see `../docs/DOCUMENTATION.md`.
 
 ## Concepts
 - [[system-architecture]] — **系统架构总览**：多层正交设计，策略运行入口，多资产架构，数据注册表
@@ -35,8 +36,8 @@ tags: [index]
 - [[web-architecture]] — Vue 3 + FastAPI，Quantum Terminal v4.0 设计系统
 
 ## Reference
-- [[data-dimensions]] — ★ 数据维度全览：34 维度注册表, 文件树, 用法速查
-- [[data-schema]] — ★ 数据库完整结构：19 类数据表的列定义、类型、说明
+- [[data-dimensions]] — ★ 数据维度索引：DataRegistry/DataHub 查询入口, 不复制动态维度数量
+- [[data-schema]] — ★ 数据合约索引：DataContract 来源、检查方式、常见 schema 家族
 
 ## Comparisons
 - [[data-sources]] — AKShare(日线+财务+宏观+资金) vs Tushare(三张表+指标+moneyflow+holders)

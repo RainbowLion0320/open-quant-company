@@ -1,22 +1,22 @@
 # Spec: 数据管道 (Data Pipeline)
 
-> 版本: 1.0 | 日期: 2026-05-21 | 关联: [[PRD.md]] [[02-signal-system.md]]
+> 版本: 1.1 | 更新: 2026-05-23 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
-数据管道负责从多源拉取、清洗、缓存、存储 A 股全量数据，并通过 DataHub 统一路径向上层（信号/回测/执行/Web）暴露。覆盖 34 个数据维度，按频率分为日频（行情/估值/资金流向）、月频/季频（财务指标/三张表）、事件驱动（龙虎榜/研报/限售解禁）。
+数据管道负责从多源拉取、清洗、缓存、存储 A 股全量数据，并通过 DataHub 统一路径向上层（信号/回测/执行/Web）暴露。覆盖维度由 `config/settings.yaml` 的 `data_registry` 声明，按频率分为日频（行情/估值/资金流向/行业快照）、月频/季频（财务指标/三张表）、事件驱动（龙虎榜/研报/限售解禁）。
 
 **核心理念：**
 - **离线优先** — 所有数据存储为本地 Parquet，不依赖云端数据库
 - **多源互补** — AKShare（免费不限流，行情）+ Tushare（深度财务数据）
-- **声明式注册** — 34 维度统一在 `settings.yaml` → `DataRegistry` 中声明，含 source/label/SLA/repair/partition
+- **声明式注册** — 数据维度统一在 `settings.yaml` → `DataRegistry` 中声明，含 source/label/SLA/repair/partition
 
 ## 2. 组件架构
 
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    config/settings.yaml               │
-│              data_registry: 34 dimensions             │
+│              data_registry: declared dimensions        │
 └──────────────────────┬──────────────────────────────┘
                        │ 声明式注册
 ┌──────────────────────▼──────────────────────────────┐
@@ -49,17 +49,19 @@
 └─────────────────────────────────────────────────────┘
 ```
 
-### 2.1 DataRegistry — 34 维度注册表
+### 2.1 DataRegistry — 声明式维度注册表
 
 `config/settings.yaml` → `data_registry` 段，每个维度声明：
 - `source`: akshare / tushare_free / tushare_paid / computed
-- `asset`: stock / macro / fund / futures / bond
+- `asset`: stock / sector / macro / fund / futures / bond
 - `status`: available / rate_limited / paid / planned
 - `freq`: daily / monthly / quarterly / event
 - `cache`: 相对路径模板，如 `stock/daily/{symbol}.parquet`
 - `health`: table / label / freshness_sla_days / repair_policy / partition_key
 
 `DataRegistry.validate()` 在启动时运行合约检验，确保所有 enabled 维度 source/asset/status/freq/cache 字段合法。
+
+行业/板块相关维度同样通过注册表管理，包括行业指数行情、行业成员映射、行业动量快照、行业信号聚合和组合行业敞口。上层代码不应硬编码 `data/store/sector/*` 路径，而应使用 `DataHub.dimension_root()` 或 `DataHub.dimension_path()`。
 
 ### 2.2 DataHub — 统一数据中台
 
@@ -176,6 +178,7 @@ get_stock_daily(symbol, adjust="qfq")       → pd.DataFrame
 get_index_daily(symbol="sh000001")          → pd.DataFrame
 get_financial_indicator(symbol)             → pd.DataFrame
 get_stock_spot()                            → pd.DataFrame
+provider.fetch("sw_daily", trade_date=...)  → pd.DataFrame
 ```
 
 ### DataRegistry 核心接口
@@ -203,10 +206,11 @@ reg.health_metadata()           → dict[str, HealthTableMeta]
 - **边界测试：** 空 DataFrame 读写、不存在文件读取、并发追加去重
 - **集成测试：** `get_stock_daily("000001")` 返回有效 DataFrame（需本地已有数据）
 - **回归测试：** Manifest schema_hash 变化检测
+- **行业数据测试：** 行业快照构建、行业动量 contract、行业信号/敞口 schema 由 `tests/test_sector_pipeline.py` 覆盖
 
 ## 8. 已知限制 & 未来方向
 
 - **AKShare 网络不稳定：** 新浪源偶尔限流，已通过 3 源 fallback 缓解
-- **ETF 真实行情缺失：** 当前 `multi_asset_tournament.py` 中用指数/收益率 proxy 替代（见 [[06-multi-asset.md]]）
+- **多资产回测数据质量不均：** ETF 适配器已有真实行情路径，但 `multi_asset_tournament.py` 仍可能在缺少本地缓存时使用 proxy（见 [06-multi-asset.md](06-multi-asset.md)）
 - **Tushare 2000 积分限制：** 部分维度 status=rate_limited，需 `cron_fetch_slow.py` 分批拉取
-- **未来：** Phase 5 考虑接入 Wind/Choice 专业数据终端
+- **未来：** 可接入 Wind/Choice 等专业数据终端，并把付费/限流源统一纳入 DataRegistry SLA

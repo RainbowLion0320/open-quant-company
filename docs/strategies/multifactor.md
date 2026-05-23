@@ -6,7 +6,7 @@
 
 ## 概述
 
-四维加权打分系统：质量 40%（Buffett 分数 + ROE + ROE 趋势）+ 估值 30%（安全边际分层）+ 技术 15%（动量 + 波动率）+ 市场 15%（板块 × 市场状态）。月度调仓，Top 10 等权。
+五维加权打分系统：质量（Buffett 分数 + ROE + ROE 趋势）+ 估值（安全边际分层）+ 技术（skip-1m 动量 + 趋势确认 + 波动率）+ 市场（regime 下的板块适配）+ 行业动量（申万行业 20D/60D 动量）。月度调仓，Top 10 等权。
 
 ## 数据依赖
 
@@ -17,34 +17,32 @@
 | fina_indicator | Tushare | quarterly |
 | adj_factor | AKShare | daily |
 | valuation_daily | Tushare | daily |
+| sector_membership_snapshot | computed | daily |
+| sector_performance_snapshot | computed | daily |
 
 ## 参数空间
 
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | buy_threshold | 52 | 最低买入分 |
-| quality_weight | 0.4 | 质量权重 |
-| valuation_weight | 0.3 | 估值权重 |
+| quality_weight | 0.35 | 质量权重 |
+| valuation_weight | 0.25 | 估值权重 |
 | technical_weight | 0.15 | 技术权重 |
-| market_weight | 0.15 | 市场权重 |
+| market_weight | 0.10 | 市场权重 |
+| industry_momentum_weight | 0.15 | 行业动量权重 |
 | top_n | 10 | 持仓数量 |
 | rebalance_interval | ~20 交易日 | 月度调仓 |
 | score_base | 50 | 基准分 |
 
-## 样本内结果
+参数权威来源为 `config/settings.yaml` → `signals.multifactor`，上表只记录当前默认值。
 
-- **回测期**: 2020-01-01 → 2026-05-10
-- **基准**: 上证综指 +35.48%
-- **年化收益**: +91.98%
-- **Sharpe**: 0.71
-- **MaxDD**: -23.8%
-- **胜率**: 50.8%
-- **交易次数**: 77
-- **排名**: 锦标赛第一
+## 结果来源
 
-## OOS 结果
+最新样本内/OOS/锦标赛结果不写死在策略文档中，避免和回测输出漂移。查看：
 
-待补充：最新月份样本外表现。
+- `data/tournament/` 下的锦标赛 JSON
+- `data/store/signals/multifactor.parquet`
+- Web `/backtest` 与 `/strategies` 页面
 
 ## 成本敏感性
 
@@ -56,3 +54,4 @@
 - 市场状态突变：月度调仓跟不上快速切换
 - ROE 季度滞后：季报空窗期质量因子失真
 - 估值陷阱：低 PE/PB 可能反映基本面恶化
+- 行业动量漂移：行业快照缺失或行业成员映射滞后时，行业维回退到中性分，可能降低轮动敏感度
