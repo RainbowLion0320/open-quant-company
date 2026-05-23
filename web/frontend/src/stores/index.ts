@@ -7,7 +7,6 @@ export const useMarketStore = defineStore("market", () => {
   const kline = ref<any[]>([]);
   const multiAsset = ref<any[]>([]);
   const macro = ref<any[]>([]);
-  const strategyMatrix = ref<any[]>([]);
   const freshness = ref<any>({});
   const updated = ref("");
   const poolSize = ref(0);
@@ -23,7 +22,6 @@ export const useMarketStore = defineStore("market", () => {
       kline.value = data.kline;
       multiAsset.value = data.multi_asset || [];
       macro.value = data.macro || [];
-      strategyMatrix.value = data.strategy_matrix || [];
       freshness.value = data.freshness || {};
       updated.value = data.updated || "";
       poolSize.value = data.pool_size || 0;
@@ -35,7 +33,7 @@ export const useMarketStore = defineStore("market", () => {
   }
 
   return {
-    regime, kline, multiAsset, macro, strategyMatrix,
+    regime, kline, multiAsset, macro,
     freshness, updated, poolSize, loading, error, fetchMarket,
   };
 });

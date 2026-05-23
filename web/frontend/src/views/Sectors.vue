@@ -4,7 +4,7 @@
       <div class="surface-copy">
         <span>SECTOR ROTATION</span>
         <strong>申万一级行业动量</strong>
-        <small>按收益周期、波动率、策略信号和组合敞口观察行业强弱</small>
+        <small>按收益周期、波动率和策略信号观察行业强弱</small>
       </div>
       <div v-if="overview" class="surface-actions">
         <span class="text-2xs" style="color:var(--text-disabled)">
@@ -143,27 +143,6 @@
       </div>
     </div>
 
-    <!-- Portfolio Exposure -->
-    <div v-if="exposure.length" class="glass-card card-pad-lg mt-4">
-      <h2 class="text-sm font-semibold mb-3" style="color:var(--text-primary)">组合行业敞口</h2>
-      <div class="exposure-bar-wrap">
-        <div
-          v-for="e in exposure"
-          :key="e.sector"
-          class="exposure-bar-item"
-        >
-          <span class="text-2xs" style="color:var(--text-secondary); width:80px; text-align:right; flex-shrink:0">{{ e.sector }}</span>
-          <div class="exposure-bar-track">
-            <div
-              class="exposure-bar-fill"
-              :style="{ width: (e.weight * 100).toFixed(1) + '%' }"
-            ></div>
-          </div>
-          <span class="text-2xs font-mono" style="color:var(--text-primary); width:60px; flex-shrink:0">{{ (e.weight * 100).toFixed(1) }}%</span>
-          <span class="text-2xs" style="color:var(--text-disabled); width:80px; flex-shrink:0">¥{{ fmtNum(e.market_value) }} · {{ e.position_count }}只</span>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -173,14 +152,12 @@ import { api } from "../api";
 import type {
   SectorOverviewResponse,
   SectorCard,
-  SectorExposureItem,
   SectorStocksResponse,
 } from "../api";
 
 const loading = ref(false);
 const error = ref("");
 const overview = ref<SectorOverviewResponse | null>(null);
-const exposure = ref<SectorExposureItem[]>([]);
 const activeSector = ref("");
 const memberStocks = ref<{ symbol: string }[]>([]);
 const memberTotal = ref(0);
@@ -221,11 +198,6 @@ function fmtPct(v: number) {
   return (v * 100).toFixed(2) + "%";
 }
 
-function fmtNum(v: number) {
-  if (Math.abs(v) >= 1e4) return (v / 1e4).toFixed(1) + "万";
-  return v.toFixed(0);
-}
-
 function colorPct(v: number) {
   if (v > 0.005) return "var(--positive)";
   if (v < -0.005) return "var(--negative)";
@@ -257,16 +229,10 @@ async function fetchData() {
   loading.value = true;
   error.value = "";
   try {
-    const [ov, exp] = await Promise.all([
-      api.sectorOverview(),
-      api.sectorExposure(),
-    ]);
-    overview.value = ov;
-    exposure.value = exp.exposure || [];
+    overview.value = await api.sectorOverview();
   } catch (e: any) {
     error.value = e?.message || "行业快照加载失败";
     overview.value = null;
-    exposure.value = [];
   }
   loading.value = false;
 }
@@ -332,29 +298,5 @@ onMounted(fetchData);
 }
 .member-chip:hover {
   background: rgba(0, 212, 255, 0.12);
-}
-.exposure-bar-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.exposure-bar-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.exposure-bar-track {
-  flex: 1;
-  height: 8px;
-  background: rgba(0, 212, 255, 0.06);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.exposure-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--positive));
-  border-radius: 4px;
-  min-width: 2px;
-  transition: width 0.3s ease;
 }
 </style>

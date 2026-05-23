@@ -145,40 +145,8 @@
       </aside>
     </section>
 
-    <section class="system-settings">
-      <div class="settings-col">
-      <div class="glass-card settings-card">
-        <div class="panel-head">
-          <span>TELEGRAM</span>
-          <router-link :to="{ path: '/system', query: { tab: 'settings' } }" class="source-badge ok summary-badge">设置</router-link>
-        </div>
-        <div class="source-list">
-          <div>
-            <span>Signal Push</span>
-            <em :class="['source-badge', notificationEnabled ? 'ok' : 'muted']">{{ notificationText }}</em>
-          </div>
-          <div>
-            <span>Signal Change Only</span>
-            <em :class="['source-badge', signalChangeOnly ? 'ok' : 'limited']">{{ signalChangeOnly ? 'enabled' : 'all signals' }}</em>
-          </div>
-        </div>
-      </div>
-      <div class="glass-card settings-card">
-        <div class="panel-head">
-          <span>DATA SOURCES</span>
-          <small>{{ sourceItems.length }} groups</small>
-        </div>
-        <div class="source-list">
-          <template v-if="sourceItems.length">
-            <div v-for="src in sourceItems" :key="src.name">
-              <span>{{ src.name }}</span>
-              <em :class="['source-badge', src.status === 'available' ? 'ok' : 'limited']">{{ src.summary }}</em>
-            </div>
-          </template>
-          <div v-else><span>Registry</span><em class="source-badge muted">暂无配置</em></div>
-        </div>
-      </div>
-      <div class="glass-card settings-card">
+    <section class="ops-grid">
+      <div class="glass-card ops-card">
         <div class="panel-head">
           <span>API HEALTH</span>
           <em v-if="apiHealth" :class="apiHealth.all_ok ? 'source-badge ok' : 'source-badge limited'"
@@ -194,7 +162,7 @@
           <div v-else><span>API Health</span><em class="source-badge muted">加载中...</em></div>
         </div>
       </div>
-      <div class="glass-card settings-card">
+      <div class="glass-card ops-card">
         <div class="panel-head">
           <span>SERVICES</span>
           <em v-if="serviceSummary" :class="['source-badge', serviceBadgeClass(), 'summary-badge']">{{ serviceSummary }}</em>
@@ -214,9 +182,7 @@
           <div v-else><span>Services</span><em class="source-badge muted">加载中...</em></div>
         </div>
       </div>
-      </div>
-      <div class="settings-col">
-      <div class="glass-card settings-card">
+      <div class="glass-card ops-card">
         <div class="panel-head">
           <span>CRON JOBS</span>
           <em v-if="cronSummary" :class="['source-badge', cronSummaryBadge, 'summary-badge']">{{ cronSummary }}</em>
@@ -234,53 +200,16 @@
           <div v-else><span>Cron Jobs</span><em class="source-badge muted">加载中...</em></div>
         </div>
       </div>
-      <div class="glass-card settings-card">
-        <div class="panel-head">
-          <span>SYSTEM INFO</span>
-          <small>{{ systemInfo.version }}</small>
-        </div>
-        <div class="source-list">
-          <div>
-            <span>Universe</span>
-            <em class="source-badge ok">{{ systemInfo.universe }}</em>
-          </div>
-          <div>
-            <span>Strategies</span>
-            <em class="source-badge ok">{{ systemInfo.strategies }}</em>
-          </div>
-          <div>
-            <span>Feature Policy</span>
-            <em class="source-badge muted">{{ systemInfo.featurePolicy }}</em>
-          </div>
-        </div>
-      </div>
-      <div class="glass-card settings-card">
-        <div class="panel-head">
-          <span>QUICK LINKS</span>
-        </div>
-        <div class="source-list">
-          <router-link :to="{ path: '/system', query: { tab: 'settings' } }" class="quick-link-item">
-            <span>系统设置</span>
-            <em class="source-badge ok">配置</em>
-          </router-link>
-          <router-link :to="{ path: '/datahub', query: { tab: 'health' } }" class="quick-link-item">
-            <span>数据库健康</span>
-            <em class="source-badge ok">→</em>
-          </router-link>
-        </div>
-      </div>
-      </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { api, type SystemMonitor } from "../api";
 
 const monitor = ref<SystemMonitor | null>(null);
 const monitorError = ref("");
-const settings = reactive<Record<string, any>>({});
 const lastFetch = ref(Date.now());
 const elapsed = ref(0);
 const historyHours = ref(24);
@@ -310,46 +239,6 @@ const dsCostRef = ref<HTMLCanvasElement | null>(null);
 const dsTotals = ref<{ pro: number; flash: number; cost: number } | null>(null);
 
 const apiHealth = ref<{ items: { name: string; status: string; detail: string }[]; summary: string; all_ok: boolean } | null>(null);
-
-const notificationEnabled = computed(() => !!settings.trading?.notification?.enabled);
-const signalChangeOnly = computed(() => settings.trading?.notification?.signal_change_only !== false);
-const notificationText = computed(() => notificationEnabled.value ? "enabled" : "disabled");
-const sourceItems = computed(() => {
-  const registry = settings.data_registry || {};
-  const grouped: Record<string, { name: string; total: number; enabled: number; status: string }> = {};
-  const labels: Record<string, string> = {
-    akshare: "AKShare",
-    tushare_free: "Tushare Free",
-    tushare_paid: "Tushare Paid",
-    future: "Future",
-    computed: "Computed",
-    system: "System",
-  };
-  for (const entry of Object.values(registry) as any[]) {
-    const key = String(entry?.source || "local");
-    grouped[key] = grouped[key] || { name: labels[key] || key, total: 0, enabled: 0, status: "available" };
-    grouped[key].total += 1;
-    if (entry?.enabled !== false) grouped[key].enabled += 1;
-    if (entry?.enabled !== false && entry?.status && entry.status !== "available") grouped[key].status = String(entry.status);
-  }
-  return Object.values(grouped)
-    .sort((a, b) => b.enabled - a.enabled || a.name.localeCompare(b.name))
-    .slice(0, 6)
-    .map(item => ({ ...item, summary: item.enabled ? `${item.enabled}/${item.total} dims` : "disabled" }));
-});
-const systemInfo = computed(() => {
-  const project = settings.project || {};
-  const strategies = settings.signals || {};
-  const registry = settings.data_registry || {};
-  const enabledStrategies = Object.values(strategies).filter((v: any) => v?.enabled !== false).length;
-  const enabledDims = Object.values(registry).filter((v: any) => v?.enabled !== false).length;
-  return {
-    version: project.version ? `v${project.version}` : "v—",
-    universe: `${enabledDims} data dims`,
-    strategies: `${enabledStrategies} enabled`,
-    featurePolicy: settings.feature_store?.point_in_time ? "PIT enforced" : "standard",
-  };
-});
 
 
 // Fixed API health display order: data → AI → infra → messaging
@@ -436,13 +325,6 @@ function apiBadgeClass(status: string): string {
 
 async function fetchApiHealth() {
   try { apiHealth.value = await api.apiHealth(); } catch { apiHealth.value = null; }
-}
-
-async function fetchSettings() {
-  try {
-    const data = await api.settings();
-    Object.assign(settings, data);
-  } catch {}
 }
 
 function fmtNum(n: number): string {
@@ -636,7 +518,6 @@ async function drawDSChart() {
 onMounted(() => {
   fetchData();
   fetchSlowData();
-  fetchSettings();
   fetchApiHealth();
   fetchCronJobs();
   fetchServiceStatus();
@@ -668,20 +549,15 @@ onUnmounted(() => {
   gap: 12px;
   align-items: start;
 }
-.system-settings {
-  display: flex;
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-}
-.settings-col {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex: 1;
 }
 .telemetry-card,
 .deepseek-panel,
 .side-card,
-.settings-card {
+.ops-card {
   padding: 14px;
 }
 .telemetry-card {
@@ -879,30 +755,6 @@ onUnmounted(() => {
   text-align: center;
 }
 
-/* ── Toggle ── */
-.toggle-switch {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  border-radius: 999px;
-  background: var(--border-strong);
-  border: none;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.toggle-switch.active { background: var(--accent); }
-.toggle-switch span {
-  position: absolute;
-  top: 2px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  transition: left 0.2s;
-}
-.toggle-switch:not(.active) span { left: 2px; }
-.toggle-switch.active span { left: 20px; }
-
 /* ── Badge / Icon ── */
 .source-badge {
   font-size: 10px;
@@ -932,17 +784,6 @@ onUnmounted(() => {
   background: rgba(148,163,184,0.12);
   color: var(--text-disabled);
 }
-.tag-badge {
-  font-size: 9px;
-  font-family: "JetBrains Mono", monospace;
-  padding: 2px 7px;
-  border-radius: 4px;
-  white-space: nowrap;
-  border: 1px solid transparent;
-}
-.tag-badge.cyan { background:rgba(6,182,212,0.12); color:rgba(6,182,212,0.95); border-color:rgba(6,182,212,0.12); }
-.tag-badge.violet { background:rgba(124,58,237,0.13); color:rgba(167,139,250,0.95); border-color:rgba(124,58,237,0.14); }
-.tag-badge.amber { background:rgba(245,158,11,0.13); color:#f59e0b; border-color:rgba(245,158,11,0.14); }
 .icon-button {
   width: 26px;
   height: 26px;
@@ -961,44 +802,8 @@ onUnmounted(() => {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.quick-link-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  font-size: 12px;
-  text-decoration: none;
-  cursor: pointer;
-}
-.quick-link-item:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
-}
-.quick-link-item:hover {
-  color: var(--accent);
-}
-.settings-row.main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.settings-row strong,
-.source-list span,
-.info-grid span {
+.source-list span {
   display: block;
-}
-.settings-row strong {
-  color: var(--text-primary);
-  font-size: 13px;
-}
-.settings-row span {
-  margin-top: 2px;
-  color: var(--text-disabled);
-  font-size: 10px;
 }
 .source-list {
   display: grid;
@@ -1028,40 +833,15 @@ onUnmounted(() => {
   font-size: 10px;
   color: var(--text-disabled);
 }
-.info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 14px;
-}
-.info-grid div {
-  min-width: 0;
-}
-.info-grid span {
-  color: var(--text-disabled);
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.info-grid strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--text-secondary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* ── Responsive ── */
 @media (max-width: 1180px) {
   .system-grid { grid-template-columns: 1fr; }
   .system-side { grid-template-columns: 1fr 1fr; }
+  .ops-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 900px) {
   .system-hero { grid-template-columns: 1fr; }
   .system-side { grid-template-columns: 1fr; }
-  .system-settings { flex-direction: column; }
   .usage-summary { grid-template-columns: 1fr; }
   .panel-head {
     align-items: flex-start;

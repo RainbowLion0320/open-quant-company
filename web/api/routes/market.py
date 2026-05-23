@@ -187,35 +187,6 @@ def _macro_cards() -> list[dict]:
     ]
 
 
-def _strategy_matrix() -> list[dict]:
-    try:
-        from data.results_db import list_strategies, load_strategy_signals
-    except Exception:
-        return []
-
-    rows = []
-    for s in list_strategies():
-        try:
-            sigs = load_strategy_signals(s["name"], limit=1)
-            top = sigs[0] if sigs else {}
-        except Exception:
-            top = {}
-        rows.append({
-            "name": s["name"],
-            "label": s.get("label", s["name"]),
-            "total": s.get("total", 0),
-            "buys": s.get("buys", 0),
-            "buy_ratio": round((s.get("buys", 0) / s.get("total", 1)) if s.get("total") else 0, 4),
-            "score": round(_num(top.get("score")), 1) if top else 0,
-            "signal": top.get("signal", "hold"),
-            "top_symbol": top.get("symbol", ""),
-            "top_name": top.get("name", ""),
-            "industry": top.get("industry", ""),
-            "last_computed": s.get("last_computed", ""),
-        })
-    return rows
-
-
 @router.get("/regime")
 async def market_regime():
     """轻量端点: 仅返回顶栏遥测所需数据 (regime + 核心指数 + 新鲜度)。App.vue 每60s轮询。"""
@@ -247,7 +218,7 @@ async def market_regime():
 
 @router.get("")
 async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|YTD)$")):
-    """市场总览: regime + K线 + 核心指数 + 宏观 + 策略矩阵"""
+    """市场总览: regime + K线 + 核心指数 + 宏观"""
     from cybernetics.orchestrator import QuantOrchestrator
 
     orch = QuantOrchestrator()
@@ -280,7 +251,6 @@ async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|Y
     }
     multi_asset = _multi_asset_cards(recent, series_limit=tail)
     macro = _macro_cards()
-    strategy_matrix = _strategy_matrix()
 
     return {
         "regime": regime,
@@ -288,7 +258,6 @@ async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|Y
         "range": range,
         "multi_asset": multi_asset,
         "macro": macro,
-        "strategy_matrix": strategy_matrix,
         "freshness": {
             "market": str(recent.iloc[-1]["date"])[:10] if len(recent) else "",
             "macro": max([m.get("date", "") for m in macro] or [""]),

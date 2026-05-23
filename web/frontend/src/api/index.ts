@@ -105,20 +105,6 @@ export interface MacroCard {
   series: MarketSeriesPoint[];
 }
 
-export interface StrategyMatrixRow {
-  name: string;
-  label: string;
-  total: number;
-  buys: number;
-  buy_ratio: number;
-  score: number;
-  signal: "buy" | "hold" | "sell";
-  top_symbol: string;
-  top_name: string;
-  industry: string;
-  last_computed: string;
-}
-
 export interface MarketAlert {
   level: "success" | "warning" | "danger" | "info";
   title: string;
@@ -132,7 +118,6 @@ export interface MarketResponse {
   range?: string;
   multi_asset?: MarketAssetCard[];
   macro?: MacroCard[];
-  strategy_matrix?: StrategyMatrixRow[];
   freshness?: { market: string; macro: string };
   pool_size?: number;
   updated?: string;

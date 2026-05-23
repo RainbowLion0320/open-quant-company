@@ -43,7 +43,53 @@
           <em>{{ relativeSubtitle }}</em>
         </div>
         <div class="index-chart-shell">
-          <div ref="chartRef" class="index-chart"></div>
+          <div v-if="relativeChart.lines.length" class="index-legend">
+            <span v-for="line in relativeChart.lines" :key="line.key">
+              <i :style="{ background: line.color }"></i>{{ line.label }}
+            </span>
+          </div>
+          <div v-if="relativeChart.lines.length" class="chart-y-labels" aria-hidden="true">
+            <span
+              v-for="tick in chartTicks"
+              :key="tick"
+              :style="{ top: chartLabelTop(tick) }"
+            >{{ fmtSignedPct(tick) }}</span>
+          </div>
+          <svg
+            v-if="relativeChart.lines.length"
+            class="index-chart"
+            :viewBox="`0 0 ${CHART_VIEW_W} ${CHART_VIEW_H}`"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="核心指数相对强弱走势图"
+          >
+            <g class="chart-grid">
+              <line
+                v-for="tick in chartTicks"
+                :key="`grid-${tick}`"
+                :x1="CHART_LEFT"
+                :x2="CHART_RIGHT"
+                :y1="chartY(tick)"
+                :y2="chartY(tick)"
+              />
+            </g>
+            <g class="chart-lines">
+              <path
+                v-for="line in relativeChart.lines"
+                :key="line.key"
+                :d="linePath(line)"
+                :stroke="line.color"
+                :stroke-width="line.key === strengthLeader.key ? 2.8 : 1.9"
+              />
+            </g>
+          </svg>
+          <div v-if="relativeChart.lines.length" class="chart-x-labels" aria-hidden="true">
+            <span
+              v-for="label in chartXLabels"
+              :key="label.date"
+              :style="{ left: label.left }"
+            >{{ label.label }}</span>
+          </div>
           <div v-if="!relativeChart.lines.length" class="panel-empty chart-empty">暂无核心指数对比数据</div>
         </div>
       </div>
@@ -72,104 +118,51 @@
       <button class="btn btn-xs" @click="refresh">重试</button>
     </div>
 
-    <section v-if="assetSummaries.length" class="asset-strip" aria-label="核心A股指数">
-      <article v-for="asset in assetSummaries" :key="asset.key" class="asset-card glass-card" :class="asset.rankClass">
-        <div class="asset-top">
-          <span>{{ asset.label }}</span>
-          <em>{{ asset.symbol }}</em>
-        </div>
-        <div class="asset-value">
-          <strong>{{ fmtValue(asset.value, asset.unit) }}</strong>
-          <small :style="{ color: (asset.change_pct || 0) >= 0 ? 'var(--positive)' : 'var(--negative)' }">
-            {{ fmtPctChange(asset.change_pct) }}
-          </small>
-        </div>
-        <div class="asset-metrics">
-          <div>
-            <span>{{ selectedRange }}</span>
-            <strong :style="{ color: asset.periodChange >= 0 ? 'var(--positive)' : 'var(--negative)' }">
-              {{ fmtPctChange(asset.periodChange) }}
-            </strong>
+    <section class="sector-pulse glass-card">
+      <div class="panel-head">
+        <span>HOT SECTOR PULSE</span>
+        <small>{{ sectorPulseMeta }}</small>
+      </div>
+      <div v-if="hotSectors.length" class="sector-pulse-grid">
+        <article v-for="sector in hotSectors" :key="sector.sector_code" class="sector-pulse-card">
+          <div class="sector-rank">#{{ sector.rank }}</div>
+          <div class="sector-main">
+            <strong>{{ sector.sector_name }}</strong>
+            <span>{{ sectorTag(sector) }}</span>
           </div>
-          <div>
-            <span>Strength</span>
-            <strong>{{ asset.rankLabel }}</strong>
+          <div class="sector-metrics">
+            <div><span>1D</span><strong :style="{ color: colorPct(sector.return_1d) }">{{ fmtReturn(sector.return_1d) }}</strong></div>
+            <div><span>5D</span><strong :style="{ color: colorPct(sector.return_5d) }">{{ fmtReturn(sector.return_5d) }}</strong></div>
+            <div><span>20D</span><strong :style="{ color: colorPct(sector.return_20d) }">{{ fmtReturn(sector.return_20d) }}</strong></div>
+            <div><span>Signal</span><strong>{{ fmtSignalPower(sector) }}</strong></div>
           </div>
-        </div>
-        <div class="asset-source" :title="asset.source_detail || ''">
-          <span v-if="asset.data_source === 'real'" class="source-dot source-real"></span>
-          <span v-else-if="asset.data_source === 'proxy'" class="source-badge source-proxy">PROXY</span>
-          <span v-else-if="asset.data_source === 'missing'" class="source-badge source-missing">NO DATA</span>
-          <span v-else class="source-dot source-unknown"></span>
-        </div>
-      </article>
-    </section>
-    <section v-else class="asset-strip">
-      <article class="asset-card glass-card asset-empty">
-        <span>核心指数数据暂未载入</span>
-        <strong>等待数据源刷新</strong>
-      </article>
-    </section>
-
-    <section class="strategy-section">
-      <div class="strategy-panel glass-card">
-        <div class="panel-head">
-          <span>STRATEGY SIGNAL MATRIX</span>
-          <small>{{ matrix.length }} strategies</small>
-        </div>
-        <table class="command-table">
-          <colgroup>
-            <col style="width:24%">
-            <col style="width:13%">
-            <col style="width:12%">
-            <col style="width:14%">
-            <col style="width:23%">
-            <col style="width:14%">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Strategy</th>
-              <th>Signal</th>
-              <th class="right">Score</th>
-              <th class="right">Buy Ratio</th>
-              <th>Top Target</th>
-              <th>Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in matrix" :key="row.name">
-              <td>
-                <strong>{{ row.label }}</strong>
-                <span>{{ row.name }}</span>
-              </td>
-              <td><b :class="`signal-${row.signal}`">{{ signalLabel(row.signal) }}</b></td>
-              <td class="right font-mono">{{ row.score?.toFixed?.(1) || '0.0' }}</td>
-              <td class="right font-mono">{{ (row.buy_ratio * 100).toFixed(1) }}%</td>
-              <td>
-                <strong>{{ row.top_symbol || '—' }}</strong>
-                <span>{{ row.top_name || row.industry || '等待信号' }}</span>
-              </td>
-              <td class="font-mono">{{ shortTime(row.last_computed) }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-if="!matrix.length" class="panel-empty table-empty">暂无策略矩阵，等待扫描结果</div>
+        </article>
+      </div>
+      <div v-else class="panel-empty sector-empty">
+        {{ sectorLoading ? "正在加载行业热点..." : "暂无行业热点数据" }}
       </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useMarketStore } from "../stores";
-import { useECharts, QUANTUM_THEME } from "../charts/useECharts";
-import type { MacroCard, MarketAssetCard, MarketSeriesPoint } from "../api";
+import { api, type MacroCard, type MarketAssetCard, type MarketSeriesPoint, type SectorCard, type SectorOverviewResponse } from "../api";
 
 const store = useMarketStore();
-const chartRef = ref<HTMLElement | null>(null);
-const { init: initChart, setOption } = useECharts(chartRef);
 const selectedRange = ref("6M");
-let renderTask: Promise<void> | null = null;
+const sectorOverview = ref<SectorOverviewResponse | null>(null);
+const sectorLoading = ref(false);
+
+const CHART_VIEW_W = 720;
+const CHART_VIEW_H = 310;
+const CHART_LEFT = 44;
+const CHART_RIGHT = 702;
+const CHART_TOP = 34;
+const CHART_BOTTOM = 282;
+const CHART_WIDTH = CHART_RIGHT - CHART_LEFT;
+const CHART_HEIGHT = CHART_BOTTOM - CHART_TOP;
 
 const timeRanges = [
   { key: "1D", label: "1D" },
@@ -180,7 +173,23 @@ const timeRanges = [
 
 const assets = computed(() => store.multiAsset || []);
 const macro = computed(() => store.macro || []);
-const matrix = computed(() => store.strategyMatrix || []);
+const hotSectors = computed(() => {
+  const sectors = sectorOverview.value?.sectors || [];
+  return [...sectors].sort((a, b) => a.rank - b.rank).slice(0, 5);
+});
+const sectorPulseMeta = computed(() => {
+  const total = sectorOverview.value?.total_sectors || 0;
+  const date = sectorDate.value;
+  if (!total) return "Top 5 · 等待行业快照";
+  return `Top 5 / ${total} · ${date}`;
+});
+const sectorDate = computed(() => {
+  const raw = sectorOverview.value?.freshness?.performance || "";
+  const m = raw.match(/(\d{4}-\d{2}-\d{2})|(\d{8})/);
+  if (!m) return "—";
+  const value = m[1] || m[2];
+  return value.length === 8 ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}` : value;
+});
 
 const indexColors: Record<string, string> = {
   sse: "#7dd3fc",
@@ -195,21 +204,6 @@ interface RelativeLine {
   color: string;
   change: number;
   data: Array<number | null>;
-}
-
-interface AssetSummary extends MarketAssetCard {
-  periodChange: number;
-  rank: number;
-  rankLabel: string;
-  rankClass: string;
-}
-
-function calcPeriodChange(asset: MarketAssetCard) {
-  const points = (asset.series || [])
-    .map(p => Number(p.value))
-    .filter(v => Number.isFinite(v) && v !== 0);
-  if (points.length < 2) return 0;
-  return (points[points.length - 1] / points[0]) - 1;
 }
 
 const relativeChart = computed(() => {
@@ -237,25 +231,6 @@ const relativeChart = computed(() => {
     };
   }).filter(line => line.data.some(v => v != null));
   return { dates, lines };
-});
-
-const assetSummaries = computed<AssetSummary[]>(() => {
-  const rows = (assets.value || []).map((asset: MarketAssetCard) => ({
-    ...asset,
-    periodChange: calcPeriodChange(asset),
-  }));
-  const ranks = new Map([...rows]
-    .sort((a, b) => b.periodChange - a.periodChange)
-    .map((asset, index) => [asset.key, index + 1]));
-  const lastRank = rows.length;
-
-  return rows.map((asset) => {
-    const rank = ranks.get(asset.key) || 0;
-    const hasSeries = (asset.series || []).length >= 2;
-    const rankLabel = !hasSeries ? "NO DATA" : rank === 1 ? "LEADER" : rank === lastRank ? "LAGGING" : `RANK ${rank}`;
-    const rankClass = !hasSeries ? "is-missing" : rank === 1 ? "is-leader" : rank === lastRank ? "is-lagging" : "";
-    return { ...asset, rank, rankLabel, rankClass };
-  });
 });
 
 const strengthLeader = computed(() => {
@@ -292,62 +267,68 @@ const regimeScore = computed(() => {
   return 50;
 });
 
-async function renderChart() {
-  const chartData = relativeChart.value;
-  if (!chartData.lines.length) return;
-  if (renderTask) return renderTask;
-
-  renderTask = (async () => {
-    await initChart();
-    setOption({
-      ...QUANTUM_THEME,
-      legend: {
-        top: 0,
-        right: 4,
-        itemWidth: 10,
-        itemHeight: 6,
-        textStyle: { color: "#64748b", fontSize: 10 },
-      },
-      grid: { left: 42, right: 18, top: 34, bottom: 28 },
-      xAxis: {
-        type: "category",
-        data: chartData.dates,
-        axisLabel: { color: "#64748b", fontSize: 9 },
-        axisLine: { lineStyle: { color: "rgba(125,211,252,0.08)" } },
-      },
-      yAxis: {
-        type: "value",
-        scale: true,
-        axisLabel: { color: "#64748b", fontSize: 9, formatter: "{value}%" },
-        splitLine: { lineStyle: { color: "rgba(125,211,252,0.05)" } },
-      },
-      series: chartData.lines.map(line => ({
-        name: line.label,
-        type: "line",
-        data: line.data,
-        smooth: true,
-        showSymbol: false,
-        connectNulls: true,
-        lineStyle: { width: line.key === strengthLeader.value.key ? 2.6 : 1.7, color: line.color },
-        itemStyle: { color: line.color },
-      })),
-    });
-  })().finally(() => {
-    renderTask = null;
-  });
-
-  return renderTask;
-}
-watch(() => store.multiAsset, () => {
-  void renderChart();
-}, {
-  deep: true,
+const chartScale = computed(() => {
+  const values = relativeChart.value.lines
+    .flatMap(line => line.data)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  if (!values.length) return { min: -1, max: 1 };
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const spread = rawMax - rawMin || 1;
+  const pad = Math.max(spread * 0.12, 0.5);
+  return { min: rawMin - pad, max: rawMax + pad };
 });
+
+const chartTicks = computed(() => {
+  const { min, max } = chartScale.value;
+  const step = (max - min) / 4;
+  return Array.from({ length: 5 }, (_, i) => Number((max - step * i).toFixed(2)));
+});
+
+const chartXLabels = computed(() => {
+  const dates = relativeChart.value.dates;
+  if (!dates.length) return [];
+  const indices = Array.from(new Set([0, Math.floor((dates.length - 1) / 2), dates.length - 1]));
+  return indices.map(index => ({
+    date: dates[index],
+    label: shortDate(dates[index]),
+    left: `${(chartX(index, dates.length) / CHART_VIEW_W) * 100}%`,
+  }));
+});
+
+function chartX(index: number, total: number) {
+  if (total <= 1) return CHART_LEFT;
+  return CHART_LEFT + (index / (total - 1)) * CHART_WIDTH;
+}
+function chartY(value: number) {
+  const { min, max } = chartScale.value;
+  const spread = max - min || 1;
+  return CHART_TOP + ((max - value) / spread) * CHART_HEIGHT;
+}
+function chartLabelTop(value: number) {
+  return `${(chartY(value) / CHART_VIEW_H) * 100}%`;
+}
+function linePath(line: RelativeLine) {
+  const total = relativeChart.value.dates.length;
+  let started = false;
+  return line.data.map((value, index) => {
+    if (value == null || !Number.isFinite(value)) {
+      started = false;
+      return "";
+    }
+    const cmd = started ? "L" : "M";
+    started = true;
+    return `${cmd} ${chartX(index, total).toFixed(1)} ${chartY(value).toFixed(1)}`;
+  }).filter(Boolean).join(" ");
+}
+function shortDate(date: string) {
+  const m = date.match(/^\d{4}-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}` : date;
+}
 
 async function switchRange(range: string) {
   selectedRange.value = range;
   await store.fetchMarket(range);
-  await renderChart();
 }
 
 function fmtValue(v: number | null | undefined, unit = "") {
@@ -356,16 +337,34 @@ function fmtValue(v: number | null | undefined, unit = "") {
   const digits = unit === "%" ? 3 : Math.abs(n) >= 100 ? 2 : 3;
   return `${n.toFixed(digits)}${unit}`;
 }
-function fmtPctChange(v: number | null | undefined) {
-  const n = Number(v || 0) * 100;
-  return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
-}
 function fmtSignedPct(v: number | null | undefined) {
   const n = Number(v || 0);
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 }
-function shortTime(s: string) { return s ? s.slice(5, 16).replace("T", " ") : "—"; }
-function signalLabel(s: string) { return s === "buy" ? "BUY" : s === "sell" ? "SELL" : "HOLD"; }
+function fmtReturn(v: number) {
+  const n = Number(v || 0) * 100;
+  return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+}
+function colorPct(v: number) {
+  if (v > 0.005) return "var(--positive)";
+  if (v < -0.005) return "var(--negative)";
+  return "var(--text-secondary)";
+}
+function signalPower(sector: SectorCard) {
+  const ratios = Object.values(sector.signals || {}).map(signal => Number(signal.buy_ratio || 0));
+  if (!ratios.length) return 0;
+  return Math.max(...ratios);
+}
+function fmtSignalPower(sector: SectorCard) {
+  return `${Math.round(signalPower(sector) * 100)}%`;
+}
+function sectorTag(sector: SectorCard) {
+  const sig = signalPower(sector);
+  if (sector.return_20d > 0.10 && sector.volatility > 0.24) return "OVERHEATED";
+  if (sig >= 0.5 && sector.return_5d > 0) return "SIGNAL-BACKED";
+  if (sector.return_5d > 0 && sector.return_20d > 0) return "MOMENTUM";
+  return "WATCH";
+}
 function macroColor(m: MacroCard) {
   if (m.key === "pmi" && Number(m.value || 0) < 50) return "var(--warning)";
   if (m.key === "cpi" && Number(m.value || 0) < 0) return "var(--negative)";
@@ -386,13 +385,28 @@ function sparkPoints(series: MarketSeriesPoint[] = [], width = 160, height = 44)
 }
 
 async function refresh() {
-  await store.fetchMarket(selectedRange.value);
-  await renderChart();
+  await Promise.all([
+    store.fetchMarket(selectedRange.value),
+    fetchHotSectors(),
+  ]);
+}
+
+async function fetchHotSectors() {
+  sectorLoading.value = true;
+  try {
+    sectorOverview.value = await api.sectorOverview();
+  } catch {
+    sectorOverview.value = null;
+  } finally {
+    sectorLoading.value = false;
+  }
 }
 
 onMounted(async () => {
-  await store.fetchMarket(selectedRange.value);
-  await renderChart();
+  await Promise.all([
+    store.fetchMarket(selectedRange.value),
+    fetchHotSectors(),
+  ]);
 });
 </script>
 
@@ -443,7 +457,7 @@ onMounted(async () => {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.regime-panel, .index-panel, .macro-panel, .strategy-panel {
+.regime-panel, .index-panel, .macro-panel {
   padding: 14px;
 }
 .regime-core {
@@ -501,7 +515,7 @@ onMounted(async () => {
   border-radius: 6px;
   background: rgba(0,0,0,0.12);
 }
-.regime-metrics span, .asset-top span, .macro-grid span {
+.regime-metrics span, .macro-grid span {
   display: block;
   color: var(--text-disabled);
   font-size: 9px;
@@ -566,7 +580,69 @@ onMounted(async () => {
   position: relative;
   min-height: 310px;
 }
-.index-chart { height: 310px; }
+.index-chart {
+  width: 100%;
+  height: 310px;
+  display: block;
+}
+.index-legend {
+  position: absolute;
+  z-index: 2;
+  top: 2px;
+  right: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 12px;
+  max-width: calc(100% - 72px);
+}
+.index-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-disabled);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.index-legend i {
+  width: 10px;
+  height: 3px;
+  border-radius: 999px;
+}
+.chart-grid line {
+  stroke: rgba(125, 211, 252, 0.06);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.chart-lines path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.chart-y-labels,
+.chart-x-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.chart-y-labels span,
+.chart-x-labels span {
+  position: absolute;
+  color: var(--text-disabled);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  line-height: 1;
+}
+.chart-y-labels span {
+  left: 0;
+  transform: translateY(-50%);
+}
+.chart-x-labels span {
+  bottom: 3px;
+  transform: translateX(-50%);
+}
 .panel-empty {
   min-height: 120px;
   display: grid;
@@ -582,134 +658,6 @@ onMounted(async () => {
   inset: 8px 0 0;
   min-height: 0;
 }
-.table-empty {
-  min-height: 86px;
-  border-top: 0;
-  border-radius: 0 0 7px 7px;
-}
-.asset-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-.asset-card {
-  padding: 12px 14px;
-  min-height: 112px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.asset-card.is-leader {
-  border-color: rgba(34, 197, 94, 0.26);
-  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.06);
-}
-.asset-card.is-lagging {
-  border-color: rgba(245, 158, 11, 0.18);
-}
-.asset-card.is-missing {
-  opacity: 0.72;
-}
-.asset-source {
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-height: 8px;
-}
-.source-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.source-real { background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,0.4); }
-.source-unknown { background: #64748b; }
-.source-badge {
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 1px 5px;
-  border-radius: 3px;
-  line-height: 1.6;
-}
-.source-proxy {
-  color: #f59e0b;
-  background: rgba(245,158,11,0.10);
-  border: 1px solid rgba(245,158,11,0.20);
-}
-.source-missing {
-  color: #94a3b8;
-  background: rgba(148,163,184,0.10);
-  border: 1px solid rgba(148,163,184,0.20);
-}
-.asset-empty {
-  grid-column: 1 / -1;
-  display: flex;
-  min-height: 92px;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-}
-.asset-empty span {
-  color: var(--text-disabled);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.asset-empty strong {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-.asset-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-.asset-top em {
-  color: var(--text-disabled);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  font-style: normal;
-}
-.asset-value {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-.asset-value strong {
-  color: var(--text-primary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 22px;
-}
-.asset-value small {
-  font-family: "JetBrains Mono", monospace;
-}
-.asset-metrics {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.asset-metrics div {
-  padding: 7px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.12);
-}
-.asset-metrics span {
-  display: block;
-  color: var(--text-disabled);
-  font-size: 9px;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-}
-.asset-metrics strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--text-secondary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
-  white-space: nowrap;
-}
 .microline {
   width: 100%;
   margin-top: 10px;
@@ -719,69 +667,6 @@ onMounted(async () => {
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
-.strategy-section {
-  display: block;
-}
-.command-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  table-layout: fixed;
-}
-.command-table th {
-  height: 34px;
-  padding: 10px 10px;
-  color: var(--text-disabled);
-  border-bottom: 1px solid var(--border-subtle);
-  background: rgba(8, 19, 33, 0.34);
-  font-size: 10px;
-  font-weight: 600;
-  text-align: left;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.command-table td {
-  height: 42px;
-  padding: 11px 10px;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: middle;
-}
-.command-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-.command-table tbody tr:nth-child(even) td {
-  background: rgba(125, 211, 252, 0.014);
-}
-.command-table td strong {
-  display: block;
-  color: var(--text-primary);
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.command-table td span {
-  display: block;
-  color: var(--text-disabled);
-  font-size: 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.command-table tbody tr:hover td {
-  background: rgba(0, 212, 255, 0.055);
-}
-.right { text-align: right !important; font-variant-numeric: tabular-nums; }
-.signal-buy { color: var(--positive); }
-.signal-sell { color: var(--negative); }
-.signal-hold { color: var(--warning); }
 .macro-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -807,15 +692,92 @@ onMounted(async () => {
   font-size: 10px;
   font-style: normal;
 }
+.sector-pulse {
+  padding: 10px 14px;
+}
+.sector-pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.sector-pulse-card {
+  min-height: 86px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.12);
+}
+.sector-rank {
+  color: var(--accent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+.sector-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+}
+.sector-main strong {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sector-main span {
+  flex-shrink: 0;
+  color: var(--text-disabled);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+.sector-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+}
+.sector-metrics div {
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(3, 10, 18, 0.22);
+}
+.sector-metrics span {
+  display: block;
+  color: var(--text-disabled);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sector-metrics strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.sector-empty {
+  margin-top: 12px;
+  min-height: 110px;
+}
 @media (max-width: 1180px) {
-  .market-hero { grid-template-columns: 1fr; }
-  .asset-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .market-hero {
+    grid-template-columns: 1fr;
+  }
+  .sector-pulse-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 720px) {
   .market-command { padding: 12px; }
-  .asset-strip, .macro-grid { grid-template-columns: 1fr; }
+  .macro-grid { grid-template-columns: 1fr; }
+  .sector-pulse-grid { grid-template-columns: 1fr; }
+  .sector-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .regime-core { grid-template-columns: 1fr; justify-items: center; text-align: center; }
-  .command-table { min-width: 720px; }
-  .strategy-panel { overflow-x: auto; }
 }
 </style>

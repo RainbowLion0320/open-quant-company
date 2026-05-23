@@ -43,7 +43,7 @@ Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSoc
 
 | 路由 | 页面 | 功能 |
 |------|------|------|
-| `/` | 市场总览 | Regime 球体 + 核心指数相对强弱图 + 指数状态卡(点位/区间涨跌/强弱排名) + 宏观快照 + 策略矩阵 |
+| `/` | 市场总览 | Regime 球体 + 核心指数相对强弱图 + 宏观快照 + 热门行业脉冲 |
 | `/research` | 市场研究 | 二级 tab: 行业雷达、个股搜索；个股详情仍使用隐藏路由 `/stocks/:code` |
 | `/strategy-lab` | 策略实验室 | 二级 tab: 策略中心、信号历史、回测分析 |
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
@@ -187,7 +187,7 @@ ALLOWED_STRATEGIES = list_strategy_names()
 
 ## 8. 已知限制 & 未来方向
 
-- **行业/板块雷达页面** — 已合入 `/research?tab=sectors`，展示申万行业动量排名、策略信号分布和组合行业敞口；数据只读本地 `sector/*_snapshot` 缓存。
+- **行业/板块雷达页面** — 已合入 `/research?tab=sectors`，展示申万行业动量排名和策略信号分布；组合行业敞口归属 `/portfolio`，避免研究页重复持仓归因。
 - **无移动端适配** — 当前仅桌面浏览器布局
 - **DuckDB 只读** — 所有写操作通过 API 触发 Python 端 DataHub，不经过 DuckDB
 - **未来：** 策略参数热调、回测结果交互式下钻、前端 smoke/e2e 自动化继续扩大到视觉回归。

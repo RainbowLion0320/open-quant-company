@@ -39,7 +39,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
-| 市场总览 | `/` | Regime 球体 + 核心指数看板 (data_source 标识) + 宏观快照 + 策略矩阵 + 智能预警 |
+| 市场总览 | `/` | Regime 球体 + 核心指数相对强弱图 + 宏观快照 + 热门行业脉冲 |
 | 市场研究 | `/research` | 二级 tab: 行业雷达 + 个股搜索；`/stocks/:code` 保留为隐藏详情路由 |
 | 策略实验室 | `/strategy-lab` | 二级 tab: 策略中心 + 信号历史 + 回测分析 |
 | 组合执行 | `/portfolio` | ★ PaperBroker 日频模拟: NAV权益曲线 + 持仓 + 交易记录 + 手动下单 |
@@ -51,13 +51,12 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 ### 指挥中心 (2026-05-16 Codex 升级)
 
 Market API 新增字段：
-- `multi_asset[]` — 兼容字段名，当前承载上证综指/沪深300/创业板指/科创50 核心指数卡片+42日趋势线
+- `multi_asset[]` — 兼容字段名，当前承载上证综指/沪深300/创业板指/科创50 核心指数序列；市场页仅用于相对强弱图，全局 ticker 展示点位与日涨跌
 - `macro[]` — GDP/PMI/CPI/SHIBOR 宏观快照
-- `strategy_matrix[]` — 已注册策略的买比/评分/Top1标的
 - `alerts[]` — 智能预警 (regime/PMI偏离/黄金波动/策略完成)
 - `freshness` — 数据新鲜度时间戳
 
-前端 Market.vue 完全重写：从4张简单卡片升级为 Command Center 布局，含 animated regime orb、核心指数相对强弱图、宏观快照行、策略矩阵卡片、预警面板。大图展示上证综指/沪深300/创业板指/科创50 的归一化强弱对比，卡片展示点位、日涨跌、区间涨跌和强弱排名，不再重复绘制缩略趋势图。
+前端 Market.vue 完全重写：从4张简单卡片升级为 Command Center 布局，含 animated regime orb、核心指数相对强弱图、宏观快照行、热门行业脉冲。大图展示上证综指/沪深300/创业板指/科创50 的归一化强弱对比；点位与日涨跌统一由底部 ticker 展示；策略明细归属策略实验室，行业页承载完整排名与信号分布，市场总览只保留 Top5 热点概览，避免重复缩略看板。
 
 ### 系统信息 (2026-05-21 升级, 2026-05-23 边界明确)
 
@@ -69,7 +68,7 @@ Market API 新增字段：
 - 新增: `/api/system/deepseek-usage` (CDP 日度 Token 用量)
 - 前端: ActivityMonitor.vue, CPU/MEM/DISK + DeepSeek 用量 + Top 进程 + API Health + Services + Cron Jobs
 - Token 三来源覆盖: Hermes state.db + factor_hypothesis log + Hindsight /metrics
-- **职责边界 (2026-05-23):** Monitor 为只读观测页，不调用 `api.saveSettings()`。配置操作通过"去设置"入口引导到 `/system?tab=settings`。
+- **职责边界 (2026-05-23):** Monitor 为只读运行观测页，不调用 `api.saveSettings()`，也不重复展示 Telegram/Data Sources/System Info 等配置摘要；配置读写集中在 `/system?tab=settings`。
 
 ### 记忆图谱 (2026-05-17)
 
