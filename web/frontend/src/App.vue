@@ -41,7 +41,7 @@
         <div class="telemetry-strip">
           <div class="telemetry-cell">
             <span>System</span>
-            <strong class="is-live">Operational</strong>
+            <strong :style="{ color: systemColor }">{{ systemLabel }}</strong>
           </div>
           <div class="telemetry-cell">
             <span>Mode</span>
@@ -102,6 +102,7 @@ let regimeTimer = 0;
 const regime = ref<{ value: string; score?: number }>({ value: "sideways" });
 const marketMeta = ref<Partial<RegimeResponse>>({});
 const runMode = ref("research");
+const systemHealth = ref<{ all_ok: boolean; ok_count: number; total: number }>({ all_ok: true, ok_count: 0, total: 0 });
 
 const nav = [
   { path: "/", label: "市场总览", pathData: "M4 17V7l8-4 8 4v10l-8 4-8-4Zm4-1 4 2 4-2V9l-4-2-4 2v7Zm2-1.5h4M10 11h4" },
@@ -147,6 +148,18 @@ const modeColor = computed(() => {
   if (runMode.value === "paper") return "var(--warning)";
   return "var(--positive)";
 });
+const systemLabel = computed(() => {
+  if (systemHealth.value.total === 0) return "Unknown";
+  if (systemHealth.value.all_ok) return "Operational";
+  if (systemHealth.value.ok_count === 0) return "Down";
+  return "Degraded";
+});
+const systemColor = computed(() => {
+  if (systemHealth.value.total === 0) return "var(--text-muted)";
+  if (systemHealth.value.all_ok) return "var(--positive)";
+  if (systemHealth.value.ok_count === 0) return "var(--negative)";
+  return "var(--warning)";
+});
 const coreVersion = computed(() => {
   const version = (marketMeta.value.config as any)?.project?.version;
   return version ? `v${version}` : "v—";
@@ -177,6 +190,14 @@ async function fetchMode() {
   } catch {}
 }
 
+async function fetchSystemHealth() {
+  try {
+    const data = await api.apiHealth();
+    const okCount = (data.items || []).filter((i: any) => i.status === "ok").length;
+    systemHealth.value = { all_ok: data.all_ok, ok_count: okCount, total: (data.items || []).length };
+  } catch {}
+}
+
 // Particles
 useParticles();
 
@@ -185,6 +206,7 @@ onMounted(() => {
   clockTimer = window.setInterval(tickClock, 1000);
   fetchRegime();
   fetchMode();
+  fetchSystemHealth();
   regimeTimer = window.setInterval(fetchRegime, 60000);
 });
 
