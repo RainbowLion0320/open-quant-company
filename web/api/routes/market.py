@@ -49,8 +49,8 @@ def _date_value_series(df: pd.DataFrame, value_col: str = "close", limit: int = 
 
 
 def _series_card(key: str, label: str, symbol: str, df: pd.DataFrame | None, value_col: str = "close", unit: str = "",
-                 data_source: str = "real", source_detail: str = "") -> dict:
-    series = _date_value_series(df, value_col=value_col)
+                 data_source: str = "real", source_detail: str = "", series_limit: int = 42) -> dict:
+    series = _date_value_series(df, value_col=value_col, limit=series_limit)
     latest = series[-1]["value"] if series else None
     prev = series[-2]["value"] if len(series) > 1 else latest
     change = (latest - prev) if latest is not None and prev is not None else 0
@@ -158,7 +158,7 @@ def _macro_card(key: str, label: str, df: pd.DataFrame | None, candidates: list[
     }
 
 
-def _multi_asset_cards(bench: pd.DataFrame) -> list[dict]:
+def _multi_asset_cards(bench: pd.DataFrame, series_limit: int = 42) -> list[dict]:
     """Keep the API field for compatibility, but render core index breadth cards."""
     cards = []
     bench_len = len(bench)
@@ -173,7 +173,8 @@ def _multi_asset_cards(bench: pd.DataFrame) -> list[dict]:
                 df = df.tail(bench_len)
             detail = f"{source_detail} · {provider_detail}" if data_source == "real" else provider_detail
         cards.append(_series_card(key, label, display_symbol, df, "close", "",
-                                  data_source=data_source, source_detail=detail))
+                                  data_source=data_source, source_detail=detail,
+                                  series_limit=series_limit))
     return cards
 
 
@@ -277,7 +278,7 @@ async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|Y
         "volume_trend": snapshot.volume_trend,
         "breadth": round(snapshot.breadth, 2),
     }
-    multi_asset = _multi_asset_cards(recent)
+    multi_asset = _multi_asset_cards(recent, series_limit=tail)
     macro = _macro_cards()
     strategy_matrix = _strategy_matrix()
 

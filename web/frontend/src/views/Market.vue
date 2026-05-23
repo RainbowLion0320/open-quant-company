@@ -30,21 +30,21 @@
 
       <div class="index-panel glass-card">
         <div class="panel-head">
-          <span>SHANGHAI COMPOSITE INDEX</span>
+          <span>CORE INDEX RELATIVE STRENGTH</span>
           <div class="time-tabs">
             <span v-for="t in timeRanges" :key="t.key" :class="{ active: selectedRange === t.key }" @click="switchRange(t.key)">{{ t.label }}</span>
           </div>
         </div>
         <div class="index-summary">
-          <strong>{{ latestClose }}</strong>
-          <span :style="{ color: indexChange >= 0 ? 'var(--positive)' : 'var(--negative)' }">
-            {{ indexChange >= 0 ? '+' : '' }}{{ indexChange.toFixed(2) }}%
+          <strong>{{ strengthLeader.label }}</strong>
+          <span :style="{ color: strengthLeader.change >= 0 ? 'var(--positive)' : 'var(--negative)' }">
+            {{ fmtSignedPct(strengthLeader.change) }}
           </span>
-          <em>fresh {{ store.freshness?.market || '—' }}</em>
+          <em>{{ relativeSubtitle }}</em>
         </div>
         <div class="index-chart-shell">
           <div ref="chartRef" class="index-chart"></div>
-          <div v-if="!store.kline.length" class="panel-empty chart-empty">暂无指数K线数据</div>
+          <div v-if="!relativeChart.lines.length" class="panel-empty chart-empty">暂无核心指数对比数据</div>
         </div>
       </div>
 
@@ -72,8 +72,8 @@
       <button class="btn btn-xs" @click="refresh">重试</button>
     </div>
 
-    <section v-if="assets.length" class="asset-strip" aria-label="核心A股指数">
-      <article v-for="asset in assets" :key="asset.key" class="asset-card glass-card">
+    <section v-if="assetSummaries.length" class="asset-strip" aria-label="核心A股指数">
+      <article v-for="asset in assetSummaries" :key="asset.key" class="asset-card glass-card" :class="asset.rankClass">
         <div class="asset-top">
           <span>{{ asset.label }}</span>
           <em>{{ asset.symbol }}</em>
@@ -84,9 +84,18 @@
             {{ fmtPctChange(asset.change_pct) }}
           </small>
         </div>
-        <svg viewBox="0 0 160 44" preserveAspectRatio="none" class="sparkline">
-          <polyline :points="sparkPoints(asset.series, 160, 44)" :stroke="sparkColor(asset.change_pct)" />
-        </svg>
+        <div class="asset-metrics">
+          <div>
+            <span>{{ selectedRange }}</span>
+            <strong :style="{ color: asset.periodChange >= 0 ? 'var(--positive)' : 'var(--negative)' }">
+              {{ fmtPctChange(asset.periodChange) }}
+            </strong>
+          </div>
+          <div>
+            <span>Strength</span>
+            <strong>{{ asset.rankLabel }}</strong>
+          </div>
+        </div>
         <div class="asset-source" :title="asset.source_detail || ''">
           <span v-if="asset.data_source === 'real'" class="source-dot source-real"></span>
           <span v-else-if="asset.data_source === 'proxy'" class="source-badge source-proxy">PROXY</span>
@@ -154,7 +163,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useMarketStore } from "../stores";
 import { useECharts, QUANTUM_THEME } from "../charts/useECharts";
-import type { MacroCard, MarketSeriesPoint } from "../api";
+import type { MacroCard, MarketAssetCard, MarketSeriesPoint } from "../api";
 
 const store = useMarketStore();
 const chartRef = ref<HTMLElement | null>(null);
@@ -173,16 +182,90 @@ const assets = computed(() => store.multiAsset || []);
 const macro = computed(() => store.macro || []);
 const matrix = computed(() => store.strategyMatrix || []);
 
-const latestClose = computed(() => {
-  const k = store.kline?.at?.(-1);
-  return k ? Number(k.close).toFixed(2) : "—";
+const indexColors: Record<string, string> = {
+  sse: "#7dd3fc",
+  csi300: "#22c55e",
+  chinext: "#f59e0b",
+  star50: "#a78bfa",
+};
+
+interface RelativeLine {
+  key: string;
+  label: string;
+  color: string;
+  change: number;
+  data: Array<number | null>;
+}
+
+interface AssetSummary extends MarketAssetCard {
+  periodChange: number;
+  rank: number;
+  rankLabel: string;
+  rankClass: string;
+}
+
+function calcPeriodChange(asset: MarketAssetCard) {
+  const points = (asset.series || [])
+    .map(p => Number(p.value))
+    .filter(v => Number.isFinite(v) && v !== 0);
+  if (points.length < 2) return 0;
+  return (points[points.length - 1] / points[0]) - 1;
+}
+
+const relativeChart = computed(() => {
+  const cards = (assets.value || []).filter((asset: MarketAssetCard) => (asset.series || []).length >= 2);
+  const dates = Array.from(new Set(cards.flatMap((asset: MarketAssetCard) => (asset.series || []).map(p => p.date)))).sort();
+  const lines: RelativeLine[] = cards.map((asset: MarketAssetCard) => {
+    const points = (asset.series || [])
+      .map(p => ({ date: p.date, value: Number(p.value) }))
+      .filter(p => p.date && Number.isFinite(p.value))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const base = points.find(p => p.value !== 0)?.value || 0;
+    const values = new Map(points.map(p => [p.date, p.value]));
+    const data = dates.map(date => {
+      const value = values.get(date);
+      if (!base || value == null || !Number.isFinite(value)) return null;
+      return Number((((value / base) - 1) * 100).toFixed(2));
+    });
+    const finite = data.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+    return {
+      key: asset.key,
+      label: asset.label,
+      color: indexColors[asset.key] || "#7dd3fc",
+      change: finite.length ? finite[finite.length - 1] : 0,
+      data,
+    };
+  }).filter(line => line.data.some(v => v != null));
+  return { dates, lines };
 });
-const indexChange = computed(() => {
-  const rows = store.kline || [];
-  if (rows.length < 2) return 0;
-  const last = rows[rows.length - 1].close;
-  const prev = rows[rows.length - 2].close;
-  return prev ? ((last / prev - 1) * 100) : 0;
+
+const assetSummaries = computed<AssetSummary[]>(() => {
+  const rows = (assets.value || []).map((asset: MarketAssetCard) => ({
+    ...asset,
+    periodChange: calcPeriodChange(asset),
+  }));
+  const ranks = new Map([...rows]
+    .sort((a, b) => b.periodChange - a.periodChange)
+    .map((asset, index) => [asset.key, index + 1]));
+  const lastRank = rows.length;
+
+  return rows.map((asset) => {
+    const rank = ranks.get(asset.key) || 0;
+    const hasSeries = (asset.series || []).length >= 2;
+    const rankLabel = !hasSeries ? "NO DATA" : rank === 1 ? "LEADER" : rank === lastRank ? "LAGGING" : `RANK ${rank}`;
+    const rankClass = !hasSeries ? "is-missing" : rank === 1 ? "is-leader" : rank === lastRank ? "is-lagging" : "";
+    return { ...asset, rank, rankLabel, rankClass };
+  });
+});
+
+const strengthLeader = computed(() => {
+  const [leader] = [...relativeChart.value.lines].sort((a, b) => b.change - a.change);
+  return leader || { key: "", label: "—", color: "var(--text-disabled)", change: 0, data: [] };
+});
+const relativeSubtitle = computed(() => {
+  const dates = relativeChart.value.dates;
+  const rangeText = dates.length ? `${dates[0]} → ${dates[dates.length - 1]}` : "等待指数序列";
+  return `${rangeText} · fresh ${store.freshness?.market || "—"}`;
 });
 
 const regimeLabel = computed(() => {
@@ -210,43 +293,44 @@ const regimeScore = computed(() => {
 });
 
 async function renderChart() {
-  if (!store.kline.length) return;
+  const chartData = relativeChart.value;
+  if (!chartData.lines.length) return;
   if (renderTask) return renderTask;
 
   renderTask = (async () => {
     await initChart();
-    const dates = store.kline.map((k: any) => k.date);
-    const closes = store.kline.map((k: any) => Number(k.close));
-    const volumes = store.kline.map((k: any) => k.volume);
     setOption({
       ...QUANTUM_THEME,
-      grid: [
-        { left: 42, right: 18, top: 12, height: "68%" },
-        { left: 42, right: 18, top: "80%", height: "13%" },
-      ],
-      xAxis: [
-        { type: "category", data: dates, gridIndex: 0, axisLabel: { show: false }, axisLine: { lineStyle: { color: "rgba(125,211,252,0.08)" } } },
-        { type: "category", data: dates, gridIndex: 1, axisLabel: { color: "#64748b", fontSize: 9 } },
-      ],
-      yAxis: [
-        { type: "value", gridIndex: 0, scale: true, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { lineStyle: { color: "rgba(125,211,252,0.05)" } } },
-        { type: "value", gridIndex: 1, axisLabel: { show: false }, splitLine: { show: false } },
-      ],
-      series: [
-        {
-          name: "Close",
-          type: "line",
-          xAxisIndex: 0,
-          yAxisIndex: 0,
-          data: closes,
-          smooth: false,
-          showSymbol: false,
-          connectNulls: true,
-          lineStyle: { width: 2, color: "#7dd3fc" },
-          itemStyle: { color: "#7dd3fc" },
-        },
-        { type: "bar", data: volumes, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: "rgba(0,212,255,0.18)" } },
-      ],
+      legend: {
+        top: 0,
+        right: 4,
+        itemWidth: 10,
+        itemHeight: 6,
+        textStyle: { color: "#64748b", fontSize: 10 },
+      },
+      grid: { left: 42, right: 18, top: 34, bottom: 28 },
+      xAxis: {
+        type: "category",
+        data: chartData.dates,
+        axisLabel: { color: "#64748b", fontSize: 9 },
+        axisLine: { lineStyle: { color: "rgba(125,211,252,0.08)" } },
+      },
+      yAxis: {
+        type: "value",
+        scale: true,
+        axisLabel: { color: "#64748b", fontSize: 9, formatter: "{value}%" },
+        splitLine: { lineStyle: { color: "rgba(125,211,252,0.05)" } },
+      },
+      series: chartData.lines.map(line => ({
+        name: line.label,
+        type: "line",
+        data: line.data,
+        smooth: true,
+        showSymbol: false,
+        connectNulls: true,
+        lineStyle: { width: line.key === strengthLeader.value.key ? 2.6 : 1.7, color: line.color },
+        itemStyle: { color: line.color },
+      })),
     });
   })().finally(() => {
     renderTask = null;
@@ -254,8 +338,10 @@ async function renderChart() {
 
   return renderTask;
 }
-watch(() => store.kline, () => {
+watch(() => store.multiAsset, () => {
   void renderChart();
+}, {
+  deep: true,
 });
 
 async function switchRange(range: string) {
@@ -274,9 +360,12 @@ function fmtPctChange(v: number | null | undefined) {
   const n = Number(v || 0) * 100;
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 }
+function fmtSignedPct(v: number | null | undefined) {
+  const n = Number(v || 0);
+  return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+}
 function shortTime(s: string) { return s ? s.slice(5, 16).replace("T", " ") : "—"; }
 function signalLabel(s: string) { return s === "buy" ? "BUY" : s === "sell" ? "SELL" : "HOLD"; }
-function sparkColor(v: number | null | undefined) { return Number(v || 0) >= 0 ? "#22c55e" : "#ef4444"; }
 function macroColor(m: MacroCard) {
   if (m.key === "pmi" && Number(m.value || 0) < 50) return "var(--warning)";
   if (m.key === "cpi" && Number(m.value || 0) < 0) return "var(--negative)";
@@ -437,9 +526,13 @@ onMounted(async () => {
   gap: 12px;
 }
 .index-summary strong {
-  color: var(--positive);
+  color: var(--text-primary);
+  font-size: 22px;
+}
+.index-summary span {
   font-family: "JetBrains Mono", monospace;
-  font-size: 26px;
+  font-size: 13px;
+  font-weight: 700;
 }
 .index-summary em {
   margin-left: auto;
@@ -501,12 +594,27 @@ onMounted(async () => {
 }
 .asset-card {
   padding: 12px 14px;
-  min-height: 126px;
+  min-height: 112px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.asset-card.is-leader {
+  border-color: rgba(34, 197, 94, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.06);
+}
+.asset-card.is-lagging {
+  border-color: rgba(245, 158, 11, 0.18);
+}
+.asset-card.is-missing {
+  opacity: 0.72;
 }
 .asset-source {
-  margin-top: 6px;
+  margin-top: auto;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  min-height: 8px;
 }
 .source-dot {
   width: 6px; height: 6px;
@@ -563,9 +671,9 @@ onMounted(async () => {
   font-style: normal;
 }
 .asset-value {
-  margin-top: 12px;
   display: flex;
   align-items: baseline;
+  justify-content: space-between;
   gap: 10px;
 }
 .asset-value strong {
@@ -576,11 +684,37 @@ onMounted(async () => {
 .asset-value small {
   font-family: "JetBrains Mono", monospace;
 }
-.sparkline, .microline {
+.asset-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.asset-metrics div {
+  padding: 7px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.12);
+}
+.asset-metrics span {
+  display: block;
+  color: var(--text-disabled);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+.asset-metrics strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.microline {
   width: 100%;
   margin-top: 10px;
 }
-.sparkline polyline, .microline polyline {
+.microline polyline {
   fill: none;
   stroke-width: 2;
   vector-effect: non-scaling-stroke;

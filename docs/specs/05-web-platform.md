@@ -43,7 +43,7 @@ Web 平台提供 Quantum Terminal — Vue 3 SPA 前端 + FastAPI 后端 + WebSoc
 
 | 路由 | 页面 | 功能 |
 |------|------|------|
-| `/` | 市场总览 | Regime 球体 + 核心指数卡片(含 data_source) + 宏观快照 + 策略矩阵 + 预警面板 |
+| `/` | 市场总览 | Regime 球体 + 核心指数相对强弱图 + 指数状态卡(点位/区间涨跌/强弱排名) + 宏观快照 + 策略矩阵 |
 | `/research` | 市场研究 | 二级 tab: 行业雷达、个股搜索；个股详情仍使用隐藏路由 `/stocks/:code` |
 | `/strategy-lab` | 策略实验室 | 二级 tab: 策略中心、信号历史、回测分析 |
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |

@@ -73,7 +73,7 @@
 | 5.4 | DuckDB :memory: 零锁查询 | `web/api/db.py` / `data/db.py` | `test_boundary.py` (DuckDB CRUD) | 所有数据查询端点 | Web 页面数据加载无延迟 | OK | — |
 | 5.5 | API 错误响应统一 + 稳定端点 response_model | 各路由文件 + `web/api/errors.py` | `test_web_system_contracts.py` | — | 4xx/5xx 错误结构一致，关键成功响应有 Pydantic schema | OK | 继续扩大 response_model 覆盖 |
 | 5.6 | Settings API YAML 读写 + 审计 | `web/api/routes/settings.py` | `test_audit.py`, `test_auth.py` | `/system?tab=settings` → `Settings.vue` | 修改配置 → 确认弹窗 → 保存 → audit ledger 有记录 | OK | — |
-| 5.7 | 市场总览 (regime + multi_asset + macro) | `web/api/routes/market.py` | — | `Market.vue` | 核心指数卡片含 data_source 标识 + 策略矩阵 + 预警面板，避免上证综指同源重复命名 | OK | — |
+| 5.7 | 市场总览 (regime + multi_asset + macro) | `web/api/routes/market.py` | `test_market_route_contracts.py` | `Market.vue` | 核心指数相对强弱图 + 指数状态卡含 data_source/区间涨跌/强弱排名，避免缩略图重复 | OK | — |
 | 5.8 | DB Health 注册表维度监控 | `web/api/routes/system.py` | `test_web_system_contracts.py:test_db_health_scans_new_registry_dimensions` | `/datahub?tab=health` → `DatabaseHealth.vue` | DataRegistry 维度状态表格 + 修复操作 | OK | — |
 | 5.9 | Hindsight 记忆查询 | `web/api/routes/hindsight.py` | — | `/system?tab=hindsight` → `HindsightGraph.vue` | LLM 记忆图谱可查询 | OK | — |
 | 5.10 | 前端构建无大 chunk 警告 | `web/frontend/vite.config.ts` | — | — | `npm run build` 无 >500KB chunk 警告 | OK | — |

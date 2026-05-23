@@ -35,3 +35,14 @@ def test_market_index_cards_are_distinct_core_indices(monkeypatch):
         for c in cards
     }
     assert len(signatures) == 4
+
+
+def test_market_index_cards_respect_requested_series_limit(monkeypatch):
+    def fake_load_index(symbol: str):
+        return _index_frame(10), "real", "test source"
+
+    monkeypatch.setattr(market, "_load_index", fake_load_index)
+
+    cards = market._multi_asset_cards(_index_frame(), series_limit=2)
+
+    assert all(len(card["series"]) == 2 for card in cards)

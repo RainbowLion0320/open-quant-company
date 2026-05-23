@@ -57,7 +57,7 @@ Market API 新增字段：
 - `alerts[]` — 智能预警 (regime/PMI偏离/黄金波动/策略完成)
 - `freshness` — 数据新鲜度时间戳
 
-前端 Market.vue 完全重写：从4张简单卡片升级为 Command Center 布局，含 animated regime orb、核心指数看板、宏观快照行、策略矩阵卡片、预警面板。指数看板避免把上证综指同时命名为“A股核心”和“SHANGHAI COMPOSITE INDEX”造成语义重复。
+前端 Market.vue 完全重写：从4张简单卡片升级为 Command Center 布局，含 animated regime orb、核心指数相对强弱图、宏观快照行、策略矩阵卡片、预警面板。大图展示上证综指/沪深300/创业板指/科创50 的归一化强弱对比，卡片展示点位、日涨跌、区间涨跌和强弱排名，不再重复绘制缩略趋势图。
 
 ### 系统信息 (2026-05-21 升级, 2026-05-23 边界明确)
 
