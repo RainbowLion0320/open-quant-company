@@ -24,8 +24,8 @@ import Stocks from "./Stocks.vue";
 const route = useRoute();
 
 const tabs = [
-  { key: "sectors", label: "行业雷达", meta: "Sector rotation" },
-  { key: "stocks", label: "个股搜索", meta: "Stock research" },
+  { key: "sectors", label: "行业雷达", meta: "Sector rotation", description: "从动量、信号集中度和组合敞口判断行业轮动方向" },
+  { key: "stocks", label: "个股搜索", meta: "Stock research", description: "按代码或名称快速定位标的，进入估值、K线和策略信号详情" },
 ];
 
 const activeTab = computed(() => {

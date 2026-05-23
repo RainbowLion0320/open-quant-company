@@ -7,6 +7,7 @@
         <span class="toolbar-stats" v-if="stats">
           {{ stats.total_nodes }} NODES · {{ stats.total_links || linkCount }} LINKS
         </span>
+        <span class="toolbar-error" v-if="loadError">{{ loadError }}</span>
       </div>
       <div class="toolbar-right">
         <button
@@ -100,12 +101,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from "vue";
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { api } from "../api";
 
 // ── Types ──
 interface GraphNode {
   id: string; index: number; label: string; fullText: string;
-  type: "observation" | "experience"; entities: string[]; tags: string[];
+  type: "observation" | "experience" | "world"; entities: string[]; tags: string[];
   date: string; documentId: string | null; chunkId: string | null;
   consolidatedAt: string | null; proofCount: number;
   x?: number; y?: number; z?: number; vx?: number; vy?: number; vz?: number;
@@ -140,6 +142,7 @@ const hoveredNode = ref<GraphNode | null>(null);
 const selectedNode = ref<GraphNode | null>(null);
 const tooltipStyle = ref({ left: "0px", top: "0px" });
 const linkCount = ref(0);
+const loadError = ref("");
 
 // ── Three.js objects ──
 let scene: THREE.Scene;
@@ -579,9 +582,9 @@ function onPointerMove(event: PointerEvent) {
 // ── Load ──
 async function loadGraph() {
   isLoading.value = true;
+  loadError.value = "";
   try {
-    const res = await fetch("/api/hindsight/graph");
-    const data: GraphData = await res.json();
+    const data = await api.hindsightGraph() as GraphData;
     stats.value = data.stats || null;
     linkCount.value = data.links?.length || 0;
     buildGraph(data);
@@ -592,6 +595,7 @@ async function loadGraph() {
     cancelAnimationFrame(animFrame);
     animFrame = requestAnimationFrame(tick);
   } catch (e) {
+    loadError.value = e instanceof Error ? e.message : "图谱加载失败";
     console.error("Failed to load graph:", e);
   } finally {
     isLoading.value = false;
@@ -660,6 +664,17 @@ onUnmounted(() => {
   color: #64748b;
   margin-left: 16px;
   letter-spacing: 1px;
+}
+.toolbar-error {
+  display: inline-block;
+  max-width: 360px;
+  margin-left: 16px;
+  color: var(--negative);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 .btn-load {
   display: flex;

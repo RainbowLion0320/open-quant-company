@@ -7,6 +7,7 @@
 import { ref, onUnmounted, type Ref } from "vue";
 
 let _echarts: any = null;
+const _chartInitTasks = new WeakMap<HTMLElement, Promise<any>>();
 
 async function loadECharts() {
   if (!_echarts) {
@@ -19,26 +20,74 @@ async function loadECharts() {
 export function useECharts(elRef: Ref<HTMLElement | null>) {
   const instance = ref<any>(null);
   let resizeObserver: ResizeObserver | null = null;
+  let initTask: Promise<void> | null = null;
+  let pendingOption: { option: Record<string, any>; replace: boolean } | null = null;
 
   async function init() {
     const el = elRef.value;
-    if (!el || instance.value) return;
+    if (!el || instance.value) return initTask || Promise.resolve();
+    if (initTask) return initTask;
 
-    const echarts = await loadECharts();
-    instance.value = echarts.init(el, undefined, {});
+    initTask = (async () => {
+      const echarts = await loadECharts();
+      const currentEl = elRef.value;
+      if (!currentEl || instance.value) return;
 
-    resizeObserver = new ResizeObserver(() => {
-      instance.value?.resize();
+      let chart = echarts.getInstanceByDom?.(currentEl);
+      if (!chart) {
+        const sharedTask = _chartInitTasks.get(currentEl);
+        if (sharedTask) {
+          chart = await sharedTask;
+        } else {
+          const task = Promise.resolve().then(() => {
+            const existing = echarts.getInstanceByDom?.(currentEl);
+            if (existing) return existing;
+            if (currentEl.getAttribute("_echarts_instance_")) {
+              currentEl.removeAttribute("_echarts_instance_");
+              currentEl.innerHTML = "";
+            }
+            return echarts.init(currentEl, undefined, {});
+          });
+          _chartInitTasks.set(currentEl, task);
+          try {
+            chart = await task;
+          } finally {
+            _chartInitTasks.delete(currentEl);
+          }
+        }
+      }
+      instance.value = chart;
+
+      if (!resizeObserver && typeof ResizeObserver !== "undefined") {
+        resizeObserver = new ResizeObserver(() => {
+          instance.value?.resize();
+        });
+        resizeObserver.observe(currentEl);
+      }
+
+      if (pendingOption) {
+        instance.value?.setOption(pendingOption.option, { notMerge: pendingOption.replace });
+        pendingOption = null;
+      }
+    })().finally(() => {
+      initTask = null;
     });
-    resizeObserver.observe(el);
+
+    return initTask;
   }
 
   function setOption(option: Record<string, any>, replace = true) {
-    instance.value?.setOption(option, { notMerge: replace });
+    if (!instance.value) {
+      pendingOption = { option, replace };
+      void init();
+      return;
+    }
+    instance.value.setOption(option, { notMerge: replace });
   }
 
   function dispose() {
     resizeObserver?.disconnect();
+    resizeObserver = null;
     instance.value?.dispose();
     instance.value = null;
   }

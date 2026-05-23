@@ -39,7 +39,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
-| 市场总览 | `/` | Regime 球体 + 多资产跟踪器 (data_source 标识) + 宏观快照 + 策略矩阵 + 智能预警 |
+| 市场总览 | `/` | Regime 球体 + 核心指数看板 (data_source 标识) + 宏观快照 + 策略矩阵 + 智能预警 |
 | 市场研究 | `/research` | 二级 tab: 行业雷达 + 个股搜索；`/stocks/:code` 保留为隐藏详情路由 |
 | 策略实验室 | `/strategy-lab` | 二级 tab: 策略中心 + 信号历史 + 回测分析 |
 | 组合执行 | `/portfolio` | ★ PaperBroker 日频模拟: NAV权益曲线 + 持仓 + 交易记录 + 手动下单 |
@@ -51,13 +51,13 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 ### 指挥中心 (2026-05-16 Codex 升级)
 
 Market API 新增字段：
-- `multi_asset[]` — A股/黄金ETF/10Y国债/SHIBOR 实时卡片+42日趋势线
+- `multi_asset[]` — 兼容字段名，当前承载上证综指/沪深300/创业板指/科创50 核心指数卡片+42日趋势线
 - `macro[]` — GDP/PMI/CPI/SHIBOR 宏观快照
 - `strategy_matrix[]` — 已注册策略的买比/评分/Top1标的
 - `alerts[]` — 智能预警 (regime/PMI偏离/黄金波动/策略完成)
 - `freshness` — 数据新鲜度时间戳
 
-前端 Market.vue 完全重写：从4张简单卡片升级为 Command Center 布局，含 animated regime orb、4资产跟踪器、宏观快照行、策略矩阵卡片、预警面板。仅读 Parquet 缓存，无网络阻塞。
+前端 Market.vue 完全重写：从4张简单卡片升级为 Command Center 布局，含 animated regime orb、核心指数看板、宏观快照行、策略矩阵卡片、预警面板。指数看板避免把上证综指同时命名为“A股核心”和“SHANGHAI COMPOSITE INDEX”造成语义重复。
 
 ### 系统信息 (2026-05-21 升级, 2026-05-23 边界明确)
 

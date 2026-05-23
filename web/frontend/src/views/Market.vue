@@ -67,7 +67,12 @@
       </div>
     </section>
 
-    <section v-if="assets.length" class="asset-strip">
+    <div v-if="store.error" class="inline-alert danger">
+      <span>{{ store.error }}</span>
+      <button class="btn btn-xs" @click="refresh">重试</button>
+    </div>
+
+    <section v-if="assets.length" class="asset-strip" aria-label="核心A股指数">
       <article v-for="asset in assets" :key="asset.key" class="asset-card glass-card">
         <div class="asset-top">
           <span>{{ asset.label }}</span>
@@ -92,7 +97,7 @@
     </section>
     <section v-else class="asset-strip">
       <article class="asset-card glass-card asset-empty">
-        <span>宏观与跨资产数据暂未载入</span>
+        <span>核心指数数据暂未载入</span>
         <strong>等待数据源刷新</strong>
       </article>
     </section>
@@ -155,6 +160,7 @@ const store = useMarketStore();
 const chartRef = ref<HTMLElement | null>(null);
 const { init: initChart, setOption } = useECharts(chartRef);
 const selectedRange = ref("6M");
+let renderTask: Promise<void> | null = null;
 
 const timeRanges = [
   { key: "1D", label: "1D" },
@@ -203,49 +209,59 @@ const regimeScore = computed(() => {
   return 50;
 });
 
-function renderChart() {
+async function renderChart() {
   if (!store.kline.length) return;
-  initChart();
-  const dates = store.kline.map((k: any) => k.date);
-  const closes = store.kline.map((k: any) => Number(k.close));
-  const volumes = store.kline.map((k: any) => k.volume);
-  setOption({
-    ...QUANTUM_THEME,
-    grid: [
-      { left: 42, right: 18, top: 12, height: "68%" },
-      { left: 42, right: 18, top: "80%", height: "13%" },
-    ],
-    xAxis: [
-      { type: "category", data: dates, gridIndex: 0, axisLabel: { show: false }, axisLine: { lineStyle: { color: "rgba(125,211,252,0.08)" } } },
-      { type: "category", data: dates, gridIndex: 1, axisLabel: { color: "#64748b", fontSize: 9 } },
-    ],
-    yAxis: [
-      { type: "value", gridIndex: 0, scale: true, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { lineStyle: { color: "rgba(125,211,252,0.05)" } } },
-      { type: "value", gridIndex: 1, axisLabel: { show: false }, splitLine: { show: false } },
-    ],
-    series: [
-      {
-        name: "Close",
-        type: "line",
-        xAxisIndex: 0,
-        yAxisIndex: 0,
-        data: closes,
-        smooth: false,
-        showSymbol: false,
-        connectNulls: true,
-        lineStyle: { width: 2, color: "#7dd3fc" },
-        itemStyle: { color: "#7dd3fc" },
-      },
-      { type: "bar", data: volumes, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: "rgba(0,212,255,0.18)" } },
-    ],
+  if (renderTask) return renderTask;
+
+  renderTask = (async () => {
+    await initChart();
+    const dates = store.kline.map((k: any) => k.date);
+    const closes = store.kline.map((k: any) => Number(k.close));
+    const volumes = store.kline.map((k: any) => k.volume);
+    setOption({
+      ...QUANTUM_THEME,
+      grid: [
+        { left: 42, right: 18, top: 12, height: "68%" },
+        { left: 42, right: 18, top: "80%", height: "13%" },
+      ],
+      xAxis: [
+        { type: "category", data: dates, gridIndex: 0, axisLabel: { show: false }, axisLine: { lineStyle: { color: "rgba(125,211,252,0.08)" } } },
+        { type: "category", data: dates, gridIndex: 1, axisLabel: { color: "#64748b", fontSize: 9 } },
+      ],
+      yAxis: [
+        { type: "value", gridIndex: 0, scale: true, axisLabel: { color: "#64748b", fontSize: 9 }, splitLine: { lineStyle: { color: "rgba(125,211,252,0.05)" } } },
+        { type: "value", gridIndex: 1, axisLabel: { show: false }, splitLine: { show: false } },
+      ],
+      series: [
+        {
+          name: "Close",
+          type: "line",
+          xAxisIndex: 0,
+          yAxisIndex: 0,
+          data: closes,
+          smooth: false,
+          showSymbol: false,
+          connectNulls: true,
+          lineStyle: { width: 2, color: "#7dd3fc" },
+          itemStyle: { color: "#7dd3fc" },
+        },
+        { type: "bar", data: volumes, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: "rgba(0,212,255,0.18)" } },
+      ],
+    });
+  })().finally(() => {
+    renderTask = null;
   });
+
+  return renderTask;
 }
-watch(() => store.kline, renderChart);
+watch(() => store.kline, () => {
+  void renderChart();
+});
 
 async function switchRange(range: string) {
   selectedRange.value = range;
   await store.fetchMarket(range);
-  renderChart();
+  await renderChart();
 }
 
 function fmtValue(v: number | null | undefined, unit = "") {
@@ -282,13 +298,12 @@ function sparkPoints(series: MarketSeriesPoint[] = [], width = 160, height = 44)
 
 async function refresh() {
   await store.fetchMarket(selectedRange.value);
-  renderChart();
+  await renderChart();
 }
 
 onMounted(async () => {
   await store.fetchMarket(selectedRange.value);
-  initChart();
-  renderChart();
+  await renderChart();
 });
 </script>
 
@@ -481,7 +496,7 @@ onMounted(async () => {
 }
 .asset-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;
 }
 .asset-card {

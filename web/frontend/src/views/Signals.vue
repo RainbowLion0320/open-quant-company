@@ -1,14 +1,31 @@
 <template>
   <div class="view-page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">信号历史</h1>
-        <p class="page-subtitle">最近 7 天信号变更追踪</p>
+    <div class="surface-toolbar">
+      <div class="surface-copy">
+        <span>SIGNAL CHANGELOG</span>
+        <strong>最近 {{ days }} 天变更</strong>
+        <small>观察新增买入、降级和不同策略之间的信号迁移</small>
+      </div>
+      <div class="surface-actions">
+        <div class="filter-tabs" aria-label="信号时间范围">
+          <button
+            v-for="d in dayOptions"
+            :key="d"
+            :class="{ active: days === d }"
+            @click="selectDays(d)"
+          >{{ d }}D</button>
+        </div>
       </div>
     </div>
 
+    <div v-if="error" class="inline-alert danger">
+      <span>{{ error }}</span>
+      <button class="btn btn-xs" @click="loadChanges">重试</button>
+    </div>
+
     <div class="glass-card card-pad-lg">
-      <div v-if="changes.length" class="table-shell" style="--table-min:680px">
+      <div v-if="loading" class="empty-state empty-state-compact">正在加载信号变更...</div>
+      <div v-else-if="changes.length" class="table-shell" style="--table-min:680px">
         <table class="data-table">
           <colgroup>
             <col style="width:14%">
@@ -60,6 +77,10 @@ import { api } from "../api";
 import type { SignalChange } from "../api";
 
 const changes = ref<SignalChange[]>([]);
+const days = ref(7);
+const dayOptions = [7, 14, 30];
+const loading = ref(false);
+const error = ref("");
 
 function signalColor(s: string) {
   if (s === "buy") return "var(--positive)";
@@ -72,7 +93,24 @@ function signalLabel(s: string) {
   return "持有";
 }
 
-onMounted(async () => {
-  try { changes.value = await api.signalChanges(7); } catch {}
-});
+async function loadChanges() {
+  loading.value = true;
+  error.value = "";
+  try {
+    changes.value = await api.signalChanges(days.value);
+  } catch (e: any) {
+    error.value = e?.message || "信号变更加载失败";
+    changes.value = [];
+  } finally {
+    loading.value = false;
+  }
+}
+
+function selectDays(d: number) {
+  if (days.value === d) return;
+  days.value = d;
+  loadChanges();
+}
+
+onMounted(loadChanges);
 </script>

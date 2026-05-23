@@ -15,6 +15,13 @@ HUB = get_datahub()
 # Kline range → tail rows mapping
 _RANGE_TAIL = {"1D": 2, "1M": 22, "6M": 126, "YTD": 252}
 
+_CORE_INDEX_CARDS = [
+    ("sse", "上证综指", "000001.SH", "sh000001", "上证综指 OHLCV"),
+    ("csi300", "沪深300", "000300.SH", "sh000300", "沪深300指数 OHLCV"),
+    ("chinext", "创业板指", "399006.SZ", "sz399006", "创业板指 OHLCV"),
+    ("star50", "科创50", "000688.SH", "sh000688", "科创50指数 OHLCV"),
+]
+
 
 def _num(v, default=0.0) -> float:
     try:
@@ -89,6 +96,16 @@ def _load_bond_yield() -> pd.DataFrame | None:
         return None
 
 
+def _load_index(symbol: str) -> tuple[pd.DataFrame | None, str, str]:
+    try:
+        from data.fetcher import get_index_daily
+        df = get_index_daily(symbol)
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        return df.dropna(subset=["date"]).sort_values("date"), "real", "AKShare stock_zh_index_daily"
+    except Exception as exc:
+        return None, "missing", f"{symbol} 指数行情加载失败: {type(exc).__name__}"
+
+
 def _load_macro(name: str) -> pd.DataFrame | None:
     path = HUB.macro_path(name)
     if not path.exists():
@@ -142,17 +159,21 @@ def _macro_card(key: str, label: str, df: pd.DataFrame | None, candidates: list[
 
 
 def _multi_asset_cards(bench: pd.DataFrame) -> list[dict]:
-    cards = [_series_card("ashare", "A股核心", "000001.SH", bench, "close", "",
-                         data_source="real", source_detail="上证综指 OHLCV")]
-
-    gold = _load_etf("518880")
-    cards.append(_series_card("gold", "黄金ETF", "518880.SH", gold, "close", "",
-                             data_source="real", source_detail="AKShare fund_etf_hist_em"))
-
-    bond = _load_bond_yield()
-    cards.append(_series_card("bond10y", "10Y国债", "CN10Y", bond, "中国国债收益率10年", "%",
-                             data_source="proxy", source_detail="收益率曲线 → 近似价格 (久期=7)"))
-
+    """Keep the API field for compatibility, but render core index breadth cards."""
+    cards = []
+    bench_len = len(bench)
+    for key, label, display_symbol, fetch_symbol, source_detail in _CORE_INDEX_CARDS:
+        if key == "sse":
+            df = bench
+            data_source = "real"
+            detail = source_detail
+        else:
+            df, data_source, provider_detail = _load_index(fetch_symbol)
+            if df is not None and bench_len:
+                df = df.tail(bench_len)
+            detail = f"{source_detail} · {provider_detail}" if data_source == "real" else provider_detail
+        cards.append(_series_card(key, label, display_symbol, df, "close", "",
+                                  data_source=data_source, source_detail=detail))
     return cards
 
 
@@ -196,7 +217,7 @@ def _strategy_matrix() -> list[dict]:
 
 @router.get("/regime")
 async def market_regime():
-    """轻量端点: 仅返回顶栏遥测所需数据 (regime + 跨资产 + 新鲜度)。App.vue 每60s轮询。"""
+    """轻量端点: 仅返回顶栏遥测所需数据 (regime + 核心指数 + 新鲜度)。App.vue 每60s轮询。"""
     from cybernetics.orchestrator import QuantOrchestrator
     from data.fetcher import get_index_daily
 
@@ -225,7 +246,7 @@ async def market_regime():
 
 @router.get("")
 async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|YTD)$")):
-    """市场总览: regime + K线 + 跨资产 + 宏观 + 策略矩阵"""
+    """市场总览: regime + K线 + 核心指数 + 宏观 + 策略矩阵"""
     from cybernetics.orchestrator import QuantOrchestrator
 
     orch = QuantOrchestrator()

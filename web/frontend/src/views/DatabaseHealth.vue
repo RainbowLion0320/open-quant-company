@@ -184,6 +184,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { api } from "../api";
 
 interface HealthRow {
   table: string;
@@ -219,6 +220,7 @@ interface HealthSummary {
 const rows = ref<HealthRow[]>([]);
 const summary = ref<HealthSummary | null>(null);
 const status = ref<"loading" | "ok" | "no_data" | "error">("loading");
+const statusMessage = ref("");
 const expanded = ref<number | null>(null);
 const apiFallback = ref(false);
 const repairing = ref<Record<string, string>>({});  // table -> status
@@ -226,8 +228,8 @@ const repairing = ref<Record<string, string>>({});  // table -> status
 const statusClass = computed(() => `dot-${status.value}`);
 const statusText = computed(() => {
   if (status.value === "loading") return "加载中...";
-  if (status.value === "no_data") return "尚未运行健康检查，请等待周六自动扫描";
-  if (status.value === "error") return "加载失败";
+  if (status.value === "no_data") return statusMessage.value || "尚未运行健康检查，请等待周六自动扫描";
+  if (status.value === "error") return statusMessage.value || "加载失败";
   return "健康检查完成";
 });
 
@@ -374,17 +376,19 @@ function toggleDetail(i: number) {
 async function startRepair(table: string) {
   repairing.value[table] = 'running';
   try {
-    const resp = await fetch('/api/system/db-health/repair/' + encodeURIComponent(table), { method: 'POST' });
-    const data = await resp.json();
+    const data = await api.dbHealthRepair(table);
     if (data.status !== 'started') {
       repairing.value[table] = 'failed';
       return;
     }
     // Poll for completion
     const jobId = data.job_id;
+    if (!jobId) {
+      repairing.value[table] = 'failed';
+      return;
+    }
     const poll = async () => {
-      const sr = await fetch('/api/system/db-health/repair-status/' + jobId);
-      const sd = await sr.json();
+      const sd = await api.dbHealthRepairStatus(jobId);
       if (sd.status === 'done') {
         repairing.value[table] = 'done';
         await fetchData();
@@ -407,11 +411,19 @@ async function startRepair(table: string) {
 
 async function fetchData() {
   status.value = "loading";
+  statusMessage.value = "";
   try {
-    const resp = await fetch("/api/system/db-health");
-    const data = await resp.json();
+    const data = await api.dbHealth();
     if (data.status === "no_data") {
       status.value = "no_data";
+      statusMessage.value = data.message || "";
+      rows.value = [];
+      summary.value = null;
+      return;
+    }
+    if (data.status === "error") {
+      status.value = "error";
+      statusMessage.value = data.message || "健康检查结果读取失败";
       rows.value = [];
       summary.value = null;
       return;
@@ -420,8 +432,9 @@ async function fetchData() {
     rows.value = data.data || [];
     summary.value = data.summary || null;
     status.value = "ok";
-  } catch {
+  } catch (e: any) {
     status.value = "error";
+    statusMessage.value = e?.message || "健康检查加载失败";
   }
 }
 

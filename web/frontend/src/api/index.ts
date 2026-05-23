@@ -18,14 +18,21 @@ async function req<T>(url: string, opts?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...authHeaders(), ...opts?.headers },
     ...opts,
   });
+  const contentType = res.headers.get("content-type") || "";
+  const text = await res.text().catch(() => "");
   if (!res.ok) {
-    const text = await res.text().catch(() => "Unknown error");
     if (res.status === 401 || (res.status === 403 && /Invalid API key/i.test(text))) {
       localStorage.removeItem("quant_api_key"); // clear stale key only on auth failure
     }
-    throw new Error(`[${res.status}] ${text}`);
+    throw new Error(`[${res.status}] ${text || "Unknown error"}`);
   }
-  return res.json();
+  if (!contentType.includes("application/json")) {
+    const hint = contentType.includes("text/html")
+      ? "后端路由可能未注册，或本地 API 服务需要重启"
+      : "接口未返回 JSON";
+    throw new Error(`${hint}: ${url}`);
+  }
+  return JSON.parse(text) as T;
 }
 
 /** GET request */
@@ -136,6 +143,7 @@ export interface RegimeResponse {
   multi_asset: MarketAssetCard[];
   freshness: { market: string };
   updated: string;
+  config?: Record<string, any>;
 }
 
 export interface StrategySignal {
@@ -227,6 +235,34 @@ export interface PortfolioBalance {
   total_pnl_pct: number;
 }
 
+export interface PortfolioNavPoint {
+  date: string;
+  total_asset: number;
+  cash: number;
+  market_value: number;
+}
+
+export interface PortfolioTrade {
+  date: string;
+  code: string;
+  name: string;
+  side: "buy" | "sell";
+  price: number;
+  volume: number;
+  amount: number;
+  strategy: string;
+}
+
+export interface PortfolioSummary {
+  balance?: { total_asset: number; cash: number; market_value: number };
+  total_return: number;
+  total_return_pct: number;
+  positions_count: number;
+  position_value: number;
+  peak_equity: number;
+  nav_days: number;
+}
+
 export interface StockDetail {
   basic: { symbol: string; name: string; industry: string; sector: string; area: string; market: string };
   buffett?: { score: number; roe: number; gross_margin: number; debt_equity: number; dcf_value: number };
@@ -257,6 +293,18 @@ export interface SystemMonitor {
     total: { input_tokens: number; output_tokens: number; total_tokens: number; cost_usd: number };
     updated_at: string | null;
   };
+}
+
+export interface SystemHistoryResponse {
+  hours: number;
+  points: number;
+  data: any[];
+}
+
+export interface DeepSeekUsageResponse {
+  data: any[];
+  status?: string;
+  message?: string;
 }
 
 export interface SectorSignal {
@@ -323,6 +371,28 @@ export interface SectorStocksResponse {
   data_source: string;
 }
 
+export interface DbHealthResponse {
+  data: any[];
+  summary: any | null;
+  status: "ok" | "no_data" | "error";
+  message?: string;
+  checked_at?: string | null;
+  api_fallback?: boolean;
+}
+
+export interface DbRepairResponse {
+  status: "started" | "conflict" | "failed" | "not_found" | string;
+  job_id?: string;
+  table?: string;
+  message?: string;
+}
+
+export interface HindsightGraphResponse {
+  nodes: any[];
+  links: any[];
+  stats?: Record<string, any>;
+}
+
 function pct(v: unknown): number | undefined {
   if (v == null) return undefined;
   const n = Number(v);
@@ -336,7 +406,7 @@ function pct(v: unknown): number | undefined {
 
 export const api = {
   // Market
-  market: () => get<MarketResponse>("/api/market"),
+  market: (range = "6M") => get<MarketResponse>(`/api/market?range=${encodeURIComponent(range)}`),
   marketRegime: () => get<RegimeResponse>("/api/market/regime"),
 
   // Strategies
@@ -351,6 +421,7 @@ export const api = {
   backtestDetail: (key: string) => get<BacktestDetail>(`/api/backtest/${key}`),
 
   // Portfolio
+  portfolioPositionRows: () => get<{ positions: any[] }>("/api/portfolio/positions"),
   portfolioPositions: async () => {
     const data = await get<{ positions: any[] }>("/api/portfolio/positions");
     return (data.positions || []).map((p) => ({
@@ -382,6 +453,10 @@ export const api = {
       volume: order.shares,
       price: order.price ?? 0,
     }),
+  portfolioNav: () => get<{ nav: PortfolioNavPoint[] }>("/api/portfolio/nav"),
+  portfolioTrades: (limit = 50) => get<{ trades: PortfolioTrade[]; total: number }>(`/api/portfolio/trades?limit=${limit}`),
+  portfolioSummary: () => get<PortfolioSummary>("/api/portfolio/summary"),
+  portfolioRefresh: () => post<any>("/api/portfolio/refresh"),
   portfolioSectorExposure: () => get<SectorExposureResponse>("/api/portfolio/sector-exposure"),
 
   // Stocks
@@ -426,11 +501,16 @@ export const api = {
 
   // System Monitor
   systemMonitor: () => get<SystemMonitor>("/api/system/monitor"),
+  systemHistory: (hours = 24) => get<SystemHistoryResponse>(`/api/system/history?hours=${hours}`),
+  deepseekUsage: () => get<DeepSeekUsageResponse>("/api/system/deepseek-usage"),
 
   // System Monitor
   apiHealth: () => get<{ items: { name: string; status: string; detail: string; cookie_remaining_days?: number }[]; summary: string; all_ok: boolean }>("/api/system/api-health"),
   cronJobs: () => get<{ jobs: { name: string; schedule: string; last_run: string | null; last_status: string | null; next_run: string | null; enabled: boolean; state: string; no_agent: boolean }[]; summary: string }>("/api/system/cron-jobs"),
   serviceStatus: () => get<{ items: { name: string; status: string; detail: string; cookie_remaining_days?: number }[]; summary: string; all_ok: boolean }>("/api/system/service-status"),
+  dbHealth: () => get<DbHealthResponse>("/api/system/db-health"),
+  dbHealthRepair: (table: string) => post<DbRepairResponse>(`/api/system/db-health/repair/${encodeURIComponent(table)}`),
+  dbHealthRepairStatus: (jobId: string) => get<DbRepairResponse>(`/api/system/db-health/repair-status/${encodeURIComponent(jobId)}`),
 
   // Settings
   settings: async () => {
@@ -449,4 +529,5 @@ export const api = {
   auditHistory: (section = "", limit = 50) =>
     get<{ entries: any[]; summary: any; total: number }>(`/api/system/audit?section=${encodeURIComponent(section)}&limit=${limit}`),
   systemMode: () => get<{ mode: string; has_api_key: boolean; allows_settings_write: boolean; allows_paper_trading: boolean; readonly_sections: string[] }>("/api/system/mode"),
+  hindsightGraph: () => get<HindsightGraphResponse>("/api/hindsight/graph"),
 };

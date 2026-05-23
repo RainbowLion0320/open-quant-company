@@ -1,15 +1,21 @@
 <template>
   <div class="view-page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">行业雷达</h1>
-        <p class="page-subtitle">申万一级行业 — 动量排名 · 信号聚合 · 组合敞口</p>
+    <div class="surface-toolbar">
+      <div class="surface-copy">
+        <span>SECTOR ROTATION</span>
+        <strong>申万一级行业动量</strong>
+        <small>按收益周期、波动率、策略信号和组合敞口观察行业强弱</small>
       </div>
-      <div v-if="overview" class="flex items-center gap-4">
+      <div v-if="overview" class="surface-actions">
         <span class="text-2xs" style="color:var(--text-disabled)">
           {{ overview.total_sectors }} 行业 · {{ dataSourceLabel(overview.data_source) }}
         </span>
       </div>
+    </div>
+
+    <div v-if="error" class="inline-alert danger">
+      <span>{{ error }}</span>
+      <button class="btn btn-xs" @click="fetchData">重试</button>
     </div>
 
     <!-- Summary stat chips -->
@@ -34,6 +40,9 @@
 
     <!-- Sector Ranking Table -->
     <div class="glass-card card-pad-lg">
+      <div v-if="loading && !overview" class="empty-state empty-state-compact">
+        正在加载行业快照...
+      </div>
       <div v-if="sortedSectors.length" class="table-shell" style="--table-min:780px">
         <table class="data-table">
           <colgroup>
@@ -169,6 +178,7 @@ import type {
 } from "../api";
 
 const loading = ref(false);
+const error = ref("");
 const overview = ref<SectorOverviewResponse | null>(null);
 const exposure = ref<SectorExposureItem[]>([]);
 const activeSector = ref("");
@@ -245,6 +255,7 @@ async function toggleSector(s: SectorCard) {
 
 async function fetchData() {
   loading.value = true;
+  error.value = "";
   try {
     const [ov, exp] = await Promise.all([
       api.sectorOverview(),
@@ -252,7 +263,11 @@ async function fetchData() {
     ]);
     overview.value = ov;
     exposure.value = exp.exposure || [];
-  } catch {}
+  } catch (e: any) {
+    error.value = e?.message || "行业快照加载失败";
+    overview.value = null;
+    exposure.value = [];
+  }
   loading.value = false;
 }
 

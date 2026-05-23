@@ -52,6 +52,11 @@
       </article>
     </section>
 
+    <div v-if="monitorError" class="inline-alert danger">
+      <span>{{ monitorError }}</span>
+      <button class="btn btn-xs" @click="fetchData">重试</button>
+    </div>
+
     <section class="system-grid">
       <div class="deepseek-panel glass-card">
         <div class="panel-head">
@@ -274,6 +279,7 @@ import { ref, computed, reactive, onMounted, onUnmounted } from "vue";
 import { api, type SystemMonitor } from "../api";
 
 const monitor = ref<SystemMonitor | null>(null);
+const monitorError = ref("");
 const settings = reactive<Record<string, any>>({});
 const lastFetch = ref(Date.now());
 const elapsed = ref(0);
@@ -458,10 +464,13 @@ function pctWidth(v: number | undefined | null): string {
 
 async function fetchData() {
   try {
+    monitorError.value = "";
     const next = await api.systemMonitor();
     monitor.value = (next as any).status === "no_data" ? null : next;
     lastFetch.value = Date.now();
-  } catch (e) { /* silent */ }
+  } catch (e: any) {
+    monitorError.value = e?.message || "系统监控加载失败";
+  }
 }
 
 function fetchSlowData() {
@@ -474,7 +483,7 @@ function drawCharts() {
     { id: cpuChartId, key: "cpu_pct" as const, color: "#06b6d4", max: 100 },
     { id: memChartId, key: "mem_pct" as const, color: "#10b981", max: 100 },
   ];
-  fetch(`/api/system/history?hours=${historyHours.value}`).then(r => r.json()).then(hist => {
+  api.systemHistory(historyHours.value).then(hist => {
     const pts = hist.data || [];
     for (const ch of charts) {
       const canvas = document.getElementById(ch.id) as HTMLCanvasElement;
@@ -506,9 +515,11 @@ function drawCharts() {
 
 async function drawDSChart() {
   try {
-    const res = await fetch("/api/system/deepseek-usage");
-    const d = await res.json();
-    if (!d.data || d.data.length === 0) return;
+    const d = await api.deepseekUsage();
+    if (!d.data || d.data.length === 0) {
+      dsTotals.value = { pro: 0, flash: 0, cost: 0 };
+      return;
+    }
     const rows: any[] = d.data;
     if (!rows.length) {
       dsTotals.value = { pro: 0, flash: 0, cost: 0 };

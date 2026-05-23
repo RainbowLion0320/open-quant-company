@@ -14,8 +14,17 @@
       </div>
     </div>
 
+    <div v-if="error" class="inline-alert danger">
+      <span>{{ error }}</span>
+      <button class="btn btn-xs" @click="search">重试</button>
+    </div>
+
+    <div v-if="loading" class="glass-card card-pad empty-state empty-state-compact">
+      正在检索标的...
+    </div>
+
     <!-- Result -->
-    <div v-if="stock" class="glass-card glow-cyan animate-fade-in card-pad-lg">
+    <div v-if="stock && !loading" class="glass-card glow-cyan animate-fade-in card-pad-lg">
       <!-- Basic Info -->
       <div class="flex items-center gap-3 mb-4">
         <div class="text-xl font-bold font-mono" style="color:var(--accent)">{{ stock.basic.symbol }}</div>
@@ -93,7 +102,7 @@
       </router-link>
     </div>
 
-    <div v-else-if="searched && !stock" class="empty-state">
+    <div v-else-if="searched && !stock && !loading && !error" class="empty-state">
       未找到该股票
     </div>
   </div>
@@ -107,6 +116,8 @@ import type { StockDetail } from "../api";
 const query = ref("");
 const stock = ref<StockDetail | null>(null);
 const searched = ref(false);
+const loading = ref(false);
+const error = ref("");
 
 function fmtPct(v: number | undefined) { return v != null ? (v * 100).toFixed(1) + "%" : "—"; }
 
@@ -121,8 +132,15 @@ const marketBadge = computed(() => {
 async function search() {
   if (!query.value.trim()) return;
   searched.value = true;
+  loading.value = true;
+  error.value = "";
   try {
     stock.value = await api.stock(query.value.trim());
-  } catch { stock.value = null; }
+  } catch (e: any) {
+    error.value = e?.message || "标的检索失败";
+    stock.value = null;
+  } finally {
+    loading.value = false;
+  }
 }
 </script>

@@ -2,7 +2,7 @@
   <header class="section-switcher">
     <div class="section-copy">
       <span>{{ eyebrow }}</span>
-      <p>{{ subtitle }}</p>
+      <p>{{ activeDescription }}</p>
     </div>
     <nav class="section-tabs" :aria-label="`${title} tabs`">
       <router-link
@@ -27,6 +27,7 @@ interface SectionTabItem {
   key: string;
   label: string;
   meta?: string;
+  description?: string;
 }
 
 const props = defineProps<{
@@ -44,6 +45,9 @@ const activeTab = computed(() => {
   const tab = typeof route.query.tab === "string" ? route.query.tab : "";
   return props.items.some(item => item.key === tab) ? tab : props.defaultTab;
 });
+
+const activeItem = computed(() => props.items.find(item => item.key === activeTab.value));
+const activeDescription = computed(() => activeItem.value?.description || props.subtitle);
 
 function tabTo(tab: string) {
   return {

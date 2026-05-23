@@ -1,14 +1,20 @@
 <template>
   <div class="view-page settings-page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">系统设置</h1>
-        <p class="page-subtitle">运行模式 · 认证 · 通知 · 数据源 · 策略 · 风控</p>
+    <div class="surface-toolbar settings-action-bar">
+      <div class="surface-copy">
+        <span>CONFIG CONTROL</span>
+        <strong>运行模式与配置写入</strong>
+        <small>认证、通知、数据源、策略状态、风控和最近配置变更集中管理</small>
       </div>
-      <div style="display:flex;gap:10px;align-items:center;">
+      <div class="surface-actions">
         <span :class="['mode-badge', `mode-${mode}`]">{{ modeLabel }}</span>
         <button @click="saveWithConfirm" class="btn btn-primary btn-sm">保存</button>
       </div>
+    </div>
+
+    <div v-if="saveError" class="inline-alert danger">
+      <span>{{ saveError }}</span>
+      <button class="btn btn-xs" @click="saveError = ''">关闭</button>
     </div>
 
     <!-- Run Mode -->
@@ -176,6 +182,7 @@ const modeStatus = ref<Record<string, any>>({});
 const apiKeyInput = ref("");
 const strategyStatuses = ref<{ name: string; label: string; status: string; status_label: string; color: string }[]>([]);
 const auditEntries = ref<any[]>([]);
+const saveError = ref("");
 
 const modeLabel = computed(() => {
   if (mode.value === "live") return "LIVE";
@@ -285,10 +292,12 @@ function cancelConfirm() {
 
 async function doSave() {
   try {
+    saveError.value = "";
     await api.saveSettings(settings);
     confirmSnapshot.value = null;
     showConfirm.value = false;
-  } catch {
+  } catch (e: any) {
+    saveError.value = e?.message || "配置保存失败";
     showConfirm.value = false;
   }
 }
@@ -323,7 +332,7 @@ onMounted(async () => {
 
 <style scoped>
 .settings-page {
-  max-width: 980px;
+  max-width: 1180px;
 }
 .mode-badge {
   padding: 2px 10px;

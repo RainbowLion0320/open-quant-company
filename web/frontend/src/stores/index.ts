@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { api } from "../api";
 
 export const useMarketStore = defineStore("market", () => {
   const regime = ref<any>(null);
@@ -17,10 +18,7 @@ export const useMarketStore = defineStore("market", () => {
     loading.value = true;
     error.value = "";
     try {
-      const url = range ? `/api/market?range=${range}` : "/api/market";
-      const res = await window.fetch(url);
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
+      const data = await api.market(range || "6M");
       regime.value = data.regime;
       kline.value = data.kline;
       multiAsset.value = data.multi_asset || [];
@@ -56,9 +54,7 @@ export const useStrategyStore = defineStore("strategy", () => {
     loading.value = true;
     error.value = "";
     try {
-      const res = await window.fetch("/api/strategies");
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
+      const data = await api.strategies();
       strategies.value = data.strategies || [];
     } catch (e: any) {
       error.value = e?.message || "策略列表加载失败";
@@ -70,10 +66,8 @@ export const useStrategyStore = defineStore("strategy", () => {
   async function fetchSignals(name: string) {
     error.value = "";
     try {
-      const res = await window.fetch(`/api/strategies/${name}`);
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      signals.value[name] = data.signals || data || [];
+      const data = await api.strategyDetail(name);
+      signals.value[name] = data.signals || [];
     } catch (e: any) {
       error.value = e?.message || "策略信号加载失败";
       signals.value[name] = [];
@@ -85,13 +79,7 @@ export const useStrategyStore = defineStore("strategy", () => {
     progress.value = 0;
     progressMsg.value = "";
     try {
-      const res = await fetch("/api/strategies/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ strategy, limit, params }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
+      const data = await api.strategyRun(strategy, limit, params);
       jobId.value = data.job_id;
 
       // WebSocket 监听进度

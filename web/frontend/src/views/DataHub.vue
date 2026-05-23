@@ -19,7 +19,7 @@ import SectionTabs from "../components/SectionTabs.vue";
 import DatabaseHealth from "./DatabaseHealth.vue";
 
 const tabs = [
-  { key: "health", label: "健康扫描", meta: "Registry health" },
+  { key: "health", label: "健康扫描", meta: "Registry health", description: "按表检查新鲜度、缺失、异常和可修复数据维度" },
 ];
 </script>
 

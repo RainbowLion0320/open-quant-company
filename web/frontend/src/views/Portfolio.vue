@@ -12,6 +12,11 @@
       </div>
     </div>
 
+    <div v-if="error" class="inline-alert danger">
+      <span>{{ error }}</span>
+      <button class="btn btn-xs" @click="loadAll">重试</button>
+    </div>
+
     <!-- Balance Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <div class="glass-card metric-card">
@@ -197,6 +202,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from "vue";
+import { api } from "../api";
 
 let echarts: any = null;
 async function getECharts() {
@@ -224,6 +230,7 @@ const navData = ref<NavPoint[]>([]);
 const trades = ref<Trade[]>([]);
 const tradeTotal = ref(0);
 const sectorExposure = ref<{ sector: string; weight: number; market_value: number; position_count: number }[]>([]);
+const error = ref("");
 const summary = ref<Summary>({
   total_asset: 0, cash: 0, market_value: 0, total_return: 0,
   total_return_pct: 0, positions_count: 0, peak_equity: 0, nav_days: 0,
@@ -242,18 +249,16 @@ function fmtReturn(v: number | undefined) {
   if (v == null || v === 0) return "0.00%";
   return (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
 }
-function isTransientFetchError(e: unknown) {
-  return e instanceof TypeError && /failed to fetch|load failed|network/i.test(e.message);
-}
-
 async function loadAll() {
   loading.value = true;
+  error.value = "";
   try {
-    const [posRes, navRes, tradeRes, sumRes] = await Promise.all([
-      fetch("/api/portfolio/positions").then(r => r.json()),
-      fetch("/api/portfolio/nav").then(r => r.json()),
-      fetch("/api/portfolio/trades?limit=50").then(r => r.json()),
-      fetch("/api/portfolio/summary").then(r => r.json()),
+    const [posRes, navRes, tradeRes, sumRes, expRes] = await Promise.all([
+      api.portfolioPositionRows(),
+      api.portfolioNav(),
+      api.portfolioTrades(50),
+      api.portfolioSummary(),
+      api.portfolioSectorExposure(),
     ]);
 
     positions.value = (posRes.positions || []).map((p: any) => ({
@@ -265,12 +270,7 @@ async function loadAll() {
     navData.value = navRes.nav || [];
     trades.value = tradeRes.trades || [];
     tradeTotal.value = tradeRes.total || 0;
-
-    // Sector exposure
-    try {
-      const expRes = await fetch("/api/portfolio/sector-exposure").then(r => r.json());
-      sectorExposure.value = expRes.exposure || [];
-    } catch {}
+    sectorExposure.value = expRes.exposure || [];
 
     const s = sumRes;
     summary.value = {
@@ -286,8 +286,9 @@ async function loadAll() {
 
     await nextTick();
     renderChart();
-  } catch (e) {
-    if (!isTransientFetchError(e)) console.error("Load portfolio failed:", e);
+  } catch (e: any) {
+    error.value = e?.message || "组合数据加载失败";
+    console.error("Load portfolio failed:", e);
   } finally {
     loading.value = false;
   }
@@ -295,9 +296,12 @@ async function loadAll() {
 
 async function refresh() {
   loading.value = true;
+  error.value = "";
   try {
-    await fetch("/api/portfolio/refresh", { method: "POST" });
+    await api.portfolioRefresh();
     await loadAll();
+  } catch (e: any) {
+    error.value = e?.message || "组合状态刷新失败";
   } finally {
     loading.value = false;
   }
@@ -305,17 +309,15 @@ async function refresh() {
 
 async function submitOrder() {
   if (!order.symbol) return;
+  error.value = "";
   try {
-    await fetch("/api/portfolio/order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: order.symbol, side: order.side, volume: order.shares, price: 0 }),
-    });
+    await api.portfolioOrder({ symbol: order.symbol, side: order.side, shares: order.shares });
     order.symbol = "";
     order.shares = 100;
     await loadAll();
-  } catch (e) {
-    if (!isTransientFetchError(e)) console.error("Order failed:", e);
+  } catch (e: any) {
+    error.value = e?.message || "订单提交失败";
+    console.error("Order failed:", e);
   }
 }
 

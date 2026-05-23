@@ -1,10 +1,22 @@
 <template>
   <div class="view-page">
-    <div class="flex items-center justify-between mb-2">
-      <button @click="runAll" :disabled="store.running" class="btn btn-primary btn-sm">
-        {{ store.running ? `运行中 ${store.progress}%` : '运行全部' }}
-      </button>
-      <span v-if="loaded && store.strategies.length" class="text-2xs" style="color:var(--text-disabled)">{{ store.strategies.length }} strategies</span>
+    <div class="surface-toolbar">
+      <div class="surface-copy">
+        <span>STRATEGY REGISTRY</span>
+        <strong>四策略扫描状态</strong>
+        <small>运行策略、查看生命周期状态，并展开最新候选信号</small>
+      </div>
+      <div class="surface-actions">
+        <span v-if="loaded && store.strategies.length" class="text-2xs" style="color:var(--text-disabled)">{{ store.strategies.length }} strategies</span>
+        <button @click="runAll" :disabled="store.running" class="btn btn-primary btn-sm">
+          {{ store.running ? `运行中 ${store.progress}%` : '运行全部' }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="store.error" class="inline-alert danger">
+      <span>{{ store.error }}</span>
+      <button class="btn btn-xs" @click="reload">重试</button>
     </div>
 
     <!-- Progress Bar -->
@@ -13,6 +25,10 @@
       <div class="progress-bar">
         <div class="progress-bar-fill" :style="{ width: store.progress + '%' }"></div>
       </div>
+    </div>
+
+    <div v-if="store.loading && !loaded" class="glass-card card-pad-lg empty-panel">
+      正在加载策略注册表...
     </div>
 
     <div v-if="loaded && !store.strategies.length && !store.running" class="glass-card card-pad-lg empty-panel">
@@ -125,6 +141,12 @@ async function toggleSignals(name: string) {
 function runAll() { store.run("all"); }
 function runSingle(name: string) { store.run(name); }
 
+async function reload() {
+  loaded.value = false;
+  try { await Promise.all([store.fetchList(), loadStatuses()]); }
+  finally { loaded.value = true; }
+}
+
 async function loadStatuses() {
   try {
     const data = await api.strategyStatuses();
@@ -136,10 +158,7 @@ async function loadStatuses() {
   } catch {}
 }
 
-onMounted(async () => {
-  try { await Promise.all([store.fetchList(), loadStatuses()]); }
-  finally { loaded.value = true; }
-});
+onMounted(reload);
 </script>
 
 <style scoped>

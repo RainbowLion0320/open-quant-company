@@ -1,10 +1,24 @@
 <template>
   <div class="view-page">
-    <!-- Header -->
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">回测分析</h1>
-        <p class="page-subtitle">{{ overview.start || '2015-01' }} → {{ overview.end || '2026-05' }} · 日频引擎 · 策略自主调仓</p>
+    <div class="surface-toolbar">
+      <div class="surface-copy">
+        <span>BACKTEST TOURNAMENT</span>
+        <strong>{{ overview.start || '2015-01' }} → {{ overview.end || '2026-05' }}</strong>
+        <small>日频引擎 · 策略自主调仓 · 与上证指数基准对比</small>
+      </div>
+      <div class="surface-actions">
+        <span class="text-2xs" style="color:var(--text-disabled)">{{ strategies.length }} strategies</span>
+      </div>
+    </div>
+
+    <div v-if="error" class="inline-alert danger">
+      <span>{{ error }}</span>
+    </div>
+
+    <div v-if="summaryCards.length" class="backtest-summary-grid">
+      <div v-for="card in summaryCards" :key="card.label" class="glass-card metric-card">
+        <div class="metric-label">{{ card.label }}</div>
+        <div class="metric-value" :style="{ color: card.color }">{{ card.value }}</div>
       </div>
     </div>
 
@@ -72,7 +86,23 @@ const strategies = computed(() =>
   }))
 );
 
+const summaryCards = computed(() => {
+  const rows = strategies.value.filter(s => s.data && Object.keys(s.data).length);
+  if (!rows.length) return [];
+  const best = [...rows].sort((a, b) => (b.data.total_return || 0) - (a.data.total_return || 0))[0];
+  const worstDrawdown = Math.min(...rows.map(s => s.data.max_drawdown || 0));
+  const avgSharpe = rows.reduce((sum, s) => sum + (s.data.sharpe || 0), 0) / rows.length;
+  const trades = rows.reduce((sum, s) => sum + (s.data.trade_count || 0), 0);
+  return [
+    { label: "最佳收益", value: `${best.label} ${fmtReturn(best.data.total_return || 0)}`, color: "var(--positive)" },
+    { label: "平均 Sharpe", value: avgSharpe.toFixed(2), color: "var(--accent)" },
+    { label: "最深回撤", value: fmtReturn(worstDrawdown), color: worstDrawdown < -0.2 ? "var(--negative)" : "var(--warning)" },
+    { label: "总交易数", value: String(trades), color: "var(--text-secondary)" },
+  ];
+});
+
 const allCurves = ref<Record<string, { equity: any[]; bench: any[] }>>({});
+const error = ref("");
 
 // Multi-chart management
 const chartRefs: Record<string, HTMLElement> = {};
@@ -166,6 +196,7 @@ async function initAllCharts() {
 
 onMounted(async () => {
   try {
+    error.value = "";
     const regData = await api.strategies();
     if (regData.registry?.length) {
       strategyList.value = regData.registry.map((r: any) => ({
@@ -179,7 +210,8 @@ onMounted(async () => {
       }));
     }
     await loadAllDetails();
-  } catch {
+  } catch (e: any) {
+    error.value = e?.message || "回测结果加载失败";
     strategyList.value = [];
     overview.value = {};
   } finally {
@@ -199,5 +231,20 @@ onUnmounted(() => {
   place-items: center;
   color: var(--text-disabled);
   font-size: 12px;
+}
+.backtest-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 900px) {
+  .backtest-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 520px) {
+  .backtest-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
