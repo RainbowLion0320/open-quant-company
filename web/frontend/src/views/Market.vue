@@ -14,12 +14,13 @@
           </div>
         </div>
         <div class="regime-metrics">
-          <div><span>Regime Score</span><strong>{{ displayScore }}</strong></div>
+          <div><span>Regime Score</span><strong>{{ displayScoreText }}</strong></div>
           <div><span>A-share Breadth</span><strong>{{ fmtRatioPct(displayBreadth) }}</strong></div>
           <div><span>Volume Trend</span><strong>{{ store.regime?.volume_trend || '—' }}</strong></div>
           <div><span>Max Positions</span><strong>{{ displayPoolSize || '—' }}</strong></div>
+          <div><span>Index Trend</span><strong>{{ fmtRatioPct(regimeTrendStrength) }}</strong></div>
+          <div><span>Above MA20</span><strong>{{ fmtRatioPct(aboveMa20Ratio) }}</strong></div>
         </div>
-        <div class="trend-note">{{ store.regime?.ma_trend || '等待市场检测' }}</div>
       </div>
 
       <div class="index-panel glass-card">
@@ -264,9 +265,13 @@ const regimeColor = computed(() => {
 });
 const regimeScore = computed(() => {
   const s = store.regime?.score;
-  if (s != null) return Math.round(s);
+  const n = Number(s);
+  if (Number.isFinite(n)) return Number(n.toFixed(1));
   return 50;
 });
+const displayScoreText = computed(() => displayScore.value.toFixed(1));
+const regimeTrendStrength = computed(() => store.regime?.score_components?.trend_raw ?? null);
+const aboveMa20Ratio = computed(() => store.regime?.breadth_detail?.above_ma20 ?? null);
 
 const chartScale = computed(() => {
   const values = relativeChart.value.lines
@@ -343,7 +348,8 @@ function fmtSignedPct(v: number | null | undefined) {
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 }
 function fmtRatioPct(v: number | null | undefined) {
-  const n = Number(v || 0) * 100;
+  if (v == null || Number.isNaN(Number(v))) return "—";
+  const n = Number(v) * 100;
   return `${n.toFixed(0)}%`;
 }
 function fmtReturn(v: number) {
@@ -421,7 +427,7 @@ function tweenTo(ref: { value: number }, target: number, decimals = 0, duration 
 
 function animateScore(target: number) {
   clearTimeout(scoreTimer);
-  tweenTo(displayScore, target, 0, 700);
+  tweenTo(displayScore, target, 1, 700);
 }
 
 // Animated display values for key metrics
@@ -636,11 +642,6 @@ onUnmounted(() => {
   margin-top: 4px;
   color: var(--text-primary);
   font-family: "JetBrains Mono", monospace;
-}
-.trend-note {
-  margin-top: 12px;
-  color: var(--text-tertiary);
-  font-size: 11px;
 }
 .index-summary {
   height: 46px;
