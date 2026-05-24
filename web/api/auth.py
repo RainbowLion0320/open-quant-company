@@ -1,9 +1,10 @@
 """
 API Authentication — lightweight Bearer token middleware for local single-user.
 
-Reads the API key from ``QUANT_AGENT_API_KEY`` or ``project.api_key`` in
-``config/settings.yaml``.  If neither is configured, auth is disabled so the
-local dashboard keeps working in the default single-user setup.
+Reads the API key from ``ASTROLABE_API_KEY`` (preferred), legacy
+``XINGPAN_API_KEY`` / ``QUANT_AGENT_API_KEY``, or ``project.api_key`` in
+``config/settings.yaml``. If none is configured, auth is disabled so the local
+dashboard keeps working in the default single-user setup.
 
 Whitelist: /api/health, static /assets, and SPA fallback paths are public.
 All other /api/* routes require Authorization: Bearer <key> when a key exists.
@@ -41,7 +42,11 @@ def _read_settings() -> dict:
 
 def get_api_key() -> str:
     """Read API key from env/config without mutating tracked settings."""
-    env_key = os.environ.get("QUANT_AGENT_API_KEY", "").strip()
+    env_key = (
+        os.environ.get("ASTROLABE_API_KEY", "").strip()
+        or os.environ.get("XINGPAN_API_KEY", "").strip()
+        or os.environ.get("QUANT_AGENT_API_KEY", "").strip()
+    )
     if env_key:
         return env_key
 

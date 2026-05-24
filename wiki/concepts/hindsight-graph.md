@@ -8,7 +8,7 @@ tags: [web, hindsight, knowledge-graph, three.js, 3d]
 
 # Hindsight Knowledge Graph
 
-Hindsight 持久化记忆的交互式知识图谱可视化。**Three.js WebGL 3D 星空图** + Quantum Terminal 风格，独立 Web 页面。
+Hindsight 持久化记忆的交互式知识图谱可视化。**Three.js WebGL 3D 星空图** + 星盘终端风格，独立 Web 页面。
 
 2026-05-17: 从 Canvas 2D 迁移到 Three.js 3D (commit 9c3bac9)。
 

@@ -1,7 +1,8 @@
-# Quant Agent — 个人A股量化AI
+# 星盘 / Astrolabe Quant OS — 个人量化研究与执行操作系统
 
 ## 项目概览
 - 目的: 分阶段打造个人量化系统 (分析助手 → 信号系统 → 半自动交易)
+- 命名: 中文产品名“星盘”，英文全名 `Astrolabe Quant OS`，仓库/包 slug `astrolabe-quant`
 - 频率: 日线级别, 低频
 - 架构: 巴菲特价值投资 (决策约束层) + 钱学森控制论 (运行机制层), 正交不冲突
 - 注意: 这两个原则已写入 ~/.hermes/SOUL.md，是 Hermes 本身的架构而非仅项目的。本项目是它们在量化领域的具体落地。
@@ -21,7 +22,7 @@
 - AKShare↔Tushare 分工: AKShare管日线，Tushare管三张表+daily_basic+融资融券+北向+申万+宏观
 
 ## 记忆系统
-- 已配置 Hindsight Local 模式 (deepseek-v4-flash, bank_id=quant-agent)
+- 已配置 Hindsight Local 模式 (deepseek-v4-flash, 星盘记忆库; legacy bank_id=quant-agent)
 - 首次启动需 /reset, daemon 会自动拉起 (首次初始化约1分钟)
 
 ## 当前进度 (2026-05-21)
@@ -45,7 +46,7 @@
 
 ## 关键文件
 ```
-~/quant-agent/
+~/astrolabe-quant/  # 项目名；本机仓库目录可能仍保留 quant-agent legacy 路径
 ├── config/settings.yaml          # 全局配置 (策略/数据/资产注册表)
 ├── data/
 │   ├── fetcher.py                # AKShare 3源 fallback
@@ -91,7 +92,7 @@
 │   ├── run_workflow.py           # qrun YAML工作流
 │   └── cron_fetch_slow.py        # 限流数据日常填充
 ├── web/api/routes/{market,strategies,stocks,portfolio,signals,sectors,settings,backtest,system,hindsight}.py
-├── web/frontend/                 # Vue 3 SPA (Quantum Terminal, 12页含行业雷达)
+├── web/frontend/                 # Vue 3 SPA (星盘终端, 12页含行业雷达)
 ├── wiki/                         # LLM Wiki (18页)
 ├── tests/                        # 合约测试 + 边界测试
 ├── docs/tushare-mcp-guide.md     # Tushare文档

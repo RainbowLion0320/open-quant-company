@@ -1,4 +1,4 @@
-# Quant Agent — 核心依赖
+# 星盘 / Astrolabe Quant OS — 核心依赖
 # 安装: pip install -r requirements.txt
 # 开发: pip install -r requirements-dev.txt
 

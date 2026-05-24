@@ -4,8 +4,8 @@
     <div class="scanline"></div>
 
     <aside class="nav-rail">
-      <router-link to="/" class="brand-mark" aria-label="Quant Agent">
-        <span class="brand-core">QA</span>
+      <router-link to="/" class="brand-mark" aria-label="星盘">
+        <span class="brand-core">星</span>
         <span class="brand-ring"></span>
       </router-link>
 
@@ -35,7 +35,7 @@
     <section class="workspace">
       <header class="command-bar">
         <div class="system-title">
-          <span class="system-kicker">HERMES QUANT AGENT</span>
+          <span class="system-kicker">ASTROLABE QUANT OS</span>
           <strong>{{ routeTitle }}</strong>
         </div>
         <div class="telemetry-group">
@@ -112,7 +112,7 @@ const activeSectionPath = computed(() => {
   return route.path;
 });
 
-const routeTitle = computed(() => nav.find(item => item.path === activeSectionPath.value)?.label || "Quant Terminal");
+const routeTitle = computed(() => nav.find(item => item.path === activeSectionPath.value)?.label || "星盘终端");
 
 const ticker = computed(() => (marketMeta.value.multi_asset || []).map((item: any) => ({
   symbol: item.symbol,

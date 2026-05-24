@@ -1,4 +1,4 @@
-# Quant Agent — PRD/Spec 验收矩阵
+# 星盘 / Astrolabe Quant OS — PRD/Spec 验收矩阵
 
 > 日期: 2026-05-23 | 来源: 文档治理基线
 > 用途: 追踪 6 个能力域从 PRD/spec → 代码 → 测试 → API/Web → 手工验收的完整链路

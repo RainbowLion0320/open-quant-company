@@ -73,6 +73,7 @@ def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatc
 
     health = importlib.reload(health)
     result = health.run_health_check(output_path=store / "db_health.parquet")
+
     tables = set(result["table"])
 
     daily = result[result["table"] == "stock_moneyflow_daily"].iloc[0].to_dict()
@@ -85,6 +86,28 @@ def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatc
     assert daily["freshness_status"] in {"fresh", "stale"}
     assert int(daily["manifest_files"]) == 1
     reset_datahub()
+
+
+def test_datahub_prefers_astrolabe_env_alias(tmp_path, monkeypatch):
+    from data.datahub import DataHub
+
+    legacy_store = tmp_path / "legacy-store"
+    legacy_cache = tmp_path / "legacy-cache"
+    xingpan_store = tmp_path / "xingpan-store"
+    xingpan_cache = tmp_path / "xingpan-cache"
+    astrolabe_store = tmp_path / "astrolabe-quant-store"
+    astrolabe_cache = tmp_path / "astrolabe-quant-cache"
+    monkeypatch.setenv("QUANT_AGENT_STORE", str(legacy_store))
+    monkeypatch.setenv("QUANT_AGENT_CACHE", str(legacy_cache))
+    monkeypatch.setenv("XINGPAN_STORE", str(xingpan_store))
+    monkeypatch.setenv("XINGPAN_CACHE", str(xingpan_cache))
+    monkeypatch.setenv("ASTROLABE_STORE", str(astrolabe_store))
+    monkeypatch.setenv("ASTROLABE_CACHE", str(astrolabe_cache))
+
+    hub = DataHub(create=False)
+
+    assert hub.store_root == astrolabe_store.resolve()
+    assert hub.cache_root == astrolabe_cache.resolve()
 
 
 def test_daily_cron_ohlcv_uses_stock_daily_module(monkeypatch):

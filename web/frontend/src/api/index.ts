@@ -1,5 +1,5 @@
 /**
- * Quantum Terminal — Shared API Client
+ * 星盘终端 — Shared API Client
  *
  * Every API call goes through here. No raw fetch() scattered across views.
  * Auto error handling, type-safe return values.

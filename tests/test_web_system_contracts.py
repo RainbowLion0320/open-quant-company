@@ -168,10 +168,15 @@ def test_monitor_is_read_only_but_keeps_system_status_cards():
 
     assert "api.saveSettings" not in monitor
     assert "saveWithConfirm" not in monitor
-    assert "TELEGRAM" in monitor
-    assert "DATA SOURCES" in monitor
-    assert "SYSTEM INFO" in monitor
-    assert "api.settings()" in monitor
+    assert "API HEALTH" in monitor
+    assert "SERVICES" in monitor
+    assert "CRON JOBS" in monitor
+    assert "RESOURCE HISTORY" in monitor
+    assert "TOP PROCESSES" in monitor
+    assert "Telegram" in monitor
+    assert "api.apiHealth()" in monitor
+    assert "api.serviceStatus()" in monitor
+    assert "api.cronJobs()" in monitor
 
 
 def test_settings_cancel_reverts_pending_toggle():

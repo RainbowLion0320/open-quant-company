@@ -1,4 +1,4 @@
-# Quant Agent 文档治理
+# 星盘 / Astrolabe Quant OS 文档治理
 
 > 更新: 2026-05-23
 

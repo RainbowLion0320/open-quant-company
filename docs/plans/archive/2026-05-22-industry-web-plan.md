@@ -1,4 +1,4 @@
-# Quant Agent 下一阶段开发计划
+# 星盘 / Astrolabe Quant OS 下一阶段开发计划
 
 > 日期: 2026-05-22
 > 来源: Codex 对当前 Git、Wiki、PRD/spec、Web UI 的复核

@@ -320,6 +320,21 @@ class TestAuthHelpers:
 
         assert get_api_key() == "env-secret"
 
+    def test_astrolabe_api_key_takes_precedence(self, monkeypatch):
+        monkeypatch.setenv("QUANT_AGENT_API_KEY", "legacy-secret")
+        monkeypatch.setenv("XINGPAN_API_KEY", "xingpan-secret")
+        monkeypatch.setenv("ASTROLABE_API_KEY", "astrolabe-quant-secret")
+        from web.api.auth import get_api_key
+
+        assert get_api_key() == "astrolabe-quant-secret"
+
+    def test_xingpan_api_key_remains_legacy_fallback(self, monkeypatch):
+        monkeypatch.setenv("QUANT_AGENT_API_KEY", "legacy-secret")
+        monkeypatch.setenv("XINGPAN_API_KEY", "xingpan-secret")
+        from web.api.auth import get_api_key
+
+        assert get_api_key() == "xingpan-secret"
+
     def test_get_run_mode_default(self):
         """get_run_mode returns 'research' when no config."""
         with patch("web.api.auth._read_settings", return_value={}):

@@ -1,5 +1,5 @@
 """
-Quant Agent API v2 -- Application Factory
+Astrolabe Quant API v2 -- Application Factory
 """
 
 import os, sys
@@ -27,9 +27,9 @@ from web.api.auth import AuthMiddleware
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Quant Agent API",
+        title="Astrolabe Quant API",
         version="2.0.0",
-        description="A-share quantitative trading platform — Buffett + Cybernetics",
+        description="星盘 / Astrolabe Quant OS — 个人量化研究与执行操作系统",
     )
 
     app.add_middleware(

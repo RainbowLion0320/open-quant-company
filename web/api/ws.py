@@ -5,7 +5,7 @@ import json
 import logging
 from fastapi import WebSocket, WebSocketDisconnect
 
-logger = logging.getLogger("quant-agent.ws")
+logger = logging.getLogger("astrolabe_quant.ws")
 
 # job_id -> set of WebSocket connections
 _connections: dict[str, set[WebSocket]] = {}

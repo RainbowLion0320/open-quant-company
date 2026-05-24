@@ -8,7 +8,7 @@
 import { computed } from "vue";
 
 const props = withDefaults(defineProps<{
-  glow?: "cyan" | "quantum" | "none";
+  glow?: "cyan" | "stellar" | "none";
   padding?: string;
 }>(), {
   glow: "none",
@@ -17,7 +17,7 @@ const props = withDefaults(defineProps<{
 
 const glowClass = computed(() => {
   if (props.glow === "cyan") return "glow-cyan";
-  if (props.glow === "quantum") return "glow-quantum";
+  if (props.glow === "stellar") return "glow-stellar";
   return "";
 });
 

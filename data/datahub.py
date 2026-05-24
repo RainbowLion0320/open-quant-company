@@ -63,8 +63,16 @@ class DatasetSpec:
     description: str = ""
 
 
+def _env_first(*names: str) -> str:
+    for name in names:
+        value = os.environ.get(name, "")
+        if value:
+            return value
+    return ""
+
+
 class DataHub:
-    """Unified local data hub for the quant-agent repository."""
+    """Unified local data hub for the 星盘 repository."""
 
     def __init__(
         self,
@@ -74,8 +82,14 @@ class DataHub:
         create: bool = True,
     ):
         self.project_root = _resolve_path(project_root or PROJECT_ROOT)
-        store_default = os.environ.get("QUANT_AGENT_STORE") or self.project_root / "data" / "store"
-        cache_default = os.environ.get("QUANT_AGENT_CACHE") or self.project_root / "data" / "cache"
+        store_default = (
+            _env_first("ASTROLABE_STORE", "XINGPAN_STORE", "QUANT_AGENT_STORE")
+            or self.project_root / "data" / "store"
+        )
+        cache_default = (
+            _env_first("ASTROLABE_CACHE", "XINGPAN_CACHE", "QUANT_AGENT_CACHE")
+            or self.project_root / "data" / "cache"
+        )
         self.store_root = _resolve_path(store_root or store_default, self.project_root)
         self.cache_root = _resolve_path(cache_root or cache_default, self.project_root)
         if create:
@@ -389,7 +403,7 @@ class DataHub:
             date_col, date_min, date_max = self._date_range(df)
             record = {
                 "path": self._relative_to_project(target),
-                "producer": producer or os.environ.get("QUANT_AGENT_PRODUCER", ""),
+                "producer": producer or _env_first("ASTROLABE_PRODUCER", "XINGPAN_PRODUCER", "QUANT_AGENT_PRODUCER"),
                 "row_count": int(len(df)),
                 "column_count": int(len(df.columns)),
                 "date_column": date_col,

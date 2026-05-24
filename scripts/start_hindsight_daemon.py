@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start Hindsight embedded daemon with the quant-agent profile config.
+"""Start Hindsight embedded daemon for 星盘.
 
 This script reads the API key from ~/.hermes/.env (DEEPSEEK_API_KEY),
 constructs proper env vars for the daemon, and keeps it alive.
@@ -60,7 +60,7 @@ def main():
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
 
-    print("Starting Hindsight embedded daemon (pg0 + deepseek-v4-flash)...")
+    print("Starting 星盘 Hindsight embedded daemon (pg0 + deepseek-v4-flash)...")
     server = start_server(
         db_url="pg0",
         llm_provider="openai",

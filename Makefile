@@ -1,4 +1,4 @@
-# Quant Agent — 维护命令
+# 星盘 / Astrolabe Quant OS — 维护命令
 PYTHON = /Users/fushao/.hermes/hermes-agent/venv/bin/python3
 
 .PHONY: install test lint ci clean scan backtest regime web web-build web-dev web-stop

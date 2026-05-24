@@ -10,7 +10,7 @@ tags: [duckdb, parquet, database, migration, architecture, ADR, concurrency]
 
 - **Date**: 2026-05-12 (Phase 1: SQLite→DuckDB), 2026-05-14 (Phase 2: DuckDB→Parquet), 2026-05-15 (Phase 3: PIT特征存储)
 - **Status**: Implemented (Phase 3 — 生产稳定)
-- **Author**: Quant Agent
+- **Author**: 星盘
 
 ## Phase 1: SQLite → DuckDB (2026-05-12)
 

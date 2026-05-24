@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Optional, Callable
 from datetime import datetime
 
-logger = logging.getLogger("quant-agent.jobs")
+logger = logging.getLogger("astrolabe_quant.jobs")
 
 # job_id -> JobInfo
 _jobs: Dict[str, dict] = {}

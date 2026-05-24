@@ -8,7 +8,7 @@ tags: [hindsight, memory, architecture, infrastructure, pg0]
 
 # Hindsight Architecture
 
-Hindsight 是 Quant Agent 的唯一记忆系统。Hermes 内置 MEMORY 已禁用（`memory_enabled: false`），所有跨会话知识存储由 Hindsight 接管。
+Hindsight 是星盘（Astrolabe Quant OS）的唯一记忆系统。Hermes 内置 MEMORY 已禁用（`memory_enabled: false`），所有跨会话知识存储由 Hindsight 接管。
 
 ## 系统定位
 
@@ -29,7 +29,7 @@ Hermes Agent (deepseek-v4-pro)
 | 向量引擎 | pg0 v18.1.0 (嵌入式 PostgreSQL + pgvector) |
 | 嵌入模型 | sentence-transformers |
 | 活跃端口 | **9177** |
-| Bank ID | `quant-agent` |
+| Bank ID | `quant-agent` (legacy ID, 星盘记忆库；Web API 可通过 `ASTROLABE_HINDSIGHT_BANK` 指向 `astrolabe-quant`) |
 | 召回预算 | mid |
 
 ## 关键配置

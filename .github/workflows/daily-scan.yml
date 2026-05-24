@@ -1,4 +1,4 @@
-name: Quant Agent Daily Scan
+name: Astrolabe Quant Daily Scan
 
 on:
   schedule:

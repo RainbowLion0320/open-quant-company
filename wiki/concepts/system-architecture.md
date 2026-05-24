@@ -8,7 +8,7 @@ tags: [architecture, system-overview, extensibility, strategy-registry, ML, Fact
 
 # System Architecture
 
-A股量化交易系统架构总览。巴菲特价值投资为决策约束层，钱学森控制论为运行机制层——两者正交不冲突。当前版本、策略数量、因子数量、回测指标等动态事实以 `config/settings.yaml`、`signals/expression.py`、`data/models/`、`data/tournament/` 和运行输出为准。
+A股量化研究与执行系统架构总览。巴菲特价值投资为决策约束层，钱学森控制论为运行机制层——两者正交不冲突。当前版本、策略数量、因子数量、回测指标等动态事实以 `config/settings.yaml`、`signals/expression.py`、`data/models/`、`data/tournament/` 和运行输出为准。
 
 ## 设计哲学：三层正交架构
 
@@ -42,7 +42,7 @@ LLM Research → 自动化R&D      Circuit Breaker → -15%熔断  Self-healing 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  Web Dashboard (port 8501)                               │
-│  Vue 3 + Pinia + ECharts + Tailwind — Quantum Terminal   │
+│  Vue 3 + Pinia + ECharts + Tailwind — 星盘终端   │
 ├──────────────────────────────────────────────────────────┤
 │  FastAPI Backend                                         │
 │  routes + WebSocket + async jobs + DuckDB :memory: views │
@@ -269,7 +269,7 @@ strategies:
 
 | 字段 | 来源 | 用途 |
 |------|------|------|
-| producer | `producer=` 参数 / `QUANT_AGENT_PRODUCER` 环境变量 | 追溯写入来源 |
+| producer | `producer=` 参数 / `ASTROLABE_PRODUCER` 环境变量；`XINGPAN_PRODUCER`、`QUANT_AGENT_PRODUCER` 作为 legacy 兼容 | 追溯写入来源 |
 | row_count / column_count | DataFrame | 数据量统计 |
 | date_column / date_min / date_max | 自动检测 date 列 | 日期范围 |
 | schema_hash | 列名+dtype SHA256 | 检测 schema 变更 |

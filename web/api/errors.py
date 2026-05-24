@@ -6,7 +6,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from datetime import datetime
 
-logger = logging.getLogger("quant-agent.api")
+logger = logging.getLogger("astrolabe_quant.api")
 
 
 class QuantError(Exception):

@@ -9,7 +9,7 @@ tags: [wiki, schema]
 # Wiki Schema
 
 ## Domain
-A股量化交易系统 — 巴菲特价值投资哲学 + 钱学森控制论的工程落地。
+A股量化研究与执行系统 — 巴菲特价值投资哲学 + 钱学森控制论的工程落地。
 覆盖: 策略设计、数据架构、技术选型、因子工程、回测方法论。
 
 ## Architecture: Three Layers

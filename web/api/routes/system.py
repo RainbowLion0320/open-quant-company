@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/system", tags=["System"])
 HUB = get_datahub()
 DB = HUB.system_monitor_path()
 TOKEN_CACHE = HUB.token_usage_path()
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent  # routes → api → web → quant-agent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent  # routes → api → web → repo root
 
 
 def _query(sql: str, params=()):

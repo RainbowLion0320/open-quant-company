@@ -1,5 +1,5 @@
 """
-Quant Agent API v2 — FastAPI 应用工厂
+Astrolabe Quant API v2 — FastAPI 应用工厂
 
 模块化设计:
   web/api/

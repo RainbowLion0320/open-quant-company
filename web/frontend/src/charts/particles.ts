@@ -1,5 +1,5 @@
 /**
- * Quantum Terminal — Particle Field
+ * 星盘终端 — Particle Field
  *
  * Subtle particle animation on the background canvas.
  * Low-CPU, deep-space feel. Activated on mount, cleaned up on unmount.

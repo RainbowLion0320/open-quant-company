@@ -12,6 +12,7 @@ Allocator 动态覆盖 config 静态权重。
 """
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
+import os
 import yaml
 from pathlib import Path
 
@@ -61,11 +62,31 @@ REGIME_WEIGHTS_DEFAULT = {
 }
 
 
+def _default_settings_path() -> Path:
+    root = os.environ.get("ASTROLABE_HOME") or os.environ.get("XINGPAN_HOME") or os.environ.get("QUANT_AGENT_HOME")
+    if root:
+        return Path(root).expanduser() / "config" / "settings.yaml"
+
+    repo_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
+    if repo_path.exists():
+        return repo_path
+
+    legacy_path = Path("~/quant-agent/config/settings.yaml").expanduser()
+    if legacy_path.exists():
+        return legacy_path
+
+    xingpan_path = Path("~/xingpan/config/settings.yaml").expanduser()
+    if xingpan_path.exists():
+        return xingpan_path
+
+    return Path("~/astrolabe-quant/config/settings.yaml").expanduser()
+
+
 class AssetAllocator:
     """Regime-aware multi-asset allocation engine."""
 
     def __init__(self, config_path: Optional[Path] = None):
-        self._config_path = config_path or Path("~/quant-agent/config/settings.yaml").expanduser()
+        self._config_path = config_path or _default_settings_path()
         self._regime_weights = copy.deepcopy(REGIME_WEIGHTS_DEFAULT)
         self._load_config()
 

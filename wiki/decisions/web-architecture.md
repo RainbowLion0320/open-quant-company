@@ -6,11 +6,11 @@ type: decision
 tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-center, monitor]
 ---
 
-# Decision: Quantum Terminal Web SPA
+# Decision: 星盘终端 Web SPA
 
 - **Date**: 2026-05-12 (initial), 2026-05-16 (command center upgrade), 2026-05-23 (refresh)
 - **Status**: Implemented
-- **Author**: Quant Agent + Codex
+- **Author**: 星盘 + Codex
 
 ## Stack
 

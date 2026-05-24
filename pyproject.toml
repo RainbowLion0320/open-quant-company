@@ -1,7 +1,7 @@
 [project]
-name = "quant-agent"
+name = "astrolabe-quant"
 version = "2.0.0"
-description = "个人A股量化AI — 巴菲特价值投资 + 钱学森控制论"
+description = "星盘 / Astrolabe Quant OS：个人量化研究与执行操作系统"
 requires-python = ">=3.11"
 
 dependencies = [

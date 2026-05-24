@@ -8,7 +8,7 @@ tags: [index]
 
 # Wiki Index
 
-> Quant Agent — 个人A股量化交易系统知识库。每行 = wikilink + 一句话概括。
+> 星盘 / Astrolabe Quant OS — 个人量化研究与执行操作系统知识库。每行 = wikilink + 一句话概括。
 > This index lists stable knowledge pages. Current counts, metrics, and phase status live in code/config/data outputs, not in wiki prose.
 > Documentation ownership: see `../docs/DOCUMENTATION.md`.
 
@@ -33,7 +33,7 @@ tags: [index]
 - [[ai-automation-roadmap]] — **AI自动化路线图** ★：LLM多轮迭代、OOS验证、自注入库的方法论
 - [[duckdb-migration]] — SQLite→DuckDB→Parquet 三阶段演进
 - [[datahub]] — DataHub 数据中台：统一路径、原子写入、最新批次、存储审计
-- [[web-architecture]] — Vue 3 + FastAPI，Quantum Terminal v4.0 设计系统
+- [[web-architecture]] — Vue 3 + FastAPI，星盘终端 v4.0 设计系统
 
 ## Reference
 - [[data-dimensions]] — ★ 数据维度索引：DataRegistry/DataHub 查询入口, 不复制动态维度数量

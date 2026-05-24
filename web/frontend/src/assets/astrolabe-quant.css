@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════
-   QUANTUM TERMINAL — Design System v4.0
+   星盘终端 — Design System v4.0
    Deep-space dark matter + electric cyan + glass morphism
    ═══════════════════════════════════════════════════════ */
 
@@ -22,9 +22,9 @@
   --accent-bg:     rgba(0, 212, 255, 0.08);
   --accent-ring:   rgba(0, 212, 255, 0.2);
 
-  /* Quantum violet — data/ML accent */
-  --quantum:       #7c3aed;
-  --quantum-glow:  #a78bfa;
+  /* Stellar violet — data/ML accent */
+  --stellar:       #7c3aed;
+  --stellar-glow:  #a78bfa;
 
   /* Semantic colors */
   --positive:      #22c55e;
@@ -50,7 +50,7 @@
 
   /* Shadows / Glow */
   --glow-cyan:    0 0 20px rgba(0, 212, 255, 0.15);
-  --glow-quantum: 0 0 20px rgba(124, 58, 237, 0.15);
+  --glow-stellar: 0 0 20px rgba(124, 58, 237, 0.15);
   --glow-text:    0 0 10px rgba(0, 212, 255, 0.4);
   --panel-shadow: 0 18px 60px rgba(0, 0, 0, 0.36);
 }
@@ -429,9 +429,9 @@ html, body {
   border-color: rgba(0, 212, 255, 0.25);
   box-shadow: var(--glow-cyan);
 }
-.glass-card.glow-quantum:hover {
+.glass-card.glow-stellar:hover {
   border-color: rgba(124, 58, 237, 0.25);
-  box-shadow: var(--glow-quantum);
+  box-shadow: var(--glow-stellar);
 }
 
 /* ── Buttons ── */
