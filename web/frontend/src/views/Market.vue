@@ -1,11 +1,5 @@
 <template>
   <div class="market-command">
-    <button @click="refresh" class="page-refresh-btn" :class="{ 'is-spinning': refreshing }" :disabled="refreshing" aria-label="刷新全部数据">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4" />
-      </svg>
-      <span>刷新数据</span>
-    </button>
     <section class="market-hero" :class="{ 'is-refreshing': refreshing }">
       <div class="regime-panel glass-card">
         <div class="panel-head">
@@ -437,12 +431,8 @@ async function fetchHotSectors() {
   }
 }
 
-onMounted(async () => {
-  await Promise.all([
-    store.fetchMarket(selectedRange.value),
-    fetchHotSectors(),
-  ]);
-  animateScore(regimeScore.value);
+onMounted(() => {
+  refresh();
 });
 </script>
 
@@ -452,45 +442,6 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  position: relative;
-}
-.page-refresh-btn {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 26px;
-  padding: 0 8px;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  background: var(--bg-panel);
-  color: var(--text-secondary);
-  font-size: 11px;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-.page-refresh-btn:hover {
-  border-color: var(--border-strong);
-  color: var(--text-primary);
-}
-.page-refresh-btn svg {
-  width: 12px;
-  height: 12px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.page-refresh-btn.is-spinning svg {
-  animation: icon-spin 0.7s linear infinite;
-}
-.page-refresh-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 .market-hero {
   display: grid;
@@ -534,17 +485,10 @@ onMounted(async () => {
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
-  transition: transform 0.15s ease;
-}
-.icon-button.is-spinning svg {
-  animation: icon-spin 0.7s linear infinite;
 }
 .icon-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-@keyframes icon-spin {
-  to { transform: rotate(360deg); }
 }
 .regime-panel, .index-panel, .macro-panel {
   padding: 14px;
