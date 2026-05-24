@@ -1,5 +1,6 @@
 import pandas as pd
 
+from cybernetics import orchestrator
 from web.api.routes import market
 
 
@@ -46,3 +47,13 @@ def test_market_index_cards_respect_requested_series_limit(monkeypatch):
     cards = market._multi_asset_cards(_index_frame(), series_limit=2)
 
     assert all(len(card["series"]) == 2 for card in cards)
+
+
+def test_position_capacity_uses_adaptive_regime_ceiling(monkeypatch):
+    def fake_adaptive_params(regime):
+        return {"max_positions": {"bull": 8, "sideways": 5, "bear": 2}[regime.value]}
+
+    monkeypatch.setattr(orchestrator, "adaptive_params", fake_adaptive_params)
+
+    assert market._position_capacity(5) == {"current": 5, "max": 8}
+    assert market._position_capacity(10) == {"current": 10, "max": 10}

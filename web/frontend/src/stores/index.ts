@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { api } from "../api";
+import { api, type PositionCapacity } from "../api";
 
 export const useMarketStore = defineStore("market", () => {
   const regime = ref<any>(null);
@@ -10,6 +10,7 @@ export const useMarketStore = defineStore("market", () => {
   const freshness = ref<any>({});
   const updated = ref("");
   const poolSize = ref(0);
+  const positionCapacity = ref<PositionCapacity>({ current: 0, max: 0 });
   const loading = ref(false);
   const error = ref("");
 
@@ -25,6 +26,10 @@ export const useMarketStore = defineStore("market", () => {
       freshness.value = data.freshness || {};
       updated.value = data.updated || "";
       poolSize.value = data.pool_size || 0;
+      positionCapacity.value = data.position_capacity || {
+        current: data.pool_size || 0,
+        max: Math.max(data.pool_size || 0, 1),
+      };
     } catch (e: any) {
       error.value = e.message;
     } finally {
@@ -34,7 +39,7 @@ export const useMarketStore = defineStore("market", () => {
 
   return {
     regime, kline, multiAsset, macro,
-    freshness, updated, poolSize, loading, error, fetchMarket,
+    freshness, updated, poolSize, positionCapacity, loading, error, fetchMarket,
   };
 });
 

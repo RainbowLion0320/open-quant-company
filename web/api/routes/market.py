@@ -22,6 +22,7 @@ _CORE_INDEX_CARDS = [
     ("chinext", "创业板指", "399006.SZ", "sz399006", "创业板指 OHLCV"),
     ("star50", "科创50", "000688.SH", "sh000688", "科创50指数 OHLCV"),
 ]
+_REGIME_KEYS = ("bull", "sideways", "bear")
 
 
 def _num(v, default=0.0) -> float:
@@ -31,6 +32,22 @@ def _num(v, default=0.0) -> float:
         return float(v)
     except Exception:
         return default
+
+
+def _position_capacity(current: object) -> dict[str, int]:
+    current_positions = max(0, int(_num(current, 0)))
+    configured_max = current_positions
+
+    try:
+        from cybernetics.orchestrator import MarketRegime, adaptive_params
+
+        for key in _REGIME_KEYS:
+            params = adaptive_params(MarketRegime(key))
+            configured_max = max(configured_max, int(_num(params.get("max_positions"), 0)))
+    except Exception:
+        configured_max = max(configured_max, 8)
+
+    return {"current": current_positions, "max": max(configured_max, 1)}
 
 
 def _date_value_series(df: pd.DataFrame, value_col: str = "close", limit: int = 42) -> list[dict]:
@@ -200,6 +217,7 @@ async def market_regime():
     bench = get_index_daily("sh000001")
     bench["date"] = pd.to_datetime(bench["date"])
     multi_asset = _multi_asset_cards(bench)
+    max_positions = orch.params.get("max_positions", 0)
 
     return {
         "regime": {
@@ -218,6 +236,7 @@ async def market_regime():
         "config": {
             "project": get_project_meta(),
         },
+        "position_capacity": _position_capacity(max_positions),
         "updated": datetime.now().strftime("%H:%M"),
     }
 
@@ -260,6 +279,8 @@ async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|Y
     multi_asset = _multi_asset_cards(recent, series_limit=tail)
     macro = _macro_cards()
 
+    max_positions = orch.params.get("max_positions", 0)
+
     return {
         "regime": regime,
         "kline": kline,
@@ -270,7 +291,8 @@ async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|Y
             "market": str(recent.iloc[-1]["date"])[:10] if len(recent) else "",
             "macro": max([m.get("date", "") for m in macro] or [""]),
         },
-        "pool_size": orch.params.get("max_positions", 0),
+        "pool_size": max_positions,
+        "position_capacity": _position_capacity(max_positions),
         "config": {
             "project": get_project_meta(),
         },

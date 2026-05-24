@@ -140,6 +140,11 @@ export interface MarketAlert {
   time: string;
 }
 
+export interface PositionCapacity {
+  current: number;
+  max: number;
+}
+
 export interface MarketResponse {
   regime: RegimeData;
   kline: KlinePoint[];
@@ -148,6 +153,7 @@ export interface MarketResponse {
   macro?: MacroCard[];
   freshness?: { market: string; macro: string };
   pool_size?: number;
+  position_capacity?: PositionCapacity;
   config?: Record<string, any>;
   updated?: string;
 }
@@ -158,6 +164,7 @@ export interface RegimeResponse {
   freshness: { market: string };
   updated: string;
   config?: Record<string, any>;
+  position_capacity?: PositionCapacity;
 }
 
 export interface StrategySignal {

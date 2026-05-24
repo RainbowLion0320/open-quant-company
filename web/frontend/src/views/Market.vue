@@ -13,13 +13,22 @@
             <div class="regime-name" :style="{ color: regimeColor }">{{ regimeLabel }}</div>
           </div>
         </div>
-        <div class="regime-metrics">
-          <div><span>Regime Score</span><strong>{{ displayScoreText }}</strong></div>
-          <div><span>A-share Breadth</span><strong>{{ fmtRatioPct(displayBreadth) }}</strong></div>
-          <div><span>Volume Trend</span><strong>{{ store.regime?.volume_trend || '—' }}</strong></div>
-          <div><span>Max Positions</span><strong>{{ displayPoolSize || '—' }}</strong></div>
-          <div><span>Index Trend</span><strong>{{ fmtRatioPct(regimeTrendStrength) }}</strong></div>
-          <div><span>Above MA20</span><strong>{{ fmtRatioPct(aboveMa20Ratio) }}</strong></div>
+        <div class="regime-gauge-grid">
+          <div
+            v-for="metric in regimeGaugeMetrics"
+            :key="metric.key"
+            class="regime-gauge-card"
+            role="group"
+            :aria-label="`${metric.label}: ${metric.value}`"
+          >
+            <div
+              class="mini-gauge"
+              :style="{ '--gauge-color': metric.color, '--gauge-value': `${metric.percent}%` }"
+            >
+              <span>{{ metric.value }}</span>
+            </div>
+            <strong>{{ metric.label }}</strong>
+          </div>
         </div>
       </div>
 
@@ -272,6 +281,59 @@ const regimeScore = computed(() => {
 const displayScoreText = computed(() => displayScore.value.toFixed(1));
 const regimeTrendStrength = computed(() => store.regime?.score_components?.trend_raw ?? null);
 const aboveMa20Ratio = computed(() => store.regime?.breadth_detail?.above_ma20 ?? null);
+const liquidityPulse = computed(() => store.regime?.score_components?.amount_ratio_5_20 ?? null);
+const capacityMax = computed(() => Math.max(Number(store.positionCapacity?.max || 0), Number(displayPoolSize.value || 0), 1));
+const liquidityColor = computed(() => {
+  const v = Number(liquidityPulse.value);
+  if (!Number.isFinite(v)) return "var(--text-disabled)";
+  if (v >= 1.2) return "var(--positive)";
+  if (v < 0.8) return "var(--warning)";
+  return "var(--accent)";
+});
+const regimeGaugeMetrics = computed(() => [
+  {
+    key: "score",
+    label: "Regime Score",
+    value: displayScoreText.value,
+    percent: clampGauge(displayScore.value),
+    color: regimeColor.value,
+  },
+  {
+    key: "breadth",
+    label: "A-share Breadth",
+    value: fmtRatioPct(displayBreadth.value),
+    percent: ratioGauge(displayBreadth.value),
+    color: "var(--accent)",
+  },
+  {
+    key: "trend",
+    label: "Index Trend",
+    value: fmtRatioPct(regimeTrendStrength.value),
+    percent: ratioGauge(regimeTrendStrength.value),
+    color: "var(--positive)",
+  },
+  {
+    key: "above-ma20",
+    label: "Above MA20",
+    value: fmtRatioPct(aboveMa20Ratio.value),
+    percent: ratioGauge(aboveMa20Ratio.value),
+    color: "var(--warning)",
+  },
+  {
+    key: "liquidity",
+    label: "Liquidity Pulse",
+    value: fmtRatioX(liquidityPulse.value),
+    percent: ratioXGauge(liquidityPulse.value),
+    color: liquidityColor.value,
+  },
+  {
+    key: "capacity",
+    label: "Position Cap",
+    value: fmtPositionCapacity(displayPoolSize.value, capacityMax.value),
+    percent: capacityGauge(displayPoolSize.value, capacityMax.value),
+    color: regimeColor.value,
+  },
+]);
 
 const chartScale = computed(() => {
   const values = relativeChart.value.lines
@@ -351,6 +413,35 @@ function fmtRatioPct(v: number | null | undefined) {
   if (v == null || Number.isNaN(Number(v))) return "—";
   const n = Number(v) * 100;
   return `${n.toFixed(0)}%`;
+}
+function clampGauge(v: number | null | undefined) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Number(n.toFixed(1))));
+}
+function ratioGauge(v: number | null | undefined) {
+  if (v == null || Number.isNaN(Number(v))) return 0;
+  return clampGauge(Number(v) * 100);
+}
+function ratioXGauge(v: number | null | undefined) {
+  if (v == null || Number.isNaN(Number(v))) return 0;
+  return clampGauge((Number(v) / 1.5) * 100);
+}
+function capacityGauge(current: number | null | undefined, max: number | null | undefined) {
+  const c = Number(current);
+  const m = Number(max);
+  if (!Number.isFinite(c) || !Number.isFinite(m) || m <= 0) return 0;
+  return clampGauge((c / m) * 100);
+}
+function fmtRatioX(v: number | null | undefined) {
+  if (v == null || Number.isNaN(Number(v))) return "—";
+  return `${Number(v).toFixed(2)}x`;
+}
+function fmtPositionCapacity(current: number | null | undefined, max: number | null | undefined) {
+  const c = Number(current);
+  const m = Number(max);
+  if (!Number.isFinite(c) || !Number.isFinite(m) || m <= 0) return "—";
+  return `${Math.round(c)}/${Math.round(m)}`;
 }
 function fmtReturn(v: number) {
   const n = Number(v || 0) * 100;
@@ -619,29 +710,65 @@ onUnmounted(() => {
   font-weight: 750;
   letter-spacing: 0.03em;
 }
-.regime-metrics {
+.regime-gauge-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
-.regime-metrics div {
-  padding: 8px;
+.regime-gauge-card {
+  min-height: 78px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 6px;
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: rgba(0,0,0,0.12);
 }
-.regime-metrics span, .macro-grid span {
+.mini-gauge {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(var(--gauge-color) var(--gauge-value), rgba(125, 211, 252, 0.08) 0);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.08);
+}
+.mini-gauge::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: rgba(3, 10, 18, 0.92);
+  border: 1px solid rgba(125, 211, 252, 0.1);
+}
+.mini-gauge span {
+  position: relative;
+  z-index: 1;
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  font-weight: 750;
+}
+.regime-gauge-card strong {
+  color: var(--text-secondary);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.macro-grid span {
   display: block;
   color: var(--text-disabled);
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-}
-.regime-metrics strong {
-  display: block;
-  margin-top: 4px;
-  color: var(--text-primary);
-  font-family: "JetBrains Mono", monospace;
 }
 .index-summary {
   height: 46px;
