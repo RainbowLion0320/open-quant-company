@@ -11,7 +11,7 @@
           </button>
         </div>
         <div class="regime-core">
-          <div class="regime-orb" :style="{ '--orb-color': regimeColor, '--orb-score': `${regimeScore}%` }">
+          <div class="regime-orb" :style="{ '--orb-color': regimeColor, '--orb-score': `${displayScore}%` }">
             <div class="regime-orb-inner"></div>
           </div>
           <div>
@@ -20,7 +20,7 @@
           </div>
         </div>
         <div class="regime-metrics">
-          <div><span>Regime Score</span><strong>{{ regimeScore }}</strong></div>
+          <div><span>Regime Score</span><strong>{{ displayScore }}</strong></div>
           <div><span>Market Breadth</span><strong>{{ store.regime?.breadth?.toFixed(2) || '—' }}</strong></div>
           <div><span>Volume Trend</span><strong>{{ store.regime?.volume_trend || '—' }}</strong></div>
           <div><span>Pool Size</span><strong>{{ store.poolSize || '—' }}</strong></div>
@@ -385,16 +385,47 @@ function sparkPoints(series: MarketSeriesPoint[] = [], width = 160, height = 44)
 }
 
 const refreshing = ref(false);
+const displayScore = ref(50);
+
+let scoreTimer = 0;
+function animateScore(target: number) {
+  clearTimeout(scoreTimer);
+  const start = displayScore.value;
+  const duration = 700;
+  const startTime = performance.now();
+  function tick(now: number) {
+    const elapsed = now - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+    displayScore.value = Math.round(start + (target - start) * eased);
+    if (t < 1) {
+      requestAnimationFrame(tick);
+    }
+  }
+  requestAnimationFrame(tick);
+}
 
 async function refresh() {
   refreshing.value = true;
+  const prevScore = regimeScore.value;
+  animateScore(0); // ring collapses to 0
+  scoreTimer = window.setTimeout(() => {
+    scoreTimer = 0;
+  }, 200);
+
   try {
     await Promise.all([
       store.fetchMarket(selectedRange.value),
       fetchHotSectors(),
     ]);
   } finally {
-    setTimeout(() => { refreshing.value = false; }, 400);
+    setTimeout(() => {
+      refreshing.value = false;
+      const newScore = regimeScore.value;
+      if (newScore !== prevScore || displayScore.value === 0) {
+        animateScore(newScore);
+      }
+    }, 400);
   }
 }
 
@@ -414,6 +445,7 @@ onMounted(async () => {
     store.fetchMarket(selectedRange.value),
     fetchHotSectors(),
   ]);
+  animateScore(regimeScore.value);
 });
 </script>
 
@@ -513,6 +545,11 @@ onMounted(async () => {
   border-radius: 50%;
   border: 1px solid var(--border-strong);
   background: radial-gradient(circle, var(--orb-color), transparent 65%);
+  animation: orb-breathe 3.2s ease-in-out infinite;
+}
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.85; box-shadow: 0 0 8px var(--orb-color); }
+  50%      { transform: scale(1.18); opacity: 1; box-shadow: 0 0 22px var(--orb-color), 0 0 44px var(--orb-color); }
 }
 .regime-name {
   font-size: 22px;
