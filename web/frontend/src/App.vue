@@ -52,16 +52,8 @@
             <strong :style="{ color: regimeColor }">{{ regimeLabel }}</strong>
           </div>
           <div class="telemetry-cell">
-            <span>Last Scan</span>
-            <strong>{{ marketMeta.updated || '—' }}</strong>
-          </div>
-          <div class="telemetry-cell">
             <span>Freshness</span>
             <strong>{{ marketMeta.freshness?.market || '—' }}</strong>
-          </div>
-          <div class="telemetry-cell clock-cell">
-            <span>Asia/Shanghai</span>
-            <strong>{{ clock }}</strong>
           </div>
         </div>
       </header>
@@ -96,8 +88,6 @@ import type { RegimeResponse } from "./api";
 
 const route = useRoute();
 const hovered = ref("");
-const clock = ref("");
-let clockTimer = 0;
 let regimeTimer = 0;
 const regime = ref<{ value: string; score?: number }>({ value: "sideways" });
 const marketMeta = ref<Partial<RegimeResponse>>({});
@@ -165,12 +155,6 @@ const coreVersion = computed(() => {
   return version ? `v${version}` : "v—";
 });
 
-function tickClock() {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  clock.value = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-}
-
 function isActive(path: string) {
   return activeSectionPath.value === path;
 }
@@ -202,8 +186,6 @@ async function fetchSystemHealth() {
 useParticles();
 
 onMounted(() => {
-  tickClock();
-  clockTimer = window.setInterval(tickClock, 1000);
   fetchRegime();
   fetchMode();
   fetchSystemHealth();
@@ -211,7 +193,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  clearInterval(clockTimer);
   clearInterval(regimeTimer);
 });
 </script>
