@@ -7,6 +7,7 @@
       base-path="/research"
       default-tab="sectors"
       :items="tabs"
+      :show-copy="false"
     />
     <section class="module-content">
       <component :is="activeComponent" />
@@ -24,8 +25,8 @@ import Stocks from "./Stocks.vue";
 const route = useRoute();
 
 const tabs = [
-  { key: "sectors", label: "行业雷达", meta: "Sector rotation", description: "从动量、信号集中度和组合敞口判断行业轮动方向" },
-  { key: "stocks", label: "个股搜索", meta: "Stock research", description: "按代码或名称快速定位标的，进入估值、K线和策略信号详情" },
+  { key: "sectors", label: "行业雷达", meta: "Sector rotation" },
+  { key: "stocks", label: "个股搜索", meta: "Stock research" },
 ];
 
 const activeTab = computed(() => {
@@ -38,7 +39,8 @@ const activeComponent = computed(() => activeTab.value === "stocks" ? Stocks : S
 
 <style scoped>
 .module-page {
-  gap: 14px;
+  gap: 8px;
+  padding-top: 10px;
 }
 
 .module-content {

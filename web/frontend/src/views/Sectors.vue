@@ -1,13 +1,12 @@
 <template>
   <div class="view-page">
-    <div class="surface-toolbar">
+    <div class="surface-toolbar sector-toolbar">
       <div class="surface-copy">
         <span>SECTOR ROTATION</span>
         <strong>申万一级行业动量</strong>
-        <small>按收益周期、波动率和策略信号观察行业强弱</small>
       </div>
       <div v-if="overview" class="surface-actions">
-        <span class="text-2xs" style="color:var(--text-disabled)">
+        <span class="sector-meta-chip">
           {{ overview.total_sectors }} 行业 · {{ dataSourceLabel(overview.data_source) }}
         </span>
       </div>
@@ -241,10 +240,29 @@ onMounted(fetchData);
 </script>
 
 <style scoped>
+.sector-toolbar {
+  padding: 10px 12px;
+}
+.sector-toolbar .surface-copy strong {
+  margin-top: 2px;
+}
+.sector-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: rgba(2, 6, 13, 0.28);
+  color: var(--text-disabled);
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
 .stat-row {
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
 .stat-chip {

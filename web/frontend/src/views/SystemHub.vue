@@ -46,7 +46,8 @@ const activeComponent = computed(() => componentMap[activeTab.value as keyof typ
 
 <style scoped>
 .module-page {
-  gap: 14px;
+  gap: 10px;
+  padding-top: 10px;
 }
 
 .module-content {

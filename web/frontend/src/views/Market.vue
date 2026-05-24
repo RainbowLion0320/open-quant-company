@@ -19,11 +19,12 @@
         </div>
         <div class="regime-gauge-grid">
           <div
-            v-for="metric in regimeGaugeMetrics"
+            v-for="(metric, index) in regimeGaugeMetrics"
             :key="metric.key"
             class="regime-gauge-card"
             role="group"
             :aria-label="`${metric.label}: ${metric.value}`"
+            :style="{ '--metric-index': index }"
           >
             <div
               class="mini-gauge"
@@ -289,7 +290,7 @@ const aboveMa20Ratio = computed(() => store.regime?.breadth_detail?.above_ma20 ?
 const liquidityPulse = computed(() => store.regime?.score_components?.amount_ratio_5_20 ?? null);
 const capacityMax = computed(() => Math.max(Number(store.positionCapacity?.max || 0), Number(displayPoolSize.value || 0), 1));
 const liquidityColor = computed(() => {
-  const v = Number(liquidityPulse.value);
+  const v = Number(displayLiquidityPulse.value);
   if (!Number.isFinite(v)) return "var(--text-disabled)";
   if (v >= 1.2) return "var(--positive)";
   if (v < 0.8) return "var(--warning)";
@@ -299,9 +300,9 @@ const regimeGaugeMetrics = computed(() => [
   {
     key: "risk",
     label: "Risk Buffer",
-    value: fmtRatioPct(riskBuffer.value),
-    percent: ratioGauge(riskBuffer.value),
-    color: riskColor(riskBuffer.value),
+    value: fmtRatioPct(displayRiskBuffer.value),
+    percent: ratioGauge(displayRiskBuffer.value),
+    color: riskColor(displayRiskBuffer.value),
   },
   {
     key: "breadth",
@@ -313,22 +314,22 @@ const regimeGaugeMetrics = computed(() => [
   {
     key: "trend",
     label: "Index Trend",
-    value: fmtRatioPct(regimeTrendStrength.value),
-    percent: ratioGauge(regimeTrendStrength.value),
+    value: fmtRatioPct(displayTrendStrength.value),
+    percent: ratioGauge(displayTrendStrength.value),
     color: "var(--positive)",
   },
   {
     key: "above-ma20",
     label: "Above MA20",
-    value: fmtRatioPct(aboveMa20Ratio.value),
-    percent: ratioGauge(aboveMa20Ratio.value),
+    value: fmtRatioPct(displayAboveMa20.value),
+    percent: ratioGauge(displayAboveMa20.value),
     color: "var(--warning)",
   },
   {
     key: "liquidity",
     label: "Liquidity Pulse",
-    value: fmtRatioX(liquidityPulse.value),
-    percent: ratioXGauge(liquidityPulse.value),
+    value: fmtRatioX(displayLiquidityPulse.value),
+    percent: ratioXGauge(displayLiquidityPulse.value),
     color: liquidityColor.value,
   },
   {
@@ -402,6 +403,9 @@ function shortDate(date: string) {
 async function switchRange(range: string) {
   selectedRange.value = range;
   await store.fetchMarket(range);
+  animateScore(regimeScore.value);
+  animateMetrics();
+  animateSparklines();
 }
 
 function fmtValue(v: number | null | undefined, unit = "") {
@@ -535,6 +539,10 @@ function animateScore(target: number) {
 
 // Animated display values for key metrics
 const displayBreadth = ref(0);
+const displayRiskBuffer = ref(0);
+const displayTrendStrength = ref(0);
+const displayAboveMa20 = ref(0);
+const displayLiquidityPulse = ref(0);
 const displayPoolSize = ref(0);
 const displayStrengthPct = ref(0);
 const macroDisplay: Record<string, { ref: ReturnType<typeof ref<number>> }> = {};
@@ -544,8 +552,17 @@ function macroRef(key: string) {
   return macroDisplay[key].ref;
 }
 
+function finiteOrZero(v: number | null | undefined) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function animateMetrics() {
+  tweenTo(displayRiskBuffer, finiteOrZero(riskBuffer.value), 2, 520);
   tweenTo(displayBreadth, store.regime?.breadth ?? 0, 2, 500);
+  tweenTo(displayTrendStrength, finiteOrZero(regimeTrendStrength.value), 2, 540);
+  tweenTo(displayAboveMa20, finiteOrZero(aboveMa20Ratio.value), 2, 560);
+  tweenTo(displayLiquidityPulse, finiteOrZero(liquidityPulse.value), 2, 580);
   tweenTo(displayPoolSize, store.poolSize ?? 0, 0, 500);
   tweenTo(displayStrengthPct, strengthLeader.value.change, 2, 500);
   for (const m of macro.value) {
@@ -765,6 +782,19 @@ onUnmounted(() => {
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: rgba(0,0,0,0.12);
+  animation: regime-gauge-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--metric-index) * 55ms);
+  will-change: transform, opacity;
+}
+@keyframes regime-gauge-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 .mini-gauge {
   width: 44px;
@@ -776,6 +806,7 @@ onUnmounted(() => {
   border-radius: 50%;
   background: conic-gradient(var(--gauge-color) var(--gauge-value), rgba(125, 211, 252, 0.08) 0);
   box-shadow: 0 0 16px rgba(0, 212, 255, 0.08);
+  will-change: background;
 }
 .mini-gauge::before {
   content: "";
@@ -1084,5 +1115,10 @@ onUnmounted(() => {
 @keyframes shimmer-sweep {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .regime-gauge-card {
+    animation: none;
+  }
 }
 </style>

@@ -25,7 +25,8 @@ const tabs = [
 
 <style scoped>
 .module-page {
-  gap: 14px;
+  gap: 10px;
+  padding-top: 10px;
 }
 
 .module-content {

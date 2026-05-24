@@ -1,6 +1,6 @@
 <template>
-  <header class="section-switcher">
-    <div class="section-copy">
+  <header class="section-switcher" :class="{ 'copy-hidden': !showCopy }">
+    <div v-if="showCopy" class="section-copy">
       <span>{{ eyebrow }}</span>
       <p>{{ activeDescription }}</p>
     </div>
@@ -37,6 +37,7 @@ const props = defineProps<{
   basePath: string;
   defaultTab: string;
   items: SectionTabItem[];
+  showCopy?: boolean;
 }>();
 
 const route = useRoute();
@@ -48,6 +49,7 @@ const activeTab = computed(() => {
 
 const activeItem = computed(() => props.items.find(item => item.key === activeTab.value));
 const activeDescription = computed(() => activeItem.value?.description || props.subtitle);
+const showCopy = computed(() => props.showCopy !== false);
 
 function tabTo(tab: string) {
   return {
@@ -66,8 +68,14 @@ function tabTo(tab: string) {
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
-  padding: 2px 2px 14px;
+  padding: 0 2px 12px;
   border-bottom: 1px solid var(--border-subtle);
+}
+.section-switcher.copy-hidden {
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 0;
+  padding-bottom: 8px;
 }
 
 .section-copy {
@@ -96,6 +104,9 @@ function tabTo(tab: string) {
   flex-wrap: wrap;
   gap: 8px;
 }
+.section-switcher.copy-hidden .section-tabs {
+  justify-content: flex-start;
+}
 
 .section-tab {
   min-width: 126px;
@@ -105,6 +116,10 @@ function tabTo(tab: string) {
   background: rgba(8, 19, 33, 0.34);
   color: var(--text-tertiary);
   transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+.section-switcher.copy-hidden .section-tab {
+  min-width: 118px;
+  padding: 7px 10px;
 }
 
 .section-tab:hover {
