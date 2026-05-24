@@ -227,8 +227,8 @@ html, body {
   height: 52px;
   flex-shrink: 0;
   display: flex;
-  align-items: stretch;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-start;
   padding: 12px 18px 10px;
   border-bottom: 1px solid rgba(125, 211, 252, 0.12);
   background: rgba(3, 10, 18, 0.62);
@@ -252,38 +252,57 @@ html, body {
   font-weight: 650;
   letter-spacing: 0.02em;
 }
-.telemetry-group {
+.system-statusbar {
+  height: 30px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 18px;
+  border-top: 1px solid rgba(125, 211, 252, 0.12);
+  background: rgba(3, 10, 18, 0.74);
+  backdrop-filter: blur(16px);
+}
+.statusbar-telemetry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 .telemetry-tag {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(8, 19, 33, 0.54);
+  min-width: 0;
   white-space: nowrap;
 }
 .telemetry-tag span {
   color: var(--text-disabled);
-  font-size: 9px;
+  font-size: 8px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
 .telemetry-tag strong {
   color: var(--text-secondary);
   font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
 }
-.system-status {
+.statusbar-health {
   display: flex;
   align-items: center;
+  gap: 7px;
+  min-width: max-content;
   user-select: none;
   cursor: default;
+}
+.statusbar-health strong {
+  color: var(--text-tertiary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 .status-dot {
   width: 8px;
@@ -301,7 +320,6 @@ html, body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding-bottom: 42px;
 }
 .view-page {
   padding: 18px;
@@ -349,48 +367,6 @@ html, body {
   color: var(--accent);
   font-size: 22px;
 }
-.market-ticker {
-  height: 34px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 0 18px;
-  border-top: 1px solid rgba(125, 211, 252, 0.12);
-  background: rgba(3, 10, 18, 0.84);
-  color: var(--text-tertiary);
-  font-size: 10px;
-  letter-spacing: 0.03em;
-}
-.ticker-label {
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-.ticker-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding-left: 18px;
-  border-left: 1px solid var(--border-subtle);
-  font-family: "JetBrains Mono", monospace;
-}
-.ticker-item em {
-  color: var(--text-disabled);
-  font-style: normal;
-}
-.ticker-proxy {
-  color: #f59e0b;
-  font-size: 8px;
-  font-weight: 700;
-  margin-left: 2px;
-  vertical-align: super;
-}
-.ticker-connection {
-  margin-left: auto;
-  color: var(--positive);
-  font-family: "JetBrains Mono", monospace;
-}
-
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -846,10 +822,22 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .nav-tooltip, .core-status { display: none; }
   .command-bar {
     height: auto;
-    gap: 12px;
-    flex-direction: column;
+    min-height: 52px;
   }
-  .telemetry-group { flex-wrap: wrap; }
-  .telemetry-tag { min-width: 0; }
-  .market-ticker { overflow-x: auto; }
+  .system-statusbar {
+    height: auto;
+    min-height: 30px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 12px;
+  }
+  .statusbar-telemetry {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+  .statusbar-health {
+    align-self: flex-end;
+  }
 }

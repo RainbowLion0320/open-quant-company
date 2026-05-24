@@ -11,7 +11,6 @@
           </div>
           <div>
             <div class="regime-name" :style="{ color: regimeColor }">{{ regimeLabel }}</div>
-            <div class="regime-subtitle">{{ regimeDescriptor }}</div>
           </div>
         </div>
         <div class="regime-metrics">
@@ -257,12 +256,6 @@ const regimeLabel = computed(() => {
   if (r === "bear") return "CONTRACTION";
   return "SIDEWAYS";
 });
-const regimeDescriptor = computed(() => {
-  const r = store.regime?.value;
-  if (r === "bull") return "Bullish trend / risk-on";
-  if (r === "bear") return "Defensive posture / risk-off";
-  return "Range-bound / wait for confirmation";
-});
 const regimeColor = computed(() => {
   const r = store.regime?.value;
   if (r === "bull") return "var(--positive)";
@@ -342,7 +335,7 @@ async function switchRange(range: string) {
 function fmtValue(v: number | null | undefined, unit = "") {
   if (v == null || Number.isNaN(Number(v))) return "—";
   const n = Number(v);
-  const digits = unit === "%" ? 3 : Math.abs(n) >= 100 ? 2 : 3;
+  const digits = unit === "%" ? 2 : Math.abs(n) >= 100 ? 2 : 3;
   return `${n.toFixed(digits)}${unit}`;
 }
 function fmtSignedPct(v: number | null | undefined) {
@@ -619,11 +612,6 @@ onUnmounted(() => {
   line-height: 1;
   font-weight: 750;
   letter-spacing: 0.03em;
-}
-.regime-subtitle {
-  margin-top: 6px;
-  color: var(--text-tertiary);
-  font-size: 11px;
 }
 .regime-metrics {
   display: grid;

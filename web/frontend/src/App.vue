@@ -37,7 +37,18 @@
           <span class="system-kicker">ASTROLABE QUANT OS</span>
           <strong>{{ routeTitle }}</strong>
         </div>
-        <div class="telemetry-group">
+      </header>
+
+      <main class="content-plane">
+        <router-view v-slot="{ Component }">
+          <transition name="page" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
+      </main>
+
+      <footer class="system-statusbar" aria-label="系统状态">
+        <div class="statusbar-telemetry">
           <div class="telemetry-tag">
             <span>MODE</span>
             <strong :style="{ color: modeColor }">{{ runMode }}</strong>
@@ -50,28 +61,11 @@
             <span>FRESH</span>
             <strong>{{ marketMeta.freshness?.market || '—' }}</strong>
           </div>
-          <div class="system-status" :title="systemLabel">
-            <span class="status-dot" :style="{ '--dot-color': systemColor }"></span>
-          </div>
         </div>
-      </header>
-
-      <main class="content-plane">
-        <router-view v-slot="{ Component }">
-          <transition name="page" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
-      </main>
-
-      <footer class="market-ticker">
-        <span class="ticker-label">MARKET TICKER</span>
-        <span v-for="item in ticker" :key="item.symbol" class="ticker-item">
-          <em>{{ item.symbol }}<b v-if="item.data_source === 'proxy'" class="ticker-proxy">p</b></em>
-          <strong :style="{ color: item.change >= 0 ? 'var(--positive)' : 'var(--negative)' }">{{ item.value }}</strong>
-          <small :style="{ color: item.change >= 0 ? 'var(--positive)' : 'var(--negative)' }">{{ item.change >= 0 ? '+' : '' }}{{ item.change.toFixed(2) }}%</small>
-        </span>
-        <span class="ticker-connection">CONNECTED</span>
+        <div class="statusbar-health" :title="systemLabel">
+          <span class="status-dot" :style="{ '--dot-color': systemColor }"></span>
+          <strong>{{ systemLabel }}</strong>
+        </div>
       </footer>
     </section>
   </div>
@@ -113,13 +107,6 @@ const activeSectionPath = computed(() => {
 });
 
 const routeTitle = computed(() => nav.find(item => item.path === activeSectionPath.value)?.label || "星盘终端");
-
-const ticker = computed(() => (marketMeta.value.multi_asset || []).map((item: any) => ({
-  symbol: item.symbol,
-  value: item.value == null ? "—" : `${Number(item.value).toFixed(item.unit === "%" ? 3 : 2)}${item.unit || ""}`,
-  change: (item.change_pct || 0) * 100,
-  data_source: item.data_source || "real",
-})));
 
 const regimeLabel = computed(() => {
   if (regime.value.value === "bull") return "BULL";
