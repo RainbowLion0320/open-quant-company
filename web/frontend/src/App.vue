@@ -34,8 +34,8 @@
     <section class="workspace">
       <header class="command-bar">
         <div class="system-title">
-          <span class="system-kicker">ASTROLABE QUANT OS</span>
           <strong>{{ routeTitle }}</strong>
+          <span class="system-kicker">ASTROLABE QUANT OS</span>
         </div>
       </header>
 
