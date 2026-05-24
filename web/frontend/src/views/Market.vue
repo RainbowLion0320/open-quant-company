@@ -1,14 +1,11 @@
 <template>
   <div class="market-command">
-    <div class="market-topbar">
-      <span class="topbar-title">MARKET OVERVIEW</span>
-      <button @click="refresh" class="icon-button" :class="{ 'is-spinning': refreshing }" :disabled="refreshing" aria-label="刷新全部数据">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4" />
-        </svg>
-        <span>刷新数据</span>
-      </button>
-    </div>
+    <button @click="refresh" class="page-refresh-btn" :class="{ 'is-spinning': refreshing }" :disabled="refreshing" aria-label="刷新全部数据">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4" />
+      </svg>
+      <span>刷新数据</span>
+    </button>
     <section class="market-hero" :class="{ 'is-refreshing': refreshing }">
       <div class="regime-panel glass-card">
         <div class="panel-head">
@@ -455,37 +452,45 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
 }
-.market-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 4px;
-}
-.topbar-title {
-  color: var(--text-tertiary);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  font-weight: 600;
-}
-.market-topbar .icon-button {
+.page-refresh-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  width: auto;
-  height: 28px;
-  padding: 0 10px;
-  font-size: 12px;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-panel);
   color: var(--text-secondary);
-  border-color: var(--border-default);
-  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
 }
-.market-topbar .icon-button span {
-  line-height: 1;
+.page-refresh-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
-.market-topbar .icon-button svg {
-  width: 13px;
-  height: 13px;
+.page-refresh-btn svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.page-refresh-btn.is-spinning svg {
+  animation: icon-spin 0.7s linear infinite;
+}
+.page-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .market-hero {
   display: grid;
