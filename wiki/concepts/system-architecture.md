@@ -8,7 +8,7 @@ tags: [architecture, system-overview, extensibility, strategy-registry, ML, Fact
 
 # System Architecture
 
-A股量化研究与执行系统架构总览。巴菲特价值投资为决策约束层，钱学森控制论为运行机制层——两者正交不冲突。当前版本、策略数量、因子数量、回测指标等动态事实以 `config/settings.yaml`、`signals/expression.py`、`data/models/`、`data/tournament/` 和运行输出为准。
+A股量化研究与执行系统架构总览。巴菲特价值投资为决策约束层，钱学森控制论为运行机制层——两者正交不冲突。发布版本以 `pyproject.toml` 为唯一权威；策略数量、因子数量、回测指标等动态事实以 `config/settings.yaml`、`signals/expression.py`、`data/models/`、`data/tournament/` 和运行输出为准。
 
 ## 设计哲学：三层正交架构
 

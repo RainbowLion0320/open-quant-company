@@ -19,6 +19,7 @@
 | 产品范围和边界 | `docs/PRD.md` | 保持稳定，不写 sprint 级状态。 |
 | 模块行为和契约 | `docs/specs/*.md` | 行为变化时同提交更新。 |
 | 当前实现状态 | 代码 + 测试 + `docs/acceptance-matrix.md` | 不在 wiki 重复维护状态表。 |
+| 项目发布版本 | `pyproject.toml` → `[project].version` | README badge 通过 `scripts/bump_version.py` 同步；配置文件不保存发布版本。 |
 | 数据维度和路径 | `config/settings.yaml` + `data/data_registry.py` + `data/datahub.py` | 文档说明如何查询，不复制动态数量。 |
 | 数据 schema | `data/contract.py` + 必要时的显式 `_contracts/` 文件 | 文档说明契约归属和查询方法。 |
 | 策略参数 | `config/settings.yaml` + 策略代码 | 文档描述设计意图，不固化易过期指标。 |

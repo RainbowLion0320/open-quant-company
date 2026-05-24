@@ -10,7 +10,7 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-_PUBLIC_PROJECT_KEYS = {"name", "display_name", "english_name", "version", "description"}
+_PUBLIC_PROJECT_KEYS = {"name", "display_name", "english_name", "description"}
 
 
 def _read_settings_project() -> dict[str, Any]:
@@ -35,9 +35,8 @@ def _read_pyproject_version() -> str:
 
 
 def get_project_version() -> str:
-    """Return canonical project version, preferring pyproject.toml."""
-    project = _read_settings_project()
-    return _read_pyproject_version() or str(project.get("version") or "").strip() or "0.0.0"
+    """Return canonical project version from pyproject.toml."""
+    return _read_pyproject_version() or "0.0.0"
 
 
 def get_project_meta() -> dict[str, Any]:

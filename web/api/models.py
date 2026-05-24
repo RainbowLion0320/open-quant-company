@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
+from web.api.version import get_project_version
+
 
 # ── 市场 ──
 
@@ -215,4 +217,4 @@ class HealthResponse(BaseModel):
     data_updated: str = ""
     stocks_scanned: int = 0
     strategies: int = 0
-    version: str = "2.0.0"
+    version: str = Field(default_factory=get_project_version)

@@ -209,7 +209,6 @@ project:
   name: astrolabe-quant
   display_name: 星盘
   english_name: Astrolabe Quant OS
-  version: 2.0.0
   description: 个人量化研究与执行操作系统 — 日频 · 自托管 · AI增强
 signals:
   multifactor:
