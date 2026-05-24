@@ -1,14 +1,18 @@
 <template>
   <div class="market-command">
+    <div class="market-topbar">
+      <span class="topbar-title">MARKET OVERVIEW</span>
+      <button @click="refresh" class="icon-button" :class="{ 'is-spinning': refreshing }" :disabled="refreshing" aria-label="刷新全部数据">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4" />
+        </svg>
+        <span>刷新数据</span>
+      </button>
+    </div>
     <section class="market-hero" :class="{ 'is-refreshing': refreshing }">
       <div class="regime-panel glass-card">
         <div class="panel-head">
           <span>MARKET REGIME</span>
-          <button @click="refresh" class="icon-button" :class="{ 'is-spinning': refreshing }" :disabled="refreshing" aria-label="刷新">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4" />
-            </svg>
-          </button>
         </div>
         <div class="regime-core">
           <div class="regime-orb" :style="{ '--orb-color': regimeColor, '--orb-score': `${displayScore}%` }">
@@ -451,6 +455,37 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.market-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+}
+.topbar-title {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+.market-topbar .icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+  background: transparent;
+}
+.market-topbar .icon-button span {
+  line-height: 1;
+}
+.market-topbar .icon-button svg {
+  width: 13px;
+  height: 13px;
 }
 .market-hero {
   display: grid;
