@@ -267,6 +267,32 @@ html, body {
   overflow: hidden;
   background: rgba(8, 19, 33, 0.54);
 }
+.system-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  min-width: 96px;
+  user-select: none;
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dot-color, var(--positive));
+  box-shadow: 0 0 6px var(--dot-color, var(--positive)), 0 0 14px var(--dot-color, var(--positive));
+  animation: status-pulse 2.4s ease-in-out infinite;
+}
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--dot-color), 0 0 14px var(--dot-color); }
+  50%      { opacity: 0.6; box-shadow: 0 0 3px var(--dot-color), 0 0 8px var(--dot-color); }
+}
+.status-label {
+  color: var(--text-disabled);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
 .telemetry-cell {
   min-width: 116px;
   padding: 9px 13px;
@@ -288,8 +314,6 @@ html, body {
   font-size: 12px;
   font-weight: 600;
 }
-.telemetry-cell .is-live,
-.is-live { color: var(--positive); }
 .content-plane {
   flex: 1;
   min-height: 0;

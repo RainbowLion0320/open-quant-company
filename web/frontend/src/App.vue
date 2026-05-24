@@ -39,9 +39,9 @@
           <strong>{{ routeTitle }}</strong>
         </div>
         <div class="telemetry-strip">
-          <div class="telemetry-cell">
-            <span>System</span>
-            <strong :style="{ color: systemColor }">{{ systemLabel }}</strong>
+          <div class="system-status" :title="systemLabel">
+            <span class="status-dot" :style="{ '--dot-color': systemColor }"></span>
+            <span class="status-label">System</span>
           </div>
           <div class="telemetry-cell">
             <span>Mode</span>
