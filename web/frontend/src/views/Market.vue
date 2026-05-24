@@ -99,8 +99,8 @@
             <span>{{ m.label }}</span>
             <strong :style="{ color: macroColor(m) }">{{ fmtValue(m.value, m.unit) }}</strong>
             <em>prev {{ fmtValue(m.prev, m.unit) }}</em>
-            <svg viewBox="0 0 120 34" preserveAspectRatio="none" class="microline">
-              <polyline :points="sparkPoints(m.series, 120, 34)" :stroke="macroColor(m)" />
+            <svg viewBox="0 0 120 34" preserveAspectRatio="none" class="microline" :class="{ 'is-drawing': refreshing }">
+              <path :d="sparkPath(m.series, 120, 34)" :stroke="macroColor(m)" />
             </svg>
           </article>
         </div>
@@ -377,6 +377,13 @@ function sparkPoints(series: MarketSeriesPoint[] = [], width = 160, height = 44)
     const y = height - ((v - min) / spread) * (height - 6) - 3;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
+}
+
+function sparkPath(series: MarketSeriesPoint[] = [], width = 160, height = 44) {
+  const pts = sparkPoints(series, width, height);
+  if (!pts) return "";
+  const arr = pts.split(" ");
+  return `M ${arr[0]} L ${arr.slice(1).join(" ")}`;
 }
 
 const refreshing = ref(false);
@@ -707,10 +714,17 @@ onMounted(() => {
   width: 100%;
   margin-top: 10px;
 }
-.microline polyline {
+.microline path {
   fill: none;
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
+  stroke-dasharray: 200;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.6s ease-out;
+}
+.microline.is-drawing path {
+  transition: stroke-dashoffset 0s;
+  stroke-dashoffset: 200;
 }
 .macro-grid {
   display: grid;
