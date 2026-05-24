@@ -9,8 +9,12 @@
           <div class="regime-orb" :style="{ '--orb-color': regimeColor, '--orb-score': `${displayScore}%` }">
             <div class="regime-orb-inner"></div>
           </div>
-          <div>
+          <div class="regime-readout">
             <div class="regime-name" :style="{ color: regimeColor }">{{ regimeLabel }}</div>
+            <div class="regime-score-line">
+              <span>Regime Score</span>
+              <strong :style="{ color: regimeColor }">{{ displayScoreText }}</strong>
+            </div>
           </div>
         </div>
         <div class="regime-gauge-grid">
@@ -280,6 +284,7 @@ const regimeScore = computed(() => {
 });
 const displayScoreText = computed(() => displayScore.value.toFixed(1));
 const regimeTrendStrength = computed(() => store.regime?.score_components?.trend_raw ?? null);
+const riskBuffer = computed(() => store.regime?.score_components?.risk_raw ?? null);
 const aboveMa20Ratio = computed(() => store.regime?.breadth_detail?.above_ma20 ?? null);
 const liquidityPulse = computed(() => store.regime?.score_components?.amount_ratio_5_20 ?? null);
 const capacityMax = computed(() => Math.max(Number(store.positionCapacity?.max || 0), Number(displayPoolSize.value || 0), 1));
@@ -292,11 +297,11 @@ const liquidityColor = computed(() => {
 });
 const regimeGaugeMetrics = computed(() => [
   {
-    key: "score",
-    label: "Regime Score",
-    value: displayScoreText.value,
-    percent: clampGauge(displayScore.value),
-    color: regimeColor.value,
+    key: "risk",
+    label: "Risk Buffer",
+    value: fmtRatioPct(riskBuffer.value),
+    percent: ratioGauge(riskBuffer.value),
+    color: riskColor(riskBuffer.value),
   },
   {
     key: "breadth",
@@ -471,6 +476,13 @@ function macroColor(m: MacroCard) {
   if (m.key === "pmi" && Number(m.value || 0) < 50) return "var(--warning)";
   if (m.key === "cpi" && Number(m.value || 0) < 0) return "var(--negative)";
   return "var(--accent)";
+}
+function riskColor(v: number | null | undefined) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "var(--text-disabled)";
+  if (n >= 0.7) return "var(--positive)";
+  if (n >= 0.45) return "var(--warning)";
+  return "var(--negative)";
 }
 function sparkPoints(series: MarketSeriesPoint[] = [], width = 160, height = 44) {
   if (!series.length) return "";
@@ -709,6 +721,33 @@ onUnmounted(() => {
   line-height: 1;
   font-weight: 750;
   letter-spacing: 0.03em;
+}
+.regime-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.regime-score-line {
+  display: inline-flex;
+  width: fit-content;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.14);
+}
+.regime-score-line span {
+  color: var(--text-disabled);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.regime-score-line strong {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 800;
 }
 .regime-gauge-grid {
   display: grid;
@@ -1023,6 +1062,7 @@ onUnmounted(() => {
   .sector-pulse-grid { grid-template-columns: 1fr; }
   .sector-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .regime-core { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .regime-readout { align-items: center; }
 }
 
 /* Refresh shimmer — brief pulse across all data panels */
