@@ -100,16 +100,16 @@
             <span>{{ m.label }}</span>
             <strong :style="{ color: macroColor(m) }">{{ fmtValue(m.value, m.unit) }}</strong>
             <em>prev {{ fmtValue(m.prev, m.unit) }}</em>
-            <svg viewBox="0 0 120 34" preserveAspectRatio="none" class="microline">
+            <svg :viewBox="`0 0 ${SPARK_W} ${SPARK_H}`" preserveAspectRatio="none" class="microline">
+              <defs>
+                <clipPath :id="sparkClipId(m.key)" clipPathUnits="userSpaceOnUse">
+                  <rect x="0" y="0" :width="SPARK_W * sparkReveal" :height="SPARK_H" />
+                </clipPath>
+              </defs>
               <path
-                :d="sparkPath(m.series, 120, 34)"
+                :d="sparkPath(m.series, SPARK_W, SPARK_H)"
                 :stroke="macroColor(m)"
-                pathLength="200"
-                :style="{
-                  strokeDasharray: 200,
-                  strokeDashoffset: refreshing ? 200 : 0,
-                  transition: refreshing ? 'stroke-dashoffset 0s' : 'stroke-dashoffset 0.6s ease-out',
-                }"
+                :clip-path="`url(#${sparkClipId(m.key)})`"
               />
             </svg>
           </article>
@@ -151,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useMarketStore } from "../stores";
 import { api, type MacroCard, type MarketAssetCard, type MarketSeriesPoint, type SectorCard, type SectorOverviewResponse } from "../api";
 
@@ -168,6 +168,9 @@ const CHART_TOP = 34;
 const CHART_BOTTOM = 282;
 const CHART_WIDTH = CHART_RIGHT - CHART_LEFT;
 const CHART_HEIGHT = CHART_BOTTOM - CHART_TOP;
+const SPARK_W = 120;
+const SPARK_H = 34;
+const SPARK_PAD_X = 2;
 
 const timeRanges = [
   { key: "1D", label: "1D" },
@@ -382,8 +385,9 @@ function sparkPoints(series: MarketSeriesPoint[] = [], width = 160, height = 44)
   const min = Math.min(...vals);
   const max = Math.max(...vals);
   const spread = max - min || 1;
+  const drawableWidth = Math.max(width - SPARK_PAD_X * 2, 1);
   return vals.map((v, i) => {
-    const x = vals.length === 1 ? width : (i / (vals.length - 1)) * width;
+    const x = vals.length === 1 ? width / 2 : SPARK_PAD_X + (i / (vals.length - 1)) * drawableWidth;
     const y = height - ((v - min) / spread) * (height - 6) - 3;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
@@ -398,8 +402,10 @@ function sparkPath(series: MarketSeriesPoint[] = [], width = 160, height = 44) {
 
 const refreshing = ref(false);
 const displayScore = ref(50);
+const sparkReveal = ref(1);
 
 let scoreTimer = 0;
+let sparkFrame = 0;
 function animateScore(target: number) {
   clearTimeout(scoreTimer);
   const start = displayScore.value;
@@ -417,8 +423,32 @@ function animateScore(target: number) {
   requestAnimationFrame(tick);
 }
 
+function animateSparklines() {
+  cancelAnimationFrame(sparkFrame);
+  sparkReveal.value = 0;
+  const duration = 600;
+  const startTime = performance.now();
+
+  function tick(now: number) {
+    const t = Math.min((now - startTime) / duration, 1);
+    sparkReveal.value = 1 - Math.pow(1 - t, 3);
+    if (t < 1) {
+      sparkFrame = requestAnimationFrame(tick);
+    } else {
+      sparkFrame = 0;
+    }
+  }
+
+  sparkFrame = requestAnimationFrame(tick);
+}
+
+function sparkClipId(key: string) {
+  return `macro-spark-${String(key).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
 async function refresh() {
   refreshing.value = true;
+  sparkReveal.value = 0;
   animateScore(0);
   scoreTimer = window.setTimeout(() => {
     scoreTimer = 0;
@@ -433,6 +463,7 @@ async function refresh() {
     setTimeout(() => {
       refreshing.value = false;
       animateScore(regimeScore.value);
+      animateSparklines();
     }, 400);
   }
 }
@@ -450,6 +481,11 @@ async function fetchHotSectors() {
 
 onMounted(() => {
   refresh();
+});
+
+onUnmounted(() => {
+  clearTimeout(scoreTimer);
+  cancelAnimationFrame(sparkFrame);
 });
 </script>
 
