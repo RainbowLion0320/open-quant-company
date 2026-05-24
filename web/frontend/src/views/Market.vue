@@ -407,8 +407,7 @@ function animateScore(target: number) {
 
 async function refresh() {
   refreshing.value = true;
-  const prevScore = regimeScore.value;
-  animateScore(0); // ring collapses to 0
+  animateScore(0);
   scoreTimer = window.setTimeout(() => {
     scoreTimer = 0;
   }, 200);
@@ -421,10 +420,7 @@ async function refresh() {
   } finally {
     setTimeout(() => {
       refreshing.value = false;
-      const newScore = regimeScore.value;
-      if (newScore !== prevScore || displayScore.value === 0) {
-        animateScore(newScore);
-      }
+      animateScore(regimeScore.value);
     }, 400);
   }
 }
