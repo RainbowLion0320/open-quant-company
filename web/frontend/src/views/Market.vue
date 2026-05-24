@@ -75,6 +75,7 @@
                 :d="linePath(line)"
                 :stroke="line.color"
                 :stroke-width="line.key === strengthLeader.key ? 2.8 : 1.9"
+                pathLength="1000"
               />
             </g>
           </svg>
@@ -100,7 +101,7 @@
             <strong :style="{ color: macroColor(m) }">{{ fmtValue(m.value, m.unit) }}</strong>
             <em>prev {{ fmtValue(m.prev, m.unit) }}</em>
             <svg viewBox="0 0 120 34" preserveAspectRatio="none" class="microline" :class="{ 'is-drawing': refreshing }">
-              <path :d="sparkPath(m.series, 120, 34)" :stroke="macroColor(m)" />
+              <path :d="sparkPath(m.series, 120, 34)" :stroke="macroColor(m)" pathLength="200" />
             </svg>
           </article>
         </div>
@@ -665,13 +666,13 @@ onMounted(() => {
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
-  stroke-dasharray: 1200;
+  stroke-dasharray: 1000;
   stroke-dashoffset: 0;
   transition: stroke-dashoffset 0.8s ease-out;
 }
 .chart-lines.is-drawing path {
   transition: stroke-dashoffset 0s;
-  stroke-dashoffset: 1200;
+  stroke-dashoffset: 1000;
 }
 .chart-y-labels,
 .chart-x-labels {
