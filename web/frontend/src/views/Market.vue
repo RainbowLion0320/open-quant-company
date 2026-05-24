@@ -100,8 +100,17 @@
             <span>{{ m.label }}</span>
             <strong :style="{ color: macroColor(m) }">{{ fmtValue(m.value, m.unit) }}</strong>
             <em>prev {{ fmtValue(m.prev, m.unit) }}</em>
-            <svg viewBox="0 0 120 34" preserveAspectRatio="none" class="microline" :class="{ 'is-drawing': refreshing }">
-              <path :d="sparkPath(m.series, 120, 34)" :stroke="macroColor(m)" pathLength="200" />
+            <svg viewBox="0 0 120 34" preserveAspectRatio="none" class="microline">
+              <path
+                :d="sparkPath(m.series, 120, 34)"
+                :stroke="macroColor(m)"
+                pathLength="200"
+                :style="{
+                  strokeDasharray: 200,
+                  strokeDashoffset: refreshing ? 200 : 0,
+                  transition: refreshing ? 'stroke-dashoffset 0s' : 'stroke-dashoffset 0.6s ease-out',
+                }"
+              />
             </svg>
           </article>
         </div>
@@ -719,13 +728,6 @@ onMounted(() => {
   fill: none;
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
-  stroke-dasharray: 200;
-  stroke-dashoffset: 0;
-  transition: stroke-dashoffset 0.6s ease-out;
-}
-.microline.is-drawing path {
-  transition: stroke-dashoffset 0s;
-  stroke-dashoffset: 200;
 }
 .macro-grid {
   display: grid;
