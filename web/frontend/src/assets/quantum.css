@@ -261,7 +261,7 @@ html, body {
 }
 .telemetry-strip {
   display: grid;
-  grid-template-columns: repeat(6, minmax(112px, auto));
+  grid-template-columns: repeat(4, minmax(112px, auto));
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   overflow: hidden;
@@ -290,7 +290,6 @@ html, body {
 }
 .telemetry-cell .is-live,
 .is-live { color: var(--positive); }
-.clock-cell strong { color: var(--text-primary); }
 .content-plane {
   flex: 1;
   min-height: 0;
