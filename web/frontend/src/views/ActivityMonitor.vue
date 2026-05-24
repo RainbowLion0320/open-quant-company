@@ -787,6 +787,9 @@ onUnmounted(() => {
 .icon-button {
   width: 26px;
   height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: rgba(0, 212, 255, 0.04);
