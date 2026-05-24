@@ -1,10 +1,10 @@
 <template>
   <div class="market-command">
-    <section class="market-hero">
+    <section class="market-hero" :class="{ 'is-refreshing': refreshing }">
       <div class="regime-panel glass-card">
         <div class="panel-head">
           <span>MARKET REGIME</span>
-          <button @click="refresh" class="icon-button" aria-label="刷新">
+          <button @click="refresh" class="icon-button" :class="{ 'is-spinning': refreshing }" :disabled="refreshing" aria-label="刷新">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4" />
             </svg>
@@ -118,7 +118,7 @@
       <button class="btn btn-xs" @click="refresh">重试</button>
     </div>
 
-    <section class="sector-pulse glass-card">
+    <section class="sector-pulse glass-card" :class="{ 'is-refreshing': refreshing }">
       <div class="panel-head">
         <span>HOT SECTOR PULSE</span>
         <small>{{ sectorPulseMeta }}</small>
@@ -384,11 +384,18 @@ function sparkPoints(series: MarketSeriesPoint[] = [], width = 160, height = 44)
   }).join(" ");
 }
 
+const refreshing = ref(false);
+
 async function refresh() {
-  await Promise.all([
-    store.fetchMarket(selectedRange.value),
-    fetchHotSectors(),
-  ]);
+  refreshing.value = true;
+  try {
+    await Promise.all([
+      store.fetchMarket(selectedRange.value),
+      fetchHotSectors(),
+    ]);
+  } finally {
+    setTimeout(() => { refreshing.value = false; }, 400);
+  }
 }
 
 async function fetchHotSectors() {
@@ -459,6 +466,17 @@ onMounted(async () => {
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+  transition: transform 0.15s ease;
+}
+.icon-button.is-spinning svg {
+  animation: icon-spin 0.7s linear infinite;
+}
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@keyframes icon-spin {
+  to { transform: rotate(360deg); }
 }
 .regime-panel, .index-panel, .macro-panel {
   padding: 14px;
@@ -782,5 +800,26 @@ onMounted(async () => {
   .sector-pulse-grid { grid-template-columns: 1fr; }
   .sector-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .regime-core { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+}
+
+/* Refresh shimmer — brief pulse across all data panels */
+.market-hero.is-refreshing .glass-card,
+.sector-pulse.is-refreshing {
+  position: relative;
+  overflow: hidden;
+}
+.market-hero.is-refreshing .glass-card::after,
+.sector-pulse.is-refreshing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(0, 212, 255, 0.06) 50%, transparent 60%);
+  animation: shimmer-sweep 0.8s ease-out;
+  pointer-events: none;
+  z-index: 1;
+}
+@keyframes shimmer-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 </style>
