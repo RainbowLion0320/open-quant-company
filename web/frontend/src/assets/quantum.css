@@ -231,7 +231,7 @@ html, body {
   z-index: 2;
 }
 .command-bar {
-  height: 72px;
+  height: 52px;
   flex-shrink: 0;
   display: flex;
   align-items: stretch;
@@ -264,13 +264,27 @@ html, body {
   align-items: center;
   gap: 12px;
 }
-.telemetry-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(112px, auto));
+.telemetry-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  overflow: hidden;
+  border-radius: 6px;
   background: rgba(8, 19, 33, 0.54);
+  white-space: nowrap;
+}
+.telemetry-tag span {
+  color: var(--text-disabled);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.telemetry-tag strong {
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
 }
 .system-status {
   display: flex;
@@ -289,27 +303,6 @@ html, body {
 @keyframes status-pulse {
   0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--dot-color), 0 0 14px var(--dot-color); }
   50%      { opacity: 0.55; box-shadow: 0 0 3px var(--dot-color), 0 0 7px var(--dot-color); }
-}
-.telemetry-cell {
-  min-width: 116px;
-  padding: 9px 13px;
-  border-left: 1px solid var(--border-subtle);
-}
-.telemetry-cell:first-child { border-left: 0; }
-.telemetry-cell span {
-  display: block;
-  color: var(--text-disabled);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-.telemetry-cell strong {
-  display: block;
-  margin-top: 4px;
-  color: var(--text-secondary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
-  font-weight: 600;
 }
 .content-plane {
   flex: 1;
@@ -862,9 +855,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     gap: 12px;
     flex-direction: column;
   }
-  .telemetry-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .telemetry-cell { min-width: 0; }
+  .telemetry-group { flex-wrap: wrap; }
+  .telemetry-tag { min-width: 0; }
   .market-ticker { overflow-x: auto; }
 }

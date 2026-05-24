@@ -39,19 +39,17 @@
           <strong>{{ routeTitle }}</strong>
         </div>
         <div class="telemetry-group">
-          <div class="telemetry-strip">
-            <div class="telemetry-cell">
-              <span>Mode</span>
-              <strong :style="{ color: modeColor }">{{ runMode }}</strong>
-            </div>
-            <div class="telemetry-cell">
-              <span>Regime</span>
-              <strong :style="{ color: regimeColor }">{{ regimeLabel }}</strong>
-            </div>
-            <div class="telemetry-cell">
-              <span>Freshness</span>
-              <strong>{{ marketMeta.freshness?.market || '—' }}</strong>
-            </div>
+          <div class="telemetry-tag">
+            <span>MODE</span>
+            <strong :style="{ color: modeColor }">{{ runMode }}</strong>
+          </div>
+          <div class="telemetry-tag">
+            <span>REGIME</span>
+            <strong :style="{ color: regimeColor }">{{ regimeLabel }}</strong>
+          </div>
+          <div class="telemetry-tag">
+            <span>FRESH</span>
+            <strong>{{ marketMeta.freshness?.market || '—' }}</strong>
           </div>
           <div class="system-status" :title="systemLabel">
             <span class="status-dot" :style="{ '--dot-color': systemColor }"></span>
