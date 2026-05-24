@@ -11,11 +11,13 @@
 - 控制论层 = "怎么做" (How) —— 执行的机制和流程
 """
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Callable
+from typing import Any, List, Dict, Optional, Sequence
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime
 import yaml
 import os
+import math
+import time
 
 
 # ----- 配置 -----
@@ -57,10 +59,60 @@ class MarketContext:
     """市场环境快照 — 顶层"""
     regime: MarketRegime = MarketRegime.UNKNOWN
     regime_score: float = 50.0      # 0-100 市场健康度连续评分
-    index_ma_trend: str = ""        # 均线排列（多头/空头）
+    index_ma_trend: str = ""        # 多指数趋势与宽度摘要
     volume_trend: str = ""          # 放量/缩量
-    breadth: float = 0.0            # 市场宽度（涨跌比）
+    breadth: float = 0.0            # 全市场上涨家数占比
+    breadth_detail: Dict[str, Any] = field(default_factory=dict)
+    score_components: Dict[str, float] = field(default_factory=dict)
     date: str = ""
+
+
+@dataclass
+class MarketBreadth:
+    """全市场宽度快照。所有比例均为 0-1。"""
+    advance_ratio: float = 0.5
+    above_ma20: float = 0.5
+    above_ma60: float = 0.5
+    above_ma120: float = 0.5
+    sample_size: int = 0
+    up_count: int = 0
+    down_count: int = 0
+    unchanged_count: int = 0
+    as_of: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "advance_ratio": round(self.advance_ratio, 4),
+            "above_ma20": round(self.above_ma20, 4),
+            "above_ma60": round(self.above_ma60, 4),
+            "above_ma120": round(self.above_ma120, 4),
+            "sample_size": self.sample_size,
+            "up_count": self.up_count,
+            "down_count": self.down_count,
+            "unchanged_count": self.unchanged_count,
+            "as_of": self.as_of,
+        }
+
+
+@dataclass
+class MarketVolume:
+    """全市场成交额确认快照。"""
+    amount_ratio_5_20: float = 1.0
+    up_amount_ratio: float = 0.5
+    sample_size: int = 0
+    amount_5d: float = 0.0
+    amount_20d: float = 0.0
+    as_of: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "amount_ratio_5_20": round(self.amount_ratio_5_20, 4),
+            "up_amount_ratio": round(self.up_amount_ratio, 4),
+            "sample_size": self.sample_size,
+            "amount_5d": round(self.amount_5d, 2),
+            "amount_20d": round(self.amount_20d, 2),
+            "as_of": self.as_of,
+        }
 
 
 @dataclass
@@ -179,33 +231,691 @@ def generate_feedback(
 # 3. 自适应机制 (Adaptive)
 # =====================================================================
 
-def _compute_regime_score(close, ma5, ma20, ma60, breadth, regime: MarketRegime) -> float:
-    """Compute a 0-100 continuous market health score from MA alignment, momentum, and breadth."""
-    current = close[-1]
+_BREADTH_CACHE: Dict[str, Any] = {"expires_at": 0.0, "snapshot": None}
+_VOLUME_CACHE: Dict[str, Any] = {"expires_at": 0.0, "snapshot": None}
 
-    # Trend alignment (0-50): how well are MAs ordered
-    if current > ma5 > ma20 > ma60:
-        trend_score = 50.0
-    elif current < ma5 < ma20 < ma60:
-        trend_score = 0.0
+_REGIME_INDEXES = [
+    ("sh000001", "上证综指", 0.25),
+    ("sh000300", "沪深300", 0.25),
+    ("sz399001", "深证成指", 0.20),
+    ("sz399006", "创业板指", 0.15),
+    ("sh000905", "中证500", 0.15),
+]
+
+
+def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
+    if math.isnan(value) or math.isinf(value):
+        return lower
+    return min(upper, max(lower, value))
+
+
+def _frame_close_volume(df):
+    """Return a sorted OHLCV-like frame with numeric close/volume columns."""
+    import pandas as pd
+
+    if df is None or len(df) == 0:
+        return pd.DataFrame(columns=["date", "close", "volume"])
+
+    data = df.copy()
+    data.columns = [str(c).lower() for c in data.columns]
+    if "close" not in data.columns and "收盘" in df.columns:
+        data["close"] = df["收盘"]
+    if "volume" not in data.columns and "成交量" in df.columns:
+        data["volume"] = df["成交量"]
+
+    if "date" in data.columns:
+        data["date"] = pd.to_datetime(data["date"], errors="coerce")
+        data = data.dropna(subset=["date"]).sort_values("date")
+    elif data.index.name:
+        data = data.reset_index().rename(columns={data.index.name: "date"})
+        data["date"] = pd.to_datetime(data["date"], errors="coerce")
+        data = data.dropna(subset=["date"]).sort_values("date")
+
+    data["close"] = pd.to_numeric(data.get("close"), errors="coerce")
+    if "volume" in data.columns:
+        data["volume"] = pd.to_numeric(data["volume"], errors="coerce")
+    return data.dropna(subset=["close"]).reset_index(drop=True)
+
+
+def _stock_daily_files() -> list:
+    from data.datahub import get_datahub
+
+    daily_dir = get_datahub().store_path("stock") / "daily"
+    if not daily_dir.exists():
+        return []
+    return sorted(daily_dir.glob("*.parquet"))
+
+
+def _stock_daily_source_sql(files: Optional[Sequence[Any]] = None) -> Optional[str]:
+    if files is None:
+        from data.datahub import get_datahub
+
+        daily_dir = get_datahub().store_path("stock") / "daily"
+        if not daily_dir.exists():
+            return None
+        return "'" + str(daily_dir / "*.parquet").replace("'", "''") + "'"
+
+    paths = [str(path).replace("'", "''") for path in files]
+    if not paths:
+        return None
+    return "[" + ", ".join(f"'{path}'" for path in paths) + "]"
+
+
+def _compute_full_market_breadth_duckdb(files: Optional[Sequence[Any]] = None) -> Optional[MarketBreadth]:
+    try:
+        import duckdb
+    except Exception:
+        return None
+
+    source_sql = _stock_daily_source_sql(files)
+    if source_sql is None:
+        return MarketBreadth()
+
+    query = f"""
+    with ranked as (
+      select
+        filename,
+        cast(date as varchar) as trade_date,
+        cast(close as double) as close,
+        row_number() over(partition by filename order by date desc) as rn
+      from read_parquet({source_sql}, filename=true)
+      where close is not null
+    ), agg as (
+      select
+        filename,
+        max(case when rn = 1 then trade_date end) as as_of,
+        max(case when rn = 1 then close end) as last_close,
+        max(case when rn = 2 then close end) as prev_close,
+        avg(case when rn <= 20 then close end) as ma20,
+        avg(case when rn <= 60 then close end) as ma60,
+        avg(case when rn <= 120 then close end) as ma120,
+        count(case when rn <= 20 then 1 end) as n20,
+        count(case when rn <= 60 then 1 end) as n60,
+        count(case when rn <= 120 then 1 end) as n120
+      from ranked
+      where rn <= 130
+      group by filename
+    )
+    select
+      count(*) filter(where last_close is not null and prev_close is not null and prev_close > 0) as sample_size,
+      count(*) filter(where last_close > prev_close and prev_close > 0) as up_count,
+      count(*) filter(where last_close < prev_close and prev_close > 0) as down_count,
+      count(*) filter(where last_close = prev_close and prev_close > 0) as unchanged_count,
+      count(*) filter(where n20 >= 20 and last_close > ma20) as above_ma20,
+      count(*) filter(where n20 >= 20) as eligible_ma20,
+      count(*) filter(where n60 >= 60 and last_close > ma60) as above_ma60,
+      count(*) filter(where n60 >= 60) as eligible_ma60,
+      count(*) filter(where n120 >= 120 and last_close > ma120) as above_ma120,
+      count(*) filter(where n120 >= 120) as eligible_ma120,
+      max(as_of) as as_of
+    from agg
+    """
+
+    try:
+        row = duckdb.connect(database=":memory:").execute(query).fetchone()
+    except Exception:
+        return None
+
+    if not row:
+        return MarketBreadth()
+
+    (
+        sample_size,
+        up_count,
+        down_count,
+        unchanged_count,
+        above_ma20,
+        eligible_ma20,
+        above_ma60,
+        eligible_ma60,
+        above_ma120,
+        eligible_ma120,
+        as_of,
+    ) = row
+
+    sample_size = int(sample_size or 0)
+    up_count = int(up_count or 0)
+    down_count = int(down_count or 0)
+    unchanged_count = int(unchanged_count or 0)
+    traded = up_count + down_count + unchanged_count
+
+    return MarketBreadth(
+        advance_ratio=(up_count / traded) if traded else 0.5,
+        above_ma20=(int(above_ma20 or 0) / int(eligible_ma20)) if eligible_ma20 else 0.5,
+        above_ma60=(int(above_ma60 or 0) / int(eligible_ma60)) if eligible_ma60 else 0.5,
+        above_ma120=(int(above_ma120 or 0) / int(eligible_ma120)) if eligible_ma120 else 0.5,
+        sample_size=sample_size,
+        up_count=up_count,
+        down_count=down_count,
+        unchanged_count=unchanged_count,
+        as_of=str(as_of)[:10] if as_of else "",
+    )
+
+
+def _read_breadth_observation(path) -> Optional[Dict[str, Any]]:
+    import pandas as pd
+
+    try:
+        try:
+            df = pd.read_parquet(path, columns=["date", "close"])
+        except Exception:
+            df = pd.read_parquet(path, columns=["close"])
+    except Exception:
+        return None
+
+    data = _frame_close_volume(df)
+    if len(data) < 2:
+        return None
+
+    closes = data["close"].tail(130)
+    if len(closes) < 2:
+        return None
+
+    last = float(closes.iloc[-1])
+    prev = float(closes.iloc[-2])
+    if not math.isfinite(last) or not math.isfinite(prev) or prev <= 0:
+        return None
+
+    result = {
+        "last": last,
+        "prev": prev,
+        "direction": 1 if last > prev else (-1 if last < prev else 0),
+        "above_ma20": False,
+        "above_ma60": False,
+        "above_ma120": False,
+        "has_ma20": False,
+        "has_ma60": False,
+        "has_ma120": False,
+        "as_of": "",
+    }
+
+    if "date" in data.columns and len(data):
+        result["as_of"] = str(data["date"].iloc[-1])[:10]
+
+    for window in (20, 60, 120):
+        if len(closes) >= window:
+            ma = float(closes.tail(window).mean())
+            result[f"has_ma{window}"] = math.isfinite(ma) and ma > 0
+            result[f"above_ma{window}"] = bool(result[f"has_ma{window}"] and last > ma)
+
+    return result
+
+
+def _compute_full_market_breadth(
+    files: Optional[Sequence[Any]] = None,
+    *,
+    use_cache: bool = True,
+) -> MarketBreadth:
+    """
+    Compute full-market A-share breadth from local stock daily parquet files.
+
+    The dashboard calls regime endpoints frequently, so the expensive full scan
+    is cached in memory for a short TTL. This still avoids implicit network
+    fetches and keeps breadth tied to the local DataHub snapshot.
+    """
+    now = time.monotonic()
+    try:
+        det_cfg = _load_config()["adaptive"]["detection"]
+        ttl = int(det_cfg.get("breadth_cache_ttl_seconds", 900))
+        workers = int(det_cfg.get("breadth_workers", min(8, os.cpu_count() or 4)))
+    except Exception:
+        ttl = 900
+        workers = min(8, os.cpu_count() or 4)
+
+    if use_cache and _BREADTH_CACHE.get("snapshot") is not None and _BREADTH_CACHE.get("expires_at", 0.0) > now:
+        return _BREADTH_CACHE["snapshot"]
+
+    source_files = list(files) if files is not None else None
+    if source_files is not None and not source_files:
+        return MarketBreadth()
+
+    snapshot = _compute_full_market_breadth_duckdb(source_files)
+    if snapshot is not None:
+        if use_cache:
+            _BREADTH_CACHE["snapshot"] = snapshot
+            _BREADTH_CACHE["expires_at"] = now + ttl
+        return snapshot
+
+    source_files = source_files if source_files is not None else _stock_daily_files()
+    if not source_files:
+        return MarketBreadth()
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    up_count = down_count = unchanged_count = 0
+    above = {20: 0, 60: 0, 120: 0}
+    eligible = {20: 0, 60: 0, 120: 0}
+    sample_size = 0
+    as_of = ""
+
+    max_workers = max(1, min(workers, len(source_files)))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for obs in executor.map(_read_breadth_observation, source_files):
+            if not obs:
+                continue
+            sample_size += 1
+            if obs["direction"] > 0:
+                up_count += 1
+            elif obs["direction"] < 0:
+                down_count += 1
+            else:
+                unchanged_count += 1
+            for window in (20, 60, 120):
+                if obs.get(f"has_ma{window}"):
+                    eligible[window] += 1
+                    if obs.get(f"above_ma{window}"):
+                        above[window] += 1
+            if obs.get("as_of"):
+                as_of = max(as_of, str(obs["as_of"]))
+
+    traded = up_count + down_count + unchanged_count
+    snapshot = MarketBreadth(
+        advance_ratio=(up_count / traded) if traded else 0.5,
+        above_ma20=(above[20] / eligible[20]) if eligible[20] else 0.5,
+        above_ma60=(above[60] / eligible[60]) if eligible[60] else 0.5,
+        above_ma120=(above[120] / eligible[120]) if eligible[120] else 0.5,
+        sample_size=sample_size,
+        up_count=up_count,
+        down_count=down_count,
+        unchanged_count=unchanged_count,
+        as_of=as_of,
+    )
+
+    if use_cache:
+        _BREADTH_CACHE["snapshot"] = snapshot
+        _BREADTH_CACHE["expires_at"] = now + ttl
+    return snapshot
+
+
+def _compute_full_market_volume_duckdb(files: Optional[Sequence[Any]] = None) -> Optional[MarketVolume]:
+    try:
+        import duckdb
+    except Exception:
+        return None
+
+    source_sql = _stock_daily_source_sql(files)
+    if source_sql is None:
+        return MarketVolume()
+
+    query = f"""
+    with rows as (
+      select
+        filename,
+        cast(date as date) as trade_date,
+        cast(close as double) as close,
+        cast(volume as double) as volume,
+        coalesce(try_cast(amount as double), try_cast(volume as double) * try_cast(close as double)) as amount,
+        lag(cast(close as double)) over(partition by filename order by cast(date as date)) as prev_close
+      from read_parquet({source_sql}, filename=true, union_by_name=true)
+      where date is not null and close is not null and volume is not null
+    ), recent_dates as (
+      select distinct trade_date
+      from rows
+      where amount is not null and amount > 0
+      order by trade_date desc
+      limit 25
+    ), daily as (
+      select
+        r.trade_date,
+        sum(r.amount) as total_amount,
+        sum(case when r.close > r.prev_close then r.amount else 0 end) as up_amount,
+        sum(case when r.close < r.prev_close then r.amount else 0 end) as down_amount,
+        count(*) as sample_size
+      from rows r
+      join recent_dates d on r.trade_date = d.trade_date
+      where r.amount is not null and r.amount > 0 and r.prev_close is not null and r.prev_close > 0
+      group by r.trade_date
+    ), ranked as (
+      select
+        *,
+        row_number() over(order by trade_date desc) as rn
+      from daily
+    )
+    select
+      avg(total_amount) filter(where rn <= 5) as amount_5d,
+      avg(total_amount) filter(where rn <= 20) as amount_20d,
+      sum(up_amount) filter(where rn <= 5) as up_amount_5d,
+      sum(total_amount) filter(where rn <= 5) as total_amount_5d,
+      avg(sample_size) filter(where rn <= 5) as sample_size,
+      max(trade_date) as as_of
+    from ranked
+    where rn <= 20
+    """
+
+    try:
+        row = duckdb.connect(database=":memory:").execute(query).fetchone()
+    except Exception:
+        return None
+
+    if not row:
+        return MarketVolume()
+
+    amount_5d, amount_20d, up_amount_5d, total_amount_5d, sample_size, as_of = row
+    amount_5d = float(amount_5d or 0.0)
+    amount_20d = float(amount_20d or 0.0)
+    up_amount_5d = float(up_amount_5d or 0.0)
+    total_amount_5d = float(total_amount_5d or 0.0)
+
+    return MarketVolume(
+        amount_ratio_5_20=(amount_5d / amount_20d) if amount_20d > 0 else 1.0,
+        up_amount_ratio=(up_amount_5d / total_amount_5d) if total_amount_5d > 0 else 0.5,
+        sample_size=int(sample_size or 0),
+        amount_5d=amount_5d,
+        amount_20d=amount_20d,
+        as_of=str(as_of)[:10] if as_of else "",
+    )
+
+
+def _compute_full_market_volume(
+    files: Optional[Sequence[Any]] = None,
+    *,
+    use_cache: bool = True,
+) -> MarketVolume:
+    now = time.monotonic()
+    try:
+        det_cfg = _load_config()["adaptive"]["detection"]
+        ttl = int(det_cfg.get("breadth_cache_ttl_seconds", 900))
+    except Exception:
+        ttl = 900
+
+    if use_cache and _VOLUME_CACHE.get("snapshot") is not None and _VOLUME_CACHE.get("expires_at", 0.0) > now:
+        return _VOLUME_CACHE["snapshot"]
+
+    source_files = list(files) if files is not None else None
+    if source_files is not None and not source_files:
+        return MarketVolume()
+
+    snapshot = _compute_full_market_volume_duckdb(source_files)
+    if snapshot is None:
+        snapshot = MarketVolume()
+
+    if use_cache:
+        _VOLUME_CACHE["snapshot"] = snapshot
+        _VOLUME_CACHE["expires_at"] = now + ttl
+    return snapshot
+
+
+def _index_trend_strength(df) -> Optional[float]:
+    data = _frame_close_volume(df)
+    if len(data) < 60:
+        return None
+
+    close = data["close"]
+    current = float(close.iloc[-1])
+    ma20 = float(close.tail(20).mean())
+    ma60 = float(close.tail(60).mean())
+    ma120 = float(close.tail(120).mean()) if len(close) >= 120 else ma60
+
+    checks = [
+        current > ma20,
+        current > ma60,
+        ma20 > ma60,
+        current > ma120,
+    ]
+    if len(close) >= 80:
+        prev_ma20 = float(close.iloc[-40:-20].mean())
+        checks.append(ma20 > prev_ma20)
+
+    return sum(1 for ok in checks if ok) / len(checks)
+
+
+def _compute_multi_index_trend(index_frames: Dict[str, Any]) -> tuple[float, Dict[str, float]]:
+    weighted = 0.0
+    total_weight = 0.0
+    detail: Dict[str, float] = {}
+
+    for symbol, _label, weight in _REGIME_INDEXES:
+        strength = _index_trend_strength(index_frames.get(symbol))
+        if strength is None:
+            continue
+        detail[symbol] = round(strength, 4)
+        weighted += strength * weight
+        total_weight += weight
+
+    if total_weight <= 0:
+        return 0.5, detail
+    return weighted / total_weight, detail
+
+
+def _index_risk_metrics(df) -> Optional[Dict[str, float]]:
+    data = _frame_close_volume(df)
+    if len(data) < 30:
+        return None
+
+    close = data["close"]
+    returns = close.pct_change().dropna()
+    if len(returns) < 10:
+        realized_vol = 0.0
     else:
-        # Partial alignment: count how many pairwise relations are bullish
-        pairs = [(current, ma5), (ma5, ma20), (ma20, ma60)]
-        bullish = sum(1 for a, b in pairs if a > b)
-        trend_score = bullish / 3 * 50.0
+        realized_vol = float(returns.tail(20).std() * math.sqrt(252))
+        if not math.isfinite(realized_vol):
+            realized_vol = 0.0
 
-    # Short-term momentum (0-25): price vs MA20
-    if ma20 > 0:
-        pct_from_ma20 = (current / ma20 - 1) * 100
-        momentum_score = min(25.0, max(0.0, 12.5 + pct_from_ma20 * 2.5))
+    window = close.tail(60)
+    peak = float(window.max())
+    current = float(close.iloc[-1])
+    drawdown = (current / peak - 1.0) if peak > 0 else 0.0
+
+    vol_score = 1.0 - _clamp((realized_vol - 0.12) / 0.28)
+    drawdown_score = 1.0 - _clamp(abs(min(drawdown, 0.0)) / 0.15)
+    return {
+        "realized_vol_20d": realized_vol,
+        "drawdown_60d": drawdown,
+        "vol_score": vol_score,
+        "drawdown_score": drawdown_score,
+    }
+
+
+def _compute_risk_strength(
+    index_frames: Dict[str, Any],
+    breadth: MarketBreadth,
+) -> tuple[float, Dict[str, float]]:
+    weighted_vol_score = 0.0
+    weighted_drawdown_score = 0.0
+    weighted_realized_vol = 0.0
+    weighted_drawdown = 0.0
+    total_weight = 0.0
+    worst_drawdown = 0.0
+    index_detail: Dict[str, float] = {}
+
+    for symbol, _label, weight in _REGIME_INDEXES:
+        metrics = _index_risk_metrics(index_frames.get(symbol))
+        if not metrics:
+            continue
+        weighted_vol_score += metrics["vol_score"] * weight
+        weighted_drawdown_score += metrics["drawdown_score"] * weight
+        weighted_realized_vol += metrics["realized_vol_20d"] * weight
+        weighted_drawdown += metrics["drawdown_60d"] * weight
+        worst_drawdown = min(worst_drawdown, metrics["drawdown_60d"])
+        index_detail[f"risk_vol_{symbol}"] = round(metrics["realized_vol_20d"], 4)
+        index_detail[f"risk_drawdown_{symbol}"] = round(metrics["drawdown_60d"], 4)
+        total_weight += weight
+
+    if total_weight <= 0:
+        vol_health = 0.5
+        drawdown_health = 0.5
+        weighted_realized_vol = 0.0
+        weighted_drawdown = 0.0
     else:
-        momentum_score = 12.5
+        vol_health = weighted_vol_score / total_weight
+        drawdown_health = weighted_drawdown_score / total_weight
+        weighted_realized_vol = weighted_realized_vol / total_weight
+        weighted_drawdown = weighted_drawdown / total_weight
 
-    # Breadth (0-25)
-    breadth_score = breadth * 25.0
+    traded = breadth.up_count + breadth.down_count + breadth.unchanged_count
+    down_ratio = (breadth.down_count / traded) if traded else 0.5
+    pressure_raw = (
+        0.50 * down_ratio
+        + 0.30 * (1.0 - breadth.above_ma20)
+        + 0.20 * (1.0 - breadth.above_ma60)
+    )
+    pressure_health = 1.0 - _clamp((pressure_raw - 0.40) / 0.35)
 
-    return round(trend_score + momentum_score + breadth_score, 1)
+    strength = 0.50 * drawdown_health + 0.30 * vol_health + 0.20 * pressure_health
+    return strength, {
+        "risk_drawdown_raw": round(drawdown_health, 4),
+        "risk_volatility_raw": round(vol_health, 4),
+        "risk_pressure_raw": round(pressure_health, 4),
+        "market_down_pressure": round(pressure_raw, 4),
+        "market_down_ratio": round(down_ratio, 4),
+        "realized_vol_20d": round(weighted_realized_vol, 4),
+        "drawdown_60d": round(weighted_drawdown, 4),
+        "worst_drawdown_60d": round(worst_drawdown, 4),
+        **index_detail,
+    }
 
+
+def _index_volume_confirmation(df) -> Optional[Dict[str, float]]:
+    data = _frame_close_volume(df)
+    if "volume" not in data.columns or len(data) < 20:
+        return None
+
+    volume = data["volume"].dropna()
+    if len(volume) < 20:
+        return None
+
+    vol_5 = float(volume.tail(5).mean())
+    vol_20 = float(volume.tail(20).mean())
+    if vol_20 <= 0:
+        return None
+
+    vol_ratio = vol_5 / vol_20
+    close = data["close"]
+    ret_5 = (float(close.iloc[-1]) / float(close.iloc[-6]) - 1.0) if len(close) >= 6 and float(close.iloc[-6]) > 0 else 0.0
+    if ret_5 > 0.01:
+        strength = 0.5 + (vol_ratio - 1.0) * 0.8
+    elif ret_5 < -0.01:
+        strength = 0.5 - (vol_ratio - 1.0) * 0.8
+    else:
+        strength = 0.5 + (vol_ratio - 1.0) * 0.2
+    return {
+        "strength": _clamp(strength),
+        "volume_ratio": vol_ratio,
+        "return_5d": ret_5,
+    }
+
+
+def _compute_multi_index_volume(index_frames: Dict[str, Any]) -> tuple[float, Dict[str, float]]:
+    weighted = 0.0
+    total_weight = 0.0
+    detail: Dict[str, float] = {}
+
+    for symbol, _label, weight in _REGIME_INDEXES:
+        metrics = _index_volume_confirmation(index_frames.get(symbol))
+        if not metrics:
+            continue
+        weighted += metrics["strength"] * weight
+        total_weight += weight
+        detail[f"volume_ratio_{symbol}"] = round(metrics["volume_ratio"], 4)
+        detail[f"volume_ret5_{symbol}"] = round(metrics["return_5d"], 4)
+
+    if total_weight <= 0:
+        return 0.5, detail
+    return weighted / total_weight, detail
+
+
+def _compute_volume_strength(
+    index_frames: Dict[str, Any],
+    breadth: MarketBreadth,
+    market_volume: MarketVolume,
+) -> tuple[float, str, Dict[str, float]]:
+    try:
+        det_cfg = _load_config()["adaptive"]["detection"]
+        vol_expand = float(det_cfg.get("volume_expansion", 1.2))
+        vol_contract = float(det_cfg.get("volume_contraction", 0.8))
+    except Exception:
+        vol_expand = 1.2
+        vol_contract = 0.8
+
+    amount_ratio = market_volume.amount_ratio_5_20
+    trend = "放量" if amount_ratio > vol_expand else ("缩量" if amount_ratio < vol_contract else "正常")
+
+    if breadth.advance_ratio >= 0.55:
+        market_activity = 0.5 + (amount_ratio - 1.0) * 0.7
+    elif breadth.advance_ratio <= 0.45:
+        market_activity = 0.5 - (amount_ratio - 1.0) * 0.7
+    else:
+        market_activity = 0.5 + (amount_ratio - 1.0) * 0.2
+    market_activity = _clamp(market_activity)
+
+    up_amount_score = _clamp(market_volume.up_amount_ratio)
+    index_volume, index_detail = _compute_multi_index_volume(index_frames)
+    strength = 0.50 * market_activity + 0.30 * up_amount_score + 0.20 * index_volume
+
+    return _clamp(strength), trend, {
+        "volume_market_activity_raw": round(market_activity, 4),
+        "volume_up_amount_raw": round(up_amount_score, 4),
+        "volume_index_raw": round(index_volume, 4),
+        "amount_ratio_5_20": round(amount_ratio, 4),
+        "up_amount_ratio": round(market_volume.up_amount_ratio, 4),
+        "volume_sample_size": float(market_volume.sample_size),
+        "amount_5d": round(market_volume.amount_5d, 2),
+        "amount_20d": round(market_volume.amount_20d, 2),
+        **index_detail,
+    }
+
+
+def _breadth_strength(breadth: MarketBreadth) -> float:
+    return _clamp(
+        0.35 * breadth.advance_ratio
+        + 0.30 * breadth.above_ma20
+        + 0.25 * breadth.above_ma60
+        + 0.10 * breadth.above_ma120
+    )
+
+
+def _compute_regime_score_v2(
+    bench_df,
+    index_frames: Dict[str, Any],
+    breadth: MarketBreadth,
+    market_volume: Optional[MarketVolume] = None,
+) -> tuple[float, Dict[str, float]]:
+    """Compute v2 regime score: trend 35%, breadth 35%, risk 20%, volume 10%."""
+    trend_raw, index_trend = _compute_multi_index_trend(index_frames)
+    risk_raw, risk_detail = _compute_risk_strength(index_frames, breadth)
+    volume_snapshot = market_volume or _compute_full_market_volume()
+    volume_raw, _volume_trend, volume_detail = _compute_volume_strength(index_frames, breadth, volume_snapshot)
+    breadth_raw = _breadth_strength(breadth)
+
+    components = {
+        "trend": round(trend_raw * 35.0, 1),
+        "breadth": round(breadth_raw * 35.0, 1),
+        "risk": round(risk_raw * 20.0, 1),
+        "volume": round(volume_raw * 10.0, 1),
+        "trend_raw": round(trend_raw, 4),
+        "breadth_raw": round(breadth_raw, 4),
+        "risk_raw": round(risk_raw, 4),
+        "volume_raw": round(volume_raw, 4),
+        "sample_size": float(breadth.sample_size),
+        **{f"trend_{symbol}": value for symbol, value in index_trend.items()},
+        **risk_detail,
+        **volume_detail,
+    }
+    score = components["trend"] + components["breadth"] + components["risk"] + components["volume"]
+    return round(score, 1), components
+
+
+def _classify_regime(score: float, components: Dict[str, float], breadth: MarketBreadth) -> MarketRegime:
+    try:
+        det_cfg = _load_config()["adaptive"]["detection"]
+        bull_threshold = float(det_cfg.get("regime_bull_threshold", 65))
+        bear_threshold = float(det_cfg.get("regime_bear_threshold", 35))
+        breadth_bull = float(det_cfg.get("breadth_bull_threshold", 0.55))
+        breadth_bear = float(det_cfg.get("breadth_bear_threshold", 0.40))
+    except Exception:
+        bull_threshold = 65.0
+        bear_threshold = 35.0
+        breadth_bull = 0.55
+        breadth_bear = 0.40
+
+    trend_raw = components.get("trend_raw", 0.5)
+    breadth_raw = components.get("breadth_raw", _breadth_strength(breadth))
+
+    if score >= bull_threshold and trend_raw >= 0.55 and breadth.advance_ratio >= breadth_bull:
+        return MarketRegime.BULL
+    if score <= bear_threshold or (trend_raw <= 0.40 and breadth_raw <= breadth_bear):
+        return MarketRegime.BEAR
+    return MarketRegime.SIDEWAYS
 
 def detect_market_regime(
     index_data: dict = None,  # 指数数据 {symbol: df}，不传则自动拉取
@@ -216,12 +926,10 @@ def detect_market_regime(
     市场状态检测：基于均线排列、波动率和趋势强度
     不传 index_data 时自动从 AKShare 拉取上证指数数据
     """
-    import pandas as pd
 
     # 自动拉取真实数据
     if index_data is None or symbol not in index_data:
         try:
-            import sys, os
             from data.fetcher import get_index_daily
             df = get_index_daily(symbol, force_refresh=False)
         except Exception:
@@ -320,75 +1028,69 @@ class QuantOrchestrator:
 
     def set_regime(self, index_data: dict = None):
         """设置当前市场状态。不传 index_data 时自动拉取真实数据。"""
-        self.regime = detect_market_regime(index_data)
-        self.params = adaptive_params(self.regime)
+        if index_data is None:
+            snapshot = self.detect()
+            self.regime = snapshot.regime
+        else:
+            self.regime = detect_market_regime(index_data)
+            self.params = adaptive_params(self.regime)
 
     def detect(self) -> MarketContext:
         """
         运行完整市场检测，返回 MarketContext 快照。
-        自动拉取真实上证指数数据，计算均线排列和趋势。
+        自动拉取真实指数数据，计算多指数趋势、全市场宽度、风险和量能确认。
         """
-        import pandas as pd
         from datetime import datetime
-        import sys, os
 
-        # 获取真实指数数据
         from data.fetcher import get_index_daily
-        df = get_index_daily("sh000001", force_refresh=False)
 
-        if df is None or len(df) < 60:
+        index_frames: Dict[str, Any] = {}
+        for symbol, _label, _weight in _REGIME_INDEXES:
+            try:
+                index_frames[symbol] = get_index_daily(symbol, force_refresh=False)
+            except Exception:
+                index_frames[symbol] = None
+
+        df = index_frames.get("sh000001")
+        bench = _frame_close_volume(df)
+        if bench is None or len(bench) < 60:
             self.market_snapshot = MarketContext(regime=MarketRegime.UNKNOWN, date=datetime.now().strftime("%Y-%m-%d"))
             return self.market_snapshot
 
-        close = df["close"].values if "close" in df.columns else df["收盘"].values
-        volume = df["volume"].values if "volume" in df.columns else None
+        close = bench["close"]
+        current = float(close.iloc[-1])
+        ma5 = float(close.tail(5).mean())
+        ma20 = float(close.tail(20).mean())
+        ma60 = float(close.tail(60).mean())
 
-        current = close[-1]
-        ma5 = close[-5:].mean()
-        ma20 = close[-20:].mean()
-        ma60 = close[-60:].mean() if len(close) >= 60 else close.mean()
-
-        # 趋势判断
-        if current > ma5 > ma20 > ma60:
-            ma_trend = "多头排列 ↑"
-            self.regime = MarketRegime.BULL
-        elif current < ma5 < ma20 < ma60:
-            ma_trend = "空头排列 ↓"
-            self.regime = MarketRegime.BEAR
-        else:
-            ma_trend = "震荡/横盘 ↔"
-            self.regime = MarketRegime.SIDEWAYS
+        breadth_snapshot = _compute_full_market_breadth()
+        volume_snapshot = _compute_full_market_volume()
+        score, components = _compute_regime_score_v2(bench, index_frames, breadth_snapshot, volume_snapshot)
+        self.regime = _classify_regime(score, components, breadth_snapshot)
 
         self.params = adaptive_params(self.regime)
+        _volume_strength, vol_trend, _volume_detail = _compute_volume_strength(
+            index_frames,
+            breadth_snapshot,
+            volume_snapshot,
+        )
 
-        # 量能趋势 — 阈值从 config 读取，fallback 1.2/0.8
-        vol_5 = volume[-5:].mean() if volume is not None else 0
-        vol_20 = volume[-20:].mean() if volume is not None and len(volume) >= 20 else vol_5
-
-        try:
-            det_cfg = _load_config()["adaptive"]["detection"]
-            vol_expand = float(det_cfg.get("volume_expansion", 1.2))
-            vol_contract = float(det_cfg.get("volume_contraction", 0.8))
-            breadth_w = int(det_cfg.get("breadth_window", 20))
-        except Exception:
-            vol_expand = 1.2
-            vol_contract = 0.8
-            breadth_w = 20
-
-        vol_trend = "放量" if vol_5 > vol_20 * vol_expand else ("缩量" if vol_5 < vol_20 * vol_contract else "正常")
-
-        # 涨跌比（从OHLC近似: 收盘>开盘为涨）
-        lookback = min(breadth_w, len(close))
-        start = max(1, len(close) - lookback)
-        up_count = sum(1 for i in range(start, len(close)) if close[i] > close[i-1])
-        breadth = up_count / (len(close) - start) if (len(close) - start) > 0 else 0.5
+        trend_raw = components.get("trend_raw", 0.5)
+        breadth_detail = breadth_snapshot.to_dict()
+        ma_trend = (
+            f"MA5:{ma5:.0f} MA20:{ma20:.0f} MA60:{ma60:.0f} · "
+            f"多指数趋势 {trend_raw:.0%} · 全A上涨 {breadth_snapshot.advance_ratio:.0%} · "
+            f"MA20上方 {breadth_snapshot.above_ma20:.0%} · 样本 {breadth_snapshot.sample_size}"
+        )
 
         self.market_snapshot = MarketContext(
             regime=self.regime,
-            regime_score=_compute_regime_score(close, ma5, ma20, ma60, breadth, self.regime),
-            index_ma_trend=f"MA5:{ma5:.0f} MA20:{ma20:.0f} MA60:{ma60:.0f} → {ma_trend}",
+            regime_score=score,
+            index_ma_trend=ma_trend,
             volume_trend=vol_trend,
-            breadth=breadth,
+            breadth=breadth_snapshot.advance_ratio,
+            breadth_detail=breadth_detail,
+            score_components=components,
             date=datetime.now().strftime("%Y-%m-%d"),
         )
         return self.market_snapshot

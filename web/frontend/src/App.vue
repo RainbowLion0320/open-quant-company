@@ -4,10 +4,9 @@
     <div class="scanline"></div>
 
     <aside class="nav-rail">
-      <router-link to="/" class="brand-mark" aria-label="星盘">
-        <span class="brand-core">星</span>
-        <span class="brand-ring"></span>
-      </router-link>
+      <div class="brand-mark" role="img" aria-label="Astrolabe Quant OS">
+        <img :src="logoUrl" alt="" aria-hidden="true" />
+      </div>
 
       <nav class="nav-stack" aria-label="主导航">
         <router-link
@@ -84,6 +83,7 @@ import { useRoute } from "vue-router";
 import { useParticles } from "./charts/particles";
 import { api } from "./api";
 import type { RegimeResponse } from "./api";
+import logoUrl from "./assets/astrolabe-logo.svg";
 
 const route = useRoute();
 const hovered = ref("");

@@ -207,6 +207,8 @@ async def market_regime():
             "ma_trend": snapshot.index_ma_trend,
             "volume_trend": snapshot.volume_trend,
             "breadth": round(snapshot.breadth, 2),
+            "breadth_detail": snapshot.breadth_detail,
+            "score_components": snapshot.score_components,
         },
         "multi_asset": multi_asset,
         "freshness": {
@@ -248,6 +250,8 @@ async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|Y
         "ma_trend": snapshot.index_ma_trend,
         "volume_trend": snapshot.volume_trend,
         "breadth": round(snapshot.breadth, 2),
+        "breadth_detail": snapshot.breadth_detail,
+        "score_components": snapshot.score_components,
     }
     multi_asset = _multi_asset_cards(recent, series_limit=tail)
     macro = _macro_cards()

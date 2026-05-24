@@ -16,9 +16,9 @@
         </div>
         <div class="regime-metrics">
           <div><span>Regime Score</span><strong>{{ displayScore }}</strong></div>
-          <div><span>Market Breadth</span><strong>{{ displayBreadth.toFixed(2) }}</strong></div>
+          <div><span>A-share Breadth</span><strong>{{ fmtRatioPct(displayBreadth) }}</strong></div>
           <div><span>Volume Trend</span><strong>{{ store.regime?.volume_trend || '—' }}</strong></div>
-          <div><span>Pool Size</span><strong>{{ displayPoolSize || '—' }}</strong></div>
+          <div><span>Max Positions</span><strong>{{ displayPoolSize || '—' }}</strong></div>
         </div>
         <div class="trend-note">{{ store.regime?.ma_trend || '等待市场检测' }}</div>
       </div>
@@ -348,6 +348,10 @@ function fmtValue(v: number | null | undefined, unit = "") {
 function fmtSignedPct(v: number | null | undefined) {
   const n = Number(v || 0);
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+}
+function fmtRatioPct(v: number | null | undefined) {
+  const n = Number(v || 0) * 100;
+  return `${n.toFixed(0)}%`;
 }
 function fmtReturn(v: number) {
   const n = Number(v || 0) * 100;

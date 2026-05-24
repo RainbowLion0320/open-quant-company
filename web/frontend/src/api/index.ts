@@ -54,11 +54,39 @@ function put<T>(url: string, body?: unknown): Promise<T> {
 // Type definitions
 // ═══════════════════════════════════════
 
+export interface RegimeBreadthDetail {
+  advance_ratio?: number;
+  above_ma20?: number;
+  above_ma60?: number;
+  above_ma120?: number;
+  sample_size?: number;
+  up_count?: number;
+  down_count?: number;
+  unchanged_count?: number;
+  as_of?: string;
+}
+
+export interface RegimeScoreComponents {
+  trend?: number;
+  breadth?: number;
+  risk?: number;
+  volume?: number;
+  trend_raw?: number;
+  breadth_raw?: number;
+  risk_raw?: number;
+  volume_raw?: number;
+  sample_size?: number;
+  [key: string]: number | undefined;
+}
+
 export interface RegimeData {
-  value: "bull" | "bear" | "sideways";
+  value: "bull" | "bear" | "sideways" | "unknown";
+  score?: number;
   ma_trend: string;
   volume_trend: string;
   breadth: number;
+  breadth_detail?: RegimeBreadthDetail;
+  score_components?: RegimeScoreComponents;
 }
 
 export interface KlinePoint {
@@ -124,7 +152,7 @@ export interface MarketResponse {
 }
 
 export interface RegimeResponse {
-  regime: RegimeData & { score?: number };
+  regime: RegimeData;
   multi_asset: MarketAssetCard[];
   freshness: { market: string };
   updated: string;

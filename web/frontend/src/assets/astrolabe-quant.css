@@ -116,27 +116,20 @@ html, body {
 }
 .brand-mark {
   position: relative;
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(0, 212, 255, 0.36);
-  border-radius: 10px;
   color: var(--accent);
-  background: radial-gradient(circle, rgba(0, 212, 255, 0.15), rgba(0, 212, 255, 0.03) 58%, transparent);
-  box-shadow: inset 0 0 24px rgba(0, 212, 255, 0.08), 0 0 24px rgba(0, 212, 255, 0.12);
+  background: transparent;
+  filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.22));
+  cursor: default;
+  user-select: none;
 }
-.brand-core {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-.brand-ring {
-  position: absolute;
-  inset: 8px;
-  border: 1px dashed rgba(34, 197, 94, 0.35);
-  border-radius: 50%;
+.brand-mark img {
+  width: 38px;
+  height: 38px;
+  display: block;
 }
 .nav-stack {
   flex: 1;
@@ -841,7 +834,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
     border-right: 0;
     border-bottom: 1px solid rgba(125, 211, 252, 0.12);
   }
-  .brand-mark { width: 46px; height: 46px; }
+  .brand-mark { width: 38px; height: 38px; }
+  .brand-mark img { width: 34px; height: 34px; }
   .nav-stack {
     flex-direction: row;
     overflow-x: auto;

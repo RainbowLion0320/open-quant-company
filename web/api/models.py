@@ -11,7 +11,9 @@ class MarketSnapshot(BaseModel):
     regime: str = Field(..., description="市场状态: bull/bear/sideways")
     ma_trend: str = Field(..., description="均线趋势描述")
     volume_trend: str = Field(..., description="成交量趋势")
-    breadth: float = Field(..., description="市场涨跌比")
+    breadth: float = Field(..., description="全市场上涨家数占比")
+    breadth_detail: Dict[str, Any] = Field(default_factory=dict, description="全市场宽度明细")
+    score_components: Dict[str, float] = Field(default_factory=dict, description="Regime 评分分项")
     confidence: float = Field(..., description="置信度 0-1")
 
 class KLineItem(BaseModel):

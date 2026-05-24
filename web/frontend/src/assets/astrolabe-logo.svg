@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Astrolabe Quant OS">
+  <defs>
+    <radialGradient id="core" cx="50%" cy="50%" r="58%">
+      <stop offset="0%" stop-color="#e0fbff"/>
+      <stop offset="42%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#0b6f88"/>
+    </radialGradient>
+    <linearGradient id="orbit" x1="10" y1="10" x2="54" y2="54">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="54%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="20" fill="none" stroke="#0e7490" stroke-width="1" opacity=".42"/>
+  <ellipse cx="32" cy="32" rx="25" ry="8.5" fill="none" stroke="url(#orbit)" stroke-width="2.2" opacity=".94" transform="rotate(-24 32 32)"/>
+  <ellipse cx="32" cy="32" rx="8.5" ry="25" fill="none" stroke="#38bdf8" stroke-width="1.35" opacity=".58" transform="rotate(-24 32 32)"/>
+  <path d="M18.5 40.5 27.5 29l5.8 5.7L45.6 20" fill="none" stroke="#22c55e" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+  <circle cx="32" cy="32" r="4.5" fill="url(#core)" filter="url(#glow)"/>
+  <circle cx="48.5" cy="22" r="2.2" fill="#a78bfa"/>
+  <circle cx="16.2" cy="43" r="1.9" fill="#7dd3fc"/>
+</svg>
