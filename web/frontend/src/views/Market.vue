@@ -548,8 +548,8 @@ onMounted(async () => {
   animation: orb-breathe 3.2s ease-in-out infinite;
 }
 @keyframes orb-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.85; box-shadow: 0 0 8px var(--orb-color); }
-  50%      { transform: scale(1.18); opacity: 1; box-shadow: 0 0 22px var(--orb-color), 0 0 44px var(--orb-color); }
+  0%, 100% { transform: scale(1); opacity: 0.9; box-shadow: 0 0 8px var(--orb-color); }
+  50%      { transform: scale(1.08); opacity: 1; box-shadow: 0 0 14px var(--orb-color), 0 0 26px var(--orb-color); }
 }
 .regime-name {
   font-size: 22px;
