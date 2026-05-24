@@ -16,9 +16,9 @@
         </div>
         <div class="regime-metrics">
           <div><span>Regime Score</span><strong>{{ displayScore }}</strong></div>
-          <div><span>Market Breadth</span><strong>{{ store.regime?.breadth?.toFixed(2) || '—' }}</strong></div>
+          <div><span>Market Breadth</span><strong>{{ displayBreadth.toFixed(2) }}</strong></div>
           <div><span>Volume Trend</span><strong>{{ store.regime?.volume_trend || '—' }}</strong></div>
-          <div><span>Pool Size</span><strong>{{ store.poolSize || '—' }}</strong></div>
+          <div><span>Pool Size</span><strong>{{ displayPoolSize || '—' }}</strong></div>
         </div>
         <div class="trend-note">{{ store.regime?.ma_trend || '等待市场检测' }}</div>
       </div>
@@ -32,8 +32,8 @@
         </div>
         <div class="index-summary">
           <strong>{{ strengthLeader.label }}</strong>
-          <span :style="{ color: strengthLeader.change >= 0 ? 'var(--positive)' : 'var(--negative)' }">
-            {{ fmtSignedPct(strengthLeader.change) }}
+          <span :style="{ color: displayStrengthPct >= 0 ? 'var(--positive)' : 'var(--negative)' }">
+            {{ fmtSignedPct(displayStrengthPct) }}
           </span>
           <em>{{ relativeSubtitle }}</em>
         </div>
@@ -98,7 +98,7 @@
         <div class="macro-grid">
           <article v-for="m in macro" :key="m.key">
             <span>{{ m.label }}</span>
-            <strong :style="{ color: macroColor(m) }">{{ fmtValue(m.value, m.unit) }}</strong>
+            <strong :style="{ color: macroColor(m) }">{{ fmtValue(macroRef(m.key).value, m.unit) }}</strong>
             <em>prev {{ fmtValue(m.prev, m.unit) }}</em>
             <svg :viewBox="`0 0 ${SPARK_W} ${SPARK_H}`" preserveAspectRatio="none" class="microline">
               <defs>
@@ -406,21 +406,46 @@ const sparkReveal = ref(1);
 
 let scoreTimer = 0;
 let sparkFrame = 0;
-function animateScore(target: number) {
-  clearTimeout(scoreTimer);
-  const start = displayScore.value;
-  const duration = 700;
+
+// Generic number tween — used for score + all data metrics
+function tweenTo(ref: { value: number }, target: number, decimals = 0, duration = 600) {
+  const start = ref.value;
+  if (start === target) return;
   const startTime = performance.now();
   function tick(now: number) {
-    const elapsed = now - startTime;
-    const t = Math.min(elapsed / duration, 1);
-    const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
-    displayScore.value = Math.round(start + (target - start) * eased);
-    if (t < 1) {
-      requestAnimationFrame(tick);
-    }
+    const t = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const val = start + (target - start) * eased;
+    ref.value = decimals > 0 ? Number(val.toFixed(decimals)) : Math.round(val);
+    if (t < 1) requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
+}
+
+function animateScore(target: number) {
+  clearTimeout(scoreTimer);
+  tweenTo(displayScore, target, 0, 700);
+}
+
+// Animated display values for key metrics
+const displayBreadth = ref(0);
+const displayPoolSize = ref(0);
+const displayStrengthPct = ref(0);
+const macroDisplay: Record<string, { ref: ReturnType<typeof ref<number>> }> = {};
+
+function macroRef(key: string) {
+  if (!macroDisplay[key]) macroDisplay[key] = { ref: ref(0) };
+  return macroDisplay[key].ref;
+}
+
+function animateMetrics() {
+  tweenTo(displayBreadth, store.regime?.breadth ?? 0, 2, 500);
+  tweenTo(displayPoolSize, store.poolSize ?? 0, 0, 500);
+  tweenTo(displayStrengthPct, strengthLeader.value.change, 2, 500);
+  for (const m of macro.value) {
+    const v = Number(m.value);
+    if (!isNaN(v)) tweenTo(macroRef(m.key), v, 2, 500);
+  }
 }
 
 function animateSparklines() {
@@ -463,6 +488,7 @@ async function refresh() {
     setTimeout(() => {
       refreshing.value = false;
       animateScore(regimeScore.value);
+      animateMetrics();
       animateSparklines();
     }, 400);
   }
