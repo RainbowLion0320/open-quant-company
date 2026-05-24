@@ -23,12 +23,14 @@ from fastapi.staticfiles import StaticFiles
 from web.api.routes import market, strategies, stocks, portfolio, signals, settings, backtest, system, hindsight, sectors
 from web.api.errors import register_error_handlers
 from web.api.auth import AuthMiddleware
+from web.api.version import get_project_version
 
 
 def create_app() -> FastAPI:
+    version = get_project_version()
     app = FastAPI(
         title="Astrolabe Quant API",
-        version="2.0.0",
+        version=version,
         description="星盘 / Astrolabe Quant OS — 个人量化研究与执行操作系统",
     )
 
@@ -79,7 +81,7 @@ def create_app() -> FastAPI:
             "data_updated": meta.get("last_scan", "") if not db_locked else "数据库被占用",
             "stocks_scanned": meta.get("total", 0) if not db_locked else 0,
             "strategies": strategies_count,
-            "version": "2.0.0",
+            "version": version,
         }
 
     # 静态文件 (前端)

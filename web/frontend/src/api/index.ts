@@ -148,6 +148,7 @@ export interface MarketResponse {
   macro?: MacroCard[];
   freshness?: { market: string; macro: string };
   pool_size?: number;
+  config?: Record<string, any>;
   updated?: string;
 }
 

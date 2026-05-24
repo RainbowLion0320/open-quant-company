@@ -26,8 +26,8 @@
       </nav>
 
       <div class="core-status">
-        <span>CORE</span>
-        <strong>{{ coreVersion }}</strong>
+        <span>BUILD</span>
+        <strong>{{ buildVersion }}</strong>
       </div>
     </aside>
 
@@ -136,7 +136,7 @@ const systemColor = computed(() => {
   if (systemHealth.value.ok_count === 0) return "var(--negative)";
   return "var(--warning)";
 });
-const coreVersion = computed(() => {
+const buildVersion = computed(() => {
   const version = (marketMeta.value.config as any)?.project?.version;
   return version ? `v${version}` : "v—";
 });

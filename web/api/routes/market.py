@@ -6,6 +6,7 @@ import pandas as pd
 from pathlib import Path
 
 from data.datahub import get_datahub
+from web.api.version import get_project_meta
 
 router = APIRouter(prefix="/api/market", tags=["Market"])
 
@@ -214,6 +215,9 @@ async def market_regime():
         "freshness": {
             "market": str(bench.iloc[-1]["date"])[:10] if len(bench) else "",
         },
+        "config": {
+            "project": get_project_meta(),
+        },
         "updated": datetime.now().strftime("%H:%M"),
     }
 
@@ -267,5 +271,8 @@ async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|Y
             "macro": max([m.get("date", "") for m in macro] or [""]),
         },
         "pool_size": orch.params.get("max_positions", 0),
+        "config": {
+            "project": get_project_meta(),
+        },
         "updated": datetime.now().strftime("%H:%M"),
     }
