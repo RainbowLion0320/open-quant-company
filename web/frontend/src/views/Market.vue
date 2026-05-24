@@ -68,7 +68,7 @@
                 :y2="chartY(tick)"
               />
             </g>
-            <g class="chart-lines">
+            <g class="chart-lines" :class="{ 'is-drawing': refreshing }">
               <path
                 v-for="line in relativeChart.lines"
                 :key="line.key"
@@ -658,6 +658,13 @@ onMounted(() => {
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.8s ease-out;
+}
+.chart-lines.is-drawing path {
+  transition: stroke-dashoffset 0s;
+  stroke-dashoffset: 1200;
 }
 .chart-y-labels,
 .chart-x-labels {
