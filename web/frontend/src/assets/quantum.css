@@ -259,9 +259,14 @@ html, body {
   font-weight: 650;
   letter-spacing: 0.02em;
 }
+.telemetry-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .telemetry-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(112px, auto));
+  grid-template-columns: repeat(3, minmax(112px, auto));
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   overflow: hidden;
@@ -270,14 +275,12 @@ html, body {
 .system-status {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 13px;
-  min-width: 96px;
   user-select: none;
+  cursor: default;
 }
 .status-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--dot-color, var(--positive));
   box-shadow: 0 0 6px var(--dot-color, var(--positive)), 0 0 14px var(--dot-color, var(--positive));
@@ -285,13 +288,7 @@ html, body {
 }
 @keyframes status-pulse {
   0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--dot-color), 0 0 14px var(--dot-color); }
-  50%      { opacity: 0.6; box-shadow: 0 0 3px var(--dot-color), 0 0 8px var(--dot-color); }
-}
-.status-label {
-  color: var(--text-disabled);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  50%      { opacity: 0.55; box-shadow: 0 0 3px var(--dot-color), 0 0 7px var(--dot-color); }
 }
 .telemetry-cell {
   min-width: 116px;
