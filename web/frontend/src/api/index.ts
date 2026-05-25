@@ -208,6 +208,22 @@ export interface StrategyStatusesResponse {
   status: string;
 }
 
+export interface StrategyGovernanceRole {
+  name: string;
+  layer: string;
+  primary_use: string;
+  description: string;
+  allow_paper: boolean;
+  allow_production: boolean;
+}
+
+export interface StrategyGovernanceResponse {
+  roles: StrategyGovernanceRole[];
+  stack: Record<string, string[]>;
+  promotion_rules: Record<string, Record<string, number>>;
+  status: string;
+}
+
 export interface StrategyDetailResponse {
   signals: StrategySignal[];
 }
@@ -433,6 +449,7 @@ export const api = {
   // Strategies
   strategies: () => get<StrategiesResponse>("/api/strategies"),
   strategyStatuses: () => get<StrategyStatusesResponse>("/api/strategies/statuses"),
+  strategyGovernance: () => get<StrategyGovernanceResponse>("/api/strategies/governance"),
   strategyDetail: (name: string) => get<StrategyDetailResponse>(`/api/strategies/${name}`),
   strategyRun: (strategy: string, limit = 0, params?: any) =>
     post<RunResponse>("/api/strategies/run", { strategy, limit, params }),

@@ -368,7 +368,7 @@ strategies:
     label: LightGBM ML
     runner: signals.ml_signals:compute_ml_signals
     signal_name: ml_lgbm
-    status: production
+    status: paper
 trading:
   commission:
     brokerage: 0.00025

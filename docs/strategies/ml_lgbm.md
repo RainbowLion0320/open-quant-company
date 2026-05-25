@@ -1,12 +1,14 @@
 # LightGBM ML
 
-- **状态**: production
+- **状态**: paper
 - **信号名**: ml_lgbm
 - **运行器**: `signals.ml_signals:compute_ml_signals`
 
 ## 概述
 
 基于 LightGBM 的机器学习选股策略。使用 PIT（Point-in-Time）特征切片训练，支持分市场状态（牛/熊/震荡）的 regime-aware 模型。每周六自动重训，日频预测。
+
+当前定位为辅助 Alpha，不直接作为 production 主策略。进入 production 前必须通过策略晋级门槛：足够 OOS 月数、交易次数、Sharpe、最大回撤、换手、IC 和 ICIR。
 
 ## 数据依赖
 

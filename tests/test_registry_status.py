@@ -79,13 +79,13 @@ class TestStatusRank:
 
 
 class TestCapabilityGates:
-    def test_production_can_run_paper(self):
+    def test_paper_strategy_can_run_paper(self):
         assert can_run_paper("ml_lgbm") is True
 
-    def test_production_can_run_production(self):
-        assert can_run_production("ml_lgbm") is True
+    def test_paper_strategy_cannot_run_production(self):
+        assert can_run_production("ml_lgbm") is False
 
-    def test_production_can_run_tournament(self):
+    def test_paper_strategy_can_run_tournament(self):
         assert can_run_tournament("ml_lgbm") is True
 
     def test_candidate_cannot_run_paper(self):

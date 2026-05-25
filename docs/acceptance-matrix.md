@@ -36,6 +36,8 @@
 | 2.8 | 策略插件注册表 (动态 import) | `data/strategy_plugins.py` | `test_architecture_contracts.py:test_enabled_strategy_plugins_have_runners` | `GET /strategies` → `Strategies.vue` | 新增策略只需改 yaml 配置 | OK | — |
 | 2.9 | Regime 自适应权重调整 | `signals/multifactor.py` | `test_sector_pipeline.py:test_regime_affects_market_score_but_not_industry` | — | bull/bear/sideways 三种 regime 下权重分布不同 | OK | — |
 | 2.10 | 行业动量因子集成 | `signals/multifactor.py:_industry_score()` | — | 多因子评分含 industry 维度, 组合敞口 API | 行业动量已纳入五维评分, detail 含 industry 分 | OK | — |
+| 2.11 | 策略研究治理和晋级门槛 | `research/strategy_governance.py` | `test_strategy_research_governance.py` | `GET /strategies/governance` → `Strategies.vue` | 四策略分层、paper/production 门槛、ML 默认为 paper | OK | — |
+| 2.12 | 因子研究诊断 | `signals/factor_research.py` | `test_strategy_research_governance.py:test_factor_diagnostics_rank_ic_quantile_spread_and_correlation_clusters` | — | 输出 IC/ICIR/分组收益 spread/相关性聚类 | OK | — |
 
 ## 3. 回测引擎 (Backtest Engine)
 
@@ -49,6 +51,7 @@
 | 3.6 | 回测结果可复现 | — | — | — | 同一数据+种子 → 同一结果 | OK | 待补回归测试 |
 | 3.7 | 可插拔回测流水线 | `backtest/pipeline.py` | — | — | 自定义 Pipeline 组合 Data/Strategy/Selection/Risk/Execution | OK | 待补自动化测试 |
 | 3.8 | 基准使用上证综指 (非个股) | `config/settings.yaml` backtest.benchmark | — | — | 确认 benchmark=sh000001 (非 000001) | OK (已修复) | — |
+| 3.9 | 约束组合构建 | `pipeline/portfolio.py:ConstrainedPortfolioConstructor` | `test_strategy_research_governance.py:test_constrained_portfolio_constructor_caps_sector_and_single_name_weight` | — | Top-N 同时受单票/行业/总仓位上限约束 | OK | — |
 
 ## 4. 执行层 (Execution Layer)
 

@@ -7,6 +7,7 @@ from pipeline.types import (
     FillResult,
     PipelineContext,
 )
+from pipeline.portfolio import ConstrainedPortfolioConstructor
 
 __all__ = [
     "AlphaSignal",
@@ -14,4 +15,5 @@ __all__ = [
     "OrderIntent",
     "FillResult",
     "PipelineContext",
+    "ConstrainedPortfolioConstructor",
 ]

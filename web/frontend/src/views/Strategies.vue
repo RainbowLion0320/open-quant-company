@@ -35,6 +35,26 @@
       暂无策略扫描结果
     </div>
 
+    <div v-if="governance" class="governance-panel glass-card">
+      <div class="governance-header">
+        <div>
+          <span>RESEARCH STACK</span>
+          <strong>策略研究分层</strong>
+        </div>
+        <div class="gate-chip">Paper gate: Sharpe ≥ {{ paperGateSharpe }} · MaxDD ≤ {{ paperGateDrawdown }}%</div>
+      </div>
+      <div class="role-grid">
+        <div v-for="role in governance.roles" :key="role.name" class="role-card">
+          <div class="role-title">
+            <span :style="{ background: colorFor(role.name) }"></span>
+            <strong>{{ labelFor(role.name) }}</strong>
+          </div>
+          <div class="role-layer">{{ layerLabel(role.layer) }}</div>
+          <p>{{ role.primary_use }}</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Strategy Cards -->
     <div v-for="s in store.strategies" :key="s.name" class="strategy-card glass-card glow-cyan animate-fade-in">
       <div class="flex items-center justify-between mb-3">
@@ -102,15 +122,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useStrategyStore } from "../stores";
-import { api } from "../api";
+import { api, type StrategyGovernanceResponse } from "../api";
 
 const store = useStrategyStore();
 const currentStrategy = ref("");
 const signals = ref<any[]>([]);
 const loaded = ref(false);
 const strategyStatuses = ref<Record<string, string>>({});
+const governance = ref<StrategyGovernanceResponse | null>(null);
 
 const STATUS_LABELS: Record<string, string> = {
   candidate: "候选",
@@ -130,6 +151,23 @@ const strategyColors: Record<string, string> = {
   ml_lgbm: "#7c3aed",
 };
 function colorFor(name: string) { return strategyColors[name] || "var(--accent)"; }
+function labelFor(name: string) {
+  return store.strategies.find(s => s.name === name)?.label || name;
+}
+function layerLabel(layer: string) {
+  return {
+    quality_filter: "质量过滤层",
+    primary_alpha: "主 Alpha",
+    auxiliary_alpha: "辅助 Alpha",
+    risk_overlay: "风险覆盖层",
+  }[layer] || layer;
+}
+
+const paperGateSharpe = computed(() => governance.value?.promotion_rules?.paper?.min_sharpe?.toFixed(2) || "0.50");
+const paperGateDrawdown = computed(() => {
+  const v = governance.value?.promotion_rules?.paper?.max_drawdown ?? 0.25;
+  return Math.round(v * 100);
+});
 
 async function toggleSignals(name: string) {
   if (currentStrategy.value === name) { currentStrategy.value = ""; signals.value = []; return; }
@@ -143,7 +181,7 @@ function runSingle(name: string) { store.run(name); }
 
 async function reload() {
   loaded.value = false;
-  try { await Promise.all([store.fetchList(), loadStatuses()]); }
+  try { await Promise.all([store.fetchList(), loadStatuses(), loadGovernance()]); }
   finally { loaded.value = true; }
 }
 
@@ -158,12 +196,80 @@ async function loadStatuses() {
   } catch {}
 }
 
+async function loadGovernance() {
+  try {
+    governance.value = await api.strategyGovernance();
+  } catch {
+    governance.value = null;
+  }
+}
+
 onMounted(reload);
 </script>
 
 <style scoped>
 .strategy-card {
   padding: 16px;
+}
+.governance-panel {
+  padding: 14px;
+}
+.governance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.governance-header span {
+  display: block;
+  color: var(--text-disabled);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.governance-header strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.gate-chip {
+  border: 1px solid rgba(0, 212, 255, 0.18);
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 5px 8px;
+}
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.role-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+  min-height: 96px;
+}
+.role-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.role-title span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+.role-layer {
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 11px;
+}
+.role-card p {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
 }
 .empty-panel {
   min-height: 120px;
@@ -173,6 +279,13 @@ onMounted(reload);
   font-size: 12px;
 }
 @media (max-width: 760px) {
+  .governance-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .role-grid {
+    grid-template-columns: 1fr;
+  }
   .strategy-card > div:first-child {
     align-items: flex-start;
     flex-direction: column;

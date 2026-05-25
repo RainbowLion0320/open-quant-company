@@ -214,3 +214,97 @@ class InverseVolatilityConstructor(PortfolioConstructor):
         if len(rets) < 10:
             return 0.30
         return float(rets.std() * np.sqrt(252))
+
+
+class ConstrainedPortfolioConstructor(PortfolioConstructor):
+    """Top-N constructor with single-name and sector exposure caps."""
+
+    def __init__(
+        self,
+        max_positions: int = 8,
+        position_pct: float = 0.80,
+        max_single_weight: float = 0.15,
+        max_sector_weight: float = 0.30,
+        sector_map: dict[str, str] | None = None,
+        lot_size: int = 100,
+    ):
+        self.max_positions = max_positions
+        self.position_pct = position_pct
+        self.max_single_weight = max_single_weight
+        self.max_sector_weight = max_sector_weight
+        self.sector_map = sector_map or {}
+        self.lot_size = lot_size
+
+    def construct(self, signals, ctx):
+        if not signals:
+            return []
+
+        total_equity = ctx.cash + sum(
+            ctx.holdings.get(sym, 0) * ctx.prices.get(sym, 0)
+            for sym in ctx.holdings
+        )
+        if total_equity <= 0:
+            return []
+
+        base_weight = min(self.max_single_weight, self.position_pct / max(self.max_positions, 1))
+        selected = []
+        sector_weights: dict[str, float] = {}
+        planned_weight = 0.0
+
+        for signal in signals:
+            if signal.direction != "buy":
+                continue
+            if len(selected) >= self.max_positions:
+                break
+            price = ctx.prices.get(signal.symbol, 0)
+            if price <= 0:
+                continue
+            sector = self.sector_map.get(signal.symbol) or f"unknown:{signal.symbol}"
+            if planned_weight + base_weight > self.position_pct + 1e-12:
+                break
+            if sector_weights.get(sector, 0.0) + base_weight > self.max_sector_weight + 1e-12:
+                continue
+            selected.append((signal, sector, base_weight))
+            sector_weights[sector] = sector_weights.get(sector, 0.0) + base_weight
+            planned_weight += base_weight
+
+        target_symbols = {signal.symbol for signal, _sector, _weight in selected}
+        current_symbols = set(ctx.holdings.keys())
+        targets: list[PortfolioTarget] = []
+
+        for signal, sector, weight in selected:
+            price = ctx.prices.get(signal.symbol, 0)
+            target_value = total_equity * weight
+            target_shares = max(0, int(target_value / price // self.lot_size) * self.lot_size)
+            current_vol = ctx.holdings.get(signal.symbol, 0)
+            current_w = (current_vol * price) / total_equity if total_equity > 0 else 0
+            display_sector = sector.split(":", 1)[0] if sector.startswith("unknown:") else sector
+            targets.append(PortfolioTarget(
+                symbol=signal.symbol,
+                strategy=signal.strategy,
+                target_weight=round(weight, 4),
+                target_shares=target_shares,
+                current_weight=round(current_w, 4),
+                current_shares=current_vol,
+                delta_shares=target_shares - current_vol,
+                reason=f"Constrained Top-{self.max_positions}; sector={display_sector}; cap={self.max_sector_weight:.0%}",
+            ))
+
+        for sym in current_symbols - target_symbols:
+            price = ctx.prices.get(sym, 0)
+            cur_vol = ctx.holdings.get(sym, 0)
+            if price <= 0 or cur_vol <= 0:
+                continue
+            cur_w = (cur_vol * price) / total_equity
+            targets.append(PortfolioTarget(
+                symbol=sym,
+                strategy="",
+                target_weight=0.0,
+                target_shares=0,
+                current_weight=round(cur_w, 4),
+                current_shares=cur_vol,
+                delta_shares=-cur_vol,
+                reason="Removed by constrained portfolio target",
+            ))
+
+        return targets

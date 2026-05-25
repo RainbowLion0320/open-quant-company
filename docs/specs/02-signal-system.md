@@ -4,12 +4,13 @@
 
 ## 1. 概述
 
-信号系统是量化策略的核心——从原始数据生成交易信号（买/卖/持有）。四种策略并行运行，每日输出信号到 `data/store/signals/{strategy}.parquet`，供回测引擎和执行层消费。
+信号系统是量化策略的核心——从原始数据生成交易信号（买/卖/持有）。四种策略仍可独立运行，但研究定位不再是简单平级：Buffett 是质量过滤层，Multifactor 是主 Alpha，ML 是辅助 Alpha，Cybernetic 是 regime 风险覆盖层。每日输出信号到 `data/store/signals/{strategy}.parquet`，供回测引擎和执行层消费。
 
 **设计原则：**
 - **策略独立性** — 每种策略可独立运行、独立回测、独立对比（锦标赛模式）
 - **可解释性** — 巴菲特策略输出自然语言判定理由，ML 策略输出特征重要性
 - **因子复用** — DSL 表达式引擎使因子可声明式组合，LLM 可发现新因子
+- **研究晋级** — 策略进入 paper / production 前必须通过 OOS、风险收益、IC/ICIR、换手和交易次数门槛
 
 ## 2. 组件架构
 
@@ -40,6 +41,11 @@
 │              Factor DSL Layer                         │
 │  expression.py — 声明式因子表达 (RSI/MA/MACD/Delta)   │
 │  dsl_parser.py — LLM 公式 → 可执行计算 + IC 检验      │
+└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│              Research Governance                     │
+│  research/strategy_governance.py — 策略分层 + 晋级门槛 │
+│  signals/factor_research.py — IC/ICIR/分组收益/相关性 │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -92,7 +98,7 @@
 
 ### 2.4 控制论自适应 (cybernetics/orchestrator.py)
 
-**核心理念：** 不预测市场方向，而是检测当前市场状态，据此调整策略参数。
+**核心理念：** 不作为独立主选股策略，而是检测当前市场状态，据此调整策略参数、仓位上限和资产配置风险预算。
 
 **Regime 检测：**
 - **Bull:** 价格 > MA5 > MA20 > MA60（月度 K 线判断，避免日频噪声）
@@ -106,7 +112,20 @@
 
 **市场广度：** 计算全市场 > MA20 的股票比例，作为辅助指标。
 
-### 2.5 因子 DSL (expression.py + dsl_parser.py)
+### 2.5 策略研究治理 (research/strategy_governance.py)
+
+四个内置策略的默认分层：
+
+| 策略 | 层级 | 主要用途 |
+|------|------|----------|
+| buffett | quality_filter | 过滤财务质量和估值陷阱 |
+| multifactor | primary_alpha | 主 Alpha 打分和横截面排序 |
+| ml_lgbm | auxiliary_alpha | 辅助 Alpha 和非线性关系捕捉 |
+| cybernetic | risk_overlay | 市场状态、仓位、风险预算和资产配置 |
+
+晋级到 paper / production 前需要通过 `evaluate_promotion()` 门槛：OOS 月数、交易次数、Sharpe、最大回撤、换手、IC、ICIR。ML 当前默认为 `paper` 状态，除非 OOS 和 IC 证据达标，否则不标记 production。
+
+### 2.6 因子 DSL (expression.py + dsl_parser.py)
 
 **表达式引擎：** 声明式因子定义，支持组合模式。
 
@@ -124,7 +143,15 @@ RSI14 = SMA(Max(Delta(Close(), 1), 0), 14) / SMA(Abs(Delta(Close(), 1)), 14) * 1
 
 **LLM 因子发现：** `dsl_parser.py` 解析 LLM 生成的公式文本 → 计算因子值 → IC 检验 → 报告结果。`scripts/factor_hypothesis.py` 批量运行因子假设检验。
 
-### 2.6 横截面排名 (selection.py)
+### 2.7 因子研究诊断 (signals/factor_research.py)
+
+因子上线前至少检查：
+
+- `rank_ic_by_period()`：按期横截面 Spearman IC。
+- `factor_diagnostics()`：mean IC、ICIR、正 IC 占比、分组收益 spread、单调性。
+- `factor_correlation_clusters()`：识别高度相关因子，避免重复暴露。
+
+### 2.8 横截面排名 (selection.py)
 
 **输入：** 各策略的原始评分 DataFrame（symbol × score）
 **输出：** 交易信号 `{symbol, strategy, signal (buy/sell/hold), score, rank}`

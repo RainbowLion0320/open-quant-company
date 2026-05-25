@@ -53,6 +53,19 @@ async def get_strategy_statuses():
     }
 
 
+@router.get("/governance")
+async def get_strategy_governance():
+    """Return strategy role layering and promotion gate definitions."""
+    from data.registry import list_strategy_names
+    from research.strategy_governance import governance_summary
+
+    summary = governance_summary(list_strategy_names())
+    return {
+        **summary,
+        "status": "ok",
+    }
+
+
 # ── 启动策略运行 ──────────────────────────────────────────
 
 @router.post("/run", response_model=StrategyRunResponse)
