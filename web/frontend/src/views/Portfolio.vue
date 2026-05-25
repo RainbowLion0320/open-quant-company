@@ -203,12 +203,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { api } from "../api";
-
-let echarts: any = null;
-async function getECharts() {
-  if (!echarts) echarts = await import("echarts");
-  return echarts;
-}
+import { getECharts } from "../charts/useECharts";
+import { fmtSignedPercentValue } from "../utils/format";
 
 interface Position {
   code: string; name: string; volume: number; avg_cost: number;
@@ -247,7 +243,7 @@ function fmtPnl(v: number | undefined) {
 }
 function fmtReturn(v: number | undefined) {
   if (v == null || v === 0) return "0.00%";
-  return (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+  return fmtSignedPercentValue(v);
 }
 async function loadAll() {
   loading.value = true;

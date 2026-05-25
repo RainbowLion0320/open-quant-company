@@ -14,7 +14,7 @@ Tushare moneyflow API: 每交易日一次调用, 返回全市场资金流向.
   python scripts/fetch_moneyflow_full.py --daily     # 日频 (4000天, 较慢)
   python scripts/fetch_moneyflow_full.py --days 60   # 最近60天
 """
-import sys, time, os
+import sys, time
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional
@@ -25,20 +25,15 @@ import numpy as np
 
 from data.datahub import get_datahub
 from data.symbols import CIRCLE_STOCKS
-from data.assets.stock import _to_ts_code
+from data.tushare_utils import get_tushare_token
 
 HUB = get_datahub()
-
-
-def get_token() -> str:
-    from data.tushare_utils import get_tushare_token
-    return get_tushare_token()
 
 
 def get_trade_calendar(start: str, end: str) -> list:
     """Get trading day list from Tushare."""
     import tushare as ts
-    api = ts.pro_api(get_token())
+    api = ts.pro_api(get_tushare_token())
     df = api.trade_cal(exchange="SSE", start_date=start, end_date=end)
     if df is None or len(df) == 0:
         return []
@@ -57,7 +52,7 @@ def fetch_moneyflow_date(trade_date: str, store_dir: Path) -> Optional[pd.DataFr
         return HUB.read_parquet(cache_path)
 
     import tushare as ts
-    api = ts.pro_api(get_token())
+    api = ts.pro_api(get_tushare_token())
 
     try:
         time.sleep(0.3)  # Rate limit ~200/min

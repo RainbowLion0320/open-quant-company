@@ -3,9 +3,10 @@
 from fastapi import APIRouter, Query
 import pandas as pd
 from pathlib import Path
-from typing import Any
 
 from data.datahub import get_datahub
+from web.api.serializers import safe_float, safe_int
+from web.api.services.snapshots import latest_hub_snapshot
 
 router = APIRouter(prefix="/api/sectors", tags=["Sectors"])
 
@@ -18,39 +19,7 @@ def _sector_store() -> Path:
 
 def _latest_snapshot(dimension: str, legacy_prefix: str) -> Path | None:
     """Find the latest registry-backed snapshot, with legacy flat-file fallback."""
-    try:
-        root = HUB.dimension_root(dimension)
-        if root.exists():
-            registry_candidates = sorted(root.glob("*.parquet"), reverse=True)
-            if registry_candidates:
-                return registry_candidates[0]
-    except Exception:
-        pass
-
-    store = _sector_store()
-    if not store.exists():
-        return None
-    legacy_candidates = sorted(store.glob(f"{legacy_prefix}*.parquet"), reverse=True)
-    return legacy_candidates[0] if legacy_candidates else None
-
-
-def _safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        n = float(value)
-        if pd.isna(n):
-            return default
-        return n
-    except Exception:
-        return default
-
-
-def _safe_int(value: Any, default: int = 0) -> int:
-    try:
-        if pd.isna(value):
-            return default
-        return int(value)
-    except Exception:
-        return default
+    return latest_hub_snapshot(HUB, dimension, _sector_store(), legacy_prefix)
 
 
 def _source_summary(sectors: list[dict]) -> str:
@@ -90,12 +59,12 @@ def sector_overview():
                 "sector_code": row.get("sector_code", ""),
                 "sector_name": row.get("sector_name", ""),
                 "rank": rank,
-                "return_1d": _safe_float(row.get("return_1d", 0)),
-                "return_5d": _safe_float(row.get("return_5d", 0)),
-                "return_20d": _safe_float(row.get("return_20d", 0)),
-                "return_60d": _safe_float(row.get("return_60d", 0)),
-                "volatility": _safe_float(row.get("volatility", 0)),
-                "member_count": _safe_int(row.get("member_count", 0)),
+                "return_1d": safe_float(row.get("return_1d", 0)),
+                "return_5d": safe_float(row.get("return_5d", 0)),
+                "return_20d": safe_float(row.get("return_20d", 0)),
+                "return_60d": safe_float(row.get("return_60d", 0)),
+                "volatility": safe_float(row.get("volatility", 0)),
+                "member_count": safe_int(row.get("member_count", 0)),
                 "data_source": str(row.get("data_source", "missing")),
             }
             # Strategy signals for this sector
@@ -105,10 +74,10 @@ def sector_overview():
                 for _, sr in sec_sigs.iterrows():
                     strategy = str(sr.get("strategy", ""))
                     sector_sigs[strategy] = {
-                        "total": _safe_int(sr.get("total", 0)),
-                        "buy_count": _safe_int(sr.get("buy_count", 0)),
-                        "buy_ratio": _safe_float(sr.get("buy_ratio", 0)),
-                        "avg_score": _safe_float(sr.get("avg_score", 0)),
+                        "total": safe_int(sr.get("total", 0)),
+                        "buy_count": safe_int(sr.get("buy_count", 0)),
+                        "buy_ratio": safe_float(sr.get("buy_ratio", 0)),
+                        "avg_score": safe_float(sr.get("avg_score", 0)),
                         "top_symbol": str(sr.get("top_symbol", "")),
                     }
             sector_data["signals"] = sector_sigs
@@ -163,9 +132,9 @@ def sector_exposure():
         exposure.append({
             "sector": row.get("sector", ""),
             "date": str(row.get("date", "")),
-            "weight": _safe_float(row.get("weight", 0)),
-            "market_value": _safe_float(row.get("market_value", 0)),
-            "position_count": _safe_int(row.get("position_count", 0)),
+            "weight": safe_float(row.get("weight", 0)),
+            "market_value": safe_float(row.get("market_value", 0)),
+            "position_count": safe_int(row.get("position_count", 0)),
         })
 
     return {
@@ -237,9 +206,9 @@ def sector_detail(industry: str):
             perf_row = {}
             for k, v in r.items():
                 if k == "member_count":
-                    perf_row[k] = _safe_int(v)
+                    perf_row[k] = safe_int(v)
                 elif k.startswith("return_") or k in {"volatility"}:
-                    perf_row[k] = _safe_float(v)
+                    perf_row[k] = safe_float(v)
                 else:
                     perf_row[k] = "" if pd.isna(v) else v
 
@@ -249,10 +218,10 @@ def sector_detail(industry: str):
         for _, sr in match.iterrows():
             strategy = str(sr.get("strategy", ""))
             signals[strategy] = {
-                "total": _safe_int(sr.get("total", 0)),
-                "buy_count": _safe_int(sr.get("buy_count", 0)),
-                "buy_ratio": _safe_float(sr.get("buy_ratio", 0)),
-                "avg_score": _safe_float(sr.get("avg_score", 0)),
+                "total": safe_int(sr.get("total", 0)),
+                "buy_count": safe_int(sr.get("buy_count", 0)),
+                "buy_ratio": safe_float(sr.get("buy_ratio", 0)),
+                "avg_score": safe_float(sr.get("avg_score", 0)),
                 "top_symbol": str(sr.get("top_symbol", "")),
             }
 

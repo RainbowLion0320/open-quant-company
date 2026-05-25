@@ -2,17 +2,16 @@
 消息推送模块 — 支持 Telegram / 企业微信 / 飞书
 配置: 星盘 config/notify.yaml 或环境变量
 """
-import os, json, yaml, requests
-from typing import List, Optional
+import os, requests
+from typing import List
 from datetime import datetime
+
+from core.settings import load_yaml_config
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "notify.yaml")
 
 def _load_config() -> dict:
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH) as f:
-            return yaml.safe_load(f) or {}
-    return {}
+    return load_yaml_config(CONFIG_PATH, default={})
 
 def _env(key: str, default: str = "") -> str:
     return os.environ.get(key, _load_config().get(key, default))

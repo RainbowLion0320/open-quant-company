@@ -9,7 +9,7 @@ import { ref, onUnmounted, type Ref } from "vue";
 let _echarts: any = null;
 const _chartInitTasks = new WeakMap<HTMLElement, Promise<any>>();
 
-async function loadECharts() {
+export async function getECharts() {
   if (!_echarts) {
     const mod = await import("echarts");
     _echarts = mod;
@@ -29,7 +29,7 @@ export function useECharts(elRef: Ref<HTMLElement | null>) {
     if (initTask) return initTask;
 
     initTask = (async () => {
-      const echarts = await loadECharts();
+      const echarts = await getECharts();
       const currentEl = elRef.value;
       if (!currentEl || instance.value) return;
 
@@ -138,18 +138,4 @@ export const QUANTUM_THEME = {
   },
 };
 
-/**
- * Format a decimal return to percentage string.
- * e.g. 0.2831 → "+28.31%"
- */
-export function fmtReturn(v: number): string {
-  return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%";
-}
-
-/**
- * Format a decimal to percentage string.
- * e.g. 0.15 → "15%"
- */
-export function fmtPct(v: number): string {
-  return v.toFixed(0) + "%";
-}
+export { fmtSignedRatioPct as fmtReturn, fmtConfigRatio as fmtPct } from "../utils/format";

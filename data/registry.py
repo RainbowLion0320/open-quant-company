@@ -7,9 +7,9 @@
 P2-12: 策略晋级制度 — 5 状态生命周期 (candidate→validated→paper→production→retired)
 """
 
-import yaml
-import os
 from typing import Dict, List, Optional
+
+from core.settings import get_settings
 
 _REGISTRY: Optional[List[Dict]] = None
 
@@ -37,11 +37,7 @@ STATUS_CAPABILITIES = {
 
 
 def _load_raw() -> dict:
-    config_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "config", "settings.yaml"
-    )
-    with open(config_path) as f:
-        return yaml.safe_load(f)
+    return get_settings()
 
 
 def load_registry(force_reload: bool = False) -> List[Dict]:

@@ -11,8 +11,8 @@
 from dataclasses import dataclass, field
 from typing import List, Tuple, Optional
 from enum import Enum
-import yaml
-import os
+
+from core.settings import get_section
 
 
 # ----- 配置加载 -----
@@ -22,9 +22,7 @@ _config = None
 def _load_config():
     global _config
     if _config is None:
-        path = os.path.join(os.path.dirname(__file__), "..", "config", "settings.yaml")
-        with open(path) as f:
-            _config = yaml.safe_load(f)["buffett"]
+        _config = get_section("buffett", {})
     return _config
 
 

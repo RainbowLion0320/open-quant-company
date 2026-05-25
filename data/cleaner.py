@@ -27,7 +27,8 @@ import pandas as pd
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, field
 from pathlib import Path
-import yaml
+
+from core.settings import get_settings, get_section
 
 
 @dataclass
@@ -335,13 +336,11 @@ class DataCleaner:
     """
 
     def __init__(self, config_path: Optional[Path] = None):
-        if config_path is None:
-            config_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
-
-        with open(config_path) as f:
-            cfg = yaml.safe_load(f)
-
-        clean_cfg = cfg.get("data_cleaning", {})
+        clean_cfg = (
+            get_settings(config_path).get("data_cleaning", {})
+            if config_path is not None
+            else get_section("data_cleaning", {})
+        )
         self._ohlcv_rules: List[CleanRule] = []
         self._feature_rules: List[CleanRule] = []
 

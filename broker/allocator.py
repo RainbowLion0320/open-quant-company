@@ -12,9 +12,9 @@ Allocator 动态覆盖 config 静态权重。
 """
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
-import os
-import yaml
 from pathlib import Path
+
+from core.settings import get_settings, resolve_settings_path
 
 
 import copy
@@ -63,23 +63,7 @@ REGIME_WEIGHTS_DEFAULT = {
 
 
 def _default_settings_path() -> Path:
-    root = os.environ.get("ASTROLABE_HOME") or os.environ.get("XINGPAN_HOME") or os.environ.get("QUANT_AGENT_HOME")
-    if root:
-        return Path(root).expanduser() / "config" / "settings.yaml"
-
-    repo_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
-    if repo_path.exists():
-        return repo_path
-
-    legacy_path = Path("~/quant-agent/config/settings.yaml").expanduser()
-    if legacy_path.exists():
-        return legacy_path
-
-    xingpan_path = Path("~/xingpan/config/settings.yaml").expanduser()
-    if xingpan_path.exists():
-        return xingpan_path
-
-    return Path("~/astrolabe-quant/config/settings.yaml").expanduser()
+    return resolve_settings_path()
 
 
 class AssetAllocator:
@@ -93,8 +77,7 @@ class AssetAllocator:
     def _load_config(self):
         """Load regime weights from config if available."""
         try:
-            with open(self._config_path) as f:
-                cfg = yaml.safe_load(f) or {}
+            cfg = get_settings(self._config_path)
             alloc_cfg = cfg.get("asset_allocation", {})
             rw = alloc_cfg.get("regime_weights", {})
             for regime, weights in rw.items():

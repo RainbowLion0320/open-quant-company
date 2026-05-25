@@ -4,21 +4,16 @@
 所有策略参数从 config/settings.yaml 读取，不做硬编码。
 """
 
-import yaml
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
+from core.settings import get_section
 
 # ── 加载配置 ──
-_PROJECT = Path(__file__).resolve().parent.parent
-_CFG_PATH = _PROJECT / "config" / "settings.yaml"
-
 def _load_backtest_config() -> dict:
-    with open(_CFG_PATH) as f:
-        return yaml.safe_load(f).get("backtest", {})
+    return get_section("backtest", {}) or {}
 
 _BC = _load_backtest_config()
 _PC = _BC.get("pipeline", {})

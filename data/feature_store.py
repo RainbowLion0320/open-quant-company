@@ -14,7 +14,6 @@ Point-in-Time 特征存储
   builder.build_month("2020-01")
   builder.build_all("2015-01", "2026-05")
 """
-import os
 from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -23,6 +22,7 @@ import pandas as pd
 import numpy as np
 
 from data.datahub import get_datahub
+from data.symbol_utils import to_ts_code
 from signals.expression import Factor, alpha_factors
 
 
@@ -232,7 +232,7 @@ def enrich_from_registry(
 
             if mf_df is not None and len(mf_df) > 0:
                 for sym in symbols:
-                    ts_code = _to_ts_code_n(sym)
+                    ts_code = to_ts_code(sym)
                     row_match = mf_df[mf_df["ts_code"] == ts_code]
                     if len(row_match) > 0:
                         row = row_match.iloc[0]
@@ -332,15 +332,3 @@ def enrich_from_registry(
             pass
 
     return df
-
-
-def _to_ts_code_n(symbol: str) -> str:
-    """Convert 000001 → 000001.SZ"""
-    if "." in symbol:
-        return symbol
-    code = symbol.zfill(6)
-    if code.startswith(("0", "3")):
-        return f"{code}.SZ"
-    if code.startswith(("6", "9")):
-        return f"{code}.SH"
-    return ""

@@ -3,7 +3,7 @@ ML 信号计算 — 用训练好的 LightGBM 模型生成每日买卖信号
 
 集成到 compute_signals.py: 跟巴菲特/多因子/控制论并列运行
 """
-import sys, os, pickle, json
+import sys, pickle, json
 from pathlib import Path
 from typing import List, Dict
 
@@ -17,18 +17,11 @@ from signals.expression import alpha_factors
 from signals.selection import apply_ranked_buys
 from models import MODEL_DIR
 from data.feature_store import FEATURES_DIR
-
-
-ROOT = Path(__file__).resolve().parent.parent
+from core.settings import get_settings
 
 
 def _load_settings() -> dict:
-    try:
-        import yaml
-        with open(ROOT / "config" / "settings.yaml") as f:
-            return yaml.safe_load(f) or {}
-    except Exception:
-        return {}
+    return get_settings()
 
 
 def _current_regime() -> str:

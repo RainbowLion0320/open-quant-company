@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import os
 import secrets
-import yaml
 from pathlib import Path
 
+from core.settings import load_yaml_config, resolve_settings_path
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -27,15 +27,11 @@ from starlette.responses import JSONResponse
 # ── Config path resolution ──
 
 def _settings_path() -> Path:
-    return Path(__file__).resolve().parent.parent.parent / "config" / "settings.yaml"
+    return resolve_settings_path()
 
 
 def _read_settings() -> dict:
-    path = _settings_path()
-    if not path.exists():
-        return {}
-    with open(path) as f:
-        return yaml.safe_load(f) or {}
+    return load_yaml_config(_settings_path(), default={})
 
 
 # ── API Key management ──

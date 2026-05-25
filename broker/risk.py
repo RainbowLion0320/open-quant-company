@@ -22,7 +22,7 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
+from core.settings import get_settings, get_section
 
 
 @dataclass
@@ -183,13 +183,11 @@ class RiskManager:
     """
 
     def __init__(self, config_path: Optional[Path] = None):
-        if config_path is None:
-            config_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
-
-        with open(config_path) as f:
-            cfg = yaml.safe_load(f)
-
-        risk_cfg = cfg.get("risk_control", {})
+        risk_cfg = (
+            get_settings(config_path).get("risk_control", {})
+            if config_path is not None
+            else get_section("risk_control", {})
+        )
         self._rules: List[RiskRule] = []
         self._daily_order_count: int = 0
         self._last_reset_date: str = ""

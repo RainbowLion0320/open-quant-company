@@ -25,17 +25,13 @@
 from __future__ import annotations
 import sys
 import os
-from pathlib import Path
 from datetime import date
 from typing import Dict, List, Tuple, Optional
 import argparse
 
 import pandas as pd
-import yaml
 
-# 项目根
-ROOT = Path(__file__).resolve().parent.parent
-
+from core.settings import get_settings
 from broker import PaperBroker
 from broker.persistence import (
     load_state, save_state, append_nav, append_trade,
@@ -50,9 +46,7 @@ HUB = get_datahub()
 # ── 配置 ──
 
 def load_config() -> dict:
-    cfg_path = ROOT / "config" / "settings.yaml"
-    with open(cfg_path) as f:
-        return yaml.safe_load(f)
+    return get_settings()
 
 
 # ── 价格获取 ──

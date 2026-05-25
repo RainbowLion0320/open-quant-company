@@ -17,7 +17,6 @@ Usage:
 """
 
 import os, sys, json, time, argparse
-from pathlib import Path
 from datetime import datetime
 
 # Proxy bypass
@@ -30,12 +29,10 @@ os.environ['no_proxy'] = '*'
 import socket
 socket.setdefaulttimeout(30)
 
-PROJECT = Path(__file__).resolve().parent.parent
-
 import pandas as pd
 import numpy as np
-import yaml
 
+from core.settings import get_section
 from data.results_db import (
     save_buffett_results, save_strategy_signals,
     load_buffett_results, load_strategy_signals,
@@ -43,6 +40,7 @@ from data.results_db import (
 )
 from data.datahub import get_datahub
 from signals.ml_signals import compute_ml_signals as compute_ml
+from signals.scoring import estimate_buffett_score
 from signals.selection import apply_ranked_buys
 
 HUB = get_datahub()
@@ -153,7 +151,7 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
 
             tech = _get_technical_factors(sym)
             factors = {
-                "buffett_score": br.score if br.score > 0 else _estimate_buffett_score(inputs),
+                "buffett_score": br.score if br.score > 0 else estimate_buffett_score(inputs),
                 "safety_margin": br.safety_margin_pct,
                 "roe_5y": (sum(inputs.get("roe_history", [0])[-5:]) / max(1, len(inputs.get("roe_history", [0])[-5:]))) if inputs.get("roe_history") else 0,
                 "roe_trend": _roe_trend(inputs.get("roe_history", [])),
@@ -201,18 +199,9 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
 
 def MFC_BUY_THRESHOLD() -> float:
     try:
-        with open(PROJECT / "config" / "settings.yaml") as f:
-            cfg = yaml.safe_load(f) or {}
-        return float(cfg.get("signals", {}).get("multifactor", {}).get("buy_threshold", 52))
+        return float(get_section("signals.multifactor.buy_threshold", 52))
     except Exception:
         return 52.0
-
-
-def _estimate_buffett_score(inputs: dict) -> float:
-    """从财务指标估算巴菲特评分 (0-100)"""
-    roe = (sum(inputs.get("roe_history", [0])[-5:]) / max(1, len(inputs.get("roe_history", [0])[-5:])))
-    score = min(100, roe * 500)  # 15% ROE → 75分
-    return score
 
 
 def _roe_trend(history: list) -> str:
@@ -392,11 +381,7 @@ def main():
 def notify_signals(strategies: list[dict]):
     """检测信号变更，只推送有变化的股票，发送到Telegram"""
     try:
-        import yaml
-        cfg_path = PROJECT / "config" / "settings.yaml"
-        with open(cfg_path) as f:
-            cfg = yaml.safe_load(f)
-        notify_cfg = cfg.get("trading", {}).get("notification", {})
+        notify_cfg = get_section("trading.notification", {}) or {}
         if not notify_cfg.get("enabled", False):
             print("\n📵 通知已关闭 (trading.notification.enabled=false)")
             return

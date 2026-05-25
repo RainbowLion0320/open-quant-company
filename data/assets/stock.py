@@ -14,6 +14,7 @@ from data.assets.base import AssetAdapter
 from data.fetcher import get_stock_daily
 from data.financials import _parse_pct, _parse_financial_number
 from data.symbols import CIRCLE_STOCKS, SYMBOL_NAME, SYMBOL_INDUSTRY, SYMBOL_SECTOR
+from data.symbol_utils import to_ts_code
 from data.tushare_utils import get_tushare_token
 
 
@@ -74,7 +75,7 @@ class StockAsset(AssetAdapter):
         if not token:
             return {}
 
-        ts_code = _to_ts_code(symbol)
+        ts_code = to_ts_code(symbol)
         if not ts_code:
             return {}
 
@@ -113,15 +114,3 @@ class StockAsset(AssetAdapter):
         from data.fetchers.moneyflow import MoneyflowFetcher
         mf = MoneyflowFetcher()
         return mf.get_latest(symbol)
-
-
-def _to_ts_code(symbol: str) -> str:
-    """Convert 000001 → 000001.SZ, 600001 → 600001.SH"""
-    if "." in symbol:
-        return symbol
-    code = symbol.zfill(6)
-    if code.startswith(("0", "3")):
-        return f"{code}.SZ"
-    if code.startswith(("6", "9")):
-        return f"{code}.SH"
-    return ""

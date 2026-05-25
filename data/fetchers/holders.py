@@ -16,14 +16,10 @@ import pandas as pd
 import numpy as np
 
 from data.datahub import get_datahub
-from data.assets.stock import _to_ts_code
+from data.fetchers.base import get_tushare_token
+from data.symbol_utils import to_ts_code
 
 HUB = get_datahub()
-
-
-def get_token() -> str:
-    from data.tushare_utils import get_tushare_token
-    return get_tushare_token()
 
 
 class HolderFetcher:
@@ -45,8 +41,8 @@ class HolderFetcher:
                 pass
 
         import tushare as ts
-        api = ts.pro_api(get_token())
-        ts_code = _to_ts_code(symbol)
+        api = ts.pro_api(get_tushare_token())
+        ts_code = to_ts_code(symbol)
         if not ts_code:
             return None
 
@@ -105,8 +101,8 @@ class HolderTradeFetcher:
                 pass
 
         import tushare as ts
-        api = ts.pro_api(get_token())
-        ts_code = _to_ts_code(symbol)
+        api = ts.pro_api(get_tushare_token())
+        ts_code = to_ts_code(symbol)
         if not ts_code:
             return None
 

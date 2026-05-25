@@ -4,6 +4,8 @@ import os
 import yaml
 from fastapi import APIRouter, HTTPException, Request
 
+from core.settings import clear_settings_cache, resolve_settings_path
+
 router = APIRouter(prefix="/api/settings", tags=["Settings"])
 
 
@@ -11,10 +13,7 @@ router = APIRouter(prefix="/api/settings", tags=["Settings"])
 
 def _config_path() -> str:
     """获取 config/settings.yaml 的绝对路径"""
-    return os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-        "config", "settings.yaml",
-    )
+    return str(resolve_settings_path())
 
 
 def _read_config() -> dict:
@@ -41,6 +40,7 @@ def _write_config(data: dict):
     try:
         with open(path, "w") as f:
             yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        clear_settings_cache()
     except Exception:
         # 写入失败时恢复备份
         if os.path.exists(bak):

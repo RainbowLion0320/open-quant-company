@@ -130,12 +130,9 @@ def create_buffett_real_scorer(pool):
 
 if __name__ == "__main__":
     """独立运行: 预热财务缓存 + 测试"""
+    from core.settings import get_section
     from data.symbols import CIRCLE_STOCKS
-    import yaml
-    cfg_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
-    with open(cfg_path) as f:
-        cfg = yaml.safe_load(f)
-    pool_size = cfg.get("backtest", {}).get("pool_size", 0)
+    pool_size = (get_section("backtest", {}) or {}).get("pool_size", 0)
     pool = list(CIRCLE_STOCKS)
     if pool_size > 0:
         pool = pool[:pool_size]

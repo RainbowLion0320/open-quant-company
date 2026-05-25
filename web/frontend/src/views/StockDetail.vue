@@ -93,6 +93,7 @@ import { ref, watch, onMounted, computed, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import { api } from "../api";
 import { useECharts, QUANTUM_THEME } from "../charts/useECharts";
+import { fmtRatioPct, isBlankNumber } from "../utils/format";
 import type { StockDetail } from "../api";
 
 const route = useRoute();
@@ -160,11 +161,11 @@ function renderKline() {
 }
 
 function fmtPctValue(v: number | undefined | null) {
-  return v == null || Number.isNaN(Number(v)) ? "—" : `${(Number(v) * 100).toFixed(1)}%`;
+  return fmtRatioPct(v, 1);
 }
 
 function fmtNumber(v: number | undefined | null, digits = 2) {
-  return v == null || Number.isNaN(Number(v)) ? "—" : Number(v).toFixed(digits);
+  return isBlankNumber(v) ? "—" : Number(v).toFixed(digits);
 }
 
 onMounted(load);

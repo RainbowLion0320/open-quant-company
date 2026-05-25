@@ -207,6 +207,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { api, type SystemMonitor } from "../api";
+import { fmtPercentValue, fmtShortCount } from "../utils/format";
 
 const monitor = ref<SystemMonitor | null>(null);
 const monitorError = ref("");
@@ -328,17 +329,14 @@ async function fetchApiHealth() {
 }
 
 function fmtNum(n: number): string {
-  if (n > 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n > 1_000) return (n / 1_000).toFixed(1) + "K";
-  return String(Math.round(n));
+  return fmtShortCount(n);
 }
 function fmtGb(v: number | undefined | null): string {
   if (v == null || Number.isNaN(Number(v))) return "— GB";
   return `${Number(v).toFixed(1)} GB`;
 }
 function fmtPercent(v: number | undefined | null): string {
-  if (v == null || Number.isNaN(Number(v))) return "—%";
-  return `${Number(v).toFixed(1)}%`;
+  return fmtPercentValue(v);
 }
 function pctWidth(v: number | undefined | null): string {
   return `${Math.max(0, Math.min(100, Number(v || 0)))}%`;

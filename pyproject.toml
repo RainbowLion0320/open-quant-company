@@ -34,6 +34,7 @@ build-backend = "setuptools.build_meta"
 include = [
     "backtest*",
     "broker*",
+    "core*",
     "cybernetics*",
     "data*",
     "models*",

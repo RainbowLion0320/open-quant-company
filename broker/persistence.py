@@ -22,8 +22,8 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import date as DateType, datetime
 from typing import Dict, List, Optional
-import os
 
+from core.settings import get_section
 from data.datahub import get_datahub
 
 # ── 默认路径 (可在 settings.yaml 覆盖) ──
@@ -34,17 +34,12 @@ STORE_DIR = HUB.paper_dir()
 def _resolve_store() -> Path:
     """读取 config/settings.yaml 的 paper_trading.store_dir, 兜底为默认"""
     try:
-        import yaml
-        cfg_path = HUB.project_root / "config" / "settings.yaml"
-        if cfg_path.exists():
-            with open(cfg_path) as f:
-                cfg = yaml.safe_load(f)
-            pt = cfg.get("paper_trading", {})
-            custom = pt.get("store_dir")
-            if custom:
-                path = HUB.resolve_path(custom)
-                path.mkdir(parents=True, exist_ok=True)
-                return path
+        pt = get_section("paper_trading", {}) or {}
+        custom = pt.get("store_dir")
+        if custom:
+            path = HUB.resolve_path(custom)
+            path.mkdir(parents=True, exist_ok=True)
+            return path
     except Exception:
         pass
     STORE_DIR.mkdir(parents=True, exist_ok=True)

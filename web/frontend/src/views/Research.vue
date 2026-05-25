@@ -16,25 +16,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { useRoute } from "vue-router";
 import SectionTabs from "../components/SectionTabs.vue";
+import { useModuleTabs } from "../composables/useModuleTabs";
 import Sectors from "./Sectors.vue";
 import Stocks from "./Stocks.vue";
-
-const route = useRoute();
 
 const tabs = [
   { key: "sectors", label: "行业雷达", meta: "Sector rotation" },
   { key: "stocks", label: "个股搜索", meta: "Stock research" },
 ];
 
-const activeTab = computed(() => {
-  const tab = typeof route.query.tab === "string" ? route.query.tab : "";
-  return tabs.some(item => item.key === tab) ? tab : "sectors";
+const { activeComponent } = useModuleTabs(tabs, "sectors", {
+  sectors: Sectors,
+  stocks: Stocks,
 });
-
-const activeComponent = computed(() => activeTab.value === "stocks" ? Stocks : Sectors);
 </script>
 
 <style scoped>

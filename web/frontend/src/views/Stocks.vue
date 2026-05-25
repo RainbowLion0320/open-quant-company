@@ -112,6 +112,7 @@
 import { ref, computed } from "vue";
 import { api } from "../api";
 import type { StockDetail } from "../api";
+import { fmtRatioPct } from "../utils/format";
 
 const query = ref("");
 const stock = ref<StockDetail | null>(null);
@@ -119,7 +120,7 @@ const searched = ref(false);
 const loading = ref(false);
 const error = ref("");
 
-function fmtPct(v: number | undefined) { return v != null ? (v * 100).toFixed(1) + "%" : "—"; }
+function fmtPct(v: number | undefined) { return fmtRatioPct(v, 1); }
 
 const marketBadge = computed(() => {
   const m = stock.value?.basic.market;

@@ -67,13 +67,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { api } from "../api";
-import { fmtReturn, QUANTUM_THEME } from "../charts/useECharts";
-
-let echarts: any = null;
-async function getECharts() {
-  if (!echarts) echarts = await import("echarts");
-  return echarts;
-}
+import { fmtReturn, getECharts, QUANTUM_THEME } from "../charts/useECharts";
 
 const overview = ref<any>({});
 const strategyList = ref<Array<{ key: string; label: string; color: string }>>([]);

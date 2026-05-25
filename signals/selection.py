@@ -8,13 +8,9 @@ hold rows for observability in Web and history views.
 from __future__ import annotations
 
 from math import ceil
-from pathlib import Path
 from typing import Iterable, List
 
-import yaml
-
-
-ROOT = Path(__file__).resolve().parent.parent
+from core.settings import get_settings
 
 DEFAULT_SELECTION = {
     "top_pct": 0.05,
@@ -26,12 +22,7 @@ DEFAULT_SELECTION = {
 
 
 def _load_config() -> dict:
-    path = ROOT / "config" / "settings.yaml"
-    try:
-        with open(path) as f:
-            cfg = yaml.safe_load(f) or {}
-    except Exception:
-        cfg = {}
+    cfg = get_settings()
     merged = dict(DEFAULT_SELECTION)
     merged.update(cfg.get("signal_selection", {}) or {})
     merged["strategies"] = {

@@ -173,6 +173,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, onMounted } from "vue";
 import { api } from "../api";
+import { fmtConfigRatio } from "../utils/format";
 
 const settings = reactive<Record<string, any>>({});
 const showConfirm = ref(false);
@@ -231,8 +232,7 @@ const sourceItems = computed(() => {
 });
 
 function fmtPct(v: number | undefined): string {
-  if (v == null) return '—';
-  return `${(v * 100).toFixed(0)}%`;
+  return fmtConfigRatio(v);
 }
 function fmtAuditTime(ts: string): string {
   if (!ts) return '—';

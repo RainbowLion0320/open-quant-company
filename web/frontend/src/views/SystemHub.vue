@@ -15,14 +15,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { useRoute } from "vue-router";
 import SectionTabs from "../components/SectionTabs.vue";
+import { useModuleTabs } from "../composables/useModuleTabs";
 import ActivityMonitor from "./ActivityMonitor.vue";
 import Settings from "./Settings.vue";
 import HindsightGraph from "./HindsightGraph.vue";
-
-const route = useRoute();
 
 const tabs = [
   { key: "monitor", label: "系统信息", meta: "Read-only ops", description: "只读观测系统资源、API 健康、任务计划和服务状态" },
@@ -30,18 +27,11 @@ const tabs = [
   { key: "hindsight", label: "记忆图谱", meta: "AI memory", description: "加载 Hindsight 记忆节点，检查经验、观察和实体关系" },
 ];
 
-const activeTab = computed(() => {
-  const tab = typeof route.query.tab === "string" ? route.query.tab : "";
-  return tabs.some(item => item.key === tab) ? tab : "monitor";
-});
-
-const componentMap = {
+const { activeComponent } = useModuleTabs(tabs, "monitor", {
   monitor: ActivityMonitor,
   settings: Settings,
   hindsight: HindsightGraph,
-};
-
-const activeComponent = computed(() => componentMap[activeTab.value as keyof typeof componentMap] || ActivityMonitor);
+});
 </script>
 
 <style scoped>

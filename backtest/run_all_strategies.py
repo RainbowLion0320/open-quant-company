@@ -13,22 +13,19 @@ os.environ['no_proxy'] = '*'
 
 import pandas as pd
 import numpy as np
-import yaml
 from datetime import datetime
 
+from core.settings import get_settings
 from data.fetcher import get_stock_daily, get_index_daily
 from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
 from backtest.analytics import RiskAnalytics
+from signals.scoring import estimate_buffett_score
 
 DATA_DIR = ROOT / "data"
 
 
 def _settings() -> dict:
-    try:
-        with open(ROOT / "config" / "settings.yaml") as f:
-            return yaml.safe_load(f) or {}
-    except Exception:
-        return {}
+    return get_settings()
 
 
 def load_prices(pool, start, end):
@@ -300,12 +297,6 @@ buffett_scorer.should_rebalance = _buffett_rebal
 _multifactor_fin_cache = {}
 
 
-def _estimate_buffett_score(inputs: dict) -> float:
-    """从财务指标估算巴菲特评分 (0-100)"""
-    roe = (sum(inputs.get("roe_history", [0])[-5:]) / max(1, len(inputs.get("roe_history", [0])[-5:])))
-    return min(100, roe * 500)
-
-
 def _get_multifactor_fin_inputs(sym, ind):
     """缓存式获取财务数据，首次拉取后复用"""
     cache_key = sym
@@ -358,10 +349,10 @@ def multifactor_scorer(sym, series, idx, regime):
         try:
             from signals.buffett import buffett_filter
             br = buffett_filter(current_price=current_price, **inputs)
-            buffett_score = br.score if br.score > 0 else _estimate_buffett_score(inputs)
+            buffett_score = br.score if br.score > 0 else estimate_buffett_score(inputs)
             safety_margin = br.safety_margin_pct
         except Exception:
-            buffett_score = _estimate_buffett_score(inputs)
+            buffett_score = estimate_buffett_score(inputs)
     roe_5y = (sum(inputs.get("roe_history", [0.08])[-5:]) / max(1, len(inputs.get("roe_history", [0.08])[-5:]))) if inputs else 0.08
 
     from signals.multifactor import MultiFactorScorer
@@ -574,11 +565,7 @@ if __name__ == "__main__":
     _args = _parser.parse_args()
     _use_pipeline = _args.pipeline or not _args.legacy  # default to pipeline
 
-    import yaml
-    cfg_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
-    with open(cfg_path) as f:
-        cfg = yaml.safe_load(f)
-    bt_cfg = cfg.get("backtest", {})
+    bt_cfg = _settings().get("backtest", {})
     pool_size = bt_cfg.get("pool_size", 0)
     pool = list(CIRCLE_STOCKS)
     if pool_size > 0:

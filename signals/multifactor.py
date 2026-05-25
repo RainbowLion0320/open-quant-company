@@ -8,14 +8,11 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
-from pathlib import Path
-import yaml
+from core.settings import get_settings
 
 
 def _load_config() -> dict:
-    config_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
-    with open(config_path) as f:
-        return yaml.safe_load(f)
+    return get_settings()
 
 
 CONFIG = _load_config()

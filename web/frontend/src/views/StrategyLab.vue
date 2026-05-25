@@ -15,14 +15,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { useRoute } from "vue-router";
 import SectionTabs from "../components/SectionTabs.vue";
+import { useModuleTabs } from "../composables/useModuleTabs";
 import Strategies from "./Strategies.vue";
 import Signals from "./Signals.vue";
 import Backtest from "./Backtest.vue";
-
-const route = useRoute();
 
 const tabs = [
   { key: "strategies", label: "策略中心", meta: "Run & inspect", description: "查看四类策略状态、运行扫描，并下钻最新候选信号" },
@@ -30,18 +27,11 @@ const tabs = [
   { key: "backtest", label: "回测分析", meta: "Tournament", description: "对比策略收益、风险、回撤和相对上证基准表现" },
 ];
 
-const activeTab = computed(() => {
-  const tab = typeof route.query.tab === "string" ? route.query.tab : "";
-  return tabs.some(item => item.key === tab) ? tab : "strategies";
-});
-
-const componentMap = {
+const { activeComponent } = useModuleTabs(tabs, "strategies", {
   strategies: Strategies,
   signals: Signals,
   backtest: Backtest,
-};
-
-const activeComponent = computed(() => componentMap[activeTab.value as keyof typeof componentMap] || Strategies);
+});
 </script>
 
 <style scoped>

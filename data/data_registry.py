@@ -10,11 +10,12 @@ Like StrategyRegistry: single source of truth for what data exists.
   dims = reg.get_enabled()  # 所有已启用的维度
   reg.get("holder_number")  # 单个维度详情
 """
-import yaml
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
+
+from core.settings import get_section
 
 
 ALLOWED_SOURCES = {"akshare", "tushare_free", "tushare_paid", "future", "computed", "system"}
@@ -174,11 +175,8 @@ class DataRegistry:
         self._load()
 
     def _load(self):
-        cfg_path = Path(__file__).resolve().parent.parent / "config" / "settings.yaml"
-        with open(cfg_path) as f:
-            cfg = yaml.safe_load(f)
-
-        for key, info in cfg.get("data_registry", {}).items():
+        registry_cfg = get_section("data_registry", {}) or {}
+        for key, info in registry_cfg.items():
             health = info.get("health", {}) or {}
             freq = info.get("freq", "daily")
             status = info.get("status", "planned")

@@ -17,13 +17,9 @@ from datetime import datetime, timedelta
 import pandas as pd
 import tushare as ts
 from data.datahub import get_datahub
+from data.tushare_utils import get_tushare_token
 
 HUB = get_datahub()
-
-
-def get_token() -> str:
-    from data.tushare_utils import get_tushare_token
-    return get_tushare_token()
 
 
 def fetch_limit_list(force: bool = False):
@@ -31,7 +27,7 @@ def fetch_limit_list(force: bool = False):
     拉取最新一天的涨跌停数据。
     1次/小时限流 → 每次只拉1天。
     """
-    api = ts.pro_api(get_token())
+    api = ts.pro_api(get_tushare_token())
     store = HUB.store_dir("stock") / "limit_list"
     store.mkdir(parents=True, exist_ok=True)
 
@@ -65,7 +61,7 @@ def fetch_limit_list(force: bool = False):
 
 def fetch_research_report(force: bool = False):
     """拉取最近一个月的研报数据。"""
-    api = ts.pro_api(get_token())
+    api = ts.pro_api(get_tushare_token())
     store = HUB.store_dir("stock") / "research_report"
     store.mkdir(parents=True, exist_ok=True)
 

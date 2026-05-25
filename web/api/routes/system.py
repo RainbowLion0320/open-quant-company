@@ -390,10 +390,9 @@ async def api_health():
 
     # Telegram — config in notify.yaml (flat keys)
     try:
+        from core.settings import load_yaml_config
         cfg_path = Path(__file__).resolve().parent.parent.parent.parent / "config" / "notify.yaml"
-        import yaml
-        with open(cfg_path) as f:
-            cfg = yaml.safe_load(f) or {}
+        cfg = load_yaml_config(cfg_path, default={})
         if cfg.get("TELEGRAM_BOT_TOKEN") and cfg.get("TELEGRAM_CHAT_ID"):
             results.append({"name": "Telegram", "status": "ok", "detail": f"已配置 (chat_id={cfg['TELEGRAM_CHAT_ID']})"})
         elif cfg.get("TELEGRAM_BOT_TOKEN") or cfg.get("TELEGRAM_CHAT_ID"):

@@ -153,6 +153,7 @@ import type {
   SectorCard,
   SectorStocksResponse,
 } from "../api";
+import { colorBySignedRatio, fmtRatioPct as fmtPct } from "../utils/format";
 
 const loading = ref(false);
 const error = ref("");
@@ -193,14 +194,8 @@ const activeDetail = computed(() => {
   return overview.value.sectors.find(s => s.sector_code === activeSector.value) || null;
 });
 
-function fmtPct(v: number) {
-  return (v * 100).toFixed(2) + "%";
-}
-
 function colorPct(v: number) {
-  if (v > 0.005) return "var(--positive)";
-  if (v < -0.005) return "var(--negative)";
-  return "var(--text-secondary)";
+  return colorBySignedRatio(v);
 }
 
 function dataSourceLabel(source: string) {

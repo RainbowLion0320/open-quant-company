@@ -185,6 +185,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { api } from "../api";
+import { fmtPercentValue, fmtShortCount } from "../utils/format";
 
 interface HealthRow {
   table: string;
@@ -255,23 +256,17 @@ function fmtSize(mb: number | undefined | null): string {
 }
 
 function fmtPercent(v: number | undefined | null): string {
-  if (v == null) return "—";
-  return `${v.toFixed(1)}%`;
+  return fmtPercentValue(v).replace("—%", "—");
 }
 
 function fmtCountOk(v: number | undefined | null): string {
   if (v == null) return "—";
   if (v === 0) return "OK";
-  if (v >= 1000000) return (v / 1000000).toFixed(1) + "M";
-  if (v >= 1000) return (v / 1000).toFixed(1) + "K";
-  return String(v);
+  return fmtShortCount(v);
 }
 
 function fmtCount(v: number | undefined | null): string {
-  if (v == null) return "—";
-  if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
-  if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
-  return String(v);
+  return fmtShortCount(v);
 }
 
 function fmtTime(iso: string | undefined): string {

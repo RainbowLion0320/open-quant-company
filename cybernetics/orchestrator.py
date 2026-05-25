@@ -14,10 +14,11 @@ from dataclasses import dataclass, field
 from typing import Any, List, Dict, Optional, Sequence
 from enum import Enum
 from datetime import datetime
-import yaml
-import os
 import math
+import os
 import time
+
+from core.settings import get_section
 
 
 # ----- 配置 -----
@@ -27,9 +28,7 @@ _config = None
 def _load_config():
     global _config
     if _config is None:
-        path = os.path.join(os.path.dirname(__file__), "..", "config", "settings.yaml")
-        with open(path) as f:
-            _config = yaml.safe_load(f)["cybernetics"]
+        _config = get_section("cybernetics", {})
     return _config
 
 

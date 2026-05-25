@@ -11,39 +11,25 @@ stock_daily.py — OHLCV 日线数据拉取 + 本地 parquet 存储
 
 from __future__ import annotations
 
-import time
-import random
 from datetime import date, timedelta
 from typing import Optional, Sequence
 
 import pandas as pd
 
 from data.datahub import get_datahub
+from data.fetchers.base import throttle
+from data.symbol_utils import normalize_symbol, to_sina_symbol
 
 HUB = get_datahub()
 
 
-def _normalize_symbol(symbol: str) -> str:
-    text = str(symbol).strip()
-    text = text.replace(".SH", "").replace(".SZ", "").replace(".sh", "").replace(".sz", "")
-    if text.lower().startswith(("sh", "sz")):
-        text = text[2:]
-    return text.zfill(6) if text.isdigit() else text
-
-
 def _to_sina(symbol: str) -> str:
     """'600519' → 'sh600519'"""
-    symbol = _normalize_symbol(symbol)
-    prefix = "sh" if symbol.startswith(("6", "9")) else "sz"
-    return f"{prefix}{symbol}"
+    return to_sina_symbol(symbol)
 
 
 def _to_plain(symbol: str) -> str:
-    return _normalize_symbol(symbol)
-
-
-def _throttle():
-    time.sleep(1.5 + random.uniform(0, 1.0))
+    return normalize_symbol(symbol)
 
 
 def fetch_one(
@@ -57,7 +43,7 @@ def fetch_one(
 
     返回 DataFrame 或 None。
     """
-    symbol = _normalize_symbol(symbol)
+    symbol = normalize_symbol(symbol)
     path = HUB.stock_daily_path(symbol)
 
     # 如果文件已存在且不强制，增量更新
@@ -73,7 +59,7 @@ def fetch_one(
 
     import akshare as ak
 
-    _throttle()
+    throttle()
     try:
         if source == "sina":
             df = ak.stock_zh_a_daily(symbol=_to_sina(symbol), adjust=adjust)
@@ -119,7 +105,7 @@ def read_one(symbol: str) -> Optional[pd.DataFrame]:
     """
     纯本地读取 — 消费者唯一入口。不从 API 拉。
     """
-    symbol = _normalize_symbol(symbol)
+    symbol = normalize_symbol(symbol)
     return HUB.read_parquet(HUB.stock_daily_path(symbol))
 
 

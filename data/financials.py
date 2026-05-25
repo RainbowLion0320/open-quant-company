@@ -5,9 +5,9 @@
 from typing import Tuple, List, Optional
 import pandas as pd
 import numpy as np
-import yaml
 import os
 
+from core.settings import get_settings
 from data.datahub import get_datahub
 from .fetcher import retry_with_backoff
 
@@ -19,11 +19,7 @@ def _load_config():
     if _CONFIG is not None:
         return _CONFIG
     try:
-        _config_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "config", "settings.yaml"
-        )
-        with open(_config_path) as f:
-            _CONFIG = yaml.safe_load(f)
+        _CONFIG = get_settings()
     except Exception:
         _CONFIG = {}
     return _CONFIG
