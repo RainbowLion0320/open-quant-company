@@ -56,6 +56,13 @@ def test_paper_broker_never_sells_more_than_position_when_t0():
     assert broker.get_positions() == []
 
 
+def test_paper_broker_is_exported_from_dedicated_module():
+    import broker
+    from broker.paper import PaperBroker
+
+    assert broker.PaperBroker is PaperBroker
+
+
 def test_enabled_strategy_plugins_have_runners():
     from data.strategy_plugins import iter_strategy_plugins
 
