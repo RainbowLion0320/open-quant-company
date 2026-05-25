@@ -23,6 +23,7 @@
 
 只有当工作流有清晰实现范围和验收标准时，才新建独立未来计划。候选方向：
 
+- Market Regime 离线训练与晋级系统：见 `docs/plans/2026-05-25-market-regime-research-trainer.md`。
 - 关键 Web UI 流程的浏览器 smoke/e2e 覆盖。
 - 行业和多资产维度的数据质量门禁。
 - 策略研究生命周期：实验注册、OOS 窗口、模型晋级规则。
