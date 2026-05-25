@@ -36,6 +36,19 @@
 - `data/tournament/` 下的锦标赛 JSON
 - Web `/strategy-lab` 页面
 
+## Regime 研究训练
+
+Market Regime 公式采用 champion/challenger 研究机制。当前生产公式是 champion；`scripts/train_market_regime.py` 会离线搜索 challenger，并用历史回放、未来标签、walk-forward、组件消融和策略 A/B 判断是否值得人工审查。
+
+运行报告存放在 `reports/regime_training/`。优先查看：
+
+- `summary.json`：决策入口，包含 `keep_champion` / `recommend_challenger_for_review` / `insufficient_data`。
+- `champion_vs_challenger.md`：当前公式与最优候选的解释性摘要。
+- `candidate_search.csv`：候选规则排名。
+- `walk_forward_results.csv`：滚动样本外窗口结果。
+- `strategy_ab_test.csv`：固定仓位、当前公式、基线和最优候选的策略贡献。
+- `recommended_config.yaml`：仅为人工审查建议，默认不会自动写回生产配置。
+
 ## 成本敏感性
 
 牛市中换手率通常高于熊市和震荡市。具体费用影响以当前回测输出和交易成本配置为准。

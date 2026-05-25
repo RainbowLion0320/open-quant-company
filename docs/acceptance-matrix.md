@@ -38,6 +38,7 @@
 | 2.10 | 行业动量因子集成 | `signals/multifactor.py:_industry_score()` | — | 多因子评分含 industry 维度, 组合敞口 API | 行业动量已纳入五维评分, detail 含 industry 分 | OK | — |
 | 2.11 | 策略研究治理和晋级门槛 | `research/strategy_governance.py` | `test_strategy_research_governance.py` | `GET /strategies/governance` → `Strategies.vue` | 四策略分层、paper/production 门槛、ML 默认为 paper | OK | — |
 | 2.12 | 因子研究诊断 | `signals/factor_research.py` | `test_strategy_research_governance.py:test_factor_diagnostics_rank_ic_quantile_spread_and_correlation_clusters` | — | 输出 IC/ICIR/分组收益 spread/相关性聚类 | OK | — |
+| 2.13 | Market Regime 离线训练与晋级 | `research/regime_training.py`, `scripts/train_market_regime.py` | `test_regime_training.py` | `reports/regime_training/summary.json` | champion/challenger、walk-forward、策略 A/B、默认不自动替换生产公式 | OK | — |
 
 ## 3. 回测引擎 (Backtest Engine)
 

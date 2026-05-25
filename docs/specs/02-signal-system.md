@@ -112,7 +112,19 @@
 
 **市场广度：** 计算全市场 > MA20 的股票比例，作为辅助指标。
 
-### 2.5 策略研究治理 (research/strategy_governance.py)
+### 2.5 Market Regime 离线训练与晋级
+
+Market Regime 生产公式保持确定性和可解释性，但不再只能靠人工拍权重。`research/regime_training.py` 和 `scripts/train_market_regime.py` 提供 champion/challenger 研究闭环：
+
+- **Champion**：当前生产公式，作为所有候选规则的基准。
+- **Challenger**：离线搜索出的可解释候选规则，包含权重、阈值、平滑窗口和最短持续期。
+- **Walk-forward**：按时间滚动训练/验证，禁止随机切分和未来函数。
+- **策略 A/B**：比较固定仓位、当前公式、trend-only、trend+breadth、best challenger 的风险收益表现。
+- **晋级门槛**：只有 challenger 在预测区分、bear 风险识别、策略贡献、稳定性和复杂度惩罚后仍优于 champion，才生成 `recommended_config.yaml` 供人工审查。
+
+第一版训练器只写 `reports/regime_training/` 研究报告，不自动改 `cybernetics/regime_scoring.py` 或 `config/settings.yaml`。
+
+### 2.6 策略研究治理 (research/strategy_governance.py)
 
 四个内置策略的默认分层：
 
@@ -125,7 +137,7 @@
 
 晋级到 paper / production 前需要通过 `evaluate_promotion()` 门槛：OOS 月数、交易次数、Sharpe、最大回撤、换手、IC、ICIR。ML 当前默认为 `paper` 状态，除非 OOS 和 IC 证据达标，否则不标记 production。
 
-### 2.6 因子 DSL (expression.py + dsl_parser.py)
+### 2.7 因子 DSL (expression.py + dsl_parser.py)
 
 **表达式引擎：** 声明式因子定义，支持组合模式。
 
@@ -143,7 +155,7 @@ RSI14 = SMA(Max(Delta(Close(), 1), 0), 14) / SMA(Abs(Delta(Close(), 1)), 14) * 1
 
 **LLM 因子发现：** `dsl_parser.py` 解析 LLM 生成的公式文本 → 计算因子值 → IC 检验 → 报告结果。`scripts/factor_hypothesis.py` 批量运行因子假设检验。
 
-### 2.7 因子研究诊断 (signals/factor_research.py)
+### 2.8 因子研究诊断 (signals/factor_research.py)
 
 因子上线前至少检查：
 
@@ -151,7 +163,7 @@ RSI14 = SMA(Max(Delta(Close(), 1), 0), 14) / SMA(Abs(Delta(Close(), 1)), 14) * 1
 - `factor_diagnostics()`：mean IC、ICIR、正 IC 占比、分组收益 spread、单调性。
 - `factor_correlation_clusters()`：识别高度相关因子，避免重复暴露。
 
-### 2.8 横截面排名 (selection.py)
+### 2.9 横截面排名 (selection.py)
 
 **输入：** 各策略的原始评分 DataFrame（symbol × score）
 **输出：** 交易信号 `{symbol, strategy, signal (buy/sell/hold), score, rank}`
