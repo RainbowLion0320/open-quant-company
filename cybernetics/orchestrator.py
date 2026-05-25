@@ -18,6 +18,13 @@ import math
 import os
 import time
 
+from cybernetics.regime_scoring import (
+    breadth_strength as _score_breadth_strength,
+    classify_regime_value,
+    clamp as _score_clamp,
+    compose_regime_score,
+    volume_strength as _score_volume_strength,
+)
 from core.settings import get_section
 
 
@@ -243,9 +250,7 @@ _REGIME_INDEXES = [
 
 
 def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
-    if math.isnan(value) or math.isinf(value):
-        return lower
-    return min(upper, max(lower, value))
+    return _score_clamp(value, lower, upper)
 
 
 def _frame_close_volume(df):
@@ -826,40 +831,27 @@ def _compute_volume_strength(
         vol_expand = 1.2
         vol_contract = 0.8
 
-    amount_ratio = market_volume.amount_ratio_5_20
-    trend = "放量" if amount_ratio > vol_expand else ("缩量" if amount_ratio < vol_contract else "正常")
-
-    if breadth.advance_ratio >= 0.55:
-        market_activity = 0.5 + (amount_ratio - 1.0) * 0.7
-    elif breadth.advance_ratio <= 0.45:
-        market_activity = 0.5 - (amount_ratio - 1.0) * 0.7
-    else:
-        market_activity = 0.5 + (amount_ratio - 1.0) * 0.2
-    market_activity = _clamp(market_activity)
-
-    up_amount_score = _clamp(market_volume.up_amount_ratio)
     index_volume, index_detail = _compute_multi_index_volume(index_frames)
-    strength = 0.50 * market_activity + 0.30 * up_amount_score + 0.20 * index_volume
-
-    return _clamp(strength), trend, {
-        "volume_market_activity_raw": round(market_activity, 4),
-        "volume_up_amount_raw": round(up_amount_score, 4),
-        "volume_index_raw": round(index_volume, 4),
-        "amount_ratio_5_20": round(amount_ratio, 4),
-        "up_amount_ratio": round(market_volume.up_amount_ratio, 4),
-        "volume_sample_size": float(market_volume.sample_size),
-        "amount_5d": round(market_volume.amount_5d, 2),
-        "amount_20d": round(market_volume.amount_20d, 2),
-        **index_detail,
-    }
+    return _score_volume_strength(
+        amount_ratio_5_20=market_volume.amount_ratio_5_20,
+        advance_ratio=breadth.advance_ratio,
+        up_amount_ratio=market_volume.up_amount_ratio,
+        index_volume=index_volume,
+        sample_size=market_volume.sample_size,
+        amount_5d=market_volume.amount_5d,
+        amount_20d=market_volume.amount_20d,
+        volume_expansion=vol_expand,
+        volume_contraction=vol_contract,
+        index_detail=index_detail,
+    )
 
 
 def _breadth_strength(breadth: MarketBreadth) -> float:
-    return _clamp(
-        0.35 * breadth.advance_ratio
-        + 0.30 * breadth.above_ma20
-        + 0.25 * breadth.above_ma60
-        + 0.10 * breadth.above_ma120
+    return _score_breadth_strength(
+        breadth.advance_ratio,
+        breadth.above_ma20,
+        breadth.above_ma60,
+        breadth.above_ma120,
     )
 
 
@@ -876,22 +868,16 @@ def _compute_regime_score_v2(
     volume_raw, _volume_trend, volume_detail = _compute_volume_strength(index_frames, breadth, volume_snapshot)
     breadth_raw = _breadth_strength(breadth)
 
-    components = {
-        "trend": round(trend_raw * 35.0, 1),
-        "breadth": round(breadth_raw * 35.0, 1),
-        "risk": round(risk_raw * 20.0, 1),
-        "volume": round(volume_raw * 10.0, 1),
-        "trend_raw": round(trend_raw, 4),
-        "breadth_raw": round(breadth_raw, 4),
-        "risk_raw": round(risk_raw, 4),
-        "volume_raw": round(volume_raw, 4),
-        "sample_size": float(breadth.sample_size),
-        **{f"trend_{symbol}": value for symbol, value in index_trend.items()},
-        **risk_detail,
-        **volume_detail,
-    }
-    score = components["trend"] + components["breadth"] + components["risk"] + components["volume"]
-    return round(score, 1), components
+    return compose_regime_score(
+        trend_raw=trend_raw,
+        breadth_raw=breadth_raw,
+        risk_raw=risk_raw,
+        volume_raw=volume_raw,
+        sample_size=breadth.sample_size,
+        index_trend=index_trend,
+        risk_detail=risk_detail,
+        volume_detail=volume_detail,
+    )
 
 
 def _classify_regime(score: float, components: Dict[str, float], breadth: MarketBreadth) -> MarketRegime:
@@ -910,11 +896,18 @@ def _classify_regime(score: float, components: Dict[str, float], breadth: Market
     trend_raw = components.get("trend_raw", 0.5)
     breadth_raw = components.get("breadth_raw", _breadth_strength(breadth))
 
-    if score >= bull_threshold and trend_raw >= 0.55 and breadth.advance_ratio >= breadth_bull:
-        return MarketRegime.BULL
-    if score <= bear_threshold or (trend_raw <= 0.40 and breadth_raw <= breadth_bear):
-        return MarketRegime.BEAR
-    return MarketRegime.SIDEWAYS
+    return MarketRegime(
+        classify_regime_value(
+            score,
+            trend_raw=trend_raw,
+            breadth_raw=breadth_raw,
+            advance_ratio=breadth.advance_ratio,
+            bull_threshold=bull_threshold,
+            bear_threshold=bear_threshold,
+            breadth_bull=breadth_bull,
+            breadth_bear=breadth_bear,
+        )
+    )
 
 def detect_market_regime(
     index_data: dict = None,  # 指数数据 {symbol: df}，不传则自动拉取
