@@ -19,7 +19,6 @@ from data.symbols import CIRCLE_STOCKS
 from data.fetcher import get_stock_daily, get_index_daily
 from data.assets.etf import ETFAsset, ETF_UNIVERSE
 from data.datahub import get_datahub
-from cybernetics.orchestrator import detect_market_regime
 from broker.exchange import AShareExchange, ETFExchange, OrderSide
 from broker.allocator import AssetAllocator
 

@@ -138,7 +138,7 @@ def _calc_order_volume(broker: PaperBroker, code: str, side: str, price: float, 
     lot_size = max(1, lot_size)
 
     if side == "sell":
-        pos = broker._positions.get(code)
+        pos = broker.get_position(code)
         if not pos:
             return 0
         if paper_cfg.get("sell_all_on_sell_signal", True):
@@ -149,7 +149,7 @@ def _calc_order_volume(broker: PaperBroker, code: str, side: str, price: float, 
     balance = broker.get_balance()
     order_value_pct = float(paper_cfg.get("order_value_pct", 0.05))
     max_order_value = float(paper_cfg.get("max_order_value", balance.total_asset * order_value_pct))
-    budget = min(balance.total_asset * order_value_pct, broker._cash, max_order_value)
+    budget = min(balance.total_asset * order_value_pct, balance.cash, max_order_value)
     return int(budget / max(price, 1e-9) // lot_size) * lot_size
 
 
@@ -288,33 +288,17 @@ def execute_daily(run_date: Optional[date] = None, dry_run: bool = False,
         state = load_state()
         print(f"  恢复状态: 现金 ¥{state.cash:,.2f}  |  持仓 {len(state.positions)} 只")
 
-    broker = PaperBroker(
-        initial_cash=state.cash,
+    broker = PaperBroker.from_state(
+        state,
         commission_rate=0.00081,
         t_plus_1=True,
         enable_risk=True,
     )
-    broker._cash = state.cash
-    broker._frozen_cash = state.frozen_cash
-    broker._peak_equity = state.peak_equity
-    broker._order_counter = state.order_counter
-    broker._today_buys = {}
-    broker._today_sells = {}
-
-    # 恢复持仓
-    for code, pos_data in state.positions.items():
-        from broker import Position
-        broker._positions[code] = Position(
-            code=code,
-            name=pos_data.get("name", ""),
-            volume=pos_data["volume"],
-            avg_cost=pos_data["avg_cost"],
-        )
 
     # 2) 获取价格
     cfg = load_config()
     paper_cfg = cfg.get("paper_trading", {})
-    all_symbols = list(broker._positions.keys())
+    all_symbols = broker.get_position_codes()
     signals = _read_latest_signals()
     for strat_name, items in signals.items():
         for code, side, _ in items:
@@ -376,21 +360,7 @@ def execute_daily(run_date: Optional[date] = None, dry_run: bool = False,
         append_nav(run_date, balance.total_asset, balance.cash, balance.market_value)
 
         # 写回状态
-        new_state = PaperState(
-            cash=broker._cash,
-            frozen_cash=broker._frozen_cash,
-            peak_equity=broker._peak_equity,
-            positions={
-                code: {
-                    "volume": p.volume,
-                    "avg_cost": p.avg_cost,
-                    "name": p.name or "",
-                }
-                for code, p in broker._positions.items() if p.volume > 0
-            },
-            order_counter=broker._order_counter,
-        )
-        save_state(new_state)
+        save_state(broker.snapshot_state())
         print(f"\n  状态已保存 → {_resolve_store() / 'state.parquet'}")
 
     # 5) 汇总

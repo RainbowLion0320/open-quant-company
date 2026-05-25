@@ -19,10 +19,10 @@ PaperBroker 状态持久化 — Parquet 存储
 from __future__ import annotations
 import pandas as pd
 from pathlib import Path
-from dataclasses import dataclass, field
 from datetime import date as DateType, datetime
-from typing import Dict, List, Optional
+from typing import Optional
 
+from broker.state import PaperBrokerState
 from core.settings import get_section
 from data.datahub import get_datahub
 
@@ -46,16 +46,7 @@ def _resolve_store() -> Path:
     return STORE_DIR
 
 
-@dataclass
-class PaperState:
-    """PaperBroker 可持久化状态"""
-    cash: float = 1_000_000.0
-    frozen_cash: float = 0.0
-    peak_equity: float = 1_000_000.0
-    positions: Dict[str, dict] = field(default_factory=dict)
-    # positions[code] = {"volume": int, "avg_cost": float, "name": str}
-    order_counter: int = 0
-    updated_at: str = ""
+PaperState = PaperBrokerState
 
 
 def load_state() -> PaperState:
@@ -85,6 +76,7 @@ def load_state() -> PaperState:
                 "volume": int(v.get("volume", 0)),
                 "avg_cost": float(v.get("avg_cost", 0)),
                 "name": str(v.get("name", "")),
+                "current_price": float(v.get("current_price", 0)),
             } for k, v in positions_raw.items()} if positions_raw else {},
             order_counter=int(row.get("order_counter", 0)),
             updated_at=str(row.get("updated_at", "")),

@@ -29,12 +29,12 @@
 | 2.1 | 巴菲特三重过滤 (能力圈→护城河→安全边际) | `signals/buffett.py` | — | `GET /signals/buffett` → `Signals.vue` | `make scan` 生成 `data/store/signals/buffett_scan.parquet` | OK | 待补: 金融板块特殊处理测试 |
 | 2.2 | 多因子五维加权打分 | `signals/multifactor.py` | `test_boundary.py` (动量计算), `test_sector_pipeline.py:test_multifactor_weights_sum_to_one` | `GET /signals/multifactor` → `Signals.vue` | 固定日期+股票池评分结果可复现，detail 含 industry 分 | OK | — |
 | 2.3 | ML LightGBM 信号 | `signals/ml_signals.py` | `test_architecture_contracts.py:test_model_evaluate_datetime_index_icir_does_not_crash` | `GET /signals/ml_lgbm` | `python scripts/tune_model.py` 和 `weekly_retrain.py` | OK | — |
-| 2.4 | 控制论自适应 regime 检测 + 参数调整 | `cybernetics/orchestrator.py` | — | `GET /market/regime` → `Market.vue` | `make regime` 输出当前市场状态 | OK | 待补: regime 检测回归测试 |
+| 2.4 | 控制论自适应 regime 检测 + 参数调整 | `cybernetics/orchestrator.py`, `cybernetics/regime.py`, `cybernetics/regime_scoring.py` | `test_market_regime_v2.py`, `test_regime_scoring.py` | `GET /market/regime` → `Market.vue` | `make regime` 输出当前市场状态 | OK | — |
 | 2.5 | 因子 DSL 表达式引擎 (声明式因子) | `signals/expression.py` | `test_boundary.py` (RSI/MA/MACD/Delta) | — | `python -c "from signals.expression import SMA,Delta,Ret; ..."` | OK | — |
 | 2.6 | DSL 公式解析 (LLM→计算) | `signals/dsl_parser.py` | `test_boundary.py` (公式解析) | — | `python scripts/factor_hypothesis.py` | OK | — |
 | 2.7 | 横截面排名 → buy/sell/hold 信号 | `signals/selection.py` | `test_boundary.py` (apply_ranked_buys) | — | 验证信号文件符合 schema (symbol, score, signal) | OK | — |
 | 2.8 | 策略插件注册表 (动态 import) | `data/strategy_plugins.py` | `test_architecture_contracts.py:test_enabled_strategy_plugins_have_runners` | `GET /strategies` → `Strategies.vue` | 新增策略只需改 yaml 配置 | OK | — |
-| 2.9 | Regime 自适应权重调整 | `signals/multifactor.py` | — | — | bull/bear/sideways 三种 regime 下权重分布不同 | OK | 待补自动化测试 |
+| 2.9 | Regime 自适应权重调整 | `signals/multifactor.py` | `test_sector_pipeline.py:test_regime_affects_market_score_but_not_industry` | — | bull/bear/sideways 三种 regime 下权重分布不同 | OK | — |
 | 2.10 | 行业动量因子集成 | `signals/multifactor.py:_industry_score()` | — | 多因子评分含 industry 维度, 组合敞口 API | 行业动量已纳入五维评分, detail 含 industry 分 | OK | — |
 
 ## 3. 回测引擎 (Backtest Engine)
@@ -56,12 +56,12 @@
 |---|--------------|---------|------|-----------|---------|------|------|
 | 4.1 | PaperBroker 模拟券商 (ABC 接口) | `broker/__init__.py` | `test_boundary.py` (买入/卖出/T+1/资金不足) | `GET /portfolio` → `Portfolio.vue` | 手工下单 → 验证持仓/余额/NAV 更新 | OK | — |
 | 4.2 | T+1 交易约束 | `broker/__init__.py` | `test_boundary.py` (T+1限制卖出/隔日解除) | — | 当日买入的股票当日不能卖出 | OK | — |
-| 4.3 | 5 规则风控 | `broker/risk.py` | `test_architecture_contracts.py:test_paper_broker_never_sells_more_than_position_when_t0` | — | 逐规则验证 (仓位上限/总敞口/日频/熔断/单笔) | OK | 4/5 规则待补独立测试 |
-| 4.4 | 熔断机制 (回撤 > 阈值自动拒绝买单) | `broker/risk.py` | — | — | 模拟回撤超限 → 验证买单全拒绝 | OK | 待补自动化测试 |
-| 4.5 | Parquet 状态持久化 (trades/nav/state) | `broker/persistence.py` | — | — | 创建 Broker → 下单 → 重启 → 状态恢复一致 | OK | 待补自动化测试 |
+| 4.3 | 5 规则风控 | `broker/risk.py` | `test_broker_risk_persistence_allocator.py:test_risk_manager_rejects_each_configured_limit`, `test_broker_risk_persistence_allocator.py:test_risk_manager_enforces_daily_order_count` | — | 逐规则验证 (仓位上限/总敞口/日频/熔断/单笔) | OK | — |
+| 4.4 | 熔断机制 (回撤 > 阈值自动拒绝买单) | `broker/risk.py` | `test_broker_risk_persistence_allocator.py:test_risk_manager_rejects_each_configured_limit` | — | 模拟回撤超限 → 验证买单全拒绝 | OK | — |
+| 4.5 | Parquet 状态持久化 (trades/nav/state) | `broker/persistence.py`, `broker/state.py` | `test_broker_risk_persistence_allocator.py:test_paper_state_persistence_round_trip_uses_public_state_model` | — | 创建 Broker → 下单 → 重启 → 状态恢复一致 | OK | — |
 | 4.6 | Cron 调度 (15:30 扫描 + 09:30 执行) | `scripts/compute_signals.py`, `scripts/execute_paper_trades.py` | — | `POST /signals/scan` (手动触发) | GitHub Actions `daily-scan.yml` 正常执行 | OK | — |
 | 4.7 | Cron 日志可观测 | `data/cron_logger.py` | — | `GET /system/cron-log` | 每次 cron 执行后日志 JSONL 有记录 | OK | — |
-| 4.8 | 多资产交易所 (差异化费率) | `broker/exchange.py` | — | — | A股 vs ETF 费率不同 | OK | 待补自动化测试 |
+| 4.8 | 多资产交易所 (差异化费率) | `broker/exchange.py` | `test_broker_risk_persistence_allocator.py:test_exchange_costs_are_asset_specific` | — | A股 vs ETF 费率不同 | OK | — |
 
 ## 5. Web 平台 (Web Platform)
 
@@ -89,7 +89,7 @@
 | 6.2 | Stock 资产 (AKShare + Tushare) | `data/assets/stock.py` | — | `GET /stocks` → `Stocks.vue` | 全量 A 股股票池可查询 | OK | — |
 | 6.3 | ETF 资产 (AKShare `fund_etf_hist_em`) | `data/assets/etf.py` | `test_asset_contracts.py::TestETFAssetContracts` | — | fetch_daily 返回标准 OHLCV, data_source="real" | OK | — |
 | 6.4 | Bond/Futures/Crypto 适配器 | `data/assets/{bond,futures,crypto}.py` | `test_asset_contracts.py` (5 classes) | — | Bond=proxy, Futures=real, Crypto=placeholder | OK | — |
-| 6.5 | AssetAllocator regime 动态权重 | `broker/allocator.py` | — | — | bull: stock 60%, bear: stock 10%, sideways: 35% | OK | 待补自动化测试 |
+| 6.5 | AssetAllocator regime 动态权重 | `broker/allocator.py` | `test_broker_risk_persistence_allocator.py:test_asset_allocator_normalizes_regime_enum_and_unknown` | — | bull: stock 60%, bear: stock 10%, sideways: 35% | OK | — |
 | 6.6 | 资产开关控制 (enabled: true/false) | `config/settings.yaml` assets.*.enabled | — | — | 关闭 stock 后 `AssetRegistry.get_enabled()` 不含 stock | OK | — |
 | 6.7 | 多资产回测对比 | `backtest/multi_asset_tournament.py` | — | — | stock-only vs ETF-only vs multi 三组对比 | OK | proxy fallback 场景需持续标注 data_source |
 | 6.8 | 差异化费率 (A股/ETF/债券) | `broker/exchange.py` | — | — | A股印花税 0.1% vs ETF 免印花税 | OK | — |

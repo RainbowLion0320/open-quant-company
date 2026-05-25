@@ -6,6 +6,25 @@ from cybernetics.regime_scoring import (
 )
 
 
+def test_regime_facade_normalizes_enum_and_string_values():
+    from cybernetics.regime import MarketRegime, normalize_regime, to_market_regime
+
+    assert normalize_regime(MarketRegime.BULL) == "bull"
+    assert normalize_regime("BEAR") == "bear"
+    assert normalize_regime("not-a-regime") == "sideways"
+    assert to_market_regime("bull") is MarketRegime.BULL
+
+
+def test_trend_regime_detector_uses_shared_facade():
+    import pandas as pd
+    from cybernetics.regime import MarketRegime, detect_trend_regime
+
+    close = list(range(1, 80))
+    df = pd.DataFrame({"close": close})
+
+    assert detect_trend_regime({"sh000001": df}) is MarketRegime.BULL
+
+
 def test_breadth_strength_weights_market_participation():
     assert breadth_strength(0.72, 0.80, 0.75, 0.68) == 0.7475
     assert breadth_strength(-1.0, 2.0, 0.5, 0.5) == 0.425

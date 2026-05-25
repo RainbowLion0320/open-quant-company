@@ -1,4 +1,5 @@
 import importlib
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -63,6 +64,63 @@ def test_paper_broker_is_exported_from_dedicated_module():
     assert broker.PaperBroker is PaperBroker
 
 
+def test_paper_broker_state_round_trips_through_public_api():
+    from broker import PaperBroker
+    from broker.state import PaperBrokerState
+
+    state = PaperBrokerState(
+        cash=12345.0,
+        frozen_cash=25.0,
+        peak_equity=15000.0,
+        order_counter=42,
+        positions={
+            "000001": {
+                "name": "平安银行",
+                "volume": 200,
+                "avg_cost": 8.5,
+                "current_price": 9.1,
+            }
+        },
+    )
+
+    broker = PaperBroker.from_state(state, enable_risk=False)
+
+    balance = broker.get_balance()
+    assert balance.cash == 12345.0
+    assert balance.frozen_cash == 25.0
+    assert broker.get_position("000001").volume == 200
+    assert broker.get_position_codes() == ["000001"]
+
+    restored = broker.snapshot_state()
+    assert restored.cash == 12345.0
+    assert restored.peak_equity == 15000.0
+    assert restored.order_counter == 42
+    assert restored.positions["000001"]["avg_cost"] == 8.5
+
+
+def test_paper_broker_private_state_is_not_used_outside_broker_package():
+    forbidden = (
+        "broker._cash",
+        "broker._frozen_cash",
+        "broker._positions",
+        "broker._order_counter",
+        "broker._today_buys",
+        "broker._today_sells",
+        "broker._peak_equity",
+    )
+    checked_files = [
+        Path("scripts/execute_paper_trades.py"),
+        Path("web/api/routes/portfolio.py"),
+    ]
+
+    offenders = []
+    for path in checked_files:
+        text = path.read_text()
+        offenders.extend(f"{path}:{token}" for token in forbidden if token in text)
+
+    assert offenders == []
+
+
 def test_enabled_strategy_plugins_have_runners():
     from data.strategy_plugins import iter_strategy_plugins
 
@@ -100,3 +158,36 @@ def test_repairable_tables_are_sourced_from_repair_map():
 
     assert _repairable_tables() == set(REPAIR_MAP)
     assert "stock_moneyflow_daily" in _repairable_tables()
+
+
+def test_system_route_delegates_large_status_domains_to_services():
+    import web.api.services.system_data_health as data_health
+    import web.api.services.system_integrations as integrations
+    import web.api.services.system_monitor as monitor
+
+    route_text = Path("web/api/routes/system.py").read_text()
+
+    assert callable(monitor.system_monitor_payload)
+    assert callable(data_health.db_health_payload)
+    assert callable(integrations.service_status_payload)
+    assert "def _query(" not in route_text
+    assert "def _read_token(" not in route_text
+    assert "def _run_repair(" not in route_text
+    assert "def _repairable_tables(" not in route_text
+
+
+def test_scripts_do_not_import_regime_helpers_from_orchestrator():
+    checked_files = [
+        Path("scripts/multi_asset_tournament.py"),
+        Path("scripts/train_regime_models.py"),
+    ]
+
+    offenders = []
+    for path in checked_files:
+        text = path.read_text()
+        if "from cybernetics.orchestrator import detect_market_regime" in text:
+            offenders.append(str(path))
+        if "from cybernetics.orchestrator import MarketRegime" in text:
+            offenders.append(str(path))
+
+    assert offenders == []

@@ -10,14 +10,13 @@ Volatile: cash↑  reduce all
 Config-driven: settings.yaml → assets.{type}.enabled + alloc_weight
 Allocator 动态覆盖 config 静态权重。
 """
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
-from pathlib import Path
-
-from core.settings import get_settings, resolve_settings_path
-
-
 import copy
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+from cybernetics.regime import normalize_regime
+from core.settings import get_settings, resolve_settings_path
 
 
 @dataclass
@@ -88,7 +87,8 @@ class AssetAllocator:
 
     def get_weights(self, regime: str) -> Dict[str, float]:
         """Get asset weights for a given market regime."""
-        regime_key = regime if regime in self._regime_weights else "unknown"
+        regime_key = normalize_regime(regime, default="unknown")
+        regime_key = regime_key if regime_key in self._regime_weights else "unknown"
         return dict(self._regime_weights[regime_key])
 
     def allocate(
@@ -112,12 +112,13 @@ class AssetAllocator:
         Returns:
             PortfolioAllocation with per-asset breakdowns
         """
-        base_weights = self.get_weights(regime)
+        regime_key = normalize_regime(regime, default="unknown")
+        base_weights = self.get_weights(regime_key)
 
         # Only consider enabled assets
         active_types = [t for t, enabled in enabled_assets.items() if enabled]
         if not active_types:
-            return PortfolioAllocation(regime=regime, total_capital=total_capital)
+            return PortfolioAllocation(regime=regime_key, total_capital=total_capital)
 
         # Normalize weights to sum to 1-cash
         raw_sum = sum(base_weights.get(t, 0) for t in active_types)
@@ -155,7 +156,7 @@ class AssetAllocator:
             ))
 
         return PortfolioAllocation(
-            regime=regime,
+            regime=regime_key,
             allocations=allocations,
             total_capital=total_capital,
             cash_reserve=total_capital * cash_weight,

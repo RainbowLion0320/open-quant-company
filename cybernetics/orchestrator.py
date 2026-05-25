@@ -18,6 +18,7 @@ import math
 import os
 import time
 
+from cybernetics.regime import MarketRegime, detect_trend_regime, to_market_regime
 from cybernetics.regime_scoring import (
     breadth_strength as _score_breadth_strength,
     classify_regime_value,
@@ -42,14 +43,6 @@ def _load_config():
 # =====================================================================
 # 1. 多层递阶结构 (Multi-level Hierarchy)
 # =====================================================================
-
-class MarketRegime(Enum):
-    """市场状态 — 顶层判断"""
-    BULL = "bull"           # 牛市：积极
-    SIDEWAYS = "sideways"   # 震荡：谨慎
-    BEAR = "bear"           # 熊市：防御
-    UNKNOWN = "unknown"
-
 
 class SectorStrength(Enum):
     """板块强度"""
@@ -918,37 +911,7 @@ def detect_market_regime(
     市场状态检测：基于均线排列、波动率和趋势强度
     不传 index_data 时自动从 AKShare 拉取上证指数数据
     """
-
-    # 自动拉取真实数据
-    if index_data is None or symbol not in index_data:
-        try:
-            from data.fetcher import get_index_daily
-            df = get_index_daily(symbol, force_refresh=False)
-        except Exception:
-            return MarketRegime.UNKNOWN
-    else:
-        df = index_data.get(symbol)
-
-    if df is None or len(df) < max(window, 60):
-        return MarketRegime.UNKNOWN
-
-    recent = df.tail(window)
-    close = recent["close"].values if "close" in df.columns else recent["收盘"].values
-
-    # 均线计算
-    ma5 = close[-5:].mean()
-    ma20 = close[-20:].mean()
-    ma60 = close[-60:].mean() if len(close) >= 60 else close.mean()
-
-    # 多头排列: price > ma5 > ma20 > ma60
-    # 空头排列: price < ma5 < ma20 < ma60
-    current = close[-1]
-    if current > ma5 > ma20 > ma60:
-        return MarketRegime.BULL
-    elif current < ma5 < ma20 < ma60:
-        return MarketRegime.BEAR
-    else:
-        return MarketRegime.SIDEWAYS
+    return detect_trend_regime(index_data=index_data, window=window, symbol=symbol)
 
 
 def adaptive_params(regime: MarketRegime) -> Dict[str, float]:
@@ -956,6 +919,7 @@ def adaptive_params(regime: MarketRegime) -> Dict[str, float]:
     根据市场状态自适应调整参数
     优先从 config/settings.yaml → cybernetics.adaptive.{regime} 读取
     """
+    regime = to_market_regime(regime)
     # 尝试从配置加载
     try:
         cfg = _load_config()["adaptive"]

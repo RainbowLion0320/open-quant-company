@@ -23,26 +23,12 @@ def get_broker():
         from broker.persistence import load_state
 
         state = load_state()
-        broker = PaperBroker(
-            initial_cash=1_000_000,
+        broker = PaperBroker.from_state(
+            state,
             commission_rate=0.00081,
             t_plus_1=True,
             enable_risk=True,
         )
-        # 恢复状态
-        broker._cash = state.cash
-        broker._frozen_cash = state.frozen_cash
-        broker._peak_equity = state.peak_equity
-        broker._order_counter = state.order_counter
-
-        from broker import Position
-        for code, pos_data in state.positions.items():
-            broker._positions[code] = Position(
-                code=code,
-                name=pos_data.get("name", ""),
-                volume=pos_data["volume"],
-                avg_cost=pos_data["avg_cost"],
-            )
         _broker = broker
     return _broker
 
