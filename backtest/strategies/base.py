@@ -31,7 +31,7 @@ class BaseStrategy(ABC):
     def score(
         self,
         symbol: str,
-        prices: pd.Series,
+        prices: pd.Series | pd.DataFrame,
         idx: int,
         regime: str,
         **kwargs,
@@ -41,7 +41,7 @@ class BaseStrategy(ABC):
 
         Args:
             symbol: 股票代码
-            prices: OHLCV 价格序列 (DateTimeIndex)
+            prices: OHLCV 价格窗口 (DateTimeIndex)
             idx: 当前日期的位置索引
             regime: 市场状态 ("bull"/"bear"/"sideways")
             **kwargs: 策略特定参数

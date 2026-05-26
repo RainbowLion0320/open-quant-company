@@ -15,7 +15,7 @@ SETTINGS_RELATIVE_PATH = Path("config") / "settings.yaml"
 
 
 def _project_root_from_env() -> Path | None:
-    for name in ("ASTROLABE_HOME", "ASTROLABE_ROOT", "XINGPAN_HOME", "QUANT_AGENT_HOME"):
+    for name in ("ASTROLABE_HOME", "ASTROLABE_ROOT"):
         value = os.environ.get(name)
         if value:
             return Path(value).expanduser().resolve()
@@ -27,7 +27,7 @@ def resolve_settings_path(path: str | os.PathLike | None = None) -> Path:
     if path:
         return Path(path).expanduser().resolve()
 
-    explicit = os.environ.get("ASTROLABE_SETTINGS") or os.environ.get("QUANT_AGENT_SETTINGS")
+    explicit = os.environ.get("ASTROLABE_SETTINGS")
     if explicit:
         return Path(explicit).expanduser().resolve()
 
@@ -38,11 +38,6 @@ def resolve_settings_path(path: str | os.PathLike | None = None) -> Path:
     repo_path = PROJECT_ROOT / SETTINGS_RELATIVE_PATH
     if repo_path.exists():
         return repo_path
-
-    for legacy in ("~/astrolabe-quant", "~/quant-agent", "~/xingpan"):
-        candidate = Path(legacy).expanduser() / SETTINGS_RELATIVE_PATH
-        if candidate.exists():
-            return candidate.resolve()
 
     return repo_path
 

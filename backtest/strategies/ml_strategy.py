@@ -68,14 +68,10 @@ class MLStrategy(BaseStrategy):
             print(f"[MLStrategy] ⚠️ 模型未找到: {model_path}, 将跳过 ML 入选")
 
     def _load_regime_models(self):
-        """加载 bull/bear/sideways 专属模型；兼容历史双 lgbm_ 文件名。"""
+        """加载 bull/bear/sideways 专属模型。"""
         for regime in ("bull", "bear", "sideways"):
-            model_path = None
-            for candidate in (MODEL_DIR / f"lgbm_{regime}.pkl", MODEL_DIR / f"lgbm_lgbm_{regime}.pkl"):
-                if candidate.exists():
-                    model_path = candidate
-                    break
-            if model_path is None:
+            model_path = MODEL_DIR / f"lgbm_{regime}.pkl"
+            if not model_path.exists():
                 continue
             try:
                 with open(model_path, "rb") as f:

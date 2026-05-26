@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-LLM 因子自动研发引擎 — Phase 4.2
+LLM 因子自动研发引擎 — Phase 4.3
 
 升级:
   1. 扩展数据词汇 — 暴露全部可用维度 (资金/筹码/宏观/事件) 给 LLM
   2. OOS 验证 — ICIR + 滚动 IC + 样本外严格验证
   3. 多轮迭代 — 模型重训 → 特征重要性 → 反馈 LLM → 再生成
-  4. 自注入库 — 通过因子自动写入 alpha_factors()
+  4. 候选池治理 — 通过 OOS 的因子先进入 candidate pool，人工晋级后再写入 alpha_factors()
 
 用法:
   python scripts/factor_hypothesis.py --n-candidates 8 --ic-threshold 0.02 --rounds 3
-  python scripts/factor_hypothesis.py --auto-register  # 自动注入已采纳因子
+  python scripts/factor_hypothesis.py --save-candidates  # 自动保存通过 OOS 的候选因子
 """
 import os, sys, json, re
 from pathlib import Path
@@ -504,15 +504,6 @@ def promote_candidate_factor(name: str) -> bool:
     return True
 
 
-def auto_register_factors(accepted: List[FactorCandidate]) -> bool:
-    """
-    [DEPRECATED — P2-12] Redirects to candidate pool instead of direct registration.
-    Use save_to_candidate_pool() + promote_candidate_factor() instead.
-    """
-    print("  ⚠️  auto_register_factors is deprecated. Saving to candidate pool instead.")
-    return save_to_candidate_pool(accepted)
-
-
 def _formula_to_dsl(formula: str, name: str) -> str:
     """
     Convert LLM formula to Factor DSL expression.
@@ -550,7 +541,7 @@ def run_research_loop(
     n_candidates: int = 8,
     ic_threshold: float = 0.015,
     max_rounds: int = 3,
-    auto_register: bool = False,
+    save_candidates: bool = False,
 ):
     """
     Full multi-round factor discovery pipeline.
@@ -563,7 +554,7 @@ def run_research_loop(
     print(f"   IC threshold: {ic_threshold}")
     print(f"   Max rounds: {max_rounds}")
     print(f"   Model: deepseek-v4-pro")
-    print(f"   Auto-save to candidate pool: {auto_register}")
+    print(f"   Save accepted candidates: {save_candidates}")
     print(f"{'='*60}")
 
     # Load existing factors
@@ -625,7 +616,7 @@ def run_research_loop(
         existing.extend([c.name for c in round_accepted])
 
         # Save to candidate pool after each round if requested
-        if auto_register and round_accepted:
+        if save_candidates and round_accepted:
             save_to_candidate_pool(round_accepted)
 
         # Early stop: no new factors
@@ -655,25 +646,25 @@ def run_research_loop(
     for c in sorted(all_accepted, key=lambda x: -x.icir):
         print(f"  ✅ {c.name:25s} IC={c.ic:.4f} ICIR={c.icir:.2f} OOS_IC={c.oos_ic:.4f} (round {c.round_num})")
 
-    if auto_register and all_accepted:
-        print(f"\n  📝 Factors auto-registered in signals/expression.py")
-        print(f"     Rebuild features and retrain model to integrate.")
+    if save_candidates and all_accepted:
+        print(f"\n  📝 Accepted factors saved to candidate pool")
+        print(f"     Promote selected candidates, then rebuild features and retrain the model.")
 
     return all_accepted
 
 
 if __name__ == "__main__":
     import argparse
-    ap = argparse.ArgumentParser(description="LLM Factor Research Engine v4.2")
+    ap = argparse.ArgumentParser(description="LLM Factor Research Engine v4.3")
     ap.add_argument("--n-candidates", type=int, default=8)
     ap.add_argument("--ic-threshold", type=float, default=0.015)
     ap.add_argument("--rounds", type=int, default=3, help="Max rounds of iteration")
-    ap.add_argument("--auto-register", action="store_true", help="Auto-insert accepted factors into alpha_factors()")
+    ap.add_argument("--save-candidates", action="store_true", help="Save accepted factors to the candidate pool")
     args = ap.parse_args()
 
     run_research_loop(
         n_candidates=args.n_candidates,
         ic_threshold=args.ic_threshold,
         max_rounds=args.rounds,
-        auto_register=args.auto_register,
+        save_candidates=args.save_candidates,
     )

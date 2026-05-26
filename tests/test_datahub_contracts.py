@@ -55,8 +55,8 @@ def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatc
 
     store = tmp_path / "store"
     cache = tmp_path / "cache"
-    monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-    monkeypatch.setenv("QUANT_AGENT_CACHE", str(cache))
+    monkeypatch.setenv("ASTROLABE_STORE", str(store))
+    monkeypatch.setenv("ASTROLABE_CACHE", str(cache))
     reset_datahub()
 
     hub = DataHub(store_root=store, cache_root=cache)
@@ -88,19 +88,11 @@ def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatc
     reset_datahub()
 
 
-def test_datahub_prefers_astrolabe_env_alias(tmp_path, monkeypatch):
+def test_datahub_uses_canonical_astrolabe_env(tmp_path, monkeypatch):
     from data.datahub import DataHub
 
-    legacy_store = tmp_path / "legacy-store"
-    legacy_cache = tmp_path / "legacy-cache"
-    xingpan_store = tmp_path / "xingpan-store"
-    xingpan_cache = tmp_path / "xingpan-cache"
     astrolabe_store = tmp_path / "astrolabe-quant-store"
     astrolabe_cache = tmp_path / "astrolabe-quant-cache"
-    monkeypatch.setenv("QUANT_AGENT_STORE", str(legacy_store))
-    monkeypatch.setenv("QUANT_AGENT_CACHE", str(legacy_cache))
-    monkeypatch.setenv("XINGPAN_STORE", str(xingpan_store))
-    monkeypatch.setenv("XINGPAN_CACHE", str(xingpan_cache))
     monkeypatch.setenv("ASTROLABE_STORE", str(astrolabe_store))
     monkeypatch.setenv("ASTROLABE_CACHE", str(astrolabe_cache))
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
 
 from data.datahub import get_datahub
@@ -13,12 +11,8 @@ from web.api.services.snapshots import latest_hub_snapshot
 HUB = get_datahub()
 
 
-def sector_store() -> Path:
-    return HUB.store_root / "sector"
-
-
-def latest_snapshot(dimension: str, legacy_prefix: str) -> Path | None:
-    return latest_hub_snapshot(HUB, dimension, sector_store(), legacy_prefix)
+def latest_snapshot(dimension: str):
+    return latest_hub_snapshot(HUB, dimension)
 
 
 def source_summary(sectors: list[dict]) -> str:
@@ -30,8 +24,8 @@ def source_summary(sectors: list[dict]) -> str:
     return "missing"
 
 
-def _read_snapshot(dimension: str, legacy_prefix: str) -> tuple[Path | None, pd.DataFrame]:
-    path = latest_snapshot(dimension, legacy_prefix)
+def _read_snapshot(dimension: str):
+    path = latest_snapshot(dimension)
     if not path:
         return None, pd.DataFrame()
     return path, HUB.read_parquet(path, default=pd.DataFrame())
@@ -54,8 +48,8 @@ def _signal_map(sigs: pd.DataFrame, sector_name: str) -> dict:
 
 
 def build_sector_overview() -> dict:
-    perf_path, perf = _read_snapshot("sector_performance_snapshot", "sector_performance_")
-    sig_path, sigs = _read_snapshot("sector_signal_snapshot", "sector_signals_")
+    perf_path, perf = _read_snapshot("sector_performance_snapshot")
+    sig_path, sigs = _read_snapshot("sector_signal_snapshot")
 
     sectors = []
     if not perf.empty:
@@ -106,7 +100,7 @@ def build_sector_overview() -> dict:
 
 
 def build_sector_exposure() -> dict:
-    exp_path, df = _read_snapshot("sector_exposure_snapshot", "sector_exposure_")
+    exp_path, df = _read_snapshot("sector_exposure_snapshot")
     if exp_path is None or df.empty:
         return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
 
@@ -143,8 +137,8 @@ def build_sector_stocks(industry: str) -> dict:
 
 
 def build_sector_detail(industry: str) -> dict:
-    _, perf = _read_snapshot("sector_performance_snapshot", "sector_performance_")
-    _, sigs = _read_snapshot("sector_signal_snapshot", "sector_signals_")
+    _, perf = _read_snapshot("sector_performance_snapshot")
+    _, sigs = _read_snapshot("sector_signal_snapshot")
 
     perf_row = {}
     if not perf.empty:

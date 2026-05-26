@@ -409,13 +409,7 @@ def build_exposure(hub: DataHub | None = None) -> pd.DataFrame:
 
 
 def _load_position_snapshot(hub: DataHub) -> pd.DataFrame:
-    """Load positions from canonical paper state, with legacy positions fallback."""
-    legacy_path = hub.paper_path("positions")
-    if legacy_path.exists():
-        legacy = hub.read_parquet(legacy_path, default=pd.DataFrame())
-        if legacy is not None and not legacy.empty:
-            return legacy.copy()
-
+    """Load positions from canonical paper state."""
     state_path = hub.paper_path("state")
     if not state_path.exists():
         return pd.DataFrame()

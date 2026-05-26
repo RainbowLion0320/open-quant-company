@@ -1,8 +1,7 @@
 """
 PipelineBacktest — daily backtest loop driven by the pipeline stages.
 
-Replaces the hand-rolled run_backtest() in run_all_strategies.py
-with the same Alpha→Portfolio→Risk→Execution stages that paper trading uses.
+Uses the same Alpha→Portfolio→Risk→Execution stages that paper trading uses.
 """
 
 from __future__ import annotations
@@ -48,7 +47,7 @@ class PipelineBacktest:
         universe: list[str] | None = None,
         monthly_regimes: dict[str, str] | None = None,
     ) -> dict:
-        """Run the backtest day by day, returning the same result dict as run_backtest()."""
+        """Run the backtest day by day and return the standard result dict."""
         if universe is None:
             universe = list(prices.columns)
 

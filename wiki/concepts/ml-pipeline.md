@@ -93,7 +93,8 @@ LLM hypothesis
   → DSL formula
   → PIT/OOS evaluation
   → factor_scoreboard
-  → optional auto-register
+  → candidate pool
+  → manual promotion when evidence is strong enough
 ```
 
 LLM 因子必须防止两类常见错误：

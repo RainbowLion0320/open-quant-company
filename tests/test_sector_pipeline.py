@@ -214,13 +214,18 @@ def test_build_exposure_with_mock_positions(tmp_path, monkeypatch):
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
 
-    pos = pd.DataFrame([
-        {"symbol": "000001", "market_value": 50000},
-        {"symbol": "000002", "market_value": 30000},
-        {"symbol": "000001", "market_value": 20000},
-    ])
-    (tmp_path / "paper").mkdir(exist_ok=True)
-    hub.write_parquet(pos, tmp_path / "paper" / "positions.parquet")
+    state = pd.DataFrame([{
+        "cash": 900000.0,
+        "frozen_cash": 0.0,
+        "peak_equity": 1000000.0,
+        "positions": json.dumps({
+            "000001": {"market_value": 70000, "volume": 1000, "avg_cost": 70.0},
+            "000002": {"market_value": 30000, "volume": 1000, "avg_cost": 30.0},
+        }, ensure_ascii=False),
+        "order_counter": 0,
+        "updated_at": "2026-05-23T00:00:00",
+    }])
+    hub.write_parquet(state, hub.paper_path("state"))
 
     mem = pd.DataFrame([
         {"symbol": "000001", "sector_name": "银行"},

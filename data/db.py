@@ -125,7 +125,7 @@ def _register_views(db: Database):
 
     视图命名:
       signals/{name}.parquet → {name}_signals  (策略信号)
-      signals/buffett.parquet → buffett_scan    (向后兼容)
+      signals/buffett_scan.parquet → buffett_scan
       scan_meta.parquet       → scan_meta
     """
     if db.backend != "duckdb":
@@ -166,7 +166,7 @@ def _register_views(db: Database):
             f"SELECT * FROM read_parquet('{meta_pq}')"
         )
 
-    # 盘后数据缓存视图 (兼容 create_cache_views) — now under data/cache/api/
+    # 盘后数据缓存视图 under data/cache/api/
     api_cache_dir = _HUB.cache_root / "api"
     if api_cache_dir.exists():
         for pq in sorted(api_cache_dir.glob("*.parquet")):
@@ -183,7 +183,7 @@ def _register_views(db: Database):
     # 扫描 data/store/{asset_type}/signals/ 下的信号文件
     for asset_dir in sorted(_STORE_DIR.glob("*/")):
         atype = asset_dir.name
-        if atype in ("signals", "features"):  # 跳过顶层兼容目录
+        if atype in ("signals", "features"):
             continue
         atype_sig_dir = asset_dir / "signals"
         if atype_sig_dir.exists():

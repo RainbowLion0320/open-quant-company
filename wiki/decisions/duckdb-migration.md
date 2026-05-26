@@ -1,7 +1,7 @@
 ---
 title: DuckDB + Parquet 存储架构演进
 created: 2026-05-12
-updated: 2026-05-14
+updated: 2026-05-26
 type: decision
 tags: [duckdb, parquet, database, migration, architecture, ADR, concurrency]
 ---
@@ -35,19 +35,14 @@ tags: [duckdb, parquet, database, migration, architecture, ADR, concurrency]
 | Web 读 | 等 cron 释放锁 | 永不等 |
 | 新增资产 | 改 schema 重建 | 新目录 + 新 Parquet |
 
-## 读写分离 (已废弃旧方案)
+## 读写分离
 
-~~Web 以 `get_db(read_only=True)` 连接，实践中采用"关 Web → 扫描 → 重启 Web"的顺序。~~
-
-**Phase 2 新方案**: 
 - Web: `duckdb.connect(":memory:")` + `CREATE VIEW FROM read_parquet()` → 永不锁
 - Cron: `pd.DataFrame.to_parquet()` → 直接写文件, 不经过 DuckDB
 
-## 写入模式 (已废弃旧方案)
+## 写入模式
 
-~~`INSERT OR REPLACE` 在 DuckDB 复合主键 + `executemany` 批量插入下有 bug……~~
-
-**Phase 2**: Pandas → Parquet, 无需 SQL 写入, 无锁, 无 INSERT 陷阱。
+Pandas → Parquet, 无需 SQL 写入, 无锁, 无 INSERT 陷阱。
 
 ## Migration Details
 
@@ -118,11 +113,8 @@ db.execute("CREATE VIEW features_2024_01 AS SELECT * FROM read_parquet('data/sto
 - PIT严格: 每月文件只含该月已知的数据, FeatureStoreBuilder 强制 as_of 限制
 - 可扩展: 新增资产 → 同 schema 新文件, 无需改表
 
-## 读写分离 (已废弃旧方案)
+## Phase 2/3 读写模式
 
-~~Web 以 `get_db(read_only=True)` 连接，实践中采用"关 Web → 扫描 → 重启 Web"的顺序。~~
-
-**Phase 2/3 方案**: 
 - Web: `duckdb.connect(":memory:")` + `CREATE VIEW FROM read_parquet()` → 永不锁
 - Cron: `pd.DataFrame.to_parquet()` → 直接写文件, 不经过 DuckDB
 - Features: `FeatureStoreBuilder.build_month()` → `to_parquet()` → 按月份压缩存储

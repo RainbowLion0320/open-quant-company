@@ -362,6 +362,7 @@ def pre_scan_gate(
     symbol: str | None = None,
     strict: bool = False,
     hub=None,
+    today: date | None = None,
 ) -> tuple[bool, list[QualityReport]]:
     """Convenience function: run pre-scan quality gate.
 
@@ -370,11 +371,12 @@ def pre_scan_gate(
         symbol: Optional single symbol for symbol-level checks.
         strict: If True, raise RuntimeError on gate failure. For cron safety.
         hub: Optional DataHub instance for testing.
+        today: Optional business date override for deterministic checks.
 
     Returns:
         (passed, reports) tuple.
     """
-    gate = DataQualityGate(hub=hub)
+    gate = DataQualityGate(today=today, hub=hub)
     passed, reports = gate.pre_scan_check(required_dims, symbol)
 
     if strict and not passed:

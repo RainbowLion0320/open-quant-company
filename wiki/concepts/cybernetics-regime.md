@@ -24,46 +24,6 @@ tags: [cybernetics, market-regime, ma-alignment, position-sizing, sector-rotatio
 
 实时链路通过 `cybernetics/regime_state.py` 做状态稳定确认。Web/API 返回的 `value` 是 confirmed regime，`raw_value` 是单次快照原始分类，`stability` 显示 pending 状态。同一交易日重复刷新不累计 dwell，必须出现连续唯一市场观测后才切换 confirmed regime。
 
-## Monthly Regime Fix (v3.4, 2026-05-14)
-
-这一节记录历史回测修复背景，不代表当前 Web/API 生产公式。当前生产链路以 V3 champion score + realtime dwell 状态机为准。
-
-**问题**: 回测引擎以日频遍历时, 每日重新判定 regime 导致 regime 在 bull/bear/sideways 间高频翻转。实际交易中 regime 判断应基于月级别趋势, 不应每日改变。后果: 控制论策略过度交易 (5974笔/100只 vs buffett 9笔), 回测收益 -5.85%。
-
-**修复**: Regime 检测从日线 MA 排列改为月线 K 线预计算:
-
-```python
-# 旧 (日频, 导致 regime 翻转)
-def detect_regime(date):
-    prices = prices_df.loc[:date]
-    ma5 = prices["close"].rolling(5).mean().iloc[-1]
-    # → bull on day 15, bear on day 17, bull on day 18...
-
-# 新 (月频, regime 稳定)
-regime_cache = {}  # 在回测开始时预计算
-for month in all_months:
-    monthly_close = prices_df["close"].resample("M").last()
-    regime_cache[month] = classify(monthly_close)
-
-# 回测中仅查表
-def detect_regime(date):
-    return regime_cache[date.strftime("%Y-%m")]
-```
-
-**Impact on Rebalance**: 控制论策略的 `should_rebalance` 逻辑:
-- 每月调仓 (monthly, 月初第一天)
-- Regime 切换时额外触发调仓
-- 月频 regime → 切换事件大幅减少 → 交易量暴跌
-
-**结果** (回测, 来源: `backtest/run_all_strategies.py` 最新输出):
-
-| 版本 | 说明 | 问题 |
-|------|------|------|
-| Daily regime (旧) | regime 日频翻转导致过度交易 | 已弃用 |
-| Monthly regime (新) | 月频 regime, 交易量大幅减少 | ✓ |
-
-具体回测收益和交易笔数以最新 `backtest/run_all_strategies.py` 运行输出为准，不写入 wiki。
-
 ## Feedback Loop
 
 1. **Sense**: 计算多指数趋势、全市场宽度、风险缓冲和量能确认

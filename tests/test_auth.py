@@ -314,26 +314,22 @@ class TestAuthHelpers:
         saved = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
         assert "api_key" not in saved["project"]
 
-    def test_api_key_can_come_from_env(self, monkeypatch):
-        monkeypatch.setenv("QUANT_AGENT_API_KEY", "env-secret")
+    def test_api_key_can_come_from_astrolabe_env(self, monkeypatch):
+        monkeypatch.setenv("ASTROLABE_API_KEY", "env-secret")
         from web.api.auth import get_api_key
 
         assert get_api_key() == "env-secret"
 
-    def test_astrolabe_api_key_takes_precedence(self, monkeypatch):
-        monkeypatch.setenv("QUANT_AGENT_API_KEY", "legacy-secret")
-        monkeypatch.setenv("XINGPAN_API_KEY", "xingpan-secret")
-        monkeypatch.setenv("ASTROLABE_API_KEY", "astrolabe-quant-secret")
+    def test_renamed_project_env_aliases_are_not_read(self, monkeypatch):
+        old_quant_env = "QUANT" + "_AGENT_API_KEY"
+        old_chinese_name_env = "XING" + "PAN_API_KEY"
+        monkeypatch.setenv(old_quant_env, "old-secret")
+        monkeypatch.setenv(old_chinese_name_env, "old-secret")
+        monkeypatch.delenv("ASTROLABE_API_KEY", raising=False)
         from web.api.auth import get_api_key
 
-        assert get_api_key() == "astrolabe-quant-secret"
-
-    def test_xingpan_api_key_remains_legacy_fallback(self, monkeypatch):
-        monkeypatch.setenv("QUANT_AGENT_API_KEY", "legacy-secret")
-        monkeypatch.setenv("XINGPAN_API_KEY", "xingpan-secret")
-        from web.api.auth import get_api_key
-
-        assert get_api_key() == "xingpan-secret"
+        with patch("web.api.auth._read_settings", return_value={"project": {}}):
+            assert get_api_key() == ""
 
     def test_get_run_mode_default(self):
         """get_run_mode returns 'research' when no config."""

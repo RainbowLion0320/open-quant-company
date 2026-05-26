@@ -262,11 +262,7 @@ async def get_sector_exposure():
     except Exception:
         latest_path = None
     if latest_path is None:
-        legacy = hub.store_root / "sector"
-        candidates = sorted(legacy.glob("sector_exposure_*.parquet"), reverse=True) if legacy.exists() else []
-        if not candidates:
-            return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
-        latest_path = candidates[0]
+        return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
 
     import pandas as pd
     df = hub.read_parquet(latest_path, default=pd.DataFrame())

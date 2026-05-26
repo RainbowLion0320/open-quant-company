@@ -52,8 +52,8 @@ def test_db_health_scans_new_registry_dimensions(tmp_path, monkeypatch):
 
     store = tmp_path / "store"
     cache = tmp_path / "cache"
-    monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-    monkeypatch.setenv("QUANT_AGENT_CACHE", str(cache))
+    monkeypatch.setenv("ASTROLABE_STORE", str(store))
+    monkeypatch.setenv("ASTROLABE_CACHE", str(cache))
     reset_datahub()
 
     hub = DataHub(store_root=store, cache_root=cache)
@@ -186,3 +186,13 @@ def test_settings_cancel_reverts_pending_toggle():
     assert "cancelConfirm" in settings
     assert "restoreConfig" in settings
     assert "@click.self=\"cancelConfirm\"" in settings
+
+
+def test_frontend_router_does_not_keep_legacy_redirect_routes():
+    router = Path("web/frontend/src/router/index.ts").read_text()
+
+    assert "redirectWithTab" not in router
+    for path in ("/strategies", "/signals", "/backtest", "/sectors", "/monitor", "/settings", "/db-health", "/hindsight"):
+        assert f'path: "{path}"' not in router
+    assert 'path: "/stocks/:code"' in router
+    assert 'path: "/stocks"' not in router

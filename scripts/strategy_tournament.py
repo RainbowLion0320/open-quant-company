@@ -178,9 +178,7 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
                     if dt not in df.index:
                         continue
                     idx = df.index.get_loc(dt)
-                    # 只传 close Series (兼容旧 scorer)
-                    close_only = df["close"] if isinstance(df, pd.DataFrame) else df
-                    sc = strategy.score(sym, close_only, idx, regime)
+                    sc = strategy.score(sym, df, idx, regime)
                     if sc > 0:
                         scores[sym] = sc
 

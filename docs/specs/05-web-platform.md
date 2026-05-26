@@ -4,7 +4,7 @@
 
 ## 1. 概述
 
-Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 实时推送。一级导航收敛为市场总览、市场研究、策略实验室、组合执行、数据中台、系统控制；原子功能通过二级 tab 或兼容 redirect 访问。
+Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 实时推送。一级导航收敛为市场总览、市场研究、策略实验室、组合执行、数据中台、系统控制；原子功能通过二级 tab 访问。
 
 **设计原则：**
 - **前后端分离** — Vue 3 (Vite) + FastAPI，独立开发/部署
@@ -50,7 +50,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | `/datahub` | 数据中台 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
 | `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、记忆图谱 |
 
-**兼容 redirect：** `/strategies`、`/signals`、`/backtest`、`/stocks`、`/sectors`、`/monitor`、`/settings`、`/db-health`、`/hindsight` 保留为旧入口重定向，不作为一级导航展示。
+旧一级页面 redirect 已移除。除 `/stocks/:code` 个股详情隐藏路由外，用户应通过六个一级模块和二级 tab 访问原子功能。
 
 ### 2.2 后端架构 (FastAPI)
 
@@ -69,7 +69,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Sectors | `routes/sectors.py` | `GET /sectors/overview`, `GET /sectors/exposure`, `GET /sectors/{industry}`, `GET /sectors/{industry}/stocks` |
 | Settings | `routes/settings.py` | `GET /settings`, `PUT /settings` |
 | System | `routes/system.py` | `GET /system/monitor`, `GET /system/history`, `GET /system/api-health`, `GET /system/cron-jobs`, `GET /system/service-status`, `GET /system/audit`, `GET /system/mode` |
-| Hindsight | `routes/hindsight.py` | `POST /hindsight/query` |
+| Hindsight | `routes/hindsight.py` | `GET /hindsight/graph` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
 
 **WebSocket：** `ws.py` → `/ws/{job_id}` — 任务进度实时推送。`broadcast_progress()` 使用 `list()` 拍平连接集合避免并发修改异常。

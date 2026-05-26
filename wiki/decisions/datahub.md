@@ -1,7 +1,7 @@
 ---
 title: DataHub 数据中台决策
 created: 2026-05-17
-updated: 2026-05-21
+updated: 2026-05-26
 type: decision
 tags: [datahub, storage, parquet, duckdb, architecture]
 ---
@@ -48,7 +48,7 @@ DataHub 负责:
 - `scripts/execute_paper_trades.py`: 使用 `latest_batch` 读取最新信号。
 - `web/api/routes/system.py`, `scripts/collect_system_metrics.py`: 系统监控库和 token cache 不再写死绝对路径。
 - `scripts/db_health_check.py`: 健康扫描从 data registry 注入 source/label/SLA/repair/partition 元数据。
-- 多个离线脚本和 fetcher: 移除硬编码 `/Users/fushao/quant-agent/...`，逐步用 DataHub 管理。
+- 多个离线脚本和 fetcher: 通过 DataHub/registry 解析路径，不依赖固定本机路径。
 
 ## 后续扩展规则
 
@@ -60,6 +60,6 @@ DataHub 负责:
 4. 追加型数据走 `append_parquet`，必须明确去重键或批次时间列。
 5. Web 查询继续走 DuckDB 只读视图，只有确实需要事务、并发写、多用户权限时再引入服务型数据库。
 
-## 迁移原则
+## 当前约束
 
-本次不移动历史数据，不改变现有 Parquet 文件名，不破坏旧路径。DataHub 先作为统一入口覆盖新增和关键路径，后续模块可以渐进式迁入。
+新增或重构模块不得再引入绕过 DataHub/registry 的读写路径。已迁入 DataHub 的维度不保留扁平文件 fallback；确需迁移旧数据时，应写一次性迁移脚本，而不是在运行时代码中长期保留兼容分支。

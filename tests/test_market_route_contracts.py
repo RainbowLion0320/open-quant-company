@@ -1,7 +1,7 @@
 import pandas as pd
 
 from cybernetics import orchestrator
-from web.api.routes import market
+from web.api.services import market as market_service
 
 
 def _index_frame(offset: float = 0) -> pd.DataFrame:
@@ -20,9 +20,7 @@ def test_market_index_cards_are_distinct_core_indices(monkeypatch):
         }
         return frames[symbol], "real", "test source"
 
-    monkeypatch.setattr(market, "_load_index", fake_load_index)
-
-    cards = market._multi_asset_cards(_index_frame())
+    cards = market_service.multi_asset_cards(_index_frame(), load_index_fn=fake_load_index)
 
     assert [c["key"] for c in cards] == ["sse", "csi300", "chinext", "star50"]
     assert [c["label"] for c in cards] == ["上证综指", "沪深300", "创业板指", "科创50"]
@@ -42,9 +40,7 @@ def test_market_index_cards_respect_requested_series_limit(monkeypatch):
     def fake_load_index(symbol: str):
         return _index_frame(10), "real", "test source"
 
-    monkeypatch.setattr(market, "_load_index", fake_load_index)
-
-    cards = market._multi_asset_cards(_index_frame(), series_limit=2)
+    cards = market_service.multi_asset_cards(_index_frame(), series_limit=2, load_index_fn=fake_load_index)
 
     assert all(len(card["series"]) == 2 for card in cards)
 
@@ -55,5 +51,5 @@ def test_position_capacity_uses_adaptive_regime_ceiling(monkeypatch):
 
     monkeypatch.setattr(orchestrator, "adaptive_params", fake_adaptive_params)
 
-    assert market._position_capacity(5) == {"current": 5, "max": 8}
-    assert market._position_capacity(10) == {"current": 10, "max": 10}
+    assert market_service.position_capacity(5) == {"current": 5, "max": 8}
+    assert market_service.position_capacity(10) == {"current": 10, "max": 10}

@@ -1,8 +1,8 @@
 # 星盘 / Astrolabe Quant OS — PRD/Spec 验收矩阵
 
-> 日期: 2026-05-23 | 来源: 文档治理基线
+> 日期: 2026-05-26 | 来源: 文档治理基线
 > 用途: 追踪 6 个能力域从 PRD/spec → 代码 → 测试 → API/Web → 手工验收的完整链路
-> 维护规则: 本文件记录当前可验收能力链路，不作为 sprint 日志；历史计划见 `docs/plans/archive/`
+> 维护规则: 本文件记录当前可验收能力链路，不作为 sprint 日志；历史计划和任务过程通过 git 追溯。
 
 ## 1. 数据管道 (Data Pipeline)
 
@@ -49,7 +49,7 @@
 | 3.2 | 15 项风险指标 (Sharpe/Sortino/Calmar...) | `backtest/analytics.py` | `test_boundary.py` (Sharpe/MaxDD/WinRate/Beta/Alpha) | `Backtest.vue` 雷达图 | 手工验证 Sortino 用 RMS 法、Beta 用 cov 矩阵 | OK | — |
 | 3.3 | PIT 零前视偏差 | `backtest/run_all_strategies.py` | — | — | 构造未来暴涨样本 → 策略不提前买入 | OK | 待增强自动化检测 |
 | 3.4 | Regime 检测用滞后一月数据 | `backtest/run_all_strategies.py:build_monthly_regime()` | — | — | `build_monthly_regime()` 使用 `monthly.values[i-1]` | OK | — |
-| 3.5 | 巴菲特滚动窗口逐年评分 | `backtest/buffett_real_scorer.py` | — | — | 验证 `_last_buffett_year` 每次 run_backtest 重置为 0 | OK | — |
+| 3.5 | 巴菲特滚动窗口逐年评分 | `backtest/buffett_real_scorer.py` | — | — | 验证滚动评分器每次策略评分前重置年度缓存，且只使用当期可得财报 | OK | — |
 | 3.6 | 回测结果可复现 | — | — | — | 同一数据+种子 → 同一结果 | OK | 待补回归测试 |
 | 3.7 | 可插拔回测流水线 | `backtest/pipeline.py` | — | — | 自定义 Pipeline 组合 Data/Strategy/Selection/Risk/Execution | OK | 待补自动化测试 |
 | 3.8 | 基准使用上证综指 (非个股) | `config/settings.yaml` backtest.benchmark | — | — | 确认 benchmark=sh000001 (非 000001) | OK (已修复) | — |
@@ -106,12 +106,12 @@
 | 能力域 | 总条目 | OK | 有缺口 | 待补测试 |
 |--------|-------|-----|--------|---------|
 | 数据管道 | 13 | 13 | 0 | 4 |
-| 信号系统 | 10 | 10 | 0 | 3 |
-| 回测引擎 | 8 | 8 | 0 | 3 |
+| 信号系统 | 14 | 14 | 0 | 3 |
+| 回测引擎 | 9 | 9 | 0 | 3 |
 | 执行层 | 8 | 8 | 0 | 5 |
 | Web 平台 | 13 | 13 | 0 | 2 |
 | 多资产架构 | 10 | 10 | 0 | 3 |
-| **合计** | **63** | **63** | **0** | **20** |
+| **合计** | **67** | **67** | **0** | **20** |
 
 **维护说明:**
 

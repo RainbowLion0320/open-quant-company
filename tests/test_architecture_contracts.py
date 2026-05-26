@@ -1,4 +1,5 @@
 import importlib
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -189,5 +190,72 @@ def test_scripts_do_not_import_regime_helpers_from_orchestrator():
             offenders.append(str(path))
         if "from cybernetics.orchestrator import MarketRegime" in text:
             offenders.append(str(path))
+
+    assert offenders == []
+
+
+def test_repository_keeps_completed_plans_out_of_active_context():
+    forbidden_paths = [
+        Path("docs/plans/archive"),
+        Path("wiki/_archive"),
+        Path("wiki/log.md"),
+    ]
+    existing = [str(path) for path in forbidden_paths if path.exists()]
+    existing.extend(str(path) for path in Path("docs/plans").glob("20*.md"))
+
+    assert existing == []
+
+
+def test_current_docs_do_not_point_agents_to_archived_context():
+    checked_roots = [Path("docs"), Path("wiki")]
+    excluded = {Path("docs/plans/README.md")}
+    forbidden_tokens = (
+        "docs/plans/archive",
+        "wiki/_archive",
+        "log-2026-05-23",
+        "2026-05-25-market-regime-research-trainer.md",
+        "2026-05-26-market-regime-profit-trainer.md",
+    )
+
+    offenders = []
+    for root in checked_roots:
+        for path in root.rglob("*.md"):
+            if path in excluded:
+                continue
+            text = path.read_text(encoding="utf-8")
+            for token in forbidden_tokens:
+                if token in text:
+                    offenders.append(f"{path}:{token}")
+
+    assert offenders == []
+
+
+def test_backtest_entrypoint_no_longer_exposes_legacy_runner():
+    text = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
+
+    assert "def run_backtest(" not in text
+    assert "--legacy" not in text
+    assert "legacy hand-rolled" not in text
+
+
+def test_tracked_project_context_uses_canonical_astrolabe_names():
+    tracked_files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+    forbidden = [
+        "QUANT" + "_AGENT_",
+        "XING" + "PAN_",
+        "quant" + "-agent",
+        "xing" + "pan",
+    ]
+
+    offenders = []
+    for raw_path in tracked_files:
+        path = Path(raw_path)
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for marker in forbidden:
+            if marker in text:
+                offenders.append(str(path))
+                break
 
     assert offenders == []

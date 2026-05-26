@@ -98,11 +98,11 @@ const nav = [
 
 const activeSectionPath = computed(() => {
   if (route.path === "/") return "/";
-  if (route.path.startsWith("/research") || route.path.startsWith("/stocks") || route.path.startsWith("/sectors")) return "/research";
-  if (route.path.startsWith("/strategy-lab") || route.path.startsWith("/strategies") || route.path.startsWith("/signals") || route.path.startsWith("/backtest")) return "/strategy-lab";
+  if (route.path.startsWith("/research") || route.path.startsWith("/stocks")) return "/research";
+  if (route.path.startsWith("/strategy-lab")) return "/strategy-lab";
   if (route.path.startsWith("/portfolio")) return "/portfolio";
-  if (route.path.startsWith("/datahub") || route.path.startsWith("/db-health")) return "/datahub";
-  if (route.path.startsWith("/system") || route.path.startsWith("/monitor") || route.path.startsWith("/settings") || route.path.startsWith("/hindsight")) return "/system";
+  if (route.path.startsWith("/datahub")) return "/datahub";
+  if (route.path.startsWith("/system")) return "/system";
   return route.path;
 });
 

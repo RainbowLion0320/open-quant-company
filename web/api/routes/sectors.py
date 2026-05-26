@@ -8,12 +8,6 @@ from web.api.services import sectors as sector_service
 
 router = APIRouter(prefix="/api/sectors", tags=["Sectors"])
 
-# Backward-compatible private aliases for older tests/imports.
-_sector_store = sector_service.sector_store
-_latest_snapshot = sector_service.latest_snapshot
-_source_summary = sector_service.source_summary
-
-
 @router.get("/overview")
 def sector_overview():
     """Return sector performance ranking + signal summary."""

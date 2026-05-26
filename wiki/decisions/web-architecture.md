@@ -46,12 +46,12 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 | 数据中台 | `/datahub` | DataRegistry 健康扫描 + 全量大小统计 + 按时间分段 + 单表修复 |
 | 系统控制 | `/system` | 二级 tab: 系统信息 + 系统设置 + Hindsight 记忆图谱 |
 
-旧路径 `/strategies`、`/signals`、`/backtest`、`/stocks`、`/sectors`、`/monitor`、`/settings`、`/db-health`、`/hindsight` 保留 redirect，保证书签和 agent 旧入口可用。
+旧一级页面 redirect 已移除，避免隐藏入口继续影响导航编排。除 `/stocks/:code` 个股详情外，模块入口以六个一级路由和二级 tab 为准。
 
 ### 指挥中心 (2026-05-16 Codex 升级)
 
 Market API 新增字段：
-- `multi_asset[]` — 兼容字段名，当前承载上证综指/沪深300/创业板指/科创50 核心指数序列；市场页仅用于相对强弱图，全局 ticker 展示点位与日涨跌
+- `multi_asset[]` — 上证综指/沪深300/创业板指/科创50 核心指数序列；市场页仅用于相对强弱图，全局 ticker 展示点位与日涨跌
 - `macro[]` — GDP/PMI/CPI/SHIBOR 宏观快照
 - `alerts[]` — 智能预警 (regime/PMI偏离/黄金波动/策略完成)
 - `freshness` — 数据新鲜度时间戳

@@ -237,10 +237,6 @@ def _get_sector_momentum() -> dict:
         except Exception:
             pass
         if not candidates:
-            legacy = hub.store_root / "sector"
-            if legacy.exists():
-                candidates = sorted(legacy.glob("sector_performance_*.parquet"), reverse=True)
-        if not candidates:
             _sector_ret_cache = {}
             return _sector_ret_cache
 

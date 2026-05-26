@@ -1,7 +1,7 @@
 ---
 title: Hindsight Architecture (记忆引擎深层架构)
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-05-26
 type: concept
 tags: [hindsight, memory, architecture, infrastructure, pg0]
 ---
@@ -29,7 +29,7 @@ Hermes Agent (deepseek-v4-pro)
 | 向量引擎 | pg0 v18.1.0 (嵌入式 PostgreSQL + pgvector) |
 | 嵌入模型 | sentence-transformers |
 | 活跃端口 | **9177** |
-| Bank ID | `quant-agent` (legacy ID, 星盘记忆库；Web API 可通过 `ASTROLABE_HINDSIGHT_BANK` 指向 `astrolabe-quant`) |
+| Bank ID | `astrolabe-quant` |
 | 召回预算 | mid |
 
 ## 关键配置
@@ -52,7 +52,7 @@ memory:
 {
   "mode": "local",
   "llm_model": "deepseek-v4-flash",
-  "bank_id": "quant-agent",
+  "bank_id": "astrolabe-quant",
   "auto_recall": true,
   "auto_retain": true,
   "memory_mode": "hybrid",
@@ -62,10 +62,9 @@ memory:
 
 ## 环境变量
 
-两个 env var 必须设置（都在 `~/.hermes/.env`）：
+必须设置的 env var（在 `~/.hermes/.env`）：
 
 - `HINDSIGHT_API_LLM_API_KEY` — Hindsight 调用 LLM 的 key
-- `HINDSIGHT_LLM_API_KEY` — 同上（向后兼容）
 
 ## 端口陷阱 (⚠️ 已修复)
 
@@ -138,7 +137,7 @@ curl localhost:9177/health
 
 ### 统计
 ```bash
-curl localhost:9177/v1/default/banks/quant-agent/stats
+curl localhost:9177/v1/default/banks/astrolabe-quant/stats
 # → total_nodes, total_links, nodes_by_fact_type, links_by_link_type
 ```
 
@@ -148,18 +147,9 @@ curl localhost:9177/v1/default/banks/quant-agent/stats
 - **端口冲突**: 不要同时跑两个 daemon 实例。
 - **pg0 数据目录**: `/Users/fushao/.pg0/instances/hindsight/data` (端口 5432)
 
-## 当前状态 (2026-05-17)
+## 当前状态
 
-> 注: 以下为历史快照，当前实时数据请查看 Web UI 记忆图谱页面或 `/api/hindsight/graph`。
-
-| 指标 | 值 |
-|------|-----|
-| 总节点 | ~100+ (增长中) |
-| Observations | ~70+ |
-| Experiences / World | ~30+ |
-| 总链接 | 3000+ |
-| 文档 | 15 |
-| 最后合并 | 2026-05-17T03:06 UTC |
+实时节点数、链接数和最后合并时间以 Web UI 记忆图谱页面或 `/api/hindsight/graph` 为准；wiki 不保存会快速过期的运行快照。
 
 ## 与 Hermes 工具的对应
 

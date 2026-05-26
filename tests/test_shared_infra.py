@@ -78,30 +78,23 @@ def test_api_serializer_converts_nan_and_time_series_consistently():
     ]
 
 
-def test_snapshot_finder_prefers_registry_path_with_legacy_fallback(tmp_path):
+def test_snapshot_finder_uses_registry_path_only(tmp_path):
     from web.api.services.snapshots import latest_snapshot
 
     registry_root = tmp_path / "registry"
-    legacy_root = tmp_path / "legacy"
     registry_root.mkdir()
-    legacy_root.mkdir()
     old = registry_root / "2026-05-20.parquet"
     new = registry_root / "2026-05-22.parquet"
-    legacy = legacy_root / "sector_performance_20260521.parquet"
-    for path in [old, new, legacy]:
+    for path in [old, new]:
         path.touch()
 
-    assert latest_snapshot(registry_root=registry_root, legacy_root=legacy_root, legacy_prefix="sector_performance_") == new
+    assert latest_snapshot(registry_root=registry_root) == new
 
     for path in [old, new]:
         path.unlink()
-    assert latest_snapshot(registry_root=registry_root, legacy_root=legacy_root, legacy_prefix="sector_performance_") == legacy
+    assert latest_snapshot(registry_root=registry_root) is None
 
-    assert latest_snapshot(
-        registry_root=Path("/does/not/exist"),
-        legacy_root=Path("/does/not/exist"),
-        legacy_prefix="missing_",
-    ) is None
+    assert latest_snapshot(registry_root=Path("/does/not/exist")) is None
 
 
 def test_buffett_score_estimator_is_shared_and_bounded():

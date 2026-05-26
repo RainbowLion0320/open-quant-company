@@ -30,7 +30,7 @@ tags: [index]
 - [[tushare-mcp]] — Tushare MCP，258工具，2000积分（门槛制，不消耗）
 
 ## Decisions
-- [[ai-automation-roadmap]] — **AI自动化路线图** ★：LLM多轮迭代、OOS验证、自注入库的方法论
+- [[ai-automation-roadmap]] — **AI自动化路线图** ★：LLM多轮迭代、OOS验证、候选池晋级的方法论
 - [[duckdb-migration]] — SQLite→DuckDB→Parquet 三阶段演进
 - [[datahub]] — DataHub 数据中台：统一路径、原子写入、最新批次、存储审计
 - [[web-architecture]] — Vue 3 + FastAPI，星盘终端 v4.0 设计系统

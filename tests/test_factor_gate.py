@@ -163,18 +163,6 @@ class TestPromoteCandidateFactor:
         assert '"expr_test"' in content
 
 
-class TestAutoRegisterDeprecated:
-    def test_auto_register_redirects_to_pool(self, clean_pool):
-        from scripts.factor_hypothesis import auto_register_factors, list_candidate_factors
-
-        factors = [FakeFactorCandidate("deprecated_test", "ts_mean(close, 5)")]
-        result = auto_register_factors(factors)
-        assert result is True
-
-        pool = list_candidate_factors()
-        assert "deprecated_test" in pool
-
-
 class TestFormulaToDSL:
     def test_converts_close_t(self):
         from scripts.factor_hypothesis import _formula_to_dsl

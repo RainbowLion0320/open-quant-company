@@ -6,11 +6,6 @@ from web.api.services import market as market_service
 
 router = APIRouter(prefix="/api/market", tags=["Market"])
 
-# Backward-compatible private aliases for older tests/imports.
-_load_index = market_service.load_index
-_position_capacity = market_service.position_capacity
-_multi_asset_cards = market_service.multi_asset_cards
-
 
 @router.get("/regime")
 async def market_regime():

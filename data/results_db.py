@@ -246,10 +246,3 @@ def _row_to_dict(row) -> dict:
     if isinstance(row, tuple):
         return {"value": row[0]}
     return {"value": row}
-
-
-# ── 兼容旧接口 ────────────────────────────────────────────
-
-def create_cache_views():
-    """已将 cache parquet 的映射整合进 db._register_views(), 此函数保留空壳兼容"""
-    pass

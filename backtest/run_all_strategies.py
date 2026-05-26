@@ -2,7 +2,7 @@
 四策略对比回测 — 逐日引擎，策略自主调仓
 产量: data/backtest_<strategy>.pkl + data/backtest_comparison.pkl
 """
-import os, sys, pickle
+import os, pickle
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,7 +18,6 @@ from datetime import datetime
 from core.settings import get_settings
 from data.fetcher import get_stock_daily, get_index_daily
 from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
-from backtest.analytics import RiskAnalytics
 from signals.scoring import estimate_buffett_score
 
 DATA_DIR = ROOT / "data"
@@ -53,14 +52,6 @@ def load_prices(pool, start, end):
     return pd.concat(dfs.values(), axis=1, keys=dfs.keys())
 
 
-def detect_regime(close, i):
-    if i < 60: return "sideways"
-    c = close[i]; ma5 = np.mean(close[i-5:i]); ma20 = np.mean(close[i-20:i]); ma60 = np.mean(close[i-60:i])
-    if c > ma5 > ma20 > ma60: return "bull"
-    if c < ma5 < ma20 < ma60: return "bear"
-    return "sideways"
-
-
 def build_monthly_regime(bench_close_series):
     """用月度K线预计算市场状态，每月一个 regime，避免日频噪声。
     使用上月末收盘价判断当月 regime，避免前视偏差。"""
@@ -82,139 +73,6 @@ def build_monthly_regime(bench_close_series):
         else:
             regimes[key] = "sideways"
     return regimes
-
-
-def run_backtest(name, pool, prices, bench_close, score_fn, start, end, cash=1_000_000):
-    """通用回测引擎 — 逐日评估，策略自主决定调仓日"""
-    global _last_buffett_year
-    _last_buffett_year = 0
-
-    # 策略调仓规则：默认月初，可通过 score_fn.should_rebalance 自定义
-    # should_rebalance 签名: (dt, regime, last_regime, holdings, current_price) → bool
-    should_rebal = getattr(score_fn, "should_rebalance", None)
-    last_regime = None
-
-    # ── 月线预计算 regime（避免日频噪声）──
-    monthly_regimes = build_monthly_regime(bench_close)
-    print(f"  [{name}] 月线 regime 预计算完成，{len(monthly_regimes)} 个月")
-
-    holdings = {}
-    portfolio_value = cash
-    trade_log = []
-
-    total_days = len(prices)
-    rebal_count = 0
-    daily_values = []
-    
-    for day_idx in range(total_days):
-        dt = prices.index[day_idx]
-        current_price = prices.iloc[day_idx]
-
-        # ── 进度 ──
-        if total_days >= 200 and day_idx % (total_days // 10) == 0:
-            print(f"  [{name}] {dt.date()}  {day_idx*100//total_days}%", end="\r", flush=True)
-
-        # ── 市场状态（从月线预计算字典查）──
-        regime = monthly_regimes.get(dt.strftime("%Y-%m"), "sideways")
-
-        # ── 调仓决策 (信号驱动, 非日历驱动) ──
-        do_rebalance = False
-        if should_rebal is not None:
-            do_rebalance = should_rebal(dt, regime, last_regime, holdings, current_price)
-        elif last_regime is None or last_regime != regime:
-            do_rebalance = True
-        else:
-            do_rebalance = False
-
-        if do_rebalance:
-            rebal_count += 1
-            last_regime = regime
-            print(f"\n  [{name}] 调仓 #{rebal_count} @ {dt.date()} regime={regime}", flush=True)
-
-            # ── 评分 ──
-            scores = {}
-            pool_total = len(pool)
-            for pi, sym in enumerate(pool):
-                if pool_total >= 500 and pi % (pool_total // 5) == 0:
-                    print(f"    评分 {pi*100//pool_total}%", end="\r", flush=True)
-                if sym not in prices.columns:
-                    continue
-                s = prices[sym]
-                try:
-                    stock_idx = s.index.get_indexer([dt], method="pad")[0]
-                    if stock_idx < 0:
-                        continue
-                except Exception:
-                    continue
-                sc = score_fn(sym, s, stock_idx, regime)
-                if sc > 0:
-                    scores[sym] = sc
-
-            if scores:
-                max_positions = getattr(score_fn, "max_positions", 8)
-                if callable(max_positions):
-                    max_positions = max_positions(regime)
-                ranked = sorted(scores.items(), key=lambda x: -x[1])[:int(max_positions)]
-                target = {s for s, _ in ranked}
-
-                record_target = getattr(score_fn, "record_target", None)
-                if callable(record_target):
-                    record_target(target)
-
-                # ── 卖出 ──
-                for sym in list(holdings):
-                    if sym not in target and sym in current_price and not pd.isna(current_price[sym]):
-                        p = current_price[sym]
-                        portfolio_value += holdings[sym] * p * 0.999  # 佣金
-                        trade_log.append((dt, "SELL", sym, holdings[sym], p))
-                        del holdings[sym]
-
-                # ── 买入 ──
-                val_per = portfolio_value * 0.30 / max(1, len(target))
-                for sym in target:
-                    if sym not in holdings and sym in current_price and not pd.isna(current_price[sym]):
-                        p = current_price[sym]
-                        shares = int(val_per / p // 100) * 100
-                        if shares >= 100:
-                            cost = shares * p * 1.001
-                            if cost <= portfolio_value:
-                                holdings[sym] = shares
-                                portfolio_value -= cost
-                                trade_log.append((dt, "BUY", sym, shares, p))
-
-        # ── 日度净值: 必须用当日现金和当日持仓，不能用最终持仓回填历史。
-        mv = 0
-        for sym, shares in holdings.items():
-            if sym in prices.columns:
-                known = prices[sym].iloc[: day_idx + 1].dropna()
-                if len(known):
-                    mv += shares * known.iloc[-1]
-        daily_values.append((dt, portfolio_value + mv))
-
-    vdf = pd.DataFrame(daily_values, columns=["date", "value"]).set_index("date")
-    daily_returns = vdf["value"].pct_change().dropna()
-    bench_returns = bench_close.pct_change().dropna()
-
-    aligned = pd.concat([daily_returns, bench_returns], axis=1, join="inner").dropna()
-    report = RiskAnalytics.compute(aligned.iloc[:, 0], aligned.iloc[:, 1])
-
-    result = {
-        "daily_returns": daily_returns,
-        "bench_returns": bench_returns,
-        "trade_log": trade_log,
-        "final_holdings": holdings,
-        "total_return": report.total_return,
-        "bench_return": (bench_close.iloc[-1] / bench_close.iloc[0] - 1),
-        "sharpe": report.sharpe,
-        "max_drawdown": report.max_drawdown,
-        "win_rate": report.win_rate,
-        "trade_count": len(trade_log),
-    }
-    with open(DATA_DIR / f"backtest_{name}.pkl", "wb") as f:
-        pickle.dump(result, f)
-
-    print(f"\n{name}: 累计{report.total_return*100:+.2f}%  Sharpe {report.sharpe:.2f}  MaxDD {report.max_drawdown*100:.1f}%  交易{len(trade_log)}笔")
-    return result
 
 
 # ══════════════════════════════════════════════════════════
@@ -498,7 +356,7 @@ ml_lgbm_scorer._last_rebalance_date = None
 
 # ══════════════════════════════════════════════════════════
 # Pipeline-based backtest — uses the same Alpha→Portfolio→Risk→Execution
-# stages as paper trading, replacing the hand-rolled run_backtest() loop.
+# stages as paper trading.
 # ══════════════════════════════════════════════════════════
 
 def run_pipeline_backtest(name, pool, prices, bench_close, scorer_fn, start, end,
@@ -561,9 +419,7 @@ if __name__ == "__main__":
     import argparse as _ap
     _parser = _ap.ArgumentParser()
     _parser.add_argument("--pipeline", action="store_true", help="Use pipeline-based backtest runner")
-    _parser.add_argument("--legacy", action="store_true", help="Use legacy hand-rolled backtest runner")
     _args = _parser.parse_args()
-    _use_pipeline = _args.pipeline or not _args.legacy  # default to pipeline
 
     bt_cfg = _settings().get("backtest", {})
     pool_size = bt_cfg.get("pool_size", 0)
@@ -571,7 +427,7 @@ if __name__ == "__main__":
     if pool_size > 0:
         pool = pool[:pool_size]
     start, end = "2015-01-01", "2026-05-10"
-    runner_label = "pipeline" if _use_pipeline else "legacy"
+    runner_label = "pipeline"
     print(f"四策略对比回测 [{runner_label}]: {len(pool)} stocks, {start} ~ {end}")
 
     prices = load_prices(pool, start, end)
@@ -607,13 +463,10 @@ if __name__ == "__main__":
         }
         print(f"\n  {s['label']} (调仓: {_sched_desc.get(name, 'default')})")
 
-        if _use_pipeline:
-            results[name] = run_pipeline_backtest(
-                name, pool, prices, bc, scorer, start, end,
-                monthly_regimes=monthly_regimes,
-            )
-        else:
-            results[name] = run_backtest(name, pool, prices, bc, scorer, start, end)
+        results[name] = run_pipeline_backtest(
+            name, pool, prices, bc, scorer, start, end,
+            monthly_regimes=monthly_regimes,
+        )
 
     comparison = {
         "strategies": {

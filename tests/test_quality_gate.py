@@ -13,8 +13,8 @@ class TestDataQualityGate:
         from data.data_registry import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-        monkeypatch.setenv("QUANT_AGENT_CACHE", str(tmp_path / "cache"))
+        monkeypatch.setenv("ASTROLABE_STORE", str(store))
+        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
         reset_datahub()
         reset_registry()
 
@@ -49,8 +49,8 @@ class TestDataQualityGate:
         from data.data_registry import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-        monkeypatch.setenv("QUANT_AGENT_CACHE", str(tmp_path / "cache"))
+        monkeypatch.setenv("ASTROLABE_STORE", str(store))
+        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
         reset_datahub()
         reset_registry()
 
@@ -80,8 +80,8 @@ class TestDataQualityGate:
         from data.data_registry import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-        monkeypatch.setenv("QUANT_AGENT_CACHE", str(tmp_path / "cache"))
+        monkeypatch.setenv("ASTROLABE_STORE", str(store))
+        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
         reset_datahub()
         reset_registry()
 
@@ -116,8 +116,8 @@ class TestDataQualityGate:
         from data.data_registry import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-        monkeypatch.setenv("QUANT_AGENT_CACHE", str(tmp_path / "cache"))
+        monkeypatch.setenv("ASTROLABE_STORE", str(store))
+        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
         reset_datahub()
         reset_registry()
 
@@ -146,8 +146,8 @@ class TestDataQualityGate:
         from data.data_registry import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-        monkeypatch.setenv("QUANT_AGENT_CACHE", str(tmp_path / "cache"))
+        monkeypatch.setenv("ASTROLABE_STORE", str(store))
+        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
         reset_datahub()
         reset_registry()
 
@@ -161,6 +161,7 @@ class TestDataQualityGate:
             required_dims=["ohlcv_daily", "financial_summary"],
             symbol="000001",
             hub=hub,
+            today=date(2026, 5, 21),
         )
 
         assert ok
@@ -171,8 +172,8 @@ class TestDataQualityGate:
         from data.data_registry import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-        monkeypatch.setenv("QUANT_AGENT_CACHE", str(tmp_path / "cache"))
+        monkeypatch.setenv("ASTROLABE_STORE", str(store))
+        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
         reset_datahub()
         reset_registry()
 
@@ -211,8 +212,8 @@ class TestDataQualityGate:
         from data.data_registry import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-        monkeypatch.setenv("QUANT_AGENT_CACHE", str(tmp_path / "cache"))
+        monkeypatch.setenv("ASTROLABE_STORE", str(store))
+        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
         reset_datahub()
         reset_registry()
 
@@ -243,8 +244,8 @@ class TestDataQualityGate:
         from data.data_registry import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-        monkeypatch.setenv("QUANT_AGENT_CACHE", str(tmp_path / "cache"))
+        monkeypatch.setenv("ASTROLABE_STORE", str(store))
+        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
         reset_datahub()
         reset_registry()
 
@@ -293,8 +294,8 @@ class TestDataQualityGate:
         from data.data_registry import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("QUANT_AGENT_STORE", str(store))
-        monkeypatch.setenv("QUANT_AGENT_CACHE", str(tmp_path / "cache"))
+        monkeypatch.setenv("ASTROLABE_STORE", str(store))
+        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
         reset_datahub()
         reset_registry()
 

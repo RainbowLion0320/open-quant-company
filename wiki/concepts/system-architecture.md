@@ -269,7 +269,7 @@ strategies:
 
 | 字段 | 来源 | 用途 |
 |------|------|------|
-| producer | `producer=` 参数 / `ASTROLABE_PRODUCER` 环境变量；`XINGPAN_PRODUCER`、`QUANT_AGENT_PRODUCER` 作为 legacy 兼容 | 追溯写入来源 |
+| producer | `producer=` 参数 / `ASTROLABE_PRODUCER` 环境变量 | 追溯写入来源 |
 | row_count / column_count | DataFrame | 数据量统计 |
 | date_column / date_min / date_max | 自动检测 date 列 | 日期范围 |
 | schema_hash | 列名+dtype SHA256 | 检测 schema 变更 |

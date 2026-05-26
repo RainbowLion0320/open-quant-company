@@ -188,7 +188,7 @@ report = FullReport(metrics, trades, monthly_returns)
 - **价格数据缺失：** `get_stock_daily()` 返回空 DataFrame → 该股票被跳过
 - **基准数据缺失：** Alpha/Beta/IR 返回 NaN，收益类指标照常计算
 - **除零保护：** 所有比率计算前检查分母 > 0
-- **全局状态污染：** `_last_buffett_year` 在每次 `run_backtest()` 入口重置为 0
+- **全局状态污染：** 巴菲特滚动评分器在每次策略评分前重置年度缓存，避免跨策略/跨窗口复用状态
 
 ## 7. 测试策略
 

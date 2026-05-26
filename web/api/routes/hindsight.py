@@ -5,32 +5,8 @@ import os
 
 router = APIRouter(prefix="/api/hindsight", tags=["Hindsight"])
 
-HINDSIGHT = (
-    os.environ.get("ASTROLABE_HINDSIGHT_URL", "")
-    or os.environ.get("XINGPAN_HINDSIGHT_URL", "")
-    or "http://localhost:9177"
-).rstrip("/")
-PRIMARY_BANK = (
-    os.environ.get("ASTROLABE_HINDSIGHT_BANK", "")
-    or os.environ.get("XINGPAN_HINDSIGHT_BANK", "")
-    or "astrolabe-quant"
-).strip() or "astrolabe-quant"
-_legacy_banks_raw = (
-    os.environ.get("ASTROLABE_HINDSIGHT_LEGACY_BANKS", "")
-    or os.environ.get("XINGPAN_HINDSIGHT_LEGACY_BANKS", "")
-    or "quant-agent,xingpan"
-)
-LEGACY_BANKS = [
-    bank.strip()
-    for bank in _legacy_banks_raw.split(",")
-    if bank.strip()
-]
-
-
-def _candidate_banks() -> list[str]:
-    banks = [PRIMARY_BANK]
-    banks.extend(bank for bank in LEGACY_BANKS if bank not in banks)
-    return banks
+HINDSIGHT = (os.environ.get("ASTROLABE_HINDSIGHT_URL", "") or "http://localhost:9177").rstrip("/")
+PRIMARY_BANK = (os.environ.get("ASTROLABE_HINDSIGHT_BANK", "") or "astrolabe-quant").strip() or "astrolabe-quant"
 
 
 def _get_memories(bank_id: str) -> list[dict]:
@@ -69,15 +45,11 @@ def _has_bank_data(memories: list[dict], stats: dict) -> bool:
 
 
 def _load_bank_data() -> tuple[str, list[dict], dict]:
-    """
-    星盘使用 Astrolabe Quant OS 作为英文项目名，但历史 Hindsight 数据仍可能
-    保存在 legacy `quant-agent` bank。优先读 ASTROLABE_HINDSIGHT_BANK，空库时回退。
-    """
-    for bank_id in _candidate_banks():
-        memories = _get_memories(bank_id)
-        stats = _get_stats(bank_id)
-        if _has_bank_data(memories, stats):
-            return bank_id, memories, stats
+    """Read the canonical Astrolabe Hindsight bank."""
+    memories = _get_memories(PRIMARY_BANK)
+    stats = _get_stats(PRIMARY_BANK)
+    if _has_bank_data(memories, stats):
+        return PRIMARY_BANK, memories, stats
     return PRIMARY_BANK, [], {}
 
 
@@ -191,7 +163,6 @@ async def get_graph():
     graph = _build_graph(memories)
     return {
         "bank_id": bank_id,
-        "legacy_bank_ids": [bank for bank in LEGACY_BANKS if bank != bank_id],
         "nodes": graph["nodes"],
         "links": graph["links"],
         "stats": {

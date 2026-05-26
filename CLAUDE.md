@@ -22,31 +22,17 @@
 - AKShare↔Tushare 分工: AKShare管日线，Tushare管三张表+daily_basic+融资融券+北向+申万+宏观
 
 ## 记忆系统
-- 已配置 Hindsight Local 模式 (deepseek-v4-flash, 星盘记忆库; legacy bank_id=quant-agent)
+- 已配置 Hindsight Local 模式 (deepseek-v4-flash, 星盘记忆库; bank_id=astrolabe-quant)
 - 首次启动需 /reset, daemon 会自动拉起 (首次初始化约1分钟)
 
-## 当前进度 (2026-05-21)
-全部 Phase 1-4.x 核心功能已完成。详细进度见 `wiki/log.md`。
-
-## 锦标赛最新结果 (2026-05-21, 50股, 2020-2026.05)
-
-```
-🥇 多因子月度调仓:   +91.98%  | MaxDD -23.8%
-🥈 LightGBM ML:      +70.28%  | MaxDD -13.2%
-🥉 控制论自适应:      +54.61%  | MaxDD -17.6%
-   巴菲特精选:         +0.00%  | (50股池不足, 需全量5517只)
-```
-基准 (上证综指): +35.48%。完整结果见 `data/tournament/`。
-
-注意: 2026-05-21 修复了锦标赛的基准代码错误 (之前 fallback 到平安银行) 和回测前视偏差。
-
-## 精选池 (2026-05-16扫描, 5517只全量)
-603288 海天味业 91分 | 002415 海康威视 88分 | 600036 招商银行 82分
-详情见 `data/store/signals/buffett_scan.parquet`
+## 当前状态
+- 当前能力链路以 `docs/acceptance-matrix.md`、测试和代码为准。
+- 产品/实现契约分别见 `docs/PRD.md` 与 `docs/specs/`。
+- 历史进度、实验结果和已完成计划不保留在工作树；需要追溯时使用 `git log`、`git show` 和生成产物。
 
 ## 关键文件
 ```
-~/astrolabe-quant/  # 项目名；本机仓库目录可能仍保留 quant-agent legacy 路径
+~/astrolabe-quant/  # 项目目录
 ├── config/settings.yaml          # 全局配置 (策略/数据/资产注册表)
 ├── data/
 │   ├── fetcher.py                # AKShare 3源 fallback
@@ -92,8 +78,8 @@
 │   ├── run_workflow.py           # qrun YAML工作流
 │   └── cron_fetch_slow.py        # 限流数据日常填充
 ├── web/api/routes/{market,strategies,stocks,portfolio,signals,sectors,settings,backtest,system,hindsight}.py
-├── web/frontend/                 # Vue 3 SPA (星盘终端, 12页含行业雷达)
-├── wiki/                         # LLM Wiki (18页)
+├── web/frontend/                 # Vue 3 SPA 星盘终端
+├── wiki/                         # 长期概念、架构决策和参考知识
 ├── tests/                        # 合约测试 + 边界测试
 ├── docs/tushare-mcp-guide.md     # Tushare文档
 ├── config/workflows/*.yaml       # 研究/因子发现 pipeline
