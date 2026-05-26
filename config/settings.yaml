@@ -157,8 +157,8 @@ cybernetics:
       breadth_cache_ttl_seconds: 900
       breadth_workers: 8
       breadth_window: 20
-      regime_bear_threshold: 35
-      regime_bull_threshold: 65
+      regime_bear_threshold: 40
+      regime_bull_threshold: 60
       volume_contraction: 0.8
       volume_expansion: 1.2
     market_regime_detection: true

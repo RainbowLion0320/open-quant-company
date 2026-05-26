@@ -50,7 +50,7 @@ def test_volume_strength_combines_activity_up_amount_and_index_confirmation():
     assert detail["volume_ratio_sh000001"] == 1.1
 
 
-def test_compose_regime_score_uses_documented_component_weights():
+def test_compose_regime_score_uses_validated_production_weights():
     score, components = compose_regime_score(
         trend_raw=0.8,
         breadth_raw=0.75,
@@ -62,10 +62,10 @@ def test_compose_regime_score_uses_documented_component_weights():
         volume_detail={"volume_up_amount_raw": 0.68},
     )
 
-    assert score == 74.2
-    assert components["trend"] == 28.0
-    assert components["breadth"] == 26.2
-    assert components["risk"] == 14.0
+    assert score == 73.5
+    assert components["trend"] == 24.0
+    assert components["breadth"] == 22.5
+    assert components["risk"] == 21.0
     assert components["volume"] == 6.0
     assert components["trend_sh000001"] == 0.8
 
@@ -73,5 +73,6 @@ def test_compose_regime_score_uses_documented_component_weights():
 def test_classify_regime_value_uses_score_trend_and_breadth_gates():
     assert classify_regime_value(70, trend_raw=0.60, breadth_raw=0.70, advance_ratio=0.58) == "bull"
     assert classify_regime_value(70, trend_raw=0.50, breadth_raw=0.70, advance_ratio=0.58) == "sideways"
-    assert classify_regime_value(34, trend_raw=0.50, breadth_raw=0.50, advance_ratio=0.45) == "bear"
+    assert classify_regime_value(62, trend_raw=0.60, breadth_raw=0.70, advance_ratio=0.58) == "bull"
+    assert classify_regime_value(39, trend_raw=0.50, breadth_raw=0.50, advance_ratio=0.45) == "bear"
     assert classify_regime_value(50, trend_raw=0.35, breadth_raw=0.35, advance_ratio=0.45) == "bear"

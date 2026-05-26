@@ -37,14 +37,14 @@ class RegimePolicy:
 
 CHAMPION_POLICY = RegimePolicy(
     candidate_id="champion_current_formula",
-    weights={"trend": 0.35, "breadth": 0.35, "risk": 0.20, "volume": 0.10},
-    bull_threshold=65.0,
-    bear_threshold=35.0,
+    weights={"trend": 0.30, "breadth": 0.30, "risk": 0.30, "volume": 0.10},
+    bull_threshold=60.0,
+    bear_threshold=40.0,
     trend_confirm=0.55,
     breadth_confirm=0.55,
     bear_trend_breakdown=0.40,
     bear_breadth_breakdown=0.40,
-    min_dwell=1,
+    min_dwell=3,
     smoothing_window=1,
     complexity=1,
 )

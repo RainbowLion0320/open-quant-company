@@ -9,6 +9,14 @@ import math
 from typing import Dict, Mapping, Optional
 
 
+REGIME_SCORE_WEIGHTS = {
+    "trend": 30.0,
+    "breadth": 30.0,
+    "risk": 30.0,
+    "volume": 10.0,
+}
+
+
 def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
     """Clamp a numeric value and treat non-finite inputs as the lower bound."""
     if math.isnan(value) or math.isinf(value):
@@ -89,12 +97,12 @@ def compose_regime_score(
     risk_detail: Optional[Mapping[str, float]] = None,
     volume_detail: Optional[Mapping[str, float]] = None,
 ) -> tuple[float, Dict[str, float]]:
-    """Compose the v2 regime score and return component-level details."""
+    """Compose the validated production regime score and return component-level details."""
     components: Dict[str, float] = {
-        "trend": round(clamp(trend_raw) * 35.0, 1),
-        "breadth": round(clamp(breadth_raw) * 35.0, 1),
-        "risk": round(clamp(risk_raw) * 20.0, 1),
-        "volume": round(clamp(volume_raw) * 10.0, 1),
+        "trend": round(clamp(trend_raw) * REGIME_SCORE_WEIGHTS["trend"], 1),
+        "breadth": round(clamp(breadth_raw) * REGIME_SCORE_WEIGHTS["breadth"], 1),
+        "risk": round(clamp(risk_raw) * REGIME_SCORE_WEIGHTS["risk"], 1),
+        "volume": round(clamp(volume_raw) * REGIME_SCORE_WEIGHTS["volume"], 1),
         "trend_raw": round(clamp(trend_raw), 4),
         "breadth_raw": round(clamp(breadth_raw), 4),
         "risk_raw": round(clamp(risk_raw), 4),
@@ -118,8 +126,8 @@ def classify_regime_value(
     trend_raw: float,
     breadth_raw: float,
     advance_ratio: float,
-    bull_threshold: float = 65.0,
-    bear_threshold: float = 35.0,
+    bull_threshold: float = 60.0,
+    bear_threshold: float = 40.0,
     breadth_bull: float = 0.55,
     breadth_bear: float = 0.40,
 ) -> str:

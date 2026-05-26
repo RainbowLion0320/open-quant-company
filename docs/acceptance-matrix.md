@@ -39,7 +39,7 @@
 | 2.11 | 策略研究治理和晋级门槛 | `research/strategy_governance.py` | `test_strategy_research_governance.py` | `GET /strategies/governance` → `Strategies.vue` | 四策略分层、paper/production 门槛、ML 默认为 paper | OK | — |
 | 2.12 | 因子研究诊断 | `signals/factor_research.py` | `test_strategy_research_governance.py:test_factor_diagnostics_rank_ic_quantile_spread_and_correlation_clusters` | — | 输出 IC/ICIR/分组收益 spread/相关性聚类 | OK | — |
 | 2.13 | Market Regime 离线训练与晋级 | `research/regime_training.py`, `scripts/train_market_regime.py` | `test_regime_training.py` | `reports/regime_training/summary.json` | champion/challenger、walk-forward、策略 A/B、默认不自动替换生产公式 | OK | — |
-| 2.14 | Market Regime 挣钱导向训练 | `research/regime_training.py`, `scripts/train_market_regime_profit.py` | `test_regime_profit_training.py` | `reports/regime_profit_training/summary.json` | 可交易资产 risk-on/risk-off、强 baseline、walk-forward OOS、champion 同标准诊断、best validated 选择、默认不自动替换生产公式 | OK | — |
+| 2.14 | Market Regime 挣钱导向训练 | `research/regime_training.py`, `scripts/train_market_regime_profit.py` | `test_regime_profit_training.py` | `reports/regime_profit_training/summary.json` | 可交易资产 risk-on/risk-off、强 baseline、walk-forward OOS、champion 同标准诊断、best validated 选择，`w0611` 已晋级生产 champion | OK | — |
 
 ## 3. 回测引擎 (Backtest Engine)
 

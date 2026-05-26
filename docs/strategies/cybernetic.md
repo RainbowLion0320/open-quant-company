@@ -38,7 +38,7 @@
 
 ## Regime 研究训练
 
-Market Regime 公式采用 champion/challenger 研究机制。当前生产公式是 champion；`scripts/train_market_regime.py` 会离线搜索 challenger，并用历史回放、未来标签、walk-forward、组件消融和策略 A/B 判断是否值得人工审查。
+Market Regime 公式采用 champion/challenger 研究机制。当前生产 champion 是 V3 验证后的 `w0611`：trend/breadth/risk/volume = 30/30/30/10，bull/bear 阈值 = 60/40。`scripts/train_market_regime.py` 会离线搜索 challenger，并用历史回放、未来标签、walk-forward、组件消融和策略 A/B 判断是否值得人工审查。
 
 运行报告存放在 `reports/regime_training/`。优先查看：
 
@@ -63,7 +63,7 @@ Market Regime 公式采用 champion/challenger 研究机制。当前生产公式
 - `candidate_gate_diagnostics.csv`：每个公式的通过状态、失败 gate、低参与度等 warning，champion 也在同一张表里。
 - `candidate_validation_summary.csv`：每个公式跨验证窗口相对 champion 的 OOS 汇总。
 - `regime_distribution.csv`：检查候选是否坍缩为永久 risk-on 或永久 risk-off。
-- `recommended_profit_config.yaml`：仅为人工审查建议，默认不会自动写回生产配置。
+- `recommended_profit_config.yaml`：仅为人工审查建议，不会自动写回生产配置；生产替换需要同步修改生产评分、配置阈值和训练 champion。
 
 V3 报告区分 `best_unconstrained_id` 和 `best_validated_id`。前者是原始收益指标最强公式，后者是通过 gate 后的当前最优候选；只有后者能进入人工替换审查。
 

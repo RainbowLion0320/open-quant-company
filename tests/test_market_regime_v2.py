@@ -62,7 +62,7 @@ def test_full_market_volume_uses_market_amount_and_up_amount(tmp_path):
     assert 0.5 < volume.up_amount_ratio < 0.8
 
 
-def test_regime_score_v2_combines_trend_breadth_risk_and_volume():
+def test_regime_score_combines_validated_trend_breadth_risk_and_volume():
     bench = _index_frame("up")
     breadth = MarketBreadth(
         advance_ratio=0.72,
@@ -83,9 +83,9 @@ def test_regime_score_v2_combines_trend_breadth_risk_and_volume():
     )
 
     assert score > 65
-    assert components["trend"] > 25
-    assert components["breadth"] > 25
-    assert components["risk"] > 10
+    assert components["trend"] > 20
+    assert components["breadth"] > 20
+    assert components["risk"] > 15
     assert components["volume"] > 0
     assert components["risk_drawdown_raw"] > 0
     assert components["risk_volatility_raw"] > 0

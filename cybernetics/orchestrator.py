@@ -854,7 +854,7 @@ def _compute_regime_score_v2(
     breadth: MarketBreadth,
     market_volume: Optional[MarketVolume] = None,
 ) -> tuple[float, Dict[str, float]]:
-    """Compute v2 regime score: trend 35%, breadth 35%, risk 20%, volume 10%."""
+    """Compute validated regime score: trend 30%, breadth 30%, risk 30%, volume 10%."""
     trend_raw, index_trend = _compute_multi_index_trend(index_frames)
     risk_raw, risk_detail = _compute_risk_strength(index_frames, breadth)
     volume_snapshot = market_volume or _compute_full_market_volume()
@@ -876,13 +876,13 @@ def _compute_regime_score_v2(
 def _classify_regime(score: float, components: Dict[str, float], breadth: MarketBreadth) -> MarketRegime:
     try:
         det_cfg = _load_config()["adaptive"]["detection"]
-        bull_threshold = float(det_cfg.get("regime_bull_threshold", 65))
-        bear_threshold = float(det_cfg.get("regime_bear_threshold", 35))
+        bull_threshold = float(det_cfg.get("regime_bull_threshold", 60))
+        bear_threshold = float(det_cfg.get("regime_bear_threshold", 40))
         breadth_bull = float(det_cfg.get("breadth_bull_threshold", 0.55))
         breadth_bear = float(det_cfg.get("breadth_bear_threshold", 0.40))
     except Exception:
-        bull_threshold = 65.0
-        bear_threshold = 35.0
+        bull_threshold = 60.0
+        bear_threshold = 40.0
         breadth_bull = 0.55
         breadth_bear = 0.40
 

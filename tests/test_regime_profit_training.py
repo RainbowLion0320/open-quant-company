@@ -263,6 +263,15 @@ def test_v3_best_validated_selection_prefers_oos_strength_over_full_sample_score
     assert selected["candidate_id"] == "oos_leader"
 
 
+def test_champion_policy_matches_validated_w0611_production_formula():
+    from research.regime_training import CHAMPION_POLICY
+
+    assert CHAMPION_POLICY.weights == {"trend": 0.30, "breadth": 0.30, "risk": 0.30, "volume": 0.10}
+    assert CHAMPION_POLICY.bull_threshold == 60.0
+    assert CHAMPION_POLICY.bear_threshold == 40.0
+    assert CHAMPION_POLICY.min_dwell == 3
+
+
 def test_profit_training_outputs_required_baselines_and_oos_decision():
     from research.regime_training import RegimePolicy, run_regime_profit_training
 
