@@ -52,26 +52,41 @@ def load_prices(pool, start, end):
     return pd.concat(dfs.values(), axis=1, keys=dfs.keys())
 
 
-def build_monthly_regime(bench_close_series):
-    """用月度K线预计算市场状态，每月一个 regime，避免日频噪声。
-    使用上月末收盘价判断当月 regime，避免前视偏差。"""
-    monthly = bench_close_series.resample("ME").last().dropna()
+def _benchmark_close_frame(bench_close_series: pd.Series) -> pd.DataFrame:
+    series = pd.Series(bench_close_series).dropna()
+    frame = pd.DataFrame({
+        "date": pd.to_datetime(series.index, errors="coerce"),
+        "close": pd.to_numeric(series.values, errors="coerce"),
+        "volume": 0.0,
+    })
+    return frame.dropna(subset=["date", "close"]).sort_values("date")
+
+
+def build_production_regime_map(bench_close_series: pd.Series) -> dict[str, str]:
+    """Replay the production Market Regime policy historically without look-ahead."""
+    from research.regime_training import CHAMPION_POLICY, apply_policy, build_regime_feature_history
+
+    index_frame = _benchmark_close_frame(bench_close_series)
+    if index_frame.empty:
+        return {}
+
+    features = build_regime_feature_history(index_frame)
+    if features.empty:
+        monthly = index_frame.set_index("date")["close"].resample("ME").last().dropna()
+        return {dt.strftime("%Y-%m"): "sideways" for dt in monthly.index}
+
+    daily_regime = apply_policy(features, CHAMPION_POLICY)["regime"]
+    close = index_frame.set_index("date")["close"]
+    monthly = close.resample("ME").last().dropna()
     regimes = {}
     for i in range(len(monthly)):
         key = monthly.index[i].strftime("%Y-%m")
-        if i < 2:
+        if i == 0:
             regimes[key] = "sideways"
             continue
-        c = monthly.values[i - 1]
-        ma5 = np.mean(monthly.values[max(0, i - 5) : i])
-        ma20 = np.mean(monthly.values[max(0, i - 20) : i])
-        ma60 = np.mean(monthly.values[max(0, i - 60) : i])
-        if c > ma5 > ma20 > ma60:
-            regimes[key] = "bull"
-        elif c < ma5 < ma20 < ma60:
-            regimes[key] = "bear"
-        else:
-            regimes[key] = "sideways"
+        cutoff = monthly.index[i - 1]
+        available = daily_regime[daily_regime.index <= cutoff]
+        regimes[key] = str(available.iloc[-1]) if len(available) else "sideways"
     return regimes
 
 
@@ -366,9 +381,9 @@ def run_pipeline_backtest(name, pool, prices, bench_close, scorer_fn, start, end
     from pipeline.portfolio import EqualWeightConstructor
     from pipeline.scheduler import RebalanceScheduler, RebalanceConfig
 
-    # Pre-compute monthly regimes if not provided
+    # Pre-compute production policy regimes if not provided
     if monthly_regimes is None:
-        monthly_regimes = build_monthly_regime(bench_close)
+        monthly_regimes = build_production_regime_map(bench_close)
 
     # Strategy-specific rebalance triggers
     _rebal_triggers = {
@@ -434,7 +449,7 @@ if __name__ == "__main__":
     bench = get_index_daily("sh000001")
     bench["date"] = pd.to_datetime(bench["date"]); bench = bench.set_index("date").sort_index()
     bc = bench["close"].loc[pd.Timestamp(start):pd.Timestamp(end)]
-    monthly_regimes = build_monthly_regime(bc)
+    monthly_regimes = build_production_regime_map(bc)
 
     print(f"基准: {bc.iloc[0]:.0f} → {bc.iloc[-1]:.0f} ({((bc.iloc[-1]/bc.iloc[0]-1)*100):+.2f}%)")
 

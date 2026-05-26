@@ -238,6 +238,69 @@ def test_backtest_entrypoint_no_longer_exposes_legacy_runner():
     assert "legacy hand-rolled" not in text
 
 
+def test_backtest_regime_replay_uses_production_policy_not_monthly_ma_chain():
+    text = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
+    tournament = Path("scripts/strategy_tournament.py").read_text(encoding="utf-8")
+    multi_asset = Path("scripts/multi_asset_tournament.py").read_text(encoding="utf-8")
+
+    assert "build_production_regime_map" in text
+    assert "CHAMPION_POLICY" in text
+    assert "apply_policy" in text
+    assert "c > ma5 > ma20 > ma60" not in text
+    assert "c < ma5 < ma20 < ma60" not in text
+    assert "build_monthly_regime" not in tournament
+    assert "build_production_regime_map" in multi_asset
+    assert "c > ma5 > ma20 > ma60" not in multi_asset
+    assert "c < ma5 < ma20 < ma60" not in multi_asset
+
+
+def test_production_regime_map_uses_previous_month_policy_result(monkeypatch):
+    import research.regime_training as regime_training
+    from backtest.run_all_strategies import build_production_regime_map
+
+    dates = pd.date_range("2024-01-01", periods=180, freq="D")
+    close = pd.Series(np.linspace(100.0, 120.0, len(dates)), index=dates)
+
+    def fake_feature_history(index_frame):
+        assert {"date", "close", "volume"}.issubset(index_frame.columns)
+        return pd.DataFrame({"feature": 1.0}, index=dates)
+
+    def fake_apply_policy(features, _policy):
+        regimes = pd.Series("sideways", index=features.index)
+        regimes.loc[regimes.index >= pd.Timestamp("2024-02-29")] = "bull"
+        regimes.loc[regimes.index >= pd.Timestamp("2024-03-31")] = "bear"
+        return pd.DataFrame({"regime": regimes}, index=features.index)
+
+    monkeypatch.setattr(regime_training, "build_regime_feature_history", fake_feature_history)
+    monkeypatch.setattr(regime_training, "apply_policy", fake_apply_policy)
+
+    result = build_production_regime_map(close)
+
+    assert result["2024-01"] == "sideways"
+    assert result["2024-02"] == "sideways"
+    assert result["2024-03"] == "bull"
+    assert result["2024-04"] == "bear"
+
+
+def test_paper_pipeline_uses_live_regime_context_not_sideways_constant():
+    text = Path("scripts/execute_paper_trades.py").read_text(encoding="utf-8")
+
+    assert "detect_live_regime" in text
+    assert 'regime="sideways"' not in text
+    assert 'generate_alpha([], pd.DataFrame(), 0, ctx.regime)' in text
+
+
+def test_signal_spec_describes_current_regime_formula():
+    text = Path("docs/specs/02-signal-system.md").read_text(encoding="utf-8")
+
+    assert "trend 30%" in text
+    assert "breadth 30%" in text
+    assert "risk 30%" in text
+    assert "volume 10%" in text
+    assert "价格 > MA5 > MA20 > MA60" not in text
+    assert "月度 K 线判断" not in text
+
+
 def test_tracked_project_context_uses_canonical_astrolabe_names():
     tracked_files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
     forbidden = [

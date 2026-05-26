@@ -101,16 +101,18 @@
 **核心理念：** 不作为独立主选股策略，而是检测当前市场状态，据此调整策略参数、仓位上限和资产配置风险预算。
 
 **Regime 检测：**
-- **Bull:** 价格 > MA5 > MA20 > MA60（月度 K 线判断，避免日频噪声）
-- **Bear:** 价格 < MA5 < MA20 < MA60
-- **Sideways:** 其他情况
+- **Score:** `trend 30% + breadth 30% + risk 30% + volume 10%`，所有分项归一到 0-100。
+- **Bull:** score >= 60，且 trend 与 breadth 确认项均 >= 0.55。
+- **Bear:** score <= 40，或 trend/breadth 任一 breakdown 项 <= 0.40。
+- **Sideways:** 其他情况。
+- **Confirmed 状态:** raw regime 必须经过 `min_dwell=3` 个连续唯一市场观测确认后才切换生产 confirmed regime。
 
 **自适应参数调整：**
 - Bull → 提高仓位上限、放宽止损
 - Bear → 降低仓位、收紧止损、增加现金比例
 - Sideways → 默认参数
 
-**市场广度：** 计算全市场 > MA20 的股票比例，作为辅助指标。
+**市场广度：** 计算全市场 > MA20 的股票比例，并与多指数趋势、风险缓冲和量能确认共同组成生产分数。
 
 ### 2.5 Market Regime 离线训练与晋级
 
@@ -222,7 +224,7 @@ Market Data (DataHub)
 |------|------|------|
 | 巴菲特作为约束层 | 不是独立信号，叠加在多因子/ML 之上 | 价值原则是硬约束；技术面/量化是执行手段 |
 | 金融板块特殊处理 | 护城河指标差异（毛利率→净利率） | 银行/保险的高杠杆天然导致毛利率失效 |
-| Regime 用月度 K 线 | 月线判断，避免日频噪声 | 日线太多假突破，月线更稳定 |
+| Regime 生产 policy | 可解释权重 + 状态机确认 | trend/breadth/risk/volume 共同决定 raw regime，`min_dwell=3` 过滤单日噪声 |
 | ML 月度重训 | 每周六 Cron 自动重训 | 市场风格漂移（regime shift）需要模型跟进 |
 | 因子 DSL | 自研表达式引擎 | Backtrader 不支持声明式因子组合 |
 

@@ -50,7 +50,7 @@
 
 **PIT 安全保障：**
 - 评分只使用调仓日之前的数据
-- Regime 检测用 `build_monthly_regime()` — 使用上月末收盘价判断当月 regime（`monthly.values[i-1]`）
+- Regime 检测用 `build_production_regime_map()` — 历史回放生产 champion policy，并将上一期已可见的 confirmed/raw 结果映射到当月
 - 巴菲特评分用滚动窗口逐年评估，不跨年引用
 
 ### 2.2 策略基类 (strategies/base.py)
@@ -142,7 +142,7 @@ data/store/signals/*.parquet  (预计算信号)
 | 决策 | 选择 | 原因 |
 |------|------|------|
 | 回测框架 | 自研（非 Backtrader） | 需要 PIT 特征存储 + 多策略锦标赛，Backtrader 不支持 |
-| Regime 检测 | 月度 K 线 + 滞后一期 | 避免前视偏差（不能用当月数据判断当月 regime） |
+| Regime 检测 | 生产 policy 历史回放 + 滞后一期 | 避免前视偏差，同时保证回测、锦标赛和 Web/API 采用同一套 regime 语义 |
 | 调仓频率 | 月初第一个交易日 | 日频调仓成本过高，月度再平衡是行业惯例 |
 | 基准选择 | 上证综指 (sh000001) | 全市场代表性最强 |
 | 交易约束 | 100 股整数倍 + 手续费 | 模拟真实 A 股交易规则 |

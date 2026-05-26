@@ -17,7 +17,7 @@ tags: [index]
 - [[ml-pipeline]] — **ML 管道** ★：因子DSL→PIT特征→LightGBM→锦标赛→LLM因子发现，enrich_from_registry
 - [[buffett-filter]] — 三重过滤器：能力圈→护城河→安全边际
 - [[buffett-rolling-backtest]] — 滚动回测：按年重新过滤，消除前视偏差
-- [[cybernetics-regime]] — 市场状态检测：月线MA排列，日频→月频修复
+- [[cybernetics-regime]] — 市场状态检测：profit-trained 权重公式 + confirmed 状态机
 - [[dcf-valuation]] — DCF估值方法
 - [[multifactor-scoring]] — 五维打分引擎（含行业动量），四策略对比体系
 - [[financial-cache]] — 三层财务缓存 + PIT基本面/估值/资金/筹码/宏观因子提取

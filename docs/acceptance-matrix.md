@@ -48,7 +48,7 @@
 | 3.1 | N 策略锦标赛对比 | `backtest/run_all_strategies.py` | — | `GET /backtest` → `Backtest.vue` | `make backtest` 输出排名表 | OK | — |
 | 3.2 | 15 项风险指标 (Sharpe/Sortino/Calmar...) | `backtest/analytics.py` | `test_boundary.py` (Sharpe/MaxDD/WinRate/Beta/Alpha) | `Backtest.vue` 雷达图 | 手工验证 Sortino 用 RMS 法、Beta 用 cov 矩阵 | OK | — |
 | 3.3 | PIT 零前视偏差 | `backtest/run_all_strategies.py` | — | — | 构造未来暴涨样本 → 策略不提前买入 | OK | 待增强自动化检测 |
-| 3.4 | Regime 检测用滞后一月数据 | `backtest/run_all_strategies.py:build_monthly_regime()` | — | — | `build_monthly_regime()` 使用 `monthly.values[i-1]` | OK | — |
+| 3.4 | Regime 回测用生产 policy 且滞后一月 | `backtest/run_all_strategies.py:build_production_regime_map()` | `test_architecture_contracts.py:test_backtest_regime_replay_uses_production_policy_not_monthly_ma_chain` | — | 历史回放 `CHAMPION_POLICY`，当月只使用上一期可得 regime，禁止旧 MA 链路 | OK | — |
 | 3.5 | 巴菲特滚动窗口逐年评分 | `backtest/buffett_real_scorer.py` | — | — | 验证滚动评分器每次策略评分前重置年度缓存，且只使用当期可得财报 | OK | — |
 | 3.6 | 回测结果可复现 | — | — | — | 同一数据+种子 → 同一结果 | OK | 待补回归测试 |
 | 3.7 | 可插拔回测流水线 | `backtest/pipeline.py` | — | — | 自定义 Pipeline 组合 Data/Strategy/Selection/Risk/Execution | OK | 待补自动化测试 |

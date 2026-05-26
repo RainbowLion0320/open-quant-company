@@ -41,6 +41,7 @@ from data.datahub import get_datahub
 from data.symbols import CIRCLE_STOCKS
 
 HUB = get_datahub()
+DEFAULT_REGIME = "sideways"
 
 
 # ── 配置 ──
@@ -153,6 +154,18 @@ def _calc_order_volume(broker: PaperBroker, code: str, side: str, price: float, 
     return int(budget / max(price, 1e-9) // lot_size) * lot_size
 
 
+def detect_live_regime(default: str = DEFAULT_REGIME) -> str:
+    """Return the confirmed production Market Regime for paper execution."""
+    try:
+        from cybernetics.orchestrator import QuantOrchestrator
+
+        snapshot = QuantOrchestrator().detect()
+        regime = snapshot.regime.value if hasattr(snapshot.regime, "value") else str(snapshot.regime)
+        return regime if regime in {"bull", "bear", "sideways"} else default
+    except Exception:
+        return default
+
+
 # ── 主逻辑 ──
 
 def _execute_signals_via_pipeline(
@@ -174,12 +187,13 @@ def _execute_signals_via_pipeline(
     holdings = {p.code: p.volume for p in broker.get_positions()}
     prices = {p.code: p.current_price for p in broker.get_positions()}
     cost_basis = {p.code: p.avg_cost for p in broker.get_positions()}
+    live_regime = detect_live_regime()
 
     ctx = PipelineContext(
         date=run_date,
         universe=list(set(list(holdings.keys()))),
         prices=prices,
-        regime="sideways",
+        regime=live_regime,
         cash=balance.cash,
         holdings=holdings,
         cost_basis=cost_basis,
@@ -218,7 +232,7 @@ def _execute_signals_via_pipeline(
             max_signals=max_signals,
         )
 
-        ctx.signals = alpha.generate_alpha([], pd.DataFrame(), 0, "sideways")
+        ctx.signals = alpha.generate_alpha([], pd.DataFrame(), 0, ctx.regime)
         if not ctx.signals:
             continue
 

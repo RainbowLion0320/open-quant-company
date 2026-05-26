@@ -142,9 +142,9 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
             print(f"    {i+1}/{len(symbols)} ({len(prices_dict)} valid, {time.monotonic()-t_load:.1f}s)")
     print(f"  有效股票: {len(prices_dict)}/{pool_size} ({time.monotonic()-t_load:.1f}s)")
 
-    # 检测 regime (月线)
-    from backtest.run_all_strategies import build_monthly_regime
-    monthly_regime = build_monthly_regime(bench["close"])
+    # 检测 regime: 历史重放生产公式，按上一期可得观测映射到当月
+    from backtest.run_all_strategies import build_production_regime_map
+    monthly_regime = build_production_regime_map(bench["close"])
 
     # ══════════════════════════════════════════════════════
     # 锦标赛回测 (每个策略独立跑)

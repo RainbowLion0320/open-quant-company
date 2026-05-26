@@ -3,7 +3,7 @@ title: Cybernetics Regime Detection
 created: 2026-05-12
 updated: 2026-05-26
 type: concept
-tags: [cybernetics, market-regime, ma-alignment, position-sizing, sector-rotation, rebalance-frequency]
+tags: [cybernetics, market-regime, profit-trained-policy, position-sizing, sector-rotation, rebalance-frequency]
 ---
 
 # Cybernetics Regime Detection
@@ -35,7 +35,7 @@ tags: [cybernetics, market-regime, ma-alignment, position-sizing, sector-rotatio
 
 控制论策略的 `should_rebalance()` 实现 (`backtest/strategies/base.py` 子类):
 - **月频**: 每月第一个交易日调仓
-- **Regime 切换**: 额外触发 (月频 regime → 极少切换)
+- **Regime 切换**: 额外触发 (confirmed regime 变化才触发)
 - **目标**: 月调仓 + regime 切换驱动的双触发
 
 ## Integration

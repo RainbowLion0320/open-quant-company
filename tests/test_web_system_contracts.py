@@ -196,3 +196,14 @@ def test_frontend_router_does_not_keep_legacy_redirect_routes():
         assert f'path: "{path}"' not in router
     assert 'path: "/stocks/:code"' in router
     assert 'path: "/stocks"' not in router
+
+
+def test_market_view_surfaces_regime_stability_state():
+    market = Path("web/frontend/src/views/Market.vue").read_text(encoding="utf-8")
+
+    assert "regimeStabilityState" in market
+    assert "raw_value" in market
+    assert "pending_count" in market
+    assert "min_dwell" in market
+    assert "Confirmed" in market
+    assert "Pending" in market

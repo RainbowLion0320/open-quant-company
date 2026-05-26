@@ -15,6 +15,12 @@
               <span>Regime Score</span>
               <strong :style="{ color: regimeColor }">{{ displayScoreText }}</strong>
             </div>
+            <div class="regime-stability-strip" aria-label="Market Regime stability state">
+              <span><em>Confirmed</em><strong>{{ regimeStabilityState.confirmed }}</strong></span>
+              <span><em>Raw</em><strong>{{ regimeStabilityState.raw }}</strong></span>
+              <span><em>Pending</em><strong>{{ regimeStabilityState.pending }}</strong></span>
+              <span><em>Dwell</em><strong>{{ regimeStabilityState.pendingCount }}/{{ regimeStabilityState.minDwell }}</strong></span>
+            </div>
           </div>
         </div>
         <div class="regime-gauge-grid">
@@ -285,6 +291,23 @@ const regimeScore = computed(() => {
   return 50;
 });
 const displayScoreText = computed(() => displayScore.value.toFixed(1));
+const regimeStabilityState = computed(() => {
+  const stability = store.regime?.stability || {};
+  const confirmedRaw = stability.confirmed_value || store.regime?.value || "sideways";
+  const rawValue = store.regime?.raw_value || stability.raw_value || store.regime?.value || "sideways";
+  const pendingRaw = stability.pending_value || "";
+  const pendingCount = Number(stability.pending_count ?? 0);
+  const minDwell = Number(stability.min_dwell ?? 1);
+  return {
+    confirmed: String(confirmedRaw).toUpperCase(),
+    raw: String(rawValue).toUpperCase(),
+    pending: pendingRaw ? String(pendingRaw).toUpperCase() : "—",
+    pending_count: pendingCount,
+    pendingCount,
+    min_dwell: minDwell,
+    minDwell,
+  };
+});
 const regimeTrendStrength = computed(() => store.regime?.score_components?.trend_raw ?? null);
 const riskBuffer = computed(() => store.regime?.score_components?.risk_raw ?? null);
 const aboveMa20Ratio = computed(() => store.regime?.breadth_detail?.above_ma20 ?? null);
@@ -763,6 +786,41 @@ onUnmounted(() => {
   font-family: "JetBrains Mono", monospace;
   font-size: 13px;
   font-weight: 800;
+}
+.regime-stability-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  width: min(100%, 280px);
+}
+.regime-stability-strip span {
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.12);
+}
+.regime-stability-strip em,
+.regime-stability-strip strong {
+  display: block;
+  line-height: 1.1;
+}
+.regime-stability-strip em {
+  color: var(--text-disabled);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.regime-stability-strip strong {
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
 }
 .regime-gauge-grid {
   display: grid;
