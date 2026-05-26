@@ -63,6 +63,32 @@ TREND_BREADTH_POLICY = RegimePolicy(
 
 BASELINE_IDS = {TREND_ONLY_POLICY.candidate_id, TREND_BREADTH_POLICY.candidate_id}
 
+DEFAULT_EXPOSURE_MAP = {
+    "risk_on": {"equity": 0.80, "defensive": 0.20},
+    "neutral": {"equity": 0.40, "defensive": 0.60},
+    "risk_off": {"equity": 0.10, "defensive": 0.90},
+}
+
+PROFIT_REQUIRED_BASELINES = {
+    "buy_and_hold_equity",
+    "fixed_60_40",
+    "ma_20_60_timing",
+}
+
+PROFIT_BASELINE_NAMES = [
+    "buy_and_hold_equity",
+    "fixed_80_20",
+    "fixed_60_40",
+    "fixed_40_60",
+    "cash_only",
+    "ma_20_60_timing",
+    "ma_60_120_timing",
+    "trend_only_regime",
+    "trend_breadth_regime",
+    "current_champion_formula",
+    "best_challenger",
+]
+
 
 def normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
     """Return a sorted OHLCV frame with datetime index and numeric close/volume."""
@@ -86,7 +112,12 @@ def normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
 
     data = data.assign(date=dates).dropna(subset=["date"])
     data["close"] = pd.to_numeric(data.get("close"), errors="coerce")
-    data["volume"] = pd.to_numeric(data.get("volume", 0.0), errors="coerce").fillna(0.0)
+    if "volume" in data.columns:
+        data["volume"] = pd.to_numeric(data["volume"], errors="coerce").fillna(0.0)
+    elif "vol" in data.columns:
+        data["volume"] = pd.to_numeric(data["vol"], errors="coerce").fillna(0.0)
+    else:
+        data["volume"] = 0.0
     if "amount" in data.columns:
         data["amount"] = pd.to_numeric(data["amount"], errors="coerce")
     else:
@@ -962,3 +993,795 @@ def run_and_write_report(
     policies = generate_candidate_policies(max_candidates=max_candidates)
     result = run_regime_research(features, close, policies=policies)
     return write_regime_training_report(output_dir, result)
+
+
+def build_tradable_asset_panel(
+    equity_df: pd.DataFrame,
+    defensive_df: pd.DataFrame | None = None,
+    *,
+    start: str | None = None,
+    end: str | None = None,
+    equity_source: str = "equity",
+    defensive_source: str | None = None,
+) -> pd.DataFrame:
+    """Build a local tradable asset panel for profit-oriented regime research."""
+    equity = normalize_ohlcv(equity_df)
+    if start:
+        equity = equity[equity.index >= pd.Timestamp(start)]
+    if end and end != "auto":
+        equity = equity[equity.index <= pd.Timestamp(end)]
+    if equity.empty:
+        panel = pd.DataFrame(columns=["equity_close", "equity_return", "cash_return", "defensive_return"])
+        panel.attrs["asset_sources"] = {"equity": equity_source, "defensive": "cash_fallback", "cash": "zero_cash"}
+        panel.attrs["notes"] = ["insufficient_data: equity proxy unavailable", "defensive_unavailable"]
+        return panel
+
+    panel = pd.DataFrame(index=equity.index)
+    panel["equity_close"] = equity["close"].astype(float)
+    panel["equity_return"] = panel["equity_close"].pct_change().fillna(0.0)
+    panel["cash_return"] = 0.0
+    notes: list[str] = []
+
+    if defensive_df is not None and not defensive_df.empty:
+        defensive = normalize_ohlcv(defensive_df)
+        defensive_return = defensive["close"].astype(float).pct_change().reindex(panel.index).ffill().fillna(0.0)
+        panel["defensive_return"] = defensive_return
+        defensive_name = defensive_source or "defensive_proxy"
+    else:
+        panel["defensive_return"] = panel["cash_return"]
+        defensive_name = "cash_fallback"
+        notes.append("defensive_unavailable")
+
+    panel = panel.replace([np.inf, -np.inf], np.nan).dropna(subset=["equity_close"])
+    panel.attrs["asset_sources"] = {"equity": equity_source, "defensive": defensive_name, "cash": "zero_cash"}
+    panel.attrs["notes"] = notes
+    return panel[["equity_close", "equity_return", "cash_return", "defensive_return"]]
+
+
+def _read_local_parquet(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_parquet(path)
+    except Exception:
+        return pd.DataFrame()
+
+
+def load_local_equity_ohlcv(symbol: str = "sh000001", *, data_root: str | Path = ".") -> tuple[pd.DataFrame, str, list[str]]:
+    """Load a broad equity proxy from local cache/parquet without network fetches."""
+    notes: list[str] = []
+    if symbol.startswith(("sh", "sz")):
+        try:
+            from data.fetcher import _read_cache
+
+            cached = _read_cache(f"index_daily_{symbol}_default", max_age_hours=0)
+            if cached is not None and len(cached) > 0:
+                return cached, f"local_cache:{symbol}", notes
+        except Exception as exc:
+            notes.append(f"index_cache_unavailable:{type(exc).__name__}")
+
+    root = Path(data_root)
+    fallbacks = [
+        (root / "data/store/fund/daily/510300.SH.parquet", "fund_daily:510300.SH"),
+        (root / "data/store/fund/daily/510500.SH.parquet", "fund_daily:510500.SH"),
+        (root / "data/store/fund/daily/510050.SH.parquet", "fund_daily:510050.SH"),
+    ]
+    for path, source in fallbacks:
+        frame = _read_local_parquet(path)
+        if not frame.empty:
+            notes.append(f"equity_symbol_{symbol}_not_found_used_{source}")
+            return frame, source, notes
+    notes.append(f"equity_proxy_unavailable:{symbol}")
+    return pd.DataFrame(), "", notes
+
+
+def _load_treasury_defensive_proxy(*, data_root: str | Path = ".") -> tuple[pd.DataFrame, str, list[str]]:
+    path = Path(data_root) / "data/store/bond/treasury_yields.parquet"
+    frame = _read_local_parquet(path)
+    if frame.empty or "中国国债收益率10年" not in frame.columns:
+        return pd.DataFrame(), "", ["bond_proxy_unavailable"]
+    data = frame.copy()
+    if "date" in data.columns:
+        dates = pd.to_datetime(data["date"], errors="coerce")
+    elif "日期" in data.columns:
+        dates = pd.to_datetime(data["日期"], errors="coerce")
+    else:
+        dates = pd.to_datetime(data.index, errors="coerce")
+    yld = pd.to_numeric(data["中国国债收益率10年"], errors="coerce")
+    proxy = pd.DataFrame({"date": pd.Series(dates).to_numpy(), "yield": pd.Series(yld).to_numpy()}).dropna().sort_values("date")
+    if proxy.empty:
+        return pd.DataFrame(), "", ["bond_proxy_unavailable"]
+    rate = proxy["yield"] / 100.0
+    duration = 7.0
+    daily_return = (rate.shift(1).fillna(rate) / 252.0) - duration * rate.diff().fillna(0.0)
+    daily_return = daily_return.clip(-0.03, 0.03).fillna(0.0)
+    close = (1.0 + daily_return).cumprod() * 100.0
+    return pd.DataFrame({"date": proxy["date"], "close": close}), "cn_10y_treasury_proxy", []
+
+
+def load_tradable_asset_panel(
+    start: str | None = None,
+    end: str | None = "auto",
+    *,
+    symbol: str = "sh000001",
+    data_root: str | Path = ".",
+) -> pd.DataFrame:
+    """Load the best local tradable panel available; never fetches network data."""
+    equity_df, equity_source, equity_notes = load_local_equity_ohlcv(symbol, data_root=data_root)
+    defensive_df, defensive_source, defensive_notes = _load_treasury_defensive_proxy(data_root=data_root)
+    panel = build_tradable_asset_panel(
+        equity_df,
+        defensive_df if not defensive_df.empty else None,
+        start=start,
+        end=end,
+        equity_source=equity_source or symbol,
+        defensive_source=defensive_source or None,
+    )
+    panel.attrs["notes"] = list(panel.attrs.get("notes", [])) + equity_notes + defensive_notes
+    return panel
+
+
+def _future_compound_return(returns: pd.Series, pos: int, horizon: int) -> float:
+    window = returns.iloc[pos + 1 : pos + horizon + 1].dropna()
+    if len(window) < horizon:
+        return np.nan
+    return float((1.0 + window).prod() - 1.0)
+
+
+def build_profit_labels(asset_panel: pd.DataFrame, horizons: Iterable[int] = (5, 20, 60)) -> pd.DataFrame:
+    """Build forward money-making labels from tradable assets only."""
+    panel = asset_panel.sort_index().copy()
+    labels = pd.DataFrame(index=panel.index)
+    close = panel["equity_close"].astype(float)
+    equity_returns = panel["equity_return"].astype(float)
+    cash_returns = panel["cash_return"].astype(float)
+    defensive_returns = panel["defensive_return"].astype(float)
+
+    for horizon in horizons:
+        equity_forward = []
+        cash_forward = []
+        defensive_forward = []
+        drawdowns = []
+        volatilities = []
+        for pos in range(len(panel)):
+            equity_ret = _future_compound_return(equity_returns, pos, horizon)
+            cash_ret = _future_compound_return(cash_returns, pos, horizon)
+            defensive_ret = _future_compound_return(defensive_returns, pos, horizon)
+            equity_forward.append(equity_ret)
+            cash_forward.append(cash_ret)
+            defensive_forward.append(defensive_ret)
+
+            path = close.iloc[pos + 1 : pos + horizon + 1]
+            if len(path) < horizon:
+                drawdowns.append(np.nan)
+                volatilities.append(np.nan)
+                continue
+            relative_path = path / close.iloc[pos] - 1.0
+            drawdowns.append(float(min(0.0, relative_path.min())))
+            realized = equity_returns.iloc[pos + 1 : pos + horizon + 1].dropna()
+            volatilities.append(float(realized.std(ddof=1) * np.sqrt(252)) if len(realized) > 1 else 0.0)
+
+        labels[f"future_{horizon}d_equity_return"] = equity_forward
+        labels[f"future_{horizon}d_equity_max_drawdown"] = drawdowns
+        labels[f"future_{horizon}d_equity_volatility"] = volatilities
+        labels[f"future_{horizon}d_cash_excess_return"] = labels[f"future_{horizon}d_equity_return"] - pd.Series(cash_forward, index=labels.index)
+        labels[f"future_{horizon}d_defensive_excess_return"] = labels[f"future_{horizon}d_equity_return"] - pd.Series(defensive_forward, index=labels.index)
+
+    if "future_20d_equity_return" in labels:
+        labels["risk_on_profitable_next_20d"] = (
+            (labels["future_20d_equity_return"] > 0.0)
+            & (labels["future_20d_cash_excess_return"] > 0.0)
+            & (labels["future_20d_defensive_excess_return"] > 0.0)
+        )
+        labels["risk_off_preferred_next_20d"] = (
+            (labels["future_20d_equity_return"] < 0.0)
+            | (labels["future_20d_defensive_excess_return"] < 0.0)
+            | (labels["future_20d_equity_max_drawdown"] <= -0.08)
+        )
+    return labels
+
+
+def _profit_regime_series(regimes: pd.Series) -> pd.Series:
+    mapping = {"bull": "risk_on", "sideways": "neutral", "bear": "risk_off"}
+    return regimes.map(lambda value: mapping.get(str(value), str(value)))
+
+
+def _portfolio_metrics(daily_return: pd.Series) -> dict[str, float | pd.Series]:
+    returns = daily_return.astype(float).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    equity_curve = (1.0 + returns).cumprod()
+    n = len(returns)
+    if n < 10:
+        return {
+            "daily_return": returns,
+            "equity_curve": equity_curve,
+            "cagr": 0.0,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "calmar": 0.0,
+            "turnover_proxy": 0.0,
+        }
+    total = float(equity_curve.iloc[-1])
+    cagr = total ** (252.0 / n) - 1.0 if total > 0 else -1.0
+    vol = float(returns.std(ddof=1) * np.sqrt(252))
+    sharpe = float(returns.mean() * 252.0 / vol) if vol > 0 else 0.0
+    drawdown = equity_curve / equity_curve.cummax() - 1.0
+    max_drawdown = float(drawdown.min()) if len(drawdown) else 0.0
+    calmar = cagr / abs(max_drawdown) if max_drawdown < 0 else 0.0
+    return {
+        "daily_return": returns,
+        "equity_curve": equity_curve,
+        "cagr": round(float(cagr), 6),
+        "sharpe": round(float(sharpe), 6),
+        "max_drawdown": round(float(max_drawdown), 6),
+        "calmar": round(float(calmar), 6),
+    }
+
+
+def simulate_tradable_exposure(
+    asset_panel: pd.DataFrame,
+    regime_series: pd.Series,
+    exposure_map: dict[str, dict[str, float]] | None = None,
+) -> dict[str, float | pd.Series]:
+    """Convert risk-on/neutral/risk-off states into tradable daily returns."""
+    exposure_map = exposure_map or DEFAULT_EXPOSURE_MAP
+    panel = asset_panel.sort_index().copy()
+    regimes = _profit_regime_series(regime_series).reindex(panel.index).ffill().fillna("neutral")
+    equity_weight = regimes.map(lambda regime: exposure_map.get(str(regime), exposure_map["neutral"])["equity"]).astype(float)
+    defensive_weight = regimes.map(lambda regime: exposure_map.get(str(regime), exposure_map["neutral"])["defensive"]).astype(float)
+
+    tradable_equity = equity_weight.shift(1).fillna(exposure_map["neutral"]["equity"])
+    tradable_defensive = defensive_weight.shift(1).fillna(exposure_map["neutral"]["defensive"])
+    daily_return = tradable_equity * panel["equity_return"].astype(float) + tradable_defensive * panel["defensive_return"].astype(float)
+    metrics = _portfolio_metrics(daily_return)
+    stats = regimes.value_counts(normalize=True)
+    metrics.update(
+        {
+            "turnover_proxy": round(float(equity_weight.diff().abs().sum()), 6),
+            "risk_on_ratio": round(float(stats.get("risk_on", 0.0)), 6),
+            "neutral_ratio": round(float(stats.get("neutral", 0.0)), 6),
+            "risk_off_ratio": round(float(stats.get("risk_off", 0.0)), 6),
+        }
+    )
+    return metrics
+
+
+def _scalar_metrics(metrics: dict) -> dict:
+    return {key: value for key, value in metrics.items() if not isinstance(value, pd.Series)}
+
+
+def _max_single_profit_regime(metrics: dict) -> float:
+    return max(
+        float(metrics.get("risk_on_ratio", 0.0)),
+        float(metrics.get("neutral_ratio", 0.0)),
+        float(metrics.get("risk_off_ratio", 0.0)),
+    )
+
+
+def profit_score_candidate(
+    metrics: dict,
+    baselines: Sequence[dict] | None = None,
+    regime_distribution: dict[str, float] | None = None,
+    *,
+    complexity: int = 1,
+) -> dict[str, float]:
+    """Score a candidate by tradable OOS-style portfolio quality."""
+    baselines = list(baselines or [])
+    regime_distribution = regime_distribution or {
+        "risk_on_ratio": float(metrics.get("risk_on_ratio", 0.0)),
+        "neutral_ratio": float(metrics.get("neutral_ratio", 0.0)),
+        "risk_off_ratio": float(metrics.get("risk_off_ratio", 0.0)),
+    }
+    calmar = float(metrics.get("calmar", 0.0))
+    sharpe = float(metrics.get("sharpe", 0.0))
+    cagr = float(metrics.get("cagr", 0.0))
+    max_drawdown = float(metrics.get("max_drawdown", 0.0))
+    turnover = float(metrics.get("turnover_proxy", 0.0))
+    max_single = max(float(regime_distribution.get(key, 0.0)) for key in ("risk_on_ratio", "neutral_ratio", "risk_off_ratio"))
+    collapse_penalty = max(0.0, max_single - 0.85) * 120.0
+    collapse_penalty += max(0.0, 0.10 - float(regime_distribution.get("risk_on_ratio", 0.0))) * 100.0
+    collapse_penalty += max(0.0, float(regime_distribution.get("risk_off_ratio", 0.0)) - 0.70) * 100.0
+
+    baseline_bonus = 0.0
+    for row in baselines:
+        if calmar > float(row.get("calmar", 0.0)):
+            baseline_bonus += 2.0
+        if sharpe > float(row.get("sharpe", 0.0)):
+            baseline_bonus += 1.0
+    raw = (
+        50.0
+        + calmar * 8.0
+        + sharpe * 10.0
+        + cagr * 120.0
+        + max_drawdown * 80.0
+        + baseline_bonus
+        - turnover * 0.15
+        - complexity * 1.25
+        - collapse_penalty
+    )
+    score = _score_1_100(raw)
+    return {
+        "profit_score": round(score, 4),
+        "collapse_penalty": round(float(collapse_penalty), 4),
+        "baseline_bonus": round(float(baseline_bonus), 4),
+    }
+
+
+def _fixed_allocation_metrics(asset_panel: pd.DataFrame, equity_weight: float) -> dict:
+    panel = asset_panel.sort_index()
+    daily = equity_weight * panel["equity_return"].astype(float) + (1.0 - equity_weight) * panel["defensive_return"].astype(float)
+    metrics = _portfolio_metrics(daily)
+    metrics["turnover_proxy"] = 0.0
+    metrics["risk_on_ratio"] = 1.0 if equity_weight >= 0.8 else 0.0
+    metrics["neutral_ratio"] = 1.0 if 0.2 < equity_weight < 0.8 else 0.0
+    metrics["risk_off_ratio"] = 1.0 if equity_weight <= 0.2 else 0.0
+    return metrics
+
+
+def _ma_timing_regime(asset_panel: pd.DataFrame, fast: int, slow: int) -> pd.Series:
+    close = asset_panel["equity_close"].astype(float)
+    ma_fast = close.rolling(fast, min_periods=max(5, fast // 2)).mean()
+    ma_slow = close.rolling(slow, min_periods=max(10, slow // 2)).mean()
+    values = []
+    for idx in close.index:
+        if pd.notna(ma_fast.loc[idx]) and pd.notna(ma_slow.loc[idx]) and close.loc[idx] > ma_fast.loc[idx] > ma_slow.loc[idx]:
+            values.append("risk_on")
+        elif pd.notna(ma_slow.loc[idx]) and close.loc[idx] < ma_slow.loc[idx]:
+            values.append("risk_off")
+        else:
+            values.append("neutral")
+    return pd.Series(values, index=close.index)
+
+
+def _policy_profit_metrics(features: pd.DataFrame, asset_panel: pd.DataFrame, policy: RegimePolicy) -> dict:
+    applied = apply_policy(features, policy)
+    regimes = _profit_regime_series(applied["regime"])
+    metrics = simulate_tradable_exposure(asset_panel, regimes, DEFAULT_EXPOSURE_MAP)
+    score = profit_score_candidate(metrics, complexity=policy.complexity)
+    out = {**_scalar_metrics(metrics), **score}
+    out["candidate_id"] = policy.candidate_id
+    out["policy"] = policy
+    return out
+
+
+def _profit_candidate_rows(features: pd.DataFrame, asset_panel: pd.DataFrame, policies: Sequence[RegimePolicy]) -> list[dict]:
+    rows = [_policy_profit_metrics(features, asset_panel, policy) for policy in policies]
+    return sorted(rows, key=lambda row: (float(row.get("profit_score", 0.0)), float(row.get("calmar", 0.0))), reverse=True)
+
+
+def _baseline_row(strategy: str, metrics: dict, candidate_id: str | None = None) -> dict:
+    row = {"strategy": strategy, **_scalar_metrics(metrics)}
+    if candidate_id:
+        row["candidate_id"] = candidate_id
+    score = profit_score_candidate(row, complexity=1)
+    row.update(score)
+    return row
+
+
+def build_profit_baseline_rows(features: pd.DataFrame, asset_panel: pd.DataFrame, best_policy: RegimePolicy) -> list[dict]:
+    """Return strong profit baselines and current/best regime A/B rows."""
+    rows = [
+        _baseline_row("buy_and_hold_equity", _fixed_allocation_metrics(asset_panel, 1.0)),
+        _baseline_row("fixed_80_20", _fixed_allocation_metrics(asset_panel, 0.80)),
+        _baseline_row("fixed_60_40", _fixed_allocation_metrics(asset_panel, 0.60)),
+        _baseline_row("fixed_40_60", _fixed_allocation_metrics(asset_panel, 0.40)),
+        _baseline_row("cash_only", _fixed_allocation_metrics(asset_panel, 0.0)),
+        _baseline_row("ma_20_60_timing", simulate_tradable_exposure(asset_panel, _ma_timing_regime(asset_panel, 20, 60), DEFAULT_EXPOSURE_MAP)),
+        _baseline_row("ma_60_120_timing", simulate_tradable_exposure(asset_panel, _ma_timing_regime(asset_panel, 60, 120), DEFAULT_EXPOSURE_MAP)),
+        _baseline_row(
+            "trend_only_regime",
+            simulate_tradable_exposure(asset_panel, _profit_regime_series(apply_policy(features, TREND_ONLY_POLICY)["regime"]), DEFAULT_EXPOSURE_MAP),
+            TREND_ONLY_POLICY.candidate_id,
+        ),
+        _baseline_row(
+            "trend_breadth_regime",
+            simulate_tradable_exposure(asset_panel, _profit_regime_series(apply_policy(features, TREND_BREADTH_POLICY)["regime"]), DEFAULT_EXPOSURE_MAP),
+            TREND_BREADTH_POLICY.candidate_id,
+        ),
+        _baseline_row(
+            "current_champion_formula",
+            simulate_tradable_exposure(asset_panel, _profit_regime_series(apply_policy(features, CHAMPION_POLICY)["regime"]), DEFAULT_EXPOSURE_MAP),
+            CHAMPION_POLICY.candidate_id,
+        ),
+        _baseline_row(
+            "best_challenger",
+            simulate_tradable_exposure(asset_panel, _profit_regime_series(apply_policy(features, best_policy)["regime"]), DEFAULT_EXPOSURE_MAP),
+            best_policy.candidate_id,
+        ),
+    ]
+    by_name = {row["strategy"]: row for row in rows}
+    return [by_name[name] for name in PROFIT_BASELINE_NAMES if name in by_name]
+
+
+def _profit_walk_forward_rows(
+    features: pd.DataFrame,
+    asset_panel: pd.DataFrame,
+    policies: Sequence[RegimePolicy],
+) -> list[dict]:
+    rows: list[dict] = []
+    index = pd.DatetimeIndex(features.index)
+    for train_idx, validate_idx in walk_forward_splits(index):
+        train_features = features.loc[train_idx]
+        train_panel = asset_panel.loc[asset_panel.index.intersection(train_idx)]
+        validate_features = features.loc[validate_idx]
+        validate_panel = asset_panel.loc[asset_panel.index.intersection(validate_idx)]
+        if len(train_features) < 252 or len(validate_features) < 60 or len(train_panel) < 252 or len(validate_panel) < 60:
+            continue
+        ranked = _profit_candidate_rows(train_features, train_panel, policies)
+        ranked = [row for row in ranked if row["candidate_id"] not in BASELINE_IDS]
+        if not ranked:
+            continue
+        selected_policy = ranked[0]["policy"]
+        champion = _policy_profit_metrics(validate_features, validate_panel, CHAMPION_POLICY)
+        challenger = _policy_profit_metrics(validate_features, validate_panel, selected_policy)
+        rows.append(
+            {
+                "train_start": str(train_idx.min().date()),
+                "train_end": str(train_idx.max().date()),
+                "validate_start": str(validate_idx.min().date()),
+                "validate_end": str(validate_idx.max().date()),
+                "selected_candidate": selected_policy.candidate_id,
+                "champion_profit_score": champion["profit_score"],
+                "challenger_profit_score": challenger["profit_score"],
+                "profit_score_delta": round(float(challenger["profit_score"]) - float(champion["profit_score"]), 4),
+                "champion_calmar": champion["calmar"],
+                "challenger_calmar": challenger["calmar"],
+                "champion_sharpe": champion["sharpe"],
+                "challenger_sharpe": challenger["sharpe"],
+                "champion_cagr": champion["cagr"],
+                "challenger_cagr": challenger["cagr"],
+                "winner": "challenger" if float(challenger["profit_score"]) > float(champion["profit_score"]) else "champion",
+            }
+        )
+    return rows
+
+
+def _beats_required_profit_baselines(challenger_metrics: dict, baseline_rows: Sequence[dict]) -> bool:
+    by_name = {row.get("strategy"): row for row in baseline_rows}
+    for name in PROFIT_REQUIRED_BASELINES:
+        baseline = by_name.get(name)
+        if not baseline:
+            return False
+        challenger_calmar = float(challenger_metrics.get("calmar", 0.0))
+        challenger_sharpe = float(challenger_metrics.get("sharpe", 0.0))
+        challenger_cagr = float(challenger_metrics.get("cagr", 0.0))
+        baseline_calmar = float(baseline.get("calmar", 0.0))
+        baseline_sharpe = float(baseline.get("sharpe", 0.0))
+        baseline_cagr = float(baseline.get("cagr", 0.0))
+        if challenger_calmar <= baseline_calmar and challenger_sharpe <= baseline_sharpe:
+            return False
+        if challenger_cagr < baseline_cagr - 0.02:
+            return False
+    return True
+
+
+def decide_profit_promotion(
+    *,
+    champion_metrics: dict,
+    challenger_metrics: dict,
+    baseline_rows: Sequence[dict],
+    walk_forward_rows: Sequence[dict],
+    min_risk_on_ratio: float = 0.10,
+    max_risk_off_ratio: float = 0.70,
+    max_single_regime_ratio: float = 0.85,
+    max_turnover_proxy: float = 80.0,
+    min_validation_win_rate: float = 0.60,
+) -> PromotionGateResult:
+    if not walk_forward_rows:
+        return PromotionGateResult.INSUFFICIENT_DATA
+    if float(challenger_metrics.get("risk_on_ratio", 0.0)) < min_risk_on_ratio:
+        return PromotionGateResult.KEEP_CHAMPION
+    if float(challenger_metrics.get("risk_off_ratio", 0.0)) > max_risk_off_ratio:
+        return PromotionGateResult.KEEP_CHAMPION
+    if _max_single_profit_regime(challenger_metrics) > max_single_regime_ratio:
+        return PromotionGateResult.KEEP_CHAMPION
+    if float(challenger_metrics.get("turnover_proxy", 0.0)) > max_turnover_proxy:
+        return PromotionGateResult.KEEP_CHAMPION
+    wins = sum(row.get("winner") == "challenger" for row in walk_forward_rows)
+    win_rate = wins / len(walk_forward_rows)
+    if win_rate < min_validation_win_rate:
+        return PromotionGateResult.KEEP_CHAMPION
+    if float(challenger_metrics.get("calmar", 0.0)) <= float(champion_metrics.get("calmar", 0.0)) + 0.05:
+        return PromotionGateResult.KEEP_CHAMPION
+    if float(challenger_metrics.get("sharpe", 0.0)) <= float(champion_metrics.get("sharpe", 0.0)) + 0.02:
+        return PromotionGateResult.KEEP_CHAMPION
+    if float(challenger_metrics.get("cagr", 0.0)) < float(champion_metrics.get("cagr", 0.0)) - 0.01:
+        return PromotionGateResult.KEEP_CHAMPION
+    if float(challenger_metrics.get("max_drawdown", 0.0)) < float(champion_metrics.get("max_drawdown", 0.0)) - 0.02:
+        return PromotionGateResult.KEEP_CHAMPION
+    if not _beats_required_profit_baselines(challenger_metrics, baseline_rows):
+        return PromotionGateResult.KEEP_CHAMPION
+    return PromotionGateResult.RECOMMEND_CHALLENGER_FOR_REVIEW
+
+
+def _select_oos_best_policy(walk_rows: Sequence[dict], policies: Sequence[RegimePolicy], fallback: RegimePolicy) -> RegimePolicy:
+    if not walk_rows:
+        return fallback
+    scores = pd.DataFrame(list(walk_rows))
+    if scores.empty or "selected_candidate" not in scores:
+        return fallback
+    grouped = scores.groupby("selected_candidate")["challenger_profit_score"].mean().sort_values(ascending=False)
+    for candidate_id in grouped.index:
+        policy = _policy_by_id(policies, str(candidate_id))
+        if policy is not None:
+            return policy
+    return fallback
+
+
+def _profit_regime_distribution_rows(features: pd.DataFrame, policies: Sequence[RegimePolicy]) -> list[dict]:
+    rows = []
+    for policy in policies:
+        regimes = _profit_regime_series(apply_policy(features, policy)["regime"])
+        stats = regimes.value_counts(normalize=True)
+        rows.append(
+            {
+                "candidate_id": policy.candidate_id,
+                "risk_on_ratio": round(float(stats.get("risk_on", 0.0)), 6),
+                "neutral_ratio": round(float(stats.get("neutral", 0.0)), 6),
+                "risk_off_ratio": round(float(stats.get("risk_off", 0.0)), 6),
+                "max_single_regime_ratio": round(float(stats.max()) if len(stats) else 0.0, 6),
+            }
+        )
+    return rows
+
+
+def _profit_event_study_rows(labels: pd.DataFrame, policies: Sequence[RegimePolicy], features: pd.DataFrame) -> list[dict]:
+    rows = []
+    for policy in policies:
+        regimes = _profit_regime_series(apply_policy(features, policy)["regime"])
+        data = labels.join(regimes.rename("regime"), how="inner")
+        for regime in ("risk_on", "neutral", "risk_off"):
+            subset = data[data["regime"] == regime]
+            rows.append(
+                {
+                    "candidate_id": policy.candidate_id,
+                    "regime": regime,
+                    "observations": int(len(subset)),
+                    "future_20d_equity_return": round(float(subset["future_20d_equity_return"].mean()), 6) if "future_20d_equity_return" in subset and len(subset) else 0.0,
+                    "future_20d_equity_max_drawdown": round(float(subset["future_20d_equity_max_drawdown"].mean()), 6) if "future_20d_equity_max_drawdown" in subset and len(subset) else 0.0,
+                    "risk_on_profitable_rate": round(float(subset["risk_on_profitable_next_20d"].mean()), 6) if "risk_on_profitable_next_20d" in subset and len(subset) else 0.0,
+                    "risk_off_preferred_rate": round(float(subset["risk_off_preferred_next_20d"].mean()), 6) if "risk_off_preferred_next_20d" in subset and len(subset) else 0.0,
+                }
+            )
+    return rows
+
+
+def run_regime_profit_training(
+    features: pd.DataFrame,
+    asset_panel: pd.DataFrame,
+    *,
+    policies: Sequence[RegimePolicy] | None = None,
+) -> dict:
+    """Run profit-oriented Market Regime champion/challenger training."""
+    features = features.sort_index().replace([np.inf, -np.inf], np.nan).dropna(subset=["trend_raw", "breadth_raw", "risk_raw", "volume_raw"])
+    panel = asset_panel.sort_index().copy()
+    common_index = features.index.intersection(panel.index)
+    features = features.loc[common_index]
+    panel = panel.loc[common_index]
+    labels = build_profit_labels(panel)
+    notes = list(panel.attrs.get("notes", []))
+    if len(features) < 504 or len(panel) < 504:
+        return {
+            "decision": PromotionGateResult.INSUFFICIENT_DATA.value,
+            "best_challenger_id": "",
+            "champion_metrics": {},
+            "best_challenger_metrics": {},
+            "candidate_rows": [],
+            "walk_forward_rows": [],
+            "baseline_rows": [],
+            "regime_exposure_rows": [],
+            "regime_distribution_rows": [],
+            "event_rows": [],
+            "features": features,
+            "labels": labels,
+            "asset_panel": panel,
+            "notes": notes + ["insufficient_data: need at least 504 aligned rows"],
+        }
+
+    candidate_policies = list(policies) if policies is not None else generate_candidate_policies()
+    policy_ids = {policy.candidate_id for policy in candidate_policies}
+    for required in (TREND_ONLY_POLICY, TREND_BREADTH_POLICY):
+        if required.candidate_id not in policy_ids:
+            candidate_policies.insert(0, required)
+            policy_ids.add(required.candidate_id)
+
+    full_rows_with_policy = _profit_candidate_rows(features, panel, candidate_policies)
+    non_baseline = [row for row in full_rows_with_policy if row["candidate_id"] not in BASELINE_IDS]
+    full_best_policy = non_baseline[0]["policy"] if non_baseline else CHAMPION_POLICY
+    walk_rows = _profit_walk_forward_rows(features, panel, candidate_policies)
+    best_policy = _select_oos_best_policy(walk_rows, candidate_policies, full_best_policy)
+    champion_metrics = _policy_profit_metrics(features, panel, CHAMPION_POLICY)
+    best_metrics = _policy_profit_metrics(features, panel, best_policy)
+    baseline_rows = build_profit_baseline_rows(features, panel, best_policy)
+
+    decision = decide_profit_promotion(
+        champion_metrics=champion_metrics,
+        challenger_metrics=best_metrics,
+        baseline_rows=baseline_rows,
+        walk_forward_rows=walk_rows,
+    )
+    if not walk_rows:
+        notes.append("insufficient_data: no valid walk-forward windows")
+    notes.extend(
+        [
+            f"rows={len(features)}",
+            f"walk_forward_windows={len(walk_rows)}",
+            "objective=profit_oriented_tradable_beta_exposure",
+            "production_formula_not_applied",
+        ]
+    )
+
+    candidate_rows = [_public_row(row) for row in full_rows_with_policy]
+    distribution_policies = [CHAMPION_POLICY, TREND_ONLY_POLICY, TREND_BREADTH_POLICY, best_policy]
+    seen: set[str] = set()
+    distribution_policies = [policy for policy in distribution_policies if not (policy.candidate_id in seen or seen.add(policy.candidate_id))]
+    event_rows = _profit_event_study_rows(labels, distribution_policies, features)
+    distribution_rows = _profit_regime_distribution_rows(features, distribution_policies)
+    return {
+        "decision": decision.value,
+        "best_challenger_id": best_policy.candidate_id,
+        "best_policy": best_policy,
+        "champion_metrics": _public_row(champion_metrics),
+        "best_challenger_metrics": _public_row(best_metrics),
+        "candidate_rows": candidate_rows,
+        "walk_forward_rows": walk_rows,
+        "baseline_rows": baseline_rows,
+        "regime_exposure_rows": baseline_rows,
+        "regime_distribution_rows": distribution_rows,
+        "event_rows": event_rows,
+        "features": features,
+        "labels": labels,
+        "asset_panel": panel,
+        "asset_sources": dict(panel.attrs.get("asset_sources", {})),
+        "notes": notes,
+    }
+
+
+def _recommended_profit_config(result: dict) -> str:
+    policy = result.get("best_policy")
+    decision = str(result.get("decision", PromotionGateResult.KEEP_CHAMPION.value))
+    lines = [
+        f"decision: {decision}",
+        "apply: false",
+        "objective: profit_oriented_tradable_beta_exposure",
+    ]
+    if decision == PromotionGateResult.RECOMMEND_CHALLENGER_FOR_REVIEW.value and isinstance(policy, RegimePolicy):
+        lines.extend(
+            [
+                "recommended_config:",
+                f"  candidate_id: {policy.candidate_id}",
+                "  weights:",
+            ]
+        )
+        for key, value in policy.weights.items():
+            lines.append(f"    {key}: {value}")
+        lines.extend(
+            [
+                f"  bull_threshold: {policy.bull_threshold}",
+                f"  bear_threshold: {policy.bear_threshold}",
+                f"  trend_confirm: {policy.trend_confirm}",
+                f"  breadth_confirm: {policy.breadth_confirm}",
+                f"  bear_trend_breakdown: {policy.bear_trend_breakdown}",
+                f"  bear_breadth_breakdown: {policy.bear_breadth_breakdown}",
+                f"  smoothing_window: {policy.smoothing_window}",
+                f"  min_dwell: {policy.min_dwell}",
+            ]
+        )
+    else:
+        lines.append("recommended_config: null")
+    return "\n".join(lines) + "\n"
+
+
+def _profit_markdown(result: dict) -> str:
+    champion = result.get("champion_metrics", {})
+    challenger = result.get("best_challenger_metrics", {})
+    lines = [
+        "# Market Regime Profit Champion vs Challenger",
+        "",
+        f"- Decision: `{result.get('decision', PromotionGateResult.KEEP_CHAMPION.value)}`",
+        f"- Best challenger: `{result.get('best_challenger_id', '')}`",
+        "- Objective: `profit_oriented_tradable_beta_exposure`",
+        "- Production formula applied: `false`",
+        "",
+        "## Metrics",
+        (
+            f"- Champion: CAGR={float(champion.get('cagr', 0.0)):.2%}, "
+            f"Sharpe={float(champion.get('sharpe', 0.0)):.2f}, "
+            f"Calmar={float(champion.get('calmar', 0.0)):.2f}, "
+            f"MaxDD={float(champion.get('max_drawdown', 0.0)):.2%}"
+        ),
+        (
+            f"- Challenger: CAGR={float(challenger.get('cagr', 0.0)):.2%}, "
+            f"Sharpe={float(challenger.get('sharpe', 0.0)):.2f}, "
+            f"Calmar={float(challenger.get('calmar', 0.0)):.2f}, "
+            f"MaxDD={float(challenger.get('max_drawdown', 0.0)):.2%}"
+        ),
+        "",
+        "## Baselines",
+    ]
+    for row in result.get("baseline_rows", []):
+        lines.append(
+            f"- `{row.get('strategy')}`: CAGR={float(row.get('cagr', 0.0)):.2%}, "
+            f"Sharpe={float(row.get('sharpe', 0.0)):.2f}, "
+            f"Calmar={float(row.get('calmar', 0.0)):.2f}, "
+            f"MaxDD={float(row.get('max_drawdown', 0.0)):.2%}"
+        )
+    lines.extend(["", "## Notes"])
+    for note in result.get("notes", []):
+        lines.append(f"- {note}")
+    return "\n".join(lines) + "\n"
+
+
+def write_regime_profit_report(output_dir: str | Path, result: dict) -> dict:
+    """Write the v2 profit-oriented regime research report."""
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+
+    _csv(output / "candidate_profit_search.csv", result.get("candidate_rows", []))
+    _csv(output / "walk_forward_profit_results.csv", result.get("walk_forward_rows", []))
+    _csv(output / "baseline_comparison.csv", result.get("baseline_rows", []))
+    _csv(output / "regime_exposure_ab_test.csv", result.get("regime_exposure_rows", []))
+    _csv(output / "regime_distribution.csv", result.get("regime_distribution_rows", []))
+    _csv(output / "event_study.csv", result.get("event_rows", []))
+
+    asset_panel = result.get("asset_panel")
+    features = result.get("features")
+    labels = result.get("labels")
+    if isinstance(asset_panel, pd.DataFrame):
+        asset_panel.to_parquet(output / "tradable_asset_panel.parquet")
+    if isinstance(features, pd.DataFrame):
+        features.to_parquet(output / "regime_feature_history.parquet")
+    if isinstance(labels, pd.DataFrame):
+        labels.to_parquet(output / "regime_label_history.parquet")
+
+    (output / "recommended_profit_config.yaml").write_text(_recommended_profit_config(result), encoding="utf-8")
+    (output / "profit_champion_vs_challenger.md").write_text(_profit_markdown(result), encoding="utf-8")
+    run_log = output / "run.log"
+    if not run_log.exists():
+        run_log.write_text("market_regime_profit_training_report_written=true\n", encoding="utf-8")
+
+    report_files = [
+        "summary.json",
+        "profit_champion_vs_challenger.md",
+        "tradable_asset_panel.parquet",
+        "regime_feature_history.parquet",
+        "regime_label_history.parquet",
+        "candidate_profit_search.csv",
+        "walk_forward_profit_results.csv",
+        "baseline_comparison.csv",
+        "regime_exposure_ab_test.csv",
+        "regime_distribution.csv",
+        "event_study.csv",
+        "recommended_profit_config.yaml",
+        "run.log",
+    ]
+    champion = result.get("champion_metrics", {})
+    challenger = result.get("best_challenger_metrics", {})
+    summary = {
+        "status": "ok",
+        "decision": str(result.get("decision", PromotionGateResult.KEEP_CHAMPION.value)),
+        "best_challenger_id": str(result.get("best_challenger_id", "")),
+        "champion_metrics": champion,
+        "best_challenger_metrics": challenger,
+        "oos_walk_forward_windows": len(result.get("walk_forward_rows", [])),
+        "asset_sources": result.get("asset_sources", {}),
+        "report_files": report_files,
+        "notes": list(result.get("notes", [])),
+    }
+    (output / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2, default=_to_jsonable), encoding="utf-8")
+    return summary
+
+
+def run_and_write_profit_report(
+    *,
+    index_df: pd.DataFrame,
+    asset_panel: pd.DataFrame,
+    output_dir: str | Path,
+    start: str | None = None,
+    end: str | None = None,
+    max_candidates: int = 1000,
+    breadth_history: pd.DataFrame | None = None,
+) -> dict:
+    features = build_regime_feature_history(index_df, breadth_history, start=start, end=end)
+    policies = generate_candidate_policies(max_candidates=max_candidates)
+    result = run_regime_profit_training(features, asset_panel, policies=policies)
+    return write_regime_profit_report(output_dir, result)

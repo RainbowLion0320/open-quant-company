@@ -49,6 +49,20 @@ Market Regime 公式采用 champion/challenger 研究机制。当前生产公式
 - `strategy_ab_test.csv`：固定仓位、当前公式、基线和最优候选的策略贡献。
 - `recommended_config.yaml`：仅为人工审查建议，默认不会自动写回生产配置。
 
+## Regime 挣钱导向训练
+
+`scripts/train_market_regime_profit.py` 用更严格的目标训练 Market Regime：把它当作全局 risk-on/risk-off 风险预算信号，而不是选股策略评分器。训练器只使用本地可交易资产代理验证收益、回撤、Sharpe、Calmar、CAGR 和换手，不依赖当前个股策略的信号或 paper PnL。
+
+运行报告存放在 `reports/regime_profit_training/`。优先查看：
+
+- `summary.json`：决策入口，包含 `keep_champion` / `recommend_challenger_for_review` / `insufficient_data`，以及 champion/challenger 的核心收益指标。
+- `profit_champion_vs_challenger.md`：收益导向的人类可读摘要。
+- `baseline_comparison.csv`：buy-and-hold、固定仓位、均线择时、trend-only、trend+breadth、当前 champion、best challenger 的强基线对比。
+- `walk_forward_profit_results.csv`：滚动样本外验证窗口，推荐结论必须由这里支撑。
+- `candidate_profit_search.csv`：候选公式全样本排序，只能作为辅助，不作为最终晋级依据。
+- `regime_distribution.csv`：检查候选是否坍缩为永久 risk-on 或永久 risk-off。
+- `recommended_profit_config.yaml`：仅为人工审查建议，默认不会自动写回生产配置。
+
 ## 成本敏感性
 
 牛市中换手率通常高于熊市和震荡市。具体费用影响以当前回测输出和交易成本配置为准。

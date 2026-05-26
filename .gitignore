@@ -59,6 +59,7 @@ data/models/*.json
 data/models/*.jsonl
 data/tournament/
 reports/regime_training/
+reports/regime_profit_training/
 
 # ── Web 构建产物 ──
 web/frontend/*.tsbuildinfo
