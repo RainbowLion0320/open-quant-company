@@ -1454,6 +1454,203 @@ def _beats_required_profit_baselines(challenger_metrics: dict, baseline_rows: Se
     return True
 
 
+def _as_reason_text(values: Sequence[str]) -> str:
+    return "|".join(values)
+
+
+def _finite_metric_set(row: dict, keys: Sequence[str]) -> bool:
+    for key in keys:
+        try:
+            value = float(row.get(key, 0.0))
+        except (TypeError, ValueError):
+            return False
+        if not math.isfinite(value):
+            return False
+    return True
+
+
+def _validation_summary_by_id(validation_rows: Sequence[dict]) -> dict[str, dict]:
+    return {str(row.get("candidate_id", "")): dict(row) for row in validation_rows}
+
+
+def build_profit_gate_diagnostics(
+    candidate_rows: Sequence[dict],
+    champion_metrics: dict,
+    baseline_rows: Sequence[dict],
+    validation_summary_rows: Sequence[dict] | None = None,
+    *,
+    min_oos_windows: int = 3,
+    min_oos_win_rate: float = 0.50,
+    max_single_regime_ratio: float = 0.90,
+    max_risk_off_ratio: float = 0.85,
+    min_abs_risk_on_ratio: float = 0.01,
+) -> list[dict]:
+    """Evaluate champion and candidate formulas under the same V3 diagnostics."""
+    validation_by_id = _validation_summary_by_id(validation_summary_rows or [])
+    champion_turnover = float(champion_metrics.get("turnover_proxy", 0.0))
+    turnover_limit = max(80.0, champion_turnover * 1.25)
+    champion_risk_on = float(champion_metrics.get("risk_on_ratio", 0.0))
+    rows: list[dict] = []
+
+    for row in candidate_rows:
+        candidate_id = str(row.get("candidate_id", ""))
+        role = "champion" if candidate_id == CHAMPION_POLICY.candidate_id else "candidate"
+        failed: list[str] = []
+        warnings: list[str] = []
+        metrics_finite = _finite_metric_set(row, ["cagr", "sharpe", "calmar", "max_drawdown", "turnover_proxy"])
+        if not metrics_finite:
+            failed.append("nonfinite_metrics")
+
+        risk_on = float(row.get("risk_on_ratio", 0.0))
+        neutral = float(row.get("neutral_ratio", 0.0))
+        risk_off = float(row.get("risk_off_ratio", 0.0))
+        max_single = max(risk_on, neutral, risk_off)
+        turnover = float(row.get("turnover_proxy", 0.0))
+
+        if max_single > max_single_regime_ratio:
+            failed.append("permanent_regime_collapse")
+        if risk_on <= min_abs_risk_on_ratio:
+            failed.append("no_risk_on_participation")
+        elif champion_risk_on > 0 and risk_on < champion_risk_on * 0.50:
+            warnings.append("low_risk_on_participation")
+        if risk_off > max_risk_off_ratio:
+            failed.append("excessive_risk_off_dominance")
+        if role != "champion" and turnover > turnover_limit:
+            failed.append("excessive_turnover_vs_champion")
+
+        if role != "champion" and not _beats_required_profit_baselines(row, baseline_rows):
+            failed.append("fails_required_baselines")
+
+        validation = validation_by_id.get(candidate_id, {})
+        oos_windows = int(validation.get("oos_windows", 0))
+        oos_win_rate = float(validation.get("oos_win_rate_vs_champion", 0.0))
+        oos_delta = float(validation.get("oos_profit_score_delta_mean", 0.0))
+        if role != "champion":
+            if oos_windows < min_oos_windows:
+                failed.append("insufficient_oos_evidence")
+            if oos_windows >= min_oos_windows and oos_win_rate < min_oos_win_rate and oos_delta <= 0:
+                failed.append("weak_oos_vs_champion")
+
+        rows.append(
+            {
+                "candidate_id": candidate_id,
+                "role": role,
+                "passes_validation": len(failed) == 0,
+                "failed_gates": _as_reason_text(failed),
+                "warnings": _as_reason_text(warnings),
+                "turnover_limit": round(turnover_limit, 6),
+                "risk_on_ratio": round(risk_on, 6),
+                "neutral_ratio": round(neutral, 6),
+                "risk_off_ratio": round(risk_off, 6),
+                "max_single_regime_ratio": round(max_single, 6),
+                "oos_windows": oos_windows,
+                "oos_win_rate_vs_champion": round(oos_win_rate, 6),
+                "oos_profit_score_delta_mean": round(oos_delta, 6),
+            }
+        )
+    return rows
+
+
+def select_best_validated_formula(
+    candidate_rows: Sequence[dict],
+    gate_rows: Sequence[dict],
+    validation_summary_rows: Sequence[dict] | None = None,
+) -> dict:
+    """Select the highest ranked formula that passed V3 validation gates."""
+    gate_by_id = {str(row.get("candidate_id", "")): row for row in gate_rows}
+    validation_by_id = _validation_summary_by_id(validation_summary_rows or [])
+
+    def sort_key(row: dict) -> tuple[float, float, float, float, float]:
+        candidate_id = str(row.get("candidate_id", ""))
+        validation = validation_by_id.get(candidate_id, {})
+        return (
+            float(validation.get("oos_profit_score_delta_mean", 0.0)),
+            float(validation.get("oos_calmar_mean", 0.0)),
+            float(validation.get("oos_sharpe_mean", 0.0)),
+            float(row.get("profit_score", 0.0)),
+            float(row.get("calmar", 0.0)),
+        )
+
+    ranked = sorted(
+        [dict(row) for row in candidate_rows],
+        key=sort_key if validation_by_id else lambda row: (float(row.get("profit_score", 0.0)), float(row.get("calmar", 0.0)), float(row.get("sharpe", 0.0))),
+        reverse=True,
+    )
+    for row in ranked:
+        gate = gate_by_id.get(str(row.get("candidate_id", "")), {})
+        if bool(gate.get("passes_validation", False)):
+            return row
+    return {}
+
+
+def _profit_candidate_validation_summary_rows(
+    features: pd.DataFrame,
+    asset_panel: pd.DataFrame,
+    policies: Sequence[RegimePolicy],
+) -> list[dict]:
+    """Evaluate every formula across validation windows against the champion."""
+    rows: list[dict] = []
+    index = pd.DatetimeIndex(features.index)
+    for _train_idx, validate_idx in walk_forward_splits(index):
+        validate_features = features.loc[validate_idx]
+        validate_panel = asset_panel.loc[asset_panel.index.intersection(validate_idx)]
+        if len(validate_features) < 60 or len(validate_panel) < 60:
+            continue
+        champion = _policy_profit_metrics(validate_features, validate_panel, CHAMPION_POLICY)
+        for policy in policies:
+            metrics = _policy_profit_metrics(validate_features, validate_panel, policy)
+            rows.append(
+                {
+                    "candidate_id": policy.candidate_id,
+                    "oos_window_start": str(validate_idx.min().date()),
+                    "oos_window_end": str(validate_idx.max().date()),
+                    "oos_profit_score": metrics["profit_score"],
+                    "oos_profit_score_delta": round(float(metrics["profit_score"]) - float(champion["profit_score"]), 6),
+                    "oos_calmar": metrics["calmar"],
+                    "oos_sharpe": metrics["sharpe"],
+                    "oos_cagr": metrics["cagr"],
+                    "oos_max_drawdown": metrics["max_drawdown"],
+                    "winner_vs_champion": "candidate" if float(metrics["profit_score"]) > float(champion["profit_score"]) else "champion",
+                }
+            )
+
+    if not rows:
+        return []
+    frame = pd.DataFrame(rows)
+    summary = []
+    for candidate_id, group in frame.groupby("candidate_id", sort=False):
+        summary.append(
+            {
+                "candidate_id": str(candidate_id),
+                "oos_windows": int(len(group)),
+                "oos_win_rate_vs_champion": round(float((group["winner_vs_champion"] == "candidate").mean()), 6),
+                "oos_profit_score_mean": round(float(group["oos_profit_score"].mean()), 6),
+                "oos_profit_score_delta_mean": round(float(group["oos_profit_score_delta"].mean()), 6),
+                "oos_calmar_mean": round(float(group["oos_calmar"].mean()), 6),
+                "oos_sharpe_mean": round(float(group["oos_sharpe"].mean()), 6),
+                "oos_cagr_mean": round(float(group["oos_cagr"].mean()), 6),
+                "oos_max_drawdown_mean": round(float(group["oos_max_drawdown"].mean()), 6),
+            }
+        )
+    return sorted(summary, key=lambda row: (float(row["oos_profit_score_delta_mean"]), float(row["oos_calmar_mean"])), reverse=True)
+
+
+def _profit_decision_v3(best_validated: dict, champion_metrics: dict, walk_rows: Sequence[dict]) -> tuple[PromotionGateResult, str]:
+    if not walk_rows:
+        return PromotionGateResult.INSUFFICIENT_DATA, "insufficient_oos_windows"
+    if not best_validated:
+        return PromotionGateResult.KEEP_CHAMPION, "no_validated_formula_keep_current_temporarily"
+    if str(best_validated.get("candidate_id")) == CHAMPION_POLICY.candidate_id:
+        return PromotionGateResult.KEEP_CHAMPION, "champion_is_best_validated_formula"
+    calmar_delta = float(best_validated.get("calmar", 0.0)) - float(champion_metrics.get("calmar", 0.0))
+    sharpe_delta = float(best_validated.get("sharpe", 0.0)) - float(champion_metrics.get("sharpe", 0.0))
+    cagr_delta = float(best_validated.get("cagr", 0.0)) - float(champion_metrics.get("cagr", 0.0))
+    maxdd_delta = float(best_validated.get("max_drawdown", 0.0)) - float(champion_metrics.get("max_drawdown", 0.0))
+    if calmar_delta >= 0.05 and sharpe_delta >= 0.02 and cagr_delta >= -0.005 and maxdd_delta >= -0.02:
+        return PromotionGateResult.RECOMMEND_CHALLENGER_FOR_REVIEW, "validated_challenger_beats_champion"
+    return PromotionGateResult.KEEP_CHAMPION, "validated_candidate_does_not_clear_replacement_margin"
+
+
 def decide_profit_promotion(
     *,
     champion_metrics: dict,
@@ -1579,26 +1776,29 @@ def run_regime_profit_training(
 
     candidate_policies = list(policies) if policies is not None else generate_candidate_policies()
     policy_ids = {policy.candidate_id for policy in candidate_policies}
-    for required in (TREND_ONLY_POLICY, TREND_BREADTH_POLICY):
+    for required in (CHAMPION_POLICY, TREND_ONLY_POLICY, TREND_BREADTH_POLICY):
         if required.candidate_id not in policy_ids:
             candidate_policies.insert(0, required)
             policy_ids.add(required.candidate_id)
 
     full_rows_with_policy = _profit_candidate_rows(features, panel, candidate_policies)
-    non_baseline = [row for row in full_rows_with_policy if row["candidate_id"] not in BASELINE_IDS]
-    full_best_policy = non_baseline[0]["policy"] if non_baseline else CHAMPION_POLICY
+    full_best = full_rows_with_policy[0] if full_rows_with_policy else {}
+    full_best_policy = full_best.get("policy", CHAMPION_POLICY) if full_best else CHAMPION_POLICY
     walk_rows = _profit_walk_forward_rows(features, panel, candidate_policies)
-    best_policy = _select_oos_best_policy(walk_rows, candidate_policies, full_best_policy)
     champion_metrics = _policy_profit_metrics(features, panel, CHAMPION_POLICY)
-    best_metrics = _policy_profit_metrics(features, panel, best_policy)
-    baseline_rows = build_profit_baseline_rows(features, panel, best_policy)
+    preliminary_baseline_rows = build_profit_baseline_rows(features, panel, full_best_policy)
+    validation_summary_rows = _profit_candidate_validation_summary_rows(features, panel, candidate_policies)
+    candidate_rows = [_public_row(row) for row in full_rows_with_policy]
+    gate_rows = build_profit_gate_diagnostics(candidate_rows, champion_metrics, preliminary_baseline_rows, validation_summary_rows)
+    best_validated = select_best_validated_formula(candidate_rows, gate_rows, validation_summary_rows)
+    best_validated_policy = _policy_by_id(candidate_policies, str(best_validated.get("candidate_id", ""))) if best_validated else None
+    if best_validated_policy is None:
+        best_validated_policy = CHAMPION_POLICY
+        best_validated = _public_row(champion_metrics)
+    best_metrics = _policy_profit_metrics(features, panel, best_validated_policy)
+    baseline_rows = build_profit_baseline_rows(features, panel, best_validated_policy)
 
-    decision = decide_profit_promotion(
-        champion_metrics=champion_metrics,
-        challenger_metrics=best_metrics,
-        baseline_rows=baseline_rows,
-        walk_forward_rows=walk_rows,
-    )
+    decision, decision_reason = _profit_decision_v3(best_validated, champion_metrics, walk_rows)
     if not walk_rows:
         notes.append("insufficient_data: no valid walk-forward windows")
     notes.extend(
@@ -1606,24 +1806,37 @@ def run_regime_profit_training(
             f"rows={len(features)}",
             f"walk_forward_windows={len(walk_rows)}",
             "objective=profit_oriented_tradable_beta_exposure",
+            "selection=v3_best_validated_formula",
+            f"decision_reason={decision_reason}",
             "production_formula_not_applied",
         ]
     )
 
-    candidate_rows = [_public_row(row) for row in full_rows_with_policy]
-    distribution_policies = [CHAMPION_POLICY, TREND_ONLY_POLICY, TREND_BREADTH_POLICY, best_policy]
+    best_unconstrained_id = str(full_best.get("candidate_id", "")) if full_best else ""
+    best_validated_id = str(best_validated.get("candidate_id", best_validated_policy.candidate_id))
+    champion_gate = next((row for row in gate_rows if row["candidate_id"] == CHAMPION_POLICY.candidate_id), {})
+    distribution_policies = [CHAMPION_POLICY, TREND_ONLY_POLICY, TREND_BREADTH_POLICY, full_best_policy, best_validated_policy]
     seen: set[str] = set()
     distribution_policies = [policy for policy in distribution_policies if not (policy.candidate_id in seen or seen.add(policy.candidate_id))]
     event_rows = _profit_event_study_rows(labels, distribution_policies, features)
     distribution_rows = _profit_regime_distribution_rows(features, distribution_policies)
     return {
         "decision": decision.value,
-        "best_challenger_id": best_policy.candidate_id,
-        "best_policy": best_policy,
+        "decision_reason": decision_reason,
+        "best_challenger_id": best_validated_id,
+        "best_unconstrained_id": best_unconstrained_id,
+        "best_validated_id": best_validated_id,
+        "best_policy": best_validated_policy,
+        "best_validated_policy": best_validated_policy,
         "champion_metrics": _public_row(champion_metrics),
+        "best_unconstrained_metrics": _public_row(full_best) if full_best else {},
         "best_challenger_metrics": _public_row(best_metrics),
+        "best_validated_metrics": _public_row(best_metrics),
+        "champion_gate_diagnostics": champion_gate,
         "candidate_rows": candidate_rows,
         "walk_forward_rows": walk_rows,
+        "candidate_validation_summary_rows": validation_summary_rows,
+        "candidate_gate_rows": gate_rows,
         "baseline_rows": baseline_rows,
         "regime_exposure_rows": baseline_rows,
         "regime_distribution_rows": distribution_rows,
@@ -1637,18 +1850,26 @@ def run_regime_profit_training(
 
 
 def _recommended_profit_config(result: dict) -> str:
-    policy = result.get("best_policy")
+    policy = result.get("best_validated_policy") or result.get("best_policy")
     decision = str(result.get("decision", PromotionGateResult.KEEP_CHAMPION.value))
     lines = [
         f"decision: {decision}",
+        f"decision_reason: {result.get('decision_reason', '')}",
         "apply: false",
         "objective: profit_oriented_tradable_beta_exposure",
+        f"best_unconstrained_id: {result.get('best_unconstrained_id', '')}",
+        f"best_validated_id: {result.get('best_validated_id', '')}",
     ]
-    if decision == PromotionGateResult.RECOMMEND_CHALLENGER_FOR_REVIEW.value and isinstance(policy, RegimePolicy):
+    if (
+        decision == PromotionGateResult.RECOMMEND_CHALLENGER_FOR_REVIEW.value
+        and isinstance(policy, RegimePolicy)
+        and policy.candidate_id != CHAMPION_POLICY.candidate_id
+    ):
         lines.extend(
             [
                 "recommended_config:",
                 f"  candidate_id: {policy.candidate_id}",
+                "  validated: true",
                 "  weights:",
             ]
         )
@@ -1673,12 +1894,16 @@ def _recommended_profit_config(result: dict) -> str:
 
 def _profit_markdown(result: dict) -> str:
     champion = result.get("champion_metrics", {})
-    challenger = result.get("best_challenger_metrics", {})
+    validated = result.get("best_validated_metrics") or result.get("best_challenger_metrics", {})
+    unconstrained = result.get("best_unconstrained_metrics", {})
+    champion_gate = result.get("champion_gate_diagnostics", {})
     lines = [
         "# Market Regime Profit Champion vs Challenger",
         "",
         f"- Decision: `{result.get('decision', PromotionGateResult.KEEP_CHAMPION.value)}`",
-        f"- Best challenger: `{result.get('best_challenger_id', '')}`",
+        f"- Decision reason: `{result.get('decision_reason', '')}`",
+        f"- Best unconstrained: `{result.get('best_unconstrained_id', '')}`",
+        f"- Best validated: `{result.get('best_validated_id', '')}`",
         "- Objective: `profit_oriented_tradable_beta_exposure`",
         "- Production formula applied: `false`",
         "",
@@ -1690,11 +1915,22 @@ def _profit_markdown(result: dict) -> str:
             f"MaxDD={float(champion.get('max_drawdown', 0.0)):.2%}"
         ),
         (
-            f"- Challenger: CAGR={float(challenger.get('cagr', 0.0)):.2%}, "
-            f"Sharpe={float(challenger.get('sharpe', 0.0)):.2f}, "
-            f"Calmar={float(challenger.get('calmar', 0.0)):.2f}, "
-            f"MaxDD={float(challenger.get('max_drawdown', 0.0)):.2%}"
+            f"- Best unconstrained: CAGR={float(unconstrained.get('cagr', 0.0)):.2%}, "
+            f"Sharpe={float(unconstrained.get('sharpe', 0.0)):.2f}, "
+            f"Calmar={float(unconstrained.get('calmar', 0.0)):.2f}, "
+            f"MaxDD={float(unconstrained.get('max_drawdown', 0.0)):.2%}"
         ),
+        (
+            f"- Best validated: CAGR={float(validated.get('cagr', 0.0)):.2%}, "
+            f"Sharpe={float(validated.get('sharpe', 0.0)):.2f}, "
+            f"Calmar={float(validated.get('calmar', 0.0)):.2f}, "
+            f"MaxDD={float(validated.get('max_drawdown', 0.0)):.2%}"
+        ),
+        "",
+        "## Champion Gate Diagnostics",
+        f"- Passes validation: `{champion_gate.get('passes_validation', '')}`",
+        f"- Failed gates: `{champion_gate.get('failed_gates', '')}`",
+        f"- Warnings: `{champion_gate.get('warnings', '')}`",
         "",
         "## Baselines",
     ]
@@ -1721,6 +1957,8 @@ def write_regime_profit_report(output_dir: str | Path, result: dict) -> dict:
     _csv(output / "baseline_comparison.csv", result.get("baseline_rows", []))
     _csv(output / "regime_exposure_ab_test.csv", result.get("regime_exposure_rows", []))
     _csv(output / "regime_distribution.csv", result.get("regime_distribution_rows", []))
+    _csv(output / "candidate_gate_diagnostics.csv", result.get("candidate_gate_rows", []))
+    _csv(output / "candidate_validation_summary.csv", result.get("candidate_validation_summary_rows", []))
     _csv(output / "event_study.csv", result.get("event_rows", []))
 
     asset_panel = result.get("asset_panel")
@@ -1750,6 +1988,8 @@ def write_regime_profit_report(output_dir: str | Path, result: dict) -> dict:
         "baseline_comparison.csv",
         "regime_exposure_ab_test.csv",
         "regime_distribution.csv",
+        "candidate_gate_diagnostics.csv",
+        "candidate_validation_summary.csv",
         "event_study.csv",
         "recommended_profit_config.yaml",
         "run.log",
@@ -1759,9 +1999,15 @@ def write_regime_profit_report(output_dir: str | Path, result: dict) -> dict:
     summary = {
         "status": "ok",
         "decision": str(result.get("decision", PromotionGateResult.KEEP_CHAMPION.value)),
+        "decision_reason": str(result.get("decision_reason", "")),
         "best_challenger_id": str(result.get("best_challenger_id", "")),
+        "best_unconstrained_id": str(result.get("best_unconstrained_id", "")),
+        "best_validated_id": str(result.get("best_validated_id", "")),
         "champion_metrics": champion,
         "best_challenger_metrics": challenger,
+        "best_unconstrained_metrics": result.get("best_unconstrained_metrics", {}),
+        "best_validated_metrics": result.get("best_validated_metrics", {}),
+        "champion_gate_diagnostics": result.get("champion_gate_diagnostics", {}),
         "oos_walk_forward_windows": len(result.get("walk_forward_rows", [])),
         "asset_sources": result.get("asset_sources", {}),
         "report_files": report_files,

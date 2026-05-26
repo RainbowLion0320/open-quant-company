@@ -142,6 +142,127 @@ def test_profit_score_penalizes_permanent_defense_and_gates_reject_it():
     ).value == "keep_champion"
 
 
+def test_v3_gate_diagnostics_apply_to_champion_and_candidates():
+    from research.regime_training import build_profit_gate_diagnostics
+
+    candidate_rows = [
+        {
+            "candidate_id": "champion_current_formula",
+            "cagr": 0.04,
+            "sharpe": 0.60,
+            "calmar": 0.50,
+            "max_drawdown": -0.08,
+            "turnover_proxy": 316.0,
+            "risk_on_ratio": 0.16,
+            "neutral_ratio": 0.60,
+            "risk_off_ratio": 0.24,
+            "profit_score": 10.0,
+        },
+        {
+            "candidate_id": "low_participation_winner",
+            "cagr": 0.07,
+            "sharpe": 1.10,
+            "calmar": 1.40,
+            "max_drawdown": -0.05,
+            "turnover_proxy": 40.0,
+            "risk_on_ratio": 0.06,
+            "neutral_ratio": 0.68,
+            "risk_off_ratio": 0.26,
+            "profit_score": 64.0,
+        },
+        {
+            "candidate_id": "permanent_defense",
+            "cagr": 0.06,
+            "sharpe": 1.20,
+            "calmar": 1.00,
+            "max_drawdown": -0.06,
+            "turnover_proxy": 0.0,
+            "risk_on_ratio": 0.0,
+            "neutral_ratio": 0.0,
+            "risk_off_ratio": 1.0,
+            "profit_score": 50.0,
+        },
+    ]
+    baseline_rows = [
+        {"strategy": "buy_and_hold_equity", "cagr": 0.02, "sharpe": 0.20, "calmar": 0.10, "max_drawdown": -0.30},
+        {"strategy": "fixed_60_40", "cagr": 0.03, "sharpe": 0.35, "calmar": 0.18, "max_drawdown": -0.17},
+        {"strategy": "ma_20_60_timing", "cagr": 0.02, "sharpe": 0.30, "calmar": 0.20, "max_drawdown": -0.11},
+    ]
+    validation_rows = [
+        {
+            "candidate_id": "low_participation_winner",
+            "oos_windows": 7,
+            "oos_win_rate_vs_champion": 0.70,
+            "oos_profit_score_delta_mean": 5.0,
+            "oos_calmar_mean": 1.0,
+            "oos_sharpe_mean": 0.9,
+            "oos_cagr_mean": 0.06,
+        },
+        {
+            "candidate_id": "permanent_defense",
+            "oos_windows": 7,
+            "oos_win_rate_vs_champion": 0.90,
+            "oos_profit_score_delta_mean": 10.0,
+            "oos_calmar_mean": 1.2,
+            "oos_sharpe_mean": 1.0,
+            "oos_cagr_mean": 0.06,
+        },
+    ]
+
+    diagnostics = build_profit_gate_diagnostics(candidate_rows, candidate_rows[0], baseline_rows, validation_rows)
+    by_id = {row["candidate_id"]: row for row in diagnostics}
+
+    assert by_id["champion_current_formula"]["role"] == "champion"
+    assert by_id["champion_current_formula"]["passes_validation"] is True
+    assert "low_risk_on_participation" in by_id["low_participation_winner"]["warnings"]
+    assert by_id["low_participation_winner"]["passes_validation"] is True
+    assert by_id["permanent_defense"]["passes_validation"] is False
+    assert "permanent_regime_collapse" in by_id["permanent_defense"]["failed_gates"]
+
+
+def test_v3_selects_best_validated_candidate_after_skipping_invalid_top_candidate():
+    from research.regime_training import select_best_validated_formula
+
+    candidate_rows = [
+        {"candidate_id": "invalid_top", "profit_score": 90.0, "calmar": 2.0},
+        {"candidate_id": "validated_second", "profit_score": 70.0, "calmar": 1.0},
+        {"candidate_id": "champion_current_formula", "profit_score": 50.0, "calmar": 0.5},
+    ]
+    gate_rows = [
+        {"candidate_id": "invalid_top", "passes_validation": False, "failed_gates": "permanent_regime_collapse"},
+        {"candidate_id": "validated_second", "passes_validation": True, "failed_gates": ""},
+        {"candidate_id": "champion_current_formula", "passes_validation": True, "failed_gates": ""},
+    ]
+
+    selected = select_best_validated_formula(candidate_rows, gate_rows)
+
+    assert selected["candidate_id"] == "validated_second"
+
+
+def test_v3_best_validated_selection_prefers_oos_strength_over_full_sample_score():
+    from research.regime_training import select_best_validated_formula
+
+    candidate_rows = [
+        {"candidate_id": "full_sample_leader", "profit_score": 80.0, "calmar": 1.2},
+        {"candidate_id": "oos_leader", "profit_score": 70.0, "calmar": 1.0},
+        {"candidate_id": "champion_current_formula", "profit_score": 50.0, "calmar": 0.5},
+    ]
+    gate_rows = [
+        {"candidate_id": "full_sample_leader", "passes_validation": True, "failed_gates": ""},
+        {"candidate_id": "oos_leader", "passes_validation": True, "failed_gates": ""},
+        {"candidate_id": "champion_current_formula", "passes_validation": True, "failed_gates": ""},
+    ]
+    validation_rows = [
+        {"candidate_id": "full_sample_leader", "oos_profit_score_delta_mean": 2.0, "oos_calmar_mean": 0.9},
+        {"candidate_id": "oos_leader", "oos_profit_score_delta_mean": 8.0, "oos_calmar_mean": 1.4},
+        {"candidate_id": "champion_current_formula", "oos_profit_score_delta_mean": 0.0, "oos_calmar_mean": 0.5},
+    ]
+
+    selected = select_best_validated_formula(candidate_rows, gate_rows, validation_rows)
+
+    assert selected["candidate_id"] == "oos_leader"
+
+
 def test_profit_training_outputs_required_baselines_and_oos_decision():
     from research.regime_training import RegimePolicy, run_regime_profit_training
 
@@ -172,6 +293,11 @@ def test_profit_training_outputs_required_baselines_and_oos_decision():
     assert result["walk_forward_rows"]
     assert all(row["train_end"] < row["validate_start"] for row in result["walk_forward_rows"])
     assert result["decision"] in {"keep_champion", "recommend_challenger_for_review"}
+    assert result["best_unconstrained_id"]
+    assert result["best_validated_id"]
+    assert result["champion_gate_diagnostics"]["candidate_id"] == "champion_current_formula"
+    assert result["candidate_gate_rows"]
+    assert result["candidate_validation_summary_rows"]
 
 
 def test_profit_report_writes_stable_schema_and_advisory_config(tmp_path):
@@ -198,10 +324,14 @@ def test_profit_report_writes_stable_schema_and_advisory_config(tmp_path):
         "baseline_comparison.csv",
         "regime_exposure_ab_test.csv",
         "regime_distribution.csv",
+        "candidate_gate_diagnostics.csv",
+        "candidate_validation_summary.csv",
         "event_study.csv",
         "recommended_profit_config.yaml",
         "run.log",
     }
     assert required.issubset(set(summary["report_files"]))
     assert json.loads((tmp_path / "summary.json").read_text())["decision"] == summary["decision"]
+    assert "best_validated_id" in summary
+    assert "champion_gate_diagnostics" in summary
     assert "apply: false" in (tmp_path / "recommended_profit_config.yaml").read_text()

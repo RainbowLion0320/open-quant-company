@@ -60,8 +60,12 @@ Market Regime 公式采用 champion/challenger 研究机制。当前生产公式
 - `baseline_comparison.csv`：buy-and-hold、固定仓位、均线择时、trend-only、trend+breadth、当前 champion、best challenger 的强基线对比。
 - `walk_forward_profit_results.csv`：滚动样本外验证窗口，推荐结论必须由这里支撑。
 - `candidate_profit_search.csv`：候选公式全样本排序，只能作为辅助，不作为最终晋级依据。
+- `candidate_gate_diagnostics.csv`：每个公式的通过状态、失败 gate、低参与度等 warning，champion 也在同一张表里。
+- `candidate_validation_summary.csv`：每个公式跨验证窗口相对 champion 的 OOS 汇总。
 - `regime_distribution.csv`：检查候选是否坍缩为永久 risk-on 或永久 risk-off。
 - `recommended_profit_config.yaml`：仅为人工审查建议，默认不会自动写回生产配置。
+
+V3 报告区分 `best_unconstrained_id` 和 `best_validated_id`。前者是原始收益指标最强公式，后者是通过 gate 后的当前最优候选；只有后者能进入人工替换审查。
 
 ## 成本敏感性
 
