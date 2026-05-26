@@ -19,7 +19,7 @@
               <span><em>Confirmed</em><strong>{{ regimeStabilityState.confirmed }}</strong></span>
               <span><em>Raw</em><strong>{{ regimeStabilityState.raw }}</strong></span>
               <span><em>Pending</em><strong>{{ regimeStabilityState.pending }}</strong></span>
-              <span><em>Dwell</em><strong>{{ regimeStabilityState.pendingCount }}/{{ regimeStabilityState.minDwell }}</strong></span>
+              <span><em>Dwell</em><strong>{{ regimeStabilityState.dwell }}</strong></span>
             </div>
           </div>
         </div>
@@ -292,20 +292,37 @@ const regimeScore = computed(() => {
 });
 const displayScoreText = computed(() => displayScore.value.toFixed(1));
 const regimeStabilityState = computed(() => {
+  if (!store.regime) {
+    return {
+      confirmed: "—",
+      raw: "—",
+      pending: "—",
+      pending_count: null,
+      pendingCount: null,
+      min_dwell: null,
+      minDwell: null,
+      dwell: "—",
+    };
+  }
   const stability = store.regime?.stability || {};
   const confirmedRaw = stability.confirmed_value || store.regime?.value || "sideways";
   const rawValue = store.regime?.raw_value || stability.raw_value || store.regime?.value || "sideways";
   const pendingRaw = stability.pending_value || "";
-  const pendingCount = Number(stability.pending_count ?? 0);
-  const minDwell = Number(stability.min_dwell ?? 1);
+  const hasPending = Boolean(pendingRaw && pendingRaw !== "unknown");
+  const pendingCountValue = Number(stability.pending_count);
+  const minDwellValue = Number(stability.min_dwell);
+  const pendingCount = Number.isFinite(pendingCountValue) ? pendingCountValue : null;
+  const minDwell = Number.isFinite(minDwellValue) ? minDwellValue : null;
+  const dwell = hasPending ? `${pendingCount ?? 0}/${minDwell ?? "—"}` : "Idle";
   return {
     confirmed: String(confirmedRaw).toUpperCase(),
     raw: String(rawValue).toUpperCase(),
-    pending: pendingRaw ? String(pendingRaw).toUpperCase() : "—",
+    pending: hasPending ? String(pendingRaw).toUpperCase() : "—",
     pending_count: pendingCount,
     pendingCount,
     min_dwell: minDwell,
     minDwell,
+    dwell,
   };
 });
 const regimeTrendStrength = computed(() => store.regime?.score_components?.trend_raw ?? null);

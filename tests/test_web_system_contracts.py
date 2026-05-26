@@ -207,3 +207,6 @@ def test_market_view_surfaces_regime_stability_state():
     assert "min_dwell" in market
     assert "Confirmed" in market
     assert "Pending" in market
+    assert "{{ regimeStabilityState.dwell }}" in market
+    assert "Idle" in market
+    assert "stability.min_dwell ?? 1" not in market
