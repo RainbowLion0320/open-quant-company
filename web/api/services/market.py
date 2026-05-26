@@ -139,14 +139,20 @@ def multi_asset_cards(
 
 
 def regime_payload(snapshot) -> dict:
+    raw_regime = getattr(snapshot, "raw_regime", snapshot.regime)
+    stability = getattr(snapshot, "regime_state", {}) or {}
+    value = snapshot.regime.value if hasattr(snapshot.regime, "value") else str(snapshot.regime)
+    raw_value = raw_regime.value if hasattr(raw_regime, "value") else str(raw_regime)
     return {
-        "value": snapshot.regime.value,
+        "value": value,
+        "raw_value": raw_value,
         "score": snapshot.regime_score,
         "ma_trend": snapshot.index_ma_trend,
         "volume_trend": snapshot.volume_trend,
         "breadth": round(snapshot.breadth, 2),
         "breadth_detail": snapshot.breadth_detail,
         "score_components": snapshot.score_components,
+        "stability": stability,
     }
 
 

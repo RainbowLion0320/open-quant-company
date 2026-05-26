@@ -133,11 +133,12 @@ Market Regime 生产公式保持确定性和可解释性，但不再只能靠人
 - **强基线**：必须比较 buy-and-hold、固定仓位、均线择时、trend-only、trend+breadth 和当前 champion。
 - **样本外优先**：候选公式通过 walk-forward 训练/验证选择；没有有效验证窗口时只能输出 `insufficient_data`。
 - **同标准诊断**：当前 champion 也进入候选池并接受 gate 诊断，`keep_champion` 不再被解释为“当前公式天然最优”。
-- **当前生产公式**：V3 已将 `w0611` 晋级为生产 champion；生产权重为 trend 30%、breadth 30%、risk 30%、volume 10%，bull/bear 阈值为 60/40。
+- **当前生产公式**：V3 已将 `w0611` 晋级为生产 champion；生产权重为 trend 30%、breadth 30%、risk 30%、volume 10%，bull/bear 阈值为 60/40，`min_dwell=3`。
+- **实时状态机**：Web/API 生产链路通过 `cybernetics/regime_state.py` 对原始分类做稳定确认；同一交易日重复刷新不累计 dwell，必须出现连续唯一市场观测后才切换 confirmed regime。
 - **V3 最优选择**：报告同时输出 `best_unconstrained_id` 和 `best_validated_id`；最终建议只来自通过验证门槛的最优公式。
 - **反过拟合门槛**：拒绝永久防守、永久进攻、单一 regime 占比过高、输给简单基线或只在样本内好看的候选；换手采用相对 champion 的约束，避免 champion 自己被绝对阈值豁免。
 
-报告写入 `reports/regime_profit_training/`，`recommended_profit_config.yaml` 仍然只是人工审查建议；生产替换必须通过代码评审落到 `cybernetics/regime_scoring.py`、`config/settings.yaml` 和 `research/regime_training.py`。
+报告写入 `reports/regime_profit_training/`，`recommended_profit_config.yaml` 仍然只是人工审查建议；生产替换必须通过代码评审落到 `cybernetics/regime_policy.py`、`cybernetics/regime_scoring.py`、`cybernetics/regime_state.py`、`config/settings.yaml` 和 `research/regime_training.py`。
 
 ### 2.6 策略研究治理 (research/strategy_governance.py)
 

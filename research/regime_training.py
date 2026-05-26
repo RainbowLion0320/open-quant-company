@@ -11,6 +11,7 @@ from typing import Iterable, Sequence
 import numpy as np
 import pandas as pd
 
+from cybernetics.regime_policy import PRODUCTION_REGIME_POLICY
 from cybernetics.regime_scoring import breadth_strength, clamp, volume_strength
 
 
@@ -37,14 +38,14 @@ class RegimePolicy:
 
 CHAMPION_POLICY = RegimePolicy(
     candidate_id="champion_current_formula",
-    weights={"trend": 0.30, "breadth": 0.30, "risk": 0.30, "volume": 0.10},
-    bull_threshold=60.0,
-    bear_threshold=40.0,
-    trend_confirm=0.55,
-    breadth_confirm=0.55,
-    bear_trend_breakdown=0.40,
-    bear_breadth_breakdown=0.40,
-    min_dwell=3,
+    weights=PRODUCTION_REGIME_POLICY.normalized_weights,
+    bull_threshold=PRODUCTION_REGIME_POLICY.bull_threshold,
+    bear_threshold=PRODUCTION_REGIME_POLICY.bear_threshold,
+    trend_confirm=PRODUCTION_REGIME_POLICY.trend_confirm,
+    breadth_confirm=PRODUCTION_REGIME_POLICY.breadth_confirm,
+    bear_trend_breakdown=PRODUCTION_REGIME_POLICY.bear_trend_breakdown,
+    bear_breadth_breakdown=PRODUCTION_REGIME_POLICY.bear_breadth_breakdown,
+    min_dwell=PRODUCTION_REGIME_POLICY.min_dwell,
     smoothing_window=1,
     complexity=1,
 )

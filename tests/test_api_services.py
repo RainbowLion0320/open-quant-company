@@ -1,6 +1,7 @@
 import pandas as pd
 
 from cybernetics import orchestrator
+from cybernetics.regime import MarketRegime
 from web.api.services import market as market_service
 from web.api.services import sectors as sector_service
 
@@ -53,6 +54,34 @@ def test_market_service_position_capacity_uses_adaptive_regime_ceiling(monkeypat
 
     assert market_service.position_capacity(5) == {"current": 5, "max": 8}
     assert market_service.position_capacity(10) == {"current": 10, "max": 10}
+
+
+def test_market_regime_payload_includes_raw_and_stability_state():
+    class Snapshot:
+        regime = MarketRegime.BULL
+        raw_regime = MarketRegime.BEAR
+        regime_score = 62.5
+        index_ma_trend = "unit"
+        volume_trend = "normal"
+        breadth = 0.62
+        breadth_detail = {"sample_size": 5000}
+        score_components = {"trend_raw": 0.56}
+        regime_state = {
+            "raw_value": "bear",
+            "confirmed_value": "bull",
+            "pending_value": "bear",
+            "pending_count": 1,
+            "min_dwell": 3,
+            "confirmed_changed": False,
+        }
+
+    payload = market_service.regime_payload(Snapshot())
+
+    assert payload["value"] == "bull"
+    assert payload["raw_value"] == "bear"
+    assert payload["stability"]["pending_value"] == "bear"
+    assert payload["stability"]["pending_count"] == 1
+    assert payload["stability"]["min_dwell"] == 3
 
 
 def test_sector_service_source_summary_prioritizes_real_then_proxy():

@@ -79,14 +79,27 @@ export interface RegimeScoreComponents {
   [key: string]: number | undefined;
 }
 
+export interface RegimeStability {
+  raw_value?: "bull" | "bear" | "sideways" | "unknown" | "";
+  confirmed_value?: "bull" | "bear" | "sideways" | "unknown" | "";
+  pending_value?: "bull" | "bear" | "sideways" | "unknown" | "";
+  pending_count?: number;
+  min_dwell?: number;
+  confirmed_changed?: boolean;
+  score?: number;
+  as_of?: string;
+}
+
 export interface RegimeData {
   value: "bull" | "bear" | "sideways" | "unknown";
+  raw_value?: "bull" | "bear" | "sideways" | "unknown";
   score?: number;
   ma_trend: string;
   volume_trend: string;
   breadth: number;
   breadth_detail?: RegimeBreadthDetail;
   score_components?: RegimeScoreComponents;
+  stability?: RegimeStability;
 }
 
 export interface KlinePoint {

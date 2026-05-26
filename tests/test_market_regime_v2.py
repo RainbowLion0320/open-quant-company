@@ -94,6 +94,7 @@ def test_regime_score_combines_validated_trend_breadth_risk_and_volume():
 
 
 def test_detect_returns_full_breadth_detail_and_score_components(monkeypatch):
+    orchestrator.reset_regime_transition_state()
     bench = _index_frame("up")
 
     def fake_index(symbol, *args, **kwargs):
@@ -129,3 +130,104 @@ def test_detect_returns_full_breadth_detail_and_score_components(monkeypatch):
     assert snapshot.score_components["breadth"] > 20
     assert snapshot.score_components["volume_up_amount_raw"] == 0.70
     assert "全A上涨 70%" in snapshot.index_ma_trend
+
+
+def test_detect_applies_min_dwell_across_request_scoped_orchestrators(monkeypatch):
+    orchestrator.reset_regime_transition_state()
+    bench = _index_frame("up")
+
+    def fake_index(symbol, *args, **kwargs):
+        return bench
+
+    raw_sequence = iter([
+        MarketRegime.BULL,
+        MarketRegime.BEAR,
+        MarketRegime.BEAR,
+        MarketRegime.BEAR,
+    ])
+
+    monkeypatch.setattr("data.fetcher.get_index_daily", fake_index)
+    monkeypatch.setattr(
+        orchestrator,
+        "_compute_full_market_breadth",
+        lambda: MarketBreadth(
+            advance_ratio=0.70,
+            above_ma20=0.75,
+            above_ma60=0.70,
+            above_ma120=0.65,
+            sample_size=5000,
+            up_count=3500,
+            down_count=1400,
+            unchanged_count=100,
+            as_of="2026-05-20",
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "_compute_full_market_volume",
+        lambda: MarketVolume(amount_ratio_5_20=1.15, up_amount_ratio=0.70, sample_size=5000, as_of="2026-05-20"),
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "_compute_regime_score_v2",
+        lambda *args, **kwargs: (35.0, {"trend_raw": 0.30, "breadth_raw": 0.35, "risk_raw": 0.45, "volume_raw": 0.50}),
+    )
+    monkeypatch.setattr(orchestrator, "_classify_regime", lambda *args, **kwargs: next(raw_sequence))
+    observation_keys = iter(["2026-05-20", "2026-05-21", "2026-05-22", "2026-05-23"])
+    monkeypatch.setattr(orchestrator, "_regime_observation_key", lambda *args, **kwargs: next(observation_keys))
+
+    detected = [QuantOrchestrator().detect().regime for _ in range(4)]
+
+    assert detected == [
+        MarketRegime.BULL,
+        MarketRegime.BULL,
+        MarketRegime.BULL,
+        MarketRegime.BEAR,
+    ]
+
+
+def test_detect_exposes_raw_and_stabilized_regime_metadata(monkeypatch):
+    orchestrator.reset_regime_transition_state()
+    bench = _index_frame("up")
+
+    monkeypatch.setattr("data.fetcher.get_index_daily", lambda *args, **kwargs: bench)
+    monkeypatch.setattr(
+        orchestrator,
+        "_compute_full_market_breadth",
+        lambda: MarketBreadth(
+            advance_ratio=0.70,
+            above_ma20=0.75,
+            above_ma60=0.70,
+            above_ma120=0.65,
+            sample_size=5000,
+            up_count=3500,
+            down_count=1400,
+            unchanged_count=100,
+            as_of="2026-05-20",
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "_compute_full_market_volume",
+        lambda: MarketVolume(amount_ratio_5_20=1.15, up_amount_ratio=0.70, sample_size=5000, as_of="2026-05-20"),
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "_compute_regime_score_v2",
+        lambda *args, **kwargs: (35.0, {"trend_raw": 0.30, "breadth_raw": 0.35, "risk_raw": 0.45, "volume_raw": 0.50}),
+    )
+    raw_sequence = iter([MarketRegime.BULL, MarketRegime.BEAR])
+    monkeypatch.setattr(orchestrator, "_classify_regime", lambda *args, **kwargs: next(raw_sequence))
+    observation_keys = iter(["2026-05-20", "2026-05-21"])
+    monkeypatch.setattr(orchestrator, "_regime_observation_key", lambda *args, **kwargs: next(observation_keys))
+
+    QuantOrchestrator().detect()
+    snapshot = QuantOrchestrator().detect()
+
+    assert snapshot.regime is MarketRegime.BULL
+    assert snapshot.raw_regime is MarketRegime.BEAR
+    assert snapshot.regime_state["raw_value"] == "bear"
+    assert snapshot.regime_state["confirmed_value"] == "bull"
+    assert snapshot.regime_state["pending_value"] == "bear"
+    assert snapshot.regime_state["pending_count"] == 1
+    assert snapshot.regime_state["min_dwell"] == 3

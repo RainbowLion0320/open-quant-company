@@ -8,13 +8,10 @@ from __future__ import annotations
 import math
 from typing import Dict, Mapping, Optional
 
+from cybernetics.regime_policy import PRODUCTION_REGIME_POLICY
 
-REGIME_SCORE_WEIGHTS = {
-    "trend": 30.0,
-    "breadth": 30.0,
-    "risk": 30.0,
-    "volume": 10.0,
-}
+
+REGIME_SCORE_WEIGHTS = dict(PRODUCTION_REGIME_POLICY.score_weights)
 
 
 def clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
@@ -126,14 +123,16 @@ def classify_regime_value(
     trend_raw: float,
     breadth_raw: float,
     advance_ratio: float,
-    bull_threshold: float = 60.0,
-    bear_threshold: float = 40.0,
-    breadth_bull: float = 0.55,
-    breadth_bear: float = 0.40,
+    bull_threshold: float = PRODUCTION_REGIME_POLICY.bull_threshold,
+    bear_threshold: float = PRODUCTION_REGIME_POLICY.bear_threshold,
+    trend_bull: float = PRODUCTION_REGIME_POLICY.trend_confirm,
+    trend_bear: float = PRODUCTION_REGIME_POLICY.bear_trend_breakdown,
+    breadth_bull: float = PRODUCTION_REGIME_POLICY.breadth_confirm,
+    breadth_bear: float = PRODUCTION_REGIME_POLICY.bear_breadth_breakdown,
 ) -> str:
     """Classify a market regime score into bull, sideways, or bear."""
-    if score >= bull_threshold and trend_raw >= 0.55 and advance_ratio >= breadth_bull:
+    if score >= bull_threshold and trend_raw >= trend_bull and advance_ratio >= breadth_bull:
         return "bull"
-    if score <= bear_threshold or (trend_raw <= 0.40 and breadth_raw <= breadth_bear):
+    if score <= bear_threshold or (trend_raw <= trend_bear and breadth_raw <= breadth_bear):
         return "bear"
     return "sideways"

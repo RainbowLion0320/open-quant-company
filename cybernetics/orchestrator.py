@@ -19,6 +19,7 @@ import os
 import time
 
 from cybernetics.regime import MarketRegime, detect_trend_regime, to_market_regime
+from cybernetics.regime_policy import PRODUCTION_REGIME_POLICY
 from cybernetics.regime_scoring import (
     breadth_strength as _score_breadth_strength,
     classify_regime_value,
@@ -26,6 +27,7 @@ from cybernetics.regime_scoring import (
     compose_regime_score,
     volume_strength as _score_volume_strength,
 )
+from cybernetics.regime_state import RegimeTransitionTracker
 from core.settings import get_section
 
 
@@ -38,6 +40,59 @@ def _load_config():
     if _config is None:
         _config = get_section("cybernetics", {})
     return _config
+
+
+def _detection_config() -> Dict[str, Any]:
+    try:
+        return _load_config().get("adaptive", {}).get("detection", {})
+    except Exception:
+        return {}
+
+
+def _regime_min_dwell() -> int:
+    det_cfg = _detection_config()
+    return max(1, int(det_cfg.get("regime_min_dwell", PRODUCTION_REGIME_POLICY.min_dwell) or 1))
+
+
+def _regime_transition_state_path() -> Optional[str]:
+    try:
+        from data.datahub import get_datahub
+
+        return str(get_datahub().cache_root / "runtime" / "market_regime_state.json")
+    except Exception:
+        return None
+
+
+def _get_regime_transition_tracker() -> RegimeTransitionTracker:
+    global _REGIME_TRACKER, _REGIME_TRACKER_PATH
+    state_path = _regime_transition_state_path()
+    if _REGIME_TRACKER is None or state_path != _REGIME_TRACKER_PATH:
+        _REGIME_TRACKER = RegimeTransitionTracker(min_dwell=_regime_min_dwell(), state_path=state_path)
+        _REGIME_TRACKER_PATH = state_path
+    else:
+        _REGIME_TRACKER.min_dwell = _regime_min_dwell()
+    return _REGIME_TRACKER
+
+
+def reset_regime_transition_state(*, remove_persisted: bool = True) -> None:
+    """Reset the process-level live regime dwell tracker, mainly for tests/tools."""
+    global _REGIME_TRACKER
+    tracker = _get_regime_transition_tracker()
+    tracker.reset(remove_persisted=remove_persisted)
+    _REGIME_TRACKER = tracker
+
+
+def _regime_observation_key(bench, breadth: "MarketBreadth", volume: "MarketVolume") -> str:
+    candidates = []
+    try:
+        if "date" in bench.columns and len(bench):
+            candidates.append(str(bench["date"].iloc[-1])[:10])
+    except Exception:
+        pass
+    for value in (getattr(breadth, "as_of", ""), getattr(volume, "as_of", "")):
+        if value:
+            candidates.append(str(value)[:10])
+    return max(candidates) if candidates else datetime.now().strftime("%Y-%m-%d")
 
 
 # =====================================================================
@@ -57,12 +112,14 @@ class SectorStrength(Enum):
 class MarketContext:
     """市场环境快照 — 顶层"""
     regime: MarketRegime = MarketRegime.UNKNOWN
+    raw_regime: MarketRegime = MarketRegime.UNKNOWN
     regime_score: float = 50.0      # 0-100 市场健康度连续评分
     index_ma_trend: str = ""        # 多指数趋势与宽度摘要
     volume_trend: str = ""          # 放量/缩量
     breadth: float = 0.0            # 全市场上涨家数占比
     breadth_detail: Dict[str, Any] = field(default_factory=dict)
-    score_components: Dict[str, float] = field(default_factory=dict)
+    score_components: Dict[str, Any] = field(default_factory=dict)
+    regime_state: Dict[str, Any] = field(default_factory=dict)
     date: str = ""
 
 
@@ -232,6 +289,8 @@ def generate_feedback(
 
 _BREADTH_CACHE: Dict[str, Any] = {"expires_at": 0.0, "snapshot": None}
 _VOLUME_CACHE: Dict[str, Any] = {"expires_at": 0.0, "snapshot": None}
+_REGIME_TRACKER: Optional[RegimeTransitionTracker] = None
+_REGIME_TRACKER_PATH: Optional[str] = None
 
 _REGIME_INDEXES = [
     ("sh000001", "上证综指", 0.25),
@@ -875,16 +934,20 @@ def _compute_regime_score_v2(
 
 def _classify_regime(score: float, components: Dict[str, float], breadth: MarketBreadth) -> MarketRegime:
     try:
-        det_cfg = _load_config()["adaptive"]["detection"]
-        bull_threshold = float(det_cfg.get("regime_bull_threshold", 60))
-        bear_threshold = float(det_cfg.get("regime_bear_threshold", 40))
-        breadth_bull = float(det_cfg.get("breadth_bull_threshold", 0.55))
-        breadth_bear = float(det_cfg.get("breadth_bear_threshold", 0.40))
+        det_cfg = _detection_config()
+        bull_threshold = float(det_cfg.get("regime_bull_threshold", PRODUCTION_REGIME_POLICY.bull_threshold))
+        bear_threshold = float(det_cfg.get("regime_bear_threshold", PRODUCTION_REGIME_POLICY.bear_threshold))
+        trend_bull = float(det_cfg.get("regime_trend_confirm", PRODUCTION_REGIME_POLICY.trend_confirm))
+        trend_bear = float(det_cfg.get("regime_bear_trend_breakdown", PRODUCTION_REGIME_POLICY.bear_trend_breakdown))
+        breadth_bull = float(det_cfg.get("breadth_bull_threshold", PRODUCTION_REGIME_POLICY.breadth_confirm))
+        breadth_bear = float(det_cfg.get("breadth_bear_threshold", PRODUCTION_REGIME_POLICY.bear_breadth_breakdown))
     except Exception:
-        bull_threshold = 60.0
-        bear_threshold = 40.0
-        breadth_bull = 0.55
-        breadth_bear = 0.40
+        bull_threshold = PRODUCTION_REGIME_POLICY.bull_threshold
+        bear_threshold = PRODUCTION_REGIME_POLICY.bear_threshold
+        trend_bull = PRODUCTION_REGIME_POLICY.trend_confirm
+        trend_bear = PRODUCTION_REGIME_POLICY.bear_trend_breakdown
+        breadth_bull = PRODUCTION_REGIME_POLICY.breadth_confirm
+        breadth_bear = PRODUCTION_REGIME_POLICY.bear_breadth_breakdown
 
     trend_raw = components.get("trend_raw", 0.5)
     breadth_raw = components.get("breadth_raw", _breadth_strength(breadth))
@@ -897,6 +960,8 @@ def _classify_regime(score: float, components: Dict[str, float], breadth: Market
             advance_ratio=breadth.advance_ratio,
             bull_threshold=bull_threshold,
             bear_threshold=bear_threshold,
+            trend_bull=trend_bull,
+            trend_bear=trend_bear,
             breadth_bull=breadth_bull,
             breadth_bear=breadth_bear,
         )
@@ -1010,7 +1075,17 @@ class QuantOrchestrator:
         df = index_frames.get("sh000001")
         bench = _frame_close_volume(df)
         if bench is None or len(bench) < 60:
-            self.market_snapshot = MarketContext(regime=MarketRegime.UNKNOWN, date=datetime.now().strftime("%Y-%m-%d"))
+            transition = _get_regime_transition_tracker().apply(
+                MarketRegime.UNKNOWN,
+                score=50.0,
+                as_of=datetime.now().strftime("%Y-%m-%d"),
+            )
+            self.market_snapshot = MarketContext(
+                regime=transition.confirmed,
+                raw_regime=transition.raw,
+                regime_state=transition.to_dict(),
+                date=datetime.now().strftime("%Y-%m-%d"),
+            )
             return self.market_snapshot
 
         close = bench["close"]
@@ -1022,7 +1097,14 @@ class QuantOrchestrator:
         breadth_snapshot = _compute_full_market_breadth()
         volume_snapshot = _compute_full_market_volume()
         score, components = _compute_regime_score_v2(bench, index_frames, breadth_snapshot, volume_snapshot)
-        self.regime = _classify_regime(score, components, breadth_snapshot)
+        raw_regime = _classify_regime(score, components, breadth_snapshot)
+        observation_key = _regime_observation_key(bench, breadth_snapshot, volume_snapshot)
+        transition = _get_regime_transition_tracker().apply(
+            raw_regime,
+            score=score,
+            as_of=observation_key,
+        )
+        self.regime = transition.confirmed
 
         self.params = adaptive_params(self.regime)
         _volume_strength, vol_trend, _volume_detail = _compute_volume_strength(
@@ -1041,12 +1123,14 @@ class QuantOrchestrator:
 
         self.market_snapshot = MarketContext(
             regime=self.regime,
+            raw_regime=raw_regime,
             regime_score=score,
             index_ma_trend=ma_trend,
             volume_trend=vol_trend,
             breadth=breadth_snapshot.advance_ratio,
             breadth_detail=breadth_detail,
             score_components=components,
+            regime_state=transition.to_dict(),
             date=datetime.now().strftime("%Y-%m-%d"),
         )
         return self.market_snapshot

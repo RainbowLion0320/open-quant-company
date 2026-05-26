@@ -29,7 +29,7 @@
 | 2.1 | 巴菲特三重过滤 (能力圈→护城河→安全边际) | `signals/buffett.py` | — | `GET /signals/buffett` → `Signals.vue` | `make scan` 生成 `data/store/signals/buffett_scan.parquet` | OK | 待补: 金融板块特殊处理测试 |
 | 2.2 | 多因子五维加权打分 | `signals/multifactor.py` | `test_boundary.py` (动量计算), `test_sector_pipeline.py:test_multifactor_weights_sum_to_one` | `GET /signals/multifactor` → `Signals.vue` | 固定日期+股票池评分结果可复现，detail 含 industry 分 | OK | — |
 | 2.3 | ML LightGBM 信号 | `signals/ml_signals.py` | `test_architecture_contracts.py:test_model_evaluate_datetime_index_icir_does_not_crash` | `GET /signals/ml_lgbm` | `python scripts/tune_model.py` 和 `weekly_retrain.py` | OK | — |
-| 2.4 | 控制论自适应 regime 检测 + 参数调整 | `cybernetics/orchestrator.py`, `cybernetics/regime.py`, `cybernetics/regime_scoring.py` | `test_market_regime_v2.py`, `test_regime_scoring.py` | `GET /market/regime` → `Market.vue` | `make regime` 输出当前市场状态 | OK | — |
+| 2.4 | 控制论自适应 regime 检测 + 参数调整 | `cybernetics/orchestrator.py`, `cybernetics/regime.py`, `cybernetics/regime_policy.py`, `cybernetics/regime_scoring.py`, `cybernetics/regime_state.py` | `test_market_regime_v2.py`, `test_regime_scoring.py`, `test_regime_state.py` | `GET /market/regime` → `Market.vue` | `make regime` 输出当前市场状态；实时 confirmed regime 按唯一观测日执行 `min_dwell=3` | OK | — |
 | 2.5 | 因子 DSL 表达式引擎 (声明式因子) | `signals/expression.py` | `test_boundary.py` (RSI/MA/MACD/Delta) | — | `python -c "from signals.expression import SMA,Delta,Ret; ..."` | OK | — |
 | 2.6 | DSL 公式解析 (LLM→计算) | `signals/dsl_parser.py` | `test_boundary.py` (公式解析) | — | `python scripts/factor_hypothesis.py` | OK | — |
 | 2.7 | 横截面排名 → buy/sell/hold 信号 | `signals/selection.py` | `test_boundary.py` (apply_ranked_buys) | — | 验证信号文件符合 schema (symbol, score, signal) | OK | — |
@@ -39,7 +39,7 @@
 | 2.11 | 策略研究治理和晋级门槛 | `research/strategy_governance.py` | `test_strategy_research_governance.py` | `GET /strategies/governance` → `Strategies.vue` | 四策略分层、paper/production 门槛、ML 默认为 paper | OK | — |
 | 2.12 | 因子研究诊断 | `signals/factor_research.py` | `test_strategy_research_governance.py:test_factor_diagnostics_rank_ic_quantile_spread_and_correlation_clusters` | — | 输出 IC/ICIR/分组收益 spread/相关性聚类 | OK | — |
 | 2.13 | Market Regime 离线训练与晋级 | `research/regime_training.py`, `scripts/train_market_regime.py` | `test_regime_training.py` | `reports/regime_training/summary.json` | champion/challenger、walk-forward、策略 A/B、默认不自动替换生产公式 | OK | — |
-| 2.14 | Market Regime 挣钱导向训练 | `research/regime_training.py`, `scripts/train_market_regime_profit.py` | `test_regime_profit_training.py` | `reports/regime_profit_training/summary.json` | 可交易资产 risk-on/risk-off、强 baseline、walk-forward OOS、champion 同标准诊断、best validated 选择，`w0611` 已晋级生产 champion | OK | — |
+| 2.14 | Market Regime 挣钱导向训练 | `research/regime_training.py`, `scripts/train_market_regime_profit.py`, `cybernetics/regime_policy.py` | `test_regime_profit_training.py` | `reports/regime_profit_training/summary.json` | 可交易资产 risk-on/risk-off、强 baseline、walk-forward OOS、champion 同标准诊断、best validated 选择，`w0611` 已晋级生产 champion 并由统一 production policy 常量约束 | OK | — |
 
 ## 3. 回测引擎 (Backtest Engine)
 

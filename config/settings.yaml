@@ -158,7 +158,10 @@ cybernetics:
       breadth_workers: 8
       breadth_window: 20
       regime_bear_threshold: 40
+      regime_bear_trend_breakdown: 0.4
       regime_bull_threshold: 60
+      regime_min_dwell: 3
+      regime_trend_confirm: 0.55
       volume_contraction: 0.8
       volume_expansion: 1.2
     market_regime_detection: true
