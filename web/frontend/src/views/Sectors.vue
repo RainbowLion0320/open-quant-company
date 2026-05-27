@@ -20,7 +20,7 @@
     <!-- Summary stat chips -->
     <div v-if="overview" class="stat-row">
       <div class="stat-chip">
-        <span class="stat-label">Top 5 动量</span>
+        <span class="stat-label">强势行业 5日</span>
         <span class="stat-value" style="color:var(--positive)">{{ top5Return }}%</span>
       </div>
       <div class="stat-chip">
@@ -60,9 +60,10 @@
           <span>资金口径: {{ capitalSourceLabel }}</span>
         </div>
         <div v-if="sectorBlockTiles.length" class="sector-block-grid" role="img" aria-label="申万一级行业独立方块矩阵">
-          <article
+          <button
             v-for="tile in sectorBlockTiles"
             :key="tile.sector.sector_code"
+            type="button"
             class="industry-block"
             :class="[
               `span-${tile.span}`,
@@ -70,20 +71,15 @@
             ]"
             :style="industryBlockStyle(tile)"
             :title="industryTitle(tile)"
+            @click="toggleSector(tile.sector)"
           >
-            <button
-              type="button"
-              class="industry-block-button"
-              @click="toggleSector(tile.sector)"
-            >
-              <span class="industry-name-row">
-                <span class="industry-name">{{ tile.sector.sector_name }}</span>
-                <strong>{{ formatAmount(tile.size) }}</strong>
-              </span>
-              <span class="industry-metric">{{ tile.metricLabel }}</span>
-              <span class="industry-code">{{ tile.sector.sector_code || 'SW1' }}</span>
-            </button>
-          </article>
+            <span class="industry-name-row">
+              <span class="industry-name">{{ tile.sector.sector_name }}</span>
+              <strong>{{ formatAmount(tile.size) }}</strong>
+            </span>
+            <span class="industry-metric">{{ tile.metricLabel }}</span>
+            <span class="industry-code">{{ tile.sector.sector_code || 'SW1' }}</span>
+          </button>
         </div>
         <div v-else class="empty-state empty-state-compact">暂无可绘制的行业资金数据</div>
       </div>
@@ -542,10 +538,19 @@ onMounted(fetchData);
   justify-content: start;
 }
 .industry-block {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: start;
+  gap: 8px;
   min-height: 0;
+  padding: 9px;
   border: 1px solid;
   border-radius: 7px;
+  background: transparent;
+  color: inherit;
   overflow: hidden;
+  text-align: left;
+  cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   transition: border-color 0.18s ease, filter 0.18s ease, transform 0.18s ease;
 }
@@ -555,21 +560,6 @@ onMounted(fetchData);
 }
 .industry-block.active {
   box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.45), 0 0 18px rgba(0, 212, 255, 0.16);
-}
-.industry-block-button {
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  padding: 9px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  align-items: start;
-  gap: 8px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 .industry-name-row {
   min-width: 0;
@@ -613,7 +603,7 @@ onMounted(fetchData);
 .industry-block.span-1 .industry-code {
   display: none;
 }
-.industry-block.span-1 .industry-block-button {
+.industry-block.span-1 {
   padding: 7px;
 }
 .industry-block.span-1 .industry-name-row {
