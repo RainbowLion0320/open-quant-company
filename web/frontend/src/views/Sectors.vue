@@ -73,30 +73,16 @@
           >
             <button
               type="button"
-              class="industry-block-head"
+              class="industry-block-button"
               @click="toggleSector(tile.sector)"
             >
-              <span class="industry-name">{{ tile.sector.sector_name }}</span>
-              <strong>{{ formatAmount(tile.size) }}</strong>
-              <em>{{ tile.metricLabel }}</em>
+              <span class="industry-name-row">
+                <span class="industry-name">{{ tile.sector.sector_name }}</span>
+                <strong>{{ formatAmount(tile.size) }}</strong>
+              </span>
+              <span class="industry-metric">{{ tile.metricLabel }}</span>
+              <span class="industry-code">{{ tile.sector.sector_code || 'SW1' }}</span>
             </button>
-            <div class="stock-block-grid" aria-label="行业 Top 5 成分股与其他">
-              <button
-                v-for="child in tile.children"
-                :key="`${tile.sector.sector_code}-${child.symbol}`"
-                type="button"
-                class="stock-block"
-                :class="{ 'is-others': child.kind === 'others', 'is-micro': child.spanX === 1 }"
-                :style="stockBlockStyle(child)"
-                :title="stockTitle(tile, child)"
-                :disabled="child.kind === 'others'"
-                @click.stop="openConstituent(child)"
-              >
-                <span class="stock-name">{{ child.name }}</span>
-                <strong>{{ child.kind === 'others' ? formatAmount(child.amount) : child.symbol }}</strong>
-                <em>{{ fmtPct(child.return_5d) }}</em>
-              </button>
-            </div>
           </article>
         </div>
         <div v-else class="empty-state empty-state-compact">暂无可绘制的行业资金数据</div>
@@ -207,23 +193,6 @@
         </div>
       </div>
 
-      <!-- Member stocks -->
-      <div>
-        <h3 class="text-xs mb-2" style="color:var(--text-secondary)">
-          成份股
-          <span class="text-2xs ml-2" style="color:var(--text-disabled)">{{ memberStocks.length }} / {{ memberTotal }} 只</span>
-        </h3>
-        <div v-if="memberStocks.length" class="member-list">
-          <router-link
-            v-for="s in memberStocks"
-            :key="s.symbol"
-            :to="`/stocks/${s.symbol}`"
-            class="member-chip font-mono"
-          >{{ s.symbol }}</router-link>
-        </div>
-        <div v-else-if="memberTotal" class="text-2xs" style="color:var(--text-disabled)">加载中...</div>
-        <div v-else class="text-2xs" style="color:var(--text-disabled)">无成份股数据</div>
-      </div>
     </div>
 
   </div>
@@ -231,13 +200,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
 import { api } from "../api";
 import type {
-  SectorConstituent,
   SectorOverviewResponse,
   SectorCard,
-  SectorStocksResponse,
 } from "../api";
 import { colorBySignedRatio, fmtRatioPct as fmtPct } from "../utils/format";
 
@@ -245,9 +211,6 @@ const loading = ref(false);
 const error = ref("");
 const overview = ref<SectorOverviewResponse | null>(null);
 const activeSector = ref("");
-const memberStocks = ref<{ symbol: string }[]>([]);
-const memberTotal = ref(0);
-const router = useRouter();
 type BlockHeatMode = "capital" | "momentum" | "signal";
 
 const blockHeatMode = ref<BlockHeatMode>("capital");
@@ -263,12 +226,6 @@ type SectorBlockTile = {
   span: number;
   metric: number;
   metricLabel: string;
-  children: SectorChildBlock[];
-};
-
-type SectorChildBlock = SectorConstituent & {
-  spanX: number;
-  spanY: number;
 };
 
 const sortedSectors = computed(() => {
@@ -326,7 +283,6 @@ const sectorBlockTiles = computed<SectorBlockTile[]>(() => {
       span,
       metric: blockMetric(item.sector),
       metricLabel: blockMetricLabel(item.sector),
-      children: stockMosaicBlocks(item.sector, span),
     };
   });
 });
@@ -387,60 +343,8 @@ function sectorBlockSpan(size: number, maxSize: number) {
   return clampNumber(Math.ceil(Math.sqrt(ratio) * 4 - 0.15), 1, 4);
 }
 
-function normalizedConstituents(sector: SectorCard): SectorConstituent[] {
-  const blocks = (sector.constituents || []).filter(child => child?.symbol);
-  if (blocks.length) return blocks;
-  return [{
-    symbol: "__others__",
-    name: "成份股",
-    amount: tileSize(sector),
-    return_5d: Number(sector.return_5d || 0),
-    weight: 1,
-    kind: "others",
-  }];
-}
-
-function stockSquareSpan(child: SectorConstituent, parentSpan: number) {
-  const maxSpan = parentSpan >= 4 ? 3 : parentSpan >= 2 ? 2 : 1;
-  const weight = clampNumber(Number(child.weight || 0), 0, 1);
-  return clampNumber(Math.round(Math.sqrt(weight) * 6), 1, maxSpan);
-}
-
-function stockMosaicBlocks(sector: SectorCard, parentSpan: number): SectorChildBlock[] {
-  const children = normalizedConstituents(sector);
-  const stockBlocks = children
-    .filter(child => child.kind !== "others")
-    .map(child => {
-    const span = stockSquareSpan(child, parentSpan);
-    return {
-      ...child,
-      spanX: span,
-      spanY: span,
-    };
-  });
-
-  const usedCells = stockBlocks.reduce((sum, child) => sum + child.spanX * child.spanY, 0);
-  const fillerRows = clampNumber(Math.floor((36 - usedCells) / 6), 1, 5);
-  const others = children.find(child => child.kind === "others");
-  if (!others) return stockBlocks;
-
-  return [
-    ...stockBlocks,
-    {
-      ...others,
-      spanX: 6,
-      spanY: fillerRows,
-    },
-  ];
-}
-
 function industryTitle(tile: SectorBlockTile) {
   return `${tile.sector.sector_name} · ${blockSizeLabel.value} ${formatAmount(tile.size)} · ${activeBlockHeatMode.value?.metric}: ${tile.metricLabel}`;
-}
-
-function stockTitle(tile: SectorBlockTile, child: SectorConstituent) {
-  const label = child.kind === "others" ? `${tile.sector.sector_name}其他成分` : `${child.name} ${child.symbol}`;
-  return `${label} · 资金 ${formatAmount(child.amount)} · 5日 ${fmtPct(child.return_5d)}`;
 }
 
 function heatStyle(metric: number) {
@@ -481,18 +385,6 @@ function industryBlockStyle(tile: SectorBlockTile) {
   };
 }
 
-function stockBlockStyle(child: SectorChildBlock) {
-  const tone = heatStyle(Number(child.return_5d || 0));
-  return {
-    gridColumn: `span ${child.spanX}`,
-    gridRow: `span ${child.spanY}`,
-    backgroundColor: tone.backgroundColor,
-    borderColor: tone.border,
-    boxShadow: tone.boxShadow,
-    color: tone.color,
-  };
-}
-
 function dataSourceLabel(source: string) {
   if (source === "real") return "真实数据";
   if (source === "proxy") return "代理数据";
@@ -500,24 +392,12 @@ function dataSourceLabel(source: string) {
   return "数据缺失";
 }
 
-async function toggleSector(s: SectorCard) {
+function toggleSector(s: SectorCard) {
   if (activeSector.value === s.sector_code) {
     activeSector.value = "";
     return;
   }
   activeSector.value = s.sector_code;
-  memberStocks.value = [];
-  memberTotal.value = 0;
-  try {
-    const data: SectorStocksResponse = await api.sectorStocks(s.sector_name);
-    memberStocks.value = data.stocks || [];
-    memberTotal.value = data.total || 0;
-  } catch {}
-}
-
-function openConstituent(child: SectorConstituent) {
-  if (child.kind === "others" || !child.symbol || child.symbol === "__others__") return;
-  router.push(`/stocks/${child.symbol}`);
 }
 
 async function fetchData() {
@@ -662,11 +542,7 @@ onMounted(fetchData);
   justify-content: start;
 }
 .industry-block {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 8px;
   min-height: 0;
-  padding: 8px;
   border: 1px solid;
   border-radius: 7px;
   overflow: hidden;
@@ -680,23 +556,29 @@ onMounted(fetchData);
 .industry-block.active {
   box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.45), 0 0 18px rgba(0, 212, 255, 0.16);
 }
-.industry-block-head {
+.industry-block-button {
+  width: 100%;
+  height: 100%;
   min-width: 0;
-  padding: 0;
+  padding: 9px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "name amount"
-    "metric metric";
+  grid-template-rows: auto 1fr auto;
   align-items: start;
-  gap: 2px 8px;
+  gap: 8px;
   border: 0;
   background: transparent;
+  color: inherit;
   text-align: left;
   cursor: pointer;
 }
+.industry-name-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
 .industry-name {
-  grid-area: name;
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 800;
@@ -705,103 +587,38 @@ onMounted(fetchData);
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.industry-block-head strong {
-  grid-area: amount;
+.industry-name-row strong {
   color: currentColor;
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   line-height: 1.15;
   white-space: nowrap;
 }
-.industry-block-head em {
-  grid-area: metric;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-style: normal;
-  line-height: 1.1;
-}
-.stock-block-grid {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-rows: repeat(6, minmax(0, 1fr));
-  grid-auto-flow: dense;
-  gap: 5px;
-}
-.stock-block {
-  min-width: 0;
-  min-height: 0;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 3px;
-  border: 1px solid;
-  border-radius: 5px;
-  overflow: hidden;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.18s ease, filter 0.18s ease, transform 0.18s ease;
-}
-.stock-block:hover:not(:disabled) {
-  filter: brightness(1.18);
-  transform: translateY(-1px);
-}
-.stock-block.is-others {
-  cursor: default;
-  opacity: 0.74;
-}
-.stock-block.is-micro .stock-name,
-.stock-block.is-micro em {
-  display: none;
-}
-.stock-name {
-  color: var(--text-primary);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.12;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.stock-block strong {
+.industry-metric {
+  align-self: center;
   color: currentColor;
   font-family: "JetBrains Mono", monospace;
+  font-size: clamp(14px, calc(var(--block-cell) / 4), 28px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.industry-code {
+  align-self: end;
+  color: var(--text-secondary);
   font-size: 10px;
   line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.stock-block em {
-  color: var(--text-secondary);
-  font-size: 9px;
-  font-style: normal;
-  line-height: 1.1;
-}
-.industry-block.span-1 .industry-block-head,
-.industry-block.span-2 .industry-block-head {
-  grid-template-columns: 1fr;
-  grid-template-areas:
-    "name"
-    "amount";
-}
-.industry-block.span-1 .industry-block-head em,
-.industry-block.span-2 .industry-block-head em,
-.industry-block.span-1 .stock-block em,
-.industry-block.span-2 .stock-block em {
+.industry-block.span-1 .industry-metric,
+.industry-block.span-1 .industry-code {
   display: none;
 }
-.industry-block.span-1 .stock-block,
-.industry-block.span-2 .stock-block {
-  padding: 5px;
+.industry-block.span-1 .industry-block-button {
+  padding: 7px;
 }
-.industry-block.span-1 .stock-name,
-.industry-block.span-1 .stock-block strong {
-  font-size: 0;
-}
-.industry-block.span-1 .stock-block {
-  padding: 3px;
+.industry-block.span-1 .industry-name-row {
+  grid-template-columns: 1fr;
+  gap: 2px;
 }
 .sector-insight-card {
   display: grid;
@@ -840,24 +657,6 @@ onMounted(fetchData);
   border: 1px solid rgba(0, 212, 255, 0.06);
   border-radius: 6px;
   padding: 10px 14px;
-}
-.member-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.member-chip {
-  font-size: 11px;
-  padding: 3px 10px;
-  background: rgba(0, 212, 255, 0.05);
-  border: 1px solid rgba(0, 212, 255, 0.1);
-  border-radius: 4px;
-  color: var(--accent);
-  text-decoration: none;
-  transition: background 0.2s;
-}
-.member-chip:hover {
-  background: rgba(0, 212, 255, 0.12);
 }
 @media (max-width: 980px) {
   .sector-radar-layout {

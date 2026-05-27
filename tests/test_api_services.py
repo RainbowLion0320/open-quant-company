@@ -137,7 +137,7 @@ def test_sector_overview_exposes_turnover_fields_for_block_map(monkeypatch, tmp_
     assert sector["amount_share"] == 0.8293
 
 
-def test_sector_overview_exposes_constituent_blocks_for_sector_grid(monkeypatch, tmp_path):
+def test_sector_overview_does_not_expose_constituent_blocks(monkeypatch, tmp_path):
     perf_path = tmp_path / "sector_performance_20260527.parquet"
     sig_path = tmp_path / "sector_signals_20260527.parquet"
     perf = pd.DataFrame({
@@ -164,19 +164,8 @@ def test_sector_overview_exposes_constituent_blocks_for_sector_grid(monkeypatch,
         return None, pd.DataFrame()
 
     monkeypatch.setattr(sector_service, "_read_snapshot", fake_read_snapshot)
-    monkeypatch.setattr(
-        sector_service,
-        "_sector_constituents",
-        lambda sector_name: [
-            {"symbol": "000001", "name": "平安银行", "amount": 100.0, "return_5d": 0.03, "weight": 0.4, "kind": "stock"},
-            {"symbol": "__others__", "name": "其他", "amount": 150.0, "return_5d": 0.0, "weight": 0.6, "kind": "others"},
-        ],
-    )
 
     overview = sector_service.build_sector_overview()
     sector = overview["sectors"][0]
 
-    assert sector["constituents"][0]["symbol"] == "000001"
-    assert sector["constituents"][0]["kind"] == "stock"
-    assert sector["constituents"][1]["kind"] == "others"
-    assert sum(item["weight"] for item in sector["constituents"]) == 1.0
+    assert "constituents" not in sector

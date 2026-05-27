@@ -365,15 +365,6 @@ export interface SectorSignal {
   top_symbol: string;
 }
 
-export interface SectorConstituent {
-  symbol: string;
-  name: string;
-  amount: number;
-  return_5d: number;
-  weight: number;
-  kind: "stock" | "others";
-}
-
 export interface SectorCard {
   sector_code: string;
   sector_name: string;
@@ -390,7 +381,6 @@ export interface SectorCard {
   amount_source: string;
   data_source: string;
   signals: Record<string, SectorSignal>;
-  constituents: SectorConstituent[];
 }
 
 export interface SectorOverviewResponse {
@@ -422,17 +412,6 @@ export interface SectorDetailResponse {
   sector_name: string;
   performance: Record<string, any>;
   signals: Record<string, SectorSignal>;
-  data_source: string;
-}
-
-export interface SectorStock {
-  symbol: string;
-}
-
-export interface SectorStocksResponse {
-  industry: string;
-  stocks: SectorStock[];
-  total: number;
   data_source: string;
 }
 
@@ -589,7 +568,6 @@ export const api = {
   sectorOverview: () => get<SectorOverviewResponse>("/api/sectors/overview"),
   sectorExposure: () => get<SectorExposureResponse>("/api/sectors/exposure"),
   sectorDetail: (industry: string) => get<SectorDetailResponse>(`/api/sectors/${encodeURIComponent(industry)}`),
-  sectorStocks: (industry: string) => get<SectorStocksResponse>(`/api/sectors/${encodeURIComponent(industry)}/stocks`),
 
   // Audit & Run Mode
   auditHistory: (section = "", limit = 50) =>

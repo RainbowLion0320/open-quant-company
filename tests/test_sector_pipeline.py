@@ -496,14 +496,9 @@ def test_sector_detail_returns_200(api_client):
     assert "signals" in data
 
 
-def test_sector_stocks_returns_200(api_client):
+def test_sector_stocks_endpoint_is_retired(api_client):
     resp = api_client.get("/api/sectors/%E9%93%B6%E8%A1%8C/stocks")
-    assert resp.status_code == 200, resp.text
-    data = resp.json()
-    assert "industry" in data, f"response missing industry key: {list(data.keys())}"
-    assert data["industry"] == "银行"
-    assert "stocks" in data
-    assert "total" in data
+    assert resp.status_code == 410, resp.text
 
 
 def test_sector_nonexistent_returns_empty(api_client):

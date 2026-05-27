@@ -1,8 +1,8 @@
-"""Sector / Industry API — radar overview, detail, stocks, exposure."""
+"""Sector / Industry API — radar overview, detail and exposure."""
 
 from urllib.parse import unquote
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from web.api.services import sectors as sector_service
 
@@ -21,9 +21,9 @@ def sector_exposure():
 
 
 @router.get("/{industry:path}/stocks")
-def sector_stocks(industry: str):
-    """Return member stocks for a sector with signal status."""
-    return sector_service.build_sector_stocks(unquote(industry))
+def sector_stocks_retired(industry: str):
+    """Retired: sector radar no longer exposes member stock lists."""
+    raise HTTPException(status_code=410, detail="Sector member stock list is retired")
 
 
 @router.get("/{industry:path}")

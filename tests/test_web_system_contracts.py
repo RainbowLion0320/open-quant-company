@@ -277,14 +277,15 @@ def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
     assert "sectorBlockTiles" in sectors
     assert "sector-block-grid" in sectors
     assert "industry-block" in sectors
-    assert "stock-block" in sectors
+    assert "industry-block-button" in sectors
+    assert "stock-block" not in sectors
     assert "sectorBlockSpan" in sectors
-    assert "stockSquareSpan" in sectors
     assert "gridColumn: `span ${tile.span}`" in sectors
     assert "gridRow: `span ${tile.span}`" in sectors
-    assert "gridColumn: `span ${child.spanX}`" in sectors
-    assert "gridRow: `span ${child.spanY}`" in sectors
-    assert "is-others" in sectors
+    assert "stockSquareSpan" not in sectors
+    assert "stockMosaicBlocks" not in sectors
+    assert "openConstituent" not in sectors
+    assert "memberStocks" not in sectors
     assert "sectorBlockSizeClass" not in sectors
     assert "splitTreemap" not in sectors
     assert "linear-gradient" not in sectors
@@ -295,4 +296,6 @@ def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
     assert "信号热力" in sectors
     assert "amount_5d_avg" in api
     assert "amount_share" in api
-    assert "constituents" in api
+    assert "SectorConstituent" not in api
+    assert "constituents" not in api
+    assert "sectorStocks" not in api

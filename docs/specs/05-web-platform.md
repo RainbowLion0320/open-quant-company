@@ -63,7 +63,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 
 - `GET /api/sectors/overview` 返回 `turnover_amount`、`amount_5d_avg`、`amount_share`、`amount_source` 和 `capital_source`，供前端表达行业资金分布。
 - 行业雷达主视图为行业资金方块矩阵：每个申万一级行业是独立方块，边长按近 5 日平均成交额开方映射，保持方形且让面积近似表达资金量；缺失时回退成份股数量并在 UI 标注口径。
-- 每个行业方块内部展示 Top 5 成分股与“其他”子块；Top 5 使用权重驱动的正方形子块，“其他”允许用矩形补齐剩余空间。方块矩阵支持资金热力、动量热力、信号热力三种模式。点击行业方块同步展开原有行业详情，不替代精确排名表。
+- 行业方块内部不展示具体股票，避免行业雷达变成个股看板；方块矩阵支持资金热力、动量热力、信号热力三种模式。点击行业方块同步展开行业级信号分布，不替代精确排名表。
 
 ### 2.2 后端架构 (FastAPI)
 
@@ -79,7 +79,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Strategies | `routes/strategies.py` | `GET /strategies`, `GET /strategies/{name}`, `GET /strategies/statuses`, `POST /strategies/run` |
 | Backtest | `routes/backtest.py` | `GET /backtest`, `GET /backtest/{key}` |
 | Portfolio | `routes/portfolio.py` | `GET /portfolio/positions`, `GET /portfolio/balance`, `POST /portfolio/order` |
-| Sectors | `routes/sectors.py` | `GET /sectors/overview`, `GET /sectors/exposure`, `GET /sectors/{industry}`, `GET /sectors/{industry}/stocks` |
+| Sectors | `routes/sectors.py` | `GET /sectors/overview`, `GET /sectors/exposure`, `GET /sectors/{industry}` |
 | Settings | `routes/settings.py` | `GET /settings`, `PUT /settings` |
 | System | `routes/system.py` | `GET /system/monitor`, `GET /system/history`, `GET /system/api-health`, `GET /system/cron-jobs`, `GET /system/service-status`, `GET /system/audit`, `GET /system/mode` |
 | Hindsight | `routes/hindsight.py` | `GET /hindsight/graph` |
