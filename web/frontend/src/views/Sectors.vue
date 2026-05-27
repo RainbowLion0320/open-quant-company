@@ -20,6 +20,10 @@
             <strong>{{ overview.signal_dispersion }}</strong>
           </span>
           <span class="sector-metric">
+            <span>资金集中度</span>
+            <strong>{{ capitalConcentration }}</strong>
+          </span>
+          <span class="sector-metric">
             <span>数据日期</span>
             <strong>{{ perfDate }}</strong>
           </span>
@@ -81,24 +85,6 @@
         </div>
         <div v-else class="empty-state empty-state-compact">暂无可绘制的行业资金数据</div>
       </div>
-
-      <aside class="glass-card sector-insight-card">
-        <div>
-          <span class="insight-label">资金最大行业</span>
-          <strong>{{ capitalLeader?.sector_name || '—' }}</strong>
-          <em>{{ capitalLeader ? formatAmount(tileSize(capitalLeader)) : '—' }}</em>
-        </div>
-        <div>
-          <span class="insight-label">资金集中度</span>
-          <strong>{{ capitalConcentration }}</strong>
-          <em>Top 5 成交占比</em>
-        </div>
-        <div>
-          <span class="insight-label">当前热力</span>
-          <strong>{{ activeBlockHeatMode?.label || '—' }}</strong>
-          <em>{{ activeBlockHeatMode?.metric || '—' }}</em>
-        </div>
-      </aside>
     </section>
 
     <!-- Sector Ranking Table -->
@@ -250,11 +236,6 @@ const blockSizeLabel = computed(() => (
     ? "近5日平均成交额"
     : "成份股数量 fallback"
 ));
-
-const capitalLeader = computed(() => {
-  const sectors = [...sortedSectors.value].sort((a, b) => tileSize(b) - tileSize(a));
-  return sectors[0] || null;
-});
 
 const capitalConcentration = computed(() => {
   const sectors = [...sortedSectors.value].sort((a, b) => tileSize(b) - tileSize(a));
@@ -473,12 +454,11 @@ onMounted(fetchData);
 }
 .sector-radar-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   margin-bottom: 14px;
 }
-.sector-map-card,
-.sector-insight-card {
+.sector-map-card {
   padding: 12px;
 }
 .sector-map-head {
@@ -487,8 +467,7 @@ onMounted(fetchData);
   justify-content: space-between;
   gap: 14px;
 }
-.sector-map-head span,
-.insight-label {
+.sector-map-head span {
   display: block;
   color: var(--text-disabled);
   font-size: 10px;
@@ -624,30 +603,6 @@ onMounted(fetchData);
   grid-template-columns: 1fr;
   gap: 2px;
 }
-.sector-insight-card {
-  display: grid;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.sector-insight-card > div {
-  padding: 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(0, 212, 255, 0.035);
-}
-.sector-insight-card strong {
-  display: block;
-  margin-top: 8px;
-  color: var(--text-primary);
-  font-size: 17px;
-}
-.sector-insight-card em {
-  display: block;
-  margin-top: 3px;
-  color: var(--text-disabled);
-  font-size: 10px;
-  font-style: normal;
-}
 .row-active {
   background: rgba(0, 212, 255, 0.06) !important;
 }
@@ -666,10 +621,6 @@ onMounted(fetchData);
   .sector-radar-layout {
     grid-template-columns: 1fr;
   }
-  .sector-insight-card {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: none;
-  }
 }
 @media (max-width: 640px) {
   .sector-map-head {
@@ -685,9 +636,6 @@ onMounted(fetchData);
   .sector-block-grid {
     --block-cell: 72px;
     --block-gap: 8px;
-  }
-  .sector-insight-card {
-    grid-template-columns: 1fr;
   }
 }
 </style>

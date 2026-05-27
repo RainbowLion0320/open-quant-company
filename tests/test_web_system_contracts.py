@@ -279,9 +279,15 @@ def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
     assert "sector-toolbar-metrics" in sectors
     assert "强势行业 5日" in sectors
     assert "信号分化度" in sectors
+    assert "资金集中度" in sectors
+    assert "{{ capitalConcentration }}" in sectors
     assert "信号集中度" not in sectors
     assert "signal_dispersion" in api
     assert "signal_concentration" not in api
+    assert "资金最大行业" not in sectors
+    assert "资金最大企业" not in sectors
+    assert "sector-insight-card" not in sectors
+    assert "capitalLeader" not in sectors
     assert "stat-row" not in sectors
     assert "stat-chip" not in sectors
     assert "industry-block" in sectors
