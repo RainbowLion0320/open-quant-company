@@ -216,6 +216,8 @@ def test_market_view_surfaces_regime_stability_state():
     assert "regime-status-card" in market
     assert "regime-status-row" not in market
     assert "regime-status-card is-inline" in market
+    assert "min-height: 28px;" in market
+    assert "padding: 4px 6px;" in market
 
     gauge_block = market.split("const regimeGaugeMetrics = computed(() => [", 1)[1].split("]);", 1)[0]
     assert 'key: "risk"' in gauge_block

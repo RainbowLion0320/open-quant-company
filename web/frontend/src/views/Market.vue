@@ -787,13 +787,13 @@ onUnmounted(() => {
   will-change: transform, opacity;
 }
 .regime-status-card {
-  min-height: 34px;
+  min-height: 28px;
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  padding: 6px 7px;
+  gap: 5px;
+  padding: 4px 6px;
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.12);
@@ -803,7 +803,7 @@ onUnmounted(() => {
 .regime-status-card em,
 .regime-status-card strong {
   min-width: 0;
-  line-height: 1.1;
+  line-height: 1;
 }
 .regime-status-card em {
   flex: 0 1 auto;
