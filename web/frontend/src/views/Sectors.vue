@@ -5,7 +5,25 @@
         <span>SECTOR ROTATION</span>
         <strong>申万一级行业动量</strong>
       </div>
-      <div v-if="overview" class="surface-actions">
+      <div v-if="overview" class="surface-actions sector-toolbar-actions">
+        <div class="sector-toolbar-metrics" aria-label="行业雷达摘要指标">
+          <span class="sector-metric">
+            <span>强势行业 5日</span>
+            <strong class="metric-positive">{{ top5Return }}%</strong>
+          </span>
+          <span class="sector-metric">
+            <span>弱势行业 5日</span>
+            <strong class="metric-negative">{{ bottom5Return }}%</strong>
+          </span>
+          <span class="sector-metric">
+            <span>信号集中度</span>
+            <strong>{{ overview.signal_concentration }}</strong>
+          </span>
+          <span class="sector-metric">
+            <span>数据日期</span>
+            <strong>{{ perfDate }}</strong>
+          </span>
+        </div>
         <span class="sector-meta-chip">
           {{ overview.total_sectors }} 行业 · {{ dataSourceLabel(overview.data_source) }}
         </span>
@@ -15,26 +33,6 @@
     <div v-if="error" class="inline-alert danger">
       <span>{{ error }}</span>
       <button class="btn btn-xs" @click="fetchData">重试</button>
-    </div>
-
-    <!-- Summary stat chips -->
-    <div v-if="overview" class="stat-row">
-      <div class="stat-chip">
-        <span class="stat-label">强势行业 5日</span>
-        <span class="stat-value" style="color:var(--positive)">{{ top5Return }}%</span>
-      </div>
-      <div class="stat-chip">
-        <span class="stat-label">Bottom 5 动量</span>
-        <span class="stat-value" style="color:var(--negative)">{{ bottom5Return }}%</span>
-      </div>
-      <div class="stat-chip">
-        <span class="stat-label">信号集中度</span>
-        <span class="stat-value">{{ overview.signal_concentration }}</span>
-      </div>
-      <div class="stat-chip">
-        <span class="stat-label">数据日期</span>
-        <span class="stat-value" style="font-size:11px">{{ perfDate }}</span>
-      </div>
     </div>
 
     <section v-if="overview" class="sector-radar-layout">
@@ -414,9 +412,51 @@ onMounted(fetchData);
 <style scoped>
 .sector-toolbar {
   padding: 10px 12px;
+  align-items: center;
+  gap: 12px;
 }
 .sector-toolbar .surface-copy strong {
   margin-top: 2px;
+}
+.sector-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sector-toolbar-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sector-metric {
+  min-height: 24px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(0, 212, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(0, 212, 255, 0.035);
+  color: var(--text-disabled);
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.sector-metric strong {
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+.sector-metric .metric-positive {
+  color: var(--positive);
+}
+.sector-metric .metric-negative {
+  color: var(--negative);
 }
 .sector-meta-chip {
   display: inline-flex;
@@ -430,32 +470,6 @@ onMounted(fetchData);
   font-size: 10px;
   line-height: 1;
   white-space: nowrap;
-}
-.stat-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-.stat-chip {
-  background: rgba(0, 212, 255, 0.04);
-  border: 1px solid rgba(0, 212, 255, 0.08);
-  border-radius: 6px;
-  padding: 8px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.stat-label {
-  font-size: 10px;
-  color: var(--text-disabled);
-  text-transform: uppercase;
-}
-.stat-value {
-  font-size: 15px;
-  font-weight: 600;
-  font-family: "JetBrains Mono", monospace;
-  color: var(--text-primary);
 }
 .sector-radar-layout {
   display: grid;

@@ -276,6 +276,10 @@ def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
 
     assert "sectorBlockTiles" in sectors
     assert "sector-block-grid" in sectors
+    assert "sector-toolbar-metrics" in sectors
+    assert "强势行业 5日" in sectors
+    assert "stat-row" not in sectors
+    assert "stat-chip" not in sectors
     assert "industry-block" in sectors
     assert '<button\n            v-for="tile in sectorBlockTiles"' in sectors
     assert "industry-block-button" not in sectors
