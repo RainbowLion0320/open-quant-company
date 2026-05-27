@@ -212,12 +212,21 @@ def test_market_view_surfaces_regime_stability_state():
     assert "{{ item.value }}" in market
     assert "Idle" in market
     assert "stability.min_dwell ?? 1" not in market
+    assert "Regime Score" not in market
+    assert "regime-score-line span" not in market
+    assert "align-items: center;" in market
     assert "regime-stability-strip" not in market
     assert "regime-status-card" in market
     assert "regime-status-row" not in market
     assert "regime-status-card is-inline" in market
     assert "min-height: 28px;" in market
     assert "padding: 4px 6px;" in market
+
+    score_block = market.split(".regime-score-line {", 1)[1].split("}", 1)[0]
+    assert "border:" not in score_block
+    assert "background:" not in score_block
+    assert "padding:" not in score_block
+    assert "justify-content: center;" in score_block
 
     gauge_block = market.split("const regimeGaugeMetrics = computed(() => [", 1)[1].split("]);", 1)[0]
     assert 'key: "risk"' in gauge_block

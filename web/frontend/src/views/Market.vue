@@ -12,7 +12,6 @@
           <div class="regime-readout">
             <div class="regime-name" :style="{ color: regimeColor }">{{ regimeLabel }}</div>
             <div class="regime-score-line">
-              <span>Regime Score</span>
               <strong :style="{ color: regimeColor }">{{ displayScoreText }}</strong>
             </div>
           </div>
@@ -742,28 +741,18 @@ onUnmounted(() => {
 .regime-readout {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 8px;
 }
 .regime-score-line {
   display: inline-flex;
-  width: fit-content;
-  align-items: baseline;
-  gap: 8px;
-  padding: 5px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.14);
-}
-.regime-score-line span {
-  color: var(--text-disabled);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  min-width: 100%;
+  align-items: center;
+  justify-content: center;
 }
 .regime-score-line strong {
   font-family: "JetBrains Mono", monospace;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
 }
 .regime-gauge-grid {
