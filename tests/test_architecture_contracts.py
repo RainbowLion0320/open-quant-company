@@ -230,6 +230,65 @@ def test_current_docs_do_not_point_agents_to_archived_context():
     assert offenders == []
 
 
+def test_current_project_docs_do_not_repeat_known_stale_facts():
+    checked_paths = [
+        Path("README.md"),
+        Path("CLAUDE.md"),
+        *Path("docs").rglob("*.md"),
+        *Path("wiki").rglob("*.md"),
+    ]
+    excluded = {Path("docs/DOCUMENTATION.md")}
+    forbidden_tokens = (
+        "34维度",
+        "34 维度",
+        "四维加权",
+        "多因子四维",
+        "9 页",
+        "9页",
+        "FastAPI（9",
+        "3页",
+        "3 页",
+        "5517",
+        "全局 ticker",
+        "底部 ticker",
+        "点位与日涨跌",
+        "Regime Score",
+    )
+
+    offenders = []
+    for path in checked_paths:
+        if path in excluded:
+            continue
+        text = path.read_text(encoding="utf-8")
+        for token in forbidden_tokens:
+            if token in text:
+                offenders.append(f"{path}:{token}")
+
+    assert offenders == []
+
+
+def test_web_docs_match_current_market_regime_layout_contract():
+    spec = Path("docs/specs/05-web-platform.md").read_text(encoding="utf-8")
+    decision = Path("wiki/decisions/web-architecture.md").read_text(encoding="utf-8")
+    acceptance = Path("docs/acceptance-matrix.md").read_text(encoding="utf-8")
+    combined = "\n".join([spec, decision, acceptance])
+
+    required_tokens = (
+        "Risk Buffer",
+        "A-share Breadth",
+        "Index Trend",
+        "Above MA20",
+        "Confirmed",
+        "Raw",
+        "Pending",
+        "Dwell",
+        "MODE / REGIME / FRESH",
+    )
+
+    missing = [token for token in required_tokens if token not in combined]
+    assert missing == []
+
+
 def test_backtest_entrypoint_no_longer_exposes_legacy_runner():
     text = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
 

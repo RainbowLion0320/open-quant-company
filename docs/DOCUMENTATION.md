@@ -1,6 +1,6 @@
 # 星盘 / Astrolabe Quant OS 文档治理
 
-> 更新: 2026-05-26
+> 更新: 2026-05-27
 
 本仓库保留三类文档层。它们不是同一种东西，每一层只负责自己的边界。
 
@@ -41,7 +41,7 @@
 文档类改动完成前运行：
 
 ```bash
-rg -n "34 维度|34维度|四维加权|多因子四维|当前 Monitor 仍含写|18 页|5517|样本内结果|OOS 结果|回测期" docs wiki -g '!docs/DOCUMENTATION.md'
+rg -n "34 维度|34维度|四维加权|多因子四维|9 页|9页|FastAPI（9|3页|3 页|5517|全局 ticker|底部 ticker|点位与日涨跌|Regime Score" README.md CLAUDE.md docs wiki -g '!docs/DOCUMENTATION.md'
 git diff --check
 ```
 

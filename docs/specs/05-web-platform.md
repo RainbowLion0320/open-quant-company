@@ -43,7 +43,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 
 | 路由 | 页面 | 功能 |
 |------|------|------|
-| `/` | 市场总览 | Regime 球体 + 核心指数相对强弱图 + 宏观快照 + 热门行业脉冲 |
+| `/` | 市场总览 | Regime 球体 + 数值分数 + 4 个小仪表盘 + 状态卡 + 核心指数相对强弱图 + 宏观快照 + 热门行业脉冲 |
 | `/research` | 市场研究 | 二级 tab: 行业雷达、个股搜索；个股详情仍使用隐藏路由 `/stocks/:code` |
 | `/strategy-lab` | 策略实验室 | 二级 tab: 策略中心、信号历史、回测分析 |
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
@@ -51,6 +51,13 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、记忆图谱 |
 
 旧一级页面 redirect 已移除。除 `/stocks/:code` 个股详情隐藏路由外，用户应通过六个一级模块和二级 tab 访问原子功能。
+
+**市场总览 Regime 面板契约：**
+
+- 顶部为 animated regime orb + confirmed regime 名称 + 居中纯数字 score；不再额外显示分数字段标题或卡片边框。
+- 中部保留 4 个核心小仪表盘：Risk Buffer、A-share Breadth、Index Trend、Above MA20。
+- 稳定性状态以紧凑状态卡展示 Confirmed / Raw / Pending / Dwell；Pending 空闲时显示 `—`，有候选时显示 `x/y`。
+- 全局页脚只展示 MODE / REGIME / FRESH 与系统健康状态，不再承担行情 ticker 或点位/日涨跌展示。
 
 ### 2.2 后端架构 (FastAPI)
 

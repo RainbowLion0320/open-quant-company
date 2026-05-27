@@ -37,7 +37,7 @@
 ├── data/
 │   ├── fetcher.py                # AKShare 3源 fallback
 │   ├── financials.py             # 财务数据提取 (三层缓存)
-│   ├── symbols.py                # 5517只全A股 + 申万31行业
+│   ├── symbols.py                # 全量A股 universe + 申万行业映射
 │   ├── feature_store.py          # PIT 特征存储 + enrich
 │   ├── data_registry.py          # ★ 维度+健康注册表: source/label/SLA/repair/partition 单源
 │   ├── cleaner.py                # 6规则数据清洗

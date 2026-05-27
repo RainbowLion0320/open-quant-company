@@ -1,14 +1,14 @@
 ---
 title: Web Architecture (Vue 3 + FastAPI)
 created: 2026-05-12
-updated: 2026-05-23
+updated: 2026-05-27
 type: decision
 tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-center, monitor]
 ---
 
 # Decision: 星盘终端 Web SPA
 
-- **Date**: 2026-05-12 (initial), 2026-05-16 (command center upgrade), 2026-05-23 (refresh)
+- **Date**: 2026-05-12 (initial), 2026-05-16 (command center upgrade), 2026-05-23 (refresh), 2026-05-27 (doc/code alignment)
 - **Status**: Implemented
 - **Author**: 星盘 + Codex
 
@@ -51,12 +51,12 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 ### 指挥中心 (2026-05-16 Codex 升级)
 
 Market API 新增字段：
-- `multi_asset[]` — 上证综指/沪深300/创业板指/科创50 核心指数序列；市场页仅用于相对强弱图，全局 ticker 展示点位与日涨跌
+- `multi_asset[]` — 上证综指/沪深300/创业板指/科创50 核心指数序列；市场页用于相对强弱图，不再复制为全局行情 ticker
 - `macro[]` — GDP/PMI/CPI/SHIBOR 宏观快照
 - `alerts[]` — 智能预警 (regime/PMI偏离/黄金波动/策略完成)
 - `freshness` — 数据新鲜度时间戳
 
-前端 Market.vue 完全重写：从4张简单卡片升级为 Command Center 布局，含 animated regime orb、核心指数相对强弱图、宏观快照行、热门行业脉冲。大图展示上证综指/沪深300/创业板指/科创50 的归一化强弱对比；点位与日涨跌统一由底部 ticker 展示；策略明细归属策略实验室，行业页承载完整排名与信号分布，市场总览只保留 Top5 热点概览，避免重复缩略看板。
+前端 Market.vue 采用 Command Center 布局，含 animated regime orb、居中纯数字 regime score、4 个核心小仪表盘（Risk Buffer / A-share Breadth / Index Trend / Above MA20）、Confirmed / Raw / Pending / Dwell 紧凑状态卡、核心指数相对强弱图、宏观快照行和热门行业脉冲。大图展示上证综指/沪深300/创业板指/科创50 的归一化强弱对比；全局页脚只显示 MODE / REGIME / FRESH 与系统健康状态，不再展示行情 ticker；策略明细归属策略实验室，行业页承载完整排名与信号分布，市场总览只保留 Top5 热点概览，避免重复缩略看板。
 
 ### 系统信息 (2026-05-21 升级, 2026-05-23 边界明确)
 
@@ -80,7 +80,7 @@ Canvas 自建力导向图，零外部图谱库依赖。直接从 Hindsight REST 
 
 ## DuckDB 读写分离
 
-Web 以 `get_db(read_only=True)` 连接 DuckDB。注意 macOS 不支持真正的并发读写——扫描和 Web 需串行执行。见 [[duckdb-migration]]。
+Web 以 DuckDB `:memory:` 注册 Parquet 视图，只读查询不持有单文件数据库写锁。数据写入统一通过 DataHub 的 Parquet 原子写入和 manifest 记录完成，Web 查询层只读消费当前落盘数据。见 [[duckdb-migration]] 与 [[datahub]]。
 
 ## 相关
 

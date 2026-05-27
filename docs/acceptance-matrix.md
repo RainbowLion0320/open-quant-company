@@ -78,7 +78,7 @@
 | 5.4 | DuckDB :memory: 零锁查询 | `web/api/db.py` / `data/db.py` | `test_boundary.py` (DuckDB CRUD) | 所有数据查询端点 | Web 页面数据加载无延迟 | OK | — |
 | 5.5 | API 错误响应统一 + 稳定端点 response_model | 各路由文件 + `web/api/errors.py` | `test_web_system_contracts.py` | — | 4xx/5xx 错误结构一致，关键成功响应有 Pydantic schema | OK | 继续扩大 response_model 覆盖 |
 | 5.6 | Settings API YAML 读写 + 审计 | `web/api/routes/settings.py` | `test_audit.py`, `test_auth.py` | `/system?tab=settings` → `Settings.vue` | 修改配置 → 确认弹窗 → 保存 → audit ledger 有记录 | OK | — |
-| 5.7 | 市场总览 (regime + multi_asset + macro + hot sectors) | `web/api/routes/market.py` + `web/api/routes/sectors.py` | `test_market_route_contracts.py` | `Market.vue` | Regime + 核心指数相对强弱图 + 宏观快照 + Top5 热门行业脉冲；点位/日涨跌由全局 ticker 承担，策略明细归属策略实验室 | OK | — |
+| 5.7 | 市场总览 (regime + multi_asset + macro + hot sectors) | `web/api/routes/market.py` + `web/api/routes/sectors.py` | `test_market_route_contracts.py`, `test_web_system_contracts.py` | `Market.vue` | Regime orb + 纯数字 score + 4 个核心小仪表盘 + Confirmed/Raw/Pending/Dwell 状态卡 + 核心指数相对强弱图 + 宏观快照 + Top5 热门行业脉冲；页脚只保留 MODE/REGIME/FRESH 和系统健康状态，策略明细归属策略实验室 | OK | — |
 | 5.8 | DB Health 注册表维度监控 | `web/api/routes/system.py` | `test_web_system_contracts.py:test_db_health_scans_new_registry_dimensions` | `/datahub?tab=health` → `DatabaseHealth.vue` | DataRegistry 维度状态表格 + 修复操作 | OK | — |
 | 5.9 | Hindsight 记忆查询 | `web/api/routes/hindsight.py` | — | `/system?tab=hindsight` → `HindsightGraph.vue` | LLM 记忆图谱可查询 | OK | — |
 | 5.10 | 前端构建无大 chunk 警告 | `web/frontend/vite.config.ts` | — | — | `npm run build` 无 >500KB chunk 警告 | OK | — |
