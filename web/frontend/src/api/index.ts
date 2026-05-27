@@ -388,7 +388,7 @@ export interface SectorOverviewResponse {
   total_sectors: number;
   top_performers: SectorCard[];
   bottom_performers: SectorCard[];
-  signal_concentration: number;
+  signal_dispersion: number;
   data_source: string;
   capital_source: string;
   freshness: { performance: string; signals: string };

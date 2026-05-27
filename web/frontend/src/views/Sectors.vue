@@ -16,8 +16,8 @@
             <strong class="metric-negative">{{ bottom5Return }}%</strong>
           </span>
           <span class="sector-metric">
-            <span>信号集中度</span>
-            <strong>{{ overview.signal_concentration }}</strong>
+            <span>信号分化度</span>
+            <strong>{{ overview.signal_dispersion }}</strong>
           </span>
           <span class="sector-metric">
             <span>数据日期</span>

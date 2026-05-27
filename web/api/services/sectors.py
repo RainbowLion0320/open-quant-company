@@ -88,7 +88,7 @@ def build_sector_overview() -> dict:
     top_performers = [s for s in sectors[:5] if s.get("return_5d", 0) > 0]
     bottom_performers = [s for s in sectors[-5:] if s.get("return_5d", 0) < 0]
 
-    signal_concentration = 0.0
+    signal_dispersion = 0.0
     if sectors and any(s.get("signals") for s in sectors):
         all_ratios = [
             data.get("buy_ratio", 0)
@@ -98,14 +98,14 @@ def build_sector_overview() -> dict:
         ]
         if all_ratios:
             import numpy as np
-            signal_concentration = round(float(np.std(all_ratios)), 4)
+            signal_dispersion = round(float(np.std(all_ratios)), 4)
 
     return {
         "sectors": sectors,
         "total_sectors": len(sectors),
         "top_performers": top_performers,
         "bottom_performers": bottom_performers,
-        "signal_concentration": signal_concentration,
+        "signal_dispersion": signal_dispersion,
         "data_source": source_summary(sectors),
         "capital_source": capital_source_summary(sectors),
         "freshness": {

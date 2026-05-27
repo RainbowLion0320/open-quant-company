@@ -131,6 +131,8 @@ def test_sector_overview_exposes_turnover_fields_for_block_map(monkeypatch, tmp_
     sector = overview["sectors"][0]
 
     assert overview["capital_source"] == "proxy"
+    assert "signal_dispersion" in overview
+    assert "signal_concentration" not in overview
     for key in ("turnover_amount", "amount_5d_avg", "amount_share", "amount_source"):
         assert key in sector
     assert sector["amount_5d_avg"] == 340.0
