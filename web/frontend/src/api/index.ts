@@ -365,6 +365,15 @@ export interface SectorSignal {
   top_symbol: string;
 }
 
+export interface SectorConstituent {
+  symbol: string;
+  name: string;
+  amount: number;
+  return_5d: number;
+  weight: number;
+  kind: "stock" | "others";
+}
+
 export interface SectorCard {
   sector_code: string;
   sector_name: string;
@@ -375,8 +384,13 @@ export interface SectorCard {
   return_60d: number;
   volatility: number;
   member_count: number;
+  turnover_amount: number;
+  amount_5d_avg: number;
+  amount_share: number;
+  amount_source: string;
   data_source: string;
   signals: Record<string, SectorSignal>;
+  constituents: SectorConstituent[];
 }
 
 export interface SectorOverviewResponse {
@@ -386,6 +400,7 @@ export interface SectorOverviewResponse {
   bottom_performers: SectorCard[];
   signal_concentration: number;
   data_source: string;
+  capital_source: string;
   freshness: { performance: string; signals: string };
 }
 

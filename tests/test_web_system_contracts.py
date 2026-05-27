@@ -47,6 +47,25 @@ def test_macro_gdp_tushare_normalizes_quarter_to_date():
     assert factors["macro_gdp_yoy"] == 4.8
 
 
+def test_macro_money_supply_normalizes_chinese_month_to_date():
+    from data.fetchers.macro import MacroFetcher
+
+    raw = pd.DataFrame({
+        "月份": ["2026年04月份", "2026年03月份"],
+        "货币和准货币(M2)-数量(亿元)": [3530425.21, 3492159.91],
+        "货币和准货币(M2)-同比增长": [8.6, 9.0],
+        "货币(M1)-数量(亿元)": [1145833.73, 1159258.82],
+        "货币(M1)-同比增长": [5.0, 5.9],
+        "流通中的现金(M0)-数量(亿元)": [147477.38, 151436.41],
+        "流通中的现金(M0)-同比增长": [12.2, 14.1],
+    })
+
+    df = MacroFetcher()._normalize("money_supply", raw, source="akshare")
+
+    assert df["date"].tolist() == [pd.Timestamp("2026-04-01"), pd.Timestamp("2026-03-01")]
+    assert df["M2_yoy"].tolist() == [8.6, 9.0]
+
+
 def test_db_health_scans_new_registry_dimensions(tmp_path, monkeypatch):
     from data.datahub import DataHub, reset_datahub
 
@@ -235,3 +254,45 @@ def test_market_view_surfaces_regime_stability_state():
     assert 'key: "above-ma20"' in gauge_block
     assert 'key: "liquidity"' not in gauge_block
     assert 'key: "capacity"' not in gauge_block
+
+
+def test_market_macro_panel_supports_six_indicator_layout():
+    market = Path("web/frontend/src/views/Market.vue").read_text(encoding="utf-8")
+
+    assert "GDP · PMI · CPI · LIQUIDITY · PROFIT" in market
+    assert 'm.key === "m1_m2_spread"' in market
+    assert 'm.key === "ppi_cpi_spread"' in market
+
+    grid_block = market.split(".macro-grid {", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in grid_block
+
+    card_block = market.split(".macro-grid article {", 1)[1].split("}", 1)[0]
+    assert "min-height: 88px;" in card_block
+
+
+def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
+    sectors = Path("web/frontend/src/views/Sectors.vue").read_text(encoding="utf-8")
+    api = Path("web/frontend/src/api/index.ts").read_text(encoding="utf-8")
+
+    assert "sectorBlockTiles" in sectors
+    assert "sector-block-grid" in sectors
+    assert "industry-block" in sectors
+    assert "stock-block" in sectors
+    assert "sectorBlockSpan" in sectors
+    assert "stockSquareSpan" in sectors
+    assert "gridColumn: `span ${tile.span}`" in sectors
+    assert "gridRow: `span ${tile.span}`" in sectors
+    assert "gridColumn: `span ${child.spanX}`" in sectors
+    assert "gridRow: `span ${child.spanY}`" in sectors
+    assert "is-others" in sectors
+    assert "sectorBlockSizeClass" not in sectors
+    assert "splitTreemap" not in sectors
+    assert "linear-gradient" not in sectors
+    assert "backgroundColor: tone.backgroundColor" in sectors
+    assert "boxShadow: tone.boxShadow" in sectors
+    assert "资金热力" in sectors
+    assert "动量热力" in sectors
+    assert "信号热力" in sectors
+    assert "amount_5d_avg" in api
+    assert "amount_share" in api
+    assert "constituents" in api

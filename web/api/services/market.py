@@ -56,6 +56,9 @@ def _load_macro(name: str) -> pd.DataFrame | None:
         return None
     try:
         df = HUB.read_parquet(path)
+        if name == "money_supply":
+            cache_timestamp = pd.Timestamp(path.stat().st_mtime, unit="s")
+            df = _restore_money_supply_dates(df, reference_date=cache_timestamp)
         if "date" not in df.columns:
             date_col = next((c for c in df.columns if "date" in str(c).lower() or "日期" in str(c)), None)
             if date_col:
@@ -66,6 +69,32 @@ def _load_macro(name: str) -> pd.DataFrame | None:
         return df.dropna(subset=["date"]).sort_values("date")
     except Exception:
         return None
+
+
+def _last_complete_month_start(reference_date: pd.Timestamp | None = None) -> pd.Timestamp:
+    reference = pd.Timestamp.today().normalize() if reference_date is None else pd.Timestamp(reference_date).normalize()
+    return reference.replace(day=1) - pd.DateOffset(months=1)
+
+
+def _restore_money_supply_dates(
+    df: pd.DataFrame,
+    reference_date: pd.Timestamp | None = None,
+) -> pd.DataFrame:
+    """Repair legacy money_supply cache rows whose AKShare month column became NaT."""
+    if "date" not in df.columns or len(df) == 0:
+        return df
+
+    dates = pd.to_datetime(df["date"], errors="coerce")
+    if not dates.isna().all():
+        out = df.copy()
+        out["date"] = dates
+        return out
+
+    out = df.copy()
+    latest = _last_complete_month_start(reference_date)
+    inferred = pd.date_range(end=latest, periods=len(out), freq="MS")
+    out["date"] = list(reversed(inferred))
+    return out
 
 
 def _quarter_to_date(q: str) -> str:
@@ -102,12 +131,68 @@ def _macro_card(key: str, label: str, df: pd.DataFrame | None, candidates: list[
     }
 
 
+def _empty_macro_card(key: str, label: str, unit: str = "%") -> dict:
+    return {"key": key, "label": label, "value": None, "prev": None, "unit": unit, "date": "", "series": []}
+
+
+def _macro_series_frame(df: pd.DataFrame | None, candidates: list[str]) -> pd.DataFrame:
+    if df is None or len(df) == 0 or "date" not in df.columns:
+        return pd.DataFrame(columns=["date", "value"])
+
+    col = next((c for c in candidates if c in df.columns), None)
+    if col is None:
+        return pd.DataFrame(columns=["date", "value"])
+
+    data = df[["date", col]].copy()
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    data["value"] = pd.to_numeric(data[col], errors="coerce")
+    return data.dropna(subset=["date", "value"])[["date", "value"]].sort_values("date")
+
+
+def _spread_card(
+    key: str,
+    label: str,
+    left_df: pd.DataFrame | None,
+    left_candidates: list[str],
+    right_df: pd.DataFrame | None,
+    right_candidates: list[str],
+    unit: str = "%",
+) -> dict:
+    left = _macro_series_frame(left_df, left_candidates)
+    right = _macro_series_frame(right_df, right_candidates)
+    if left.empty or right.empty:
+        return _empty_macro_card(key, label, unit)
+
+    merged = left.merge(right, on="date", how="inner", suffixes=("_left", "_right"))
+    if merged.empty:
+        return _empty_macro_card(key, label, unit)
+
+    merged["spread"] = merged["value_left"] - merged["value_right"]
+    return _macro_card(key, label, merged[["date", "spread"]], ["spread"], unit)
+
+
+def _money_supply_spread_card(df: pd.DataFrame | None) -> dict:
+    if df is None or len(df) == 0 or not {"M1_yoy", "M2_yoy"}.issubset(df.columns):
+        return _empty_macro_card("m1_m2_spread", "M1-M2 Spread")
+
+    data = df.copy()
+    data["M1_yoy"] = pd.to_numeric(data["M1_yoy"], errors="coerce")
+    data["M2_yoy"] = pd.to_numeric(data["M2_yoy"], errors="coerce")
+    data["m1_m2_spread"] = data["M1_yoy"] - data["M2_yoy"]
+    return _macro_card("m1_m2_spread", "M1-M2 Spread", data, ["m1_m2_spread"])
+
+
 def macro_cards() -> list[dict]:
+    cpi = _load_macro("cpi")
+    ppi = _load_macro("ppi")
+    money_supply = _load_macro("money_supply")
     return [
         _macro_card("gdp", "GDP YoY", _load_macro("gdp"), ["gdp_yoy", "GDP_同比", "今值"]),
         _macro_card("pmi", "制造业 PMI", _load_macro("pmi"), ["pmi_mfg", "PMI010000", "今值"]),
-        _macro_card("cpi", "CPI YoY", _load_macro("cpi"), ["nt_yoy", "cpi_yoy", "CPI_全国_同比", "今值"]),
+        _macro_card("cpi", "CPI YoY", cpi, ["nt_yoy", "cpi_yoy", "CPI_全国_同比", "今值"]),
         _macro_card("shibor", "SHIBOR 7D", _load_macro("shibor"), ["1W", "1W-定价"]),
+        _money_supply_spread_card(money_supply),
+        _spread_card("ppi_cpi_spread", "PPI-CPI Spread", ppi, ["ppi_yoy"], cpi, ["nt_yoy", "cpi_yoy", "CPI_全国_同比", "今值"]),
     ]
 
 

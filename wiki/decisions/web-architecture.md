@@ -40,7 +40,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 | 页面 | 路由 | 功能 |
 |------|------|------|
 | 市场总览 | `/` | Regime 球体 + 核心指数相对强弱图 + 宏观快照 + 热门行业脉冲 |
-| 市场研究 | `/research` | 二级 tab: 行业雷达 + 个股搜索；`/stocks/:code` 保留为隐藏详情路由 |
+| 市场研究 | `/research` | 二级 tab: 行业雷达 + 个股搜索；行业雷达以行业资金方块矩阵为主视图，`/stocks/:code` 保留为隐藏详情路由 |
 | 策略实验室 | `/strategy-lab` | 二级 tab: 策略中心 + 信号历史 + 回测分析 |
 | 组合执行 | `/portfolio` | ★ PaperBroker 日频模拟: NAV权益曲线 + 持仓 + 交易记录 + 手动下单 |
 | 数据中台 | `/datahub` | DataRegistry 健康扫描 + 全量大小统计 + 按时间分段 + 单表修复 |
@@ -57,6 +57,10 @@ Market API 新增字段：
 - `freshness` — 数据新鲜度时间戳
 
 前端 Market.vue 采用 Command Center 布局，含 animated regime orb、居中纯数字 regime score、4 个核心小仪表盘（Risk Buffer / A-share Breadth / Index Trend / Above MA20）、Confirmed / Raw / Pending / Dwell 紧凑状态卡、核心指数相对强弱图、宏观快照行和热门行业脉冲。大图展示上证综指/沪深300/创业板指/科创50 的归一化强弱对比；全局页脚只显示 MODE / REGIME / FRESH 与系统健康状态，不再展示行情 ticker；策略明细归属策略实验室，行业页承载完整排名与信号分布，市场总览只保留 Top5 热点概览，避免重复缩略看板。
+
+### 行业雷达方块矩阵 (2026-05-27)
+
+Sectors.vue 在行业排名表上方增加行业资金方块矩阵。每个申万一级行业是独立方块，边长按 `amount_5d_avg`（近 5 日平均成交额）开方映射，保持方形且让面积近似表达资金量；颜色可在资金热力（5日涨跌幅）、动量热力（20日涨跌幅）、信号热力（策略买入集中度）之间切换。`data/sectors.py` 从申万行业指数成交额或成员股 OHLCV `amount` 聚合资金字段；`web/api/services/sectors.py` 为每个行业补充 Top 5 成分股与“其他”子方块。Top 5 子块保持正方形并按权重映射面积，“其他”允许用矩形补齐剩余空间。缺失时前端回退成份股数量并标注口径。点击行业方块沿用原行业详情展开，不把方块矩阵当作精确数值表替代品。
 
 ### 系统信息 (2026-05-21 升级, 2026-05-23 边界明确)
 

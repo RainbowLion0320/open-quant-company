@@ -44,7 +44,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | 路由 | 页面 | 功能 |
 |------|------|------|
 | `/` | 市场总览 | Regime 球体 + 数值分数 + 4 个小仪表盘 + 状态卡 + 核心指数相对强弱图 + 宏观快照 + 热门行业脉冲 |
-| `/research` | 市场研究 | 二级 tab: 行业雷达、个股搜索；个股详情仍使用隐藏路由 `/stocks/:code` |
+| `/research` | 市场研究 | 二级 tab: 行业雷达、个股搜索；行业雷达以行业资金方块矩阵为主视图，个股详情仍使用隐藏路由 `/stocks/:code` |
 | `/strategy-lab` | 策略实验室 | 二级 tab: 策略中心、信号历史、回测分析 |
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
 | `/datahub` | 数据中台 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
@@ -58,6 +58,12 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 - 中部保留 4 个核心小仪表盘：Risk Buffer、A-share Breadth、Index Trend、Above MA20。
 - 稳定性状态以紧凑状态卡展示 Confirmed / Raw / Pending / Dwell；Pending 空闲时显示 `—`，有候选时显示 `x/y`。
 - 全局页脚只展示 MODE / REGIME / FRESH 与系统健康状态，不再承担行情 ticker 或点位/日涨跌展示。
+
+**市场研究行业雷达契约：**
+
+- `GET /api/sectors/overview` 返回 `turnover_amount`、`amount_5d_avg`、`amount_share`、`amount_source` 和 `capital_source`，供前端表达行业资金分布。
+- 行业雷达主视图为行业资金方块矩阵：每个申万一级行业是独立方块，边长按近 5 日平均成交额开方映射，保持方形且让面积近似表达资金量；缺失时回退成份股数量并在 UI 标注口径。
+- 每个行业方块内部展示 Top 5 成分股与“其他”子块；Top 5 使用权重驱动的正方形子块，“其他”允许用矩形补齐剩余空间。方块矩阵支持资金热力、动量热力、信号热力三种模式。点击行业方块同步展开原有行业详情，不替代精确排名表。
 
 ### 2.2 后端架构 (FastAPI)
 

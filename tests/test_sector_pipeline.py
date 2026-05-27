@@ -362,6 +362,60 @@ def test_get_sector_momentum_cache(tmp_path, monkeypatch):
     assert result["房地产"]["return_60d"] == -0.10
 
 
+def test_sector_performance_aggregates_turnover_amount_from_member_ohlcv(tmp_path, monkeypatch):
+    from data import sectors
+
+    hub = _patch_hub_store(tmp_path, monkeypatch)
+    monkeypatch.setattr(sectors, "SW_INDUSTRIES", {"801780": "银行", "801750": "计算机"})
+
+    mem_path = tmp_path / "sector_membership.parquet"
+    mem = pd.DataFrame({
+        "symbol": ["000001", "000002", "000003"],
+        "sector_code": ["801780", "801780", "801750"],
+        "sector_name": ["银行", "银行", "计算机"],
+        "sector_level": [1, 1, 1],
+    })
+    hub.write_parquet(mem, mem_path)
+
+    dates = pd.date_range("2026-05-18", periods=5, freq="B")
+
+    def stock_frame(close: float, amounts: list[float]) -> pd.DataFrame:
+        return pd.DataFrame({
+            "date": [str(d.date()) for d in dates],
+            "close": [close, close * 1.01, close * 1.02, close * 1.03, close * 1.04],
+            "amount": amounts,
+            "volume": [1000, 1000, 1000, 1000, 1000],
+        })
+
+    frames = {
+        "000001": stock_frame(10, [100, 110, 120, 130, 140]),
+        "000002": stock_frame(20, [200, 210, 220, 230, 240]),
+        "000003": stock_frame(30, [50, 60, 70, 80, 90]),
+    }
+    for symbol, frame in frames.items():
+        hub.write_parquet(frame, tmp_path / f"ohlcv_daily_{symbol}.parquet")
+
+    def mock_dim_path(dim, **kw):
+        if dim == "sector_membership":
+            return mem_path
+        if dim == "ohlcv_daily":
+            return tmp_path / f"ohlcv_daily_{kw['symbol']}.parquet"
+        return tmp_path / f"{dim}_{kw.get('symbol', '')}.parquet"
+
+    monkeypatch.setattr(hub, "dimension_path", mock_dim_path)
+
+    perf = sectors.build_sector_performance(hub, lookback_days=5)
+    bank = perf[perf["sector_name"] == "银行"].iloc[0]
+    tech = perf[perf["sector_name"] == "计算机"].iloc[0]
+
+    assert bank["turnover_amount"] == 380.0
+    assert bank["amount_5d_avg"] == 340.0
+    assert bank["amount_source"] == "proxy"
+    assert round(bank["amount_share"], 4) == round(340.0 / 410.0, 4)
+    assert tech["turnover_amount"] == 90.0
+    assert tech["amount_5d_avg"] == 70.0
+
+
 def test_lookup_sector_from_membership(tmp_path, monkeypatch):
     from signals import multifactor as mf
     from data import datahub
@@ -419,7 +473,9 @@ def test_sector_overview_fields(api_client):
     if data["sectors"]:
         s = data["sectors"][0]
         for key in ("sector_code", "sector_name", "rank", "return_1d", "return_5d",
-                     "return_20d", "return_60d", "volatility", "member_count", "data_source"):
+                     "return_20d", "return_60d", "volatility", "member_count",
+                     "turnover_amount", "amount_5d_avg", "amount_share", "amount_source",
+                     "data_source"):
             assert key in s, f"missing field {key}"
 
 

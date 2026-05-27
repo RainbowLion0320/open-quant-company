@@ -83,6 +83,21 @@ def _quarter_to_date(value) -> pd.Timestamp:
     return parsed
 
 
+def _month_to_date(value) -> pd.Timestamp:
+    """Convert labels such as 2026年04月份/202604/2026-04 to month-start date."""
+    text = str(value).strip()
+    match = re.search(r"(\d{4})\D*([01]?\d)", text)
+    if match:
+        year = int(match.group(1))
+        month = int(match.group(2))
+        if 1 <= month <= 12:
+            return pd.Timestamp(year=year, month=month, day=1)
+    parsed = pd.to_datetime(text, errors="coerce")
+    if pd.isna(parsed):
+        return pd.NaT
+    return pd.Timestamp(year=parsed.year, month=parsed.month, day=1)
+
+
 class MacroFetcher:
     """宏观经济数据获取器 (Tushare优先, AKShare兜底)"""
 
@@ -178,7 +193,7 @@ class MacroFetcher:
                     "流通中的现金(M0)-数量(亿元)": "M0_stock",
                     "流通中的现金(M0)-同比增长": "M0_yoy",
                 })
-            raw["date"] = pd.to_datetime(raw["date"], errors="coerce")
+            raw["date"] = raw["date"].apply(_month_to_date)
             return raw[[c for c in ["date", "M2_stock", "M2_yoy", "M1_stock", "M1_yoy", "M0_stock", "M0_yoy"] if c in raw.columns]]
 
         if name == "pmi":

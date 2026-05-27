@@ -84,7 +84,7 @@
 | 5.10 | 前端构建无大 chunk 警告 | `web/frontend/vite.config.ts` | — | — | `npm run build` 无 >500KB chunk 警告 | OK | — |
 | 5.11 | System monitor (CPU/MEM/DISK) | `web/api/routes/system.py` | `test_web_system_contracts.py` | `/system?tab=monitor` → `ActivityMonitor.vue` | 资源面板 + DeepSeek 用量 + Top 进程 + API Health/Services/Cron Jobs | OK | — |
 | 5.12 | Monitor/Settings 职责边界清晰 | `ActivityMonitor.vue` + `Settings.vue` | — | `/system` tabs | Monitor 只读运行观测，不展示 Telegram/Data Sources 等配置摘要；Settings 含策略状态/风控/审计 | OK | — |
-| 5.13 | 行业雷达 Web 页面 | `Sectors.vue` + `web/api/routes/sectors.py` | — | `/research?tab=sectors` + `GET /api/sectors/*` | 申万行业排名表 + 信号分布；组合敞口归属组合执行页 | OK | — |
+| 5.13 | 行业雷达 Web 页面 | `Sectors.vue` + `web/api/routes/sectors.py`, `web/api/services/sectors.py`, `data/sectors.py` | `test_sector_pipeline.py`, `test_api_services.py`, `test_web_system_contracts.py` | `/research?tab=sectors` + `GET /api/sectors/*` | 行业资金方块矩阵主视图 + 行业面积按资金量映射 + Top5 正方形/其他补位子块 + 资金/动量/信号热力切换 + 申万行业排名表 + 信号分布；组合敞口归属组合执行页 | OK | — |
 
 ## 6. 多资产架构 (Multi-Asset)
 
@@ -99,7 +99,7 @@
 | 6.7 | 多资产回测对比 | `backtest/multi_asset_tournament.py` | — | — | stock-only vs ETF-only vs multi 三组对比 | OK | proxy fallback 场景需持续标注 data_source |
 | 6.8 | 差异化费率 (A股/ETF/债券) | `broker/exchange.py` | — | — | A股印花税 0.1% vs ETF 免印花税 | OK | — |
 | 6.9 | 行业/板块数据维度 | `data/sectors.py` + `scripts/build_sector_snapshots.py` | — | `GET /api/sectors/*` | 申万行业指数 + 行业映射 + 信号聚合 + 敞口 | OK | — |
-| 6.10 | 行业 Web 雷达页面 | `web/frontend/src/views/Sectors.vue` | — | `/research?tab=sectors` | 申万行业排名表 + 信号分布 | OK | — |
+| 6.10 | 行业 Web 雷达页面 | `web/frontend/src/views/Sectors.vue` + `data/sectors.py` | `test_sector_pipeline.py`, `test_web_system_contracts.py` | `/research?tab=sectors` | 申万行业资金方块矩阵 + 按资金量映射面积 + Top5 正方形/其他补位子块 + 排名表 + 信号分布 | OK | — |
 
 ## 汇总
 

@@ -115,7 +115,7 @@
       <div class="macro-panel glass-card">
         <div class="panel-head">
           <span>MACRO INDICATORS</span>
-          <small>GDP · PMI · CPI · SHIBOR</small>
+          <small>GDP · PMI · CPI · LIQUIDITY · PROFIT</small>
         </div>
         <div class="macro-grid">
           <article v-for="m in macro" :key="m.key">
@@ -482,6 +482,8 @@ function sectorTag(sector: SectorCard) {
 function macroColor(m: MacroCard) {
   if (m.key === "pmi" && Number(m.value || 0) < 50) return "var(--warning)";
   if (m.key === "cpi" && Number(m.value || 0) < 0) return "var(--negative)";
+  if (m.key === "m1_m2_spread") return Number(m.value || 0) >= 0 ? "var(--positive)" : "var(--warning)";
+  if (m.key === "ppi_cpi_spread") return Number(m.value || 0) >= 0 ? "var(--positive)" : "var(--negative)";
   return "var(--accent)";
 }
 function riskColor(v: number | null | undefined) {
@@ -866,7 +868,7 @@ onUnmounted(() => {
   color: var(--text-disabled);
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
 }
 .index-summary {
   height: 46px;
@@ -1002,7 +1004,7 @@ onUnmounted(() => {
 }
 .microline {
   width: 100%;
-  margin-top: 10px;
+  margin-top: 6px;
 }
 .microline path {
   fill: none;
@@ -1011,22 +1013,22 @@ onUnmounted(() => {
 }
 .macro-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .macro-grid article {
-  min-height: 108px;
-  padding: 10px;
+  min-height: 88px;
+  padding: 8px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: rgba(0,0,0,0.12);
 }
 .macro-grid strong {
   display: block;
-  margin-top: 5px;
+  margin-top: 4px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 18px;
+  font-size: 16px;
 }
 .macro-grid em {
   display: block;
