@@ -15,12 +15,6 @@
               <span>Regime Score</span>
               <strong :style="{ color: regimeColor }">{{ displayScoreText }}</strong>
             </div>
-            <div class="regime-stability-strip" aria-label="Market Regime stability state">
-              <span><em>Confirmed</em><strong>{{ regimeStabilityState.confirmed }}</strong></span>
-              <span><em>Raw</em><strong>{{ regimeStabilityState.raw }}</strong></span>
-              <span><em>Pending</em><strong>{{ regimeStabilityState.pending }}</strong></span>
-              <span><em>Dwell</em><strong>{{ regimeStabilityState.dwell }}</strong></span>
-            </div>
           </div>
         </div>
         <div class="regime-gauge-grid">
@@ -39,6 +33,15 @@
               <span>{{ metric.value }}</span>
             </div>
             <strong>{{ metric.label }}</strong>
+          </div>
+          <div
+            v-for="(item, index) in regimeStatusCards"
+            :key="item.key"
+            class="regime-status-card is-inline"
+            :style="{ '--metric-index': index + regimeGaugeMetrics.length }"
+          >
+            <em>{{ item.label }}</em>
+            <strong>{{ item.value }}</strong>
           </div>
         </div>
       </div>
@@ -325,18 +328,15 @@ const regimeStabilityState = computed(() => {
     dwell,
   };
 });
-const regimeTrendStrength = computed(() => store.regime?.score_components?.trend_raw ?? null);
 const riskBuffer = computed(() => store.regime?.score_components?.risk_raw ?? null);
+const regimeTrendStrength = computed(() => store.regime?.score_components?.trend_raw ?? null);
 const aboveMa20Ratio = computed(() => store.regime?.breadth_detail?.above_ma20 ?? null);
-const liquidityPulse = computed(() => store.regime?.score_components?.amount_ratio_5_20 ?? null);
-const capacityMax = computed(() => Math.max(Number(store.positionCapacity?.max || 0), Number(displayPoolSize.value || 0), 1));
-const liquidityColor = computed(() => {
-  const v = Number(displayLiquidityPulse.value);
-  if (!Number.isFinite(v)) return "var(--text-disabled)";
-  if (v >= 1.2) return "var(--positive)";
-  if (v < 0.8) return "var(--warning)";
-  return "var(--accent)";
-});
+const regimeStatusCards = computed(() => [
+  { key: "confirmed", label: "Confirmed", value: regimeStabilityState.value.confirmed },
+  { key: "raw", label: "Raw", value: regimeStabilityState.value.raw },
+  { key: "pending", label: "Pending", value: regimeStabilityState.value.pending },
+  { key: "dwell", label: "Dwell", value: regimeStabilityState.value.dwell },
+]);
 const regimeGaugeMetrics = computed(() => [
   {
     key: "risk",
@@ -365,20 +365,6 @@ const regimeGaugeMetrics = computed(() => [
     value: fmtRatioPct(displayAboveMa20.value),
     percent: ratioGauge(displayAboveMa20.value),
     color: "var(--warning)",
-  },
-  {
-    key: "liquidity",
-    label: "Liquidity Pulse",
-    value: fmtRatioX(displayLiquidityPulse.value),
-    percent: ratioXGauge(displayLiquidityPulse.value),
-    color: liquidityColor.value,
-  },
-  {
-    key: "capacity",
-    label: "Position Cap",
-    value: fmtPositionCapacity(displayPoolSize.value, capacityMax.value),
-    percent: capacityGauge(displayPoolSize.value, capacityMax.value),
-    color: regimeColor.value,
   },
 ]);
 
@@ -473,26 +459,6 @@ function ratioGauge(v: number | null | undefined) {
   if (v == null || Number.isNaN(Number(v))) return 0;
   return clampGauge(Number(v) * 100);
 }
-function ratioXGauge(v: number | null | undefined) {
-  if (v == null || Number.isNaN(Number(v))) return 0;
-  return clampGauge((Number(v) / 1.5) * 100);
-}
-function capacityGauge(current: number | null | undefined, max: number | null | undefined) {
-  const c = Number(current);
-  const m = Number(max);
-  if (!Number.isFinite(c) || !Number.isFinite(m) || m <= 0) return 0;
-  return clampGauge((c / m) * 100);
-}
-function fmtRatioX(v: number | null | undefined) {
-  if (v == null || Number.isNaN(Number(v))) return "—";
-  return `${Number(v).toFixed(2)}x`;
-}
-function fmtPositionCapacity(current: number | null | undefined, max: number | null | undefined) {
-  const c = Number(current);
-  const m = Number(max);
-  if (!Number.isFinite(c) || !Number.isFinite(m) || m <= 0) return "—";
-  return `${Math.round(c)}/${Math.round(m)}`;
-}
 function fmtReturn(v: number) {
   return fmtSignedRatioPct(v);
 }
@@ -580,8 +546,6 @@ const displayBreadth = ref(0);
 const displayRiskBuffer = ref(0);
 const displayTrendStrength = ref(0);
 const displayAboveMa20 = ref(0);
-const displayLiquidityPulse = ref(0);
-const displayPoolSize = ref(0);
 const displayStrengthPct = ref(0);
 const macroDisplay: Record<string, { ref: ReturnType<typeof ref<number>> }> = {};
 
@@ -600,8 +564,6 @@ function animateMetrics() {
   tweenTo(displayBreadth, store.regime?.breadth ?? 0, 2, 500);
   tweenTo(displayTrendStrength, finiteOrZero(regimeTrendStrength.value), 2, 540);
   tweenTo(displayAboveMa20, finiteOrZero(aboveMa20Ratio.value), 2, 560);
-  tweenTo(displayLiquidityPulse, finiteOrZero(liquidityPulse.value), 2, 580);
-  tweenTo(displayPoolSize, store.poolSize ?? 0, 0, 500);
   tweenTo(displayStrengthPct, strengthLeader.value.change, 2, 500);
   for (const m of macro.value) {
     const v = Number(m.value);
@@ -804,41 +766,6 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 800;
 }
-.regime-stability-strip {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  width: min(100%, 280px);
-}
-.regime-stability-strip span {
-  min-width: 0;
-  padding: 6px 7px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.12);
-}
-.regime-stability-strip em,
-.regime-stability-strip strong {
-  display: block;
-  line-height: 1.1;
-}
-.regime-stability-strip em {
-  color: var(--text-disabled);
-  font-size: 8px;
-  font-style: normal;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.regime-stability-strip strong {
-  margin-top: 3px;
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  font-weight: 800;
-  text-overflow: ellipsis;
-}
 .regime-gauge-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -858,6 +785,45 @@ onUnmounted(() => {
   animation: regime-gauge-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(var(--metric-index) * 55ms);
   will-change: transform, opacity;
+}
+.regime-status-card {
+  min-height: 34px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.12);
+  animation: regime-gauge-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--metric-index) * 55ms);
+}
+.regime-status-card em,
+.regime-status-card strong {
+  min-width: 0;
+  line-height: 1.1;
+}
+.regime-status-card em {
+  flex: 0 1 auto;
+  color: var(--text-disabled);
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.regime-status-card strong {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 @keyframes regime-gauge-enter {
   from {
@@ -1190,7 +1156,8 @@ onUnmounted(() => {
   100% { transform: translateX(100%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .regime-gauge-card {
+  .regime-gauge-card,
+  .regime-status-card {
     animation: none;
   }
 }

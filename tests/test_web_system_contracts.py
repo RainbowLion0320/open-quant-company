@@ -202,11 +202,25 @@ def test_market_view_surfaces_regime_stability_state():
     market = Path("web/frontend/src/views/Market.vue").read_text(encoding="utf-8")
 
     assert "regimeStabilityState" in market
+    assert "regimeStatusCards" in market
     assert "raw_value" in market
     assert "pending_count" in market
     assert "min_dwell" in market
     assert "Confirmed" in market
     assert "Pending" in market
-    assert "{{ regimeStabilityState.dwell }}" in market
+    assert "{ key: \"dwell\", label: \"Dwell\", value: regimeStabilityState.value.dwell }" in market
+    assert "{{ item.value }}" in market
     assert "Idle" in market
     assert "stability.min_dwell ?? 1" not in market
+    assert "regime-stability-strip" not in market
+    assert "regime-status-card" in market
+    assert "regime-status-row" not in market
+    assert "regime-status-card is-inline" in market
+
+    gauge_block = market.split("const regimeGaugeMetrics = computed(() => [", 1)[1].split("]);", 1)[0]
+    assert 'key: "risk"' in gauge_block
+    assert 'key: "breadth"' in gauge_block
+    assert 'key: "trend"' in gauge_block
+    assert 'key: "above-ma20"' in gauge_block
+    assert 'key: "liquidity"' not in gauge_block
+    assert 'key: "capacity"' not in gauge_block
