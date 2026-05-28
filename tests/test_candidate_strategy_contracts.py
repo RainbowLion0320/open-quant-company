@@ -29,3 +29,25 @@ def test_cross_section_percentile_score_bounds():
     assert scores["a"] == 0.0
     assert scores["c"] == 100.0
     assert all(0.0 <= value <= 100.0 for value in scores.values())
+
+
+def test_candidate_strategy_runners_return_signal_rows_for_small_limit():
+    modules = [
+        "signals.candidates.trend_following",
+        "signals.candidates.donchian_breakout",
+        "signals.candidates.rps_relative_strength",
+        "signals.candidates.sector_rotation",
+        "signals.candidates.quality_value",
+        "signals.candidates.low_vol_defensive",
+        "signals.candidates.volume_confirmation",
+        "signals.candidates.regime_gated",
+    ]
+
+    for module_name in modules:
+        module = __import__(module_name, fromlist=["compute"])
+        rows = module.compute(limit=5)
+        assert isinstance(rows, list)
+        for row in rows:
+            assert {"symbol", "name", "industry", "score", "signal", "detail"}.issubset(row)
+            assert row["signal"] in {"buy", "hold", "sell"}
+            assert 0 <= row["score"] <= 100

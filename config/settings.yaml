@@ -285,6 +285,30 @@ signal_selection:
     ml_lgbm:
       min_score: 52
       max_buys: 80
+    trend_following:
+      min_score: 55
+      max_buys: 20
+    donchian_breakout:
+      min_score: 60
+      max_buys: 20
+    rps_relative_strength:
+      min_score: 55
+      max_buys: 20
+    sector_rotation:
+      min_score: 55
+      max_buys: 20
+    quality_value:
+      min_score: 55
+      max_buys: 20
+    low_vol_defensive:
+      min_score: 55
+      max_buys: 20
+    volume_confirmation:
+      min_score: 55
+      max_buys: 20
+    regime_gated:
+      min_score: 55
+      max_buys: 20
 ml:
   use_regime_models: true
   score_scale: 5.0
@@ -372,6 +396,94 @@ strategies:
     runner: signals.ml_signals:compute_ml_signals
     signal_name: ml_lgbm
     status: paper
+  trend_following:
+    color: '#38bdf8'
+    config_key: strategies.trend_following
+    enabled: true
+    label: 趋势跟随候选
+    runner: signals.candidates.trend_following:compute
+    signal_name: trend_following
+    status: candidate
+    strategy_type: timing
+    layer: candidate_alpha
+    data_requirements: [stock_daily]
+  donchian_breakout:
+    color: '#f97316'
+    config_key: strategies.donchian_breakout
+    enabled: true
+    label: Donchian突破候选
+    runner: signals.candidates.donchian_breakout:compute
+    signal_name: donchian_breakout
+    status: candidate
+    strategy_type: timing
+    layer: candidate_alpha
+    data_requirements: [stock_daily]
+  rps_relative_strength:
+    color: '#22c55e'
+    config_key: strategies.rps_relative_strength
+    enabled: true
+    label: RPS相对强弱候选
+    runner: signals.candidates.rps_relative_strength:compute
+    signal_name: rps_relative_strength
+    status: candidate
+    strategy_type: selection
+    layer: candidate_alpha
+    data_requirements: [stock_daily]
+  sector_rotation:
+    color: '#06b6d4'
+    config_key: strategies.sector_rotation
+    enabled: true
+    label: 行业轮动候选
+    runner: signals.candidates.sector_rotation:compute
+    signal_name: sector_rotation
+    status: candidate
+    strategy_type: sector_rotation
+    layer: candidate_alpha
+    data_requirements: [stock_daily, sector]
+  quality_value:
+    color: '#84cc16'
+    config_key: strategies.quality_value
+    enabled: true
+    label: 质量价值候选
+    runner: signals.candidates.quality_value:compute
+    signal_name: quality_value
+    status: candidate
+    strategy_type: selection
+    layer: candidate_alpha
+    data_requirements: [financials, valuation_daily]
+  low_vol_defensive:
+    color: '#a78bfa'
+    config_key: strategies.low_vol_defensive
+    enabled: true
+    label: 低波防御候选
+    runner: signals.candidates.low_vol_defensive:compute
+    signal_name: low_vol_defensive
+    status: candidate
+    strategy_type: selection
+    layer: defensive_alpha
+    data_requirements: [stock_daily]
+  volume_confirmation:
+    color: '#facc15'
+    config_key: strategies.volume_confirmation
+    enabled: true
+    label: 量能确认候选
+    runner: signals.candidates.volume_confirmation:compute
+    signal_name: volume_confirmation
+    status: candidate
+    strategy_type: selection
+    layer: confirmation_alpha
+    data_requirements: [stock_daily, moneyflow]
+  regime_gated:
+    color: '#fb7185'
+    config_key: strategies.regime_gated
+    enabled: true
+    label: Regime门控候选
+    runner: signals.candidates.regime_gated:compute
+    signal_name: regime_gated
+    status: candidate
+    strategy_type: portfolio
+    layer: risk_overlay
+    data_requirements: [market_regime, stock_daily]
 trading:
   commission:
     brokerage: 0.00025
