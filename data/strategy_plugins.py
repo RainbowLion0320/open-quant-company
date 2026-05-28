@@ -93,14 +93,18 @@ def get_strategy_plugin(name: str) -> StrategyPlugin | None:
     )
 
 
-def iter_strategy_plugins(selected: str = "all") -> Iterable[StrategyPlugin]:
+def iter_strategy_plugins(selected: str = "all", mode: str = "production") -> Iterable[StrategyPlugin]:
     valid = set(list_strategy_names()) | {"all"}
     if selected not in valid:
         raise ValueError(f"Invalid strategy: {selected}. Choose from: {', '.join(sorted(valid))}")
+    if mode not in {"production", "research"}:
+        raise ValueError(f"Invalid strategy runtime mode: {mode}")
 
     for item in get_enabled_strategies():
         name = item["name"]
         if selected not in ("all", name):
+            continue
+        if mode == "production" and item.get("status", "candidate") != "production":
             continue
         plugin = get_strategy_plugin(name)
         if plugin:
@@ -120,10 +124,11 @@ def run_registered_strategies(
     selected: str = "all",
     limit: int = 0,
     progress_callback: Callable[[int, int, str], None] | None = None,
+    mode: str = "production",
 ) -> list[dict]:
-    plugins = list(iter_strategy_plugins(selected))
+    plugins = list(iter_strategy_plugins(selected, mode=mode))
     if not plugins:
-        raise ValueError(f"No enabled strategy plugin found for: {selected}")
+        raise ValueError(f"No enabled strategy plugin found for: {selected} (mode={mode})")
     total = max(len(plugins), 1)
     for idx, plugin in enumerate(plugins, 1):
         if progress_callback:

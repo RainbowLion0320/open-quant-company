@@ -51,17 +51,20 @@ def main():
     parser.add_argument('--limit', type=int, default=0, help='Limit to N stocks (0=all)')
     parser.add_argument('--skip-quality-gate', action='store_true', help='Skip pre-scan data freshness check')
     parser.add_argument('--allow-candidate', action='store_true', help='Allow candidate/validated strategies (dev/testing)')
+    parser.add_argument('--mode', choices=['production', 'research'], default='production', help='Strategy runtime mode')
     args = parser.parse_args()
+    if args.allow_candidate:
+        args.mode = 'research'
 
     start = time.time()
-    print(f"Compute signals: strategy={args.strategy}")
+    print(f"Compute signals: strategy={args.strategy} mode={args.mode}")
 
     # P2-12: Status gate — only production strategies produce production signals
-    if args.strategy != "all" and not args.allow_candidate:
+    if args.mode == "production" and args.strategy != "all":
         st = get_status(args.strategy)
         if not can_run_production(args.strategy):
             print(f"  ⛔ Strategy '{args.strategy}' status={st} ({status_label(st)}) — not production. Skipping.")
-            print(f"  Use --allow-candidate to bypass this gate for development/testing.")
+            print(f"  Use --mode research to run candidate/validated strategies for development/testing.")
             return
         print(f"  ✅ Strategy '{args.strategy}' status={st} ({status_label(st)}) — production ✓")
 
@@ -85,7 +88,7 @@ def main():
     reset_db()
     init()
 
-    run_registered_strategies(args.strategy, limit=args.limit)
+    run_registered_strategies(args.strategy, limit=args.limit, mode=args.mode)
 
     elapsed = time.time() - start
     print(f"\nTotal: {elapsed:.0f}s")
