@@ -242,6 +242,11 @@ class StrategyCatalogResponse(BaseModel):
     items: List[StrategyCatalogItemResponse]
     total: int
 
+class StrategyEvaluationSummaryResponse(BaseModel):
+    baselines: List[str]
+    status: str
+    note: str
+
 class StrategySignalsResponse(BaseModel):
     strategy: str = ""
     total: int = 0

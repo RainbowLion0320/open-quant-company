@@ -3,6 +3,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from web.api.models import (
     StrategyCatalogResponse,
+    StrategyEvaluationSummaryResponse,
     StrategyListResponse,
     StrategyRunRequest,
     StrategyRunResponse,
@@ -80,6 +81,18 @@ async def get_strategy_catalog():
 
     items = [item.__dict__ for item in catalog_items()]
     return {"items": items, "total": len(items)}
+
+
+@router.get("/evaluation", response_model=StrategyEvaluationSummaryResponse)
+async def get_strategy_evaluation_summary():
+    """Return evaluation evidence requirements for candidate promotion."""
+    from research.strategy_evaluation import required_baselines
+
+    return {
+        "baselines": required_baselines(),
+        "status": "research_required",
+        "note": "Candidate strategies require OOS, walk-forward, cost and regime evidence before promotion.",
+    }
 
 
 # ── 启动策略运行 ──────────────────────────────────────────
