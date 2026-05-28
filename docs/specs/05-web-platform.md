@@ -109,6 +109,10 @@ def get_db() -> Database:
     return db
 ```
 
+### 2.4 Agent-facing Control Plane
+
+`astroq` 是 Web/API 之外的本地控制平面，用于 agent、cron 和人工维护。CLI 只做编排：策略扫描仍走 `data.strategy_plugins`，数据修复仍走 `scripts.repair_table`，Web 服务仍走 `uvicorn web.api.app:create_app`。所有 agent 依赖命令必须支持 `--json`。
+
 ## 3. 数据流
 
 ```

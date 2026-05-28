@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 
 def test_cli_result_json_shape():
@@ -57,3 +58,13 @@ def test_validate_runtime_mode_rejects_invalid_mode():
         assert "Invalid runtime mode" in str(exc)
     else:
         raise AssertionError("invalid runtime mode should fail")
+
+
+def test_docs_describe_astroq_as_agent_control_plane():
+    docs = Path("docs/DOCUMENTATION.md").read_text(encoding="utf-8")
+    web_spec = Path("docs/specs/05-web-platform.md").read_text(encoding="utf-8")
+    acceptance = Path("docs/acceptance-matrix.md").read_text(encoding="utf-8")
+
+    assert "astroq" in docs
+    assert "Agent-facing Control Plane" in web_spec
+    assert "CLI Control Plane" in acceptance

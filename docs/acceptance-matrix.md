@@ -90,6 +90,7 @@
 | 5.12 | Monitor/Settings 职责边界清晰 | `ActivityMonitor.vue` + `Settings.vue` | — | `/system` tabs | Monitor 只读运行观测，不展示 Telegram/Data Sources 等配置摘要；Settings 含策略状态/风控/审计 | OK | — |
 | 5.13 | 行业雷达 Web 页面 | `Sectors.vue` + `web/api/routes/sectors.py`, `web/api/services/sectors.py`, `data/sectors.py` | `test_sector_pipeline.py`, `test_api_services.py`, `test_web_system_contracts.py` | `/research?tab=sectors` + `GET /api/sectors/*` | 行业资金方块矩阵主视图 + 行业面积按资金量映射 + 资金/动量/信号热力切换 + 申万行业排名表 + 行业级信号分布；不展示行业内具体股票；组合敞口归属组合执行页 | OK | — |
 | 5.14 | Strategy Lab 目录化 UI | `Strategies.vue`, `StrategyLab.vue`, `web/frontend/src/api/index.ts` | `test_web_system_contracts.py:test_strategy_lab_exposes_catalog_and_candidate_language` | `/strategy-lab?tab=strategies` + `GET /api/strategies/catalog` + `GET /api/strategies/evaluation` | 首屏展示策略目录、生命周期筛选、候选策略、生产隔离横幅和研究扫描动作 | OK | 需继续扩展 evidence artifact 下钻 |
+| 5.15 | CLI Control Plane | `astrolabe_cli/` | `test_cli_*.py` | `astroq health`, `astroq strategy catalog`, `astroq data status` | Agent 可通过 JSON 输出判断下一步动作 | OK | 继续扩大命令覆盖 |
 
 ## 6. 多资产架构 (Multi-Asset)
 
@@ -114,9 +115,9 @@
 | 信号系统 | 17 | 17 | 0 | 4 |
 | 回测引擎 | 10 | 10 | 0 | 4 |
 | 执行层 | 8 | 8 | 0 | 5 |
-| Web 平台 | 14 | 14 | 0 | 3 |
+| Web 平台 | 15 | 15 | 0 | 3 |
 | 多资产架构 | 10 | 10 | 0 | 3 |
-| **合计** | **72** | **72** | **0** | **23** |
+| **合计** | **73** | **73** | **0** | **23** |
 
 **维护说明:**
 

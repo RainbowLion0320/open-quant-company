@@ -43,19 +43,19 @@ clean: pyc-clean tmp-clean
 
 # 扫描全量股票 (日频 cron 标准入口)
 scan:
-	$(PYTHON) scripts/compute_signals.py
+	$(PYTHON) -m astrolabe_cli.main strategy run all --mode production
 
 # 三策略对比回测
 backtest:
-	$(PYTHON) backtest/run_all_strategies.py
+	$(PYTHON) -m astrolabe_cli.main backtest run
 
 # 市场状态检测
 regime:
-	$(PYTHON) -c "from cybernetics.orchestrator import QuantOrchestrator; o=QuantOrchestrator(); s=o.detect(); print(f'Regime: {s.regime.value} Score: {s.regime_score} | {s.index_ma_trend}')"
+	$(PYTHON) -m astrolabe_cli.main regime status
 
 # Web 仪表盘 (生产构建 + 启动)
 web: web-build
-	$(PYTHON) -m uvicorn web.api.app:create_app --factory --port 8501 --host 0.0.0.0
+	$(PYTHON) -m astrolabe_cli.main web serve --host 0.0.0.0 --port 8501
 
 # Web 开发模式 (直接启动，使用 Vite 前端)
 web-dev:
@@ -63,7 +63,7 @@ web-dev:
 
 # 前端构建
 web-build:
-	cd web/frontend && npm run build
+	$(PYTHON) -m astrolabe_cli.main web build
 
 # 停止 Web
 web-stop:
