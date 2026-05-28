@@ -5,12 +5,18 @@ import sys
 from collections.abc import Sequence
 
 from astrolabe_cli.commands.config import validate_config
+from astrolabe_cli.commands.backtest import run_backtest
 from astrolabe_cli.commands.data import repair as data_repair
 from astrolabe_cli.commands.data import status as data_status
+from astrolabe_cli.commands.docs import check_docs
 from astrolabe_cli.commands.health import run_health
+from astrolabe_cli.commands.regime import status as regime_status
+from astrolabe_cli.commands.regime import train_profit as regime_train_profit
 from astrolabe_cli.commands.strategy import catalog as strategy_catalog
 from astrolabe_cli.commands.strategy import evidence as strategy_evidence
 from astrolabe_cli.commands.strategy import run_strategy
+from astrolabe_cli.commands.web import build as web_build
+from astrolabe_cli.commands.web import serve as web_serve
 from astrolabe_cli.results import CliResult, ExitCode
 
 
@@ -74,6 +80,44 @@ def build_parser() -> argparse.ArgumentParser:
     data_repair_cmd.set_defaults(
         handler=lambda args: data_repair(args.table, args.limit, args.days, args.dry_run)
     )
+
+    regime = sub.add_parser("regime", help="Inspect and train Market Regime policy")
+    regime_sub = regime.add_subparsers(dest="regime_command", required=True)
+
+    regime_status_cmd = regime_sub.add_parser("status", help="Detect current Market Regime")
+    add_common_flags(regime_status_cmd)
+    regime_status_cmd.set_defaults(handler=lambda args: regime_status())
+
+    regime_train_cmd = regime_sub.add_parser("train-profit", help="Run Market Regime profit trainer")
+    regime_train_cmd.add_argument("--dry-run", action="store_true")
+    add_common_flags(regime_train_cmd)
+    regime_train_cmd.set_defaults(handler=lambda args: regime_train_profit(args.dry_run))
+
+    backtest = sub.add_parser("backtest", help="Run strategy backtests")
+    backtest_sub = backtest.add_subparsers(dest="backtest_command", required=True)
+    backtest_run_cmd = backtest_sub.add_parser("run", help="Run all or one strategy backtest")
+    backtest_run_cmd.add_argument("--strategy", default="")
+    backtest_run_cmd.add_argument("--dry-run", action="store_true")
+    add_common_flags(backtest_run_cmd)
+    backtest_run_cmd.set_defaults(handler=lambda args: run_backtest(args.strategy, args.dry_run))
+
+    docs = sub.add_parser("docs", help="Check documentation hygiene")
+    docs_sub = docs.add_subparsers(dest="docs_command", required=True)
+    docs_check_cmd = docs_sub.add_parser("check", help="Scan docs for known stale phrases")
+    add_common_flags(docs_check_cmd)
+    docs_check_cmd.set_defaults(handler=lambda args: check_docs())
+
+    web = sub.add_parser("web", help="Build or serve the Web UI")
+    web_sub = web.add_subparsers(dest="web_command", required=True)
+    web_build_cmd = web_sub.add_parser("build", help="Build Vite frontend assets")
+    web_build_cmd.add_argument("--dry-run", action="store_true")
+    add_common_flags(web_build_cmd)
+    web_build_cmd.set_defaults(handler=lambda args: web_build(args.dry_run))
+
+    web_serve_cmd = web_sub.add_parser("serve", help="Serve the Web API")
+    web_serve_cmd.add_argument("--host", default="0.0.0.0")
+    web_serve_cmd.add_argument("--port", type=int, default=8501)
+    web_serve_cmd.set_defaults(handler=lambda args: web_serve(args.host, args.port))
 
     return parser
 

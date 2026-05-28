@@ -402,6 +402,7 @@ if __name__ == "__main__":
     import argparse as _ap
     _parser = _ap.ArgumentParser()
     _parser.add_argument("--pipeline", action="store_true", help="Use pipeline-based backtest runner")
+    _parser.add_argument("--strategy", default="", help="Run one registered strategy by name")
     _args = _parser.parse_args()
 
     bt_cfg = _settings().get("backtest", {})
@@ -431,7 +432,13 @@ if __name__ == "__main__":
     }
 
     results = {}
-    for s in get_enabled_strategies():
+    enabled_strategies = get_enabled_strategies()
+    if _args.strategy:
+        enabled_strategies = [s for s in enabled_strategies if s["name"] == _args.strategy]
+        if not enabled_strategies:
+            raise SystemExit(f"Unknown or disabled strategy: {_args.strategy}")
+
+    for s in enabled_strategies:
         name = s["name"]
         scorer = _scorer_map.get(name)
         if scorer is None:
