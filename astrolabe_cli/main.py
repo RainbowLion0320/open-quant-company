@@ -5,6 +5,8 @@ import sys
 from collections.abc import Sequence
 
 from astrolabe_cli.commands.config import validate_config
+from astrolabe_cli.commands.data import repair as data_repair
+from astrolabe_cli.commands.data import status as data_status
 from astrolabe_cli.commands.health import run_health
 from astrolabe_cli.commands.strategy import catalog as strategy_catalog
 from astrolabe_cli.commands.strategy import evidence as strategy_evidence
@@ -55,6 +57,23 @@ def build_parser() -> argparse.ArgumentParser:
     strategy_evidence_cmd.add_argument("name")
     add_common_flags(strategy_evidence_cmd)
     strategy_evidence_cmd.set_defaults(handler=lambda args: strategy_evidence(args.name))
+
+    data = sub.add_parser("data", help="Inspect and repair local DataHub datasets")
+    data_sub = data.add_subparsers(dest="data_command", required=True)
+
+    data_status_cmd = data_sub.add_parser("status", help="Run DB health check")
+    add_common_flags(data_status_cmd)
+    data_status_cmd.set_defaults(handler=lambda args: data_status())
+
+    data_repair_cmd = data_sub.add_parser("repair", help="Repair one logical table")
+    data_repair_cmd.add_argument("table")
+    data_repair_cmd.add_argument("--limit", type=int, default=0)
+    data_repair_cmd.add_argument("--days", type=int, default=365)
+    data_repair_cmd.add_argument("--dry-run", action="store_true")
+    add_common_flags(data_repair_cmd)
+    data_repair_cmd.set_defaults(
+        handler=lambda args: data_repair(args.table, args.limit, args.days, args.dry_run)
+    )
 
     return parser
 
