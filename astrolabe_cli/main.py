@@ -6,6 +6,9 @@ from collections.abc import Sequence
 
 from astrolabe_cli.commands.config import validate_config
 from astrolabe_cli.commands.health import run_health
+from astrolabe_cli.commands.strategy import catalog as strategy_catalog
+from astrolabe_cli.commands.strategy import evidence as strategy_evidence
+from astrolabe_cli.commands.strategy import run_strategy
 from astrolabe_cli.results import CliResult, ExitCode
 
 
@@ -30,6 +33,28 @@ def build_parser() -> argparse.ArgumentParser:
     config_validate = config_sub.add_parser("validate", help="Validate settings and strategy registry")
     add_common_flags(config_validate)
     config_validate.set_defaults(handler=lambda args: validate_config())
+
+    strategy = sub.add_parser("strategy", help="Inspect and run registered strategies")
+    strategy_sub = strategy.add_subparsers(dest="strategy_command", required=True)
+
+    strategy_catalog_cmd = strategy_sub.add_parser("catalog", help="Show Strategy Catalog")
+    add_common_flags(strategy_catalog_cmd)
+    strategy_catalog_cmd.set_defaults(handler=lambda args: strategy_catalog())
+
+    strategy_run_cmd = strategy_sub.add_parser("run", help="Run a strategy through runtime gates")
+    strategy_run_cmd.add_argument("name", help="Strategy name or all")
+    strategy_run_cmd.add_argument("--mode", choices=["production", "research"], default="production")
+    strategy_run_cmd.add_argument("--limit", type=int, default=0)
+    strategy_run_cmd.add_argument("--dry-run", action="store_true")
+    add_common_flags(strategy_run_cmd)
+    strategy_run_cmd.set_defaults(
+        handler=lambda args: run_strategy(args.name, args.mode, args.limit, args.dry_run)
+    )
+
+    strategy_evidence_cmd = strategy_sub.add_parser("evidence", help="Show strategy evidence report path")
+    strategy_evidence_cmd.add_argument("name")
+    add_common_flags(strategy_evidence_cmd)
+    strategy_evidence_cmd.set_defaults(handler=lambda args: strategy_evidence(args.name))
 
     return parser
 
