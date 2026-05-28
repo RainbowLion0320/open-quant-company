@@ -42,9 +42,16 @@
     <section v-if="overview" class="sector-radar-layout">
       <div class="glass-card sector-map-card">
         <div class="sector-map-head">
-          <div>
-            <span>INDUSTRY CAPITAL MAP</span>
-            <strong>行业资金方块图</strong>
+          <div class="sector-map-heading">
+            <span class="sector-map-eyebrow">INDUSTRY CAPITAL MAP</span>
+            <div class="sector-map-title-row">
+              <strong>行业资金方块图</strong>
+              <div class="block-map-meta">
+                <span>面积: {{ blockSizeLabel }}</span>
+                <span>颜色: {{ activeBlockHeatMode?.metric }}</span>
+                <span>资金口径: {{ capitalSourceLabel }}</span>
+              </div>
+            </div>
           </div>
           <div class="block-mode-tabs" role="tablist" aria-label="行业热力模式">
             <button
@@ -55,11 +62,6 @@
               @click="blockHeatMode = mode.key"
             >{{ mode.label }}</button>
           </div>
-        </div>
-        <div class="block-map-meta">
-          <span>面积: {{ blockSizeLabel }}</span>
-          <span>颜色: {{ activeBlockHeatMode?.metric }}</span>
-          <span>资金口径: {{ capitalSourceLabel }}</span>
         </div>
         <div v-if="sectorBlockTiles.length" class="sector-block-grid" role="img" aria-label="申万一级行业独立方块矩阵">
           <button
@@ -76,11 +78,11 @@
             :data-tooltip="industryTooltip(tile)"
             @click="toggleSector(tile.sector)"
           >
-            <span class="industry-value-row">
+            <strong class="industry-amount">{{ formatAmount(tile.size) }}</strong>
+            <span class="industry-center-stack">
+              <span class="industry-name">{{ tile.sector.sector_name }}</span>
               <span class="industry-metric">{{ tile.metricLabel }}</span>
-              <strong>{{ formatAmount(tile.size) }}</strong>
             </span>
-            <span class="industry-name">{{ tile.sector.sector_name }}</span>
           </button>
         </div>
         <div v-else class="empty-state empty-state-compact">暂无可绘制的行业资金数据</div>
@@ -307,8 +309,8 @@ function sectorBlockSpan(size: number, maxSize: number) {
 }
 
 function industryNameFontSize(sizeRatio: number) {
-  const visualWeight = Math.sqrt(clampNumber(sizeRatio, 0, 1));
-  return `${(12 + visualWeight * 9.5).toFixed(1)}px`;
+  const visualWeight = Math.pow(clampNumber(sizeRatio, 0, 1), 0.8);
+  return `${(12 + visualWeight * 18).toFixed(1)}px`;
 }
 
 function industryTooltip(tile: SectorBlockTile) {
@@ -455,7 +457,11 @@ onMounted(fetchData);
   justify-content: space-between;
   gap: 14px;
 }
-.sector-map-head span {
+.sector-map-heading {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.sector-map-eyebrow {
   display: block;
   color: var(--text-disabled);
   font-size: 10px;
@@ -463,13 +469,22 @@ onMounted(fetchData);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.sector-map-head strong {
-  display: block;
+.sector-map-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-top: 3px;
+}
+.sector-map-title-row strong {
+  display: inline-flex;
+  flex: 0 0 auto;
   color: var(--text-primary);
   font-size: 15px;
+  line-height: 1.2;
 }
 .block-mode-tabs {
+  flex: 0 0 auto;
   display: inline-flex;
   gap: 4px;
   padding: 3px;
@@ -492,20 +507,24 @@ onMounted(fetchData);
   color: var(--accent);
 }
 .block-map-meta {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 10px 0;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
 }
 .block-map-meta span {
-  min-height: 22px;
-  padding: 0 8px;
+  min-height: 20px;
+  padding: 0 7px;
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--border-subtle);
   border-radius: 999px;
   color: var(--text-disabled);
   font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
 }
 .sector-block-grid {
   --block-cell: 78px;
@@ -515,15 +534,16 @@ onMounted(fetchData);
   grid-auto-rows: var(--block-cell);
   grid-auto-flow: dense;
   gap: var(--block-gap);
+  margin-top: 12px;
   align-items: stretch;
   justify-content: start;
 }
 .industry-block {
   position: relative;
   display: grid;
-  grid-template-rows: auto 1fr;
-  align-items: stretch;
-  gap: 8px;
+  grid-template-rows: 1fr;
+  align-items: center;
+  justify-items: center;
   min-height: 0;
   padding: 9px;
   border: 1px solid;
@@ -575,12 +595,15 @@ onMounted(fetchData);
 .industry-block.active {
   box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.45), 0 0 18px rgba(0, 212, 255, 0.16);
 }
-.industry-value-row {
+.industry-center-stack {
   min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  align-self: center;
+  justify-self: center;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
 }
 .industry-name {
   align-self: center;
@@ -596,8 +619,11 @@ onMounted(fetchData);
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-.industry-value-row strong {
-  justify-self: end;
+.industry-amount {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  z-index: 1;
   color: currentColor;
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
@@ -605,25 +631,25 @@ onMounted(fetchData);
   white-space: nowrap;
 }
 .industry-metric {
-  justify-self: start;
+  justify-self: center;
   color: currentColor;
   font-family: "JetBrains Mono", monospace;
-  font-size: clamp(13px, calc(var(--block-cell) / 5.4), 21px);
+  font-size: clamp(12px, calc(var(--block-cell) / 6.2), 18px);
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0;
+  text-align: center;
   white-space: nowrap;
 }
 .industry-block.span-1 .industry-metric,
-.industry-block.span-1 .industry-value-row strong {
+.industry-block.span-1 .industry-amount {
   display: none;
 }
 .industry-block.span-1 {
   padding: 7px;
 }
-.industry-block.span-1 .industry-value-row {
-  grid-template-columns: 1fr;
-  gap: 2px;
+.industry-block.span-1 .industry-center-stack {
+  gap: 0;
 }
 .row-active {
   background: rgba(0, 212, 255, 0.06) !important;
@@ -647,6 +673,10 @@ onMounted(fetchData);
 @media (max-width: 640px) {
   .sector-map-head {
     flex-direction: column;
+  }
+  .sector-map-title-row {
+    align-items: flex-start;
+    gap: 7px;
   }
   .block-mode-tabs {
     width: 100%;

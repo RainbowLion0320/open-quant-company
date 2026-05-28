@@ -315,15 +315,27 @@ def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
     assert "constituents" not in api
     assert "sectorStocks" not in api
 
+    map_head = sectors.split('class="sector-map-head"', 1)[1].split('class="sector-block-grid"', 1)[0]
+    assert 'class="sector-map-title-row"' in map_head
+    assert 'class="block-map-meta"' in map_head
+    assert map_head.index("行业资金方块图") < map_head.index('class="block-map-meta"')
+    assert map_head.index('class="block-map-meta"') < map_head.index('class="block-mode-tabs"')
+    assert '</div>\n        <div class="block-map-meta">' not in sectors
+
+    block_grid_style = sectors.split(".sector-block-grid {", 1)[1].split("}", 1)[0]
+    assert "margin-top: 12px;" in block_grid_style
+
 
 def test_sector_capital_blocks_prioritize_metric_then_centered_industry_name():
     sectors = Path("web/frontend/src/views/Sectors.vue").read_text(encoding="utf-8")
 
     block_template = sectors.split('class="industry-block"', 1)[1].split("</button>", 1)[0]
-    assert 'class="industry-value-row"' in block_template
+    assert 'class="industry-amount"' in block_template
+    assert 'class="industry-center-stack"' in block_template
     assert 'class="industry-name"' in block_template
+    assert 'class="industry-metric"' in block_template
     assert ':data-tooltip="industryTooltip(tile)"' in block_template
-    assert block_template.index('class="industry-value-row"') < block_template.index('class="industry-name"')
+    assert block_template.index('class="industry-name"') < block_template.index('class="industry-metric"')
     assert 'class="industry-code"' not in block_template
     assert "tile.sector.sector_code || 'SW1'" not in block_template
 
@@ -338,10 +350,18 @@ def test_sector_capital_blocks_prioritize_metric_then_centered_industry_name():
     assert "sizeRatio" in sectors
     assert "function industryNameFontSize" in sectors
     assert '"--industry-name-size": industryNameFontSize(tile.sizeRatio)' in sectors
-    assert "12 + visualWeight * 9.5" in sectors
+    assert "Math.pow(clampNumber(sizeRatio, 0, 1), 0.8)" in sectors
+    assert "12 + visualWeight * 18" in sectors
 
     metric_style = sectors.split(".industry-metric {", 1)[1].split("}", 1)[0]
     assert "--industry-name-size" not in metric_style
+    assert "justify-self: center;" in metric_style
+    assert "text-align: center;" in metric_style
+
+    stack_style = sectors.split(".industry-center-stack {", 1)[1].split("}", 1)[0]
+    assert "align-self: center;" in stack_style
+    assert "justify-self: center;" in stack_style
+    assert "align-items: center;" in stack_style
 
     tooltip_style = sectors.split(".industry-block::after {", 1)[1].split("}", 1)[0]
     assert "content: attr(data-tooltip);" in tooltip_style
