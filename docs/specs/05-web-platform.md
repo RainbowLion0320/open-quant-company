@@ -1,6 +1,6 @@
 # Spec: Web 平台 (Web Platform)
 
-> 版本: 2.1 | 更新: 2026-05-23 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
+> 版本: 2.2 | 更新: 2026-05-29 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
@@ -45,7 +45,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 |------|------|------|
 | `/` | 市场总览 | Regime 球体 + 数值分数 + 4 个小仪表盘 + 状态卡 + 核心指数相对强弱图 + 宏观快照 + 热门行业脉冲 |
 | `/research` | 市场研究 | 二级 tab: 行业雷达、个股搜索；行业雷达以行业资金方块矩阵为主视图，个股详情仍使用隐藏路由 `/stocks/:code` |
-| `/strategy-lab` | 策略实验室 | 二级 tab: 策略中心、信号历史、回测分析 |
+| `/strategy-lab` | 策略实验室 | 二级 tab: 策略目录、信号历史、回测证据 |
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
 | `/datahub` | 数据中台 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
 | `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、记忆图谱 |
@@ -65,6 +65,14 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 - 行业雷达主视图为行业资金方块矩阵：每个申万一级行业是独立方块，边长按近 5 日平均成交额开方映射，保持方形且让面积近似表达资金量；缺失时回退成份股数量并在 UI 标注口径。
 - 行业方块内部不展示具体股票，避免行业雷达变成个股看板；方块矩阵支持资金热力、动量热力、信号热力三种模式。点击行业方块同步展开行业级信号分布，不替代精确排名表。
 
+**策略实验室契约：**
+
+- 默认 tab 是 Strategy Catalog，对应 `GET /api/strategies/catalog`。
+- 首屏必须展示策略目录、生命周期、策略类型、研究层级、数据需求、最新扫描和动作。
+- 当存在 `candidate` / `validated` 策略时，必须展示生产隔离横幅：候选策略只允许研究扫描和回测，不参与生产信号。
+- 候选策略动作标记为“研究扫描”，前端调用 `POST /api/strategies/run` 时使用 `mode=research`；生产策略和“运行生产策略”使用 `mode=production`。
+- `GET /api/strategies/evaluation` 返回强基准和候选晋级证据要求，回测证据 tab 用于承接后续 artifact 下钻。
+
 ### 2.2 后端架构 (FastAPI)
 
 **应用工厂：** `web/api/__init__.py` → `create_app()` → 注册路由 + CORS + 异常处理
@@ -76,7 +84,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Market | `routes/market.py` | `GET /market`, `GET /market/regime` |
 | Stocks | `routes/stocks.py` | `GET /stocks/{code}`, `GET /stocks/{code}/kline` |
 | Signals | `routes/signals.py` | `GET /signals/changes`, `GET /signals/{strategy}` |
-| Strategies | `routes/strategies.py` | `GET /strategies`, `GET /strategies/{name}`, `GET /strategies/statuses`, `POST /strategies/run` |
+| Strategies | `routes/strategies.py` | `GET /strategies`, `GET /strategies/catalog`, `GET /strategies/evaluation`, `GET /strategies/{name}`, `GET /strategies/statuses`, `POST /strategies/run` |
 | Backtest | `routes/backtest.py` | `GET /backtest`, `GET /backtest/{key}` |
 | Portfolio | `routes/portfolio.py` | `GET /portfolio/positions`, `GET /portfolio/balance`, `POST /portfolio/order` |
 | Sectors | `routes/sectors.py` | `GET /sectors/overview`, `GET /sectors/exposure`, `GET /sectors/{industry}` |

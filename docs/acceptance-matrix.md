@@ -40,6 +40,9 @@
 | 2.12 | 因子研究诊断 | `signals/factor_research.py` | `test_strategy_research_governance.py:test_factor_diagnostics_rank_ic_quantile_spread_and_correlation_clusters` | — | 输出 IC/ICIR/分组收益 spread/相关性聚类 | OK | — |
 | 2.13 | Market Regime 离线训练与晋级 | `research/regime_training.py`, `scripts/train_market_regime.py` | `test_regime_training.py` | `reports/regime_training/summary.json` | champion/challenger、walk-forward、策略 A/B、默认不自动替换生产公式 | OK | — |
 | 2.14 | Market Regime 挣钱导向训练 | `research/regime_training.py`, `scripts/train_market_regime_profit.py`, `cybernetics/regime_policy.py` | `test_regime_profit_training.py` | `reports/regime_profit_training/summary.json` | 可交易资产 risk-on/risk-off、强 baseline、walk-forward OOS、champion 同标准诊断、best validated 选择，`w0611` 已晋级生产 champion 并由统一 production policy 常量约束 | OK | — |
+| 2.15 | Strategy Catalog 策略元数据权威目录 | `research/strategy_catalog.py`, `data/registry.py` | `test_strategy_catalog.py` | `GET /strategies/catalog` → `Strategies.vue` | 策略目录含类型、层级、生命周期、数据需求和输出契约 | OK | — |
+| 2.16 | 策略 runtime mode 生产隔离 | `data/strategy_plugins.py`, `scripts/compute_signals.py`, `web/api/jobs.py` | `test_strategy_runtime_gates.py` | `POST /strategies/run` (`mode=production/research`) | production 默认排除 candidate；Strategy Lab 候选按钮显式 research scan | OK | — |
+| 2.17 | 首批候选策略池 | `signals/candidates/*.py`, `config/settings.yaml` | `test_candidate_strategy_contracts.py` | `GET /strategies/catalog` | 8 个候选策略输出统一 StrategySignalRows，默认候选买入上限 ≤20 | OK | 需后续 OOS 实证 |
 
 ## 3. 回测引擎 (Backtest Engine)
 
@@ -54,6 +57,7 @@
 | 3.7 | 可插拔回测流水线 | `backtest/pipeline.py` | — | — | 自定义 Pipeline 组合 Data/Strategy/Selection/Risk/Execution | OK | 待补自动化测试 |
 | 3.8 | 基准使用上证综指 (非个股) | `config/settings.yaml` backtest.benchmark | — | — | 确认 benchmark=sh000001 (非 000001) | OK (已修复) | — |
 | 3.9 | 约束组合构建 | `pipeline/portfolio.py:ConstrainedPortfolioConstructor` | `test_strategy_research_governance.py:test_constrained_portfolio_constructor_caps_sector_and_single_name_weight` | — | Top-N 同时受单票/行业/总仓位上限约束 | OK | — |
+| 3.10 | 候选策略证据报告契约 | `research/strategy_evaluation.py`, `backtest/run_all_strategies.py` | `test_strategy_backtest_evidence.py`, `test_strategy_evaluation.py` | `data/store/research/strategy_evidence/*.json` | 报告含强基准、metrics、OOS、成本、regime breakdown 和 promotion decision | OK | 待接入更多真实 baseline 结果 |
 
 ## 4. 执行层 (Execution Layer)
 
@@ -85,6 +89,7 @@
 | 5.11 | System monitor (CPU/MEM/DISK) | `web/api/routes/system.py` | `test_web_system_contracts.py` | `/system?tab=monitor` → `ActivityMonitor.vue` | 资源面板 + DeepSeek 用量 + Top 进程 + API Health/Services/Cron Jobs | OK | — |
 | 5.12 | Monitor/Settings 职责边界清晰 | `ActivityMonitor.vue` + `Settings.vue` | — | `/system` tabs | Monitor 只读运行观测，不展示 Telegram/Data Sources 等配置摘要；Settings 含策略状态/风控/审计 | OK | — |
 | 5.13 | 行业雷达 Web 页面 | `Sectors.vue` + `web/api/routes/sectors.py`, `web/api/services/sectors.py`, `data/sectors.py` | `test_sector_pipeline.py`, `test_api_services.py`, `test_web_system_contracts.py` | `/research?tab=sectors` + `GET /api/sectors/*` | 行业资金方块矩阵主视图 + 行业面积按资金量映射 + 资金/动量/信号热力切换 + 申万行业排名表 + 行业级信号分布；不展示行业内具体股票；组合敞口归属组合执行页 | OK | — |
+| 5.14 | Strategy Lab 目录化 UI | `Strategies.vue`, `StrategyLab.vue`, `web/frontend/src/api/index.ts` | `test_web_system_contracts.py:test_strategy_lab_exposes_catalog_and_candidate_language` | `/strategy-lab?tab=strategies` + `GET /api/strategies/catalog` + `GET /api/strategies/evaluation` | 首屏展示策略目录、生命周期筛选、候选策略、生产隔离横幅和研究扫描动作 | OK | 需继续扩展 evidence artifact 下钻 |
 
 ## 6. 多资产架构 (Multi-Asset)
 
@@ -106,12 +111,12 @@
 | 能力域 | 总条目 | OK | 有缺口 | 待补测试 |
 |--------|-------|-----|--------|---------|
 | 数据管道 | 13 | 13 | 0 | 4 |
-| 信号系统 | 14 | 14 | 0 | 3 |
-| 回测引擎 | 9 | 9 | 0 | 3 |
+| 信号系统 | 17 | 17 | 0 | 4 |
+| 回测引擎 | 10 | 10 | 0 | 4 |
 | 执行层 | 8 | 8 | 0 | 5 |
-| Web 平台 | 13 | 13 | 0 | 2 |
+| Web 平台 | 14 | 14 | 0 | 3 |
 | 多资产架构 | 10 | 10 | 0 | 3 |
-| **合计** | **67** | **67** | **0** | **20** |
+| **合计** | **72** | **72** | **0** | **23** |
 
 **维护说明:**
 

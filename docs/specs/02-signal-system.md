@@ -1,16 +1,17 @@
 # Spec: 信号系统 (Signal System)
 
-> 版本: 1.1 | 更新: 2026-05-23 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Backtest Engine](03-backtest-engine.md)
+> 版本: 1.2 | 更新: 2026-05-29 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Backtest Engine](03-backtest-engine.md)
 
 ## 1. 概述
 
-信号系统是量化策略的核心——从原始数据生成交易信号（买/卖/持有）。四种策略仍可独立运行，但研究定位不再是简单平级：Buffett 是质量过滤层，Multifactor 是主 Alpha，ML 是辅助 Alpha，Cybernetic 是 regime 风险覆盖层。每日输出信号到 `data/store/signals/{strategy}.parquet`，供回测引擎和执行层消费。
+信号系统是量化策略的核心——从原始数据生成交易信号（买/卖/持有）。策略元数据以 Strategy Catalog 为 UI 和研究工作流的权威目录，生产策略和候选策略共享统一运行契约，但生命周期和运行模式严格隔离：Buffett 是质量过滤层，Multifactor 是主 Alpha，ML 是辅助 Alpha，Cybernetic 是 regime 风险覆盖层；新增候选策略只允许研究扫描、回测和证据沉淀。每日生产扫描输出信号到 `data/store/signals/{strategy}.parquet`，供回测引擎和执行层消费。
 
 **设计原则：**
 - **策略独立性** — 每种策略可独立运行、独立回测、独立对比（锦标赛模式）
 - **可解释性** — 巴菲特策略输出自然语言判定理由，ML 策略输出特征重要性
 - **因子复用** — DSL 表达式引擎使因子可声明式组合，LLM 可发现新因子
 - **研究晋级** — 策略进入 paper / production 前必须通过 OOS、风险收益、IC/ICIR、换手和交易次数门槛
+- **生产隔离** — `candidate` / `validated` 是研究状态，不参与默认生产信号；生产扫描默认 `mode=production`，Strategy Lab 研究扫描显式使用 `mode=research`
 
 ## 2. 组件架构
 
@@ -45,6 +46,7 @@
 ┌─────────────────────────────────────────────────────┐
 │              Research Governance                     │
 │  research/strategy_governance.py — 策略分层 + 晋级门槛 │
+│  research/strategy_catalog.py — 策略目录 + 元数据契约  │
 │  signals/factor_research.py — IC/ICIR/分组收益/相关性 │
 └─────────────────────────────────────────────────────┘
 ```
@@ -154,6 +156,51 @@ Market Regime 生产公式保持确定性和可解释性，但不再只能靠人
 | cybernetic | risk_overlay | 市场状态、仓位、风险预算和资产配置 |
 
 晋级到 paper / production 前需要通过 `evaluate_promotion()` 门槛：OOS 月数、交易次数、Sharpe、最大回撤、换手、IC、ICIR。ML 当前默认为 `paper` 状态，除非 OOS 和 IC 证据达标，否则不标记 production。
+
+### 2.6.1 Strategy Catalog 与运行模式
+
+`research/strategy_catalog.py` 是策略元数据权威目录，前端 Strategy Lab、研究治理和候选策略扩展均以该目录为准。目录项至少包含：
+
+- `name` / `label`
+- `strategy_type`: `selection` / `timing` / `sector_rotation` / `portfolio` / `risk_overlay`
+- `layer`
+- `lifecycle`: `candidate` / `validated` / `paper` / `production` / `retired`
+- `data_requirements`
+- `output_contract`: 当前统一为 `StrategySignalRows`
+
+所有策略 runner 输出 `StrategySignalRows`：
+
+```python
+{
+    "symbol": "000001",
+    "name": "平安银行",
+    "industry": "银行",
+    "score": 82.5,
+    "signal": "buy",  # buy / hold / sell
+    "detail": {...},
+}
+```
+
+运行闸门：
+
+- `scripts/compute_signals.py` 默认 `--mode production`，只运行 `status=production` 的策略。
+- Strategy Lab 候选策略按钮使用 `mode=research`，允许 `candidate` / `validated` 参与研究扫描。
+- `all + production` 只代表生产全集，不代表候选策略全集。
+
+### 2.6.2 候选策略池
+
+首批候选策略注册在 `config/settings.yaml` → `strategies`，runner 位于 `signals/candidates/`：
+
+- 趋势跟随候选
+- Donchian 突破候选
+- RPS 相对强弱候选
+- 行业轮动候选
+- 质量价值候选
+- 低波防御候选
+- 量能确认候选
+- Regime 门控候选
+
+候选策略全部是 `status=candidate`，默认买入上限不超过 20，只能进入研究扫描、回测、证据报告和人工晋级流程。公式细节见 [Candidate Strategies](../strategies/candidate-strategies.md)。
 
 ### 2.7 因子 DSL (expression.py + dsl_parser.py)
 

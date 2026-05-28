@@ -1,6 +1,6 @@
 # Spec: 回测引擎 (Backtest Engine)
 
-> 版本: 1.0 | 日期: 2026-05-21 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md) [Execution Layer](04-execution-layer.md)
+> 版本: 1.1 | 日期: 2026-05-29 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md) [Execution Layer](04-execution-layer.md)
 
 ## 1. 概述
 
@@ -10,6 +10,7 @@
 - **PIT 零容忍** — 任何前视偏差都是 bug，不是 feature
 - **策略可插拔** — `backtest/strategies/` 下每个策略独立文件
 - **自研非 Backtrader** — 需要 PIT 特征存储和锦标赛对比，Backtrader 不满足
+- **证据先行** — 候选策略晋级必须有强基准、OOS、walk-forward、成本模型和 regime 分解证据
 
 ## 2. 组件架构
 
@@ -108,6 +109,24 @@ Pipeline([
 
 **默认基准：** 上证综指（`sh000001`），非个股（之前版本错误使用了平安银行 `000001`）。
 
+### 2.7 候选策略证据报告
+
+候选策略不能只凭单次收益曲线晋级。进入 `paper` 或 `production` 前必须输出证据报告并通过研究治理门槛：
+
+- 强基准比较：`buy_and_hold`、`fixed_weight`、`ma_timing`、`trend_only`、`trend_breadth`、`current_champion`
+- 样本外 OOS 月数与 walk-forward 结果
+- 成本模型：佣金、滑点、A 股交易约束
+- regime 分解：bull / sideways / bear 下的收益、回撤、交易频率
+- promotion decision：目标状态、是否通过、失败规则和理由
+
+证据报告写入：
+
+```text
+data/store/research/strategy_evidence/<strategy>.json
+```
+
+报告字段由 `research/strategy_evaluation.py` 统一构建，runner 只负责把回测结果映射到该契约。
+
 ## 3. 数据流
 
 ```
@@ -135,6 +154,9 @@ data/store/signals/*.parquet  (预计算信号)
              │
              ▼
     data/tournament/{date}.json
+             │
+             ▼
+    data/store/research/strategy_evidence/{strategy}.json
 ```
 
 ## 4. 关键设计决策
@@ -147,6 +169,7 @@ data/store/signals/*.parquet  (预计算信号)
 | 基准选择 | 上证综指 (sh000001) | 全市场代表性最强 |
 | 交易约束 | 100 股整数倍 + 手续费 | 模拟真实 A 股交易规则 |
 | 巴菲特评分 | 滚动窗口逐年评估 | 避免全局数据泄露 |
+| 候选晋级证据 | 统一 JSON artifact | 避免 UI、文档和研究脚本各自解释策略是否可晋级 |
 
 ## 5. 接口合约
 
@@ -197,6 +220,7 @@ report = FullReport(metrics, trades, monthly_returns)
 - **公式测试：** Sortino/Beta/Sharpe 计算结果与 `empyrical` 库对比（误差 < 1e-6）
 - **边界测试：** 单日回测、单只股票、负价格、全 NaN NAV
 - **回归测试：** 固定随机种子 + 固定数据，回测结果可复现
+- **证据测试：** `tests/test_strategy_backtest_evidence.py` 验证强基准和晋级门槛字段完整
 
 ## 8. 已知限制 & 未来方向
 
