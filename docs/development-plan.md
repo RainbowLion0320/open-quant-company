@@ -1,1127 +1,1432 @@
-# Strategy Lab Expansion Implementation Plan
+# CLI Control Plane Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把策略实验室从“四个内置策略展示页”升级为可扩展、可评估、可治理的策略研究平台，第一批引入 8 个候选策略原型，并确保候选策略不会绕过样本外和晋级门槛进入生产信号。
+**Goal:** Build a unified `astroq` CLI control plane so agents, cron jobs and local operators can inspect, validate, run and repair Astrolabe Quant OS through stable, JSON-capable commands.
 
-**Architecture:** 先建立 Strategy Catalog 和统一评估/晋级门禁，再扩展策略数量，最后改 Strategy Lab UI。所有新策略以 `candidate` 或 `validated` 生命周期接入，默认只用于研究扫描、回测和实验室展示，不参与生产信号、模拟盘或自动交易，直到证据门槛通过。
+**Architecture:** The CLI is an orchestration layer only. It must call existing domain modules in `data/`, `signals/`, `research/`, `backtest/`, `scripts/` and `web/` instead of duplicating business logic. Commands return a typed `CliResult`, support `--json`, use consistent exit codes, and require explicit flags for write or long-running actions.
 
-**Tech Stack:** Python 3.11、pandas、DuckDB/Parquet、FastAPI、Vue 3、ECharts、pytest、Vite。
+**Tech Stack:** Python 3.11, stdlib `argparse`, existing project modules, pytest, FastAPI/uvicorn for web serving, no new runtime dependency.
 
 ---
 
 ## Non-Negotiable Rules
 
-- 不直接把 GitHub 策略复制进生产；外部项目只作为策略设计参考。
-- 不新增无法回测、无法解释、无法评估的策略。
-- 不让 `candidate` / `validated` 策略被 `scripts/compute_signals.py --strategy all` 静默写入生产信号。
-- 不用当前未成熟策略结果反证新策略质量；必须跑 baseline、交易成本、OOS、walk-forward、regime 分层。
-- 不改实盘或模拟盘策略来源，除非晋级门禁明确通过且用户单独确认。
+- CLI must not bypass Strategy Catalog, runtime mode gates, DataHub paths, settings validation or existing safety rules.
+- CLI must not reimplement data fetching, strategy scoring, backtesting, regime training or web services.
+- Every command that can write data, start a long task, repair data, or run research must support `--dry-run` where meaningful and require explicit arguments.
+- Every command intended for agents must support `--json` with stable keys: `ok`, `command`, `data`, `message`, `errors`.
+- Default strategy execution mode is `production`; candidate strategy scans require `--mode research`.
+- Old scripts remain callable during transition, but docs and agent-facing examples must point to `astroq`.
+- Do not push commits unless the user explicitly asks.
 
-## External References To Read First
+## Command Name Decision
 
-- `https://github.com/hugo2046/QuantsPlaybook` — A股金工策略复现，重点参考择时、RPS、行业轮动、质量价值。
-- `https://github.com/microsoft/qlib` — 研究流水线、因子/模型/组合治理。
-- `https://github.com/tkfy920/qstock` — A股数据、RPS、MM趋势、资金流模型。
-- `https://github.com/fasiondog/hikyuu` — 策略组件化：环境、信号、止损、资金管理。
-- `https://github.com/freqtrade/freqtrade-strategies` — 技术指标策略模板和参数实验，不直接迁移交易制度。
+The public command name is `astroq`.
 
-## Current Baseline
+Name checks performed on 2026-05-29:
 
-现有活跃策略：
+- `npm view quant name --silent`: no exact package found, but `quant` is too generic and has high future collision risk.
+- `npm view astrolabe name --silent`: exact package exists, do not use.
+- `npm view astroq name --silent`: no exact package found.
+- `command -v astroq`: no local command found.
 
-- `buffett`：生产状态，质量/价值过滤层。
-- `multifactor`：生产状态，主 Alpha 横截面打分。
-- `cybernetic`：生产状态，当前被定位为风险覆盖/市场状态层。
-- `ml_lgbm`：模拟盘状态，辅助非线性 Alpha。
+Rationale: `astroq` is short, English, tied to Astrolabe Quant, and less likely to collide than generic names such as `quant` or taken names such as `astrolabe`.
 
-现有关键文件：
+## Target Command Surface
 
-- `config/settings.yaml`：策略注册配置。
-- `data/registry.py`：策略注册表和生命周期状态。
-- `data/strategy_plugins.py`：CLI 与 Web 任务统一策略调度入口。
-- `signals/runners.py`：生产策略 runner。
-- `signals/technical.py`、`signals/scoring.py`、`signals/selection.py`：技术因子、打分、买入选择。
-- `research/strategy_governance.py`：策略分层和晋级门禁。
-- `web/api/routes/strategies.py`、`web/api/routes/backtest.py`：策略实验室 API。
-- `web/frontend/src/views/StrategyLab.vue`、`Strategies.vue`、`Backtest.vue`、`Signals.vue`：策略实验室 UI。
-- `tests/test_registry_status.py`、`tests/test_strategy_research_governance.py`：当前治理测试。
-
----
+```bash
+astroq --help
+astroq health [--json]
+astroq config validate [--json]
+astroq data status [--json]
+astroq data repair <table> [--limit N] [--days N] [--dry-run] [--json]
+astroq strategy catalog [--json]
+astroq strategy run <name|all> [--mode production|research] [--limit N] [--dry-run] [--json]
+astroq strategy evidence <name> [--json]
+astroq regime status [--json]
+astroq regime train-profit [--dry-run] [--json]
+astroq backtest run [--strategy NAME] [--dry-run] [--json]
+astroq docs check [--json]
+astroq web build [--json]
+astroq web serve [--host HOST] [--port PORT]
+```
 
 ## File Map
 
 Create:
 
-- `research/strategy_catalog.py` — 策略目录模型、分类、数据需求、参数 schema、展示元数据。
-- `research/strategy_evaluation.py` — baseline、OOS、walk-forward、成本、regime 分层评估结果聚合。
-- `signals/candidates/__init__.py` — 候选策略包导出。
-- `signals/candidates/common.py` — 候选策略通用数据加载、ST/流动性过滤、分数归一化、信号构造。
-- `signals/candidates/trend_following.py` — 均线趋势择时/选股候选。
-- `signals/candidates/donchian_breakout.py` — Donchian 突破候选。
-- `signals/candidates/rps_relative_strength.py` — RPS 相对强弱候选。
-- `signals/candidates/sector_rotation.py` — 行业轮动动量候选。
-- `signals/candidates/quality_value.py` — 质量价值复合候选。
-- `signals/candidates/low_vol_defensive.py` — 低波动防御候选。
-- `signals/candidates/volume_confirmation.py` — 量能确认候选。
-- `signals/candidates/regime_gated.py` — regime-gated 组合候选。
-- `tests/test_strategy_catalog.py` — 策略目录契约测试。
-- `tests/test_candidate_strategy_contracts.py` — 候选策略输出契约测试。
-- `tests/test_strategy_runtime_gates.py` — 生命周期调度门禁测试。
-- `tests/test_strategy_lab_api.py` — API 契约测试。
+- `astrolabe_cli/__init__.py` — package marker and exported version.
+- `astrolabe_cli/main.py` — argparse entrypoint and command dispatch.
+- `astrolabe_cli/results.py` — `CliResult`, `ExitCode`, JSON/text rendering.
+- `astrolabe_cli/safety.py` — dry-run helpers and explicit-mode validation.
+- `astrolabe_cli/commands/__init__.py` — command package marker.
+- `astrolabe_cli/commands/health.py` — `astroq health`.
+- `astrolabe_cli/commands/config.py` — `astroq config validate`.
+- `astrolabe_cli/commands/data.py` — `astroq data status/repair`.
+- `astrolabe_cli/commands/strategy.py` — `astroq strategy catalog/run/evidence`.
+- `astrolabe_cli/commands/regime.py` — `astroq regime status/train-profit`.
+- `astrolabe_cli/commands/backtest.py` — `astroq backtest run`.
+- `astrolabe_cli/commands/docs.py` — `astroq docs check`.
+- `astrolabe_cli/commands/web.py` — `astroq web build/serve`.
+- `tests/test_cli_foundation.py` — base parser/result/console-script contract.
+- `tests/test_cli_strategy_commands.py` — Strategy Catalog/run/evidence commands.
+- `tests/test_cli_data_commands.py` — DB health and repair command safety.
+- `tests/test_cli_ops_commands.py` — health/config/regime/backtest/docs/web command contracts.
 
 Modify:
 
-- `config/settings.yaml` — 增加 8 个候选策略注册项和可解释参数。
-- `data/registry.py` — 读取 catalog 元数据、暴露策略类型/层级/数据需求。
-- `data/strategy_plugins.py` — 增加生产/研究运行模式，避免候选策略污染生产信号。
-- `scripts/compute_signals.py` — 明确 `--mode production|research` 和 `--allow-candidate` 行为。
-- `web/api/models.py` — 增加 strategy catalog / evaluation 响应模型。
-- `web/api/routes/strategies.py` — 增加 catalog、candidate scan、evaluation summary API。
-- `web/frontend/src/api/index.ts` — 增加策略目录和评估接口类型。
-- `web/frontend/src/views/Strategies.vue` — 从旧的四内置策略状态视角改成策略目录与生命周期研究台。
-- `web/frontend/src/views/Backtest.vue` — 增加 baseline、成本、OOS、regime 分层指标展示。
-- `docs/specs/02-signal-system.md` — 同步策略生命周期、候选策略接入、信号契约。
-- `docs/specs/03-backtest-engine.md` — 同步统一评估要求。
-- `docs/specs/05-web-platform.md` — 同步 Strategy Lab UI/API 结构。
-- `docs/acceptance-matrix.md` — 增加策略扩充验收链路。
+- `pyproject.toml` — add `astrolabe_cli*` package and `[project.scripts] astroq = "astrolabe_cli.main:main"`.
+- `Makefile` — replace script-heavy targets with `astroq` wrappers where stable.
+- `docs/DOCUMENTATION.md` — document CLI as agent-facing control plane.
+- `docs/specs/05-web-platform.md` — mention CLI control plane for local operation.
+- `docs/acceptance-matrix.md` — add CLI acceptance rows.
 
-Delete:
+Do not modify:
 
-- 不再保留已完成计划或空计划目录说明。历史计划只通过 git 追溯。
+- Strategy formulas, Market Regime production policy, DataHub storage format, or Web UI layout unless a CLI test exposes a real bug.
 
 ---
 
-## Task 1: Baseline Audit And Guard Tests
+## Task 1: CLI Foundation And Console Script
 
 **Files:**
-- Create: `tests/test_strategy_runtime_gates.py`
-- Modify: `data/strategy_plugins.py`
-- Modify: `scripts/compute_signals.py`
+- Create: `astrolabe_cli/__init__.py`
+- Create: `astrolabe_cli/main.py`
+- Create: `astrolabe_cli/results.py`
+- Create: `astrolabe_cli/commands/__init__.py`
+- Modify: `pyproject.toml`
+- Test: `tests/test_cli_foundation.py`
 
-- [ ] **Step 1: Write failing tests for production-vs-research runtime gates**
+- [ ] **Step 1: Write failing foundation tests**
 
-Create `tests/test_strategy_runtime_gates.py`:
+Create `tests/test_cli_foundation.py`:
 
 ```python
-def test_production_mode_excludes_candidate_strategies(monkeypatch):
-    from data.strategy_plugins import iter_strategy_plugins
-
-    fake_registry = [
-        {"name": "prod_alpha", "label": "Prod", "runner": "signals.runners:compute_multifactor", "signal_name": "prod_alpha", "enabled": True, "status": "production"},
-        {"name": "candidate_alpha", "label": "Candidate", "runner": "signals.runners:compute_multifactor", "signal_name": "candidate_alpha", "enabled": True, "status": "candidate"},
-    ]
-    monkeypatch.setattr("data.strategy_plugins.get_enabled_strategies", lambda: fake_registry)
-    monkeypatch.setattr("data.strategy_plugins.get_strategy", lambda name: next((s for s in fake_registry if s["name"] == name), None))
-    monkeypatch.setattr("data.strategy_plugins.list_strategy_names", lambda: [s["name"] for s in fake_registry])
-
-    names = [plugin.name for plugin in iter_strategy_plugins("all", mode="production")]
-
-    assert names == ["prod_alpha"]
+import json
 
 
-def test_research_mode_can_include_candidate_strategies(monkeypatch):
-    from data.strategy_plugins import iter_strategy_plugins
+def test_cli_result_json_shape():
+    from astrolabe_cli.results import CliResult
 
-    fake_registry = [
-        {"name": "prod_alpha", "label": "Prod", "runner": "signals.runners:compute_multifactor", "signal_name": "prod_alpha", "enabled": True, "status": "production"},
-        {"name": "candidate_alpha", "label": "Candidate", "runner": "signals.runners:compute_multifactor", "signal_name": "candidate_alpha", "enabled": True, "status": "candidate"},
-    ]
-    monkeypatch.setattr("data.strategy_plugins.get_enabled_strategies", lambda: fake_registry)
-    monkeypatch.setattr("data.strategy_plugins.get_strategy", lambda name: next((s for s in fake_registry if s["name"] == name), None))
-    monkeypatch.setattr("data.strategy_plugins.list_strategy_names", lambda: [s["name"] for s in fake_registry])
+    payload = CliResult(ok=True, command="health", data={"status": "ok"}, message="ready").to_dict()
 
-    names = [plugin.name for plugin in iter_strategy_plugins("all", mode="research")]
+    assert payload == {
+        "ok": True,
+        "command": "health",
+        "data": {"status": "ok"},
+        "message": "ready",
+        "errors": [],
+    }
 
-    assert names == ["prod_alpha", "candidate_alpha"]
+
+def test_cli_health_help_exits_zero(capsys):
+    from astrolabe_cli.main import run_cli
+
+    code = run_cli(["health", "--help"])
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert "usage:" in out
+
+
+def test_cli_json_flag_renders_json(capsys):
+    from astrolabe_cli.main import run_cli
+
+    code = run_cli(["health", "--json"])
+    out = capsys.readouterr().out
+
+    assert code == 0
+    parsed = json.loads(out)
+    assert parsed["ok"] is True
+    assert parsed["command"] == "health"
 ```
 
-- [ ] **Step 2: Run tests and confirm they fail**
+- [ ] **Step 2: Run tests and confirm red**
 
 Run:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_strategy_runtime_gates.py -q
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_foundation.py -q
 ```
 
-Expected: FAIL because `iter_strategy_plugins()` does not accept `mode`.
+Expected: FAIL with `ModuleNotFoundError: No module named 'astrolabe_cli'`.
 
-- [ ] **Step 3: Add runtime mode to strategy dispatch**
+- [ ] **Step 3: Add result contract**
 
-Modify `data/strategy_plugins.py`:
+Create `astrolabe_cli/__init__.py`:
 
 ```python
-def iter_strategy_plugins(selected: str = "all", mode: str = "production") -> Iterable[StrategyPlugin]:
-    valid = set(list_strategy_names()) | {"all"}
-    if selected not in valid:
-        raise ValueError(f"Invalid strategy: {selected}. Choose from: {', '.join(sorted(valid))}")
-    if mode not in {"production", "research"}:
-        raise ValueError(f"Invalid strategy runtime mode: {mode}")
+"""Agent-facing CLI control plane for Astrolabe Quant OS."""
 
-    for item in get_enabled_strategies():
-        name = item["name"]
-        if selected not in ("all", name):
-            continue
-        if mode == "production" and item.get("status", "candidate") != "production":
-            continue
-        plugin = get_strategy_plugin(name)
-        if plugin:
-            yield plugin
+__all__ = ["__version__"]
+__version__ = "2.0.0"
 ```
 
-Update `run_registered_strategies()` signature:
-
-```python
-def run_registered_strategies(
-    selected: str = "all",
-    limit: int = 0,
-    progress_callback: Callable[[int, int, str], None] | None = None,
-    mode: str = "production",
-) -> list[dict]:
-    plugins = list(iter_strategy_plugins(selected, mode=mode))
-```
-
-Modify `scripts/compute_signals.py` parser:
-
-```python
-parser.add_argument("--mode", choices=["production", "research"], default="production")
-```
-
-Then pass:
-
-```python
-run_registered_strategies(args.strategy, limit=args.limit, mode=args.mode)
-```
-
-- [ ] **Step 4: Run gate tests**
-
-Run:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_strategy_runtime_gates.py -q
-```
-
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-Run:
-
-```bash
-git add data/strategy_plugins.py scripts/compute_signals.py tests/test_strategy_runtime_gates.py
-git commit -m "codex: add strategy runtime mode gates"
-```
-
----
-
-## Task 2: Strategy Catalog Contract
-
-**Files:**
-- Create: `research/strategy_catalog.py`
-- Create: `tests/test_strategy_catalog.py`
-- Modify: `data/registry.py`
-- Modify: `config/settings.yaml`
-- Modify: `web/api/models.py`
-- Modify: `web/api/routes/strategies.py`
-
-- [ ] **Step 1: Write failing catalog tests**
-
-Create `tests/test_strategy_catalog.py`:
-
-```python
-def test_strategy_catalog_has_required_fields_for_every_enabled_strategy():
-    from data.registry import get_enabled_strategies
-    from research.strategy_catalog import catalog_by_name
-
-    catalog = catalog_by_name()
-    for strategy in get_enabled_strategies():
-        item = catalog[strategy["name"]]
-        assert item.name == strategy["name"]
-        assert item.strategy_type in {"selection", "timing", "sector_rotation", "portfolio", "risk_overlay"}
-        assert item.lifecycle in {"candidate", "validated", "paper", "production", "retired"}
-        assert item.data_requirements
-        assert item.output_contract == "StrategySignalRows"
-
-
-def test_strategy_catalog_api_is_not_shadowed(monkeypatch):
-    from fastapi.testclient import TestClient
-    from web.api.app import create_app
-
-    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
-    res = TestClient(create_app()).get("/api/strategies/catalog")
-
-    assert res.status_code == 200
-    data = res.json()
-    assert "items" in data
-    assert any(item["name"] == "multifactor" for item in data["items"])
-```
-
-- [ ] **Step 2: Run tests and confirm they fail**
-
-Run:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_strategy_catalog.py -q
-```
-
-Expected: FAIL because `research.strategy_catalog` and `/api/strategies/catalog` do not exist.
-
-- [ ] **Step 3: Implement catalog model**
-
-Create `research/strategy_catalog.py`:
+Create `astrolabe_cli/results.py`:
 
 ```python
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
-
-from data.registry import get_enabled_strategies
-
-
-@dataclass(frozen=True)
-class StrategyCatalogItem:
-    name: str
-    label: str
-    strategy_type: str
-    layer: str
-    lifecycle: str
-    data_requirements: list[str]
-    parameters: dict[str, object] = field(default_factory=dict)
-    output_contract: str = "StrategySignalRows"
-    research_sources: list[str] = field(default_factory=list)
-
-
-DEFAULT_TYPES = {
-    "buffett": ("selection", "quality_filter", ["financials", "valuation_daily", "stock_daily"]),
-    "multifactor": ("selection", "primary_alpha", ["financials", "valuation_daily", "stock_daily", "sector"]),
-    "ml_lgbm": ("selection", "auxiliary_alpha", ["features", "stock_daily", "valuation_daily", "macro"]),
-    "cybernetic": ("risk_overlay", "risk_overlay", ["market_regime", "stock_daily", "sector"]),
-}
-
-
-def catalog_items() -> list[StrategyCatalogItem]:
-    items: list[StrategyCatalogItem] = []
-    for raw in get_enabled_strategies():
-        name = raw["name"]
-        strategy_type, layer, requirements = DEFAULT_TYPES.get(
-            name,
-            (
-                raw.get("strategy_type", "selection"),
-                raw.get("layer", "candidate_alpha"),
-                raw.get("data_requirements", ["stock_daily"]),
-            ),
-        )
-        items.append(
-            StrategyCatalogItem(
-                name=name,
-                label=raw.get("label", name),
-                strategy_type=raw.get("strategy_type", strategy_type),
-                layer=raw.get("layer", layer),
-                lifecycle=raw.get("status", "candidate"),
-                data_requirements=list(raw.get("data_requirements", requirements)),
-                parameters=dict(raw.get("parameters", {})),
-                research_sources=list(raw.get("research_sources", [])),
-            )
-        )
-    return items
-
-
-def catalog_by_name() -> dict[str, StrategyCatalogItem]:
-    return {item.name: item for item in catalog_items()}
-```
-
-- [ ] **Step 4: Add catalog API**
-
-Add response models in `web/api/models.py`:
-
-```python
-class StrategyCatalogItemResponse(BaseModel):
-    name: str
-    label: str
-    strategy_type: str
-    layer: str
-    lifecycle: str
-    data_requirements: List[str]
-    parameters: Dict[str, Any] = {}
-    output_contract: str
-    research_sources: List[str] = []
-
-
-class StrategyCatalogResponse(BaseModel):
-    items: List[StrategyCatalogItemResponse]
-    total: int
-```
-
-Add route before `@router.get("/{name}")` in `web/api/routes/strategies.py`:
-
-```python
-@router.get("/catalog", response_model=StrategyCatalogResponse)
-async def get_strategy_catalog():
-    from research.strategy_catalog import catalog_items
-
-    items = [item.__dict__ for item in catalog_items()]
-    return {"items": items, "total": len(items)}
-```
-
-- [ ] **Step 5: Run tests**
-
-Run:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_strategy_catalog.py tests/test_strategy_research_governance.py tests/test_registry_status.py -q
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-Run:
-
-```bash
-git add research/strategy_catalog.py web/api/models.py web/api/routes/strategies.py tests/test_strategy_catalog.py
-git commit -m "codex: add strategy catalog contract"
-```
-
----
-
-## Task 3: Candidate Strategy Common Runtime
-
-**Files:**
-- Create: `signals/candidates/__init__.py`
-- Create: `signals/candidates/common.py`
-- Create: `tests/test_candidate_strategy_contracts.py`
-
-- [ ] **Step 1: Write common contract tests**
-
-Create `tests/test_candidate_strategy_contracts.py`:
-
-```python
-import pandas as pd
-
-
-def test_candidate_signal_row_contract():
-    from signals.candidates.common import build_signal_row
-
-    row = build_signal_row(
-        symbol="000001",
-        name="平安银行",
-        industry="银行",
-        score=82.5,
-        signal="buy",
-        detail={"reason": "test"},
-    )
-
-    assert row["symbol"] == "000001"
-    assert row["name"] == "平安银行"
-    assert row["industry"] == "银行"
-    assert row["score"] == 82.5
-    assert row["signal"] == "buy"
-    assert row["detail"]["reason"] == "test"
-
-
-def test_cross_section_percentile_score_bounds():
-    from signals.candidates.common import percentile_score
-
-    scores = percentile_score(pd.Series([10, 20, 30], index=["a", "b", "c"]))
-
-    assert scores["a"] == 0.0
-    assert scores["c"] == 100.0
-    assert all(0.0 <= value <= 100.0 for value in scores)
-```
-
-- [ ] **Step 2: Run tests and confirm they fail**
-
-Run:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_candidate_strategy_contracts.py -q
-```
-
-Expected: FAIL because `signals.candidates.common` does not exist.
-
-- [ ] **Step 3: Implement common helpers**
-
-Create `signals/candidates/__init__.py`:
-
-```python
-"""Candidate strategy runners for Strategy Lab research mode."""
-```
-
-Create `signals/candidates/common.py`:
-
-```python
-from __future__ import annotations
-
-import math
+from enum import IntEnum
 from typing import Any
 
-import pandas as pd
+
+class ExitCode(IntEnum):
+    OK = 0
+    USAGE = 2
+    FAILED = 1
 
 
-def safe_float(value: Any, default: float = 0.0) -> float:
-    try:
-        number = float(value)
-    except Exception:
-        return default
-    return default if math.isnan(number) else number
+@dataclass(frozen=True)
+class CliResult:
+    ok: bool
+    command: str
+    data: dict[str, Any] = field(default_factory=dict)
+    message: str = ""
+    errors: list[str] = field(default_factory=list)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "command": self.command,
+            "data": self.data,
+            "message": self.message,
+            "errors": self.errors,
+        }
 
-def percentile_score(values: pd.Series) -> dict[str, float]:
-    clean = pd.to_numeric(values, errors="coerce").dropna()
-    if clean.empty:
-        return {}
-    if len(clean) == 1:
-        return {str(clean.index[0]): 100.0}
-    ranked = clean.rank(method="average", pct=True)
-    min_rank = ranked.min()
-    max_rank = ranked.max()
-    scaled = (ranked - min_rank) / max(max_rank - min_rank, 1e-12) * 100
-    return {str(k): round(float(v), 2) for k, v in scaled.items()}
+    def render_json(self) -> str:
+        return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True)
 
-
-def is_st_name(name: str) -> bool:
-    return "ST" in str(name or "").upper()
-
-
-def build_signal_row(symbol: str, name: str, industry: str, score: float, signal: str, detail: dict | None = None) -> dict:
-    return {
-        "symbol": str(symbol),
-        "name": str(name or symbol),
-        "industry": str(industry or ""),
-        "score": round(safe_float(score), 2),
-        "signal": signal if signal in {"buy", "hold", "sell"} else "hold",
-        "detail": detail or {},
-    }
+    def render_text(self) -> str:
+        status = "OK" if self.ok else "ERROR"
+        lines = [f"{status}: {self.message or self.command}"]
+        for key, value in self.data.items():
+            lines.append(f"{key}: {value}")
+        for err in self.errors:
+            lines.append(f"error: {err}")
+        return "\n".join(lines)
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **Step 4: Add argparse entrypoint**
 
-Run:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_candidate_strategy_contracts.py -q
-```
-
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-Run:
-
-```bash
-git add signals/candidates/__init__.py signals/candidates/common.py tests/test_candidate_strategy_contracts.py
-git commit -m "codex: add candidate strategy common runtime"
-```
-
----
-
-## Task 4: First Candidate Strategy Batch
-
-**Files:**
-- Create 8 files under `signals/candidates/`
-- Modify: `config/settings.yaml`
-- Modify: `tests/test_candidate_strategy_contracts.py`
-
-- [ ] **Step 1: Add candidate runner import tests**
-
-Append to `tests/test_candidate_strategy_contracts.py`:
+Create `astrolabe_cli/commands/__init__.py`:
 
 ```python
-def test_candidate_strategy_runners_return_signal_rows_for_small_limit():
-    modules = [
-        "signals.candidates.trend_following",
-        "signals.candidates.donchian_breakout",
-        "signals.candidates.rps_relative_strength",
-        "signals.candidates.sector_rotation",
-        "signals.candidates.quality_value",
-        "signals.candidates.low_vol_defensive",
-        "signals.candidates.volume_confirmation",
-        "signals.candidates.regime_gated",
-    ]
-
-    for module_name in modules:
-        module = __import__(module_name, fromlist=["compute"])
-        rows = module.compute(limit=5)
-        assert isinstance(rows, list)
-        for row in rows:
-            assert {"symbol", "name", "industry", "score", "signal", "detail"}.issubset(row)
-            assert row["signal"] in {"buy", "hold", "sell"}
-            assert 0 <= row["score"] <= 100
+"""CLI command implementations."""
 ```
 
-- [ ] **Step 2: Run tests and confirm they fail**
-
-Run:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_candidate_strategy_contracts.py::test_candidate_strategy_runners_return_signal_rows_for_small_limit -q
-```
-
-Expected: FAIL because the modules do not exist.
-
-- [ ] **Step 3: Implement candidate strategy calculations**
-
-Each file exposes `compute(limit: int = 0) -> list[dict]`.
-
-Required formulas:
-
-- `trend_following.py`: score = 40% MA20/MA60 trend + 30% close above MA120 + 30% 60-day momentum percentile.
-- `donchian_breakout.py`: score = 60% close proximity to 55-day high + 20% 20-day volume ratio + 20% 20-day volatility penalty.
-- `rps_relative_strength.py`: score = 45% 3-month skip-1-month RPS + 45% 6-month skip-1-month RPS + 10% positive trend filter.
-- `sector_rotation.py`: score = 60% industry 20-day median return rank + 25% industry 60-day median return rank + 15% candidate stock score inside industry.
-- `quality_value.py`: score = 35% ROE rank + 25% gross margin rank + 20% inverse PE rank + 20% inverse PB rank.
-- `low_vol_defensive.py`: score = 40% inverse 60-day volatility rank + 30% drawdown control + 20% positive 20-day trend + 10% liquidity rank.
-- `volume_confirmation.py`: score = 45% 20-day volume ratio rank + 35% price momentum rank + 20% turnover/moneyflow proxy.
-- `regime_gated.py`: in bull mode boost `trend_following` and `rps_relative_strength`; in sideways mode boost `quality_value` and `low_vol_defensive`; in bear mode allow only `low_vol_defensive` and cash-defense proxy rows.
-
-Use `signals.candidates.common.build_signal_row()` and `signals.selection.apply_ranked_buys()` for final `buy` selection. Default candidate max buys should be 20 or lower.
-
-- [ ] **Step 4: Register candidates as research-only strategies**
-
-Add entries under `strategies:` in `config/settings.yaml`:
-
-```yaml
-  trend_following:
-    color: '#38bdf8'
-    config_key: strategies.trend_following
-    enabled: true
-    label: 趋势跟随候选
-    runner: signals.candidates.trend_following:compute
-    signal_name: trend_following
-    status: candidate
-    strategy_type: timing
-    layer: candidate_alpha
-    data_requirements: [stock_daily]
-  donchian_breakout:
-    color: '#f97316'
-    config_key: strategies.donchian_breakout
-    enabled: true
-    label: Donchian突破候选
-    runner: signals.candidates.donchian_breakout:compute
-    signal_name: donchian_breakout
-    status: candidate
-    strategy_type: timing
-    layer: candidate_alpha
-    data_requirements: [stock_daily]
-  rps_relative_strength:
-    color: '#22c55e'
-    config_key: strategies.rps_relative_strength
-    enabled: true
-    label: RPS相对强弱候选
-    runner: signals.candidates.rps_relative_strength:compute
-    signal_name: rps_relative_strength
-    status: candidate
-    strategy_type: selection
-    layer: candidate_alpha
-    data_requirements: [stock_daily]
-  sector_rotation:
-    color: '#06b6d4'
-    config_key: strategies.sector_rotation
-    enabled: true
-    label: 行业轮动候选
-    runner: signals.candidates.sector_rotation:compute
-    signal_name: sector_rotation
-    status: candidate
-    strategy_type: sector_rotation
-    layer: candidate_alpha
-    data_requirements: [stock_daily, sector]
-  quality_value:
-    color: '#84cc16'
-    config_key: strategies.quality_value
-    enabled: true
-    label: 质量价值候选
-    runner: signals.candidates.quality_value:compute
-    signal_name: quality_value
-    status: candidate
-    strategy_type: selection
-    layer: candidate_alpha
-    data_requirements: [financials, valuation_daily]
-  low_vol_defensive:
-    color: '#a78bfa'
-    config_key: strategies.low_vol_defensive
-    enabled: true
-    label: 低波防御候选
-    runner: signals.candidates.low_vol_defensive:compute
-    signal_name: low_vol_defensive
-    status: candidate
-    strategy_type: selection
-    layer: defensive_alpha
-    data_requirements: [stock_daily]
-  volume_confirmation:
-    color: '#facc15'
-    config_key: strategies.volume_confirmation
-    enabled: true
-    label: 量能确认候选
-    runner: signals.candidates.volume_confirmation:compute
-    signal_name: volume_confirmation
-    status: candidate
-    strategy_type: selection
-    layer: confirmation_alpha
-    data_requirements: [stock_daily, moneyflow]
-  regime_gated:
-    color: '#fb7185'
-    config_key: strategies.regime_gated
-    enabled: true
-    label: Regime门控候选
-    runner: signals.candidates.regime_gated:compute
-    signal_name: regime_gated
-    status: candidate
-    strategy_type: portfolio
-    layer: risk_overlay
-    data_requirements: [market_regime, stock_daily]
-```
-
-- [ ] **Step 5: Run candidate tests**
-
-Run:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_candidate_strategy_contracts.py tests/test_strategy_catalog.py tests/test_strategy_runtime_gates.py -q
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-Run:
-
-```bash
-git add config/settings.yaml signals/candidates tests/test_candidate_strategy_contracts.py
-git commit -m "codex: add first strategy lab candidate batch"
-```
-
----
-
-## Task 5: Evaluation And Promotion Evidence
-
-**Files:**
-- Create: `research/strategy_evaluation.py`
-- Modify: `research/strategy_governance.py`
-- Create: `tests/test_strategy_evaluation.py`
-- Modify: `web/api/routes/strategies.py`
-- Modify: `web/api/models.py`
-
-- [ ] **Step 1: Write evaluation tests**
-
-Create `tests/test_strategy_evaluation.py`:
-
-```python
-def test_strategy_evaluation_requires_strong_baselines():
-    from research.strategy_evaluation import required_baselines
-
-    assert required_baselines() == [
-        "buy_and_hold",
-        "fixed_weight",
-        "ma_timing",
-        "trend_only",
-        "trend_breadth",
-        "current_champion",
-    ]
-
-
-def test_evaluation_summary_blocks_missing_oos():
-    from research.strategy_evaluation import StrategyEvaluation, promotion_ready
-
-    eval_result = StrategyEvaluation(
-        name="trend_following",
-        cagr=0.15,
-        sharpe=0.9,
-        max_drawdown=-0.18,
-        turnover=3.2,
-        oos_months=6,
-        trades=40,
-        baseline_win_rate=0.8,
-        regime_coverage={"bull": 0.7, "sideways": 0.5, "bear": 0.2},
-    )
-
-    decision = promotion_ready(eval_result, target_status="paper")
-
-    assert not decision.passed
-    assert "oos_months" in decision.failed_rules
-```
-
-- [ ] **Step 2: Implement evaluation dataclasses**
-
-Create `research/strategy_evaluation.py`:
+Create `astrolabe_cli/main.py`:
 
 ```python
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import argparse
+import sys
+from collections.abc import Sequence
 
-from research.strategy_governance import StrategyMetrics, evaluate_promotion
-
-
-def required_baselines() -> list[str]:
-    return [
-        "buy_and_hold",
-        "fixed_weight",
-        "ma_timing",
-        "trend_only",
-        "trend_breadth",
-        "current_champion",
-    ]
+from astrolabe_cli.results import CliResult, ExitCode
 
 
-@dataclass(frozen=True)
-class StrategyEvaluation:
-    name: str
-    cagr: float
-    sharpe: float
-    max_drawdown: float
-    turnover: float
-    oos_months: int
-    trades: int
-    baseline_win_rate: float = 0.0
-    regime_coverage: dict[str, float] = field(default_factory=dict)
-    cost_model: str = "commission_slippage"
-
-
-def promotion_ready(evaluation: StrategyEvaluation, target_status: str = "paper"):
-    metrics = StrategyMetrics(
-        cagr=evaluation.cagr,
-        sharpe=evaluation.sharpe,
-        max_drawdown=evaluation.max_drawdown,
-        turnover=evaluation.turnover,
-        oos_months=evaluation.oos_months,
-        trades=evaluation.trades,
-        ic=0.03 if evaluation.baseline_win_rate >= 0.6 else 0.0,
-        icir=0.4 if evaluation.baseline_win_rate >= 0.6 else 0.0,
+def _health_command(args: argparse.Namespace) -> CliResult:
+    return CliResult(
+        ok=True,
+        command="health",
+        data={"status": "ok"},
+        message="Astrolabe CLI ready",
     )
-    return evaluate_promotion(metrics, target_status=target_status)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="astroq", description="Astrolabe Quant OS control plane")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    health = sub.add_parser("health", help="Check CLI and local project health")
+    health.add_argument("--json", action="store_true", help="Render machine-readable JSON")
+    health.set_defaults(handler=_health_command)
+
+    return parser
+
+
+def run_cli(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(list(argv) if argv is not None else None)
+    result: CliResult = args.handler(args)
+    output = result.render_json() if getattr(args, "json", False) else result.render_text()
+    print(output)
+    return int(ExitCode.OK if result.ok else ExitCode.FAILED)
+
+
+def main() -> None:
+    raise SystemExit(run_cli(sys.argv[1:]))
 ```
 
-- [ ] **Step 3: Add API summary**
+- [ ] **Step 5: Add console script**
 
-Add route:
+Modify `pyproject.toml`:
 
-```python
-@router.get("/evaluation")
-async def get_strategy_evaluation_summary():
-    from research.strategy_evaluation import required_baselines
-
-    return {
-        "baselines": required_baselines(),
-        "status": "research_required",
-        "note": "Candidate strategies require OOS, walk-forward, cost and regime evidence before promotion.",
-    }
+```toml
+[project.scripts]
+astroq = "astrolabe_cli.main:main"
 ```
 
-Place it before `@router.get("/{name}")`.
+Add package include:
 
-- [ ] **Step 4: Run tests**
+```toml
+include = [
+    "astrolabe_cli*",
+    "backtest*",
+    "broker*",
+    "core*",
+    "cybernetics*",
+    "data*",
+    "models*",
+    "notify*",
+    "pipeline*",
+    "research*",
+    "scripts*",
+    "signals*",
+    "web*",
+]
+```
+
+- [ ] **Step 6: Run foundation tests**
 
 Run:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_strategy_evaluation.py tests/test_strategy_research_governance.py -q
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_foundation.py -q
 ```
 
 Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-Run:
-
-```bash
-git add research/strategy_evaluation.py research/strategy_governance.py web/api/routes/strategies.py web/api/models.py tests/test_strategy_evaluation.py
-git commit -m "codex: add strategy evaluation evidence layer"
-```
-
----
-
-## Task 6: Strategy Lab API And UI Expansion
-
-**Files:**
-- Modify: `web/frontend/src/api/index.ts`
-- Modify: `web/frontend/src/views/Strategies.vue`
-- Modify: `web/frontend/src/views/Backtest.vue`
-- Modify: `web/frontend/src/views/StrategyLab.vue`
-- Modify: `tests/test_web_system_contracts.py`
-
-- [ ] **Step 1: Write UI contract tests**
-
-Append to `tests/test_web_system_contracts.py`:
-
-```python
-def test_strategy_lab_exposes_catalog_and_candidate_language():
-    strategies = Path("web/frontend/src/views/Strategies.vue").read_text(encoding="utf-8")
-    api = Path("web/frontend/src/api/index.ts").read_text(encoding="utf-8")
-
-    assert "strategyCatalog" in api
-    assert "strategyEvaluation" in api
-    assert "策略目录" in strategies
-    assert "候选策略" in strategies
-    assert "生命周期" in strategies
-    assert "生产隔离" in strategies
-```
-
-- [ ] **Step 2: Run UI contract test and confirm it fails**
-
-Run:
-
-```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_web_system_contracts.py::test_strategy_lab_exposes_catalog_and_candidate_language -q
-```
-
-Expected: FAIL.
-
-- [ ] **Step 3: Add frontend API types**
-
-In `web/frontend/src/api/index.ts`, add:
-
-```ts
-export interface StrategyCatalogItem {
-  name: string;
-  label: string;
-  strategy_type: string;
-  layer: string;
-  lifecycle: string;
-  data_requirements: string[];
-  output_contract: string;
-  research_sources: string[];
-}
-
-export interface StrategyCatalogResponse {
-  items: StrategyCatalogItem[];
-  total: number;
-}
-
-export interface StrategyEvaluationSummary {
-  baselines: string[];
-  status: string;
-  note: string;
-}
-```
-
-Add API methods:
-
-```ts
-strategyCatalog: () => get<StrategyCatalogResponse>("/api/strategies/catalog"),
-strategyEvaluation: () => get<StrategyEvaluationSummary>("/api/strategies/evaluation"),
-```
-
-- [ ] **Step 4: Rebuild Strategy Center UI**
-
-Modify `web/frontend/src/views/Strategies.vue` so the first viewport contains:
-
-- Header: `策略目录`
-- Four compact status counters: total, production, paper, candidate
-- Filters: lifecycle, strategy type, layer
-- Table/card list columns: strategy, lifecycle, type, layer, data requirements, latest scan, actions
-- Safety banner text: `生产隔离：candidate/validated 只允许研究扫描和回测，不参与生产信号`
-
-- [ ] **Step 5: Run frontend checks**
-
-Run:
-
-```bash
-cd web/frontend
-npm run typecheck
-npm run build
-```
-
-Expected: both commands exit 0.
-
-- [ ] **Step 6: Browser smoke test**
-
-Run local service and verify:
-
-```bash
-.venv/bin/python -m uvicorn web.api.app:create_app --factory --host 0.0.0.0 --port 8501
-```
-
-Open:
-
-```text
-http://localhost:8501/strategy-lab
-```
-
-Expected visible text:
-
-- `策略目录`
-- `候选策略`
-- `生命周期`
-- `生产隔离`
 
 - [ ] **Step 7: Commit**
 
 Run:
 
 ```bash
-git add web/frontend/src/api/index.ts web/frontend/src/views/Strategies.vue web/frontend/src/views/Backtest.vue web/frontend/src/views/StrategyLab.vue tests/test_web_system_contracts.py
-git commit -m "codex: expand strategy lab catalog UI"
+git add astrolabe_cli pyproject.toml tests/test_cli_foundation.py
+git commit -m "codex: add astroq cli foundation"
 ```
 
 ---
 
-## Task 7: Backtest Tournament And Evidence Reports
+## Task 2: Shared Command Rendering And Safety Helpers
 
 **Files:**
-- Modify: `backtest/pipeline.py`
-- Modify: `backtest/pipeline_runner.py`
-- Modify: `backtest/run_all_strategies.py`
-- Create: `tests/test_strategy_backtest_evidence.py`
+- Create: `astrolabe_cli/safety.py`
+- Modify: `astrolabe_cli/main.py`
+- Modify: `astrolabe_cli/results.py`
+- Test: `tests/test_cli_foundation.py`
 
-- [ ] **Step 1: Write evidence output test**
+- [ ] **Step 1: Add failing tests for errors and dry-run safety**
 
-Create `tests/test_strategy_backtest_evidence.py`:
-
-```python
-def test_strategy_evidence_report_contains_baselines_and_gates():
-    from research.strategy_evaluation import required_baselines
-
-    baselines = required_baselines()
-
-    assert "buy_and_hold" in baselines
-    assert "current_champion" in baselines
-    assert len(baselines) >= 6
-```
-
-- [ ] **Step 2: Extend runner output contract**
-
-Ensure backtest/report generation writes a JSON or Parquet evidence artifact with these fields:
+Append to `tests/test_cli_foundation.py`:
 
 ```python
-{
-    "strategy": "trend_following",
-    "status": "candidate",
-    "baselines": {"buy_and_hold": {}, "fixed_weight": {}, "ma_timing": {}, "trend_only": {}, "trend_breadth": {}, "current_champion": {}},
-    "metrics": {"cagr": 0.0, "sharpe": 0.0, "max_drawdown": 0.0, "turnover": 0.0, "trades": 0},
-    "oos": {"months": 0, "start": "", "end": ""},
-    "cost_model": {"commission": 0.00025, "slippage": 0.001},
-    "regime_breakdown": {"bull": {}, "sideways": {}, "bear": {}},
-    "promotion_decision": {"target_status": "paper", "passed": False, "failed_rules": []}
-}
+def test_unknown_command_returns_usage_exit():
+    from astrolabe_cli.main import run_cli
+
+    try:
+        run_cli(["missing"])
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("argparse should exit for unknown command")
+
+
+def test_validate_runtime_mode_rejects_invalid_mode():
+    from astrolabe_cli.safety import validate_runtime_mode
+
+    try:
+        validate_runtime_mode("paper")
+    except ValueError as exc:
+        assert "Invalid runtime mode" in str(exc)
+    else:
+        raise AssertionError("invalid runtime mode should fail")
 ```
 
-The artifact path should be:
-
-```text
-data/store/research/strategy_evidence/<strategy>.json
-```
-
-- [ ] **Step 3: Run backtest evidence tests**
+- [ ] **Step 2: Run tests and confirm red**
 
 Run:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_strategy_backtest_evidence.py -q
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_foundation.py::test_validate_runtime_mode_rejects_invalid_mode -q
+```
+
+Expected: FAIL because `astrolabe_cli.safety` does not exist.
+
+- [ ] **Step 3: Add safety helpers**
+
+Create `astrolabe_cli/safety.py`:
+
+```python
+from __future__ import annotations
+
+
+VALID_RUNTIME_MODES = {"production", "research"}
+
+
+def validate_runtime_mode(mode: str) -> str:
+    if mode not in VALID_RUNTIME_MODES:
+        raise ValueError(f"Invalid runtime mode: {mode}. Expected production or research.")
+    return mode
+
+
+def dry_run_payload(action: str, **kwargs) -> dict:
+    return {
+        "dry_run": True,
+        "action": action,
+        "would_run": kwargs,
+    }
+```
+
+- [ ] **Step 4: Ensure all subcommands can inherit `--json`**
+
+Modify `astrolabe_cli/main.py` so every command can add `--json` consistently:
+
+```python
+def add_common_flags(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--json", action="store_true", help="Render machine-readable JSON")
+```
+
+Replace direct `health.add_argument("--json", ...)` with:
+
+```python
+add_common_flags(health)
+```
+
+- [ ] **Step 5: Run foundation tests**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_foundation.py -q
 ```
 
 Expected: PASS.
-
-- [ ] **Step 4: Commit**
-
-Run:
-
-```bash
-git add backtest research tests/test_strategy_backtest_evidence.py
-git commit -m "codex: add strategy evidence report contract"
-```
-
----
-
-## Task 8: Documentation And Acceptance Alignment
-
-**Files:**
-- Modify: `docs/specs/02-signal-system.md`
-- Modify: `docs/specs/03-backtest-engine.md`
-- Modify: `docs/specs/05-web-platform.md`
-- Modify: `docs/acceptance-matrix.md`
-- Create: `docs/strategies/candidate-strategies.md`
-
-- [ ] **Step 1: Update signal system spec**
-
-`docs/specs/02-signal-system.md` must state:
-
-- Strategy Catalog is the strategy metadata authority for UI and research workflows.
-- `candidate` and `validated` are research states, not production signal states.
-- All strategy runners output `StrategySignalRows`: `symbol`, `name`, `industry`, `score`, `signal`, `detail`.
-- Production daily signal scan defaults to `mode=production`.
-- Strategy Lab research scan uses `mode=research`.
-
-- [ ] **Step 2: Update backtest spec**
-
-`docs/specs/03-backtest-engine.md` must state:
-
-- Candidate promotion requires baseline comparison, OOS, walk-forward, cost model and regime breakdown.
-- Required baselines are `buy_and_hold`, `fixed_weight`, `ma_timing`, `trend_only`, `trend_breadth`, `current_champion`.
-- Evidence artifacts live under `data/store/research/strategy_evidence/`.
-
-- [ ] **Step 3: Update web spec**
-
-`docs/specs/05-web-platform.md` must state:
-
-- Strategy Lab has Strategy Catalog, Signal History and Backtest/Evidence views.
-- Candidate strategy actions are labeled as research scans.
-- Production isolation banner must be visible when candidates exist.
-
-- [ ] **Step 4: Create candidate strategy doc**
-
-Create `docs/strategies/candidate-strategies.md` with sections for:
-
-- 趋势跟随候选
-- Donchian突破候选
-- RPS相对强弱候选
-- 行业轮动候选
-- 质量价值候选
-- 低波防御候选
-- 量能确认候选
-- Regime门控候选
-
-Each section must include: purpose, data requirements, formula, failure modes, promotion evidence.
-
-- [ ] **Step 5: Documentation drift check**
-
-Run:
-
-```bash
-rg -n "当前没有展开中的专题计划|空专题计划目录说明|历史计划索引" docs wiki web/frontend/src/views -g '*.md' -g '*.vue' -g '!docs/development-plan.md'
-git diff --check
-```
-
-Expected:
-
-- No stale text in docs.
-- `git diff --check` exits 0.
 
 - [ ] **Step 6: Commit**
 
 Run:
 
 ```bash
-git add docs
-git commit -m "codex: document strategy lab expansion plan and contracts"
+git add astrolabe_cli tests/test_cli_foundation.py
+git commit -m "codex: add cli safety helpers"
 ```
 
 ---
 
-## Final Verification
+## Task 3: Health And Config Commands
 
-After all tasks complete, run:
+**Files:**
+- Create: `astrolabe_cli/commands/health.py`
+- Create: `astrolabe_cli/commands/config.py`
+- Modify: `astrolabe_cli/main.py`
+- Test: `tests/test_cli_ops_commands.py`
+
+- [ ] **Step 1: Write failing ops command tests**
+
+Create `tests/test_cli_ops_commands.py`:
+
+```python
+import json
+
+
+def _json_from_cli(capsys):
+    return json.loads(capsys.readouterr().out)
+
+
+def test_health_command_reports_core_sections(capsys):
+    from astrolabe_cli.main import run_cli
+
+    code = run_cli(["health", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["ok"] is True
+    assert data["data"]["project"] == "astrolabe-quant"
+    assert "version" in data["data"]
+    assert "store_root" in data["data"]
+
+
+def test_config_validate_reports_strategy_count(capsys):
+    from astrolabe_cli.main import run_cli
+
+    code = run_cli(["config", "validate", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["ok"] is True
+    assert data["data"]["strategy_count"] >= 4
+```
+
+- [ ] **Step 2: Run tests and confirm red**
+
+Run:
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m pytest tests/test_registry_status.py tests/test_strategy_research_governance.py tests/test_strategy_runtime_gates.py tests/test_strategy_catalog.py tests/test_candidate_strategy_contracts.py tests/test_strategy_evaluation.py tests/test_strategy_backtest_evidence.py tests/test_web_system_contracts.py -q
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_ops_commands.py::test_config_validate_reports_strategy_count -q
+```
+
+Expected: FAIL because `config` command is not registered.
+
+- [ ] **Step 3: Implement health command**
+
+Create `astrolabe_cli/commands/health.py`:
+
+```python
+from __future__ import annotations
+
+from astrolabe_cli.results import CliResult
+
+
+def run_health() -> CliResult:
+    from data.datahub import get_datahub
+    from web.api.version import get_project_version
+
+    hub = get_datahub()
+    return CliResult(
+        ok=True,
+        command="health",
+        message="Astrolabe local environment is reachable",
+        data={
+            "project": "astrolabe-quant",
+            "version": get_project_version(),
+            "store_root": str(hub.store_root),
+            "cache_root": str(hub.cache_root),
+        },
+    )
+```
+
+- [ ] **Step 4: Implement config validate command**
+
+Create `astrolabe_cli/commands/config.py`:
+
+```python
+from __future__ import annotations
+
+from astrolabe_cli.results import CliResult
+
+
+def validate_config() -> CliResult:
+    from core.settings import get_settings
+    from data.registry import get_enabled_strategies, load_registry
+
+    cfg = get_settings()
+    registry = load_registry(force_reload=True)
+    enabled = get_enabled_strategies()
+    required = {"strategies", "backtest", "risk_control"}
+    missing = sorted(section for section in required if section not in cfg)
+    ok = not missing
+    return CliResult(
+        ok=ok,
+        command="config validate",
+        message="Config valid" if ok else "Config missing required sections",
+        data={
+            "strategy_count": len(registry),
+            "enabled_strategy_count": len(enabled),
+            "missing_sections": missing,
+        },
+        errors=[f"missing section: {name}" for name in missing],
+    )
+```
+
+- [ ] **Step 5: Register commands in parser**
+
+Modify `astrolabe_cli/main.py`:
+
+```python
+from astrolabe_cli.commands.config import validate_config
+from astrolabe_cli.commands.health import run_health
+```
+
+Replace `_health_command` body:
+
+```python
+def _health_command(args: argparse.Namespace) -> CliResult:
+    return run_health()
+```
+
+Add config parser:
+
+```python
+config = sub.add_parser("config", help="Inspect and validate project configuration")
+config_sub = config.add_subparsers(dest="config_command", required=True)
+config_validate = config_sub.add_parser("validate", help="Validate settings and strategy registry")
+add_common_flags(config_validate)
+config_validate.set_defaults(handler=lambda args: validate_config())
+```
+
+- [ ] **Step 6: Run tests**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_foundation.py tests/test_cli_ops_commands.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 7: Commit**
+
+Run:
+
+```bash
+git add astrolabe_cli tests/test_cli_ops_commands.py
+git commit -m "codex: add cli health and config commands"
+```
+
+---
+
+## Task 4: Strategy Catalog, Run And Evidence Commands
+
+**Files:**
+- Create: `astrolabe_cli/commands/strategy.py`
+- Modify: `astrolabe_cli/main.py`
+- Test: `tests/test_cli_strategy_commands.py`
+
+- [ ] **Step 1: Write failing strategy command tests**
+
+Create `tests/test_cli_strategy_commands.py`:
+
+```python
+import json
+
+
+def _json_from_cli(capsys):
+    return json.loads(capsys.readouterr().out)
+
+
+def test_strategy_catalog_command_outputs_items(capsys):
+    from astrolabe_cli.main import run_cli
+
+    code = run_cli(["strategy", "catalog", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["ok"] is True
+    assert data["data"]["total"] >= 4
+    assert any(item["name"] == "multifactor" for item in data["data"]["items"])
+
+
+def test_strategy_run_dry_run_requires_explicit_research_for_candidate(capsys):
+    from astrolabe_cli.main import run_cli
+
+    code = run_cli(["strategy", "run", "trend_following", "--dry-run", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 1
+    assert data["ok"] is False
+    assert "research" in data["message"]
+
+
+def test_strategy_run_research_dry_run_lists_candidate(capsys):
+    from astrolabe_cli.main import run_cli
+
+    code = run_cli(["strategy", "run", "trend_following", "--mode", "research", "--dry-run", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["data"]["dry_run"] is True
+    assert data["data"]["would_run"]["strategy"] == "trend_following"
+    assert data["data"]["would_run"]["mode"] == "research"
+```
+
+- [ ] **Step 2: Run tests and confirm red**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_strategy_commands.py -q
+```
+
+Expected: FAIL because `strategy` command is not registered.
+
+- [ ] **Step 3: Implement strategy commands**
+
+Create `astrolabe_cli/commands/strategy.py`:
+
+```python
+from __future__ import annotations
+
+from pathlib import Path
+
+from astrolabe_cli.results import CliResult
+from astrolabe_cli.safety import dry_run_payload, validate_runtime_mode
+
+
+def catalog() -> CliResult:
+    from research.strategy_catalog import catalog_items
+
+    items = [item.__dict__ for item in catalog_items()]
+    return CliResult(
+        ok=True,
+        command="strategy catalog",
+        message=f"{len(items)} strategies",
+        data={"items": items, "total": len(items)},
+    )
+
+
+def run_strategy(strategy: str, mode: str, limit: int, dry_run: bool) -> CliResult:
+    from data.registry import get_strategy
+    from data.strategy_plugins import iter_strategy_plugins, run_registered_strategies
+
+    mode = validate_runtime_mode(mode)
+    meta = get_strategy(strategy) if strategy != "all" else {"status": "production"}
+    if not meta:
+        return CliResult(False, "strategy run", message=f"Unknown strategy: {strategy}", errors=[strategy])
+    if strategy != "all" and meta.get("status") != "production" and mode != "research":
+        return CliResult(
+            ok=False,
+            command="strategy run",
+            message=f"{strategy} is not production; rerun with --mode research",
+            errors=["candidate_requires_research_mode"],
+        )
+
+    plugins = [plugin.name for plugin in iter_strategy_plugins(strategy, mode=mode)]
+    if dry_run:
+        return CliResult(
+            ok=True,
+            command="strategy run",
+            message=f"Dry run: {len(plugins)} strategy plugin(s)",
+            data=dry_run_payload("strategy.run", strategy=strategy, mode=mode, limit=limit, plugins=plugins),
+        )
+
+    result = run_registered_strategies(strategy, limit=limit, mode=mode)
+    return CliResult(
+        ok=True,
+        command="strategy run",
+        message=f"Ran {strategy} in {mode} mode",
+        data={"strategies": result, "mode": mode},
+    )
+
+
+def evidence(strategy: str) -> CliResult:
+    from research.strategy_evaluation import strategy_evidence_dir
+
+    path = strategy_evidence_dir() / f"{strategy}.json"
+    if not path.exists():
+        return CliResult(
+            ok=False,
+            command="strategy evidence",
+            message=f"No evidence report found for {strategy}",
+            data={"path": str(path)},
+            errors=["evidence_missing"],
+        )
+    return CliResult(
+        ok=True,
+        command="strategy evidence",
+        message=f"Evidence report found for {strategy}",
+        data={"path": str(Path(path).resolve())},
+    )
+```
+
+- [ ] **Step 4: Register strategy parser**
+
+Modify `astrolabe_cli/main.py`:
+
+```python
+from astrolabe_cli.commands.strategy import catalog as strategy_catalog
+from astrolabe_cli.commands.strategy import evidence as strategy_evidence
+from astrolabe_cli.commands.strategy import run_strategy
+```
+
+Add:
+
+```python
+strategy = sub.add_parser("strategy", help="Inspect and run registered strategies")
+strategy_sub = strategy.add_subparsers(dest="strategy_command", required=True)
+
+strategy_catalog_cmd = strategy_sub.add_parser("catalog", help="Show Strategy Catalog")
+add_common_flags(strategy_catalog_cmd)
+strategy_catalog_cmd.set_defaults(handler=lambda args: strategy_catalog())
+
+strategy_run_cmd = strategy_sub.add_parser("run", help="Run a strategy through runtime gates")
+strategy_run_cmd.add_argument("name", help="Strategy name or all")
+strategy_run_cmd.add_argument("--mode", choices=["production", "research"], default="production")
+strategy_run_cmd.add_argument("--limit", type=int, default=0)
+strategy_run_cmd.add_argument("--dry-run", action="store_true")
+add_common_flags(strategy_run_cmd)
+strategy_run_cmd.set_defaults(
+    handler=lambda args: run_strategy(args.name, args.mode, args.limit, args.dry_run)
+)
+
+strategy_evidence_cmd = strategy_sub.add_parser("evidence", help="Show strategy evidence report path")
+strategy_evidence_cmd.add_argument("name")
+add_common_flags(strategy_evidence_cmd)
+strategy_evidence_cmd.set_defaults(handler=lambda args: strategy_evidence(args.name))
+```
+
+- [ ] **Step 5: Run strategy tests**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_strategy_commands.py tests/test_strategy_runtime_gates.py tests/test_strategy_catalog.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+Run:
+
+```bash
+git add astrolabe_cli tests/test_cli_strategy_commands.py
+git commit -m "codex: add cli strategy commands"
+```
+
+---
+
+## Task 5: Data Status And Repair Commands
+
+**Files:**
+- Create: `astrolabe_cli/commands/data.py`
+- Modify: `astrolabe_cli/main.py`
+- Test: `tests/test_cli_data_commands.py`
+
+- [ ] **Step 1: Write failing data command tests**
+
+Create `tests/test_cli_data_commands.py`:
+
+```python
+import json
+
+
+def _json_from_cli(capsys):
+    return json.loads(capsys.readouterr().out)
+
+
+def test_data_status_runs_health_check(monkeypatch, capsys):
+    from astrolabe_cli.main import run_cli
+
+    monkeypatch.setattr(
+        "scripts.db_health_check.run_health_check",
+        lambda: [{"table": "summary", "missing_pct": 0}],
+    )
+
+    code = run_cli(["data", "status", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["ok"] is True
+    assert data["data"]["rows"] == 1
+
+
+def test_data_repair_dry_run_does_not_call_repair(monkeypatch, capsys):
+    from astrolabe_cli.main import run_cli
+
+    calls = []
+    monkeypatch.setattr("scripts.repair_table.repair", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    code = run_cli(["data", "repair", "stock_valuation", "--dry-run", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert calls == []
+    assert data["data"]["dry_run"] is True
+```
+
+- [ ] **Step 2: Run tests and confirm red**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_data_commands.py -q
+```
+
+Expected: FAIL because `data` command is not registered.
+
+- [ ] **Step 3: Implement data commands**
+
+Create `astrolabe_cli/commands/data.py`:
+
+```python
+from __future__ import annotations
+
+from astrolabe_cli.results import CliResult
+from astrolabe_cli.safety import dry_run_payload
+
+
+def status() -> CliResult:
+    from scripts.db_health_check import run_health_check
+
+    result = run_health_check()
+    rows = len(result) if hasattr(result, "__len__") else 0
+    return CliResult(
+        ok=True,
+        command="data status",
+        message=f"DB health check returned {rows} row(s)",
+        data={"rows": rows},
+    )
+
+
+def repair(table: str, limit: int, days: int, dry_run: bool) -> CliResult:
+    from scripts.repair_table import REPAIR_MAP, repair as repair_table
+
+    if table not in REPAIR_MAP:
+        return CliResult(
+            ok=False,
+            command="data repair",
+            message=f"Unknown or non-repairable table: {table}",
+            errors=["unknown_table"],
+            data={"table": table},
+        )
+    if dry_run:
+        return CliResult(
+            ok=True,
+            command="data repair",
+            message=f"Dry run: repair {table}",
+            data=dry_run_payload("data.repair", table=table, limit=limit, days=days),
+        )
+
+    repair_table(table, limit=limit, days=days)
+    return CliResult(
+        ok=True,
+        command="data repair",
+        message=f"Repair complete: {table}",
+        data={"table": table, "limit": limit, "days": days},
+    )
+```
+
+- [ ] **Step 4: Register data parser**
+
+Modify `astrolabe_cli/main.py`:
+
+```python
+from astrolabe_cli.commands.data import repair as data_repair
+from astrolabe_cli.commands.data import status as data_status
+```
+
+Add:
+
+```python
+data = sub.add_parser("data", help="Inspect and repair local DataHub datasets")
+data_sub = data.add_subparsers(dest="data_command", required=True)
+
+data_status_cmd = data_sub.add_parser("status", help="Run DB health check")
+add_common_flags(data_status_cmd)
+data_status_cmd.set_defaults(handler=lambda args: data_status())
+
+data_repair_cmd = data_sub.add_parser("repair", help="Repair one logical table")
+data_repair_cmd.add_argument("table")
+data_repair_cmd.add_argument("--limit", type=int, default=0)
+data_repair_cmd.add_argument("--days", type=int, default=365)
+data_repair_cmd.add_argument("--dry-run", action="store_true")
+add_common_flags(data_repair_cmd)
+data_repair_cmd.set_defaults(
+    handler=lambda args: data_repair(args.table, args.limit, args.days, args.dry_run)
+)
+```
+
+- [ ] **Step 5: Run data tests**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_data_commands.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+Run:
+
+```bash
+git add astrolabe_cli tests/test_cli_data_commands.py
+git commit -m "codex: add cli data commands"
+```
+
+---
+
+## Task 6: Regime, Backtest, Docs And Web Commands
+
+**Files:**
+- Create: `astrolabe_cli/commands/regime.py`
+- Create: `astrolabe_cli/commands/backtest.py`
+- Create: `astrolabe_cli/commands/docs.py`
+- Create: `astrolabe_cli/commands/web.py`
+- Modify: `astrolabe_cli/main.py`
+- Test: `tests/test_cli_ops_commands.py`
+
+- [ ] **Step 1: Add failing command tests**
+
+Append to `tests/test_cli_ops_commands.py`:
+
+```python
+def test_regime_status_command_uses_orchestrator(monkeypatch, capsys):
+    from astrolabe_cli.main import run_cli
+
+    class FakeRegime:
+        value = "sideways"
+
+    class FakeSnapshot:
+        regime = FakeRegime()
+        regime_score = 51.2
+        index_ma_trend = "flat"
+
+    class FakeOrchestrator:
+        def detect(self):
+            return FakeSnapshot()
+
+    monkeypatch.setattr("cybernetics.orchestrator.QuantOrchestrator", FakeOrchestrator)
+
+    code = run_cli(["regime", "status", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["data"]["regime"] == "sideways"
+    assert data["data"]["score"] == 51.2
+
+
+def test_docs_check_command_runs_rg(monkeypatch, capsys):
+    from astrolabe_cli.main import run_cli
+
+    class FakeCompleted:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: FakeCompleted())
+
+    code = run_cli(["docs", "check", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["ok"] is True
+
+
+def test_web_build_dry_run(monkeypatch, capsys):
+    from astrolabe_cli.main import run_cli
+
+    calls = []
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: calls.append(args))
+
+    code = run_cli(["web", "build", "--dry-run", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert calls == []
+    assert data["data"]["dry_run"] is True
+```
+
+- [ ] **Step 2: Run tests and confirm red**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_ops_commands.py::test_regime_status_command_uses_orchestrator -q
+```
+
+Expected: FAIL because `regime` command is not registered.
+
+- [ ] **Step 3: Implement regime commands**
+
+Create `astrolabe_cli/commands/regime.py`:
+
+```python
+from __future__ import annotations
+
+import subprocess
+import sys
+
+from astrolabe_cli.results import CliResult
+from astrolabe_cli.safety import dry_run_payload
+
+
+def status() -> CliResult:
+    from cybernetics.orchestrator import QuantOrchestrator
+
+    snapshot = QuantOrchestrator().detect()
+    regime = snapshot.regime.value if hasattr(snapshot.regime, "value") else str(snapshot.regime)
+    return CliResult(
+        ok=True,
+        command="regime status",
+        message=f"Regime: {regime}",
+        data={
+            "regime": regime,
+            "score": float(getattr(snapshot, "regime_score", 0.0)),
+            "trend": str(getattr(snapshot, "index_ma_trend", "")),
+        },
+    )
+
+
+def train_profit(dry_run: bool) -> CliResult:
+    cmd = [sys.executable, "scripts/train_market_regime_profit.py"]
+    if dry_run:
+        return CliResult(
+            ok=True,
+            command="regime train-profit",
+            message="Dry run: train Market Regime profit policy",
+            data=dry_run_payload("regime.train_profit", cmd=cmd),
+        )
+    completed = subprocess.run(cmd, capture_output=True, text=True)
+    return CliResult(
+        ok=completed.returncode == 0,
+        command="regime train-profit",
+        message="Regime profit training finished" if completed.returncode == 0 else "Regime profit training failed",
+        data={"returncode": completed.returncode},
+        errors=[completed.stderr.strip()] if completed.returncode else [],
+    )
+```
+
+- [ ] **Step 4: Implement backtest/docs/web commands**
+
+Create `astrolabe_cli/commands/backtest.py`:
+
+```python
+from __future__ import annotations
+
+import subprocess
+import sys
+
+from astrolabe_cli.results import CliResult
+from astrolabe_cli.safety import dry_run_payload
+
+
+def run_backtest(strategy: str, dry_run: bool) -> CliResult:
+    cmd = [sys.executable, "backtest/run_all_strategies.py"]
+    if strategy:
+        cmd.extend(["--strategy", strategy])
+    if dry_run:
+        return CliResult(True, "backtest run", data=dry_run_payload("backtest.run", cmd=cmd), message="Dry run")
+    completed = subprocess.run(cmd, capture_output=True, text=True)
+    return CliResult(
+        ok=completed.returncode == 0,
+        command="backtest run",
+        message="Backtest finished" if completed.returncode == 0 else "Backtest failed",
+        data={"returncode": completed.returncode},
+        errors=[completed.stderr.strip()] if completed.returncode else [],
+    )
+```
+
+Create `astrolabe_cli/commands/docs.py`:
+
+```python
+from __future__ import annotations
+
+import subprocess
+
+from astrolabe_cli.results import CliResult
+
+
+DRIFT_PATTERNS = "34 维度|34维度|四维加权|多因子四维|9 页|9页|FastAPI（9|3页|3 页|5517|全局 ticker|底部 ticker|点位与日涨跌|Regime Score"
+
+
+def check_docs() -> CliResult:
+    cmd = [
+        "rg",
+        "-n",
+        DRIFT_PATTERNS,
+        "README.md",
+        "CLAUDE.md",
+        "docs",
+        "wiki",
+        "-g",
+        "!docs/DOCUMENTATION.md",
+    ]
+    completed = subprocess.run(cmd, capture_output=True, text=True)
+    ok = completed.returncode in {0, 1}
+    findings = [line for line in completed.stdout.splitlines() if line.strip()]
+    return CliResult(
+        ok=ok and not findings,
+        command="docs check",
+        message="No known stale phrases found" if not findings else "Known stale phrases found",
+        data={"findings": findings, "returncode": completed.returncode},
+        errors=[] if ok else [completed.stderr.strip()],
+    )
+```
+
+Create `astrolabe_cli/commands/web.py`:
+
+```python
+from __future__ import annotations
+
+import subprocess
+import sys
+
+from astrolabe_cli.results import CliResult
+from astrolabe_cli.safety import dry_run_payload
+
+
+def build(dry_run: bool) -> CliResult:
+    cmd = ["npm", "run", "build"]
+    if dry_run:
+        return CliResult(True, "web build", data=dry_run_payload("web.build", cmd=cmd, cwd="web/frontend"), message="Dry run")
+    completed = subprocess.run(cmd, cwd="web/frontend", capture_output=True, text=True)
+    return CliResult(completed.returncode == 0, "web build", data={"returncode": completed.returncode}, message="Web build finished")
+
+
+def serve(host: str, port: int) -> CliResult:
+    cmd = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "web.api.app:create_app",
+        "--factory",
+        "--host",
+        host,
+        "--port",
+        str(port),
+    ]
+    subprocess.run(cmd)
+    return CliResult(True, "web serve", data={"host": host, "port": port}, message="Web server stopped")
+```
+
+- [ ] **Step 5: Register parsers**
+
+Modify `astrolabe_cli/main.py` by importing the new command functions and adding subparsers for `regime`, `backtest`, `docs`, and `web`. Use these exact argument sets:
+
+```python
+regime_status_cmd.add_argument("--json", action="store_true")
+regime_train_cmd.add_argument("--dry-run", action="store_true")
+backtest_run_cmd.add_argument("--strategy", default="")
+backtest_run_cmd.add_argument("--dry-run", action="store_true")
+docs_check_cmd.add_argument("--json", action="store_true")
+web_build_cmd.add_argument("--dry-run", action="store_true")
+web_serve_cmd.add_argument("--host", default="0.0.0.0")
+web_serve_cmd.add_argument("--port", type=int, default=8501)
+```
+
+For consistency, prefer `add_common_flags()` over direct `--json` where there is no conflict.
+
+- [ ] **Step 6: Run ops tests**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_ops_commands.py -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 7: Commit**
+
+Run:
+
+```bash
+git add astrolabe_cli tests/test_cli_ops_commands.py
+git commit -m "codex: add cli ops commands"
+```
+
+---
+
+## Task 7: Makefile And Documentation Alignment
+
+**Files:**
+- Modify: `Makefile`
+- Modify: `docs/DOCUMENTATION.md`
+- Modify: `docs/specs/05-web-platform.md`
+- Modify: `docs/acceptance-matrix.md`
+- Test: `tests/test_cli_foundation.py`
+
+- [ ] **Step 1: Add failing documentation contract test**
+
+Append to `tests/test_cli_foundation.py`:
+
+```python
+from pathlib import Path
+
+
+def test_docs_describe_xp_as_agent_control_plane():
+    docs = Path("docs/DOCUMENTATION.md").read_text(encoding="utf-8")
+    web_spec = Path("docs/specs/05-web-platform.md").read_text(encoding="utf-8")
+    acceptance = Path("docs/acceptance-matrix.md").read_text(encoding="utf-8")
+
+    assert "astroq" in docs
+    assert "Agent-facing Control Plane" in web_spec
+    assert "CLI Control Plane" in acceptance
+```
+
+- [ ] **Step 2: Run test and confirm red**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_foundation.py::test_docs_describe_xp_as_agent_control_plane -q
+```
+
+Expected: FAIL because docs do not mention CLI control plane.
+
+- [ ] **Step 3: Update Makefile wrappers**
+
+Modify `Makefile` targets:
+
+```make
+scan:
+	$(PYTHON) -m astrolabe_cli.main strategy run all --mode production
+
+backtest:
+	$(PYTHON) -m astrolabe_cli.main backtest run
+
+regime:
+	$(PYTHON) -m astrolabe_cli.main regime status
+
+web: web-build
+	$(PYTHON) -m astrolabe_cli.main web serve --host 0.0.0.0 --port 8501
+
+web-build:
+	$(PYTHON) -m astrolabe_cli.main web build
+```
+
+- [ ] **Step 4: Update documentation**
+
+Add to `docs/DOCUMENTATION.md` under 权威来源:
+
+```markdown
+| Agent/cron/local 操作入口 | `astroq` CLI (`astrolabe_cli/`) | 新自动化优先调用 CLI；旧脚本作为底层实现或兼容入口。 |
+```
+
+Add to `docs/specs/05-web-platform.md`:
+
+```markdown
+### 2.4 Agent-facing Control Plane
+
+`astroq` 是 Web/API 之外的本地控制平面，用于 agent、cron 和人工维护。CLI 只做编排：策略扫描仍走 `data.strategy_plugins`，数据修复仍走 `scripts.repair_table`，Web 服务仍走 `uvicorn web.api.app:create_app`。所有 agent 依赖命令必须支持 `--json`。
+```
+
+Add to `docs/acceptance-matrix.md` Web 平台 section:
+
+```markdown
+| 5.15 | CLI Control Plane | `astrolabe_cli/` | `test_cli_*.py` | `astroq health`, `astroq strategy catalog`, `astroq data status` | Agent 可通过 JSON 输出判断下一步动作 | OK | 继续扩大命令覆盖 |
+```
+
+- [ ] **Step 5: Run docs test**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest tests/test_cli_foundation.py::test_docs_describe_xp_as_agent_control_plane -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+Run:
+
+```bash
+git add Makefile docs/DOCUMENTATION.md docs/specs/05-web-platform.md docs/acceptance-matrix.md tests/test_cli_foundation.py
+git commit -m "codex: document astroq cli control plane"
+```
+
+---
+
+## Task 8: Final Verification And Migration Notes
+
+**Files:**
+- Modify: `docs/development-plan.md` only if implementation reveals a real mismatch in this plan.
+
+- [ ] **Step 1: Run focused CLI tests**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest \
+  tests/test_cli_foundation.py \
+  tests/test_cli_strategy_commands.py \
+  tests/test_cli_data_commands.py \
+  tests/test_cli_ops_commands.py \
+  -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 2: Run adjacent regression tests**
+
+Run:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m pytest \
+  tests/test_strategy_runtime_gates.py \
+  tests/test_strategy_catalog.py \
+  tests/test_strategy_backtest_evidence.py \
+  tests/test_web_system_contracts.py::test_strategy_lab_exposes_catalog_and_candidate_language \
+  -q
+```
+
+Expected: PASS.
+
+- [ ] **Step 3: Run frontend build if Makefile web target changed**
+
+Run:
+
+```bash
 cd web/frontend && npm run typecheck && npm run build
 ```
 
-Then start or restart the Web service:
+Expected: both commands exit 0.
+
+- [ ] **Step 4: Run command smoke tests**
+
+Run:
 
 ```bash
-.venv/bin/python -m uvicorn web.api.app:create_app --factory --host 0.0.0.0 --port 8501
+PYTHONPATH=. .venv/bin/python -m astrolabe_cli.main health --json
+PYTHONPATH=. .venv/bin/python -m astrolabe_cli.main config validate --json
+PYTHONPATH=. .venv/bin/python -m astrolabe_cli.main strategy catalog --json
+PYTHONPATH=. .venv/bin/python -m astrolabe_cli.main strategy run trend_following --mode research --limit 5 --dry-run --json
+PYTHONPATH=. .venv/bin/python -m astrolabe_cli.main data repair stock_valuation --dry-run --json
+PYTHONPATH=. .venv/bin/python -m astrolabe_cli.main docs check --json
 ```
 
-Browser smoke paths:
+Expected: each command prints valid JSON. `docs check` must return `ok=true` unless it reports real stale phrases, in which case fix the stale text before commit.
 
-- `http://localhost:8501/strategy-lab`
-- `http://localhost:8501/strategy-lab?tab=backtest`
-- `http://localhost:8501/strategy-lab?tab=signals`
+- [ ] **Step 5: Install editable package smoke test**
 
-Required visible outcomes:
+Run:
 
-- Strategy Lab no longer reads as a four-strategy-only page.
-- Candidate strategies are visible but marked as research/candidate.
-- Production isolation is visible.
-- Backtest page exposes baseline/evidence language.
-- Running all production strategies does not run candidate strategies.
+```bash
+.venv/bin/python -m pip install -e .
+astroq health --json
+```
+
+Expected: `astroq` resolves from the console script and prints JSON with `ok=true`.
+
+- [ ] **Step 6: Final diff checks**
+
+Run:
+
+```bash
+git diff --check
+git status --short
+```
+
+Expected: no whitespace errors. `git status --short` should only show intended files before final commit.
+
+- [ ] **Step 7: Final commit**
+
+Run:
+
+```bash
+git add astrolabe_cli pyproject.toml Makefile docs tests
+git commit -m "codex: add astroq cli control plane"
+```
+
+Expected: commit succeeds. Do not push unless the user asks.
+
+---
+
+## Acceptance Criteria
+
+- `astroq health --json` returns stable JSON with project version and data roots.
+- `astroq config validate --json` validates settings and strategy registry.
+- `astroq strategy catalog --json` returns Strategy Catalog data.
+- `astroq strategy run all` defaults to `mode=production`.
+- `astroq strategy run trend_following --dry-run` fails unless `--mode research` is specified.
+- `astroq data status --json` runs DB health check through existing code.
+- `astroq data repair <table> --dry-run --json` never calls repair code.
+- `astroq docs check --json` performs the documented drift scan.
+- `astroq web build` delegates to the existing Vite build command.
+- CLI tests and adjacent strategy/web contracts pass.
+
+## Known Follow-Up After MVP
+
+- Add `astroq job` commands only after the local job queue has durable storage.
+- Add `astroq cron` commands only after cron definitions have one machine-readable registry.
+- Add shell completion only after command names stabilize.
+- Add richer evidence report rendering after `data/store/research/strategy_evidence/*.json` contains real baseline payloads.
