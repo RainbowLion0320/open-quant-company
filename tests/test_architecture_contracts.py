@@ -219,7 +219,24 @@ def test_health_check_uses_datahub_dimension_snapshot_listing():
     text = Path("scripts/db_health_check.py").read_text(encoding="utf-8")
 
     assert "list_dimension_snapshots" in text
+    assert "iter_feature_files" in text
     assert "root.glob(\"*.parquet\")" not in text
+    assert 'feat_dir.glob("*.parquet")' not in text
+    assert 'STORE / "features"' not in text
+
+
+def test_feature_store_registry_enrichment_uses_dimension_snapshot_listing():
+    text = Path("data/feature_store.py").read_text(encoding="utf-8")
+
+    assert 'list_dimension_snapshots("moneyflow_monthly")' in text
+    assert 'HUB.store_dir("stock") / "moneyflow" / "monthly"' not in text
+
+
+def test_moneyflow_scripts_use_registry_dimension_paths():
+    text = Path("scripts/fetch_moneyflow_full.py").read_text(encoding="utf-8")
+
+    assert 'dimension_root("moneyflow_monthly")' in text
+    assert 'HUB.store_dir("stock") / "moneyflow" / "monthly"' not in text
 
 
 def test_regime_ml_training_uses_production_regime_replay():

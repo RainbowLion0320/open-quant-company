@@ -259,8 +259,7 @@ def enrich_from_registry(
     # ── Moneyflow factors ──
     if reg.get("moneyflow_monthly") and reg.get("moneyflow_monthly").is_available:
         try:
-            mf_dir = HUB.store_dir("stock") / "moneyflow" / "monthly"
-            mf_files = sorted(mf_dir.glob("*.parquet"))
+            mf_files = HUB.list_dimension_snapshots("moneyflow_monthly")
 
             # Find latest moneyflow date ON OR BEFORE month_end
             mf_df = None

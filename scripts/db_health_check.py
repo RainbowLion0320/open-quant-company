@@ -25,6 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 from data.datahub import get_datahub
 from data.data_registry import HealthTableMeta, get_registry
+from data.feature_store import iter_feature_files
 
 HUB = get_datahub()
 STORE = HUB.store_root
@@ -401,14 +402,12 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
             _scan_dimension(dim)
 
     # ── Features (all, as aggregate) ──
-    feat_dir = STORE / "features"
-    if feat_dir.exists():
-        feat_files = sorted(feat_dir.glob("*.parquet"))
-        if feat_files:
-            records.append(_scan_many("features_all", feat_files, max_sample=20, source="Computed"))
-        # Also keep 3 recent individual entries for per-month detail
-        for f in feat_files[-3:]:
-            records.append(_scan_single(f"features_{f.stem}", f, source="Computed"))
+    feat_files = iter_feature_files(HUB.features_dir())
+    if feat_files:
+        records.append(_scan_many("features_all", feat_files, max_sample=20, source="Computed"))
+    # Also keep 3 recent individual entries for per-month detail
+    for f in feat_files[-3:]:
+        records.append(_scan_single(f"features_{f.stem}", f, source="Computed"))
 
     # ── Signals ──
     for name in ["buffett", "buffett_scan", "multifactor", "ml_lgbm", "cybernetic"]:

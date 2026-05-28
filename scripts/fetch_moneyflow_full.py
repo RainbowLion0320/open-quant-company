@@ -98,7 +98,7 @@ def fetch_monthly_only(start: str = "20150101", end: str = "20260501"):
     print(f"   积分: 0 (门槛2000，不消耗)")
     print(f"{'='*60}")
 
-    store_dir = HUB.store_dir("stock") / "moneyflow" / "monthly"
+    store_dir = HUB.dimension_root("moneyflow_monthly")
     store_dir.mkdir(parents=True, exist_ok=True)
 
     all_days = get_trade_calendar(start, end)
