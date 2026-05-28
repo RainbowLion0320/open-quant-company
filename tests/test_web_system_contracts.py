@@ -334,6 +334,14 @@ def test_sector_capital_blocks_prioritize_metric_then_centered_industry_name():
     assert "align-self: center;" in name_style
     assert "justify-self: center;" in name_style
     assert "text-align: center;" in name_style
+    assert "font-size: var(--industry-name-size, 12px);" in name_style
+    assert "sizeRatio" in sectors
+    assert "function industryNameFontSize" in sectors
+    assert '"--industry-name-size": industryNameFontSize(tile.sizeRatio)' in sectors
+    assert "12 + visualWeight * 9.5" in sectors
+
+    metric_style = sectors.split(".industry-metric {", 1)[1].split("}", 1)[0]
+    assert "--industry-name-size" not in metric_style
 
     tooltip_style = sectors.split(".industry-block::after {", 1)[1].split("}", 1)[0]
     assert "content: attr(data-tooltip);" in tooltip_style

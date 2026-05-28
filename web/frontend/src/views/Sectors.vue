@@ -204,6 +204,7 @@ const blockHeatModes: { key: BlockHeatMode; label: string; metric: string }[] = 
 type SectorBlockTile = {
   sector: SectorCard;
   size: number;
+  sizeRatio: number;
   span: number;
   metric: number;
   metricLabel: string;
@@ -253,9 +254,11 @@ const sectorBlockTiles = computed<SectorBlockTile[]>(() => {
     .sort((a, b) => b.size - a.size);
   const maxSize = items[0]?.size || 1;
   return items.map(item => {
+    const sizeRatio = clampNumber(item.size / maxSize, 0, 1);
     const span = sectorBlockSpan(item.size, maxSize);
     return {
       ...item,
+      sizeRatio,
       span,
       metric: blockMetric(item.sector),
       metricLabel: blockMetricLabel(item.sector),
@@ -303,6 +306,11 @@ function sectorBlockSpan(size: number, maxSize: number) {
   return clampNumber(Math.ceil(Math.sqrt(ratio) * 4 - 0.15), 1, 4);
 }
 
+function industryNameFontSize(sizeRatio: number) {
+  const visualWeight = Math.sqrt(clampNumber(sizeRatio, 0, 1));
+  return `${(12 + visualWeight * 9.5).toFixed(1)}px`;
+}
+
 function industryTooltip(tile: SectorBlockTile) {
   const code = tile.sector.sector_code || "SW1";
   return `${tile.sector.sector_name} · 行业代码 ${code} · ${blockSizeLabel.value} ${formatAmount(tile.size)} · ${activeBlockHeatMode.value?.metric}: ${tile.metricLabel}`;
@@ -343,6 +351,7 @@ function industryBlockStyle(tile: SectorBlockTile) {
     borderColor: activeSector.value === tile.sector.sector_code ? "var(--accent)" : tone.border,
     boxShadow: tone.boxShadow,
     color: tone.color,
+    "--industry-name-size": industryNameFontSize(tile.sizeRatio),
   };
 }
 
@@ -577,7 +586,7 @@ onMounted(fetchData);
   align-self: center;
   justify-self: center;
   color: var(--text-primary);
-  font-size: clamp(12px, calc(var(--block-cell) / 6.7), 22px);
+  font-size: var(--industry-name-size, 12px);
   font-weight: 800;
   line-height: 1.12;
   text-align: center;
