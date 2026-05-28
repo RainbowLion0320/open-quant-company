@@ -314,3 +314,26 @@ def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
     assert "SectorConstituent" not in api
     assert "constituents" not in api
     assert "sectorStocks" not in api
+
+
+def test_sector_capital_blocks_prioritize_metric_then_centered_industry_name():
+    sectors = Path("web/frontend/src/views/Sectors.vue").read_text(encoding="utf-8")
+
+    block_template = sectors.split('class="industry-block"', 1)[1].split("</button>", 1)[0]
+    assert 'class="industry-value-row"' in block_template
+    assert 'class="industry-name"' in block_template
+    assert ':data-tooltip="industryTooltip(tile)"' in block_template
+    assert block_template.index('class="industry-value-row"') < block_template.index('class="industry-name"')
+    assert 'class="industry-code"' not in block_template
+    assert "tile.sector.sector_code || 'SW1'" not in block_template
+
+    tooltip_block = sectors.split("function industryTooltip", 1)[1].split("function heatStyle", 1)[0]
+    assert "行业代码" in tooltip_block
+
+    name_style = sectors.split(".industry-name {", 1)[1].split("}", 1)[0]
+    assert "align-self: center;" in name_style
+    assert "justify-self: center;" in name_style
+    assert "text-align: center;" in name_style
+
+    tooltip_style = sectors.split(".industry-block::after {", 1)[1].split("}", 1)[0]
+    assert "content: attr(data-tooltip);" in tooltip_style

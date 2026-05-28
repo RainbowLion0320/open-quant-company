@@ -72,15 +72,15 @@
               { active: activeSector === tile.sector.sector_code, 'is-compact': tile.span === 1 },
             ]"
             :style="industryBlockStyle(tile)"
-            :title="industryTitle(tile)"
+            :aria-label="industryTooltip(tile)"
+            :data-tooltip="industryTooltip(tile)"
             @click="toggleSector(tile.sector)"
           >
-            <span class="industry-name-row">
-              <span class="industry-name">{{ tile.sector.sector_name }}</span>
+            <span class="industry-value-row">
+              <span class="industry-metric">{{ tile.metricLabel }}</span>
               <strong>{{ formatAmount(tile.size) }}</strong>
             </span>
-            <span class="industry-metric">{{ tile.metricLabel }}</span>
-            <span class="industry-code">{{ tile.sector.sector_code || 'SW1' }}</span>
+            <span class="industry-name">{{ tile.sector.sector_name }}</span>
           </button>
         </div>
         <div v-else class="empty-state empty-state-compact">暂无可绘制的行业资金数据</div>
@@ -303,8 +303,9 @@ function sectorBlockSpan(size: number, maxSize: number) {
   return clampNumber(Math.ceil(Math.sqrt(ratio) * 4 - 0.15), 1, 4);
 }
 
-function industryTitle(tile: SectorBlockTile) {
-  return `${tile.sector.sector_name} · ${blockSizeLabel.value} ${formatAmount(tile.size)} · ${activeBlockHeatMode.value?.metric}: ${tile.metricLabel}`;
+function industryTooltip(tile: SectorBlockTile) {
+  const code = tile.sector.sector_code || "SW1";
+  return `${tile.sector.sector_name} · 行业代码 ${code} · ${blockSizeLabel.value} ${formatAmount(tile.size)} · ${activeBlockHeatMode.value?.metric}: ${tile.metricLabel}`;
 }
 
 function heatStyle(metric: number) {
@@ -509,9 +510,10 @@ onMounted(fetchData);
   justify-content: start;
 }
 .industry-block {
+  position: relative;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  align-items: start;
+  grid-template-rows: auto 1fr;
+  align-items: stretch;
   gap: 8px;
   min-height: 0;
   padding: 9px;
@@ -520,19 +522,51 @@ onMounted(fetchData);
   background: transparent;
   color: inherit;
   overflow: hidden;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   transition: border-color 0.18s ease, filter 0.18s ease, transform 0.18s ease;
+}
+.industry-block::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  z-index: 20;
+  max-width: min(360px, calc(100vw - 48px));
+  width: max-content;
+  padding: 7px 10px;
+  border: 1px solid rgba(0, 212, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(3, 12, 24, 0.94);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  white-space: nowrap;
 }
 .industry-block:hover,
 .industry-block.active {
   filter: brightness(1.14);
 }
+.industry-block:hover {
+  z-index: 5;
+  overflow: visible;
+}
+.industry-block:hover::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
 .industry-block.active {
   box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.45), 0 0 18px rgba(0, 212, 255, 0.16);
 }
-.industry-name-row {
+.industry-value-row {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -540,15 +574,21 @@ onMounted(fetchData);
   align-items: start;
 }
 .industry-name {
+  align-self: center;
+  justify-self: center;
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: clamp(12px, calc(var(--block-cell) / 6.7), 22px);
   font-weight: 800;
-  line-height: 1.15;
-  white-space: nowrap;
+  line-height: 1.12;
+  text-align: center;
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
-.industry-name-row strong {
+.industry-value-row strong {
+  justify-self: end;
   color: currentColor;
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
@@ -556,28 +596,23 @@ onMounted(fetchData);
   white-space: nowrap;
 }
 .industry-metric {
-  align-self: center;
+  justify-self: start;
   color: currentColor;
   font-family: "JetBrains Mono", monospace;
-  font-size: clamp(14px, calc(var(--block-cell) / 4), 28px);
+  font-size: clamp(13px, calc(var(--block-cell) / 5.4), 21px);
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0;
-}
-.industry-code {
-  align-self: end;
-  color: var(--text-secondary);
-  font-size: 10px;
-  line-height: 1.1;
+  white-space: nowrap;
 }
 .industry-block.span-1 .industry-metric,
-.industry-block.span-1 .industry-code {
+.industry-block.span-1 .industry-value-row strong {
   display: none;
 }
 .industry-block.span-1 {
   padding: 7px;
 }
-.industry-block.span-1 .industry-name-row {
+.industry-block.span-1 .industry-value-row {
   grid-template-columns: 1fr;
   gap: 2px;
 }
@@ -614,6 +649,9 @@ onMounted(fetchData);
   .sector-block-grid {
     --block-cell: 72px;
     --block-gap: 8px;
+  }
+  .industry-block::after {
+    display: none;
   }
 }
 </style>
