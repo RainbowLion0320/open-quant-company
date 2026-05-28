@@ -2,13 +2,24 @@
 
 import json
 from fastapi import APIRouter, Query
-from web.api.models import DCFParams, DCFResult, StockResponse, StockDetail, FinancialData, StrategySignal, KLineItem
+from web.api.models import DCFParams, DCFResult, StockResponse, StockDetail, StockListResponse, FinancialData, StrategySignal, KLineItem
 from web.api.errors import DataNotFoundError, InvalidParameterError
 
 router = APIRouter(prefix="/api/stocks", tags=["Stocks"])
 
 
 # ── 个股全景 ──────────────────────────────────────────────
+
+@router.get("", response_model=StockListResponse)
+async def list_stocks(
+    limit: int = Query(default=300, ge=1, le=1000, description="返回股票数量上限"),
+    q: str = Query(default="", description="按代码/名称/行业过滤"),
+):
+    """股票池默认列表: 基础资料 + 估值 + 质量分 + 策略信号摘要."""
+    rows, total = _build_stock_list(limit=limit, q=q)
+    updated = max((_safe_text(row.get("updated_at")) for row in rows), default="")
+    return StockListResponse(stocks=rows, total=total, limit=limit, updated_at=updated)
+
 
 @router.get("/{code}", response_model=StockResponse)
 async def get_stock_detail(code: str):
@@ -17,6 +28,8 @@ async def get_stock_detail(code: str):
     from data.financials import get_financial_summary, extract_roe_history, extract_gross_margin_history, extract_net_margin_history, extract_debt_equity_ratio, extract_latest_net_profit, extract_latest_revenue
     from data.results_db import load_buffett_results, load_strategy_signals
     from data.fetcher import get_stock_daily
+
+    code = _resolve_stock_symbol(code)
 
     # 验码
     name = SYMBOL_NAME.get(code)
@@ -206,6 +219,255 @@ async def compute_dcf(
 
 
 # ── 辅助 ──────────────────────────────────────────────────
+
+def _build_stock_list(limit: int, q: str = "") -> tuple[list[dict], int]:
+    from data.datahub import get_datahub
+    from data.registry import get_enabled_strategies
+    from data.results_db import load_buffett_results, load_strategy_signals
+    from data.symbols import SYMBOL_NAME, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
+
+    hub = get_datahub()
+    query = str(q or "").strip().lower()
+
+    buffett_rows = load_buffett_results(sort="score", order="desc")
+    buffett_by_symbol = {str(row.get("symbol")): row for row in buffett_rows if row.get("symbol")}
+
+    signal_summary: dict[str, dict] = {}
+    for strat in get_enabled_strategies():
+        strategy_name = strat["name"]
+        try:
+            sigs = load_strategy_signals(strategy_name, sort="score", order="desc")
+        except Exception:
+            sigs = []
+        for sig in sigs:
+            symbol = str(sig.get("symbol") or "")
+            if not symbol:
+                continue
+            score = _safe_float(sig.get("score"))
+            item = signal_summary.setdefault(symbol, {
+                "signal_count": 0,
+                "buy_signals": 0,
+                "signal_score": None,
+                "signal": "hold",
+                "top_strategy": "",
+            })
+            item["signal_count"] += 1
+            if sig.get("signal") == "buy":
+                item["buy_signals"] += 1
+                item["signal"] = "buy"
+            if score is not None and (item["signal_score"] is None or score > item["signal_score"]):
+                item["signal_score"] = score
+                item["top_strategy"] = strategy_name
+
+    symbols = sorted(set(SYMBOL_NAME) | set(buffett_by_symbol) | set(signal_summary))
+    candidates: list[dict] = []
+    for symbol in symbols:
+        name = SYMBOL_NAME.get(symbol) or str(buffett_by_symbol.get(symbol, {}).get("name") or symbol)
+        industry = SYMBOL_INDUSTRY.get(symbol) or str(buffett_by_symbol.get(symbol, {}).get("industry") or "")
+        if query and query not in symbol.lower() and query not in name.lower() and query not in industry.lower():
+            continue
+
+        buffett = buffett_by_symbol.get(symbol, {})
+        signal = signal_summary.get(symbol, {})
+        candidates.append({
+            "symbol": symbol,
+            "name": name,
+            "industry": industry,
+            "sector": SYMBOL_SECTOR.get(symbol, FALLBACK_SECTOR),
+            "buffett_score": _safe_float(buffett.get("score")),
+            "roe": _safe_float(buffett.get("avg_roe_5y")),
+            "gross_margin": _safe_float(buffett.get("avg_gross_margin_5y")),
+            "buffett_price": _safe_float(buffett.get("current_price")),
+            "buffett_updated_at": str(buffett.get("updated_at") or ""),
+            "signal_score": signal.get("signal_score"),
+            "signal": signal.get("signal", "hold"),
+            "buy_signals": int(signal.get("buy_signals", 0)),
+            "signal_count": int(signal.get("signal_count", 0)),
+            "top_strategy": signal.get("top_strategy", ""),
+        })
+
+    total = len(candidates)
+    candidates.sort(key=_stock_list_rank, reverse=True)
+    rows: list[dict] = []
+    visible = candidates[:limit]
+    valuations = _latest_valuations(hub, [str(base["symbol"]) for base in visible])
+    for base in visible:
+        valuation = valuations.get(base["symbol"], {})
+        base["price"] = _first_number(valuation.get("price"), base.pop("buffett_price", None))
+        base["change_pct"] = valuation.get("change_pct")
+        base["pe_ttm"] = valuation.get("pe_ttm")
+        base["pb"] = valuation.get("pb")
+        base["total_mv"] = valuation.get("total_mv")
+        base["updated_at"] = _safe_text(valuation.get("trade_date") or base.pop("buffett_updated_at", ""))
+        rows.append(base)
+
+    rows.sort(key=_stock_list_rank, reverse=True)
+    return rows, total
+
+
+def _stock_list_rank(row: dict) -> tuple:
+    return (
+        0 if _is_st_stock(row.get("name")) else 1,
+        int(row.get("buy_signals") or 0),
+        _rank_number(row.get("signal_score")),
+        _rank_number(row.get("buffett_score")),
+        _rank_number(row.get("total_mv")),
+    )
+
+
+def _is_st_stock(name) -> bool:
+    text = str(name or "").upper()
+    return "ST" in text
+
+
+def _latest_valuations(hub, symbols: list[str]) -> dict[str, dict]:
+    symbol_set = {str(symbol) for symbol in symbols if symbol}
+    if not symbol_set:
+        return {}
+
+    try:
+        import duckdb
+
+        valuation_glob = str(hub.store_path("stock") / "valuation" / "*.parquet")
+        con = duckdb.connect(database=":memory:")
+        try:
+            rows = con.execute(
+                """
+                WITH ranked AS (
+                  SELECT
+                    regexp_extract(filename, '([^/]+)\\.parquet$', 1) AS symbol,
+                    trade_date,
+                    close,
+                    pe_ttm,
+                    pb,
+                    total_mv,
+                    row_number() OVER (PARTITION BY filename ORDER BY trade_date DESC) AS rn
+                  FROM read_parquet(?, filename=true)
+                )
+                SELECT
+                  latest.symbol,
+                  latest.trade_date,
+                  latest.close,
+                  previous.close AS previous_close,
+                  latest.pe_ttm,
+                  latest.pb,
+                  latest.total_mv
+                FROM ranked latest
+                LEFT JOIN ranked previous ON latest.symbol = previous.symbol AND previous.rn = 2
+                WHERE latest.rn = 1
+                """,
+                [valuation_glob],
+            ).fetchall()
+        finally:
+            con.close()
+
+        latest: dict[str, dict] = {}
+        for symbol, trade_date, price, previous_price, pe_ttm, pb, total_mv in rows:
+            symbol = str(symbol)
+            if symbol not in symbol_set:
+                continue
+            price_val = _safe_float(price)
+            previous_val = _safe_float(previous_price)
+            change_pct = None
+            if price_val is not None and previous_val not in (None, 0):
+                change_pct = price_val / previous_val - 1
+            total_mv_val = _safe_float(total_mv)
+            latest[symbol] = {
+                "price": price_val,
+                "change_pct": change_pct,
+                "pe_ttm": _safe_float(pe_ttm),
+                "pb": _safe_float(pb),
+                "total_mv": total_mv_val / 10000 if total_mv_val is not None else None,
+                "trade_date": _safe_text(trade_date),
+            }
+        return latest
+    except Exception:
+        return {symbol: _latest_valuation(hub, symbol) for symbol in symbol_set}
+
+
+def _latest_valuation(hub, symbol: str) -> dict:
+    import pandas as pd
+
+    pq = hub.stock_valuation_path(symbol)
+    df = hub.read_parquet(pq, default=pd.DataFrame())
+    if df is None or df.empty:
+        return {}
+    data = df.copy()
+    if "trade_date" in data.columns:
+        data = data.sort_values("trade_date")
+    latest = data.iloc[-1]
+    prev = data.iloc[-2] if len(data) > 1 else latest
+    price = _safe_float(latest.get("close"))
+    prev_price = _safe_float(prev.get("close"))
+    change_pct = None
+    if price is not None and prev_price and prev_price != 0:
+        change_pct = price / prev_price - 1
+    total_mv = _safe_float(latest.get("total_mv"))
+    return {
+        "price": price,
+        "change_pct": change_pct,
+        "pe_ttm": _safe_float(latest.get("pe_ttm")),
+        "pb": _safe_float(latest.get("pb")),
+        "total_mv": total_mv / 10000 if total_mv is not None else None,
+        "trade_date": _safe_text(latest.get("trade_date")),
+    }
+
+
+def _resolve_stock_symbol(identifier: str) -> str:
+    from data.symbols import SYMBOL_NAME
+
+    raw = str(identifier or "").strip()
+    if raw in SYMBOL_NAME:
+        return raw
+    needle = raw.lower()
+    matches = [
+        symbol for symbol, name in SYMBOL_NAME.items()
+        if needle and (needle in symbol.lower() or needle in str(name).lower())
+    ]
+    if not matches:
+        return raw
+    matches.sort(key=lambda symbol: (
+        0 if str(SYMBOL_NAME.get(symbol, "")).lower() == needle else 1,
+        symbol,
+    ))
+    return matches[0]
+
+
+def _safe_float(val):
+    if val is None:
+        return None
+    try:
+        if val != val:
+            return None
+        return float(val)
+    except Exception:
+        return None
+
+
+def _safe_text(val) -> str:
+    if val is None:
+        return ""
+    try:
+        if val != val:
+            return ""
+    except Exception:
+        pass
+    text = str(val)
+    return "" if text.lower() == "nan" else text
+
+
+def _first_number(*values):
+    for value in values:
+        number = _safe_float(value)
+        if number is not None:
+            return number
+    return None
+
+
+def _rank_number(value):
+    number = _safe_float(value)
+    return number if number is not None else -1e18
+
 
 def _safe_parse_pct(val):
     import pandas as pd

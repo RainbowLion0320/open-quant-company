@@ -109,6 +109,32 @@ class StockResponse(BaseModel):
     kline: List[KLineItem]
     dcf: Optional[DCFResult] = None
 
+class StockListItem(BaseModel):
+    symbol: str
+    name: str = ""
+    industry: str = ""
+    sector: str = ""
+    price: Optional[float] = None
+    change_pct: Optional[float] = None
+    pe_ttm: Optional[float] = None
+    pb: Optional[float] = None
+    total_mv: Optional[float] = None
+    buffett_score: Optional[float] = None
+    roe: Optional[float] = None
+    gross_margin: Optional[float] = None
+    signal_score: Optional[float] = None
+    signal: str = "hold"
+    buy_signals: int = 0
+    signal_count: int = 0
+    top_strategy: str = ""
+    updated_at: str = ""
+
+class StockListResponse(BaseModel):
+    stocks: List[StockListItem]
+    total: int
+    limit: int
+    updated_at: str = ""
+
 # ── 模拟交易 ──
 
 class PositionItem(BaseModel):

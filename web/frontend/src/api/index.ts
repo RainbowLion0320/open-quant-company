@@ -321,6 +321,34 @@ export interface StockDetail {
   financials?: any[];
 }
 
+export interface StockListItem {
+  symbol: string;
+  name: string;
+  industry: string;
+  sector: string;
+  price: number | null;
+  change_pct: number | null;
+  pe_ttm: number | null;
+  pb: number | null;
+  total_mv: number | null;
+  buffett_score: number | null;
+  roe: number | null;
+  gross_margin: number | null;
+  signal_score: number | null;
+  signal: "buy" | "hold" | string;
+  buy_signals: number;
+  signal_count: number;
+  top_strategy: string;
+  updated_at: string;
+}
+
+export interface StockListResponse {
+  stocks: StockListItem[];
+  total: number;
+  limit: number;
+  updated_at: string;
+}
+
 export interface SignalChange {
   date: string;
   strategy: string;
@@ -504,8 +532,9 @@ export const api = {
   portfolioRefresh: () => post<any>("/api/portfolio/refresh"),
 
   // Stocks
+  stockList: (limit = 300) => get<StockListResponse>(`/api/stocks?limit=${limit}`),
   stock: async (code: string) => {
-    const data = await get<any>(`/api/stocks/${code}`);
+    const data = await get<any>(`/api/stocks/${encodeURIComponent(code)}`);
     const br = data.buffett_result || null;
     const grouped: Record<string, StrategySignal[]> = {};
     for (const sig of data.signals || []) {

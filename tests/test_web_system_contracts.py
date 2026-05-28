@@ -30,6 +30,24 @@ def test_strategy_jobs_route_is_not_shadowed(monkeypatch):
     assert res.json()["progress"] == 42
 
 
+def test_stock_list_route_is_not_shadowed(monkeypatch):
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+
+    res = TestClient(create_app()).get("/api/stocks?limit=5")
+    assert res.status_code == 200
+    data = res.json()
+    assert "stocks" in data
+    assert "total" in data
+    assert data["limit"] == 5
+    assert data["total"] >= len(data["stocks"])
+    if data["stocks"]:
+        row = data["stocks"][0]
+        for key in ("symbol", "name", "industry", "price", "change_pct", "pe_ttm", "pb", "buffett_score", "signal_score"):
+            assert key in row
+
+
 def test_macro_gdp_tushare_normalizes_quarter_to_date():
     from data.fetchers.macro import MacroFetcher, derive_macro_factors
 
@@ -365,3 +383,19 @@ def test_sector_capital_blocks_prioritize_metric_then_centered_industry_name():
 
     tooltip_style = sectors.split(".industry-block::after {", 1)[1].split("}", 1)[0]
     assert "content: attr(data-tooltip);" in tooltip_style
+
+
+def test_stock_search_view_defaults_to_stock_table():
+    stocks = Path("web/frontend/src/views/Stocks.vue").read_text(encoding="utf-8")
+    api = Path("web/frontend/src/api/index.ts").read_text(encoding="utf-8")
+
+    assert "api.stockList" in stocks
+    assert "onMounted(loadStockList)" in stocks
+    assert "stock-list-table" in stocks
+    assert "defaultRows" in stocks
+    assert "filteredRows" in stocks
+    assert "listTotal" in stocks
+    assert "stock-list-stats" in stocks
+    assert "股票池概览" in stocks
+    assert 'stockList: (limit = 300' in api
+    assert 'get<StockListResponse>(`/api/stocks?limit=${limit}`)' in api
