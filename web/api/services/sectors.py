@@ -130,6 +130,7 @@ def build_sector_exposure() -> dict:
         }
         for _, row in df.iterrows()
     ]
+    exposure = sorted(exposure, key=lambda row: row["weight"], reverse=True)
     return {"exposure": exposure, "total_sectors": len(exposure), "data_source": "real"}
 
 

@@ -1,4 +1,5 @@
 import importlib
+import os
 import subprocess
 from pathlib import Path
 
@@ -131,6 +132,27 @@ def test_enabled_strategy_plugins_have_runners():
         assert callable(plugin.load_runner())
 
 
+def test_strategy_runners_do_not_point_at_cli_scripts():
+    from data.strategy_plugins import DEFAULT_RUNNERS
+
+    offenders = {name: runner for name, runner in DEFAULT_RUNNERS.items() if runner.startswith("scripts.")}
+
+    assert offenders == {}
+
+
+def test_compute_signals_import_has_no_runtime_side_effects(monkeypatch):
+    import socket
+
+    monkeypatch.setenv("http_proxy", "http://proxy.invalid")
+    before_timeout = socket.getdefaulttimeout()
+
+    module = importlib.import_module("scripts.compute_signals")
+
+    assert callable(module.main)
+    assert socket.getdefaulttimeout() == before_timeout
+    assert "http_proxy" in os.environ
+
+
 def test_datahub_catalog_includes_data_registry_dimensions():
     from data.datahub import get_datahub
 
@@ -175,6 +197,36 @@ def test_system_route_delegates_large_status_domains_to_services():
     assert "def _read_token(" not in route_text
     assert "def _run_repair(" not in route_text
     assert "def _repairable_tables(" not in route_text
+
+
+def test_portfolio_sector_exposure_reuses_sector_service():
+    route_text = Path("web/api/routes/portfolio.py").read_text()
+
+    assert "build_sector_exposure" in route_text
+    assert 'dimension_root("sector_exposure_snapshot")' not in route_text
+    assert "root.glob(\"*.parquet\")" not in route_text
+
+
+def test_regime_training_reuses_shared_metric_helpers():
+    text = Path("research/regime_training.py").read_text()
+
+    assert "from research.performance import portfolio_metrics" in text
+    assert "from research.forward_labels import" in text
+    assert "def _portfolio_metrics(" not in text
+    assert "def _future_compound_return(" not in text
+
+
+def test_frontend_sector_metrics_are_shared():
+    sectors = Path("web/frontend/src/views/Sectors.vue").read_text()
+    market = Path("web/frontend/src/views/Market.vue").read_text()
+    sector_utils = Path("web/frontend/src/utils/sector.ts").read_text()
+
+    assert "../utils/sector" in sectors
+    assert "../utils/sector" in market
+    assert "export function signalPower" in sector_utils
+    assert "export function dataSourceLabel" in sector_utils
+    assert "function signalPower(" not in sectors
+    assert "function signalPower(" not in market
 
 
 def test_scripts_do_not_import_regime_helpers_from_orchestrator():

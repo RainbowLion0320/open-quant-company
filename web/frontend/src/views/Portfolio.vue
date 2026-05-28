@@ -254,7 +254,7 @@ async function loadAll() {
       api.portfolioNav(),
       api.portfolioTrades(50),
       api.portfolioSummary(),
-      api.portfolioSectorExposure(),
+      api.sectorExposure(),
     ]);
 
     positions.value = (posRes.positions || []).map((p: any) => ({

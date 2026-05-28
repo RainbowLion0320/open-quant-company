@@ -502,7 +502,6 @@ export const api = {
   portfolioTrades: (limit = 50) => get<{ trades: PortfolioTrade[]; total: number }>(`/api/portfolio/trades?limit=${limit}`),
   portfolioSummary: () => get<PortfolioSummary>("/api/portfolio/summary"),
   portfolioRefresh: () => post<any>("/api/portfolio/refresh"),
-  portfolioSectorExposure: () => get<SectorExposureResponse>("/api/portfolio/sector-exposure"),
 
   // Stocks
   stock: async (code: string) => {

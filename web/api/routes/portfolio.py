@@ -7,6 +7,7 @@ PaperBroker 实例从 Parquet 恢复，确保服务器重启不丢状态。
 from fastapi import APIRouter, HTTPException
 from web.api.models import OrderRequest, PositionItem, AccountInfo, OrderItem
 from web.api.errors import InvalidParameterError
+from web.api.services.sectors import build_sector_exposure
 
 router = APIRouter(prefix="/api/portfolio", tags=["Portfolio"])
 
@@ -248,41 +249,9 @@ async def get_orders():
 async def get_sector_exposure():
     """按申万一级行业汇总的持仓敞口。
 
-    读取 sector_exposure 快照 parquet，返回各行业权重/市值/持仓数。
+    Compatibility alias for the canonical sector exposure service.
     """
-    from data.datahub import get_datahub
-    hub = get_datahub()
-    latest_path = None
-    try:
-        root = hub.dimension_root("sector_exposure_snapshot")
-        if root.exists():
-            candidates = sorted(root.glob("*.parquet"), reverse=True)
-            if candidates:
-                latest_path = candidates[0]
-    except Exception:
-        latest_path = None
-    if latest_path is None:
-        return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
-
-    import pandas as pd
-    df = hub.read_parquet(latest_path, default=pd.DataFrame())
-    if df.empty:
-        return {"exposure": [], "total_sectors": 0, "data_source": "missing"}
-
-    exposure = []
-    for _, row in df.iterrows():
-        exposure.append({
-            "sector": str(row.get("sector", "")),
-            "weight": float(row.get("weight", 0)),
-            "market_value": float(row.get("market_value", 0)),
-            "position_count": int(row.get("position_count", 0)),
-        })
-
-    return {
-        "exposure": sorted(exposure, key=lambda x: x["weight"], reverse=True),
-        "total_sectors": len(exposure),
-        "data_source": "real",
-    }
+    return build_sector_exposure()
 
 
 # ── 刷新状态 ──────────────────────────────────────────────

@@ -177,6 +177,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useMarketStore } from "../stores";
 import { api, type MacroCard, type MarketAssetCard, type MarketSeriesPoint, type SectorCard, type SectorOverviewResponse } from "../api";
 import { colorBySignedRatio, fmtSignedRatioPct } from "../utils/format";
+import { signalPower } from "../utils/sector";
 
 const store = useMarketStore();
 const selectedRange = ref("6M");
@@ -463,11 +464,6 @@ function fmtReturn(v: number) {
 }
 function colorPct(v: number) {
   return colorBySignedRatio(v);
-}
-function signalPower(sector: SectorCard) {
-  const ratios = Object.values(sector.signals || {}).map(signal => Number(signal.buy_ratio || 0));
-  if (!ratios.length) return 0;
-  return Math.max(...ratios);
 }
 function fmtSignalPower(sector: SectorCard) {
   return `${Math.round(signalPower(sector) * 100)}%`;

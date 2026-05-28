@@ -186,6 +186,7 @@ import type {
   SectorCard,
 } from "../api";
 import { colorBySignedRatio, fmtRatioPct as fmtPct } from "../utils/format";
+import { clampNumber, dataSourceLabel, formatAmount, signalPower } from "../utils/sector";
 
 const loading = ref(false);
 const error = ref("");
@@ -279,11 +280,6 @@ function colorPct(v: number) {
   return colorBySignedRatio(v);
 }
 
-function signalPower(sector: SectorCard) {
-  const ratios = Object.values(sector.signals || {}).map(signal => Number(signal.buy_ratio || 0));
-  return ratios.length ? Math.max(...ratios) : 0;
-}
-
 function tileSize(sector: SectorCard) {
   const amount = Number(sector.amount_5d_avg || sector.turnover_amount || 0);
   if (amount > 0) return amount;
@@ -299,17 +295,6 @@ function blockMetric(sector: SectorCard) {
 function blockMetricLabel(sector: SectorCard) {
   if (blockHeatMode.value === "signal") return `${(signalPower(sector) * 100).toFixed(0)}% buy`;
   return fmtPct(blockHeatMode.value === "momentum" ? sector.return_20d : sector.return_5d);
-}
-
-function formatAmount(value: number) {
-  const n = Number(value || 0);
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}亿`;
-  if (n >= 10_000) return `${(n / 10_000).toFixed(1)}万`;
-  return n.toFixed(0);
-}
-
-function clampNumber(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }
 
 function sectorBlockSpan(size: number, maxSize: number) {
@@ -358,13 +343,6 @@ function industryBlockStyle(tile: SectorBlockTile) {
     boxShadow: tone.boxShadow,
     color: tone.color,
   };
-}
-
-function dataSourceLabel(source: string) {
-  if (source === "real") return "真实数据";
-  if (source === "proxy") return "代理数据";
-  if (source === "estimated") return "估算数据";
-  return "数据缺失";
 }
 
 function toggleSector(s: SectorCard) {

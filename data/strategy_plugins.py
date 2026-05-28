@@ -21,9 +21,9 @@ from data.results_db import (
 
 
 DEFAULT_RUNNERS = {
-    "buffett": "scripts.compute_signals:compute_buffett",
-    "multifactor": "scripts.compute_signals:compute_multifactor",
-    "cybernetic": "scripts.compute_signals:compute_cybernetic",
+    "buffett": "signals.runners:compute_buffett",
+    "multifactor": "signals.runners:compute_multifactor",
+    "cybernetic": "signals.runners:compute_cybernetic",
     "ml_lgbm": "signals.ml_signals:compute_ml_signals",
 }
 

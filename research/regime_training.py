@@ -13,6 +13,11 @@ import pandas as pd
 
 from cybernetics.regime_policy import PRODUCTION_REGIME_POLICY
 from cybernetics.regime_scoring import breadth_strength, clamp, volume_strength
+from research.forward_labels import (
+    build_forward_labels as _shared_build_forward_labels,
+    build_profit_labels as _shared_build_profit_labels,
+)
+from research.performance import portfolio_metrics
 
 
 class PromotionGateResult(StrEnum):
@@ -129,31 +134,7 @@ def normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
 
 def build_forward_labels(close: pd.Series, horizons: Iterable[int] = (5, 20, 60)) -> pd.DataFrame:
     """Build forward labels from rows after each feature date."""
-    close = close.sort_index().astype(float)
-    out = pd.DataFrame(index=close.index)
-    for horizon in horizons:
-        future = close.shift(-horizon)
-        out[f"future_{horizon}d_return"] = (future - close) / close
-        drawdowns = []
-        volatilities = []
-        for pos in range(len(close)):
-            window = close.iloc[pos + 1 : pos + horizon + 1]
-            if len(window) < horizon:
-                drawdowns.append(np.nan)
-                volatilities.append(np.nan)
-                continue
-            start = close.iloc[pos]
-            path = window / start - 1.0
-            drawdowns.append(float(min(0.0, path.min())))
-            returns = window.pct_change().dropna()
-            volatilities.append(float(returns.std() * np.sqrt(252)) if len(returns) else np.nan)
-        out[f"future_{horizon}d_max_drawdown"] = drawdowns
-        out[f"future_{horizon}d_volatility"] = volatilities
-    if "future_20d_max_drawdown" in out:
-        out["bear_event_next_20d"] = out["future_20d_max_drawdown"] <= -0.08
-    if "future_20d_return" in out:
-        out["bull_continuation_next_20d"] = out["future_20d_return"] >= 0.03
-    return out
+    return _shared_build_forward_labels(close, horizons)
 
 
 def _smooth(series: pd.Series, window: int) -> pd.Series:
@@ -642,26 +623,21 @@ def simulate_regime_allocation(close: pd.Series, regimes: pd.Series | None = Non
         exposure = aligned.map({"bull": 0.60, "sideways": 0.35, "bear": 0.10}).fillna(0.35)
         exposure = exposure.shift(1).fillna(0.35)
     strategy_returns = returns * exposure
-    n = len(strategy_returns.dropna())
-    if n < 10:
-        return {"cagr": 0.0, "sharpe": 0.0, "max_drawdown": 0.0, "calmar": 0.0, "turnover_proxy": 0.0, "strategy_score": 0.0}
-
-    total = float((1.0 + strategy_returns).prod())
-    cagr = total ** (252.0 / n) - 1.0 if total > 0 else -1.0
-    vol = float(strategy_returns.std(ddof=1) * np.sqrt(252))
-    sharpe = float(strategy_returns.mean() * 252 / vol) if vol > 0 else 0.0
-    equity = (1.0 + strategy_returns).cumprod()
-    drawdown = equity / equity.cummax() - 1.0
-    max_drawdown = float(drawdown.min()) if len(drawdown) else 0.0
-    calmar = cagr / abs(max_drawdown) if max_drawdown < 0 else 0.0
     turnover_proxy = float(exposure.diff().abs().sum())
-    strategy_score = _score_1_100(50.0 + sharpe * 10.0 + calmar * 3.0 + max_drawdown * 100.0 - turnover_proxy * 0.2)
+    metrics = portfolio_metrics(strategy_returns, turnover_proxy=turnover_proxy, include_series=False)
+    strategy_score = _score_1_100(
+        50.0
+        + float(metrics["sharpe"]) * 10.0
+        + float(metrics["calmar"]) * 3.0
+        + float(metrics["max_drawdown"]) * 100.0
+        - turnover_proxy * 0.2
+    )
     return {
-        "cagr": round(cagr, 6),
-        "sharpe": round(sharpe, 6),
-        "max_drawdown": round(max_drawdown, 6),
-        "calmar": round(calmar, 6),
-        "turnover_proxy": round(turnover_proxy, 6),
+        "cagr": metrics["cagr"],
+        "sharpe": metrics["sharpe"],
+        "max_drawdown": metrics["max_drawdown"],
+        "calmar": metrics["calmar"],
+        "turnover_proxy": metrics["turnover_proxy"],
         "strategy_score": round(strategy_score, 4),
     }
 
@@ -1122,100 +1098,14 @@ def load_tradable_asset_panel(
     return panel
 
 
-def _future_compound_return(returns: pd.Series, pos: int, horizon: int) -> float:
-    window = returns.iloc[pos + 1 : pos + horizon + 1].dropna()
-    if len(window) < horizon:
-        return np.nan
-    return float((1.0 + window).prod() - 1.0)
-
-
 def build_profit_labels(asset_panel: pd.DataFrame, horizons: Iterable[int] = (5, 20, 60)) -> pd.DataFrame:
     """Build forward money-making labels from tradable assets only."""
-    panel = asset_panel.sort_index().copy()
-    labels = pd.DataFrame(index=panel.index)
-    close = panel["equity_close"].astype(float)
-    equity_returns = panel["equity_return"].astype(float)
-    cash_returns = panel["cash_return"].astype(float)
-    defensive_returns = panel["defensive_return"].astype(float)
-
-    for horizon in horizons:
-        equity_forward = []
-        cash_forward = []
-        defensive_forward = []
-        drawdowns = []
-        volatilities = []
-        for pos in range(len(panel)):
-            equity_ret = _future_compound_return(equity_returns, pos, horizon)
-            cash_ret = _future_compound_return(cash_returns, pos, horizon)
-            defensive_ret = _future_compound_return(defensive_returns, pos, horizon)
-            equity_forward.append(equity_ret)
-            cash_forward.append(cash_ret)
-            defensive_forward.append(defensive_ret)
-
-            path = close.iloc[pos + 1 : pos + horizon + 1]
-            if len(path) < horizon:
-                drawdowns.append(np.nan)
-                volatilities.append(np.nan)
-                continue
-            relative_path = path / close.iloc[pos] - 1.0
-            drawdowns.append(float(min(0.0, relative_path.min())))
-            realized = equity_returns.iloc[pos + 1 : pos + horizon + 1].dropna()
-            volatilities.append(float(realized.std(ddof=1) * np.sqrt(252)) if len(realized) > 1 else 0.0)
-
-        labels[f"future_{horizon}d_equity_return"] = equity_forward
-        labels[f"future_{horizon}d_equity_max_drawdown"] = drawdowns
-        labels[f"future_{horizon}d_equity_volatility"] = volatilities
-        labels[f"future_{horizon}d_cash_excess_return"] = labels[f"future_{horizon}d_equity_return"] - pd.Series(cash_forward, index=labels.index)
-        labels[f"future_{horizon}d_defensive_excess_return"] = labels[f"future_{horizon}d_equity_return"] - pd.Series(defensive_forward, index=labels.index)
-
-    if "future_20d_equity_return" in labels:
-        labels["risk_on_profitable_next_20d"] = (
-            (labels["future_20d_equity_return"] > 0.0)
-            & (labels["future_20d_cash_excess_return"] > 0.0)
-            & (labels["future_20d_defensive_excess_return"] > 0.0)
-        )
-        labels["risk_off_preferred_next_20d"] = (
-            (labels["future_20d_equity_return"] < 0.0)
-            | (labels["future_20d_defensive_excess_return"] < 0.0)
-            | (labels["future_20d_equity_max_drawdown"] <= -0.08)
-        )
-    return labels
+    return _shared_build_profit_labels(asset_panel, horizons)
 
 
 def _profit_regime_series(regimes: pd.Series) -> pd.Series:
     mapping = {"bull": "risk_on", "sideways": "neutral", "bear": "risk_off"}
     return regimes.map(lambda value: mapping.get(str(value), str(value)))
-
-
-def _portfolio_metrics(daily_return: pd.Series) -> dict[str, float | pd.Series]:
-    returns = daily_return.astype(float).replace([np.inf, -np.inf], np.nan).fillna(0.0)
-    equity_curve = (1.0 + returns).cumprod()
-    n = len(returns)
-    if n < 10:
-        return {
-            "daily_return": returns,
-            "equity_curve": equity_curve,
-            "cagr": 0.0,
-            "sharpe": 0.0,
-            "max_drawdown": 0.0,
-            "calmar": 0.0,
-            "turnover_proxy": 0.0,
-        }
-    total = float(equity_curve.iloc[-1])
-    cagr = total ** (252.0 / n) - 1.0 if total > 0 else -1.0
-    vol = float(returns.std(ddof=1) * np.sqrt(252))
-    sharpe = float(returns.mean() * 252.0 / vol) if vol > 0 else 0.0
-    drawdown = equity_curve / equity_curve.cummax() - 1.0
-    max_drawdown = float(drawdown.min()) if len(drawdown) else 0.0
-    calmar = cagr / abs(max_drawdown) if max_drawdown < 0 else 0.0
-    return {
-        "daily_return": returns,
-        "equity_curve": equity_curve,
-        "cagr": round(float(cagr), 6),
-        "sharpe": round(float(sharpe), 6),
-        "max_drawdown": round(float(max_drawdown), 6),
-        "calmar": round(float(calmar), 6),
-    }
 
 
 def simulate_tradable_exposure(
@@ -1233,7 +1123,7 @@ def simulate_tradable_exposure(
     tradable_equity = equity_weight.shift(1).fillna(exposure_map["neutral"]["equity"])
     tradable_defensive = defensive_weight.shift(1).fillna(exposure_map["neutral"]["defensive"])
     daily_return = tradable_equity * panel["equity_return"].astype(float) + tradable_defensive * panel["defensive_return"].astype(float)
-    metrics = _portfolio_metrics(daily_return)
+    metrics = portfolio_metrics(daily_return)
     stats = regimes.value_counts(normalize=True)
     metrics.update(
         {
@@ -1310,7 +1200,7 @@ def profit_score_candidate(
 def _fixed_allocation_metrics(asset_panel: pd.DataFrame, equity_weight: float) -> dict:
     panel = asset_panel.sort_index()
     daily = equity_weight * panel["equity_return"].astype(float) + (1.0 - equity_weight) * panel["defensive_return"].astype(float)
-    metrics = _portfolio_metrics(daily)
+    metrics = portfolio_metrics(daily)
     metrics["turnover_proxy"] = 0.0
     metrics["risk_on_ratio"] = 1.0 if equity_weight >= 0.8 else 0.0
     metrics["neutral_ratio"] = 1.0 if 0.2 < equity_weight < 0.8 else 0.0
