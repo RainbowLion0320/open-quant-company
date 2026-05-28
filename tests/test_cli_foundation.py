@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -34,6 +36,19 @@ def test_cli_json_flag_renders_json(capsys):
 
     assert code == 0
     parsed = json.loads(out)
+    assert parsed["ok"] is True
+    assert parsed["command"] == "health"
+
+
+def test_python_module_entrypoint_renders_json():
+    completed = subprocess.run(
+        [sys.executable, "-m", "astrolabe_cli.main", "health", "--json"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0
+    parsed = json.loads(completed.stdout)
     assert parsed["ok"] is True
     assert parsed["command"] == "health"
 

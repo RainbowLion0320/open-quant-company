@@ -138,3 +138,7 @@ def run_cli(argv: Sequence[str] | None = None) -> int:
 
 def main() -> None:
     raise SystemExit(run_cli(sys.argv[1:]))
+
+
+if __name__ == "__main__":
+    main()
