@@ -259,6 +259,7 @@ def test_market_view_surfaces_regime_stability_state():
     assert "min-height: 28px;" in market
     assert "padding: 4px 6px;" in market
 
+
     score_block = market.split(".regime-score-line {", 1)[1].split("}", 1)[0]
     assert "border:" not in score_block
     assert "background:" not in score_block
@@ -272,6 +273,18 @@ def test_market_view_surfaces_regime_stability_state():
     assert 'key: "above-ma20"' in gauge_block
     assert 'key: "liquidity"' not in gauge_block
     assert 'key: "capacity"' not in gauge_block
+
+
+def test_strategy_lab_exposes_catalog_and_candidate_language():
+    strategies = Path("web/frontend/src/views/Strategies.vue").read_text(encoding="utf-8")
+    api = Path("web/frontend/src/api/index.ts").read_text(encoding="utf-8")
+
+    assert "strategyCatalog" in api
+    assert "strategyEvaluation" in api
+    assert "策略目录" in strategies
+    assert "候选策略" in strategies
+    assert "生命周期" in strategies
+    assert "生产隔离" in strategies
 
 
 def test_market_macro_panel_supports_six_indicator_layout():

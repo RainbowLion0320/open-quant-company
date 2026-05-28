@@ -58,6 +58,7 @@ class StrategyRunRequest(BaseModel):
     strategy: str = Field(..., description="buffett/multifactor/cybernetic/all")
     limit: int = Field(default=0, description="限制股票数, 0=全部")
     params: Optional[Dict[str, Any]] = Field(default=None, description="覆盖默认参数")
+    mode: str = Field(default="production", description="production/research")
 
 class StrategyRunResponse(BaseModel):
     job_id: str

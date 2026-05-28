@@ -109,8 +109,10 @@ async def run_strategy(req: StrategyRunRequest):
             req.strategy,
             f"Invalid strategy. Choose from: {', '.join(sorted(valid))}",
         )
+    if req.mode not in {"production", "research"}:
+        raise StrategyRunError(req.strategy, f"Invalid runtime mode: {req.mode}")
 
-    job_id = await run_strategy_async(req.strategy, req.limit, req.params)
+    job_id = await run_strategy_async(req.strategy, req.limit, req.params, mode=req.mode)
     return StrategyRunResponse(job_id=job_id, status="started")
 
 

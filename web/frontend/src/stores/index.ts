@@ -77,12 +77,12 @@ export const useStrategyStore = defineStore("strategy", () => {
     }
   }
 
-  async function run(strategy: string, limit = 0, params?: any) {
+  async function run(strategy: string, limit = 0, params?: any, mode: "production" | "research" = "production") {
     running.value = true;
     progress.value = 0;
     progressMsg.value = "";
     try {
-      const data = await api.strategyRun(strategy, limit, params);
+      const data = await api.strategyRun(strategy, limit, params, mode);
       jobId.value = data.job_id;
 
       // WebSocket 监听进度

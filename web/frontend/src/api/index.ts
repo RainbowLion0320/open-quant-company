@@ -186,7 +186,7 @@ export interface StrategySignal {
   name: string;
   industry: string;
   score: number;
-  signal: "buy" | "hold";
+  signal: "buy" | "hold" | "sell";
   detail?: any;
   computed_at?: string;
 }
@@ -235,6 +235,29 @@ export interface StrategyGovernanceResponse {
   stack: Record<string, string[]>;
   promotion_rules: Record<string, Record<string, number>>;
   status: string;
+}
+
+export interface StrategyCatalogItem {
+  name: string;
+  label: string;
+  strategy_type: string;
+  layer: string;
+  lifecycle: string;
+  data_requirements: string[];
+  parameters?: Record<string, any>;
+  output_contract: string;
+  research_sources: string[];
+}
+
+export interface StrategyCatalogResponse {
+  items: StrategyCatalogItem[];
+  total: number;
+}
+
+export interface StrategyEvaluationSummary {
+  baselines: string[];
+  status: string;
+  note: string;
 }
 
 export interface StrategyDetailResponse {
@@ -485,9 +508,11 @@ export const api = {
   strategies: () => get<StrategiesResponse>("/api/strategies"),
   strategyStatuses: () => get<StrategyStatusesResponse>("/api/strategies/statuses"),
   strategyGovernance: () => get<StrategyGovernanceResponse>("/api/strategies/governance"),
+  strategyCatalog: () => get<StrategyCatalogResponse>("/api/strategies/catalog"),
+  strategyEvaluation: () => get<StrategyEvaluationSummary>("/api/strategies/evaluation"),
   strategyDetail: (name: string) => get<StrategyDetailResponse>(`/api/strategies/${name}`),
-  strategyRun: (strategy: string, limit = 0, params?: any) =>
-    post<RunResponse>("/api/strategies/run", { strategy, limit, params }),
+  strategyRun: (strategy: string, limit = 0, params?: any, mode: "production" | "research" = "production") =>
+    post<RunResponse>("/api/strategies/run", { strategy, limit, params, mode }),
 
   // Backtest
   backtest: () => get<BacktestOverview>("/api/backtest"),

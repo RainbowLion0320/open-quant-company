@@ -13,7 +13,7 @@ _jobs: Dict[str, dict] = {}
 _lock = threading.Lock()
 
 
-def create_job(strategy: str, limit: int = 0, params: dict = None) -> str:
+def create_job(strategy: str, limit: int = 0, params: dict = None, mode: str = "production") -> str:
     job_id = str(uuid.uuid4())[:8]
     with _lock:
         _jobs[job_id] = {
@@ -25,6 +25,7 @@ def create_job(strategy: str, limit: int = 0, params: dict = None) -> str:
             "result": None,
             "params": params or {},
             "limit": limit,
+            "mode": mode,
             "created_at": datetime.now().isoformat(),
             "started_at": None,
             "completed_at": None,
@@ -61,9 +62,9 @@ def run_job(job_id: str, target: Callable, *args, **kwargs):
     t.start()
 
 
-async def run_strategy_async(strategy: str, limit: int = 0, params: dict = None) -> str:
+async def run_strategy_async(strategy: str, limit: int = 0, params: dict = None, mode: str = "production") -> str:
     """异步启动策略运行，返回 job_id"""
-    job_id = create_job(strategy, limit, params)
+    job_id = create_job(strategy, limit, params, mode)
 
     def _run():
         from data.results_db import init
@@ -75,7 +76,7 @@ async def run_strategy_async(strategy: str, limit: int = 0, params: dict = None)
             pct = int(current / total * 100) if total > 0 else 0
             update_job(job_id, progress=pct, message=message or f"{current}/{total}")
 
-        return {"strategies": run_registered_strategies(strategy, limit, progress_callback)}
+        return {"strategies": run_registered_strategies(strategy, limit, progress_callback, mode=mode)}
 
     run_job(job_id, _run)
     return job_id

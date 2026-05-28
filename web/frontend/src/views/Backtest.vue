@@ -2,9 +2,9 @@
   <div class="view-page">
     <div class="surface-toolbar">
       <div class="surface-copy">
-        <span>BACKTEST TOURNAMENT</span>
+        <span>BACKTEST EVIDENCE</span>
         <strong>{{ overview.start || '2015-01' }} → {{ overview.end || '2026-05' }}</strong>
-        <small>日频引擎 · 策略自主调仓 · 与上证指数基准对比</small>
+        <small>日频引擎 · 策略自主调仓 · 强基准、成本和晋级证据待统一接入</small>
       </div>
       <div class="surface-actions">
         <span class="text-2xs" style="color:var(--text-disabled)">{{ strategies.length }} strategies</span>

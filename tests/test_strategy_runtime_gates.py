@@ -73,3 +73,27 @@ def test_invalid_strategy_runtime_mode_is_rejected():
         assert "Invalid strategy runtime mode" in str(exc)
     else:
         raise AssertionError("invalid runtime mode should fail")
+
+
+def test_strategy_run_api_accepts_research_mode(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from web.api.app import create_app
+
+    captured = {}
+
+    async def fake_run_strategy_async(strategy, limit=0, params=None, mode="production"):
+        captured["strategy"] = strategy
+        captured["mode"] = mode
+        return "unit-job"
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    monkeypatch.setattr("web.api.jobs.run_strategy_async", fake_run_strategy_async)
+
+    res = TestClient(create_app()).post(
+        "/api/strategies/run",
+        json={"strategy": "trend_following", "mode": "research", "limit": 5},
+    )
+
+    assert res.status_code == 200
+    assert captured == {"strategy": "trend_following", "mode": "research"}

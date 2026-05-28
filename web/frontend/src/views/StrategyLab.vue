@@ -3,7 +3,7 @@
     <SectionTabs
       title="策略实验室"
       eyebrow="Strategy Lab"
-      subtitle="策略运行、信号变化和回测表现合并为完整研究闭环"
+      subtitle="策略目录、信号变化和回测证据合并为完整研究闭环"
       base-path="/strategy-lab"
       default-tab="strategies"
       :items="tabs"
@@ -22,9 +22,9 @@ import Signals from "./Signals.vue";
 import Backtest from "./Backtest.vue";
 
 const tabs = [
-  { key: "strategies", label: "策略中心", meta: "Run & inspect", description: "查看四类策略状态、运行扫描，并下钻最新候选信号" },
+  { key: "strategies", label: "策略目录", meta: "Catalog & gates", description: "查看生产策略和候选策略目录、生命周期、研究扫描与生产隔离状态" },
   { key: "signals", label: "信号历史", meta: "Signal changes", description: "追踪最近信号迁移，识别新增买入、降级和策略一致性变化" },
-  { key: "backtest", label: "回测分析", meta: "Tournament", description: "对比策略收益、风险、回撤和相对上证基准表现" },
+  { key: "backtest", label: "回测证据", meta: "Evidence", description: "对比策略收益、风险、回撤、强基准和晋级证据" },
 ];
 
 const { activeComponent } = useModuleTabs(tabs, "strategies", {
