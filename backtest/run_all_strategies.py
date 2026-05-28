@@ -19,6 +19,7 @@ from data.fetcher import get_stock_daily, get_index_daily
 from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
 from signals.scoring import estimate_buffett_score, score_cybernetic_from_factors
 from signals.technical import technical_factors_from_series
+from research.strategy_evaluation import write_backtest_evidence
 
 DATA_DIR = ROOT / "data"
 
@@ -448,6 +449,13 @@ if __name__ == "__main__":
         results[name] = run_pipeline_backtest(
             name, pool, prices, bc, scorer, start, end,
             monthly_regimes=monthly_regimes,
+        )
+        write_backtest_evidence(
+            name,
+            s.get("status", "candidate"),
+            results[name],
+            start=start,
+            end=end,
         )
 
     comparison = {

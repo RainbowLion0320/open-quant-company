@@ -242,3 +242,32 @@ class BacktestStage(Stage):
             pass
 
         return ctx
+
+
+class EvidenceReportStage(Stage):
+    """Write a strategy evidence report from a completed pipeline context."""
+
+    def __init__(self, strategy: str, status: str = "candidate"):
+        self.strategy = strategy
+        self.status = status
+
+    def process(self, ctx: Context) -> Context:
+        from research.strategy_evaluation import build_evidence_report, write_strategy_evidence_report
+
+        returns = ctx.daily_returns if ctx.daily_returns is not None else pd.Series(dtype="float64")
+        metrics = {
+            "cagr": float((1 + returns).prod() - 1) if len(returns) else 0.0,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "turnover": 0.0,
+            "trades": len(ctx.orders),
+        }
+        report = build_evidence_report(
+            strategy=self.strategy,
+            status=self.status,
+            metrics=metrics,
+            oos={"months": 0, "start": ctx.start_date, "end": ctx.end_date},
+        )
+        path = write_strategy_evidence_report(report)
+        ctx.info(f"EvidenceReport: wrote {path}")
+        return ctx

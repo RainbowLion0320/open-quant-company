@@ -174,6 +174,8 @@ class PipelineBacktest:
             "max_drawdown": report.max_drawdown,
             "win_rate": report.win_rate,
             "trade_count": len(trade_log),
+            "commission": self.execution.config.commission_rate,
+            "slippage": 0.001,
         }
 
     @staticmethod
