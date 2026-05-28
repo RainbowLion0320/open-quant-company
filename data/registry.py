@@ -58,6 +58,12 @@ def load_registry(force_reload: bool = False) -> List[Dict]:
             "signal_name": v.get("signal_name", name),
             "enabled": v.get("enabled", True),
             "status": v.get("status", "candidate"),
+            "strategy_type": v.get("strategy_type", ""),
+            "layer": v.get("layer", ""),
+            "data_requirements": v.get("data_requirements", []),
+            "parameters": v.get("parameters", {}),
+            "output_contract": v.get("output_contract", "StrategySignalRows"),
+            "research_sources": v.get("research_sources", []),
         }
         for name, v in raw.items()
     ]

@@ -227,6 +227,21 @@ class StrategyListResponse(BaseModel):
     registry: List[Dict[str, Any]] = []
     total: int = 0
 
+class StrategyCatalogItemResponse(BaseModel):
+    name: str
+    label: str
+    strategy_type: str
+    layer: str
+    lifecycle: str
+    data_requirements: List[str]
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    output_contract: str
+    research_sources: List[str] = Field(default_factory=list)
+
+class StrategyCatalogResponse(BaseModel):
+    items: List[StrategyCatalogItemResponse]
+    total: int
+
 class StrategySignalsResponse(BaseModel):
     strategy: str = ""
     total: int = 0

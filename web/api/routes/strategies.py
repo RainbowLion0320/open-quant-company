@@ -1,7 +1,14 @@
 """策略中心路由 — 策略列表 / 信号 / 异步运行 / 进度"""
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from web.api.models import StrategyRunRequest, StrategyRunResponse, JobStatus, StrategyListResponse, StrategySignalsResponse
+from web.api.models import (
+    StrategyCatalogResponse,
+    StrategyListResponse,
+    StrategyRunRequest,
+    StrategyRunResponse,
+    StrategySignalsResponse,
+    JobStatus,
+)
 from web.api.errors import DataNotFoundError, InvalidParameterError, StrategyRunError
 
 router = APIRouter(prefix="/api/strategies", tags=["Strategies"])
@@ -64,6 +71,15 @@ async def get_strategy_governance():
         **summary,
         "status": "ok",
     }
+
+
+@router.get("/catalog", response_model=StrategyCatalogResponse)
+async def get_strategy_catalog():
+    """Return the strategy catalog contract used by research and UI surfaces."""
+    from research.strategy_catalog import catalog_items
+
+    items = [item.__dict__ for item in catalog_items()]
+    return {"items": items, "total": len(items)}
 
 
 # ── 启动策略运行 ──────────────────────────────────────────
