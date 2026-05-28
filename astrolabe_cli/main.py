@@ -7,6 +7,10 @@ from collections.abc import Sequence
 from astrolabe_cli.results import CliResult, ExitCode
 
 
+def add_common_flags(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--json", action="store_true", help="Render machine-readable JSON")
+
+
 def _health_command(args: argparse.Namespace) -> CliResult:
     return CliResult(
         ok=True,
@@ -21,7 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     health = sub.add_parser("health", help="Check CLI and local project health")
-    health.add_argument("--json", action="store_true", help="Render machine-readable JSON")
+    add_common_flags(health)
     health.set_defaults(handler=_health_command)
 
     return parser

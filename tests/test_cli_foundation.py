@@ -35,3 +35,25 @@ def test_cli_json_flag_renders_json(capsys):
     parsed = json.loads(out)
     assert parsed["ok"] is True
     assert parsed["command"] == "health"
+
+
+def test_unknown_command_returns_usage_exit():
+    from astrolabe_cli.main import run_cli
+
+    try:
+        run_cli(["missing"])
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("argparse should exit for unknown command")
+
+
+def test_validate_runtime_mode_rejects_invalid_mode():
+    from astrolabe_cli.safety import validate_runtime_mode
+
+    try:
+        validate_runtime_mode("paper")
+    except ValueError as exc:
+        assert "Invalid runtime mode" in str(exc)
+    else:
+        raise AssertionError("invalid runtime mode should fail")
