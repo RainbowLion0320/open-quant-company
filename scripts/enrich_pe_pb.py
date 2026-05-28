@@ -12,11 +12,11 @@ ROOT = Path(__file__).resolve().parent.parent
 import pandas as pd
 import numpy as np
 from data.datahub import get_datahub
+from data.feature_store import iter_feature_files
 from data.tushare_utils import get_tushare_token
 import tushare as ts
 
 HUB = get_datahub()
-FEATURES_DIR = HUB.features_dir()
 token = get_tushare_token()
 api = ts.pro_api(token)
 print(f"Tushare token: {'OK' if api else 'FAIL'}")
@@ -27,7 +27,7 @@ daily_cache = {}
 symbols_needed = set()
 
 # 从特征文件收集 symbol 列表
-for pq in sorted(FEATURES_DIR.glob('*.parquet')):
+for pq in iter_feature_files():
     try:
         df = HUB.read_parquet(pq)
         symbols_needed.update(df['symbol'].unique())
@@ -93,7 +93,7 @@ def compute_valuation_factors(daily_df, as_of):
 
 # Step 3: 逐月补增 PE/PB
 print("\n[2] 补增 PE/PB 到特征文件...")
-for pq in sorted(FEATURES_DIR.glob('*.parquet')):
+for pq in iter_feature_files():
     try:
         df = HUB.read_parquet(pq)
         month_str = pq.stem

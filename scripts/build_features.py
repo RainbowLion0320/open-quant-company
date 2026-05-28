@@ -28,7 +28,7 @@ import pandas as pd
 
 from data.datahub import get_datahub
 from data.fetcher import get_stock_daily
-from data.feature_store import FEATURES_DIR, enrich_from_registry
+from data.feature_store import FEATURES_DIR, enrich_from_registry, iter_feature_files
 from data.symbols import CIRCLE_STOCKS
 from signals.expression import alpha_factors
 
@@ -281,7 +281,7 @@ def build_features(
         rows = _build_month(month, price_cache, fin_cache, daily_cache, factors, force=force)
         print(f"  {month}: {rows} stocks" if rows else f"  {month}: skipped")
 
-    pq_files = sorted(FEATURES_DIR.glob("*.parquet"))
+    pq_files = iter_feature_files()
     total_rows = sum(len(HUB.read_parquet(pq, default=pd.DataFrame())) for pq in pq_files)
     print(f"\n完成: {len(pq_files)} 个月, {total_rows} 总行")
 

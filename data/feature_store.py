@@ -29,6 +29,49 @@ from signals.expression import Factor, alpha_factors
 HUB = get_datahub()
 FEATURES_DIR = HUB.features_dir()
 FEATURES_DIR.mkdir(parents=True, exist_ok=True)
+FEATURE_METADATA_STEMS = frozenset({"scan_meta", "buffett_scan"})
+
+
+def iter_feature_files(directory: Path | None = None) -> list[Path]:
+    """List monthly PIT feature parquet files, excluding metadata sidecars."""
+    root = directory or FEATURES_DIR
+    if not root.exists():
+        return []
+    return sorted(path for path in root.glob("*.parquet") if path.stem not in FEATURE_METADATA_STEMS)
+
+
+def latest_feature_file(directory: Path | None = None) -> Path | None:
+    files = iter_feature_files(directory)
+    return files[-1] if files else None
+
+
+def _read_feature_file(path: Path, hub=None) -> pd.DataFrame:
+    store = hub or HUB
+    df = store.read_parquet(path, default=pd.DataFrame())
+    if df is None or df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    if "month" not in out.columns:
+        out["month"] = path.stem
+    return out
+
+
+def load_feature_panel(files: list[Path] | None = None, hub=None) -> pd.DataFrame:
+    """Load and concatenate all monthly PIT feature slices."""
+    selected = files if files is not None else iter_feature_files()
+    frames = [_read_feature_file(path, hub=hub) for path in selected]
+    frames = [frame for frame in frames if not frame.empty]
+    if not frames:
+        raise RuntimeError(f"No features found in {FEATURES_DIR}")
+    return pd.concat(frames, ignore_index=True)
+
+
+def latest_feature_frame(hub=None) -> pd.DataFrame:
+    """Load the latest monthly PIT feature slice, or an empty frame when absent."""
+    latest = latest_feature_file()
+    if latest is None:
+        return pd.DataFrame()
+    return _read_feature_file(latest, hub=hub)
 
 
 class FeatureStoreBuilder:

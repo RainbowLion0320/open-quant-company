@@ -386,14 +386,13 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         if not dim.cache:
             return
         table = dim.health_table
-        root = HUB.dimension_root(dim.key)
+        paths = HUB.list_dimension_snapshots(dim.key)
         if "{" not in dim.cache:
-            if root.exists() and root.is_file():
-                records.append(_scan_single(table, root))
+            if paths:
+                records.append(_scan_single(table, paths[-1]))
             else:
                 records.append(_scan_many(table, [], max_sample=dim.health_max_sample))
             return
-        paths = sorted(root.glob("*.parquet")) if root.exists() else []
         records.append(_scan_many(table, paths, max_sample=dim.health_max_sample))
 
     # ── Registry dimensions (source/path/label/SLA live in data_registry) ──

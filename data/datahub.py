@@ -247,6 +247,23 @@ class DataHub:
         rel = _ensure_relative_store_pattern(expanded)
         return self.store_root.joinpath(*rel.parts)
 
+    def list_dimension_snapshots(self, key: str, pattern: str = "*.parquet") -> list[Path]:
+        """Return sorted parquet snapshots for a registry-backed dimension."""
+        try:
+            root = self.dimension_root(key)
+        except Exception:
+            return []
+        if root.is_file():
+            return [root]
+        if not root.exists():
+            return []
+        return self.list_parquet(root, pattern)
+
+    def latest_dimension_snapshot(self, key: str, pattern: str = "*.parquet") -> Path | None:
+        """Return the latest parquet snapshot for a registry-backed dimension."""
+        candidates = self.list_dimension_snapshots(key, pattern)
+        return candidates[-1] if candidates else None
+
     # ── Parquet helpers ──────────────────────────────────────
 
     def read_parquet(

@@ -2,27 +2,58 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 
+def json_map(value: Any) -> dict:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    try:
+        if isinstance(value, float) and np.isnan(value):
+            return {}
+    except TypeError:
+        pass
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def json_value(value: Any) -> Any:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    return value
+
+
 def safe_float(value: Any, default: float = 0.0) -> float:
+    value = json_value(value)
     try:
         number = float(value)
-        if pd.isna(number):
-            return default
         return number
-    except Exception:
+    except (TypeError, ValueError):
         return default
 
 
 def safe_int(value: Any, default: int = 0) -> int:
+    value = json_value(value)
     try:
-        if pd.isna(value):
-            return default
         return int(value)
-    except Exception:
+    except (TypeError, ValueError):
         return default
 
 

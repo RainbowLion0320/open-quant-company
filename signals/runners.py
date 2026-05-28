@@ -6,8 +6,9 @@ timeouts and notification side effects belong in scripts/compute_signals.py.
 from __future__ import annotations
 
 from core.settings import get_section
-from signals.scoring import estimate_buffett_score
+from signals.scoring import estimate_buffett_score, favored_sectors_for_regime, score_cybernetic_from_factors
 from signals.selection import apply_ranked_buys
+from signals.technical import technical_factors_from_frame
 
 
 def _get_latest_price(symbol: str) -> float:
@@ -202,23 +203,12 @@ def _get_technical_factors(symbol: str) -> dict:
     }
     try:
         from data.fetcher import get_stock_daily
-        from signals.multifactor import compute_momentum, compute_trend_strength, compute_volatility
 
         df = get_stock_daily(symbol)
         if df is None or len(df) < 63:
             return fallback
         df = df.sort_values("date") if "date" in df.columns else df
-        mom = compute_momentum(df, [21, 63])
-        mom_3m_skip = compute_momentum(df, [42], skip_recent=21)
-        mom_6m_skip = compute_momentum(df, [105], skip_recent=21)
-        return {
-            "momentum_1m": mom.get(21, 0),
-            "momentum_3m": mom.get(63, 0),
-            "momentum_3m_skip_1m": mom_3m_skip.get(42, 0),
-            "momentum_6m_skip_1m": mom_6m_skip.get(105, 0),
-            "trend_strength": compute_trend_strength(df, 120),
-            "volatility": compute_volatility(df, 20),
-        }
+        return technical_factors_from_frame(df)
     except Exception:
         return fallback
 
@@ -237,12 +227,7 @@ def compute_cybernetic(limit: int = 0) -> list[dict]:
         regime = "sideways"
         params = {"position_pct": 0.15, "max_positions": 5, "stop_loss": -0.05}
 
-    regime_sectors = {
-        "bull": ["证券", "电子", "计算机", "电力设备", "国防军工"],
-        "bear": ["银行", "公用事业", "交通运输", "食品饮料", "医药生物"],
-        "sideways": ["银行", "公用事业", "煤炭", "石油石化", "建筑装饰"],
-    }
-    favored = regime_sectors.get(regime, regime_sectors["sideways"])
+    favored = favored_sectors_for_regime(regime)
 
     symbols = list(CIRCLE_STOCKS)
     if limit and limit < len(symbols):
@@ -255,13 +240,7 @@ def compute_cybernetic(limit: int = 0) -> list[dict]:
         name = SYMBOL_NAME.get(sym, sym)
 
         tech = _get_technical_factors(sym)
-        base = 62.0 if ind in favored else (35.0 if regime == "bear" else 45.0)
-        trend_bonus = max(-18.0, min(18.0, tech.get("trend_strength", 0) * 100))
-        mom_bonus = max(-12.0, min(12.0, tech.get("momentum_3m_skip_1m", 0) * 80))
-        vol_penalty = max(0.0, (tech.get("volatility", 0.30) - 0.35) * 45)
-        if regime == "bear" and ind not in favored:
-            vol_penalty += 8.0
-        score = max(0.0, min(100.0, base + trend_bonus + mom_bonus - vol_penalty))
+        score = score_cybernetic_from_factors(ind, regime, tech)
 
         results.append(
             {

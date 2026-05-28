@@ -16,7 +16,7 @@ from data.fetcher import get_stock_daily
 from signals.expression import alpha_factors
 from signals.selection import apply_ranked_buys
 from models import MODEL_DIR
-from data.feature_store import FEATURES_DIR
+from data.feature_store import latest_feature_file
 from core.settings import get_settings
 
 
@@ -85,11 +85,10 @@ def _feature_age_months(month: str) -> int:
 
 
 def _latest_feature_file(cfg: dict) -> tuple[Path | None, str]:
-    pq_files = sorted(p for p in FEATURES_DIR.glob("*.parquet") if p.stem[:4].isdigit())
-    if not pq_files:
+    latest = latest_feature_file()
+    if latest is None:
         return None, "missing"
 
-    latest = pq_files[-1]
     latest_month = latest.stem
     age = _feature_age_months(latest_month)
     max_age = int(cfg.get("max_feature_age_months", 3))

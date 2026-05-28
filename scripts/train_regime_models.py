@@ -4,15 +4,13 @@ Regime-Aware ML — 按市场状态训练三模型 (bull/bear/sideways)
 
 预测时: 检测当前 regime → 选择对应模型 → 生成信号
 """
-import os, sys, json
-from pathlib import Path
+import os, json
 
 
 import pandas as pd
-import numpy as np
 
 from data.datahub import get_datahub
-from data.feature_store import FEATURES_DIR
+from data.feature_store import load_feature_panel
 from models import LightGBMRegressor, prepare_xy, MODEL_DIR
 
 HUB = get_datahub()
@@ -30,34 +28,12 @@ def train_regime_models():
         return
     df_idx["date"] = pd.to_datetime(df_idx["date"])
     df_idx = df_idx.set_index("date").sort_index()
-    regime_map = {}  # month → regime
-    for idx_date in pd.date_range("2018-01-01", "2026-06-01", freq="MS"):
-        month = idx_date.strftime("%Y-%m")
-        hist = df_idx[df_idx.index <= idx_date]
-        if len(hist) < 60:
-            regime_map[month] = "unknown"
-            continue
-        close = hist["close"].values[-60:]
-        ma5 = close[-5:].mean()
-        ma20 = close[-20:].mean()
-        ma60 = close[-60:].mean()
-        current = close[-1]
-        if current > ma5 > ma20 > ma60:
-            regime_map[month] = "bull"
-        elif current < ma5 < ma20 < ma60:
-            regime_map[month] = "bear"
-        else:
-            regime_map[month] = "sideways"
+    from backtest.run_all_strategies import build_production_regime_map
+
+    regime_map = build_production_regime_map(df_idx["close"])
 
     # 2. Load all feature data and assign regime
-    dfs = []
-    for pq in sorted(FEATURES_DIR.glob("*.parquet")):
-        if pq.stem in ("scan_meta", "buffett_scan"):
-            continue
-        df = HUB.read_parquet(pq)
-        df["month"] = pq.stem
-        dfs.append(df)
-    all_features = pd.concat(dfs, ignore_index=True)
+    all_features = load_feature_panel(hub=HUB)
     all_features["regime"] = all_features["month"].map(regime_map).fillna("unknown")
 
     # 3. Train per regime

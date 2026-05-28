@@ -140,6 +140,97 @@ def test_strategy_runners_do_not_point_at_cli_scripts():
     assert offenders == {}
 
 
+def test_api_serialization_helpers_have_single_source():
+    serializers = Path("web/api/serializers.py").read_text(encoding="utf-8")
+    system_common = Path("web/api/services/system_common.py").read_text(encoding="utf-8")
+
+    assert "def safe_float(" in serializers
+    assert "def safe_int(" in serializers
+    assert "def json_value(" in serializers
+    assert "def json_map(" in serializers
+    assert "def safe_float(" not in system_common
+    assert "def safe_int(" not in system_common
+    assert "def json_value(" not in system_common
+    assert "def json_map(" not in system_common
+
+
+def test_datahub_snapshot_discovery_is_not_reimplemented_in_signal_or_web_layers():
+    checked_paths = [
+        Path("signals/multifactor.py"),
+        Path("web/api/services/sectors.py"),
+    ]
+    offenders = []
+    for path in checked_paths:
+        text = path.read_text(encoding="utf-8")
+        if 'glob("*.parquet")' in text or "glob('*.parquet')" in text:
+            offenders.append(str(path))
+
+    assert offenders == []
+    assert "latest_dimension_snapshot" in Path("signals/multifactor.py").read_text(encoding="utf-8")
+    assert "latest_dimension_snapshot" in Path("web/api/services/sectors.py").read_text(encoding="utf-8")
+
+
+def test_backtest_strategy_scorers_reuse_shared_signal_scoring_helpers():
+    text = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
+
+    assert "technical_factors_from_series" in text
+    assert "score_cybernetic_from_factors" in text
+    assert "np.diff(" not in text
+    assert "np.std(" not in text
+    assert "bull_sectors =" not in text
+    assert "bear_sectors =" not in text
+    assert "sideways_sectors =" not in text
+
+
+def test_multi_asset_tournament_reuses_shared_momentum_helpers():
+    text = Path("scripts/multi_asset_tournament.py").read_text(encoding="utf-8")
+
+    assert "from backtest.momentum import" in text
+    assert "def momentum_score(" not in text
+    assert "def run_strat(" not in text
+
+
+def test_feature_scripts_use_shared_feature_store_loaders():
+    checked_paths = [
+        Path("signals/ml_signals.py"),
+        Path("scripts/build_features.py"),
+        Path("scripts/enrich_pe_pb.py"),
+        Path("scripts/factor_hypothesis.py"),
+        Path("scripts/lookahead_check.py"),
+        Path("scripts/strategy_tournament.py"),
+        Path("scripts/tune_model.py"),
+        Path("scripts/train_regime_models.py"),
+    ]
+    offenders = []
+    for path in checked_paths:
+        text = path.read_text(encoding="utf-8")
+        if 'FEATURES_DIR.glob("*.parquet")' in text or "FEATURES_DIR.glob('*.parquet')" in text:
+            offenders.append(str(path))
+
+    assert offenders == []
+
+    feature_store = Path("data/feature_store.py").read_text(encoding="utf-8")
+    assert "def iter_feature_files(" in feature_store
+    assert "def load_feature_panel(" in feature_store
+    assert "def latest_feature_frame(" in feature_store
+
+
+def test_health_check_uses_datahub_dimension_snapshot_listing():
+    text = Path("scripts/db_health_check.py").read_text(encoding="utf-8")
+
+    assert "list_dimension_snapshots" in text
+    assert "root.glob(\"*.parquet\")" not in text
+
+
+def test_regime_ml_training_uses_production_regime_replay():
+    text = Path("scripts/train_regime_models.py").read_text(encoding="utf-8")
+
+    assert "build_production_regime_map" in text
+    assert "current > ma5 > ma20 > ma60" not in text
+    assert "current < ma5 < ma20 < ma60" not in text
+    assert "ma5 = " not in text
+
+
 def test_compute_signals_import_has_no_runtime_side_effects(monkeypatch):
     import socket
 

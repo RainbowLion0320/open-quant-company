@@ -21,6 +21,7 @@ import numpy as np
 from data.symbols import CIRCLE_STOCKS
 from data.fetcher import get_stock_daily, get_index_daily
 from data.datahub import get_datahub
+from data.feature_store import latest_feature_frame
 from backtest.strategies.base import BaseStrategy, StrategyRegistry
 from backtest.strategies.ml_strategy import MLStrategy
 from broker.exchange import AShareExchange, OrderSide
@@ -100,13 +101,10 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
     symbols_raw = list(CIRCLE_STOCKS)
     # 优先用已有 Parquet 缓存中的最新 total_mv 排序
     try:
-        feat_dir = HUB.features_dir()
-        latest_pq = sorted(feat_dir.glob("*.parquet"))[-1] if list(feat_dir.glob("*.parquet")) else None
-        if latest_pq:
-            df_latest = HUB.read_parquet(latest_pq)
-            if "val_total_mv" in df_latest.columns and "symbol" in df_latest.columns:
-                mv_map = dict(zip(df_latest["symbol"], df_latest["val_total_mv"]))
-                symbols_raw.sort(key=lambda s: mv_map.get(s, 0), reverse=True)
+        df_latest = latest_feature_frame(hub=HUB)
+        if "val_total_mv" in df_latest.columns and "symbol" in df_latest.columns:
+            mv_map = dict(zip(df_latest["symbol"], df_latest["val_total_mv"]))
+            symbols_raw.sort(key=lambda s: mv_map.get(s, 0), reverse=True)
     except Exception:
         pass  # fallback: 均匀采样
     if len(symbols_raw) <= pool_size:

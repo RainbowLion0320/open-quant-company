@@ -12,13 +12,13 @@ for k in list(os.environ.keys()):
 os.environ['no_proxy'] = '*'
 
 import pandas as pd
-import numpy as np
 from datetime import datetime
 
 from core.settings import get_settings
 from data.fetcher import get_stock_daily, get_index_daily
 from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
-from signals.scoring import estimate_buffett_score
+from signals.scoring import estimate_buffett_score, score_cybernetic_from_factors
+from signals.technical import technical_factors_from_series
 
 DATA_DIR = ROOT / "data"
 
@@ -193,26 +193,15 @@ def multifactor_scorer(sym, series, idx, regime):
     ind = SYMBOL_INDUSTRY.get(sym, "待分类")
     sec = SYMBOL_SECTOR.get(sym, FALLBACK_SECTOR)
 
-    # 构建因子输入
-    mom_1m = mom_3m = 0.0
-    vol = 0.30
     try:
-        close_vals = series[:idx+1].values
-        if len(close_vals) < 63:
+        history = pd.Series(series).iloc[: idx + 1].dropna()
+        if len(history) < 63:
             return 0
-        current_price = float(close_vals[-1])
-        mom_1m = close_vals[-1] / close_vals[-22] - 1 if len(close_vals) >= 22 and close_vals[-22] else 0
-        mom_3m = close_vals[-1] / close_vals[-64] - 1 if len(close_vals) >= 64 and close_vals[-64] else 0
-        mom_3m_skip = close_vals[-22] / close_vals[-64] - 1 if len(close_vals) >= 64 and close_vals[-64] else 0
-        mom_6m_skip = close_vals[-22] / close_vals[-127] - 1 if len(close_vals) >= 127 and close_vals[-127] else mom_3m_skip
-        ma120 = np.mean(close_vals[-120:]) if len(close_vals) >= 120 else np.mean(close_vals)
-        trend_strength = current_price / ma120 - 1 if ma120 else 0
-        rets = np.diff(close_vals[-21:]) / close_vals[-21:-1]
-        vol = np.std(rets) * np.sqrt(252)
+        current_price = float(history.iloc[-1])
+        tech = technical_factors_from_series(series, idx)
     except Exception:
         current_price = 0.0
-        mom_1m = mom_3m = mom_3m_skip = mom_6m_skip = trend_strength = 0
-        vol = 0.30
+        tech = technical_factors_from_series(pd.Series(dtype="float64"))
 
     # 财务数据从缓存获取（每个symbol首次拉取，之后复用）
     inputs = _get_multifactor_fin_inputs(sym, ind)
@@ -228,18 +217,17 @@ def multifactor_scorer(sym, series, idx, regime):
             buffett_score = estimate_buffett_score(inputs)
     roe_5y = (sum(inputs.get("roe_history", [0.08])[-5:]) / max(1, len(inputs.get("roe_history", [0.08])[-5:]))) if inputs else 0.08
 
-    from signals.multifactor import MultiFactorScorer
     scorer = MultiFactorScorer(regime=regime)
     factors = {
         "buffett_score": buffett_score,
         "safety_margin": safety_margin,
         "roe_5y": roe_5y,
-        "momentum_1m": mom_1m,
-        "momentum_3m": mom_3m,
-        "momentum_3m_skip_1m": mom_3m_skip,
-        "momentum_6m_skip_1m": mom_6m_skip,
-        "trend_strength": trend_strength,
-        "volatility": vol,
+        "momentum_1m": tech["momentum_1m"],
+        "momentum_3m": tech["momentum_3m"],
+        "momentum_3m_skip_1m": tech["momentum_3m_skip_1m"],
+        "momentum_6m_skip_1m": tech["momentum_6m_skip_1m"],
+        "trend_strength": tech["trend_strength"],
+        "volatility": tech["volatility"],
         "sector": sec,
     }
     return scorer.score(factors)
@@ -282,33 +270,12 @@ multifactor_scorer._last_rebalance_date = None
 
 def cybernetic_scorer(sym, series, idx, regime):
     """控制论评分: regime + 板块轮动 + 个股趋势确认"""
-    bull_sectors = {"证券", "电子", "计算机", "电力设备", "国防军工"}
-    bear_sectors = {"银行", "公用事业", "交通运输", "食品饮料", "医药生物"}
-    sideways_sectors = {"银行", "公用事业", "煤炭", "石油石化", "建筑装饰"}
-
     ind = SYMBOL_INDUSTRY.get(sym, "")
-    favored = (
-        ind in bull_sectors if regime == "bull"
-        else ind in bear_sectors if regime == "bear"
-        else ind in sideways_sectors
-    )
-    base = 62 if favored else (35 if regime == "bear" else 45)
     try:
-        vals = series[:idx+1].values
-        if len(vals) < 64:
-            return base
-        mom_3m_skip = vals[-22] / vals[-64] - 1 if vals[-64] else 0
-        ma120 = np.mean(vals[-120:]) if len(vals) >= 120 else np.mean(vals)
-        trend = vals[-1] / ma120 - 1 if ma120 else 0
-        rets = np.diff(vals[-21:]) / vals[-21:-1]
-        vol = np.std(rets) * np.sqrt(252)
-        score = base + max(-18, min(18, trend * 100)) + max(-12, min(12, mom_3m_skip * 80))
-        score -= max(0, (vol - 0.35) * 45)
-        if regime == "bear" and not favored:
-            score -= 8
-        return max(0, min(100, score))
+        tech = technical_factors_from_series(series, idx)
+        return score_cybernetic_from_factors(ind, regime, tech)
     except Exception:
-        return base
+        return score_cybernetic_from_factors(ind, regime, None)
 
 
 # ── 控制论调仓: 仅 regime 切换 + 漂移 > 50% ──

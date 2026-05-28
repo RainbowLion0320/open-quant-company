@@ -3,7 +3,7 @@
 Multi-Asset Tournament — 干净版
 对比: stock-only vs ETF-only vs multi-asset (stock+ETF分配)
 """
-import os, sys, json
+import os, json
 from pathlib import Path
 from datetime import datetime
 
@@ -13,13 +13,19 @@ for k in list(os.environ.keys()):
 os.environ['no_proxy'] = '*'
 
 import pandas as pd
-import numpy as np
 
 from data.symbols import CIRCLE_STOCKS
 from data.fetcher import get_stock_daily, get_index_daily
-from data.assets.etf import ETFAsset, ETF_UNIVERSE
+from data.assets.etf import ETFAsset
 from data.datahub import get_datahub
-from broker.exchange import AShareExchange, ETFExchange, OrderSide
+from backtest.momentum import (
+    buy_equal_weight_selection,
+    liquidate_positions,
+    portfolio_value,
+    run_monthly_rebalance_strategy,
+    select_top_momentum,
+)
+from broker.exchange import AShareExchange, ETFExchange
 from broker.allocator import AssetAllocator
 
 HUB = get_datahub()
@@ -167,87 +173,17 @@ dates = common[mask]
 print(f"  Stocks: {len(prices_s_df.columns)}/{N_STOCKS}, ETFs: {len(prices_e_df.columns)}/{N_ETFS}")
 print(f"  Period: {dates[0].strftime('%Y-%m-%d')} → {dates[-1].strftime('%Y-%m-%d')}, {len(dates)} days")
 
-# ════════════════ helpers ════════════════
-def momentum_score(series, dt):
-    """Momentum + vol score. series is a pd.Series with full history."""
-    hist = series.loc[:dt].dropna()
-    if len(hist) < 63:
-        return 0
-    c = hist.values
-    m1 = c[-1] / c[-21] - 1
-    m3 = c[-1] / c[-63] - 1
-    r = np.diff(c[-20:]) / c[-20:-1]
-    v = np.std(r) * np.sqrt(252)
-    return 50 + m1 * 80 + m3 * 40 - v * 25
-
-def run_strat(name, prices, ex, n_pos, score_fn=None):
-    """Generic monthly-rebalance strategy runner."""
-    cols = list(prices.columns)
-    holdings = {}  # symbol → shares
-    cash = CASH
-    vals, trades = [], 0
-
-    for di, dt in enumerate(dates):
-        if di == 0 or dt.month != dates[di-1].month:
-            # Score & select
-            sc = {}
-            for sym in cols:
-                s = score_fn(prices[sym], dt) if score_fn else momentum_score(prices[sym], dt)
-                if s > 0:
-                    sc[sym] = s
-            sel = sorted(sc.items(), key=lambda x: -x[1])[:n_pos]
-
-            # Sell all
-            for sym in list(holdings):
-                p = prices[sym].get(dt, None)
-                if p is None or pd.isna(p):
-                    continue
-                cash += holdings[sym] * p - ex.calc_cost(p, holdings[sym], OrderSide.SELL)
-                del holdings[sym]
-
-            # Buy
-            if sel and cash > 0:
-                budget = cash / len(sel) * 0.99
-                for sym, _ in sel:
-                    p = prices[sym].get(dt, None)
-                    if p is None or pd.isna(p) or p <= 0:
-                        continue
-                    sh = int(budget / p / 100) * 100
-                    if sh >= 100:
-                        cost = ex.calc_cost(p, sh, OrderSide.BUY)
-                        if sh * p + cost <= cash:
-                            cash -= sh * p + cost
-                            holdings[sym] = holdings.get(sym, 0) + sh
-                            trades += 1
-
-        # NAV
-        mv = cash
-        for sym, sh in holdings.items():
-            p = prices[sym].get(dt, None)
-            if p is not None and not pd.isna(p):
-                mv += sh * p
-        vals.append(float(mv))
-
-    ret = (vals[-1] / vals[0] - 1) * 100 if vals[0] > 0 else 0
-    return ret, trades
-
-def multi_score_stock(series, dt):
-    return momentum_score(series, dt)
-
-def multi_score_etf(series, dt):
-    return momentum_score(series, dt)
-
 # ════════════════ run ════════════════
 print("\nRunning...")
 results = {}
 
 # Stock-only
-r, t = run_strat("stock_only", prices_s_df, stock_ex, n_pos=8)
+r, t = run_monthly_rebalance_strategy(prices_s_df, dates, stock_ex, n_pos=8, cash=CASH)
 results["stock_only"] = ("纯股票 动量", r, t)
 print(f"  stock-only: {r:+.2f}% ({t} trades)")
 
 # ETF-only
-r, t = run_strat("etf_only", prices_e_df, etf_ex, n_pos=3)
+r, t = run_monthly_rebalance_strategy(prices_e_df, dates, etf_ex, n_pos=3, cash=CASH)
 results["etf_only"] = ("纯ETF 动量", r, t)
 print(f"  etf-only:   {r:+.2f}% ({t} trades)")
 
@@ -284,78 +220,48 @@ for di, dt in enumerate(dates):
         w = allocator.get_weights(rs)
         w_s, w_e = w.get("stock", 0.5), w.get("etf", 0.3)
 
-        # Sell all
-        for sym in list(holdings):
-            if sym in prices_s_df.columns:
-                p = prices_s_df[sym].get(dt, None); ex = stock_ex
-            elif sym in prices_e_df.columns:
-                p = prices_e_df[sym].get(dt, None); ex = etf_ex
-            else:
-                continue
-            if p is None or pd.isna(p):
-                continue
-            cash += holdings[sym] * p - ex.calc_cost(p, holdings[sym], OrderSide.SELL)
-            del holdings[sym]
+        cash, holdings = liquidate_positions(
+            holdings,
+            cash,
+            [(prices_s_df, stock_ex), (prices_e_df, etf_ex)],
+            dt,
+        )
 
         total = cash
         budget_s, budget_e = total * w_s, total * w_e
 
         # Buy stocks
         if budget_s > 10000:
-            sc = {}
-            for sym in prices_s_df.columns:
-                s = momentum_score(prices_s_df[sym], dt)
-                if s > 0:
-                    sc[sym] = s
-            sel_s = sorted(sc.items(), key=lambda x: -x[1])[:5]
+            sel_s = select_top_momentum(prices_s_df, dt, 5)
             if sel_s:
-                per = budget_s / len(sel_s) * 0.99
-                for sym, _ in sel_s:
-                    p = prices_s_df[sym].get(dt, None)
-                    if p is None or pd.isna(p) or p <= 0:
-                        continue
-                    sh = int(per / p / 100) * 100
-                    if sh >= 100:
-                        cost = stock_ex.calc_cost(p, sh, OrderSide.BUY)
-                        if sh * p + cost <= cash:
-                            cash -= sh * p + cost
-                            holdings[sym] = holdings.get(sym, 0) + sh
-                            trades2 += 1
+                cash, holdings, new_trades = buy_equal_weight_selection(
+                    holdings,
+                    cash,
+                    prices_s_df,
+                    dt,
+                    stock_ex,
+                    sel_s,
+                    budget_s,
+                )
+                trades2 += new_trades
 
         # Buy ETFs
         if budget_e > 10000:
-            sc = {}
-            for sym in prices_e_df.columns:
-                s = momentum_score(prices_e_df[sym], dt)
-                if s > 0:
-                    sc[sym] = s
-            sel_e = sorted(sc.items(), key=lambda x: -x[1])[:3]
+            sel_e = select_top_momentum(prices_e_df, dt, 3)
             if sel_e:
-                per = budget_e / len(sel_e) * 0.99
-                for sym, _ in sel_e:
-                    p = prices_e_df[sym].get(dt, None)
-                    if p is None or pd.isna(p) or p <= 0:
-                        continue
-                    sh = int(per / p / 100) * 100
-                    if sh >= 100:
-                        cost = etf_ex.calc_cost(p, sh, OrderSide.BUY)
-                        if sh * p + cost <= cash:
-                            cash -= sh * p + cost
-                            holdings[sym] = holdings.get(sym, 0) + sh
-                            trades2 += 1
+                cash, holdings, new_trades = buy_equal_weight_selection(
+                    holdings,
+                    cash,
+                    prices_e_df,
+                    dt,
+                    etf_ex,
+                    sel_e,
+                    budget_e,
+                )
+                trades2 += new_trades
 
     # NAV
-    mv = cash
-    for sym, sh in holdings.items():
-        if sym in prices_s_df.columns:
-            p = prices_s_df[sym].get(dt, None)
-        elif sym in prices_e_df.columns:
-            p = prices_e_df[sym].get(dt, None)
-        else:
-            continue
-        if p is not None and not pd.isna(p):
-            mv += sh * p
-    vals2.append(float(mv))
+    vals2.append(portfolio_value(cash, holdings, [prices_s_df, prices_e_df], dt))
 
 ret2 = (vals2[-1] / vals2[0] - 1) * 100 if vals2[0] > 0 else 0
 results["multi"] = ("二资产分配", ret2, trades2)

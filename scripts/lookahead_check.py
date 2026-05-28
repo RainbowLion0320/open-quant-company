@@ -34,17 +34,14 @@ def _load_candidates(n: int = 20) -> list[str]:
     """加载候选股票 (优先大盘/高流动性)。"""
     from data.symbols import CIRCLE_STOCKS
     symbols = list(CIRCLE_STOCKS)[:n * 10]  # pool
-    from data.datahub import get_datahub
-    hub = get_datahub()
+    from data.feature_store import latest_feature_frame
+
     # 尝试按市值排序
-    feat_dir = hub.features_dir()
     try:
-        latest = sorted(feat_dir.glob("*.parquet"))[-1] if list(feat_dir.glob("*.parquet")) else None
-        if latest:
-            df = hub.read_parquet(latest)
-            if "val_total_mv" in df.columns and "symbol" in df.columns:
-                mv_map = dict(zip(df["symbol"], df["val_total_mv"]))
-                symbols.sort(key=lambda s: mv_map.get(s, 0), reverse=True)
+        df = latest_feature_frame()
+        if "val_total_mv" in df.columns and "symbol" in df.columns:
+            mv_map = dict(zip(df["symbol"], df["val_total_mv"]))
+            symbols.sort(key=lambda s: mv_map.get(s, 0), reverse=True)
     except Exception:
         pass
     return symbols[:n]

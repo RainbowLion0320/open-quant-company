@@ -55,7 +55,7 @@ def _log_llm_usage(source: str, usage, model: str):
 import pandas as pd
 import numpy as np
 
-from data.feature_store import FEATURES_DIR
+from data.feature_store import iter_feature_files
 from data.data_registry import get_registry, DataDimension
 from signals.dsl_parser import compute_formula
 
@@ -559,7 +559,7 @@ def run_research_loop(
 
     # Load existing factors
     existing = []
-    for pq in sorted(FEATURES_DIR.glob("*.parquet"))[:1]:
+    for pq in iter_feature_files()[:1]:
         df = get_datahub().read_parquet(pq)
         existing = [c for c in df.columns if c not in ("symbol", "month", "ret_fwd_20d", "name")]
         break

@@ -5,10 +5,10 @@
 每月重打分, 买Top-N, 卖跌出Top-N的
 """
 import pandas as pd
-import numpy as np
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from core.settings import get_settings
+from signals.technical import annualized_volatility, compute_momentum_periods, trend_strength
 
 
 def _load_config() -> dict:
@@ -229,18 +229,12 @@ def _get_sector_momentum() -> dict:
     try:
         from data.datahub import get_datahub
         hub = get_datahub()
-        candidates = []
-        try:
-            root = hub.dimension_root("sector_performance_snapshot")
-            if root.exists():
-                candidates = sorted(root.glob("*.parquet"), reverse=True)
-        except Exception:
-            pass
-        if not candidates:
+        path = hub.latest_dimension_snapshot("sector_performance_snapshot")
+        if not path:
             _sector_ret_cache = {}
             return _sector_ret_cache
 
-        df = hub.read_parquet(candidates[0], default=pd.DataFrame())
+        df = hub.read_parquet(path, default=pd.DataFrame())
         if df.empty or "sector_name" not in df.columns:
             _sector_ret_cache = {}
             return _sector_ret_cache
@@ -289,35 +283,17 @@ def _lookup_sector(symbol: str, fallback_sector: str) -> str:
 
 def compute_momentum(df: pd.DataFrame, periods: List[int], skip_recent: int = 0) -> Dict[int, float]:
     """计算多周期动量，可跳过最近 N 个交易日以降低短期反转噪声。"""
-    if len(df) < max(periods) + skip_recent + 1:
-        return {p: 0 for p in periods}
-
-    result = {}
-    for p in periods:
-        if len(df) >= p + skip_recent + 1:
-            end_idx = -1 - skip_recent if skip_recent else -1
-            start_idx = end_idx - p
-            base = df["close"].iloc[start_idx]
-            result[p] = (df["close"].iloc[end_idx] / base - 1) if base else 0
-        else:
-            result[p] = 0
-    return result
+    return compute_momentum_periods(df, periods, skip_recent=skip_recent)
 
 
 def compute_volatility(df: pd.DataFrame, window: int = 20) -> float:
     """计算年化波动率"""
-    if len(df) < window + 1:
-        return 0.30
-    returns = df["close"].pct_change().dropna().tail(window)
-    return returns.std() * np.sqrt(252)
+    return annualized_volatility(df, window=window)
 
 
 def compute_trend_strength(df: pd.DataFrame, window: int = 120) -> float:
     """当前价格相对中长期均线的强弱。"""
-    if len(df) < window:
-        return 0.0
-    ma = df["close"].tail(window).mean()
-    return float(df["close"].iloc[-1] / ma - 1) if ma else 0.0
+    return trend_strength(df, window=window)
 
 
 def compute_roe_trend(roe_history: List[float]) -> str:

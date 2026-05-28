@@ -5,7 +5,6 @@ Optuna 超参数优化 + 模型训练 + 评估
   python scripts/tune_model.py --n-trials 50
 """
 import os, sys, time, json
-from pathlib import Path
 
 for k in list(os.environ.keys()):
     if k.lower() in ('http_proxy', 'https_proxy', 'all_proxy'):
@@ -17,7 +16,7 @@ import numpy as np
 from scipy.stats import spearmanr
 
 from data.datahub import get_datahub
-from data.feature_store import FEATURES_DIR, TimeSeriesSplitter
+from data.feature_store import TimeSeriesSplitter, load_feature_panel
 from models import LightGBMRegressor, prepare_xy, MODEL_DIR
 
 HUB = get_datahub()
@@ -25,17 +24,7 @@ HUB = get_datahub()
 
 def load_all_features() -> pd.DataFrame:
     """加载所有月份的特征并拼接"""
-    dfs = []
-    for pq in sorted(FEATURES_DIR.glob("*.parquet")):
-        if pq.stem in ("scan_meta", "buffett_scan"):
-            continue
-        df = HUB.read_parquet(pq)
-        if "month" not in df.columns:
-            df["month"] = pq.stem
-        dfs.append(df)
-    if not dfs:
-        raise RuntimeError(f"No features found in {FEATURES_DIR}")
-    return pd.concat(dfs, ignore_index=True)
+    return load_feature_panel(hub=HUB)
 
 
 def optimize_hyperparams(n_trials: int = 50) -> dict:

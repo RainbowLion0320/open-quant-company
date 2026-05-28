@@ -6,13 +6,8 @@ import pandas as pd
 
 from data.datahub import get_datahub
 from web.api.serializers import safe_float, safe_int
-from web.api.services.snapshots import latest_hub_snapshot
 
 HUB = get_datahub()
-
-
-def latest_snapshot(dimension: str):
-    return latest_hub_snapshot(HUB, dimension)
 
 
 def source_summary(sectors: list[dict]) -> str:
@@ -36,7 +31,7 @@ def capital_source_summary(sectors: list[dict]) -> str:
 
 
 def _read_snapshot(dimension: str):
-    path = latest_snapshot(dimension)
+    path = HUB.latest_dimension_snapshot(dimension)
     if not path:
         return None, pd.DataFrame()
     return path, HUB.read_parquet(path, default=pd.DataFrame())
