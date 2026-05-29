@@ -111,6 +111,11 @@ def _evaluate_regime_quality(
     # Forward returns
     fwd_ret_20 = close.pct_change(20).shift(-20)
 
+    # Align lengths
+    min_len = min(len(fwd_ret_20), len(regime_labels))
+    fwd_ret_20 = fwd_ret_20.iloc[:min_len]
+    regime_labels = regime_labels[:min_len]
+
     # Per-regime stats
     stats = {}
     regime_names = {0: "bull", 1: "sideways", 2: "bear"}
@@ -120,7 +125,7 @@ def _evaluate_regime_quality(
             stats[f"{name}_count"] = 0
             stats[f"{name}_mean_fwd_20d"] = 0.0
             continue
-        subset = fwd_ret_20[mask].dropna()
+        subset = fwd_ret_20.iloc[mask].dropna()
         stats[f"{name}_count"] = int(mask.sum())
         stats[f"{name}_mean_fwd_20d"] = float(subset.mean()) if len(subset) > 0 else 0.0
 
@@ -231,19 +236,20 @@ def _compare_with_champion(
     champion_numeric = np.array([regime_map.get(r, 1) for r in champion_regimes])
 
     # Ensure same length
-    min_len = min(len(champion_numeric), len(hmm_states))
+    min_len = min(len(champion_numeric), len(hmm_states), len(close))
     champion_numeric = champion_numeric[:min_len]
     hmm_states = hmm_states[:min_len]
+    close_aligned = close.iloc[:min_len]
 
     # Agreement rate
     agreement = float(np.mean(champion_numeric == hmm_states))
 
     # Per-regime comparison
-    fwd_ret_20 = close.pct_change(20).shift(-20)
+    fwd_ret_20 = close_aligned.pct_change(20).shift(-20)
 
     comparison = {
         "agreement_rate": agreement,
-        "hmm_regime_quality": _evaluate_regime_quality(hmm_probs[:min_len], close.iloc[:min_len], hmm_states),
+        "hmm_regime_quality": _evaluate_regime_quality(hmm_probs[:min_len], close_aligned, hmm_states),
     }
 
     # Champion regime quality
@@ -251,7 +257,7 @@ def _compare_with_champion(
     for regime_name, regime_idx in regime_map.items():
         mask = champion_numeric == regime_idx
         if mask.sum() > 0:
-            subset = fwd_ret_20.iloc[:min_len][mask].dropna()
+            subset = fwd_ret_20.iloc[mask].dropna()
             champion_quality[f"{regime_name}_mean_fwd_20d"] = float(subset.mean()) if len(subset) > 0 else 0.0
             champion_quality[f"{regime_name}_count"] = int(mask.sum())
     comparison["champion_regime_quality"] = champion_quality
@@ -339,8 +345,14 @@ def main() -> int:
     probs = hmm.predict_proba(X)
     states = hmm.predict(X)
 
-    close = features.index.map(lambda x: index_df.loc[x, "close"] if x in index_df.index else np.nan)
-    close = pd.Series(close, index=features.index).dropna()
+    # Build close series aligned with features index
+    bench_data = index_df.copy()
+    bench_data.columns = [str(c).lower() for c in bench_data.columns]
+    if "date" in bench_data.columns:
+        bench_data["date"] = pd.to_datetime(bench_data["date"], errors="coerce")
+        bench_data = bench_data.dropna(subset=["date"]).set_index("date")
+    bench_data["close"] = pd.to_numeric(bench_data["close"], errors="coerce")
+    close = bench_data["close"].reindex(features.index).ffill().dropna()
 
     quality = _evaluate_regime_quality(probs, close.iloc[:len(states)], states)
     log.info(f"Regime quality: {json.dumps(quality, indent=2)}")

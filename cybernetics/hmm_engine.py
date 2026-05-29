@@ -450,16 +450,20 @@ def align_states(result: HMMResult, X: np.ndarray | None = None) -> HMMResult:
     - State with lowest mean return_1d  → index 2 (bear)
     - Middle                           → index 1 (sideways)
 
-    If X is provided, uses the actual observation means.
-    Otherwise uses result.means[:, 0] (first feature assumed to be return_1d).
+    Uses a composite score of return_1d (feature 0) and realized_vol_20d (feature 1)
+    for more robust alignment: high return + low vol = bull, low return + high vol = bear.
     """
     K = result.means.shape[0]
     if K != 3:
         return result  # only align for 3-state models
 
-    # Determine ordering by mean of first feature (return_1d)
-    feature_means = result.means[:, 0]
-    order = np.argsort(-feature_means)  # descending: [bull_idx, sideways_idx, bear_idx]
+    # Composite alignment score: return_1d mean - 0.3 * vol mean
+    # Bull: high return, low vol → high score
+    # Bear: low return, high vol → low score
+    return_means = result.means[:, 0]  # return_1d
+    vol_means = result.means[:, 1] if result.means.shape[1] > 1 else np.zeros(K)
+    alignment_score = return_means - 0.3 * vol_means
+    order = np.argsort(-alignment_score)  # descending: [bull_idx, sideways_idx, bear_idx]
 
     if np.array_equal(order, [0, 1, 2]):
         return result  # already aligned
