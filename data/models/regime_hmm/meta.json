@@ -1,0 +1,18 @@
+{
+  "log_likelihood": 9541.788852125645,
+  "n_iter": 89,
+  "aic": -18785.57770425129,
+  "bic": -17952.766666598865,
+  "n_samples": 1977,
+  "n_features": 8,
+  "config": {
+    "n_states": 3,
+    "max_iter": 100,
+    "tol": 0.0001,
+    "n_init": 5,
+    "min_df": 3.0,
+    "max_df": 30.0,
+    "random_seed": 42,
+    "reg_covar": 1e-06
+  }
+}
