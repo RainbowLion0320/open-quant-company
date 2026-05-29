@@ -10,7 +10,7 @@
 2. `docs/specs/` — 子系统实现契约，是代码行为的权威设计文档。
 3. `docs/acceptance-matrix.md` — PRD/spec 到代码、测试、API/Web、手工验收的追踪矩阵。
 4. `wiki/` — 长期知识：概念、架构决策、对比分析、操作方法。
-5. `docs/development-plan.md` — 当前唯一活跃开发计划。完成或被取代的计划从工作树删除，历史从 git 恢复。
+5. `docs/development-plan.md` — 仅在有活跃开发计划时存在。完成或被取代的计划从工作树删除，历史从 git 恢复。
 
 ## 权威来源
 
@@ -57,7 +57,7 @@ astroq web serve --host 0.0.0.0 --port 8501
 - 产品范围变化更新 `docs/PRD.md`，不要把实施阶段清单塞进 PRD。
 - wiki 页面保存推理、概念和方法论。动态值通过代码/配置链接查询，不复制数量、日期、回测结果。
 - 完成或被取代的计划从工作树删除；需要追溯时使用 git log / git show。
-- 当前活跃计划只放在 `docs/development-plan.md`；已完成或被替换的计划依靠 git 历史追溯。
+- 当前活跃计划只放在 `docs/development-plan.md`；没有活跃计划时该文件不应保留。已完成或被替换的计划依靠 git 历史追溯。
 - 不在 wiki 保留大型历史日志。当前活动由 git commit 追溯。
 
 ## 漂移检查
