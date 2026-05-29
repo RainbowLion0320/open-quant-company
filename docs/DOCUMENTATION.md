@@ -28,6 +28,29 @@
 | Agent/cron/local 操作入口 | `astroq` CLI (`astrolabe_cli/`) | 新自动化优先调用 CLI；旧脚本作为底层实现或兼容入口。 |
 | 操作历史 | git log | 仓库不再保留 append-only changelog 或历史计划归档。 |
 
+## CLI 操作入口
+
+新自动化、cron 和本地维护优先使用 `astroq`，不要直接拼接底层脚本。CLI 只做编排，真实逻辑仍由现有模块承担。
+
+常用命令：
+
+```bash
+astroq health --json
+astroq config validate --json
+astroq data status --json
+astroq data repair stock_valuation --dry-run --json
+astroq strategy catalog --json
+astroq strategy run all --mode production --json
+astroq strategy run trend_following --mode research --dry-run --json
+astroq regime status --json
+astroq backtest run --strategy multifactor --dry-run --json
+astroq docs check --json
+astroq web build --json
+astroq web serve --host 0.0.0.0 --port 8501
+```
+
+长期操作说明见 `wiki/reference/cli-control-plane.md`。机器调用必须使用 `--json` 并读取稳定字段：`ok`、`command`、`data`、`message`、`errors`。
+
 ## 更新规则
 
 - 改动公开契约的代码提交，必须同步更新对应 `docs/specs/` 页面；必要时更新验收矩阵。

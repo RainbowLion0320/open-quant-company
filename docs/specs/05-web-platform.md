@@ -113,6 +113,17 @@ def get_db() -> Database:
 
 `astroq` 是 Web/API 之外的本地控制平面，用于 agent、cron 和人工维护。CLI 只做编排：策略扫描仍走 `data.strategy_plugins`，数据修复仍走 `scripts.repair_table`，Web 服务仍走 `uvicorn web.api.app:create_app`。所有 agent 依赖命令必须支持 `--json`。
 
+| 命令域 | 命令 | 契约 |
+|--------|------|------|
+| Health | `astroq health --json` | 返回项目版本、DataHub store/cache 路径 |
+| Config | `astroq config validate --json` | 校验 settings 和策略注册表 |
+| Data | `astroq data status --json` / `astroq data repair <table> --dry-run --json` | 委托 DB health 和单表修复，dry-run 不触发写入 |
+| Strategy | `astroq strategy catalog --json` / `astroq strategy run <name|all>` | 委托 Strategy Catalog 和 runtime gates，candidate 必须显式 `--mode research` |
+| Regime | `astroq regime status --json` / `astroq regime train-profit --dry-run --json` | 读取当前生产 regime；训练命令默认可 dry-run |
+| Backtest | `astroq backtest run [--strategy NAME] --dry-run --json` | 委托回测 runner，不在 CLI 重写回测逻辑 |
+| Docs | `astroq docs check --json` | 扫描已知陈旧文档短语 |
+| Web | `astroq web build --json` / `astroq web serve --host HOST --port PORT` | 委托 Vite build 和 FastAPI/uvicorn |
+
 ## 3. 数据流
 
 ```
