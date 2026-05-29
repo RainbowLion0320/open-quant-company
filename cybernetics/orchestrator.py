@@ -1248,20 +1248,51 @@ class QuantOrchestrator:
         except Exception:
             engine = "rule_based"
 
+        hmm_raw = None
         if engine in ("hmm", "hybrid"):
             try:
                 regime_probs, hmm_confidence, hmm_entropy, hmm_raw = _hmm_detect(
                     index_frames, breadth_snapshot, volume_snapshot
                 )
-                if regime_probs:
-                    raw_regime = hmm_raw
-                    detection_method = "hmm"
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(f"HMM detection failed, falling back to rules: {e}")
-                if engine == "hmm":
-                    # pure HMM mode: still fall back
-                    detection_method = "rule_based"
+
+        if engine == "hmm":
+            # Pure HMM: use HMM result, fall back to rules only on failure
+            if regime_probs:
+                raw_regime = hmm_raw
+                detection_method = "hmm"
+            else:
+                detection_method = "rule_based"
+
+        elif engine == "hybrid":
+            # Hybrid: run both, take consensus
+            if regime_probs and hmm_raw is not None:
+                if hmm_raw == rule_raw_regime:
+                    # Agreement: use HMM probabilities directly
+                    raw_regime = hmm_raw
+                    detection_method = "hmm"
+                else:
+                    # Disagreement: blend probabilities with rule-based vote
+                    # Rule gets a "virtual vote" weight of 0.4, HMM keeps its probs
+                    rule_vote = 0.4
+                    hmm_weight = 1.0 - rule_vote
+                    blended = {
+                        "bull": regime_probs.get("bull", 0) * hmm_weight,
+                        "sideways": regime_probs.get("sideways", 0) * hmm_weight,
+                        "bear": regime_probs.get("bear", 0) * hmm_weight,
+                    }
+                    blended[rule_raw_regime.value] = blended.get(rule_raw_regime.value, 0) + rule_vote
+                    # Normalize
+                    total = sum(blended.values())
+                    if total > 0:
+                        blended = {k: v / total for k, v in blended.items()}
+                    regime_probs = blended
+                    raw_regime = MarketRegime(max(blended, key=blended.get))
+                    detection_method = "hybrid"
+            else:
+                detection_method = "rule_based"
 
         # --- Smoothing ---
         transition = _get_regime_transition_tracker().apply(
