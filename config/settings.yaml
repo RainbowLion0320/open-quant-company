@@ -172,6 +172,27 @@ cybernetics:
       position_size: 0.15
       stop_loss: -0.05
     volatility_adjustment: true
+  regime_engine: hmm  # "hmm" | "rule_based" | "hybrid"
+  hmm:
+    n_states: 3
+    max_iter: 100
+    tol: 0.0001
+    n_init: 5
+    min_df: 3.0
+    max_df: 30.0
+    feature_window: 252
+    min_training_samples: 504
+    model_path: data/models/regime_hmm
+    fallback_to_rules: true
+    observation_columns:
+      - return_1d
+      - realized_vol_20d
+      - skewness_20d
+      - kurtosis_20d
+      - drawdown_from_peak
+      - volume_surprise
+      - breadth_momentum
+      - correlation_stock_bond
   feedback:
     loop_interval: daily
     max_consecutive_losses: 3

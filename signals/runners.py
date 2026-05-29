@@ -93,10 +93,12 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
     try:
         snapshot = orch.detect()
         regime = snapshot.regime.value if hasattr(snapshot.regime, "value") else str(snapshot.regime)
+        regime_probs = getattr(snapshot, "regime_probs", {})
     except Exception:
         regime = "sideways"
+        regime_probs = {}
 
-    scorer = MultiFactorScorer(regime=regime)
+    scorer = MultiFactorScorer(regime=regime, regime_probs=regime_probs)
     symbols = list(CIRCLE_STOCKS)
     if limit and limit < len(symbols):
         symbols = symbols[:limit]
@@ -222,9 +224,11 @@ def compute_cybernetic(limit: int = 0) -> list[dict]:
     try:
         snapshot = orch.detect()
         regime = snapshot.regime.value if hasattr(snapshot.regime, "value") else str(snapshot.regime)
+        regime_probs = getattr(snapshot, "regime_probs", {})
         params = orch.get_params()
     except Exception:
         regime = "sideways"
+        regime_probs = {}
         params = {"position_pct": 0.15, "max_positions": 5, "stop_loss": -0.05}
 
     favored = favored_sectors_for_regime(regime)
@@ -240,7 +244,7 @@ def compute_cybernetic(limit: int = 0) -> list[dict]:
         name = SYMBOL_NAME.get(sym, sym)
 
         tech = _get_technical_factors(sym)
-        score = score_cybernetic_from_factors(ind, regime, tech)
+        score = score_cybernetic_from_factors(ind, regime, tech, regime_probs=regime_probs)
 
         results.append(
             {

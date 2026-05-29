@@ -122,6 +122,19 @@ class MarketContext:
     regime_state: Dict[str, Any] = field(default_factory=dict)
     date: str = ""
 
+    # === HMM 概率字段 ===
+    regime_probs: Dict[str, float] = field(default_factory=dict)
+    # {"bull": 0.65, "sideways": 0.25, "bear": 0.10}
+
+    detection_method: str = "rule_based"
+    # "hmm" | "rule_based" | "hybrid"
+
+    hmm_confidence: float = 0.0
+    # max(regime_probs) — 状态确定性
+
+    hmm_entropy: float = 0.0
+    # -sum(p * log(p)) — 状态不确定性
+
 
 @dataclass
 class MarketBreadth:
@@ -967,6 +980,93 @@ def _classify_regime(score: float, components: Dict[str, float], breadth: Market
         )
     )
 
+
+def _hmm_detect(
+    index_frames: Dict[str, Any],
+    breadth: MarketBreadth,
+    volume: MarketVolume,
+) -> tuple[Dict[str, float], float, float, MarketRegime]:
+    """Run Student-t HMM regime detection.
+
+    Returns (regime_probs, confidence, entropy, raw_regime).
+    Raises if model not available or inference fails.
+    """
+    import math
+
+    import numpy as np
+
+    from cybernetics.features import OBSERVATION_COLUMNS, build_observation_matrix, build_regime_features
+    from cybernetics.hmm_engine import HMMConfig, HMMResult, StudentTHMM, load_hmm_model
+
+    # Check model path
+    try:
+        hmm_cfg = _load_config().get("hmm", {})
+        model_path = hmm_cfg.get("model_path", "data/models/regime_hmm")
+    except Exception:
+        model_path = "data/models/regime_hmm"
+
+    from pathlib import Path
+    mp = Path(model_path)
+    if not (mp / "params.npz").exists():
+        raise FileNotFoundError(f"HMM model not found at {mp}")
+
+    # Build features
+    features = build_regime_features(
+        index_frames,
+        breadth_raw=_score_breadth_strength(
+            breadth.advance_ratio, breadth.above_ma20, breadth.above_ma60, breadth.above_ma120
+        ),
+        breadth_above_ma20=breadth.above_ma20,
+        breadth_above_ma60=breadth.above_ma60,
+        breadth_above_ma120=breadth.above_ma120,
+        amount_ratio_5_20=volume.amount_ratio_5_20,
+        advance_ratio=breadth.advance_ratio,
+        up_amount_ratio=volume.up_amount_ratio,
+        sample_size=breadth.sample_size,
+    )
+    if features.empty:
+        raise ValueError("Feature construction returned empty DataFrame")
+
+    # Load model
+    result = load_hmm_model(mp)
+
+    # Build observation for latest day
+    obs_cols = hmm_cfg.get("observation_columns", OBSERVATION_COLUMNS)
+    obs = build_observation_matrix(features, columns=obs_cols, standardise=True)
+    if len(obs) == 0:
+        raise ValueError("Observation matrix is empty")
+
+    # Use the last observation
+    latest = obs[-1:]  # (1, D)
+
+    # Predict probabilities
+    hmm = StudentTHMM(result.config)
+    hmm._params = {
+        "means": result.means,
+        "covars": result.covars,
+        "df": result.df,
+        "transmat": result.transmat,
+        "startprob": result.startprob,
+    }
+    probs = hmm.predict_proba(latest)[0]  # (3,)
+
+    # Map to regime labels (aligned: 0=bull, 1=sideways, 2=bear)
+    regime_probs = {
+        "bull": float(probs[0]),
+        "sideways": float(probs[1]),
+        "bear": float(probs[2]),
+    }
+    confidence = float(max(probs))
+    entropy = -sum(p * math.log(p + 1e-300) for p in probs)
+
+    # Argmax regime
+    regime_idx = int(np.argmax(probs))
+    regime_map = {0: MarketRegime.BULL, 1: MarketRegime.SIDEWAYS, 2: MarketRegime.BEAR}
+    raw_regime = regime_map.get(regime_idx, MarketRegime.SIDEWAYS)
+
+    return regime_probs, confidence, entropy, raw_regime
+
+
 def detect_market_regime(
     index_data: dict = None,  # 指数数据 {symbol: df}，不传则自动拉取
     window: int = 60,
@@ -979,32 +1079,24 @@ def detect_market_regime(
     return detect_trend_regime(index_data=index_data, window=window, symbol=symbol)
 
 
-def adaptive_params(regime: MarketRegime) -> Dict[str, float]:
+def adaptive_params(
+    regime: MarketRegime,
+    probs: Dict[str, float] | None = None,
+) -> Dict[str, float]:
     """
-    根据市场状态自适应调整参数
-    优先从 config/settings.yaml → cybernetics.adaptive.{regime} 读取
+    根据市场状态自适应调整参数。
+
+    如果提供 probs（regime 概率向量），做概率加权：
+      position_size = P(bull)*0.30 + P(sideways)*0.15 + P(bear)*0.05
+    否则退化到原有的硬分类逻辑。
     """
     regime = to_market_regime(regime)
-    # 尝试从配置加载
-    try:
-        cfg = _load_config()["adaptive"]
-        regime_key = regime.value  # "bull", "sideways", "bear"
-        if regime_key in cfg:
-            entry = cfg[regime_key]
-            return {
-                "position_size": float(entry["position_size"]),
-                "stop_loss": float(entry["stop_loss"]),
-                "confidence_threshold": float(entry["confidence_threshold"]),
-                "max_positions": int(entry["max_positions"]),
-            }
-    except Exception:
-        pass
 
-    # 配置不可用时的硬编码回退
-    params = {
+    # 硬编码的基础参数
+    _HARD_PARAMS = {
         MarketRegime.BULL: {
-            "position_size": 0.30,      # 牛市：单票可到30%
-            "stop_loss": -0.08,         # 止损：-8%
+            "position_size": 0.30,
+            "stop_loss": -0.08,
             "confidence_threshold": 0.60,
             "max_positions": 8,
         },
@@ -1021,7 +1113,46 @@ def adaptive_params(regime: MarketRegime) -> Dict[str, float]:
             "max_positions": 2,
         },
     }
-    return params.get(regime, params[MarketRegime.SIDEWAYS])
+
+    # 尝试从配置加载覆盖
+    _CFG_PARAMS = {}
+    try:
+        cfg = _load_config()["adaptive"]
+        for r in (MarketRegime.BULL, MarketRegime.SIDEWAYS, MarketRegime.BEAR):
+            if r.value in cfg:
+                entry = cfg[r.value]
+                _CFG_PARAMS[r] = {
+                    "position_size": float(entry["position_size"]),
+                    "stop_loss": float(entry["stop_loss"]),
+                    "confidence_threshold": float(entry["confidence_threshold"]),
+                    "max_positions": int(entry["max_positions"]),
+                }
+    except Exception:
+        pass
+
+    # 合并：配置覆盖硬编码
+    merged = {}
+    for r in _HARD_PARAMS:
+        merged[r] = {**_HARD_PARAMS[r], **(_CFG_PARAMS.get(r, {}))}
+
+    # 概率加权路径
+    if probs and sum(probs.values()) > 0.95:
+        regime_map = {
+            "bull": MarketRegime.BULL,
+            "sideways": MarketRegime.SIDEWAYS,
+            "bear": MarketRegime.BEAR,
+        }
+        result = {}
+        for key in merged[MarketRegime.BULL]:
+            val = sum(
+                probs.get(r_str, 0) * merged[r_enum].get(key, 0)
+                for r_str, r_enum in regime_map.items()
+            )
+            result[key] = val
+        result["max_positions"] = round(result["max_positions"])
+        return result
+
+    return merged.get(regime, merged[MarketRegime.SIDEWAYS])
 
 
 # =====================================================================
@@ -1060,7 +1191,11 @@ class QuantOrchestrator:
         """
         运行完整市场检测，返回 MarketContext 快照。
         自动拉取真实指数数据，计算多指数趋势、全市场宽度、风险和量能确认。
+
+        如果配置 regime_engine=hmm 且模型可用，使用 Student-t HMM 做概率推断；
+        否则退化到规则评分。
         """
+        import math
         from datetime import datetime
 
         from data.fetcher import get_index_daily
@@ -1097,8 +1232,38 @@ class QuantOrchestrator:
         breadth_snapshot = _compute_full_market_breadth()
         volume_snapshot = _compute_full_market_volume()
         score, components = _compute_regime_score_v2(bench, index_frames, breadth_snapshot, volume_snapshot)
-        raw_regime = _classify_regime(score, components, breadth_snapshot)
+        rule_raw_regime = _classify_regime(score, components, breadth_snapshot)
         observation_key = _regime_observation_key(bench, breadth_snapshot, volume_snapshot)
+
+        # --- HMM detection path ---
+        regime_probs: Dict[str, float] = {}
+        detection_method = "rule_based"
+        hmm_confidence = 0.0
+        hmm_entropy = 0.0
+        raw_regime = rule_raw_regime
+
+        try:
+            hmm_cfg = _load_config().get("hmm", {})
+            engine = hmm_cfg.get("regime_engine", _load_config().get("regime_engine", "rule_based"))
+        except Exception:
+            engine = "rule_based"
+
+        if engine in ("hmm", "hybrid"):
+            try:
+                regime_probs, hmm_confidence, hmm_entropy, hmm_raw = _hmm_detect(
+                    index_frames, breadth_snapshot, volume_snapshot
+                )
+                if regime_probs:
+                    raw_regime = hmm_raw
+                    detection_method = "hmm"
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"HMM detection failed, falling back to rules: {e}")
+                if engine == "hmm":
+                    # pure HMM mode: still fall back
+                    detection_method = "rule_based"
+
+        # --- Smoothing ---
         transition = _get_regime_transition_tracker().apply(
             raw_regime,
             score=score,
@@ -1106,7 +1271,12 @@ class QuantOrchestrator:
         )
         self.regime = transition.confirmed
 
-        self.params = adaptive_params(self.regime)
+        # --- Adaptive params (probability-weighted if HMM) ---
+        if regime_probs and detection_method == "hmm":
+            self.params = adaptive_params(self.regime, probs=regime_probs)
+        else:
+            self.params = adaptive_params(self.regime)
+
         _volume_strength, vol_trend, _volume_detail = _compute_volume_strength(
             index_frames,
             breadth_snapshot,
@@ -1132,6 +1302,10 @@ class QuantOrchestrator:
             score_components=components,
             regime_state=transition.to_dict(),
             date=datetime.now().strftime("%Y-%m-%d"),
+            regime_probs=regime_probs,
+            detection_method=detection_method,
+            hmm_confidence=hmm_confidence,
+            hmm_entropy=hmm_entropy,
         )
         return self.market_snapshot
 

@@ -22,8 +22,9 @@ MFC = CONFIG.get("signals", {}).get("multifactor", {})
 class MultiFactorScorer:
     """多因子打分器"""
 
-    def __init__(self, regime: str = "sideways"):
+    def __init__(self, regime: str = "sideways", regime_probs: dict[str, float] | None = None):
         self.regime = regime
+        self.regime_probs = regime_probs or {}
 
     @staticmethod
     def _bounded(v: float) -> float:
@@ -156,24 +157,31 @@ class MultiFactorScorer:
         return min(100, mom_score * w_mom + vol_score * w_vol)
 
     def _market_score(self, f: dict) -> float:
-        """市场环境分: 当前市场状态下的板块适配"""
+        """市场环境分: 当前市场状态下的板块适配
+
+        如果有 regime_probs，做概率加权。
+        """
         mc = MFC.get("market", {})
         sector = f.get("sector", "consumer")
 
-        # 从config读取板块加分表，回落至原始硬编码值
-        if self.regime == "bull":
-            cfg_bonus = mc.get("bull", {})
-            sector_bonus = cfg_bonus.get(sector, {
-                "bank": 15, "insurance": 10, "securities": 20
-            }.get(sector, 5))
-        elif self.regime == "bear":
-            cfg_bonus = mc.get("bear", {})
-            sector_bonus = cfg_bonus.get(sector, {
-                "bank": 25, "consumer": 20
-            }.get(sector, 5))
+        _REGIME_BONUS_DEFAULTS = {
+            "bull": {"bank": 15, "insurance": 10, "securities": 20},
+            "bear": {"bank": 25, "consumer": 20},
+            "sideways": {},
+        }
+
+        def _get_bonus(regime: str) -> float:
+            cfg_bonus = mc.get(regime, {})
+            defaults = _REGIME_BONUS_DEFAULTS.get(regime, {})
+            return float(cfg_bonus.get(sector, defaults.get(sector, 10 if regime == "sideways" else 5)))
+
+        if self.regime_probs and sum(self.regime_probs.values()) > 0.95:
+            sector_bonus = sum(
+                p * _get_bonus(r)
+                for r, p in self.regime_probs.items()
+            )
         else:
-            cfg_bonus = mc.get("sideways", {})
-            sector_bonus = cfg_bonus.get(sector, 10)  # 震荡均等
+            sector_bonus = _get_bonus(self.regime)
 
         return min(100, 50 + sector_bonus)
 

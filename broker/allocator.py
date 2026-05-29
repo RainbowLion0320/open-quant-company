@@ -85,8 +85,21 @@ class AssetAllocator:
         except Exception:
             pass  # Use defaults
 
-    def get_weights(self, regime: str) -> Dict[str, float]:
-        """Get asset weights for a given market regime."""
+    def get_weights(self, regime: str, probs: Dict[str, float] | None = None) -> Dict[str, float]:
+        """Get asset weights for a given market regime.
+
+        If probs is provided, returns probability-weighted blend of regime weights.
+        """
+        if probs and sum(probs.values()) > 0.95:
+            # Probability-weighted allocation
+            result = {}
+            for asset_type in ("stock", "etf", "bond", "cash"):
+                result[asset_type] = sum(
+                    probs.get(r, 0) * self._regime_weights.get(r, self._regime_weights["unknown"]).get(asset_type, 0)
+                    for r in ("bull", "sideways", "bear")
+                )
+            return result
+
         regime_key = normalize_regime(regime, default="unknown")
         regime_key = regime_key if regime_key in self._regime_weights else "unknown"
         return dict(self._regime_weights[regime_key])

@@ -24,20 +24,23 @@ def _load_settings() -> dict:
     return get_settings()
 
 
-def _current_regime() -> str:
+def _current_regime() -> tuple[str, dict[str, float]]:
+    """Return (regime_string, regime_probs)."""
     try:
         from cybernetics.orchestrator import QuantOrchestrator
         snapshot = QuantOrchestrator().detect()
         regime = snapshot.regime.value if hasattr(snapshot.regime, "value") else str(snapshot.regime)
-        return regime if regime in {"bull", "bear", "sideways"} else "sideways"
+        regime = regime if regime in {"bull", "bear", "sideways"} else "sideways"
+        probs = getattr(snapshot, "regime_probs", {})
+        return regime, probs if probs else {regime: 1.0}
     except Exception:
-        return "sideways"
+        return "sideways", {"sideways": 1.0}
 
 
 def _load_model_bundle(model_version: str = "best") -> tuple[object | None, list[str], dict, str]:
     """Load regime-aware model when available, falling back to lgbm_best."""
     cfg = _load_settings().get("ml", {})
-    regime = _current_regime()
+    regime, _probs = _current_regime()
     use_regime = cfg.get("use_regime_models", True)
 
     candidates: list[tuple[Path, Path, str]] = []
