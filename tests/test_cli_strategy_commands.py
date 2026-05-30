@@ -38,3 +38,54 @@ def test_strategy_run_research_dry_run_lists_candidate(capsys):
     assert data["data"]["dry_run"] is True
     assert data["data"]["would_run"]["strategy"] == "trend_following"
     assert data["data"]["would_run"]["mode"] == "research"
+
+
+def test_strategy_evidence_without_name_lists_artifacts(monkeypatch, capsys):
+    from astrolabe_cli.main import run_cli
+
+    monkeypatch.setattr(
+        "research.strategy_evaluation.list_evidence_artifacts",
+        lambda: [
+            {
+                "strategy": "trend_following",
+                "path": "data/store/research/strategy_evidence/trend_following.json",
+                "exists": False,
+                "promotion_decision": "missing",
+                "oos_status": "missing",
+                "baseline_count": 0,
+                "parse_error": None,
+            }
+        ],
+    )
+
+    code = run_cli(["strategy", "evidence", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["ok"] is True
+    assert data["data"]["total"] == 1
+    assert data["data"]["items"][0]["strategy"] == "trend_following"
+
+
+def test_strategy_evidence_with_name_returns_detail(monkeypatch, capsys):
+    from astrolabe_cli.main import run_cli
+
+    monkeypatch.setattr(
+        "research.strategy_evaluation.load_evidence_artifact",
+        lambda name: {
+            "strategy": name,
+            "exists": False,
+            "path": f"data/store/research/strategy_evidence/{name}.json",
+            "summary": {},
+            "artifact": {},
+            "parse_error": None,
+        },
+    )
+
+    code = run_cli(["strategy", "evidence", "trend_following", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["ok"] is True
+    assert data["data"]["strategy"] == "trend_following"
+    assert data["data"]["exists"] is False

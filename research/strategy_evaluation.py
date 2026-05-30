@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from research.strategy_catalog import catalog_items
 from research.strategy_governance import StrategyMetrics, evaluate_promotion
 
 
@@ -141,35 +142,68 @@ def write_strategy_evidence_report(report: dict[str, Any], output_dir: str | Pat
     return path
 
 
-def list_evidence_artifacts(root: str | Path | None = None) -> list[dict]:
-    """List all evidence artifacts without creating files."""
-    evidence_dir = Path(root) if root is not None else strategy_evidence_dir()
-    if not evidence_dir.exists():
+def _catalog_strategy_names() -> list[str]:
+    try:
+        return [str(item.name) for item in catalog_items()]
+    except Exception:
         return []
-    results = []
-    for path in sorted(evidence_dir.glob("*.json")):
-        strategy = path.stem
-        entry = {
-            "strategy": strategy,
-            "path": str(path),
-            "updated": None,
-            "exists": True,
-            "promotion_decision": None,
-            "oos_status": None,
-            "baseline_count": 0,
-            "parse_error": None,
-        }
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            entry["updated"] = data.get("generated_at")
-            pd_data = data.get("promotion_decision", {})
-            entry["promotion_decision"] = "passed" if pd_data.get("passed") else "blocked"
-            entry["oos_status"] = data.get("oos", {}).get("months", 0)
-            entry["baseline_count"] = len(data.get("baselines", {}))
-        except (json.JSONDecodeError, OSError) as e:
-            entry["parse_error"] = str(e)
-        results.append(entry)
-    return results
+
+
+def _missing_evidence_entry(strategy: str, path: Path) -> dict:
+    return {
+        "strategy": strategy,
+        "path": str(path),
+        "updated": None,
+        "exists": False,
+        "promotion_decision": "missing",
+        "oos_status": "missing",
+        "baseline_count": 0,
+        "parse_error": None,
+    }
+
+
+def _artifact_entry(path: Path) -> dict:
+    strategy = path.stem
+    entry = {
+        "strategy": strategy,
+        "path": str(path),
+        "updated": None,
+        "exists": True,
+        "promotion_decision": None,
+        "oos_status": None,
+        "baseline_count": 0,
+        "parse_error": None,
+    }
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        entry["updated"] = data.get("generated_at")
+        decision = data.get("promotion_decision", {})
+        entry["promotion_decision"] = "passed" if decision.get("passed") else "blocked"
+        months = int(data.get("oos", {}).get("months", 0) or 0)
+        entry["oos_status"] = f"{months}m" if months > 0 else "missing"
+        entry["baseline_count"] = len(data.get("baselines", {}))
+    except (json.JSONDecodeError, OSError) as e:
+        entry["promotion_decision"] = "parse_error"
+        entry["oos_status"] = "unknown"
+        entry["parse_error"] = str(e)
+    return entry
+
+
+def list_evidence_artifacts(root: str | Path | None = None) -> list[dict]:
+    """List evidence status for every catalog strategy without creating files."""
+    evidence_dir = Path(root) if root is not None else strategy_evidence_dir()
+    catalog_names = _catalog_strategy_names()
+    results: dict[str, dict] = {
+        name: _missing_evidence_entry(name, evidence_dir / f"{name}.json")
+        for name in catalog_names
+    }
+    if evidence_dir.exists():
+        for path in sorted(evidence_dir.glob("*.json")):
+            results[path.stem] = _artifact_entry(path)
+
+    ordered = [results[name] for name in catalog_names if name in results]
+    extras = [row for key, row in sorted(results.items()) if key not in set(catalog_names)]
+    return ordered + extras
 
 
 def load_evidence_artifact(strategy: str, root: str | Path | None = None) -> dict:

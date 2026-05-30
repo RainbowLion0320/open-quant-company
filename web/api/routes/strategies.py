@@ -1,11 +1,10 @@
 """策略中心路由 — 策略列表 / 信号 / 异步运行 / 进度"""
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Query, WebSocket
 from web.api.models import (
     StrategyCatalogResponse,
     StrategyEvaluationSummaryResponse,
     StrategyEvidenceDetailResponse,
-    StrategyEvidenceItem,
     StrategyEvidenceListResponse,
     StrategyListResponse,
     StrategyRunRequest,

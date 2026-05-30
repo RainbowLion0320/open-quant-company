@@ -30,6 +30,42 @@ def test_strategy_jobs_route_is_not_shadowed(monkeypatch):
     assert res.json()["progress"] == 42
 
 
+def test_assets_overview_api_respects_config_enabled_flags(monkeypatch):
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+
+    res = TestClient(create_app()).get("/api/assets/overview")
+    assert res.status_code == 200
+    payload = res.json()
+    by_type = {item["asset_type"]: item for item in payload["items"]}
+
+    assert payload["total"] == len(payload["items"])
+    assert by_type["stock"]["enabled"] is True
+    assert by_type["etf"]["enabled"] is True
+    assert by_type["bond"]["enabled"] is False
+    assert by_type["futures"]["enabled"] is False
+    assert by_type["crypto"]["enabled"] is False
+    assert by_type["crypto"]["data_source"] == "placeholder"
+    assert by_type["crypto"]["error"] == ""
+
+
+def test_strategy_evidence_api_lists_catalog_gaps(monkeypatch):
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+
+    res = TestClient(create_app()).get("/api/strategies/evidence")
+    assert res.status_code == 200
+    payload = res.json()
+    by_strategy = {item["strategy"]: item for item in payload["items"]}
+
+    assert payload["total"] == len(payload["items"])
+    assert "trend_following" in by_strategy
+    assert "exists" in by_strategy["trend_following"]
+    assert "promotion_decision" in by_strategy["trend_following"]
+
+
 def test_stock_list_route_is_not_shadowed(monkeypatch):
     from web.api.app import create_app
 

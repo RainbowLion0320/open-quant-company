@@ -210,6 +210,21 @@ def list_strategies() -> List[dict]:
     return strategies
 
 
+def load_latest_signals(limit: int = 0, signal: str = "buy") -> List[dict]:
+    """Load latest strategy signals across registered signal files."""
+    rows: List[dict] = []
+    for item in list_strategies():
+        strategy = item.get("name", "")
+        if not strategy:
+            continue
+        for row in load_strategy_signals(strategy, sort="score", order="desc"):
+            if signal and row.get("signal") != signal:
+                continue
+            rows.append(row)
+    rows.sort(key=lambda r: (str(r.get("computed_at", "")), float(r.get("score", 0) or 0)), reverse=True)
+    return rows[:limit] if limit else rows
+
+
 # ── 辅助 ──────────────────────────────────────────────────
 
 def _save_meta(key: str, data: dict):

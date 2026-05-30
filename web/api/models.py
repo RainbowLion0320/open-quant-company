@@ -289,6 +289,7 @@ class AssetOverviewItem(BaseModel):
     research_ready: bool = False
     tradable: bool = False
     universe_size: int = 0
+    error: str = ""
 
 class AssetOverviewResponse(BaseModel):
     items: List[AssetOverviewItem] = []

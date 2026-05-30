@@ -16,6 +16,16 @@ async def ws_endpoint(websocket: WebSocket, job_id: str = None):
     await websocket.accept()
 
     if job_id:
+        from web.api.jobs import get_job
+        if get_job(job_id) is None:
+            await websocket.send_text(json.dumps({
+                "job_id": job_id,
+                "status": "not_found",
+                "progress": 0,
+                "message": "Job not found",
+            }))
+            await websocket.close()
+            return
         if job_id not in _connections:
             _connections[job_id] = set()
         _connections[job_id].add(websocket)

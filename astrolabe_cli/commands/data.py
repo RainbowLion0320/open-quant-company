@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import contextlib
+import io
+
 from astrolabe_cli.results import CliResult
 from astrolabe_cli.safety import dry_run_payload
 
@@ -24,23 +27,56 @@ def freshness_gate(audit_rows: list[dict], *, required: list[str] | None = None)
     return {"ok": not stale and not missing, "stale": stale, "missing": missing}
 
 
-def status() -> CliResult:
+def _iter_health_rows(result) -> list[dict]:
+    if hasattr(result, "iterrows"):
+        return [dict(row) for _, row in result.iterrows()]
+    if isinstance(result, list):
+        return [dict(row) for row in result if isinstance(row, dict)]
+    if isinstance(result, dict):
+        rows = result.get("rows")
+        if isinstance(rows, list):
+            return [dict(row) for row in rows if isinstance(row, dict)]
+        return [dict(result)]
+    return []
+
+
+def health_result_to_gate_data(result) -> list[dict]:
+    """Normalize DB health result rows for freshness_gate()."""
+    gate_data: list[dict] = []
+    for row in _iter_health_rows(result):
+        key = str(row.get("table") or row.get("key") or row.get("dimension") or "")
+        status_value = str(row.get("status") or "").lower()
+        if not status_value:
+            status_value = "ok"
+        try:
+            missing_pct = float(row.get("missing_pct", 0) or 0)
+        except Exception:
+            missing_pct = 0.0
+        if missing_pct > 50 and status_value == "ok":
+            status_value = "stale"
+        gate_data.append({"table": key, "status": status_value})
+    return gate_data
+
+
+def run_health_check_quiet():
     from scripts.db_health_check import run_health_check
 
-    result = run_health_check()
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        return run_health_check()
+
+
+def freshness_gate_from_health_check() -> tuple[dict, int]:
+    result = run_health_check_quiet()
     rows = len(result) if hasattr(result, "__len__") else 0
+    return freshness_gate(health_result_to_gate_data(result)), rows
 
-    # Build freshness gate from health check data
-    gate_data = []
-    if hasattr(result, "to_dict"):
-        for _, row in result.iterrows():
-            entry = {"table": row.get("table", ""), "status": "ok"}
-            pct = row.get("missing_pct", 0)
-            if pct and float(pct) > 50:
-                entry["status"] = "stale"
-            gate_data.append(entry)
 
-    gate = freshness_gate(gate_data)
+def status() -> CliResult:
+    result = run_health_check_quiet()
+    rows = len(result) if hasattr(result, "__len__") else 0
+    gate = freshness_gate(health_result_to_gate_data(result))
 
     return CliResult(
         ok=True,

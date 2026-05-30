@@ -5,6 +5,7 @@ Tests the execution dry-run CLI command and verifies it returns
 structured JSON without mutating broker state.
 """
 import pytest
+import pandas as pd
 
 
 class TestExecutionDryRun:
@@ -47,3 +48,28 @@ class TestExecutionDryRun:
         from astrolabe_cli.commands.execution import dry_run
         result = dry_run()
         assert result.ok is True
+
+    def test_dry_run_blocks_buy_orders_when_freshness_gate_fails(self, monkeypatch):
+        """Dry-run checks current DB health rows before proposing buy orders."""
+        monkeypatch.setattr(
+            "data.results_db.load_latest_signals",
+            lambda: [
+                {"strategy": "multifactor", "symbol": "600000", "signal": "buy"},
+                {"strategy": "buffett", "symbol": "600519", "signal": "buy"},
+            ],
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "scripts.db_health_check.run_health_check",
+            lambda: pd.DataFrame([{"table": "stock_daily", "missing_pct": 75.0}]),
+        )
+
+        from astrolabe_cli.commands.execution import dry_run
+
+        result = dry_run()
+
+        assert result.ok is True
+        assert result.data["orders_proposed"] == 2
+        assert result.data["orders_rejected"] == 2
+        assert "data_freshness_gate_failed" in result.data["risk_rejections"]
+        assert result.data["freshness_gate"]["stale"] == ["stock_daily"]

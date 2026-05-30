@@ -42,10 +42,12 @@ astroq data repair stock_valuation --limit 100 --days 365 --json
 ```bash
 astroq strategy run all --mode production --json
 astroq strategy run trend_following --mode research --dry-run --json
+astroq strategy evidence --json
 astroq strategy evidence multifactor --json
 ```
 
 生产扫描只运行 `status=production` 的策略。候选策略如果没有 `--mode research` 应返回失败，防止研究候选误入生产信号。
+`strategy evidence` 不带名称时返回所有策略的 evidence 状态，带名称时返回单策略 detail；缺失报告返回结构化 `exists=false`，不作为 CLI 执行失败。
 
 ## Regime 与回测
 
@@ -74,7 +76,7 @@ astroq pipeline show data_quality --json
 astroq assets overview --json
 ```
 
-返回多资产覆盖情况：资产类型、数据来源、研究就绪度、交易能力和 universe 大小。
+返回多资产覆盖情况：资产类型、启用状态、数据来源、研究就绪度、交易能力和 universe 大小。`enabled` 必须来自 `config/settings.yaml`，不能用 adapter 能力硬编码。
 
 ## 执行
 
@@ -82,7 +84,7 @@ astroq assets overview --json
 astroq execution dry-run --json
 ```
 
-模拟执行 dry-run：加载信号、提议订单、检查风控、返回 JSON。不修改 broker 状态。
+模拟执行 dry-run：加载信号、检查数据 freshness gate、提议订单、检查风控、返回 JSON。不修改 broker 状态；数据门禁失败时拒绝新买单。
 
 ## Web 运维
 

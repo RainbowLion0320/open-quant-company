@@ -26,16 +26,11 @@ def client():
 class TestWebSocketContract:
 
     def test_unknown_job_returns_message_or_closes(self, client):
-        """Connecting to an unknown job_id should return a status or close."""
+        """Connecting to an unknown job_id returns a bounded not_found status."""
         with client.websocket_connect("/api/strategies/ws/nonexistent_job_123") as ws:
-            try:
-                # The server may send a message or close the connection
-                data = ws.receive_json(timeout=3)
-                # If we get a message, it should have job_id and status
-                assert "job_id" in data or "status" in data
-            except Exception:
-                # Connection closed is also acceptable for unknown jobs
-                pass
+            data = ws.receive_json()
+            assert data["job_id"] == "nonexistent_job_123"
+            assert data["status"] == "not_found"
 
     def test_progress_message_has_required_fields(self, client):
         """Progress messages should contain job_id, status, progress, message."""
@@ -44,16 +39,11 @@ class TestWebSocketContract:
         job_id = create_job("test_strategy")
 
         with client.websocket_connect(f"/api/strategies/ws/{job_id}") as ws:
-            try:
-                data = ws.receive_json(timeout=3)
-                # Should have the required fields
-                assert "job_id" in data
-                assert "status" in data
-                assert "progress" in data
-                assert "message" in data
-            except Exception:
-                # Connection may close quickly if job is already done
-                pass
+            data = ws.receive_json()
+            assert data["job_id"] == job_id
+            assert "status" in data
+            assert "progress" in data
+            assert "message" in data
 
     def test_ping_responds_with_pong(self, client):
         """Sending 'ping' should get 'pong' response."""
@@ -62,12 +52,8 @@ class TestWebSocketContract:
 
         with client.websocket_connect(f"/api/strategies/ws/{job_id}") as ws:
             ws.send_text("ping")
-            try:
-                data = ws.receive_json(timeout=3)
-                assert data == "pong"
-            except Exception:
-                # Some implementations may not support ping/pong via JSON
-                pass
+            data = ws.receive_text()
+            assert data == "pong"
 
     def test_connection_bounded_timeout(self, client):
         """WebSocket connection should not hang indefinitely."""
@@ -77,7 +63,7 @@ class TestWebSocketContract:
         with client.websocket_connect(f"/api/strategies/ws/{job_id}") as ws:
             # Try to receive with a short timeout
             try:
-                ws.receive_json(timeout=2)
+                ws.receive_json()
             except Exception:
                 # Timeout or close is expected
                 pass

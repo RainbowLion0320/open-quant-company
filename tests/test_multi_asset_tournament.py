@@ -12,6 +12,7 @@ from data.assets.stock import StockAsset
 from data.assets.etf import ETFAsset
 from data.assets.bond import BondAsset
 from data.assets.futures import FuturesAsset
+from data.assets.crypto import CryptoAsset
 
 
 class TestAssetProvenance:
@@ -38,6 +39,12 @@ class TestAssetProvenance:
         asset = FuturesAsset()
         assert asset.RESEARCH_READY is True
         assert asset.DATA_SOURCE == "real"
+
+    def test_crypto_default_constructor_matches_adapter_contract(self):
+        asset = CryptoAsset()
+        assert asset.TRADABLE is False
+        assert asset.RESEARCH_READY is False
+        assert asset.DATA_SOURCE == "placeholder"
 
     def test_get_data_source_includes_provenance(self):
         asset = StockAsset()
@@ -95,3 +102,25 @@ class TestDataSourceInResults:
         }
         assert "data_source" in result
         assert result["data_source"] == "proxy"
+
+
+class TestAssetOverviewContracts:
+
+    def test_cli_asset_overview_respects_config_enabled_flags(self, capsys):
+        """Asset overview must reflect config/settings.yaml asset enablement."""
+        import json
+
+        from astrolabe_cli.main import run_cli
+
+        code = run_cli(["assets", "overview", "--json"])
+        payload = json.loads(capsys.readouterr().out)
+        by_type = {item["asset_type"]: item for item in payload["data"]["items"]}
+
+        assert code == 0
+        assert by_type["stock"]["enabled"] is True
+        assert by_type["etf"]["enabled"] is True
+        assert by_type["bond"]["enabled"] is False
+        assert by_type["futures"]["enabled"] is False
+        assert by_type["crypto"]["enabled"] is False
+        assert by_type["crypto"]["data_source"] == "placeholder"
+        assert by_type["crypto"]["error"] == ""

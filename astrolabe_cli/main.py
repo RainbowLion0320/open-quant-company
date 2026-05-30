@@ -63,8 +63,8 @@ def build_parser() -> argparse.ArgumentParser:
         handler=lambda args: run_strategy(args.name, args.mode, args.limit, args.dry_run)
     )
 
-    strategy_evidence_cmd = strategy_sub.add_parser("evidence", help="Show strategy evidence report path")
-    strategy_evidence_cmd.add_argument("name")
+    strategy_evidence_cmd = strategy_sub.add_parser("evidence", help="Show strategy evidence artifacts")
+    strategy_evidence_cmd.add_argument("name", nargs="?")
     add_common_flags(strategy_evidence_cmd)
     strategy_evidence_cmd.set_defaults(handler=lambda args: strategy_evidence(args.name))
 

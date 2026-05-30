@@ -72,12 +72,12 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 - 首屏必须展示策略目录、生命周期、策略类型、研究层级、数据需求、最新扫描和动作。
 - 当存在 `candidate` / `validated` 策略时，必须展示生产隔离横幅：候选策略只允许研究扫描和回测，不参与生产信号。
 - 候选策略动作标记为“研究扫描”，前端调用 `POST /api/strategies/run` 时使用 `mode=research`；生产策略和“运行生产策略”使用 `mode=production`。
-- `GET /api/strategies/evaluation` 返回强基准和候选晋级证据要求，回测证据 tab 用于承接后续 artifact 下钻。
+- `GET /api/strategies/evaluation` 返回强基准和候选晋级证据要求；`GET /api/strategies/evidence` 返回策略目录与 artifact 合并后的 evidence 状态，缺失报告必须显式显示 `missing`，不能只展示已有文件。
 
 **Pipeline 页面契约：**
 
 - `/pipeline` 是一级页面，不归入 Market 或 System 的二级 tab。
-- v1 只展示 `market_regime` 关键参数计算链路：`inputs`、`features`、`rule_score`、`hmm_inference`、`hybrid_decision`、`stability`、`outputs` 七个固定节点。
+- 当前支持 `market_regime`、`data_quality`、`strategy_evidence`、`portfolio_execution` 四条关键链路。`market_regime` 固定展示 `inputs`、`features`、`rule_score`、`hmm_inference`、`hybrid_decision`、`stability`、`outputs` 七个节点。
 - 前端不引入新图形库，使用 Vue + CSS grid + inline SVG arrows；节点可点击，右侧详情面板展示节点输入、输出和关键指标。
 - Pipeline 页面用于解释关键参数如何形成，不替代市场总览页面的行情、宏观和热门行业展示。
 
@@ -85,18 +85,19 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 
 **应用工厂：** `web/api/__init__.py` → `create_app()` → 注册路由 + CORS + 异常处理
 
-**11 个业务路由模块 + Auth/WS/Jobs：**
+**12 个业务路由模块 + Auth/WS/Jobs：**
 
 | 模块 | 文件 | 端点 |
 |------|------|------|
 | Market | `routes/market.py` | `GET /market`, `GET /market/regime` |
 | Stocks | `routes/stocks.py` | `GET /stocks/{code}`, `GET /stocks/{code}/kline` |
 | Signals | `routes/signals.py` | `GET /signals/changes`, `GET /signals/{strategy}` |
-| Strategies | `routes/strategies.py` | `GET /strategies`, `GET /strategies/catalog`, `GET /strategies/evaluation`, `GET /strategies/{name}`, `GET /strategies/statuses`, `POST /strategies/run` |
+| Strategies | `routes/strategies.py` | `GET /strategies`, `GET /strategies/catalog`, `GET /strategies/evaluation`, `GET /strategies/evidence`, `GET /strategies/{name}`, `GET /strategies/statuses`, `POST /strategies/run` |
 | Backtest | `routes/backtest.py` | `GET /backtest`, `GET /backtest/{key}` |
 | Portfolio | `routes/portfolio.py` | `GET /portfolio/positions`, `GET /portfolio/balance`, `POST /portfolio/order` |
 | Sectors | `routes/sectors.py` | `GET /sectors/overview`, `GET /sectors/exposure`, `GET /sectors/{industry}` |
-| Pipeline | `routes/pipeline.py` | `GET /pipeline/market-regime` |
+| Pipeline | `routes/pipeline.py` | `GET /pipeline`, `GET /pipeline/market-regime`, `GET /pipeline/{pipeline_key}` |
+| Assets | `routes/assets.py` | `GET /assets/overview` |
 | Settings | `routes/settings.py` | `GET /settings`, `PUT /settings` |
 | System | `routes/system.py` | `GET /system/monitor`, `GET /system/history`, `GET /system/api-health`, `GET /system/cron-jobs`, `GET /system/service-status`, `GET /system/audit`, `GET /system/mode` |
 | Hindsight | `routes/hindsight.py` | `GET /hindsight/graph` |
@@ -104,9 +105,9 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 
 **Pipeline API 契约：**
 
-`GET /api/pipeline/market-regime` 返回稳定 JSON：
+`GET /api/pipeline` 返回可用 pipeline 列表。`GET /api/pipeline/{pipeline_key}` 返回稳定 JSON：
 
-- `pipeline_key: "market_regime"`
+- `pipeline_key`: `market_regime` / `data_quality` / `strategy_evidence` / `portfolio_execution`
 - `updated`
 - `summary`: confirmed/raw regime、score、engine、detection_method、confidence、entropy、adaptive_params
 - `nodes`: 固定 7 节点数组
@@ -248,6 +249,6 @@ ALLOWED_STRATEGIES = list_strategy_names()
 - **行业/板块雷达页面** — 已合入 `/research?tab=sectors`，展示申万行业动量排名和策略信号分布；组合行业敞口归属 `/portfolio`，避免研究页重复持仓归因。
 - **无移动端适配** — 当前仅桌面浏览器布局
 - **DuckDB 只读** — 所有写操作通过 API 触发 Python 端 DataHub，不经过 DuckDB
-- **Pipeline v2 规划：** Pipeline 页面当前 v1 只覆盖 Market Regime。后续 Pipeline v2 应扩展到 Data Quality、Strategy Evidence、Portfolio/Execution 三条关键链路。
+- **Pipeline v2：** Pipeline 页面已覆盖 Market Regime、Data Quality、Strategy Evidence、Portfolio/Execution 四条关键链路；后续扩展应继续复用统一 `nodes` / `edges` / `summary` 契约。
 - **Web API 契约：** Web API 的稳定契约以 Pydantic `response_model` 和前端 TypeScript 类型共同约束；新关键端点必须同时补齐后端模型、前端类型和合约测试。
 - **未来：** 策略参数热调、回测结果交互式下钻、前端 smoke/e2e 自动化继续扩大到视觉回归。

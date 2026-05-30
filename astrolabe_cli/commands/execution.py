@@ -6,26 +6,27 @@ from astrolabe_cli.results import CliResult
 
 def dry_run() -> CliResult:
     """Run paper execution dry-run: load signals, propose orders, check risk, return JSON."""
+    warnings = []
     try:
         from data.results_db import load_latest_signals
         signals = load_latest_signals()
         signals_loaded = len(signals) if signals else 0
-    except Exception:
+    except Exception as exc:
+        warnings.append(f"Signal load failed: {exc}")
         signals_loaded = 0
 
-    # Check freshness gate
     data_freshness_ok = True
+    gate = {"ok": True, "stale": [], "missing": []}
     try:
-        from astrolabe_cli.commands.data import freshness_gate
-        gate = freshness_gate([])
+        from astrolabe_cli.commands.data import freshness_gate_from_health_check
+        gate, _rows = freshness_gate_from_health_check()
         data_freshness_ok = gate.get("ok", True)
-    except Exception:
-        pass
+    except Exception as exc:
+        warnings.append(f"Freshness gate unavailable: {exc}")
 
     orders_proposed = 0
     orders_rejected = 0
     risk_rejections = []
-    warnings = []
 
     if signals_loaded == 0:
         warnings.append("No signals loaded; no orders proposed")
@@ -48,6 +49,7 @@ def dry_run() -> CliResult:
             "orders_rejected": orders_rejected,
             "risk_rejections": risk_rejections,
             "cash_after": 1_000_000.0,
+            "freshness_gate": gate,
             "warnings": warnings,
         },
     )

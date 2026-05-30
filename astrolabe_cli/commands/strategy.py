@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any
 
 from astrolabe_cli.results import CliResult
@@ -71,21 +70,22 @@ def run_strategy(strategy: str, mode: str, limit: int, dry_run: bool) -> CliResu
     )
 
 
-def evidence(strategy: str) -> CliResult:
-    from research.strategy_evaluation import strategy_evidence_dir
+def evidence(strategy: str | None = None) -> CliResult:
+    from research.strategy_evaluation import list_evidence_artifacts, load_evidence_artifact
 
-    path = strategy_evidence_dir() / f"{strategy}.json"
-    if not path.exists():
+    if not strategy:
+        items = list_evidence_artifacts()
         return CliResult(
-            ok=False,
+            ok=True,
             command="strategy evidence",
-            message=f"No evidence report found for {strategy}",
-            data={"path": str(path)},
-            errors=["evidence_missing"],
+            message=f"{len(items)} strategy evidence item(s)",
+            data={"items": items, "total": len(items)},
         )
+
+    detail = load_evidence_artifact(strategy)
     return CliResult(
         ok=True,
         command="strategy evidence",
-        message=f"Evidence report found for {strategy}",
-        data={"path": str(Path(path).resolve())},
+        message=f"Evidence detail for {strategy}",
+        data=detail,
     )

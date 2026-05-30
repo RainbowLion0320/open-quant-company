@@ -38,7 +38,7 @@ class CryptoAsset(AssetAdapter):
     TRADABLE: bool = False
     RESEARCH_READY: bool = False
 
-    def __init__(self, store_root: Path):
+    def __init__(self, store_root: Path | str | None = None):
         super().__init__(store_root)
         self._universe = list(CRYPTO_UNIVERSE)
 
