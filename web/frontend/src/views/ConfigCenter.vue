@@ -275,6 +275,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  position: relative;
+  padding-bottom: 60px;
 }
 .editor-header h3 {
   font-size: 16px;
@@ -352,11 +354,16 @@ onMounted(async () => {
   font-family: "JetBrains Mono", monospace;
 }
 .editor-actions {
+  position: sticky;
+  bottom: 0;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  padding-top: 8px;
+  padding: 12px 0;
   border-top: 1px solid var(--border-subtle);
+  background: var(--bg-page, #0a0f1a);
+  z-index: 10;
 }
 .btn-save {
   padding: 8px 20px;
