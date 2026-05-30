@@ -61,7 +61,7 @@
         </div>
         <div class="index-chart-shell">
           <div v-if="relativeChart.lines.length" class="index-legend">
-            <span v-for="line in relativeChart.lines" :key="line.key" class="legend-item">
+            <span v-for="line in relativeChart.lines" :key="line.key">
               <i :style="{ background: line.color }"></i>{{ line.label }}
               <em
                 v-if="line.data_source && line.data_source !== 'real' && line.data_source !== 'cached'"
