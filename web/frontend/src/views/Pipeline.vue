@@ -31,19 +31,36 @@
     <section class="pipeline-layout">
       <div class="flow-stage glass-card">
         <div v-if="loading" class="pipeline-empty">正在加载 Pipeline 数据...</div>
-        <div v-else-if="payload" class="flow-canvas" :style="canvasStyle">
-          <svg class="flow-arrows" :viewBox="svgViewBox" preserveAspectRatio="none" aria-hidden="true">
+        <div v-else-if="payload" ref="canvasRef" class="flow-canvas" :style="canvasStyle">
+          <!-- Arrow SVG overlay — viewBox matches canvas pixel size -->
+          <svg
+            v-if="arrowSvgPaths.length"
+            class="flow-arrows"
+            :viewBox="`0 0 ${canvasSize.w} ${canvasSize.h}`"
+            :width="canvasSize.w"
+            :height="canvasSize.h"
+            aria-hidden="true"
+          >
             <defs>
-              <marker id="pipeline-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
-                <path d="M0 0 8 4 0 8Z" />
+              <marker id="arrow-head" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0 0 8 4 0 8Z" fill="rgba(0, 212, 255, 0.8)" />
               </marker>
             </defs>
-            <path v-for="(arrow, i) in computedArrows" :key="i" :d="arrow" />
+            <path
+              v-for="(d, i) in arrowSvgPaths"
+              :key="i"
+              :d="d"
+              fill="none"
+              stroke="rgba(0, 212, 255, 0.45)"
+              stroke-width="1.5"
+              marker-end="url(#arrow-head)"
+            />
           </svg>
 
           <button
             v-for="node in payload.nodes"
             :key="node.id"
+            :ref="(el) => setNodeRef(node.id, el)"
             class="flow-node"
             :class="[{ active: selectedNodeId === node.id }, node.status]"
             :style="nodeStyle(node)"
@@ -108,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { api } from "../api";
 
 interface PipelineNodeData {
@@ -127,6 +144,17 @@ const loading = ref(true);
 const error = ref("");
 const pipelines = ref<{ key: string; label: string; status: string }[]>([]);
 const activeKey = ref("market_regime");
+
+// Node DOM refs for measuring positions
+const nodeRefs = new Map<string, Element>();
+const canvasRef = ref<HTMLElement | null>(null);
+const canvasSize = reactive({ w: 800, h: 500 });
+const arrowSvgPaths = ref<string[]>(function () { return []; }());
+
+function setNodeRef(id: string, el: any) {
+  if (el) nodeRefs.set(id, el.$el || el);
+  else nodeRefs.delete(id);
+}
 
 const currentLabel = computed(() => {
   const p = pipelines.value.find((p) => p.key === activeKey.value);
@@ -154,7 +182,6 @@ const nodeLayout = computed<NodePos[]>(() => {
   const edges: { source: string; target: string }[] = payload.value?.edges || [];
   if (!nodes.length) return [];
 
-  // 1. Compute raw depth via topological BFS
   const inDegree = new Map<string, number>();
   const children = new Map<string, string[]>();
   for (const n of nodes) {
@@ -172,7 +199,6 @@ const nodeLayout = computed<NodePos[]>(() => {
     rawDepth.set(n.id, 0);
     if ((inDegree.get(n.id) || 0) === 0) queue.push(n.id);
   }
-
   while (queue.length) {
     const cur = queue.shift()!;
     for (const child of children.get(cur) || []) {
@@ -182,17 +208,14 @@ const nodeLayout = computed<NodePos[]>(() => {
     }
   }
 
-  // 2. Remap depth to fit in MAX_COLS
   const maxRaw = Math.max(...rawDepth.values(), 0);
   const depthRemap = new Map<string, number>();
   for (const n of nodes) {
     const raw = rawDepth.get(n.id) || 0;
-    // Scale raw depth [0..maxRaw] → [0..MAX_COLS-1]
     const col = maxRaw === 0 ? 0 : Math.round((raw / maxRaw) * (MAX_COLS - 1));
     depthRemap.set(n.id, col);
   }
 
-  // 3. Group by column, assign rows
   const colGroups = new Map<number, string[]>();
   for (const n of nodes) {
     const col = depthRemap.get(n.id) || 0;
@@ -214,48 +237,56 @@ const canvasStyle = computed(() => ({
   gridTemplateRows: `repeat(${numRows.value}, 112px)`,
 }));
 
-const svgViewBox = computed(() => `0 0 ${MAX_COLS * 25} ${numRows.value * 25}`);
-
 function nodeStyle(node: PipelineNodeData) {
   const pos = nodeLayout.value.find(p => p.id === node.id);
   if (!pos) return {};
-  return {
-    gridColumn: pos.col + 1,
-    gridRow: pos.row + 1,
-  };
+  return { gridColumn: pos.col + 1, gridRow: pos.row + 1 };
 }
 
-// ── Dynamic SVG arrows from edges ──
+// ── Measure node positions and compute arrow SVG paths ──
 
-const computedArrows = computed<string[]>(() => {
+function updateArrows() {
+  const canvas = canvasRef.value;
+  if (!canvas) { arrowSvgPaths.value = []; return; }
+
+  const canvasRect = canvas.getBoundingClientRect();
+  canvasSize.w = Math.round(canvasRect.width);
+  canvasSize.h = Math.round(canvasRect.height);
+
   const edges: { source: string; target: string }[] = payload.value?.edges || [];
-  if (!edges.length || !nodeLayout.value.length) return [];
+  const paths: string[] = [];
 
-  const posMap = new Map<string, NodePos>();
-  for (const p of nodeLayout.value) posMap.set(p.id, p);
+  for (const edge of edges) {
+    const srcEl = nodeRefs.get(edge.source);
+    const tgtEl = nodeRefs.get(edge.target);
+    if (!srcEl || !tgtEl) continue;
 
-  const cols = MAX_COLS;
-  const rows = numRows.value;
+    const srcRect = srcEl.getBoundingClientRect();
+    const tgtRect = tgtEl.getBoundingClientRect();
 
-  return edges.map(e => {
-    const src = posMap.get(e.source);
-    const tgt = posMap.get(e.target);
-    if (!src || !tgt) return "";
+    // Positions relative to canvas
+    const x1 = srcRect.left + srcRect.width / 2 - canvasRect.left;
+    const y1 = srcRect.bottom - canvasRect.top;
+    const x2 = tgtRect.left + tgtRect.width / 2 - canvasRect.left;
+    const y2 = tgtRect.top - canvasRect.top;
 
-    // Center of source node → top of target node
-    const x1 = ((src.col + 0.5) / cols) * 100;
-    const y1 = ((src.row + 1) / rows) * 100;
-    const x2 = ((tgt.col + 0.5) / cols) * 100;
-    const y2 = (tgt.row / rows) * 100;
-
-    if (src.col === tgt.col) {
-      // Same column: vertical line
-      return `M${x1} ${y1}L${x2} ${y2}`;
+    if (Math.abs(x1 - x2) < 2) {
+      // Same column: straight vertical
+      paths.push(`M${x1} ${y1}L${x2} ${y2}`);
+    } else {
+      // Different columns: bezier curve
+      const cy = (y1 + y2) / 2;
+      paths.push(`M${x1} ${y1}C${x1} ${cy} ${x2} ${cy} ${x2} ${y2}`);
     }
-    // Different columns: smooth curve
-    const cy = (y1 + y2) / 2;
-    return `M${x1} ${y1}C${x1} ${cy} ${x2} ${cy} ${x2} ${y2}`;
-  }).filter(Boolean);
+  }
+  arrowSvgPaths.value = paths;
+}
+
+// Re-measure arrows when payload changes or window resizes
+watch(payload, () => nextTick(updateArrows), { deep: true });
+watch(activeKey, () => nextTick(updateArrows));
+onMounted(() => {
+  window.addEventListener("resize", updateArrows);
 });
 
 // ── Dynamic summary output band ──
@@ -265,7 +296,6 @@ const summaryItems = computed(() => {
   const summary = payload.value.summary || {};
   const skip = new Set(["adaptive_params"]);
   const items: { label: string; value: string; tone: string }[] = [];
-
   for (const [key, val] of Object.entries(summary)) {
     if (skip.has(key)) continue;
     if (val === null || val === undefined) continue;
@@ -274,15 +304,12 @@ const summaryItems = computed(() => {
       : String(val);
     items.push({ label: key.replace(/_/g, " "), value: displayVal, tone: "neutral" });
   }
-
-  // Adaptive params for market_regime
   const params = summary.adaptive_params;
   if (params && typeof params === "object") {
     for (const [k, v] of Object.entries(params as Record<string, any>)) {
       items.push({ label: k.replace(/_/g, " "), value: formatParam(k, v), tone: "accent" });
     }
   }
-
   return items;
 });
 
@@ -412,22 +439,10 @@ onMounted(async () => {
 }
 .flow-arrows {
   position: absolute;
-  inset: 12px 14px;
-  width: calc(100% - 28px);
-  height: calc(100% - 24px);
+  top: 0;
+  left: 0;
   pointer-events: none;
   overflow: visible;
-}
-.flow-arrows path {
-  fill: none;
-  stroke: rgba(0, 212, 255, 0.42);
-  stroke-width: 0.55;
-  filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.55));
-  marker-end: url(#pipeline-arrow);
-}
-.flow-arrows marker path {
-  fill: rgba(0, 212, 255, 0.8);
-  stroke: none;
 }
 .flow-node {
   position: relative;
@@ -604,7 +619,7 @@ onMounted(async () => {
 }
 .output-band article {
   min-width: 0;
-  padding: 10px 11px;
+  padding: 10px  11px;
   border: 1px solid var(--border-subtle);
   border-radius: 7px;
   background: rgba(0, 0, 0, 0.12);
