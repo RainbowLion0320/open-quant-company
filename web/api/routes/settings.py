@@ -193,47 +193,49 @@ def _validate_section(section: str, data: dict) -> list[str]:
     from web.api.settings_schema import SETTINGS_SECTIONS
 
     errors = []
-    schema = next((s for s in SETTINGS_SECTIONS if s["key"] == section), None)
-    if not schema:
+    # Match schemas where key starts with section (e.g., "data" matches "data.fetcher")
+    matching_schemas = [s for s in SETTINGS_SECTIONS if s["key"] == section or s["key"].startswith(section + ".")]
+    if not matching_schemas:
         return []  # No schema = no validation
 
-    for field in schema["fields"]:
-        key = field["key"]
-        # Support dotted keys (e.g., "max_single_position.max_pct")
-        parts = key.split(".")
-        val = data
-        for p in parts:
-            if isinstance(val, dict):
-                val = val.get(p)
-            else:
-                val = None
-                break
+    for schema in matching_schemas:
+        for field in schema["fields"]:
+            key = field["key"]
+            # Support dotted keys (e.g., "max_single_position.max_pct")
+            parts = key.split(".")
+            val = data
+            for p in parts:
+                if isinstance(val, dict):
+                    val = val.get(p)
+                else:
+                    val = None
+                    break
 
-        if val is None:
-            continue  # Missing = use default, not an error
+            if val is None:
+                continue  # Missing = use default, not an error
 
-        ftype = field.get("type", "float")
-        fmin = field.get("min")
-        fmax = field.get("max")
+            ftype = field.get("type", "float")
+            fmin = field.get("min")
+            fmax = field.get("max")
 
-        # Type check
-        if ftype == "int" and not isinstance(val, int):
-            try:
-                val = int(val)
-            except (ValueError, TypeError):
-                errors.append(f"{key}: expected int, got {type(val).__name__}")
-                continue
-        elif ftype == "float" and not isinstance(val, (int, float)):
-            try:
-                val = float(val)
-            except (ValueError, TypeError):
-                errors.append(f"{key}: expected float, got {type(val).__name__}")
-                continue
+            # Type check
+            if ftype == "int" and not isinstance(val, int):
+                try:
+                    val = int(val)
+                except (ValueError, TypeError):
+                    errors.append(f"{key}: expected int, got {type(val).__name__}")
+                    continue
+            elif ftype == "float" and not isinstance(val, (int, float)):
+                try:
+                    val = float(val)
+                except (ValueError, TypeError):
+                    errors.append(f"{key}: expected float, got {type(val).__name__}")
+                    continue
 
-        # Range check
-        if fmin is not None and val < fmin:
-            errors.append(f"{key}: {val} < min ({fmin})")
-        if fmax is not None and val > fmax:
-            errors.append(f"{key}: {val} > max ({fmax})")
+            # Range check
+            if fmin is not None and val < fmin:
+                errors.append(f"{key}: {val} < min ({fmin})")
+            if fmax is not None and val > fmax:
+                errors.append(f"{key}: {val} > max ({fmax})")
 
     return errors
