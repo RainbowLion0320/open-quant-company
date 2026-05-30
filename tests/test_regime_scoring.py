@@ -70,6 +70,26 @@ def test_compose_regime_score_uses_validated_production_weights():
     assert components["trend_sh000001"] == 0.8
 
 
+def test_compose_regime_score_uses_current_config_weights(monkeypatch):
+    monkeypatch.setattr(
+        "cybernetics.regime_scoring.regime_score_weights",
+        lambda: {"trend": 100.0, "breadth": 0.0, "risk": 0.0, "volume": 0.0},
+        raising=False,
+    )
+
+    score, components = compose_regime_score(
+        trend_raw=0.42,
+        breadth_raw=1.0,
+        risk_raw=1.0,
+        volume_raw=1.0,
+        sample_size=5000,
+    )
+
+    assert score == 42.0
+    assert components["trend"] == 42.0
+    assert components["breadth"] == 0.0
+
+
 def test_classify_regime_value_uses_score_trend_and_breadth_gates():
     assert classify_regime_value(70, trend_raw=0.60, breadth_raw=0.70, advance_ratio=0.58) == "bull"
     assert classify_regime_value(70, trend_raw=0.50, breadth_raw=0.70, advance_ratio=0.58) == "sideways"

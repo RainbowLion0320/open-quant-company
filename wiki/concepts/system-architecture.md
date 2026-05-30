@@ -210,7 +210,7 @@ strategies:
 | 回测评分 | `backtest/buffett_real_scorer.py` | PIT滚动评分器 |
 | 风险分析 | `backtest/analytics.py` | 15项风险指标 |
 | 回测流水线 | `backtest/pipeline.py` | 可插拔回测 |
-| 配置 | `config/settings.yaml` | 全部可调参数 |
+| 配置 | `config/settings.yaml` + `web/api/settings_schema.py` | 全部可调参数；Web Config Center 通过 schema 编辑 dotted section 并写回嵌套 YAML |
 
 ## 因子体系
 

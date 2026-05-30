@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 from typing import Dict, Mapping, Optional
 
-from cybernetics.regime_policy import PRODUCTION_REGIME_POLICY
+from cybernetics.regime_policy import PRODUCTION_REGIME_POLICY, regime_score_weights
 
 
 REGIME_SCORE_WEIGHTS = dict(PRODUCTION_REGIME_POLICY.score_weights)
@@ -97,11 +97,12 @@ def compose_regime_score(
     volume_detail: Optional[Mapping[str, float]] = None,
 ) -> tuple[float, Dict[str, float]]:
     """Compose the validated production regime score and return component-level details."""
+    weights = regime_score_weights()
     components: Dict[str, float] = {
-        "trend": round(clamp(trend_raw) * REGIME_SCORE_WEIGHTS["trend"], 1),
-        "breadth": round(clamp(breadth_raw) * REGIME_SCORE_WEIGHTS["breadth"], 1),
-        "risk": round(clamp(risk_raw) * REGIME_SCORE_WEIGHTS["risk"], 1),
-        "volume": round(clamp(volume_raw) * REGIME_SCORE_WEIGHTS["volume"], 1),
+        "trend": round(clamp(trend_raw) * weights["trend"], 1),
+        "breadth": round(clamp(breadth_raw) * weights["breadth"], 1),
+        "risk": round(clamp(risk_raw) * weights["risk"], 1),
+        "volume": round(clamp(volume_raw) * weights["volume"], 1),
         "trend_raw": round(clamp(trend_raw), 4),
         "breadth_raw": round(clamp(breadth_raw), 4),
         "risk_raw": round(clamp(risk_raw), 4),

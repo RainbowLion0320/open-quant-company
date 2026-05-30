@@ -44,6 +44,25 @@ def _stock_volume_frame(up: bool = True) -> pd.DataFrame:
     return pd.DataFrame({"date": dates, "close": close, "volume": amount, "amount": amount})
 
 
+def test_regime_indexes_reflect_config_changes_without_module_reload(monkeypatch):
+    orchestrator._REGIME_INDEXES = None
+
+    monkeypatch.setattr(
+        "core.settings.get_section",
+        lambda key, default=None: {"sh000001": 1.0} if key == "cybernetics.regime_indexes" else default,
+    )
+    first = orchestrator._regime_indexes()
+
+    monkeypatch.setattr(
+        "core.settings.get_section",
+        lambda key, default=None: {"sh000001": 0.1} if key == "cybernetics.regime_indexes" else default,
+    )
+    second = orchestrator._regime_indexes()
+
+    assert dict((symbol, weight) for symbol, _label, weight in first)["sh000001"] == 1.0
+    assert dict((symbol, weight) for symbol, _label, weight in second)["sh000001"] == 0.1
+
+
 def test_full_market_breadth_uses_stock_universe_files(tmp_path):
     files = []
     for symbol, delta in [("000001", 1.0), ("000002", 0.8), ("000003", -0.5)]:

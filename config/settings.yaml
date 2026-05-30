@@ -972,5 +972,3 @@ data_registry:
     label: 组合持仓按行业暴露
     cache: sector/exposure_snapshot/{YYYYMMDD}.parquet
     description: Paper/Portfolio 持仓按行业权重/市值/数量汇总
-data.fetcher:
-  min_interval: 3.0

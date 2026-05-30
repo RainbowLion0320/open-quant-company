@@ -100,6 +100,38 @@ class TestAuthMiddleware:
         )
         assert resp.status_code in (200, 204)
 
+    def test_dotted_section_patch_updates_nested_config_without_top_level_duplicate(self, tmp_path):
+        """Config Center PATCH for dotted sections must preserve canonical nested YAML."""
+        import yaml
+
+        config_file = tmp_path / "settings.yaml"
+        config_file.write_text(
+            yaml.safe_dump({
+                "project": {"name": "test", "run_mode": "research", "api_key": "test-secret-key"},
+                "strategies": {},
+                "risk_control": {},
+                "data": {"fetcher": {"min_interval": 3.0, "max_retries": 3}},
+            }, allow_unicode=True),
+            encoding="utf-8",
+        )
+
+        with patch("web.api.auth._settings_path", return_value=config_file), \
+             patch("web.api.routes.settings._config_path", return_value=str(config_file)):
+            from web.api.app import create_app
+            client = TestClient(create_app())
+
+            resp = client.patch(
+                "/api/settings/section/data.fetcher",
+                json={"min_interval": 4.5, "max_retries": 4},
+                headers={"Authorization": "Bearer test-secret-key"},
+            )
+
+        assert resp.status_code == 200
+        saved = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+        assert saved["data"]["fetcher"]["min_interval"] == 4.5
+        assert saved["data"]["fetcher"]["max_retries"] == 4
+        assert "data.fetcher" not in saved
+
 
 class TestRunModeEnforcement:
     @pytest.fixture

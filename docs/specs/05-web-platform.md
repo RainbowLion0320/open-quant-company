@@ -1,6 +1,6 @@
 # Spec: Web 平台 (Web Platform)
 
-> 版本: 2.3 | 更新: 2026-05-30 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
+> 版本: 2.4 | 更新: 2026-05-30 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
@@ -10,7 +10,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 - **前后端分离** — Vue 3 (Vite) + FastAPI，独立开发/部署
 - **零锁查询** — DuckDB :memory: 模式直接读 Parquet，不经过数据库锁
 - **实时推送** — WebSocket 推送长时间任务（回测/训练）的进度
-- **职责分离** — `/system?tab=monitor` 只读观测, `/system?tab=settings` 配置管理, 不交叉
+- **职责分离** — `/system?tab=monitor` 只读观测, `/system?tab=settings` 管理基础设置, `/system?tab=config` 编辑参数 schema, 不交叉
 
 ## 2. 组件架构
 
@@ -49,7 +49,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
 | `/pipeline` | 流程图 | 关键参数计算透明度入口；v1 展示 Market Regime 7 节点计算链路 |
 | `/datahub` | 数据中台 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
-| `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、记忆图谱 |
+| `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、配置中心、记忆图谱 |
 
 旧一级页面 redirect 已移除。除 `/stocks/:code` 个股详情隐藏路由外，用户应通过七个一级模块、二级 tab 和 Pipeline 透明度页访问原子功能。
 
@@ -98,7 +98,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Sectors | `routes/sectors.py` | `GET /sectors/overview`, `GET /sectors/exposure`, `GET /sectors/{industry}` |
 | Pipeline | `routes/pipeline.py` | `GET /pipeline`, `GET /pipeline/market-regime`, `GET /pipeline/{pipeline_key}` |
 | Assets | `routes/assets.py` | `GET /assets/overview` |
-| Settings | `routes/settings.py` | `GET /settings`, `PUT /settings` |
+| Settings | `routes/settings.py` | `GET /settings`, `GET /settings/schema`, `PUT /settings`, `PATCH /settings/section/{section}` |
 | System | `routes/system.py` | `GET /system/monitor`, `GET /system/history`, `GET /system/api-health`, `GET /system/cron-jobs`, `GET /system/service-status`, `GET /system/audit`, `GET /system/mode` |
 | Hindsight | `routes/hindsight.py` | `GET /hindsight/graph` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
@@ -188,7 +188,7 @@ Vue Component 实时更新进度条
 | 数据库 | DuckDB :memory:（只读 Parquet） | 查询零锁等待，不需要数据库服务器 |
 | 长任务处理 | WebSocket 推送进度 | 回测/训练可能跑几分钟，HTTP 轮询太低效 |
 | 状态管理 | Pinia (per-page stores) | 页面间独立，不需要全局状态 |
-| 配置管理 | YAML → Pydantic 校验 | settings.yaml 人类可读写 + API 层类型安全 |
+| 配置管理 | YAML + schema 校验 | settings.yaml 人类可读写 + API 层字段/范围校验 |
 
 ## 5. 接口合约
 
@@ -216,17 +216,17 @@ Vue Component 实时更新进度条
 ### Settings API 安全校验
 
 ```python
-# Pydantic 校验
-class SettingsUpdate(BaseModel):
-    strategies: dict | None
-    risk_control: dict | None
+# Config Center schema
+GET /api/settings/schema
+
+# Dotted section patch keeps canonical nested YAML:
+PATCH /api/settings/section/data.fetcher
 
 # 必须段校验
 REQUIRED_SECTIONS = {"strategies", "risk_control"}
-
-# 策略名白名单
-ALLOWED_STRATEGIES = list_strategy_names()
 ```
+
+`PATCH /settings/section/{section}` 支持 dotted section，例如 `data.fetcher`、`buffett.margin_of_safety`。服务端必须写回嵌套 YAML，不允许生成顶层 `data.fetcher:` 这类重复 key。
 
 ## 6. 错误处理
 
@@ -234,14 +234,14 @@ ALLOWED_STRATEGIES = list_strategy_names()
 - **422：** Pydantic 校验失败 → FastAPI 自动返回字段级错误
 - **500：** 未捕获异常 → `errors.py` 全局处理器统一格式化
 - **WebSocket 断连：** 前端指数退避重连（1s → 2s → 4s，最多 5 次）
-- **Settings 更新非法：** 更新端点校验 section 白名单和关键字段，非法配置返回 4xx
+- **Settings 更新非法：** 更新端点校验 run mode、schema 字段类型和范围，非法配置返回 4xx/422
 
 ## 7. 测试策略
 
 - **合约测试：** 所有路由返回正确的 HTTP 状态码和 JSON schema
 - **集成测试：** `GET /signals/buffett` 返回实际数据（需本地有信号文件）
 - **WebSocket 测试：** 创建 Job → 验证进度消息格式
-- **Settings 测试：** 非法配置更新返回 422，白名单外策略名返回 400
+- **Settings 测试：** 非法配置更新返回 422，dotted section PATCH 不生成顶层重复 key，配置中心 schema 字段必须存在于 canonical settings
 - **边界测试：** 空 Parquet 文件返回空列表，分页越界返回空数组
 
 ## 8. 已知限制 & 未来方向

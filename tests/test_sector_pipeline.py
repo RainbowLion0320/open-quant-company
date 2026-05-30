@@ -645,3 +645,40 @@ def test_regime_affects_market_score_but_not_industry():
 
     # Industry score is data-driven, not regime-dependent
     assert bull["industry"] == bear["industry"] == sideways["industry"]
+
+
+def test_multifactor_technical_score_uses_migrated_momentum_and_volatility_config(monkeypatch):
+    from signals import multifactor as mf
+
+    monkeypatch.setattr(
+        mf,
+        "MFC",
+        {
+            "technical": {},
+            "momentum": {
+                "weight_3m": 1.0,
+                "weight_6m": 0.0,
+                "strong_threshold": 0.5,
+                "strong_score": 35,
+                "multiplier_strong": 100,
+                "multiplier_normal": 10,
+                "weak_floor": 7,
+            },
+            "trend_penalty": {"threshold": -0.05, "multiplier": 0.55},
+            "volatility": {
+                "default_volatility": 0.0,
+                "weight_momentum": 1.0,
+                "weight_volatility": 0.0,
+                "vol_max_score": 30,
+                "vol_penalty_mult": 100,
+            },
+        },
+    )
+
+    score = mf.MultiFactorScorer()._technical_score({
+        "momentum_3m_skip_1m": 0.20,
+        "momentum_6m_skip_1m": 0.0,
+        "trend_strength": 0.0,
+    })
+
+    assert score == 60.0

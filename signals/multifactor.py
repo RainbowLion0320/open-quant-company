@@ -128,22 +128,30 @@ class MultiFactorScorer:
         mom_3m_skip = f.get("momentum_3m_skip_1m", mom_3m)
         mom_6m_skip = f.get("momentum_6m_skip_1m", mom_3m)
         trend_strength = f.get("trend_strength", 0)
-        volatility = f.get("volatility", tc.get("default_volatility", 0.30))
+        vol_cfg = MFC.get("volatility", {})
+        volatility = f.get(
+            "volatility",
+            vol_cfg.get("default_volatility", tc.get("default_volatility", 0.30)),
+        )
 
         # 动量: 正动量好但不要追涨(太高反而回调风险)
         mom_cfg = MFC.get("momentum", {})
         _w3 = float(mom_cfg.get("weight_3m", 0.35))
         _w6 = float(mom_cfg.get("weight_6m", 0.65))
         mom_composite = mom_3m_skip * _w3 + mom_6m_skip * _w6
-        mom_strong = tc.get("mom_strong", 0.15)
+        mom_strong = float(mom_cfg.get("strong_threshold", tc.get("mom_strong", 0.15)))
         if mom_composite > mom_strong:
-            mom_score = 40  # 涨太多，等回调
+            mom_score = float(mom_cfg.get("strong_score", 40))  # 涨太多，等回调
         elif mom_composite > 0:
-            mom_score = 40 + mom_composite * tc.get("mom_multiplier_strong", 400)
+            mom_score = 40 + mom_composite * float(
+                mom_cfg.get("multiplier_strong", tc.get("mom_multiplier_strong", 400))
+            )
         elif mom_composite > -0.10:
-            mom_score = 40 + mom_composite * tc.get("mom_multiplier_normal", 200)
+            mom_score = 40 + mom_composite * float(
+                mom_cfg.get("multiplier_normal", tc.get("mom_multiplier_normal", 200))
+            )
         else:
-            mom_score = 20  # 跌太多，观望
+            mom_score = float(mom_cfg.get("weak_floor", 20))  # 跌太多，观望
 
         tp_cfg = MFC.get("trend_penalty", {})
         _tp_thresh = float(tp_cfg.get("threshold", -0.05))
@@ -154,12 +162,12 @@ class MultiFactorScorer:
             mom_score += min(10, trend_strength * 100)
 
         # 低波动加分
-        vol_max = tc.get("vol_max_score", 30)
-        vol_penalty = tc.get("vol_penalty_mult", 100)
+        vol_max = vol_cfg.get("vol_max_score", tc.get("vol_max_score", 30))
+        vol_penalty = vol_cfg.get("vol_penalty_mult", tc.get("vol_penalty_mult", 100))
         vol_score = max(0, vol_max - volatility * vol_penalty)
 
-        w_mom = tc.get("weight_momentum", 0.6)
-        w_vol = tc.get("weight_volatility", 0.4)
+        w_mom = vol_cfg.get("weight_momentum", tc.get("weight_momentum", 0.6))
+        w_vol = vol_cfg.get("weight_volatility", tc.get("weight_volatility", 0.4))
         return min(100, mom_score * w_mom + vol_score * w_vol)
 
     def _market_score(self, f: dict) -> float:

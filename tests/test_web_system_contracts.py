@@ -261,6 +261,19 @@ def test_settings_cancel_reverts_pending_toggle():
     assert "@click.self=\"cancelConfirm\"" in settings
 
 
+def test_config_center_preserves_dotted_section_paths():
+    config_center = Path("web/frontend/src/views/ConfigCenter.vue").read_text()
+    api_client = Path("web/frontend/src/api/index.ts").read_text()
+
+    assert "function getNestedValue" in config_center
+    assert "function setNestedValue" in config_center
+    assert "setNestedValue(config, activeSection.value" in config_center
+    assert "config[activeSection.value]" not in config_center
+    assert "function patch<T>" in api_client
+    assert "saveSettingsSection" in api_client
+    assert "patch<Record<string, any>>" in api_client
+
+
 def test_frontend_router_does_not_keep_legacy_redirect_routes():
     router = Path("web/frontend/src/router/index.ts").read_text()
 

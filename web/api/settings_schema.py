@@ -125,13 +125,20 @@ SETTINGS_SECTIONS: list[dict[str, Any]] = [
         ],
     },
     {
-        "key": "buffett.valuation",
-        "label": "巴菲特估值参数",
-        "description": "DCF 折现和安全边际参数",
+        "key": "buffett.margin_of_safety",
+        "label": "巴菲特安全边际",
+        "description": "DCF 折现、永续增长和安全边际参数",
         "fields": [
             _field("dcf_discount_rate", "DCF折现率", "float", min_val=0.03, max_val=0.20, default=0.08),
             _field("growth_rate_terminal", "永续增长率", "float", min_val=0.01, max_val=0.10, default=0.03),
             _field("safety_margin_pct", "安全边际要求", "float", min_val=0.1, max_val=0.6, default=0.30),
+        ],
+    },
+    {
+        "key": "buffett.valuation",
+        "label": "巴菲特估值扩展",
+        "description": "DCF 高增长期和终值估算参数",
+        "fields": [
             _field("growth_period", "DCF增长期(年)", "int", min_val=3, max_val=10, default=5),
             _field("terminal_pe", "终值PE倍数", "float", min_val=5, max_val=50, default=20),
         ],

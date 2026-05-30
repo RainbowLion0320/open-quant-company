@@ -329,15 +329,13 @@ def _get_regime_indexes() -> list[tuple]:
     return [(k, _INDEX_NAMES.get(k, k), v) for k, v in merged.items()]
 
 
-# Module-level cache, refreshed lazily
+# Kept for compatibility with older tests/imports; current config is read on
+# each detection so Config Center changes apply without restarting the API.
 _REGIME_INDEXES: list[tuple] | None = None
 
 
 def _regime_indexes() -> list[tuple]:
-    global _REGIME_INDEXES
-    if _REGIME_INDEXES is None:
-        _REGIME_INDEXES = _get_regime_indexes()
-    return _REGIME_INDEXES
+    return _get_regime_indexes()
 
 
 def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:

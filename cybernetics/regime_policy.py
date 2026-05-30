@@ -15,6 +15,15 @@ def _get_score_weights() -> dict[str, float]:
 PRODUCTION_REGIME_SCORE_WEIGHTS = _get_score_weights()
 
 
+def regime_score_weights() -> dict[str, float]:
+    """Return current configured score weights.
+
+    Config Center writes clear the settings cache at runtime; callers that need
+    live values should use this function instead of the import-time constant.
+    """
+    return _get_score_weights()
+
+
 @dataclass(frozen=True)
 class ProductionRegimePolicy:
     """Single source of truth for the live Market Regime formula."""
@@ -34,4 +43,3 @@ class ProductionRegimePolicy:
 
 
 PRODUCTION_REGIME_POLICY = ProductionRegimePolicy()
-

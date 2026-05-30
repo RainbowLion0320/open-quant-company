@@ -21,7 +21,7 @@ def _read_config() -> dict:
     path = _config_path()
     if not os.path.exists(path):
         return {}
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 
@@ -33,19 +33,19 @@ def _write_config(data: dict):
     # 备份原文件
     bak = path + ".bak"
     if os.path.exists(path):
-        with open(path, "r") as src:
-            with open(bak, "w") as dst:
+        with open(path, "r", encoding="utf-8") as src:
+            with open(bak, "w", encoding="utf-8") as dst:
                 dst.write(src.read())
 
     try:
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
         clear_settings_cache()
     except Exception:
         # 写入失败时恢复备份
         if os.path.exists(bak):
-            with open(bak, "r") as src:
-                with open(path, "w") as dst:
+            with open(bak, "r", encoding="utf-8") as src:
+                with open(path, "w", encoding="utf-8") as dst:
                     dst.write(src.read())
         raise
 
@@ -100,6 +100,27 @@ def _audit_change(request: Request, section: str, method: str, old_data: dict, n
         )
     except Exception:
         pass  # audit failure must not block config writes
+
+
+def _get_nested(data: dict, dotted_key: str, default=None):
+    current = data
+    for part in dotted_key.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return default
+        current = current[part]
+    return current
+
+
+def _set_nested(data: dict, dotted_key: str, value: dict) -> None:
+    parts = dotted_key.split(".")
+    current = data
+    for part in parts[:-1]:
+        child = current.get(part)
+        if not isinstance(child, dict):
+            child = {}
+            current[part] = child
+        current = child
+    current[parts[-1]] = value
 
 
 # ── GET ────────────────────────────────────────────────────
@@ -175,9 +196,9 @@ async def update_section(section: str, data: dict, request: Request):
         raise HTTPException(status_code=422, detail={"validation_errors": errors})
 
     config = _read_config()
-    old_section = config.get(section, {})
+    old_section = _get_nested(config, section, {})
 
-    config[section] = data
+    _set_nested(config, section, data)
     try:
         _write_config(config)
     except Exception as e:

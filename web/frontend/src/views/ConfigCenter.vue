@@ -143,48 +143,50 @@ const hasChanges = computed(() =>
   JSON.stringify(config) !== originalConfig.value
 );
 
-function getFieldValue(fieldKey: string): any {
-  if (!activeSection.value) return undefined;
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value ?? {}));
+}
 
-  // Navigate config by section key (may be dotted, e.g. "data.fetcher")
-  const sectionParts = activeSection.value.split(".");
-  let sectionData: any = config;
-  for (const sp of sectionParts) {
-    if (sectionData && typeof sectionData === "object") {
-      sectionData = sectionData[sp];
-    } else {
-      sectionData = undefined;
-      break;
-    }
-  }
-  if (!sectionData) return undefined;
-
-  // Navigate field key (e.g. "max_single_position.max_pct")
-  const fieldParts = fieldKey.split(".");
-  let val: any = sectionData;
-  for (const fp of fieldParts) {
-    if (val && typeof val === "object") {
-      val = val[fp];
-    } else {
+function getNestedValue(source: any, dottedKey: string): any {
+  let current = source;
+  for (const part of dottedKey.split(".")) {
+    if (!current || typeof current !== "object") {
       return undefined;
     }
+    current = current[part];
   }
-  return val;
+  return current;
+}
+
+function setNestedValue(target: any, dottedKey: string, value: any) {
+  const parts = dottedKey.split(".");
+  let current = target;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    if (!current[part] || typeof current[part] !== "object") {
+      current[part] = {};
+    }
+    current = current[part];
+  }
+  current[parts[parts.length - 1]] = value;
+}
+
+function getSectionData(): any {
+  if (!activeSection.value) return undefined;
+  return getNestedValue(config, activeSection.value);
+}
+
+function getFieldValue(fieldKey: string): any {
+  const sectionData = getSectionData();
+  if (!sectionData) return undefined;
+  return getNestedValue(sectionData, fieldKey);
 }
 
 function setFieldValue(fieldKey: string, value: any) {
   if (!activeSection.value) return;
-  if (!config[activeSection.value]) {
-    config[activeSection.value] = {};
-  }
-
-  const parts = fieldKey.split(".");
-  let obj: any = config[activeSection.value];
-  for (let i = 0; i < parts.length - 1; i++) {
-    if (!obj[parts[i]]) obj[parts[i]] = {};
-    obj = obj[parts[i]];
-  }
-  obj[parts[parts.length - 1]] = value;
+  const sectionData = getSectionData() ?? {};
+  setNestedValue(config, activeSection.value, sectionData);
+  setNestedValue(sectionData, fieldKey, value);
 }
 
 function onSliderInput(field: FieldSchema, event: Event) {
@@ -196,7 +198,7 @@ function onSliderInput(field: FieldSchema, event: Event) {
 function resetSection() {
   if (!activeSection.value) return;
   const original = JSON.parse(originalConfig.value);
-  config[activeSection.value] = JSON.parse(JSON.stringify(original[activeSection.value] || {}));
+  setNestedValue(config, activeSection.value, clone(getNestedValue(original, activeSection.value) || {}));
 }
 
 async function saveSection() {
@@ -204,9 +206,9 @@ async function saveSection() {
   saving.value = true;
   saveMsg.value = "";
   try {
-    const sectionData = config[activeSection.value];
+    const sectionData = clone(getSectionData() || {});
     await api.saveSettingsSection(activeSection.value, sectionData);
-    originalConfig.value = JSON.stringify(JSON.parse(JSON.stringify(config)));
+    originalConfig.value = JSON.stringify(clone(config));
     saveMsg.value = "保存成功";
     saveOk.value = true;
   } catch (err: any) {
@@ -225,12 +227,8 @@ onMounted(async () => {
       api.settings(),
     ]);
     schema.value = schemaData.sections || [];
-    // Populate config from current settings
-    for (const section of schema.value) {
-      const sectionKey = section.key.split(".")[0]; // top-level key
-      config[sectionKey] = JSON.parse(JSON.stringify(settingsData[sectionKey] || {}));
-    }
-    originalConfig.value = JSON.stringify(JSON.parse(JSON.stringify(config)));
+    Object.assign(config, clone(settingsData));
+    originalConfig.value = JSON.stringify(clone(config));
     activeSection.value = schema.value[0]?.key || "";
   } catch (err) {
     console.error("Failed to load config schema:", err);

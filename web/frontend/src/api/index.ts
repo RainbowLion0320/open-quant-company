@@ -50,6 +50,11 @@ function put<T>(url: string, body?: unknown): Promise<T> {
   return req<T>(url, { method: "PUT", body: body ? JSON.stringify(body) : undefined });
 }
 
+/** PATCH request */
+function patch<T>(url: string, body?: unknown): Promise<T> {
+  return req<T>(url, { method: "PATCH", body: body ? JSON.stringify(body) : undefined });
+}
+
 // ═══════════════════════════════════════
 // Type definitions
 // ═══════════════════════════════════════
@@ -675,17 +680,7 @@ export const api = {
   saveSettings: (data: Record<string, any>) => put<Record<string, any>>("/api/settings", data),
   settingsSchema: () => get<{ sections: any[]; total_sections: number; total_fields: number }>("/api/settings/schema"),
   saveSettingsSection: (section: string, data: Record<string, any>) =>
-    fetch(`/api/settings/section/${encodeURIComponent(section)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    }).then(async (res) => {
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail));
-      }
-      return res.json();
-    }),
+    patch<Record<string, any>>(`/api/settings/section/${encodeURIComponent(section)}`, data),
 
   // Sectors
   sectorOverview: () => get<SectorOverviewResponse>("/api/sectors/overview"),
