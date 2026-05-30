@@ -114,6 +114,13 @@ async def get_settings():
     }
 
 
+@router.get("/schema")
+async def get_settings_schema():
+    """返回配置中心 schema — 每个可编辑 section 的参数元数据"""
+    from web.api.settings_schema import get_settings_schema
+    return get_settings_schema()
+
+
 # ── PUT ────────────────────────────────────────────────────
 
 @router.put("")
@@ -162,6 +169,11 @@ async def update_section(section: str, data: dict, request: Request):
     """部分更新：只修改指定配置段，不影响其他段"""
     _check_writable(section)
 
+    # Validate against schema if available
+    errors = _validate_section(section, data)
+    if errors:
+        raise HTTPException(status_code=422, detail={"validation_errors": errors})
+
     config = _read_config()
     old_section = config.get(section, {})
 
@@ -174,3 +186,54 @@ async def update_section(section: str, data: dict, request: Request):
     _audit_change(request, section, "PATCH", old_section, data)
 
     return {"status": "saved", "section": section}
+
+
+def _validate_section(section: str, data: dict) -> list[str]:
+    """Validate section data against schema. Returns list of error messages."""
+    from web.api.settings_schema import SETTINGS_SECTIONS
+
+    errors = []
+    schema = next((s for s in SETTINGS_SECTIONS if s["key"] == section), None)
+    if not schema:
+        return []  # No schema = no validation
+
+    for field in schema["fields"]:
+        key = field["key"]
+        # Support dotted keys (e.g., "max_single_position.max_pct")
+        parts = key.split(".")
+        val = data
+        for p in parts:
+            if isinstance(val, dict):
+                val = val.get(p)
+            else:
+                val = None
+                break
+
+        if val is None:
+            continue  # Missing = use default, not an error
+
+        ftype = field.get("type", "float")
+        fmin = field.get("min")
+        fmax = field.get("max")
+
+        # Type check
+        if ftype == "int" and not isinstance(val, int):
+            try:
+                val = int(val)
+            except (ValueError, TypeError):
+                errors.append(f"{key}: expected int, got {type(val).__name__}")
+                continue
+        elif ftype == "float" and not isinstance(val, (int, float)):
+            try:
+                val = float(val)
+            except (ValueError, TypeError):
+                errors.append(f"{key}: expected float, got {type(val).__name__}")
+                continue
+
+        # Range check
+        if fmin is not None and val < fmin:
+            errors.append(f"{key}: {val} < min ({fmin})")
+        if fmax is not None and val > fmax:
+            errors.append(f"{key}: {val} > max ({fmax})")
+
+    return errors
