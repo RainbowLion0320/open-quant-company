@@ -48,7 +48,7 @@ backtest:
   alpha_min_score: 30
   rebalance:
     drift_threshold: 0.75
-    overlap_threshold: 0.50
+    overlap_threshold: 0.5
     max_idle_days: 28
   max_positions:
     buffett: 8
@@ -187,11 +187,11 @@ cybernetics:
       position_size: 0.15
       stop_loss: -0.05
     volatility_adjustment: true
-  regime_engine: hybrid  # "hmm" | "rule_based" | "hybrid"
+  regime_engine: hybrid
   regime_indexes:
     sh000001: 0.25
     sh000300: 0.25
-    sz399001: 0.20
+    sz399001: 0.2
     sz399006: 0.15
     sh000905: 0.15
   score_weights:
@@ -201,18 +201,23 @@ cybernetics:
     volume: 10
   breadth_weights:
     advance_ratio: 0.35
-    above_ma20: 0.30
+    above_ma20: 0.3
     above_ma60: 0.25
-    above_ma120: 0.10
+    above_ma120: 0.1
   risk_strength_weights:
-    drawdown: 0.50
-    volatility: 0.30
-    pressure: 0.20
-  hmm_confidence_override: 0.80
+    drawdown: 0.5
+    volatility: 0.3
+    pressure: 0.2
+  hmm_confidence_override: 0.8
   min_bars_trend: 60
   min_bars_risk: 30
-  ma_windows: [20, 60, 120]
-  vol_normalization: [0.12, 0.40]
+  ma_windows:
+  - 20
+  - 60
+  - 120
+  vol_normalization:
+  - 0.12
+  - 0.4
   drawdown_normalization: 0.15
   hmm:
     n_states: 3
@@ -226,14 +231,14 @@ cybernetics:
     model_path: data/models/regime_hmm
     fallback_to_rules: true
     observation_columns:
-      - return_1d
-      - realized_vol_20d
-      - skewness_20d
-      - kurtosis_20d
-      - drawdown_from_peak
-      - volume_surprise
-      - breadth_momentum
-      - correlation_stock_bond
+    - return_1d
+    - realized_vol_20d
+    - skewness_20d
+    - kurtosis_20d
+    - drawdown_from_peak
+    - volume_surprise
+    - breadth_momentum
+    - correlation_stock_bond
   feedback:
     loop_interval: daily
     max_consecutive_losses: 3
@@ -354,13 +359,13 @@ signals:
       down_threshold: 0.95
       min_years: 3
     volatility:
-      default_volatility: 0.30
+      default_volatility: 0.3
       weight_momentum: 0.6
       weight_volatility: 0.4
       vol_max_score: 30
       vol_penalty_mult: 100
     weights:
-      market: 0.10
+      market: 0.1
       quality: 0.35
       technical: 0.15
       valuation: 0.25
@@ -501,7 +506,8 @@ strategies:
     status: candidate
     strategy_type: timing
     layer: candidate_alpha
-    data_requirements: [stock_daily]
+    data_requirements:
+    - stock_daily
   donchian_breakout:
     color: '#f97316'
     config_key: strategies.donchian_breakout
@@ -512,7 +518,8 @@ strategies:
     status: candidate
     strategy_type: timing
     layer: candidate_alpha
-    data_requirements: [stock_daily]
+    data_requirements:
+    - stock_daily
   rps_relative_strength:
     color: '#22c55e'
     config_key: strategies.rps_relative_strength
@@ -523,7 +530,8 @@ strategies:
     status: candidate
     strategy_type: selection
     layer: candidate_alpha
-    data_requirements: [stock_daily]
+    data_requirements:
+    - stock_daily
   sector_rotation:
     color: '#06b6d4'
     config_key: strategies.sector_rotation
@@ -534,7 +542,9 @@ strategies:
     status: candidate
     strategy_type: sector_rotation
     layer: candidate_alpha
-    data_requirements: [stock_daily, sector]
+    data_requirements:
+    - stock_daily
+    - sector
   quality_value:
     color: '#84cc16'
     config_key: strategies.quality_value
@@ -545,7 +555,9 @@ strategies:
     status: candidate
     strategy_type: selection
     layer: candidate_alpha
-    data_requirements: [financials, valuation_daily]
+    data_requirements:
+    - financials
+    - valuation_daily
   low_vol_defensive:
     color: '#a78bfa'
     config_key: strategies.low_vol_defensive
@@ -556,7 +568,8 @@ strategies:
     status: candidate
     strategy_type: selection
     layer: defensive_alpha
-    data_requirements: [stock_daily]
+    data_requirements:
+    - stock_daily
   volume_confirmation:
     color: '#facc15'
     config_key: strategies.volume_confirmation
@@ -567,7 +580,9 @@ strategies:
     status: candidate
     strategy_type: selection
     layer: confirmation_alpha
-    data_requirements: [stock_daily, moneyflow]
+    data_requirements:
+    - stock_daily
+    - moneyflow
   regime_gated:
     color: '#fb7185'
     config_key: strategies.regime_gated
@@ -578,7 +593,9 @@ strategies:
     status: candidate
     strategy_type: portfolio
     layer: risk_overlay
-    data_requirements: [market_regime, stock_daily]
+    data_requirements:
+    - market_regime
+    - stock_daily
 trading:
   commission:
     brokerage: 0.00025
@@ -588,21 +605,21 @@ trading:
     stock:
       stamp_tax: 0.0005
       commission: 0.00025
-      transfer_fee: 0.00001
+      transfer_fee: 1.0e-05
       min_commission: 5.0
       lot_size: 100
       t_plus: 1
     etf:
-      commission: 0.00005
-      min_commission: 0.10
+      commission: 5.0e-05
+      min_commission: 0.1
       lot_size: 100
     bond:
-      commission: 0.00002
-      min_commission: 0.10
+      commission: 2.0e-05
+      min_commission: 0.1
     futures:
       commission_per_lot: 10.0
       lot_size: 1
-      margin_rate: 0.10
+      margin_rate: 0.1
   notification:
     enabled: true
     require_confirmation: false
@@ -910,7 +927,6 @@ data_registry:
     enabled: false
     label: 加密货币日线
     cache: crypto/daily/{symbol}.parquet
-  # ── P2: Sector / Industry Dimensions ──
   sector_sw_daily:
     source: tushare_free
     asset: sector
@@ -956,3 +972,5 @@ data_registry:
     label: 组合持仓按行业暴露
     cache: sector/exposure_snapshot/{YYYYMMDD}.parquet
     description: Paper/Portfolio 持仓按行业权重/市值/数量汇总
+data.fetcher:
+  min_interval: 3.0
