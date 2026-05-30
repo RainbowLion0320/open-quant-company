@@ -72,11 +72,11 @@ class AssetAdapter(ABC):
 
 | 资产 | 类 | 数据源 | 状态 |
 |------|-----|--------|------|
-| Stock | `StockAsset` | AKShare(新浪) + Tushare(财务) | available |
-| ETF | `ETFAsset` | AKShare `fund_etf_hist_em` (网络不稳定) | rate_limited |
-| Bond | 待实现 | — | planned |
-| Futures | 待实现 | — | planned |
-| Crypto | 待实现 | — | planned |
+| Stock | `StockAsset` | AKShare 日线 + Tushare 财务补充 | production-ready adapter |
+| ETF | `ETFAsset` | AKShare `fund_etf_hist_em`; tournament 可显式降级到指数代理 | production adapter with fallback marking |
+| Bond | `BondAsset` | 国债收益率价格代理 + 可转债快照真实数据 | proxy/partial-real adapter |
+| Futures | `FuturesAsset` | AKShare 主力连续合约行情 | real adapter, not yet deeply integrated into allocation research |
+| Crypto | `CryptoAsset` | 默认禁用；未接入 CCXT 真实行情 | disabled adapter |
 
 ### 2.3 AssetAllocator — 动态权重分配
 
@@ -219,7 +219,7 @@ portfolio = allocator.allocate(
 ## 8. 已知限制 & 未来方向
 
 - **ETF proxy fallback：** ETF 适配器已有真实行情路径，但多资产回测在缺少本地缓存时仍可能回退 proxy，收益计算需标注 data_source
-- **Bond/Futures/Crypto 未实现：** 框架已就绪，需要数据源接入
+- **Bond/Futures/Crypto 边界：** Bond 当前是国债收益率价格代理 + 可转债快照，Futures 有真实日线适配器但未形成完整研究/交易闭环，Crypto 默认禁用且未接入 CCXT。所有收益、回测和 Web 展示必须保留 `data_source` provenance。
 - **无跨资产对冲：** 当前各资产独立选标的，未考虑资产间相关性
 - **无动态风险预算：** 当前 regime 权重是静态矩阵，未来可基于波动率动态调整
 - **未来：** 半自动实盘中多资产联合执行、T+0 ETF 日内轮动

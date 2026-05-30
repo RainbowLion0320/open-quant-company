@@ -248,4 +248,6 @@ ALLOWED_STRATEGIES = list_strategy_names()
 - **行业/板块雷达页面** — 已合入 `/research?tab=sectors`，展示申万行业动量排名和策略信号分布；组合行业敞口归属 `/portfolio`，避免研究页重复持仓归因。
 - **无移动端适配** — 当前仅桌面浏览器布局
 - **DuckDB 只读** — 所有写操作通过 API 触发 Python 端 DataHub，不经过 DuckDB
+- **Pipeline v2 规划：** Pipeline 页面当前 v1 只覆盖 Market Regime。后续 Pipeline v2 应扩展到 Data Quality、Strategy Evidence、Portfolio/Execution 三条关键链路。
+- **Web API 契约：** Web API 的稳定契约以 Pydantic `response_model` 和前端 TypeScript 类型共同约束；新关键端点必须同时补齐后端模型、前端类型和合约测试。
 - **未来：** 策略参数热调、回测结果交互式下钻、前端 smoke/e2e 自动化继续扩大到视觉回归。
