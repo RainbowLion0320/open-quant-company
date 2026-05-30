@@ -64,7 +64,7 @@
             <span v-for="line in relativeChart.lines" :key="line.key" class="legend-item">
               <i :style="{ background: line.color }"></i>{{ line.label }}
               <em
-                v-if="line.data_source && line.data_source !== 'real'"
+                v-if="line.data_source && line.data_source !== 'real' && line.data_source !== 'cached'"
                 class="source-badge"
                 :class="`source-${line.data_source}`"
                 :title="line.source_detail || line.data_source"
