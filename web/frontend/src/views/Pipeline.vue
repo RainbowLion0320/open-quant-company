@@ -32,7 +32,6 @@
       <div class="flow-stage glass-card">
         <div v-if="loading" class="pipeline-empty">正在加载 Pipeline 数据...</div>
         <div v-else-if="payload" ref="canvasRef" class="flow-canvas" :style="canvasStyle">
-          <!-- Arrow SVG overlay — viewBox matches canvas pixel size -->
           <svg
             v-if="arrowSvgPaths.length"
             class="flow-arrows"
@@ -149,7 +148,7 @@ const activeKey = ref("market_regime");
 const nodeRefs = new Map<string, Element>();
 const canvasRef = ref<HTMLElement | null>(null);
 const canvasSize = reactive({ w: 800, h: 500 });
-const arrowSvgPaths = ref<string[]>(function () { return []; }());
+const arrowSvgPaths = ref<string[]>([]);
 
 function setNodeRef(id: string, el: any) {
   if (el) nodeRefs.set(id, el.$el || el);
@@ -171,17 +170,16 @@ const scoreText = computed(() => {
   return typeof score === "number" && Number.isFinite(score) ? score.toFixed(1) : "—";
 });
 
-// ── Dynamic layout: topological depth, capped at 4 columns ──
+// ── Dynamic layout: top-to-bottom, depth = row, siblings = columns ──
 
-const MAX_COLS = 4;
-
-interface NodePos { col: number; row: number; id: string }
+interface NodePos { row: number; col: number; id: string }
 
 const nodeLayout = computed<NodePos[]>(() => {
   const nodes: PipelineNodeData[] = payload.value?.nodes || [];
   const edges: { source: string; target: string }[] = payload.value?.edges || [];
   if (!nodes.length) return [];
 
+  // 1. Compute depth via topological BFS
   const inDegree = new Map<string, number>();
   const children = new Map<string, string[]>();
   for (const n of nodes) {
@@ -193,48 +191,41 @@ const nodeLayout = computed<NodePos[]>(() => {
     children.get(e.source)?.push(e.target);
   }
 
-  const rawDepth = new Map<string, number>();
+  const depth = new Map<string, number>();
   const queue: string[] = [];
   for (const n of nodes) {
-    rawDepth.set(n.id, 0);
+    depth.set(n.id, 0);
     if ((inDegree.get(n.id) || 0) === 0) queue.push(n.id);
   }
   while (queue.length) {
     const cur = queue.shift()!;
     for (const child of children.get(cur) || []) {
-      rawDepth.set(child, Math.max(rawDepth.get(child) || 0, (rawDepth.get(cur) || 0) + 1));
+      depth.set(child, Math.max(depth.get(child) || 0, (depth.get(cur) || 0) + 1));
       inDegree.set(child, (inDegree.get(child) || 0) - 1);
       if (inDegree.get(child) === 0) queue.push(child);
     }
   }
 
-  const maxRaw = Math.max(...rawDepth.values(), 0);
-  const depthRemap = new Map<string, number>();
+  // 2. Group by row (depth), assign columns
+  const rowGroups = new Map<number, string[]>();
   for (const n of nodes) {
-    const raw = rawDepth.get(n.id) || 0;
-    const col = maxRaw === 0 ? 0 : Math.round((raw / maxRaw) * (MAX_COLS - 1));
-    depthRemap.set(n.id, col);
-  }
-
-  const colGroups = new Map<number, string[]>();
-  for (const n of nodes) {
-    const col = depthRemap.get(n.id) || 0;
-    if (!colGroups.has(col)) colGroups.set(col, []);
-    colGroups.get(col)!.push(n.id);
+    const row = depth.get(n.id) || 0;
+    if (!rowGroups.has(row)) rowGroups.set(row, []);
+    rowGroups.get(row)!.push(n.id);
   }
 
   const positions: NodePos[] = [];
-  for (const [col, ids] of [...colGroups.entries()].sort((a, b) => a[0] - b[0])) {
-    ids.forEach((id, row) => positions.push({ col, row, id }));
+  for (const [row, ids] of [...rowGroups.entries()].sort((a, b) => a[0] - b[0])) {
+    ids.forEach((id, col) => positions.push({ row, col, id }));
   }
   return positions;
 });
 
-const numRows = computed(() => Math.max(...nodeLayout.value.map(p => p.row), 0) + 1);
+const numCols = computed(() => Math.max(...nodeLayout.value.map(p => p.col), 0) + 1);
 
 const canvasStyle = computed(() => ({
-  gridTemplateColumns: `repeat(${MAX_COLS}, minmax(128px, 1fr))`,
-  gridTemplateRows: `repeat(${numRows.value}, 112px)`,
+  gridTemplateColumns: `repeat(${numCols.value}, minmax(140px, 1fr))`,
+  gridAutoRows: "112px",
 }));
 
 function nodeStyle(node: PipelineNodeData) {
@@ -264,30 +255,27 @@ function updateArrows() {
     const srcRect = srcEl.getBoundingClientRect();
     const tgtRect = tgtEl.getBoundingClientRect();
 
-    // Positions relative to canvas
+    // Source: bottom center → Target: top center
     const x1 = srcRect.left + srcRect.width / 2 - canvasRect.left;
     const y1 = srcRect.bottom - canvasRect.top;
     const x2 = tgtRect.left + tgtRect.width / 2 - canvasRect.left;
     const y2 = tgtRect.top - canvasRect.top;
 
     if (Math.abs(x1 - x2) < 2) {
-      // Same column: straight vertical
+      // Same column: straight vertical line
       paths.push(`M${x1} ${y1}L${x2} ${y2}`);
     } else {
-      // Different columns: bezier curve
-      const cy = (y1 + y2) / 2;
-      paths.push(`M${x1} ${y1}C${x1} ${cy} ${x2} ${cy} ${x2} ${y2}`);
+      // Different columns: smooth S-curve
+      const midY = (y1 + y2) / 2;
+      paths.push(`M${x1} ${y1}C${x1} ${midY} ${x2} ${midY} ${x2} ${y2}`);
     }
   }
   arrowSvgPaths.value = paths;
 }
 
-// Re-measure arrows when payload changes or window resizes
 watch(payload, () => nextTick(updateArrows), { deep: true });
 watch(activeKey, () => nextTick(updateArrows));
-onMounted(() => {
-  window.addEventListener("resize", updateArrows);
-});
+onMounted(() => window.addEventListener("resize", updateArrows));
 
 // ── Dynamic summary output band ──
 
@@ -423,7 +411,6 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 12px;
-  min-height: 600px;
 }
 .flow-stage,
 .detail-panel,
@@ -432,10 +419,9 @@ onMounted(async () => {
 }
 .flow-canvas {
   position: relative;
-  min-height: 572px;
   display: grid;
   gap: 24px;
-  align-items: stretch;
+  justify-items: center;
 }
 .flow-arrows {
   position: absolute;
@@ -447,7 +433,8 @@ onMounted(async () => {
 .flow-node {
   position: relative;
   z-index: 1;
-  min-width: 0;
+  width: 100%;
+  max-width: 280px;
   padding: 12px;
   border: 1px solid var(--border-default);
   border-radius: 8px;
@@ -619,7 +606,7 @@ onMounted(async () => {
 }
 .output-band article {
   min-width: 0;
-  padding: 10px  11px;
+  padding: 10px 11px;
   border: 1px solid var(--border-subtle);
   border-radius: 7px;
   background: rgba(0, 0, 0, 0.12);
@@ -641,7 +628,7 @@ onMounted(async () => {
 .accent { color: var(--accent) !important; }
 .neutral { color: var(--text-secondary) !important; }
 .pipeline-empty {
-  min-height: 520px;
+  min-height: 400px;
   display: grid;
   place-items: center;
   color: var(--text-tertiary);
@@ -692,12 +679,6 @@ onMounted(async () => {
   .pipeline-meta {
     width: 100%;
     flex-wrap: wrap;
-  }
-  .flow-canvas {
-    min-height: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
   }
   .flow-arrows {
     display: none;
