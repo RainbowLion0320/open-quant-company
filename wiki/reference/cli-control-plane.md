@@ -53,9 +53,36 @@ astroq strategy evidence multifactor --json
 astroq regime status --json
 astroq regime train-profit --dry-run --json
 astroq backtest run --strategy multifactor --dry-run --json
+astroq backtest check --json
 ```
 
-`regime status` 读取当前生产检测链路。`train-profit` 和 `backtest run` 可能耗时，agent 默认先 dry-run。
+`regime status` 读取当前生产检测链路。`train-profit` 和 `backtest run` 可能耗时，agent 默认先 dry-run。`backtest check` 运行可复现性、PIT 和管道合约测试。
+
+## Pipeline
+
+```bash
+astroq pipeline list --json
+astroq pipeline show market_regime --json
+astroq pipeline show data_quality --json
+```
+
+`pipeline list` 返回所有可用管道。`pipeline show` 返回指定管道的节点、边和摘要。
+
+## 资产概览
+
+```bash
+astroq assets overview --json
+```
+
+返回多资产覆盖情况：资产类型、数据来源、研究就绪度、交易能力和 universe 大小。
+
+## 执行
+
+```bash
+astroq execution dry-run --json
+```
+
+模拟执行 dry-run：加载信号、提议订单、检查风控、返回 JSON。不修改 broker 状态。
 
 ## Web 运维
 

@@ -9,6 +9,8 @@ from astrolabe_cli.commands.backtest import check as backtest_check
 from astrolabe_cli.commands.backtest import run_backtest
 from astrolabe_cli.commands.data import repair as data_repair
 from astrolabe_cli.commands.execution import dry_run as execution_dry_run
+from astrolabe_cli.commands.pipeline import list_pipelines, show_pipeline
+from astrolabe_cli.commands.assets import overview as assets_overview
 from astrolabe_cli.commands.data import status as data_status
 from astrolabe_cli.commands.docs import check_docs
 from astrolabe_cli.commands.health import run_health
@@ -112,6 +114,22 @@ def build_parser() -> argparse.ArgumentParser:
     execution_dry_run_cmd = execution_sub.add_parser("dry-run", help="Dry-run paper execution")
     add_common_flags(execution_dry_run_cmd)
     execution_dry_run_cmd.set_defaults(handler=lambda args: execution_dry_run())
+
+    pipeline = sub.add_parser("pipeline", help="Inspect pipeline flows")
+    pipeline_sub = pipeline.add_subparsers(dest="pipeline_command", required=True)
+    pipeline_list_cmd = pipeline_sub.add_parser("list", help="List available pipelines")
+    add_common_flags(pipeline_list_cmd)
+    pipeline_list_cmd.set_defaults(handler=lambda args: list_pipelines())
+    pipeline_show_cmd = pipeline_sub.add_parser("show", help="Show a specific pipeline")
+    pipeline_show_cmd.add_argument("key", help="Pipeline key (e.g. market_regime)")
+    add_common_flags(pipeline_show_cmd)
+    pipeline_show_cmd.set_defaults(handler=lambda args: show_pipeline(args.key))
+
+    assets = sub.add_parser("assets", help="Inspect multi-asset coverage")
+    assets_sub = assets.add_subparsers(dest="assets_command", required=True)
+    assets_overview_cmd = assets_sub.add_parser("overview", help="Show asset coverage and readiness")
+    add_common_flags(assets_overview_cmd)
+    assets_overview_cmd.set_defaults(handler=lambda args: assets_overview())
 
     docs = sub.add_parser("docs", help="Check documentation hygiene")
     docs_sub = docs.add_subparsers(dest="docs_command", required=True)
