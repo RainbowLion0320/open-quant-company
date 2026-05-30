@@ -301,9 +301,9 @@ const regimeScore = computed(() => {
   const s = store.regime?.score;
   const n = Number(s);
   if (Number.isFinite(n)) return Number(n.toFixed(1));
-  return 50;
+  return null;
 });
-const displayScoreText = computed(() => displayScore.value.toFixed(1));
+const displayScoreText = computed(() => regimeScore.value === null ? "—" : displayScore.value.toFixed(1));
 const regimeStabilityState = computed(() => {
   if (!store.regime) {
     return {
@@ -543,8 +543,9 @@ function tweenTo(ref: { value: number }, target: number, decimals = 0, duration 
   requestAnimationFrame(tick);
 }
 
-function animateScore(target: number) {
+function animateScore(target: number | null) {
   clearTimeout(scoreTimer);
+  if (target === null) return;
   tweenTo(displayScore, target, 1, 700);
 }
 
