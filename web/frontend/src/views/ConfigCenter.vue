@@ -25,11 +25,17 @@
 
         <div class="field-grid">
           <div v-for="field in currentSection.fields" :key="field.key" class="field-card">
-            <label class="field-label">
-              {{ field.label }}
+            <div class="field-info">
+              <span class="field-label">{{ field.label }}</span>
               <span class="field-type" :class="`type-${field.type}`">{{ field.type }}</span>
-            </label>
-            <div class="field-input-row">
+              <span class="field-range" v-if="field.min !== undefined || field.max !== undefined">
+                {{ field.min ?? '—' }} ~ {{ field.max ?? '—' }}
+              </span>
+              <span class="field-default" v-if="field.default !== undefined">
+                默认 {{ field.default }}
+              </span>
+            </div>
+            <div class="field-input-wrap">
               <input
                 v-if="field.type === 'string'"
                 type="text"
@@ -60,9 +66,6 @@
                 :placeholder="String(field.default ?? '')"
                 @input="setFieldValue(field.key, parseFloat(($event.target as HTMLInputElement).value))"
               />
-              <span class="field-default" v-if="field.default !== undefined">
-                默认: {{ field.default }}
-              </span>
             </div>
             <p class="field-desc" v-if="field.description">{{ field.description }}</p>
             <p class="field-range" v-if="field.min !== undefined || field.max !== undefined">
@@ -297,23 +300,27 @@ onMounted(async () => {
   padding-bottom: 8px;
 }
 .field-card {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.08);
 }
-.field-label {
+.field-info {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.field-label {
   font-size: 12px;
   font-weight: 500;
   color: var(--text-primary);
-  margin: 0;
+  white-space: nowrap;
 }
 .field-type {
   font-size: 9px;
@@ -334,13 +341,11 @@ onMounted(async () => {
   background: rgba(251, 191, 36, 0.12);
   color: #fbbf24;
 }
-.field-input-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.field-input-wrap {
+  flex-shrink: 0;
 }
 .field-input {
-  width: 160px;
+  width: 140px;
   padding: 5px 10px;
   border: 1px solid var(--border, #444);
   border-radius: 5px;
@@ -355,17 +360,16 @@ onMounted(async () => {
 .field-input:focus {
   border-color: var(--accent, #6366f1);
 }
+.field-range {
+  font-size: 10px;
+  color: var(--text-disabled);
+  font-family: "JetBrains Mono", monospace;
+  white-space: nowrap;
+}
 .field-default {
   font-size: 10px;
   color: var(--text-disabled);
   white-space: nowrap;
-  min-width: 60px;
-}
-.field-desc {
-  display: none;
-}
-.field-range {
-  display: none;
 }
 .editor-actions {
   flex-shrink: 0;
