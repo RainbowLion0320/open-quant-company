@@ -32,7 +32,7 @@
       <div class="flow-stage glass-card">
         <div v-if="loading" class="pipeline-empty">正在加载 Pipeline 数据...</div>
         <div v-else-if="payload" class="flow-canvas" :style="canvasStyle">
-          <svg class="flow-arrows" :viewBox="`0 0 ${svgWidth} ${svgHeight}`" preserveAspectRatio="none" aria-hidden="true">
+          <svg class="flow-arrows" :viewBox="svgViewBox" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <marker id="pipeline-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
                 <path d="M0 0 8 4 0 8Z" />
@@ -143,78 +143,78 @@ const scoreText = computed(() => {
   return typeof score === "number" && Number.isFinite(score) ? score.toFixed(1) : "—";
 });
 
-// ── Dynamic layout computation ──
+// ── Dynamic layout: topological depth, capped at 4 columns ──
 
-interface NodePos { col: number; row: number; id: string; }
+const MAX_COLS = 4;
+
+interface NodePos { col: number; row: number; id: string }
 
 const nodeLayout = computed<NodePos[]>(() => {
   const nodes: PipelineNodeData[] = payload.value?.nodes || [];
   const edges: { source: string; target: string }[] = payload.value?.edges || [];
   if (!nodes.length) return [];
 
-  // Build adjacency and compute depth via topological sort
+  // 1. Compute raw depth via topological BFS
   const inDegree = new Map<string, number>();
-  const depthMap = new Map<string, number>();
-  const childrenMap = new Map<string, string[]>();
-
+  const children = new Map<string, string[]>();
   for (const n of nodes) {
     inDegree.set(n.id, 0);
-    depthMap.set(n.id, 0);
-    childrenMap.set(n.id, []);
+    children.set(n.id, []);
   }
   for (const e of edges) {
     inDegree.set(e.target, (inDegree.get(e.target) || 0) + 1);
-    childrenMap.get(e.source)?.push(e.target);
+    children.get(e.source)?.push(e.target);
   }
 
-  // BFS from roots
+  const rawDepth = new Map<string, number>();
   const queue: string[] = [];
   for (const n of nodes) {
+    rawDepth.set(n.id, 0);
     if ((inDegree.get(n.id) || 0) === 0) queue.push(n.id);
   }
 
   while (queue.length) {
     const cur = queue.shift()!;
-    const curDepth = depthMap.get(cur) || 0;
-    for (const child of childrenMap.get(cur) || []) {
-      depthMap.set(child, Math.max(depthMap.get(child) || 0, curDepth + 1));
+    for (const child of children.get(cur) || []) {
+      rawDepth.set(child, Math.max(rawDepth.get(child) || 0, (rawDepth.get(cur) || 0) + 1));
       inDegree.set(child, (inDegree.get(child) || 0) - 1);
       if (inDegree.get(child) === 0) queue.push(child);
     }
   }
 
-  // Group nodes by depth
-  const depthGroups = new Map<number, string[]>();
+  // 2. Remap depth to fit in MAX_COLS
+  const maxRaw = Math.max(...rawDepth.values(), 0);
+  const depthRemap = new Map<string, number>();
   for (const n of nodes) {
-    const d = depthMap.get(n.id) || 0;
-    if (!depthGroups.has(d)) depthGroups.set(d, []);
-    depthGroups.get(d)!.push(n.id);
+    const raw = rawDepth.get(n.id) || 0;
+    // Scale raw depth [0..maxRaw] → [0..MAX_COLS-1]
+    const col = maxRaw === 0 ? 0 : Math.round((raw / maxRaw) * (MAX_COLS - 1));
+    depthRemap.set(n.id, col);
   }
 
-  // Assign positions
+  // 3. Group by column, assign rows
+  const colGroups = new Map<number, string[]>();
+  for (const n of nodes) {
+    const col = depthRemap.get(n.id) || 0;
+    if (!colGroups.has(col)) colGroups.set(col, []);
+    colGroups.get(col)!.push(n.id);
+  }
+
   const positions: NodePos[] = [];
-  for (const [col, ids] of [...depthGroups.entries()].sort((a, b) => a[0] - b[0])) {
-    ids.forEach((id, row) => {
-      positions.push({ col, row, id });
-    });
+  for (const [col, ids] of [...colGroups.entries()].sort((a, b) => a[0] - b[0])) {
+    ids.forEach((id, row) => positions.push({ col, row, id }));
   }
   return positions;
 });
 
-const maxCol = computed(() => Math.max(...nodeLayout.value.map(p => p.col), 0));
-const maxRow = computed(() => Math.max(...nodeLayout.value.map(p => p.row), 0));
+const numRows = computed(() => Math.max(...nodeLayout.value.map(p => p.row), 0) + 1);
 
-const canvasStyle = computed(() => {
-  const cols = maxCol.value + 1;
-  const rows = maxRow.value + 1;
-  return {
-    gridTemplateColumns: `repeat(${cols}, minmax(128px, 1fr))`,
-    gridTemplateRows: `repeat(${rows}, 112px)`,
-  };
-});
+const canvasStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${MAX_COLS}, minmax(128px, 1fr))`,
+  gridTemplateRows: `repeat(${numRows.value}, 112px)`,
+}));
 
-const svgWidth = computed(() => (maxCol.value + 1) * 25);
-const svgHeight = computed(() => (maxRow.value + 1) * 25);
+const svgViewBox = computed(() => `0 0 ${MAX_COLS * 25} ${numRows.value * 25}`);
 
 function nodeStyle(node: PipelineNodeData) {
   const pos = nodeLayout.value.find(p => p.id === node.id);
@@ -225,7 +225,7 @@ function nodeStyle(node: PipelineNodeData) {
   };
 }
 
-// ── Dynamic SVG arrows ──
+// ── Dynamic SVG arrows from edges ──
 
 const computedArrows = computed<string[]>(() => {
   const edges: { source: string; target: string }[] = payload.value?.edges || [];
@@ -234,27 +234,27 @@ const computedArrows = computed<string[]>(() => {
   const posMap = new Map<string, NodePos>();
   for (const p of nodeLayout.value) posMap.set(p.id, p);
 
-  const cols = maxCol.value + 1;
-  const rows = maxRow.value + 1;
+  const cols = MAX_COLS;
+  const rows = numRows.value;
 
   return edges.map(e => {
     const src = posMap.get(e.source);
     const tgt = posMap.get(e.target);
     if (!src || !tgt) return "";
 
-    // Convert grid positions to SVG coordinates (percentage-like)
+    // Center of source node → top of target node
     const x1 = ((src.col + 0.5) / cols) * 100;
     const y1 = ((src.row + 1) / rows) * 100;
     const x2 = ((tgt.col + 0.5) / cols) * 100;
     const y2 = (tgt.row / rows) * 100;
 
-    // If same column, draw vertical line
     if (src.col === tgt.col) {
+      // Same column: vertical line
       return `M${x1} ${y1}L${x2} ${y2}`;
     }
-    // Otherwise, draw a bezier curve
-    const midY = (y1 + y2) / 2;
-    return `M${x1} ${y1}C${x1} ${midY} ${x2} ${midY} ${x2} ${y2}`;
+    // Different columns: smooth curve
+    const cy = (y1 + y2) / 2;
+    return `M${x1} ${y1}C${x1} ${cy} ${x2} ${cy} ${x2} ${y2}`;
   }).filter(Boolean);
 });
 
@@ -269,15 +269,17 @@ const summaryItems = computed(() => {
   for (const [key, val] of Object.entries(summary)) {
     if (skip.has(key)) continue;
     if (val === null || val === undefined) continue;
-    const displayVal = typeof val === "number" ? (Number.isFinite(val) ? val.toFixed(4) : "—") : String(val);
-    items.push({ label: key, value: displayVal, tone: "neutral" });
+    const displayVal = typeof val === "number"
+      ? (Number.isFinite(val) ? (Math.abs(val) < 1 ? val.toFixed(4) : val.toFixed(1)) : "—")
+      : String(val);
+    items.push({ label: key.replace(/_/g, " "), value: displayVal, tone: "neutral" });
   }
 
-  // Add adaptive_params if present (market_regime)
+  // Adaptive params for market_regime
   const params = summary.adaptive_params;
   if (params && typeof params === "object") {
     for (const [k, v] of Object.entries(params as Record<string, any>)) {
-      items.push({ label: k, value: formatParam(k, v), tone: "accent" });
+      items.push({ label: k.replace(/_/g, " "), value: formatParam(k, v), tone: "accent" });
     }
   }
 
