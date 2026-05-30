@@ -42,7 +42,7 @@
               <input
                 v-if="field.type === 'string'"
                 type="text"
-                class="field-input"
+                class="field-input field-input-wide"
                 :value="getFieldValue(field.key)"
                 :placeholder="String(field.default ?? '')"
                 @input="setFieldValue(field.key, ($event.target as HTMLInputElement).value)"
@@ -427,6 +427,9 @@ onMounted(async () => {
 }
 .field-input:focus {
   border-color: var(--accent, #6366f1);
+}
+.field-input-wide {
+  width: 140px;
 }
 .field-input::-webkit-inner-spin-button,
 .field-input::-webkit-outer-spin-button {
