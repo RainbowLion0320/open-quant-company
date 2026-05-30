@@ -101,7 +101,7 @@
       <div class="settings-list">
         <div v-for="s in strategyStatuses" :key="s.name">
           <span>{{ s.label }}</span>
-          <span :class="['badge', `badge-${s.color}`]">{{ s.status_label }}</span>
+          <span :class="['badge', statusBadgeClass(s.status)]">{{ s.status_label }}</span>
         </div>
         <div v-if="strategyStatuses.length === 0">
           <span>策略</span>
@@ -257,6 +257,13 @@ async function fetchAudit() {
 function sourceBadgeClass(status: string): string {
   if (status === "available") return "badge-green";
   if (status === "rate_limited") return "badge-amber";
+  return "badge-muted";
+}
+
+function statusBadgeClass(status: string): string {
+  if (status === "production") return "badge-green";
+  if (status === "paper") return "badge-amber";
+  if (status === "candidate") return "badge-blue";
   return "badge-muted";
 }
 
