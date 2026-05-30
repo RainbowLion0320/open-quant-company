@@ -561,6 +561,8 @@ export const api = {
   strategyCatalog: () => get<StrategyCatalogResponse>("/api/strategies/catalog"),
   strategyEvaluation: () => get<StrategyEvaluationSummary>("/api/strategies/evaluation"),
   strategyDetail: (name: string) => get<StrategyDetailResponse>(`/api/strategies/${name}`),
+  strategyEvidence: () => get<{ items: any[]; total: number }>("/api/strategies/evidence"),
+  strategyEvidenceDetail: (strategy: string) => get<any>(`/api/strategies/evidence/${strategy}`),
   strategyRun: (strategy: string, limit = 0, params?: any, mode: "production" | "research" = "production") =>
     post<RunResponse>("/api/strategies/run", { strategy, limit, params, mode }),
 

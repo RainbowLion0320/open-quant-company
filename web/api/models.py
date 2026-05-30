@@ -254,6 +254,30 @@ class StrategySignalsResponse(BaseModel):
     buys: int = 0
     signals: List[Dict[str, Any]] = []
 
+# ── 策略证据 ──
+
+class StrategyEvidenceItem(BaseModel):
+    strategy: str
+    path: str
+    updated: Optional[str] = None
+    exists: bool = True
+    promotion_decision: Optional[str] = None
+    oos_status: Optional[str] = None
+    baseline_count: int = 0
+    parse_error: Optional[str] = None
+
+class StrategyEvidenceListResponse(BaseModel):
+    items: List[StrategyEvidenceItem] = []
+    total: int = 0
+
+class StrategyEvidenceDetailResponse(BaseModel):
+    strategy: str
+    exists: bool = False
+    path: Optional[str] = None
+    summary: Dict[str, Any] = {}
+    artifact: Dict[str, Any] = {}
+    parse_error: Optional[str] = None
+
 # ── 通用 ──
 
 class ErrorResponse(BaseModel):

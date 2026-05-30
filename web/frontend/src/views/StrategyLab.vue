@@ -20,17 +20,20 @@ import { useModuleTabs } from "../composables/useModuleTabs";
 import Strategies from "./Strategies.vue";
 import Signals from "./Signals.vue";
 import Backtest from "./Backtest.vue";
+import StrategyEvidence from "./StrategyEvidence.vue";
 
 const tabs = [
   { key: "strategies", label: "策略目录", meta: "Catalog & gates", description: "查看生产策略和候选策略目录、生命周期、研究扫描与生产隔离状态" },
   { key: "signals", label: "信号历史", meta: "Signal changes", description: "追踪最近信号迁移，识别新增买入、降级和策略一致性变化" },
   { key: "backtest", label: "回测证据", meta: "Evidence", description: "对比策略收益、风险、回撤、强基准和晋级证据" },
+  { key: "evidence", label: "证据面板", meta: "Evidence panel", description: "查看策略证据制品、OOS状态、成本模型和晋级决策" },
 ];
 
 const { activeComponent } = useModuleTabs(tabs, "strategies", {
   strategies: Strategies,
   signals: Signals,
   backtest: Backtest,
+  evidence: StrategyEvidence,
 });
 </script>
 

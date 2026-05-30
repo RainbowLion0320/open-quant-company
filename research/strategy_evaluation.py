@@ -141,6 +141,75 @@ def write_strategy_evidence_report(report: dict[str, Any], output_dir: str | Pat
     return path
 
 
+def list_evidence_artifacts(root: str | Path | None = None) -> list[dict]:
+    """List all evidence artifacts without creating files."""
+    evidence_dir = Path(root) if root is not None else strategy_evidence_dir()
+    if not evidence_dir.exists():
+        return []
+    results = []
+    for path in sorted(evidence_dir.glob("*.json")):
+        strategy = path.stem
+        entry = {
+            "strategy": strategy,
+            "path": str(path),
+            "updated": None,
+            "exists": True,
+            "promotion_decision": None,
+            "oos_status": None,
+            "baseline_count": 0,
+            "parse_error": None,
+        }
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            entry["updated"] = data.get("generated_at")
+            pd_data = data.get("promotion_decision", {})
+            entry["promotion_decision"] = "passed" if pd_data.get("passed") else "blocked"
+            entry["oos_status"] = data.get("oos", {}).get("months", 0)
+            entry["baseline_count"] = len(data.get("baselines", {}))
+        except (json.JSONDecodeError, OSError) as e:
+            entry["parse_error"] = str(e)
+        results.append(entry)
+    return results
+
+
+def load_evidence_artifact(strategy: str, root: str | Path | None = None) -> dict:
+    """Load a single strategy's evidence artifact. Returns structured 'missing' if absent."""
+    evidence_dir = Path(root) if root is not None else strategy_evidence_dir()
+    path = evidence_dir / f"{strategy}.json"
+    if not path.exists():
+        return {
+            "strategy": strategy,
+            "exists": False,
+            "path": str(path),
+            "summary": {},
+            "artifact": {},
+            "parse_error": None,
+        }
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return {
+            "strategy": strategy,
+            "exists": True,
+            "path": str(path),
+            "summary": {
+                "status": data.get("status"),
+                "promotion_decision": data.get("promotion_decision"),
+                "generated_at": data.get("generated_at"),
+            },
+            "artifact": data,
+            "parse_error": None,
+        }
+    except (json.JSONDecodeError, OSError) as e:
+        return {
+            "strategy": strategy,
+            "exists": True,
+            "path": str(path),
+            "summary": {},
+            "artifact": {},
+            "parse_error": str(e),
+        }
+
+
 def write_backtest_evidence(
     strategy: str,
     status: str,

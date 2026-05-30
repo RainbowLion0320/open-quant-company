@@ -4,6 +4,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from web.api.models import (
     StrategyCatalogResponse,
     StrategyEvaluationSummaryResponse,
+    StrategyEvidenceDetailResponse,
+    StrategyEvidenceItem,
+    StrategyEvidenceListResponse,
     StrategyListResponse,
     StrategyRunRequest,
     StrategyRunResponse,
@@ -127,6 +130,25 @@ async def get_job_status(job_id: str):
     if not job:
         raise DataNotFoundError("job", job_id)
     return JobStatus(**{k: job.get(k) for k in ("job_id", "status", "progress", "message", "result")})
+
+
+# ── 策略证据 ──────────────────────────────────────────────
+
+@router.get("/evidence", response_model=StrategyEvidenceListResponse)
+async def list_strategy_evidence():
+    """List all strategy evidence artifacts."""
+    from research.strategy_evaluation import list_evidence_artifacts
+
+    items = list_evidence_artifacts()
+    return {"items": items, "total": len(items)}
+
+
+@router.get("/evidence/{strategy}", response_model=StrategyEvidenceDetailResponse)
+async def get_strategy_evidence(strategy: str):
+    """Load a single strategy's evidence artifact."""
+    from research.strategy_evaluation import load_evidence_artifact
+
+    return load_evidence_artifact(strategy)
 
 
 # ── 策略信号 ──────────────────────────────────────────────
