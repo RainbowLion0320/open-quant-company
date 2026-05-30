@@ -1,20 +1,21 @@
 <template>
   <div class="view-page pipeline-page">
+    <nav class="pipeline-tabs" v-if="pipelines.length > 1">
+      <button
+        v-for="p in pipelines"
+        :key="p.key"
+        class="tab-btn"
+        :class="{ active: activeKey === p.key }"
+        @click="switchPipeline(p.key)"
+      >
+        {{ p.label }}
+      </button>
+    </nav>
+
     <section class="pipeline-header glass-card">
       <div>
         <span class="eyebrow">Pipeline</span>
         <h1>{{ currentLabel }}</h1>
-      </div>
-      <div class="pipeline-selector" v-if="pipelines.length > 1">
-        <button
-          v-for="p in pipelines"
-          :key="p.key"
-          class="selector-btn"
-          :class="{ active: activeKey === p.key }"
-          @click="switchPipeline(p.key)"
-        >
-          {{ p.label }}
-        </button>
       </div>
       <div class="pipeline-meta" v-if="payload && activeKey === 'market_regime'">
         <span :class="regimeClass(payload.summary.confirmed_regime)">{{ payload.summary.confirmed_regime }}</span>
@@ -361,6 +362,43 @@ onMounted(async () => {
 .pipeline-page {
   gap: 12px;
 }
+.pipeline-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 2px;
+}
+.tab-btn {
+  padding: 8px 18px;
+  border: 1px solid var(--border, #333);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab-btn:hover {
+  background: var(--bg-hover, rgba(255,255,255,0.04));
+  color: var(--text-primary);
+}
+.tab-btn.active {
+  background: var(--bg-card, rgba(13, 26, 42, 0.94));
+  border-color: var(--border-default);
+  color: var(--accent);
+  font-weight: 600;
+  position: relative;
+}
+.tab-btn.active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--bg-card, rgba(13, 26, 42, 0.94));
+}
 .pipeline-header {
   min-height: 76px;
   padding: 16px 18px;
@@ -633,30 +671,6 @@ onMounted(async () => {
   place-items: center;
   color: var(--text-tertiary);
   font-size: 12px;
-}
-.pipeline-selector {
-  display: flex;
-  gap: 4px;
-  margin-top: 8px;
-}
-.selector-btn {
-  padding: 4px 12px;
-  border: 1px solid var(--border, #333);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary, #888);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.selector-btn:hover {
-  background: var(--bg-hover, rgba(255,255,255,0.04));
-}
-.selector-btn.active {
-  background: var(--accent-bg, rgba(99,102,241,0.15));
-  border-color: var(--accent, #6366f1);
-  color: var(--accent, #6366f1);
-  font-weight: 600;
 }
 
 @media (max-width: 1180px) {
