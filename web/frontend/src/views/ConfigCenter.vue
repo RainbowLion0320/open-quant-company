@@ -27,7 +27,7 @@
           <div v-for="field in currentSection.fields" :key="field.key" class="field-card">
             <label class="field-label">
               {{ field.label }}
-              <span class="field-type">{{ field.type }}</span>
+              <span class="field-type" :class="`type-${field.type}`">{{ field.type }}</span>
             </label>
             <div class="field-input-row">
               <input
@@ -315,9 +315,20 @@ onMounted(async () => {
   font-size: 9px;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(125, 211, 252, 0.08);
-  color: var(--text-tertiary);
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.type-int {
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+}
+.type-float {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+.type-string {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
 }
 .field-input-row {
   display: flex;
