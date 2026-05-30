@@ -307,4 +307,98 @@ class HealthResponse(BaseModel):
     data_updated: str = ""
     stocks_scanned: int = 0
     strategies: int = 0
+
+# ── Market Response Models ──
+
+class MarketRegimeResponse(BaseModel):
+    regime: Dict[str, Any] = {}
+    multi_asset: List[Dict[str, Any]] = []
+    freshness: Dict[str, Any] = {}
+    config: Dict[str, Any] = {}
+    position_capacity: Dict[str, Any] = {}
+    updated: str = ""
+
+class MarketOverviewResponse(BaseModel):
+    regime: Dict[str, Any] = {}
+    kline: List[Dict[str, Any]] = []
+    range: str = "6M"
+    multi_asset: List[Dict[str, Any]] = []
+    macro: List[Dict[str, Any]] = []
+    freshness: Dict[str, Any] = {}
+    pool_size: int = 0
+    position_capacity: Dict[str, Any] = {}
+    config: Dict[str, Any] = {}
+    updated: str = ""
+
+# ── Pipeline Response Models ──
+
+class PipelineNode(BaseModel):
+    id: str = ""
+    title: str = ""
+    subtitle: str = ""
+    status: str = ""
+    metrics: List[Any] = []
+    inputs: List[Any] = []
+    outputs: List[Any] = []
+
+class PipelineEdge(BaseModel):
+    source: str = ""
+    target: str = ""
+    label: str = ""
+
+class PipelineDetailResponse(BaseModel):
+    pipeline_key: str = ""
+    updated: str = ""
+    summary: Dict[str, Any] = {}
+    nodes: List[PipelineNode] = []
+    edges: List[PipelineEdge] = []
+    warnings: List[str] = []
+
+class PipelineRegistryItem(BaseModel):
+    key: str = ""
+    label: str = ""
+    status: str = "available"
+
+class PipelineRegistryResponse(BaseModel):
+    items: List[PipelineRegistryItem] = []
+    total: int = 0
+
+# ── Sector Response Models ──
+
+class SectorOverviewResponse(BaseModel):
+    sectors: List[Dict[str, Any]] = []
+    total_sectors: int = 0
+    top_performers: List[Dict[str, Any]] = []
+    bottom_performers: List[Dict[str, Any]] = []
+    signal_dispersion: float = 0.0
+    data_source: str = ""
+    capital_source: str = ""
+    freshness: Dict[str, Any] = {}
+
+# ── System Response Models ──
+
+class SystemHealthItem(BaseModel):
+    name: str = ""
+    status: str = ""
+    detail: str = ""
+
+class SystemHealthResponse(BaseModel):
+    items: List[SystemHealthItem] = []
+    summary: str = ""
+    all_ok: bool = True
+
+class CronJobItem(BaseModel):
+    name: str = ""
+    schedule: str = ""
+    last_run: str = ""
+    last_status: str = ""
+    next_run: str = ""
+    enabled: bool = True
+    state: str = ""
+    no_agent: bool = False
+
+class CronJobsResponse(BaseModel):
+    jobs: List[CronJobItem] = []
+    summary: str = ""
+    checked_at: str = ""
     version: str = Field(default_factory=get_project_version)

@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Query
 
 from web.api.errors import InvalidParameterError
+from web.api.models import CronJobsResponse, SystemHealthResponse
 from web.api.services.system_data_health import (
     db_health_payload,
     repair_status_payload,
@@ -59,13 +60,13 @@ async def repair_status(job_id: str):
     return repair_status_payload(job_id)
 
 
-@router.get("/api-health")
+@router.get("/api-health", response_model=SystemHealthResponse)
 async def api_health():
     """检查各 API 配置健康状态 (不含 token 值)。"""
     return api_health_payload()
 
 
-@router.get("/cron-jobs")
+@router.get("/cron-jobs", response_model=CronJobsResponse)
 async def cron_jobs():
     """Cron job 状态 (读取 ~/.hermes/cron/jobs.json)"""
     return cron_jobs_payload()

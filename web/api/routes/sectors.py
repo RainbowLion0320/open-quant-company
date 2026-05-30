@@ -4,11 +4,12 @@ from urllib.parse import unquote
 
 from fastapi import APIRouter, HTTPException
 
+from web.api.models import SectorOverviewResponse
 from web.api.services import sectors as sector_service
 
 router = APIRouter(prefix="/api/sectors", tags=["Sectors"])
 
-@router.get("/overview")
+@router.get("/overview", response_model=SectorOverviewResponse)
 def sector_overview():
     """Return sector performance ranking + signal summary."""
     return sector_service.build_sector_overview()
