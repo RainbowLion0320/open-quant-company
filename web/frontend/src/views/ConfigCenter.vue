@@ -289,27 +289,31 @@ onMounted(async () => {
   margin: 4px 0 0;
 }
 .field-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   flex: 1;
   overflow-y: auto;
   padding-bottom: 8px;
 }
 .field-card {
-  padding: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.08);
 }
 .field-label {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  margin: 0;
 }
 .field-type {
   font-size: 9px;
@@ -336,16 +340,17 @@ onMounted(async () => {
   gap: 8px;
 }
 .field-input {
-  flex: 1;
-  padding: 6px 10px;
+  width: 160px;
+  padding: 5px 10px;
   border: 1px solid var(--border, #444);
-  border-radius: 6px;
+  border-radius: 5px;
   background: rgba(0, 0, 0, 0.2);
   color: var(--text-primary);
   font-family: "JetBrains Mono", monospace;
-  font-size: 13px;
+  font-size: 12px;
   outline: none;
   transition: border-color 0.15s;
+  text-align: right;
 }
 .field-input:focus {
   border-color: var(--accent, #6366f1);
@@ -354,18 +359,13 @@ onMounted(async () => {
   font-size: 10px;
   color: var(--text-disabled);
   white-space: nowrap;
+  min-width: 60px;
 }
 .field-desc {
-  font-size: 10px;
-  color: var(--text-tertiary);
-  margin: 6px 0 0;
-  line-height: 1.4;
+  display: none;
 }
 .field-range {
-  font-size: 10px;
-  color: var(--text-disabled);
-  margin: 2px 0 0;
-  font-family: "JetBrains Mono", monospace;
+  display: none;
 }
 .editor-actions {
   flex-shrink: 0;
