@@ -145,15 +145,26 @@ const hasChanges = computed(() =>
 
 function getFieldValue(fieldKey: string): any {
   if (!activeSection.value) return undefined;
-  const sectionData = config[activeSection.value];
+
+  // Navigate config by section key (may be dotted, e.g. "data.fetcher")
+  const sectionParts = activeSection.value.split(".");
+  let sectionData: any = config;
+  for (const sp of sectionParts) {
+    if (sectionData && typeof sectionData === "object") {
+      sectionData = sectionData[sp];
+    } else {
+      sectionData = undefined;
+      break;
+    }
+  }
   if (!sectionData) return undefined;
 
-  // Support dotted keys (e.g., "max_single_position.max_pct")
-  const parts = fieldKey.split(".");
+  // Navigate field key (e.g. "max_single_position.max_pct")
+  const fieldParts = fieldKey.split(".");
   let val: any = sectionData;
-  for (const p of parts) {
+  for (const fp of fieldParts) {
     if (val && typeof val === "object") {
-      val = val[p];
+      val = val[fp];
     } else {
       return undefined;
     }
@@ -405,10 +416,11 @@ onMounted(async () => {
   padding: 5px 8px;
   border: 1px solid var(--border, #444);
   border-radius: 5px;
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.3);
+  color: #e2e8f0;
   font-family: "JetBrains Mono", monospace;
   font-size: 12px;
+  font-weight: 500;
   outline: none;
   transition: border-color 0.15s;
   text-align: right;
