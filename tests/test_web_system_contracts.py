@@ -231,6 +231,7 @@ def test_frontend_router_does_not_keep_legacy_redirect_routes():
     assert "redirectWithTab" not in router
     for path in ("/strategies", "/signals", "/backtest", "/sectors", "/monitor", "/settings", "/db-health", "/hindsight"):
         assert f'path: "{path}"' not in router
+    assert 'path: "/pipeline"' in router
     assert 'path: "/stocks/:code"' in router
     assert 'path: "/stocks"' not in router
 

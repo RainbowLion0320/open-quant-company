@@ -1,6 +1,6 @@
 # Spec: 信号系统 (Signal System)
 
-> 版本: 1.2 | 更新: 2026-05-29 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Backtest Engine](03-backtest-engine.md)
+> 版本: 1.3 | 更新: 2026-05-30 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Backtest Engine](03-backtest-engine.md)
 
 ## 1. 概述
 
@@ -102,11 +102,11 @@
 
 **核心理念：** 不作为独立主选股策略，而是检测当前市场状态，据此调整策略参数、仓位上限和资产配置风险预算。
 
-**Regime 检测：**
-- **Score:** `trend 30% + breadth 30% + risk 30% + volume 10%`，所有分项归一到 0-100。
-- **Bull:** score >= 60，且 trend 与 breadth 确认项均 >= 0.55。
-- **Bear:** score <= 40，或 trend/breadth 任一 breakdown 项 <= 0.40。
-- **Sideways:** 其他情况。
+**Hybrid Regime 检测：**
+- **默认引擎:** `config/settings.yaml` → `cybernetics.regime_engine: hybrid`。规则评分和 Student-t HMM 并行运行，不把 HMM 作为无条件替代。
+- **规则评分:** `trend 30% + breadth 30% + risk 30% + volume 10%`，所有分项归一到 0-100，并继续输出 `regime_score`、`score_components` 和 `breadth_detail` 供解释。
+- **HMM 概率:** `data/models/regime_hmm/` 中的 Student-t HMM 输出 bull/sideways/bear 概率、confidence 和 entropy。
+- **Hybrid 决策:** 规则/HMM 一致时使用 HMM 概率；不一致但 `hmm_confidence >= 0.80` 时采用 HMM；不一致且低置信时用 HMM 概率和规则投票 blended vote。
 - **Confirmed 状态:** raw regime 必须经过 `min_dwell=3` 个连续唯一市场观测确认后才切换生产 confirmed regime。
 
 **自适应参数调整：**
@@ -118,7 +118,7 @@
 
 ### 2.5 Market Regime 离线训练与晋级
 
-Market Regime 生产公式保持确定性和可解释性，但不再只能靠人工拍权重。`research/regime_training.py` 和 `scripts/train_market_regime.py` 提供 champion/challenger 研究闭环：
+Market Regime 规则评分层保持确定性和可解释性，但不再只能靠人工拍权重。`research/regime_training.py` 和 `scripts/train_market_regime.py` 提供 champion/challenger 研究闭环：
 
 - **Champion**：当前生产公式，作为所有候选规则的基准。
 - **Challenger**：离线搜索出的可解释候选规则，包含权重、阈值、平滑窗口和最短持续期。
@@ -126,7 +126,7 @@ Market Regime 生产公式保持确定性和可解释性，但不再只能靠人
 - **策略 A/B**：比较固定仓位、当前公式、trend-only、trend+breadth、best challenger 的风险收益表现。
 - **晋级门槛**：只有 challenger 在预测区分、bear 风险识别、策略贡献、稳定性和复杂度惩罚后仍优于 champion，才生成 `recommended_config.yaml` 供人工审查。
 
-第一版训练器只写 `reports/regime_training/` 研究报告，不自动改 `cybernetics/regime_scoring.py` 或 `config/settings.yaml`。
+训练器只写 `reports/regime_training/` 研究报告，不自动改 `cybernetics/regime_scoring.py`、`cybernetics/hmm_engine.py` 或 `config/settings.yaml`。
 
 ### 2.5.1 Market Regime 挣钱导向训练
 
@@ -137,7 +137,7 @@ Market Regime 生产公式保持确定性和可解释性，但不再只能靠人
 - **强基线**：必须比较 buy-and-hold、固定仓位、均线择时、trend-only、trend+breadth 和当前 champion。
 - **样本外优先**：候选公式通过 walk-forward 训练/验证选择；没有有效验证窗口时只能输出 `insufficient_data`。
 - **同标准诊断**：当前 champion 也进入候选池并接受 gate 诊断，`keep_champion` 不再被解释为“当前公式天然最优”。
-- **当前生产公式**：V3 已将 `w0611` 晋级为生产 champion；生产权重为 trend 30%、breadth 30%、risk 30%、volume 10%，bull/bear 阈值为 60/40，`min_dwell=3`。
+- **当前规则评分基线**：V3 已将 `w0611` 晋级为规则评分基线；权重为 trend 30%、breadth 30%、risk 30%、volume 10%，bull/bear 阈值为 60/40，`min_dwell=3`。
 - **实时状态机**：Web/API 生产链路通过 `cybernetics/regime_state.py` 对原始分类做稳定确认；同一交易日重复刷新不累计 dwell，必须出现连续唯一市场观测后才切换 confirmed regime。
 - **V3 最优选择**：报告同时输出 `best_unconstrained_id` 和 `best_validated_id`；最终建议只来自通过验证门槛的最优公式。
 - **反过拟合门槛**：拒绝永久防守、永久进攻、单一 regime 占比过高、输给简单基线或只在样本内好看的候选；换手采用相对 champion 的约束，避免 champion 自己被绝对阈值豁免。

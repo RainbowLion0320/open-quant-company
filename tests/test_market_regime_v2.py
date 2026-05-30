@@ -4,6 +4,20 @@ from cybernetics import orchestrator
 from cybernetics.orchestrator import MarketBreadth, MarketRegime, MarketVolume, QuantOrchestrator
 
 
+def _force_regime_engine(monkeypatch, engine: str) -> None:
+    original_load_config = orchestrator._load_config
+
+    def fake_load_config():
+        cfg = dict(original_load_config())
+        hmm_cfg = dict(cfg.get("hmm", {}))
+        hmm_cfg.pop("regime_engine", None)
+        cfg["hmm"] = hmm_cfg
+        cfg["regime_engine"] = engine
+        return cfg
+
+    monkeypatch.setattr(orchestrator, "_load_config", fake_load_config)
+
+
 def _stock_frame(last_delta: float) -> pd.DataFrame:
     dates = pd.date_range("2026-01-01", periods=130, freq="D")
     close = [100 + i * 0.1 for i in range(130)]
@@ -95,6 +109,7 @@ def test_regime_score_combines_validated_trend_breadth_risk_and_volume():
 
 def test_detect_returns_full_breadth_detail_and_score_components(monkeypatch):
     orchestrator.reset_regime_transition_state()
+    _force_regime_engine(monkeypatch, "rule_based")
     bench = _index_frame("up")
 
     def fake_index(symbol, *args, **kwargs):
@@ -134,6 +149,7 @@ def test_detect_returns_full_breadth_detail_and_score_components(monkeypatch):
 
 def test_detect_applies_min_dwell_across_request_scoped_orchestrators(monkeypatch):
     orchestrator.reset_regime_transition_state()
+    _force_regime_engine(monkeypatch, "rule_based")
     bench = _index_frame("up")
 
     def fake_index(symbol, *args, **kwargs):
@@ -188,6 +204,7 @@ def test_detect_applies_min_dwell_across_request_scoped_orchestrators(monkeypatc
 
 def test_detect_exposes_raw_and_stabilized_regime_metadata(monkeypatch):
     orchestrator.reset_regime_transition_state()
+    _force_regime_engine(monkeypatch, "rule_based")
     bench = _index_frame("up")
 
     monkeypatch.setattr("data.fetcher.get_index_daily", lambda *args, **kwargs: bench)
@@ -231,3 +248,91 @@ def test_detect_exposes_raw_and_stabilized_regime_metadata(monkeypatch):
     assert snapshot.regime_state["pending_value"] == "bear"
     assert snapshot.regime_state["pending_count"] == 1
     assert snapshot.regime_state["min_dwell"] == 3
+
+
+def test_resolve_regime_decision_uses_high_confidence_hmm_override():
+    decision = orchestrator._resolve_regime_decision(
+        rule_raw_regime=MarketRegime.BULL,
+        hmm_raw_regime=MarketRegime.BEAR,
+        regime_probs={"bull": 0.05, "sideways": 0.10, "bear": 0.85},
+        hmm_confidence=0.85,
+        engine="hybrid",
+    )
+
+    assert decision.raw_regime is MarketRegime.BEAR
+    assert decision.detection_method == "hmm"
+    assert decision.regime_probs["bear"] == 0.85
+    assert decision.decision_reason == "hmm_high_confidence_override"
+
+
+def test_resolve_regime_decision_blends_low_confidence_disagreement():
+    decision = orchestrator._resolve_regime_decision(
+        rule_raw_regime=MarketRegime.BULL,
+        hmm_raw_regime=MarketRegime.BEAR,
+        regime_probs={"bull": 0.15, "sideways": 0.30, "bear": 0.55},
+        hmm_confidence=0.55,
+        engine="hybrid",
+    )
+
+    assert decision.raw_regime is MarketRegime.BULL
+    assert decision.detection_method == "hybrid"
+    assert decision.regime_probs["bull"] > decision.regime_probs["bear"]
+    assert round(sum(decision.regime_probs.values()), 6) == 1
+    assert decision.decision_reason == "hybrid_low_confidence_blend"
+
+
+def test_detect_uses_hybrid_probabilities_for_adaptive_params(monkeypatch):
+    orchestrator.reset_regime_transition_state()
+    _force_regime_engine(monkeypatch, "hybrid")
+    bench = _index_frame("up")
+
+    monkeypatch.setattr("data.fetcher.get_index_daily", lambda *args, **kwargs: bench)
+    monkeypatch.setattr(
+        orchestrator,
+        "_compute_full_market_breadth",
+        lambda: MarketBreadth(
+            advance_ratio=0.70,
+            above_ma20=0.75,
+            above_ma60=0.70,
+            above_ma120=0.65,
+            sample_size=5000,
+            up_count=3500,
+            down_count=1400,
+            unchanged_count=100,
+            as_of="2026-05-20",
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "_compute_full_market_volume",
+        lambda: MarketVolume(amount_ratio_5_20=1.15, up_amount_ratio=0.70, sample_size=5000, as_of="2026-05-20"),
+    )
+    monkeypatch.setattr(
+        orchestrator,
+        "_compute_regime_score_v2",
+        lambda *args, **kwargs: (68.0, {"trend_raw": 0.70, "breadth_raw": 0.75, "risk_raw": 0.65, "volume_raw": 0.60}),
+    )
+    monkeypatch.setattr(orchestrator, "_classify_regime", lambda *args, **kwargs: MarketRegime.BULL)
+    monkeypatch.setattr(
+        orchestrator,
+        "_hmm_detect",
+        lambda *args, **kwargs: (
+            {"bull": 0.15, "sideways": 0.30, "bear": 0.55},
+            0.55,
+            0.98,
+            MarketRegime.BEAR,
+        ),
+    )
+
+    qo = QuantOrchestrator()
+    snapshot = qo.detect()
+
+    assert snapshot.detection_method == "hybrid"
+    assert snapshot.raw_regime is MarketRegime.BULL
+    assert qo.params["position_size"] < 0.30
+    assert qo.params["position_size"] > 0.05
+    expected = sum(
+        snapshot.regime_probs[key] * {"bull": 0.30, "sideways": 0.15, "bear": 0.05}[key]
+        for key in ("bull", "sideways", "bear")
+    )
+    assert round(qo.params["position_size"], 6) == round(expected, 6)

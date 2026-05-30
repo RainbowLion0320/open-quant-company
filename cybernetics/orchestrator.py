@@ -135,6 +135,17 @@ class MarketContext:
     hmm_entropy: float = 0.0
     # -sum(p * log(p)) — 状态不确定性
 
+    decision_reason: str = ""
+    # Regime engine decision path for observability / Pipeline UI.
+
+
+@dataclass(frozen=True)
+class RegimeDecision:
+    raw_regime: MarketRegime
+    detection_method: str
+    regime_probs: Dict[str, float]
+    decision_reason: str
+
 
 @dataclass
 class MarketBreadth:
@@ -1067,6 +1078,62 @@ def _hmm_detect(
     return regime_probs, confidence, entropy, raw_regime
 
 
+def _normalise_regime_probs(regime_probs: Dict[str, float] | None) -> Dict[str, float]:
+    probs = {
+        "bull": float((regime_probs or {}).get("bull", 0.0) or 0.0),
+        "sideways": float((regime_probs or {}).get("sideways", 0.0) or 0.0),
+        "bear": float((regime_probs or {}).get("bear", 0.0) or 0.0),
+    }
+    total = sum(v for v in probs.values() if v > 0)
+    if total <= 0:
+        return {}
+    return {key: max(0.0, value) / total for key, value in probs.items()}
+
+
+def _resolve_regime_decision(
+    *,
+    rule_raw_regime: MarketRegime,
+    hmm_raw_regime: MarketRegime | None,
+    regime_probs: Dict[str, float] | None,
+    hmm_confidence: float,
+    engine: str,
+) -> RegimeDecision:
+    """Resolve rule/HMM regime into a single raw decision.
+
+    Hybrid policy:
+    - rule/HMM agree: use HMM probabilities directly.
+    - disagreement and HMM confidence >= 0.80: trust HMM.
+    - disagreement and lower confidence: blend HMM probabilities with a rule vote.
+    """
+    engine = engine if engine in {"hmm", "hybrid", "rule_based"} else "rule_based"
+    rule_raw_regime = to_market_regime(rule_raw_regime)
+    probs = _normalise_regime_probs(regime_probs)
+
+    if engine == "rule_based":
+        return RegimeDecision(rule_raw_regime, "rule_based", {}, "rule_only")
+
+    if not probs or hmm_raw_regime is None:
+        return RegimeDecision(rule_raw_regime, "rule_based", {}, "hmm_unavailable_fallback")
+
+    hmm_raw_regime = to_market_regime(hmm_raw_regime)
+    if engine == "hmm":
+        return RegimeDecision(hmm_raw_regime, "hmm", probs, "hmm_only")
+
+    if hmm_raw_regime == rule_raw_regime:
+        return RegimeDecision(hmm_raw_regime, "hmm", probs, "hmm_rule_consensus")
+
+    if hmm_confidence >= 0.80:
+        return RegimeDecision(hmm_raw_regime, "hmm", probs, "hmm_high_confidence_override")
+
+    rule_weight = min(0.50, max(0.20, 1.0 - hmm_confidence))
+    hmm_weight = 1.0 - rule_weight
+    blended = {key: value * hmm_weight for key, value in probs.items()}
+    blended[rule_raw_regime.value] = blended.get(rule_raw_regime.value, 0.0) + rule_weight
+    blended = _normalise_regime_probs(blended)
+    raw_regime = MarketRegime(max(blended, key=blended.get)) if blended else rule_raw_regime
+    return RegimeDecision(raw_regime, "hybrid", blended, "hybrid_low_confidence_blend")
+
+
 def detect_market_regime(
     index_data: dict = None,  # 指数数据 {symbol: df}，不传则自动拉取
     window: int = 60,
@@ -1241,6 +1308,7 @@ class QuantOrchestrator:
         hmm_confidence = 0.0
         hmm_entropy = 0.0
         raw_regime = rule_raw_regime
+        decision_reason = "rule_only"
 
         try:
             hmm_cfg = _load_config().get("hmm", {})
@@ -1258,48 +1326,17 @@ class QuantOrchestrator:
                 import logging
                 logging.getLogger(__name__).warning(f"HMM detection failed, falling back to rules: {e}")
 
-        if engine == "hmm":
-            # Pure HMM: use HMM result, fall back to rules only on failure
-            if regime_probs:
-                raw_regime = hmm_raw
-                detection_method = "hmm"
-            else:
-                detection_method = "rule_based"
-
-        elif engine == "hybrid":
-            # Hybrid: run both, consensus based on HMM confidence
-            if regime_probs and hmm_raw is not None:
-                if hmm_raw == rule_raw_regime:
-                    # Agreement: use HMM probabilities directly
-                    raw_regime = hmm_raw
-                    detection_method = "hmm"
-                elif hmm_confidence >= 0.80:
-                    # HMM highly confident despite disagreement → trust HMM
-                    raw_regime = hmm_raw
-                    detection_method = "hmm"
-                else:
-                    # HMM uncertain + disagreement → blend with rule vote
-                    # Rule weight scales inversely with HMM confidence:
-                    #   confidence=0.80 → rule_weight=0.20
-                    #   confidence=0.50 → rule_weight=0.40
-                    #   confidence=0.33 → rule_weight=0.50 (max)
-                    rule_weight = min(0.50, max(0.20, 1.0 - hmm_confidence))
-                    hmm_weight = 1.0 - rule_weight
-                    blended = {
-                        "bull": regime_probs.get("bull", 0) * hmm_weight,
-                        "sideways": regime_probs.get("sideways", 0) * hmm_weight,
-                        "bear": regime_probs.get("bear", 0) * hmm_weight,
-                    }
-                    blended[rule_raw_regime.value] = blended.get(rule_raw_regime.value, 0) + rule_weight
-                    # Normalize
-                    total = sum(blended.values())
-                    if total > 0:
-                        blended = {k: v / total for k, v in blended.items()}
-                    regime_probs = blended
-                    raw_regime = MarketRegime(max(blended, key=blended.get))
-                    detection_method = "hybrid"
-            else:
-                detection_method = "rule_based"
+        decision = _resolve_regime_decision(
+            rule_raw_regime=rule_raw_regime,
+            hmm_raw_regime=hmm_raw,
+            regime_probs=regime_probs,
+            hmm_confidence=hmm_confidence,
+            engine=engine,
+        )
+        raw_regime = decision.raw_regime
+        detection_method = decision.detection_method
+        regime_probs = decision.regime_probs
+        decision_reason = decision.decision_reason
 
         # --- Smoothing ---
         transition = _get_regime_transition_tracker().apply(
@@ -1310,7 +1347,7 @@ class QuantOrchestrator:
         self.regime = transition.confirmed
 
         # --- Adaptive params (probability-weighted if HMM) ---
-        if regime_probs and detection_method == "hmm":
+        if regime_probs and detection_method in {"hmm", "hybrid"}:
             self.params = adaptive_params(self.regime, probs=regime_probs)
         else:
             self.params = adaptive_params(self.regime)
@@ -1344,6 +1381,7 @@ class QuantOrchestrator:
             detection_method=detection_method,
             hmm_confidence=hmm_confidence,
             hmm_entropy=hmm_entropy,
+            decision_reason=decision_reason,
         )
         return self.market_snapshot
 

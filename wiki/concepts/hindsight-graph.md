@@ -102,5 +102,5 @@ tick() 每帧:
 ## See Also
 
 - [[hindsight-architecture]] — Hindsight 引擎深层架构 + 配置详解
-- [[web-architecture]] — Web 整体架构 + 6 个一级入口
+- [[web-architecture]] — Web 整体架构 + 7 个一级入口
 - [[system-architecture]] — 系统分层 + 关键模块表

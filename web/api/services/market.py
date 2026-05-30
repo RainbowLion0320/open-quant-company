@@ -243,6 +243,7 @@ def regime_payload(snapshot) -> dict:
         "detection_method": getattr(snapshot, "detection_method", "rule_based"),
         "hmm_confidence": round(getattr(snapshot, "hmm_confidence", 0.0), 4),
         "hmm_entropy": round(getattr(snapshot, "hmm_entropy", 0.0), 4),
+        "decision_reason": getattr(snapshot, "decision_reason", ""),
     }
 
 

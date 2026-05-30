@@ -90,6 +90,9 @@ export interface RegimeStability {
   as_of?: string;
 }
 
+export type RegimeDetectionMethod = "rule_based" | "hmm" | "hybrid";
+export type RegimeProbabilityMap = Partial<Record<"bull" | "sideways" | "bear", number>>;
+
 export interface RegimeData {
   value: "bull" | "bear" | "sideways" | "unknown";
   raw_value?: "bull" | "bear" | "sideways" | "unknown";
@@ -100,6 +103,11 @@ export interface RegimeData {
   breadth_detail?: RegimeBreadthDetail;
   score_components?: RegimeScoreComponents;
   stability?: RegimeStability;
+  regime_probs?: RegimeProbabilityMap;
+  detection_method?: RegimeDetectionMethod;
+  hmm_confidence?: number;
+  hmm_entropy?: number;
+  decision_reason?: string;
 }
 
 export interface KlinePoint {
@@ -488,6 +496,47 @@ export interface HindsightGraphResponse {
   stats?: Record<string, any>;
 }
 
+export interface PipelineMetric {
+  label: string;
+  value: string | number;
+  tone?: "neutral" | "accent" | "positive" | "warning" | "negative" | string;
+}
+
+export interface PipelineNode {
+  id: "inputs" | "features" | "rule_score" | "hmm_inference" | "hybrid_decision" | "stability" | "outputs" | string;
+  title: string;
+  subtitle: string;
+  status: "ready" | "fallback" | "warning" | string;
+  metrics: PipelineMetric[];
+  inputs: string[];
+  outputs: string[];
+}
+
+export interface PipelineEdge {
+  source: string;
+  target: string;
+  label?: string;
+}
+
+export interface MarketRegimePipelineResponse {
+  pipeline_key: "market_regime";
+  updated: string;
+  summary: {
+    confirmed_regime: string;
+    raw_regime: string;
+    score: number;
+    engine: string;
+    detection_method: string;
+    decision_reason?: string;
+    confidence: number;
+    entropy: number;
+    adaptive_params?: Record<string, number | string>;
+  };
+  nodes: PipelineNode[];
+  edges: PipelineEdge[];
+  warnings: string[];
+}
+
 function pct(v: unknown): number | undefined {
   if (v == null) return undefined;
   const n = Number(v);
@@ -503,6 +552,7 @@ export const api = {
   // Market
   market: (range = "6M") => get<MarketResponse>(`/api/market?range=${encodeURIComponent(range)}`),
   marketRegime: () => get<RegimeResponse>("/api/market/regime"),
+  marketRegimePipeline: () => get<MarketRegimePipelineResponse>("/api/pipeline/market-regime"),
 
   // Strategies
   strategies: () => get<StrategiesResponse>("/api/strategies"),

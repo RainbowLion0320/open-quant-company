@@ -92,6 +92,7 @@ const nav = [
   { path: "/research", label: "市场研究", pathData: "M3 18l5-5 4 3 7-9M4 6h16M4 21h16M7 11h3m4 7h3" },
   { path: "/strategy-lab", label: "策略实验室", pathData: "M12 3l8 4v10l-8 4-8-4V7l8-4Zm0 4v10M7 9.5l5 2.5 5-2.5M8 17l4-2 4 2" },
   { path: "/portfolio", label: "组合执行", pathData: "M5 7h14v12H5V7Zm3 0V5h8v2M8 13h3m2 0h3M8 16h8" },
+  { path: "/pipeline", label: "流程图", pathData: "M5 5h5v5H5V5Zm9 0h5v5h-5V5ZM5 14h5v5H5v-5Zm9 0h5v5h-5v-5ZM10 7.5h4M7.5 10v4M16.5 10v4M10 16.5h4" },
   { path: "/datahub", label: "数据中台", pathData: "M4 6c0-2 16-2 16 0v12c0 2-16 2-16 0V6Zm0 0c0 2 16 2 16 0M4 12c0 2 16 2 16 0M4 18c0 2 16 2 16 0" },
   { path: "/system", label: "系统控制", pathData: "M4 13h3l2-6 4 12 2-6h5M4 20h16M4 4h16M17 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" },
 ];
@@ -101,6 +102,7 @@ const activeSectionPath = computed(() => {
   if (route.path.startsWith("/research") || route.path.startsWith("/stocks")) return "/research";
   if (route.path.startsWith("/strategy-lab")) return "/strategy-lab";
   if (route.path.startsWith("/portfolio")) return "/portfolio";
+  if (route.path.startsWith("/pipeline")) return "/pipeline";
   if (route.path.startsWith("/datahub")) return "/datahub";
   if (route.path.startsWith("/system")) return "/system";
   return route.path;

@@ -1,7 +1,7 @@
 ---
 title: Web Architecture (Vue 3 + FastAPI)
 created: 2026-05-12
-updated: 2026-05-27
+updated: 2026-05-30
 type: decision
 tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-center, monitor]
 ---
@@ -35,7 +35,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 - Regime 球体：CSS 动画光晕, 评分环形进度
 - 预警面板：多级颜色 (success/warning/danger/info)
 
-## 页面结构 (6 个一级入口)
+## 页面结构 (7 个一级入口)
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
@@ -43,10 +43,15 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 | 市场研究 | `/research` | 二级 tab: 行业雷达 + 个股搜索；行业雷达以行业资金方块矩阵为主视图，`/stocks/:code` 保留为隐藏详情路由 |
 | 策略实验室 | `/strategy-lab` | 二级 tab: 策略中心 + 信号历史 + 回测分析 |
 | 组合执行 | `/portfolio` | ★ PaperBroker 日频模拟: NAV权益曲线 + 持仓 + 交易记录 + 手动下单 |
+| 流程图 | `/pipeline` | 关键参数计算透明度入口；v1 展示 Market Regime 7 节点计算链路 |
 | 数据中台 | `/datahub` | DataRegistry 健康扫描 + 全量大小统计 + 按时间分段 + 单表修复 |
 | 系统控制 | `/system` | 二级 tab: 系统信息 + 系统设置 + Hindsight 记忆图谱 |
 
-旧一级页面 redirect 已移除，避免隐藏入口继续影响导航编排。除 `/stocks/:code` 个股详情外，模块入口以六个一级路由和二级 tab 为准。
+旧一级页面 redirect 已移除，避免隐藏入口继续影响导航编排。除 `/stocks/:code` 个股详情外，模块入口以七个一级路由、二级 tab 和 Pipeline 透明度页为准。
+
+### Pipeline 透明度页 (2026-05-30)
+
+`/pipeline` 首版只展示 Market Regime Calculation Flow。后端 `GET /api/pipeline/market-regime` 复用 `QuantOrchestrator().detect()` 的生产结果，返回 `inputs`、`features`、`rule_score`、`hmm_inference`、`hybrid_decision`、`stability`、`outputs` 七个固定节点和连线。前端使用 CSS grid + inline SVG arrows，不引入 Vue Flow / Mermaid 渲染依赖；节点点击后在右侧展示输入、输出和关键指标。该页面解释关键参数形成过程，不替代 Market 页面。
 
 ### 指挥中心 (2026-05-16 Codex 升级)
 

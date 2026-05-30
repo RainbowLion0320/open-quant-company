@@ -475,7 +475,9 @@ def align_states(result: HMMResult, X: np.ndarray | None = None) -> HMMResult:
     transmat = result.transmat[np.ix_(order, order)]
     startprob = result.startprob[order]
     state_probs = result.state_probs[:, order]
-    viterbi_states = np.array([order[s] for s in result.viterbi_states])
+    old_to_new = np.empty_like(order)
+    old_to_new[order] = np.arange(len(order))
+    viterbi_states = old_to_new[result.viterbi_states]
 
     return HMMResult(
         state_probs=state_probs,

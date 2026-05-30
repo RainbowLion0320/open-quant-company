@@ -1,10 +1,10 @@
 # Spec: Web 平台 (Web Platform)
 
-> 版本: 2.2 | 更新: 2026-05-29 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
+> 版本: 2.3 | 更新: 2026-05-30 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
-Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 实时推送。一级导航收敛为市场总览、市场研究、策略实验室、组合执行、数据中台、系统控制；原子功能通过二级 tab 访问。
+Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 实时推送。一级导航收敛为市场总览、市场研究、策略实验室、组合执行、流程图、数据中台、系统控制；原子功能通过二级 tab 或关键参数 Pipeline 访问。
 
 **设计原则：**
 - **前后端分离** — Vue 3 (Vite) + FastAPI，独立开发/部署
@@ -19,13 +19,13 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 │              web/frontend/ (Vue 3 + Vite)             │
 │   Pinia Store → Components → ECharts + Tailwind       │
 │   Router: market / research / strategy-lab             │
-│           portfolio / datahub / system                 │
+│           portfolio / pipeline / datahub / system      │
 └──────────────────────┬──────────────────────────────┘
                        │ HTTP REST + WebSocket
 ┌──────────────────────▼──────────────────────────────┐
 │              web/api/ (FastAPI)                        │
 │   create_app() → CORS → Router → Error Handler        │
-│   routes/ (10 domain modules) + ws.py + jobs.py        │
+│   routes/ (11 domain modules) + ws.py + jobs.py        │
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
@@ -39,7 +39,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 
 **技术栈：** Vue 3 (Composition API) + ECharts (图表) + Tailwind CSS (样式) + Vite (构建)
 
-**一级导航 (6 个入口):**
+**一级导航 (7 个入口):**
 
 | 路由 | 页面 | 功能 |
 |------|------|------|
@@ -47,10 +47,11 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | `/research` | 市场研究 | 二级 tab: 行业雷达、个股搜索；行业雷达以行业资金方块矩阵为主视图，个股详情仍使用隐藏路由 `/stocks/:code` |
 | `/strategy-lab` | 策略实验室 | 二级 tab: 策略目录、信号历史、回测证据 |
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
+| `/pipeline` | 流程图 | 关键参数计算透明度入口；v1 展示 Market Regime 7 节点计算链路 |
 | `/datahub` | 数据中台 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
 | `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、记忆图谱 |
 
-旧一级页面 redirect 已移除。除 `/stocks/:code` 个股详情隐藏路由外，用户应通过六个一级模块和二级 tab 访问原子功能。
+旧一级页面 redirect 已移除。除 `/stocks/:code` 个股详情隐藏路由外，用户应通过七个一级模块、二级 tab 和 Pipeline 透明度页访问原子功能。
 
 **市场总览 Regime 面板契约：**
 
@@ -73,11 +74,18 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 - 候选策略动作标记为“研究扫描”，前端调用 `POST /api/strategies/run` 时使用 `mode=research`；生产策略和“运行生产策略”使用 `mode=production`。
 - `GET /api/strategies/evaluation` 返回强基准和候选晋级证据要求，回测证据 tab 用于承接后续 artifact 下钻。
 
+**Pipeline 页面契约：**
+
+- `/pipeline` 是一级页面，不归入 Market 或 System 的二级 tab。
+- v1 只展示 `market_regime` 关键参数计算链路：`inputs`、`features`、`rule_score`、`hmm_inference`、`hybrid_decision`、`stability`、`outputs` 七个固定节点。
+- 前端不引入新图形库，使用 Vue + CSS grid + inline SVG arrows；节点可点击，右侧详情面板展示节点输入、输出和关键指标。
+- Pipeline 页面用于解释关键参数如何形成，不替代市场总览页面的行情、宏观和热门行业展示。
+
 ### 2.2 后端架构 (FastAPI)
 
 **应用工厂：** `web/api/__init__.py` → `create_app()` → 注册路由 + CORS + 异常处理
 
-**10 个业务路由模块 + Auth/WS/Jobs：**
+**11 个业务路由模块 + Auth/WS/Jobs：**
 
 | 模块 | 文件 | 端点 |
 |------|------|------|
@@ -88,10 +96,24 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Backtest | `routes/backtest.py` | `GET /backtest`, `GET /backtest/{key}` |
 | Portfolio | `routes/portfolio.py` | `GET /portfolio/positions`, `GET /portfolio/balance`, `POST /portfolio/order` |
 | Sectors | `routes/sectors.py` | `GET /sectors/overview`, `GET /sectors/exposure`, `GET /sectors/{industry}` |
+| Pipeline | `routes/pipeline.py` | `GET /pipeline/market-regime` |
 | Settings | `routes/settings.py` | `GET /settings`, `PUT /settings` |
 | System | `routes/system.py` | `GET /system/monitor`, `GET /system/history`, `GET /system/api-health`, `GET /system/cron-jobs`, `GET /system/service-status`, `GET /system/audit`, `GET /system/mode` |
 | Hindsight | `routes/hindsight.py` | `GET /hindsight/graph` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
+
+**Pipeline API 契约：**
+
+`GET /api/pipeline/market-regime` 返回稳定 JSON：
+
+- `pipeline_key: "market_regime"`
+- `updated`
+- `summary`: confirmed/raw regime、score、engine、detection_method、confidence、entropy、adaptive_params
+- `nodes`: 固定 7 节点数组
+- `edges`: 节点连线数组，source/target 必须引用有效 node id
+- `warnings`: HMM 模型缺失、fallback、样本不足等提示
+
+服务端复用 `QuantOrchestrator().detect()` 输出的 `score_components`、`breadth_detail`、`regime_probs`、`detection_method` 和 HMM `meta.json`，不得在 API 层重写 Market Regime 计算公式。
 
 **WebSocket：** `ws.py` → `/ws/{job_id}` — 任务进度实时推送。`broadcast_progress()` 使用 `list()` 拍平连接集合避免并发修改异常。
 

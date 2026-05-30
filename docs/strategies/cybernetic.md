@@ -38,9 +38,9 @@
 
 ## Regime 研究训练
 
-Market Regime 公式采用 champion/challenger 研究机制。当前生产 champion 是 V3 验证后的 `w0611`：trend/breadth/risk/volume = 30/30/30/10，bull/bear 阈值 = 60/40，`min_dwell=3`。`scripts/train_market_regime.py` 会离线搜索 challenger，并用历史回放、未来标签、walk-forward、组件消融和策略 A/B 判断是否值得人工审查。
+Market Regime 采用 Hybrid 生产链路：规则评分和 Student-t HMM 并行运行，规则评分继续提供 `regime_score` 和可解释组件，HMM 提供 bull/sideways/bear 概率、confidence 和 entropy。规则评分基线来自 V3 验证后的 `w0611`：trend/breadth/risk/volume = 30/30/30/10，bull/bear 阈值 = 60/40，`min_dwell=3`。`scripts/train_market_regime.py` 会离线搜索 challenger，并用历史回放、未来标签、walk-forward、组件消融和策略 A/B 判断是否值得人工审查。
 
-生产实时链路不再直接把单次 raw 分类暴露给组合参数，而是通过 `cybernetics/regime_state.py` 做 confirmed regime 稳定确认。状态保存在 DataHub cache 的 `runtime/market_regime_state.json`，Web payload 同时返回 `value`（confirmed）、`raw_value` 和 `stability`，便于审查是否处于等待确认阶段。dwell 计数按唯一市场观测日期推进，同一交易日重复刷新不会提前确认切换。
+Hybrid 决策规则为：规则/HMM 一致时使用 HMM 概率；不一致但 `hmm_confidence >= 0.80` 时采用 HMM；不一致且低置信时使用 blended vote。生产实时链路不直接把单次 raw 分类暴露给组合参数，而是通过 `cybernetics/regime_state.py` 做 confirmed regime 稳定确认。状态保存在 DataHub cache 的 `runtime/market_regime_state.json`，Web payload 同时返回 `value`（confirmed）、`raw_value`、`regime_probs`、`detection_method` 和 `stability`，便于审查是否处于等待确认阶段。dwell 计数按唯一市场观测日期推进，同一交易日重复刷新不会提前确认切换。
 
 运行报告存放在 `reports/regime_training/`。优先查看：
 

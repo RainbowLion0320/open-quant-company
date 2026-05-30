@@ -1,7 +1,7 @@
 ---
 title: System Architecture (系统架构总览)
 created: 2026-05-12
-updated: 2026-05-23
+updated: 2026-05-30
 type: concept
 tags: [architecture, system-overview, extensibility, strategy-registry, ML, Factor-DSL, PIT, LightGBM, LLM]
 ---
@@ -42,7 +42,8 @@ LLM Research → 自动化R&D      Circuit Breaker → -15%熔断  Self-healing 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  Web Dashboard (port 8501)                               │
-│  Vue 3 + Pinia + ECharts + Tailwind — 星盘终端   │
+│  Vue 3 + Pinia + ECharts + Tailwind — 星盘终端           │
+│  /pipeline 关键参数计算透明度页                           │
 ├──────────────────────────────────────────────────────────┤
 │  FastAPI Backend                                         │
 │  routes + WebSocket + async jobs + DuckDB :memory: views │
