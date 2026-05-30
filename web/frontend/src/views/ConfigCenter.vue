@@ -28,6 +28,8 @@
             <div class="field-info">
               <span class="field-label">{{ field.label }}</span>
               <span class="field-type" :class="`type-${field.type}`">{{ field.type }}</span>
+            </div>
+            <div class="field-hints">
               <span class="field-range" v-if="field.min !== undefined || field.max !== undefined">
                 {{ field.min ?? '—' }} ~ {{ field.max ?? '—' }}
               </span>
@@ -323,6 +325,12 @@ onMounted(async () => {
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
+}
+.field-hints {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 .field-type {
   font-size: 9px;
