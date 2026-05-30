@@ -416,6 +416,14 @@ onMounted(async () => {
 .field-input:focus {
   border-color: var(--accent, #6366f1);
 }
+.field-input::-webkit-inner-spin-button,
+.field-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.field-input[type="number"] {
+  -moz-appearance: textfield;
+}
 .field-range {
   font-size: 10px;
   color: var(--text-disabled);
