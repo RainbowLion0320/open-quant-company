@@ -66,6 +66,8 @@ class BondAsset(AssetAdapter):
     DATA_SOURCE: str = "proxy"
     DATA_SOURCE_DETAIL: str = "国债收益率 → 合成价格 (-duration * yield_change); 可转债为实时快照"
     TRADING_CALENDAR: str = "SSE"
+    TRADABLE: bool = False  # treasury yield proxy not directly tradable; convertibles are
+    RESEARCH_READY: bool = True
 
     # Per-symbol source classification
     _PROXY_SYMBOLS = {"CN2Y", "CN5Y", "CN10Y", "CN30Y"}  # yield-based proxy

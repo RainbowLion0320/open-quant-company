@@ -278,6 +278,22 @@ class StrategyEvidenceDetailResponse(BaseModel):
     artifact: Dict[str, Any] = {}
     parse_error: Optional[str] = None
 
+# ── 资产概览 ──
+
+class AssetOverviewItem(BaseModel):
+    asset_type: str
+    label: str
+    enabled: bool = True
+    data_source: str = "unknown"
+    data_source_detail: str = ""
+    research_ready: bool = False
+    tradable: bool = False
+    universe_size: int = 0
+
+class AssetOverviewResponse(BaseModel):
+    items: List[AssetOverviewItem] = []
+    total: int = 0
+
 # ── 通用 ──
 
 class ErrorResponse(BaseModel):

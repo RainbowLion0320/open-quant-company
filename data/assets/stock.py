@@ -27,6 +27,8 @@ class StockAsset(AssetAdapter):
     DATA_SOURCE = "real"
     DATA_SOURCE_DETAIL = "AKShare + Tushare OHLCV (新浪/东方财富/腾讯3源fallback)"
     TRADING_CALENDAR = "SSE"
+    TRADABLE = True
+    RESEARCH_READY = True
 
     def fetch_daily(
         self,

@@ -566,6 +566,9 @@ export const api = {
   strategyRun: (strategy: string, limit = 0, params?: any, mode: "production" | "research" = "production") =>
     post<RunResponse>("/api/strategies/run", { strategy, limit, params, mode }),
 
+  // Assets
+  assetsOverview: () => get<{ items: any[]; total: number }>("/api/assets/overview"),
+
   // Backtest
   backtest: () => get<BacktestOverview>("/api/backtest"),
   backtestDetail: (key: string) => get<BacktestDetail>(`/api/backtest/${key}`),

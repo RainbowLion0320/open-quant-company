@@ -65,6 +65,8 @@ class FuturesAsset(AssetAdapter):
     DATA_SOURCE_DETAIL: str = "AKShare futures_main_sina (主力连续合约, 日频)"
     TRADING_CALENDAR: str = "CFFEX/SHFE/DCE"
     ROLLOVER_RULE: str = "continuous_main"
+    TRADABLE: bool = False  # data available but not yet integrated with broker/exchange
+    RESEARCH_READY: bool = True
     # Contract multipliers for margin and PnL calculation
     CONTRACT_MULTIPLIER: float = 1.0  # per-symbol; use get_metadata() for specific
     _MULTIPLIERS: dict = {

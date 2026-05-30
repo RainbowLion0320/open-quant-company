@@ -43,6 +43,8 @@ class AssetAdapter(ABC):
     CONTRACT_MULTIPLIER: float = 1.0
     ROLLOVER_RULE: str = ""            # continuous_main | expiry_based
     FX_PAIR: str = ""                  # USD/CNY for cross-border assets
+    TRADABLE: bool = False             # Whether broker/exchange supports this asset
+    RESEARCH_READY: bool = False       # Whether data quality is sufficient for research
 
     def __init__(self, store_root: Path | str | None = None):
         """
@@ -91,7 +93,11 @@ class AssetAdapter(ABC):
         """Return data provenance info: real/proxy/placeholder + detail + asset metadata.
         Subclasses with per-symbol variation can override with symbol-dependent logic."""
         return {
+            "asset_type": self.asset_type,
             "data_source": self.DATA_SOURCE,
+            "data_source_detail": self.DATA_SOURCE_DETAIL,
+            "tradable": self.TRADABLE,
+            "research_ready": self.RESEARCH_READY,
             "detail": self.DATA_SOURCE_DETAIL,
             "currency": self.CURRENCY,
             "multiplier": self.CONTRACT_MULTIPLIER,

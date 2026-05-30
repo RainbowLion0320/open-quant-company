@@ -35,6 +35,8 @@ class CryptoAsset(AssetAdapter):
     DATA_SOURCE_DETAIL: str = "CCXT integration pending; fetch_daily returns None"
     TRADING_CALENDAR: str = "24x7"
     CURRENCY: str = "USDT"
+    TRADABLE: bool = False
+    RESEARCH_READY: bool = False
 
     def __init__(self, store_root: Path):
         super().__init__(store_root)
