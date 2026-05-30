@@ -61,8 +61,14 @@
         </div>
         <div class="index-chart-shell">
           <div v-if="relativeChart.lines.length" class="index-legend">
-            <span v-for="line in relativeChart.lines" :key="line.key">
+            <span v-for="line in relativeChart.lines" :key="line.key" class="legend-item">
               <i :style="{ background: line.color }"></i>{{ line.label }}
+              <em
+                v-if="line.data_source && line.data_source !== 'real'"
+                class="source-badge"
+                :class="`source-${line.data_source}`"
+                :title="line.source_detail || line.data_source"
+              >{{ line.data_source === 'proxy' ? 'PROXY' : line.data_source === 'placeholder' ? 'N/A' : line.data_source }}</em>
             </span>
           </div>
           <div v-if="relativeChart.lines.length" class="chart-y-labels" aria-hidden="true">
@@ -236,6 +242,8 @@ interface RelativeLine {
   color: string;
   change: number;
   data: Array<number | null>;
+  data_source?: string;
+  source_detail?: string;
 }
 
 const relativeChart = computed(() => {
@@ -260,6 +268,8 @@ const relativeChart = computed(() => {
       color: indexColors[asset.key] || "#7dd3fc",
       change: finite.length ? finite[finite.length - 1] : 0,
       data,
+      data_source: asset.data_source,
+      source_detail: asset.source_detail,
     };
   }).filter(line => line.data.some(v => v != null));
   return { dates, lines };
@@ -942,6 +952,25 @@ onUnmounted(() => {
   width: 10px;
   height: 3px;
   border-radius: 999px;
+}
+.source-badge {
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 14px;
+}
+.source-proxy {
+  background: rgba(234, 179, 8, 0.15);
+  color: #fbbf24;
+}
+.source-placeholder,
+.source-missing {
+  background: rgba(120, 120, 120, 0.15);
+  color: #888;
 }
 .chart-grid line {
   stroke: rgba(125, 211, 252, 0.06);
