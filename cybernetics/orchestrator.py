@@ -1267,23 +1267,30 @@ class QuantOrchestrator:
                 detection_method = "rule_based"
 
         elif engine == "hybrid":
-            # Hybrid: run both, take consensus
+            # Hybrid: run both, consensus based on HMM confidence
             if regime_probs and hmm_raw is not None:
                 if hmm_raw == rule_raw_regime:
                     # Agreement: use HMM probabilities directly
                     raw_regime = hmm_raw
                     detection_method = "hmm"
+                elif hmm_confidence >= 0.80:
+                    # HMM highly confident despite disagreement → trust HMM
+                    raw_regime = hmm_raw
+                    detection_method = "hmm"
                 else:
-                    # Disagreement: blend probabilities with rule-based vote
-                    # Rule gets a "virtual vote" weight of 0.4, HMM keeps its probs
-                    rule_vote = 0.4
-                    hmm_weight = 1.0 - rule_vote
+                    # HMM uncertain + disagreement → blend with rule vote
+                    # Rule weight scales inversely with HMM confidence:
+                    #   confidence=0.80 → rule_weight=0.20
+                    #   confidence=0.50 → rule_weight=0.40
+                    #   confidence=0.33 → rule_weight=0.50 (max)
+                    rule_weight = min(0.50, max(0.20, 1.0 - hmm_confidence))
+                    hmm_weight = 1.0 - rule_weight
                     blended = {
                         "bull": regime_probs.get("bull", 0) * hmm_weight,
                         "sideways": regime_probs.get("sideways", 0) * hmm_weight,
                         "bear": regime_probs.get("bear", 0) * hmm_weight,
                     }
-                    blended[rule_raw_regime.value] = blended.get(rule_raw_regime.value, 0) + rule_vote
+                    blended[rule_raw_regime.value] = blended.get(rule_raw_regime.value, 0) + rule_weight
                     # Normalize
                     total = sum(blended.values())
                     if total > 0:
