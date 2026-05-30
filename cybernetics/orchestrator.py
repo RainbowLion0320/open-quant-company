@@ -1285,7 +1285,7 @@ class QuantOrchestrator:
         from data.fetcher import get_index_daily
 
         index_frames: Dict[str, Any] = {}
-        for symbol, _label, _weight in _REGIME_INDEXES:
+        for symbol, _label, _weight in _regime_indexes():
             try:
                 index_frames[symbol] = get_index_daily(symbol, force_refresh=False)
             except Exception:
