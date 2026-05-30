@@ -67,10 +67,6 @@
                 @input="setFieldValue(field.key, parseFloat(($event.target as HTMLInputElement).value))"
               />
             </div>
-            <p class="field-desc" v-if="field.description">{{ field.description }}</p>
-            <p class="field-range" v-if="field.min !== undefined || field.max !== undefined">
-              范围: {{ field.min ?? '—' }} ~ {{ field.max ?? '—' }}
-            </p>
           </div>
         </div>
 
