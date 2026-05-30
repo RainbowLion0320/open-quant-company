@@ -355,7 +355,7 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 .field-input {
-  width: 140px;
+  width: 70px;
   padding: 5px 10px;
   border: 1px solid var(--border, #444);
   border-radius: 5px;
