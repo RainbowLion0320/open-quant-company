@@ -8,6 +8,7 @@ from astrolabe_cli.commands.config import validate_config
 from astrolabe_cli.commands.backtest import check as backtest_check
 from astrolabe_cli.commands.backtest import run_backtest
 from astrolabe_cli.commands.data import repair as data_repair
+from astrolabe_cli.commands.execution import dry_run as execution_dry_run
 from astrolabe_cli.commands.data import status as data_status
 from astrolabe_cli.commands.docs import check_docs
 from astrolabe_cli.commands.health import run_health
@@ -105,6 +106,12 @@ def build_parser() -> argparse.ArgumentParser:
     backtest_check_cmd = backtest_sub.add_parser("check", help="Run backtest quality checks")
     add_common_flags(backtest_check_cmd)
     backtest_check_cmd.set_defaults(handler=lambda args: backtest_check())
+
+    execution = sub.add_parser("execution", help="Paper execution operations")
+    execution_sub = execution.add_subparsers(dest="execution_command", required=True)
+    execution_dry_run_cmd = execution_sub.add_parser("dry-run", help="Dry-run paper execution")
+    add_common_flags(execution_dry_run_cmd)
+    execution_dry_run_cmd.set_defaults(handler=lambda args: execution_dry_run())
 
     docs = sub.add_parser("docs", help="Check documentation hygiene")
     docs_sub = docs.add_subparsers(dest="docs_command", required=True)
