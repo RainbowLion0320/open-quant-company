@@ -38,6 +38,7 @@
               </span>
             </div>
             <div class="field-input-wrap">
+              <!-- string: text input only -->
               <input
                 v-if="field.type === 'string'"
                 type="text"
@@ -46,27 +47,36 @@
                 :placeholder="String(field.default ?? '')"
                 @input="setFieldValue(field.key, ($event.target as HTMLInputElement).value)"
               />
-              <input
-                v-else-if="field.type === 'int'"
-                type="number"
-                step="1"
-                class="field-input"
-                :value="getFieldValue(field.key)"
-                :min="field.min"
-                :max="field.max"
-                :placeholder="String(field.default ?? '')"
-                @input="setFieldValue(field.key, parseInt(($event.target as HTMLInputElement).value))"
-              />
+              <!-- int/float with range: slider + input -->
+              <template v-else-if="field.min !== undefined && field.max !== undefined">
+                <input
+                  type="range"
+                  class="field-slider"
+                  :min="field.min"
+                  :max="field.max"
+                  :step="field.type === 'int' ? 1 : (field.max - field.min) / 100"
+                  :value="getFieldValue(field.key) ?? field.default ?? 0"
+                  @input="onSliderInput(field, $event)"
+                />
+                <input
+                  type="number"
+                  class="field-input field-input-small"
+                  :step="field.type === 'int' ? 1 : 'any'"
+                  :value="getFieldValue(field.key)"
+                  :min="field.min"
+                  :max="field.max"
+                  @input="setFieldValue(field.key, field.type === 'int' ? parseInt(($event.target as HTMLInputElement).value) : parseFloat(($event.target as HTMLInputElement).value))"
+                />
+              </template>
+              <!-- int/float without range: input only -->
               <input
                 v-else
                 type="number"
-                step="any"
-                class="field-input"
+                class="field-input field-input-small"
+                :step="field.type === 'int' ? 1 : 'any'"
                 :value="getFieldValue(field.key)"
-                :min="field.min"
-                :max="field.max"
                 :placeholder="String(field.default ?? '')"
-                @input="setFieldValue(field.key, parseFloat(($event.target as HTMLInputElement).value))"
+                @input="setFieldValue(field.key, field.type === 'int' ? parseInt(($event.target as HTMLInputElement).value) : parseFloat(($event.target as HTMLInputElement).value))"
               />
             </div>
           </div>
@@ -164,6 +174,12 @@ function setFieldValue(fieldKey: string, value: any) {
     obj = obj[parts[i]];
   }
   obj[parts[parts.length - 1]] = value;
+}
+
+function onSliderInput(field: FieldSchema, event: Event) {
+  const raw = parseFloat((event.target as HTMLInputElement).value);
+  const value = field.type === "int" ? Math.round(raw) : parseFloat(raw.toFixed(6));
+  setFieldValue(field.key, value);
 }
 
 function resetSection() {
@@ -352,11 +368,41 @@ onMounted(async () => {
   color: #fbbf24;
 }
 .field-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
+}
+.field-slider {
+  width: 120px;
+  height: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(125, 211, 252, 0.15);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.field-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent, #6366f1);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.4);
+}
+.field-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent, #6366f1);
+  cursor: pointer;
 }
 .field-input {
   width: 70px;
-  padding: 5px 10px;
+  padding: 5px 8px;
   border: 1px solid var(--border, #444);
   border-radius: 5px;
   background: rgba(0, 0, 0, 0.2);
