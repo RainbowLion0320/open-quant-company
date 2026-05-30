@@ -26,8 +26,8 @@
         <div class="field-grid">
           <div v-for="field in currentSection.fields" :key="field.key" class="field-card">
             <div class="field-info">
-              <span class="field-label">{{ field.label }}</span>
               <span class="field-type" :class="`type-${field.type}`">{{ field.type }}</span>
+              <span class="field-label">{{ field.label }}</span>
             </div>
             <div class="field-hints">
               <span class="field-range" v-if="field.min !== undefined || field.max !== undefined">
