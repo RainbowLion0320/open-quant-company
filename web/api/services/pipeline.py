@@ -220,3 +220,203 @@ def build_market_regime_pipeline() -> dict[str, object]:
         "edges": edges,
         "warnings": warnings,
     }
+
+
+def build_data_quality_pipeline() -> dict[str, object]:
+    """Build Data Quality pipeline payload."""
+    from data.data_registry import get_registry
+
+    reg = get_registry()
+    dims = reg.get_enabled() if hasattr(reg, "get_enabled") else []
+    dim_count = len(dims) if dims else 0
+
+    # Try to get freshness gate result
+    gate_ok = True
+    stale_count = 0
+    try:
+        from astrolabe_cli.commands.data import freshness_gate
+        gate_data = [{"table": d.get("name", ""), "status": "ok"} for d in (dims or [])]
+        gate = freshness_gate(gate_data)
+        gate_ok = gate.get("ok", True)
+        stale_count = len(gate.get("stale", []))
+    except Exception:
+        pass
+
+    warnings = []
+    if stale_count > 0:
+        warnings.append(f"{stale_count} dimensions have stale data")
+    if dim_count == 0:
+        warnings.append("No enabled dimensions found in registry")
+
+    nodes = [
+        _node("registry", "Registry Dimensions", f"{dim_count} enabled dimensions",
+              metrics=[_metric("Dimensions", dim_count, "accent")],
+              inputs=["settings.yaml → data_registry"],
+              outputs=["Dimension list"]),
+        _node("cache", "Cache Discovery", "Parquet files on disk",
+              metrics=[_metric("Status", "ready" if dim_count > 0 else "empty")],
+              inputs=["Dimension list"],
+              outputs=["Cache paths", "File sizes"]),
+        _node("manifest", "Manifest Audit", "Per-dimension freshness timestamps",
+              metrics=[_metric("Audited", dim_count)],
+              inputs=["Cache paths"],
+              outputs=["Freshness timestamps"]),
+        _node("freshness", "Freshness Gate", "Stale/missing detection",
+              status="ok" if gate_ok else "warning",
+              metrics=[_metric("Gate", "PASS" if gate_ok else "FAIL", "positive" if gate_ok else "negative"),
+                       _metric("Stale", stale_count, "negative" if stale_count > 0 else "neutral")],
+              inputs=["Freshness timestamps"],
+              outputs=["Gate result"]),
+        _node("repair", "Repair Actions", "Auto/manual repair dispatch",
+              metrics=[_metric("Auto-repairable", "per policy")],
+              inputs=["Gate result"],
+              outputs=["Repair actions"]),
+        _node("downstream", "Downstream Readiness", "Consumer availability",
+              metrics=[_metric("Ready", "signals, backtest, web")],
+              inputs=["Gate result", "Repair actions"],
+              outputs=["Readiness report"]),
+    ]
+    edges = [
+        _edge("registry", "cache"),
+        _edge("cache", "manifest"),
+        _edge("manifest", "freshness"),
+        _edge("freshness", "repair"),
+        _edge("freshness", "downstream"),
+        _edge("repair", "downstream"),
+    ]
+    return {
+        "pipeline_key": "data_quality",
+        "updated": datetime.now().isoformat(timespec="seconds"),
+        "summary": {"dimensions": dim_count, "gate_ok": gate_ok, "stale_count": stale_count},
+        "nodes": nodes,
+        "edges": edges,
+        "warnings": warnings,
+    }
+
+
+def build_strategy_evidence_pipeline() -> dict[str, object]:
+    """Build Strategy Evidence pipeline payload."""
+    from research.strategy_evaluation import list_evidence_artifacts
+
+    artifacts = list_evidence_artifacts()
+    total = len(artifacts)
+    promoted = sum(1 for a in artifacts if a.get("promotion_decision") == "passed")
+    blocked = sum(1 for a in artifacts if a.get("promotion_decision") == "blocked")
+    missing = sum(1 for a in artifacts if not a.get("exists"))
+
+    warnings = []
+    if missing > 0:
+        warnings.append(f"{missing} strategies have no evidence artifact")
+
+    nodes = [
+        _node("catalog", "Strategy Catalog", f"{total} strategies registered",
+              metrics=[_metric("Total", total, "accent")],
+              inputs=["config/settings.yaml → strategies"],
+              outputs=["Strategy list"]),
+        _node("scan", "Research Scan", "Candidate strategy evaluation",
+              metrics=[_metric("With evidence", total - missing)],
+              inputs=["Strategy list"],
+              outputs=["Evidence artifacts"]),
+        _node("tournament", "Backtest Tournament", "Multi-strategy comparison",
+              metrics=[_metric("Promoted", promoted, "positive"),
+                       _metric("Blocked", blocked, "negative")],
+              inputs=["Evidence artifacts"],
+              outputs=["Tournament results"]),
+        _node("baseline", "Baseline Comparison", "vs buy_and_hold, fixed_weight, etc.",
+              metrics=[_metric("Baselines", 6)],
+              inputs=["Tournament results"],
+              outputs=["Baseline win rates"]),
+        _node("oos", "OOS & Cost Diagnostics", "Out-of-sample validation + cost model",
+              metrics=[_metric("OOS months", "varies")],
+              inputs=["Tournament results"],
+              outputs=["OOS metrics", "Cost-adjusted returns"]),
+        _node("promotion", "Promotion Decision", "Governance gate evaluation",
+              metrics=[_metric("Ready", promoted, "positive"),
+                       _metric("Blocked", blocked, "negative")],
+              inputs=["Baseline win rates", "OOS metrics"],
+              outputs=["Promotion decision"]),
+    ]
+    edges = [
+        _edge("catalog", "scan"),
+        _edge("scan", "tournament"),
+        _edge("tournament", "baseline"),
+        _edge("tournament", "oos"),
+        _edge("baseline", "promotion"),
+        _edge("oos", "promotion"),
+    ]
+    return {
+        "pipeline_key": "strategy_evidence",
+        "updated": datetime.now().isoformat(timespec="seconds"),
+        "summary": {"total": total, "promoted": promoted, "blocked": blocked, "missing": missing},
+        "nodes": nodes,
+        "edges": edges,
+        "warnings": warnings,
+    }
+
+
+def build_portfolio_execution_pipeline() -> dict[str, object]:
+    """Build Portfolio Execution pipeline payload."""
+    warnings = []
+
+    nodes = [
+        _node("signals", "Signals", "Strategy signal aggregation",
+              metrics=[_metric("Source", "compute_signals.py")],
+              inputs=["Strategy signals"],
+              outputs=["Buy/sell signals"]),
+        _node("regime", "Regime Overlay", "Market regime risk adjustment",
+              metrics=[_metric("Source", "orchestrator.detect()")],
+              inputs=["Buy/sell signals", "Market regime"],
+              outputs=["Risk-adjusted signals"]),
+        _node("allocation", "Asset Allocation", "Multi-asset weight distribution",
+              metrics=[_metric("Assets", "stock, ETF, bond, futures")],
+              inputs=["Risk-adjusted signals"],
+              outputs=["Target weights"]),
+        _node("risk", "Risk Checks", "Position limits, concentration, drawdown",
+              metrics=[_metric("Checks", "single-name cap, total exposure, stop-loss")],
+              inputs=["Target weights"],
+              outputs=["Approved orders", "Risk rejections"]),
+        _node("paper", "Paper Order Simulation", "Simulated execution with costs",
+              metrics=[_metric("Mode", "paper")],
+              inputs=["Approved orders"],
+              outputs=["Filled orders", "Cash impact"]),
+        _node("persist", "Persistence & Audit", "Ledger + run record",
+              metrics=[_metric("Store", "data/store/ledger/")],
+              inputs=["Filled orders", "Cash impact"],
+              outputs=["Run ledger", "Audit trail"]),
+    ]
+    edges = [
+        _edge("signals", "regime"),
+        _edge("regime", "allocation"),
+        _edge("allocation", "risk"),
+        _edge("risk", "paper"),
+        _edge("paper", "persist"),
+    ]
+    return {
+        "pipeline_key": "portfolio_execution",
+        "updated": datetime.now().isoformat(timespec="seconds"),
+        "summary": {"mode": "paper"},
+        "nodes": nodes,
+        "edges": edges,
+        "warnings": warnings,
+    }
+
+
+PIPELINE_REGISTRY = {
+    "market_regime": {"label": "Market Regime", "builder": build_market_regime_pipeline},
+    "data_quality": {"label": "Data Quality", "builder": build_data_quality_pipeline},
+    "strategy_evidence": {"label": "Strategy Evidence", "builder": build_strategy_evidence_pipeline},
+    "portfolio_execution": {"label": "Portfolio Execution", "builder": build_portfolio_execution_pipeline},
+}
+
+
+def list_pipelines() -> list[dict]:
+    """Return the list of available pipelines."""
+    return [{"key": k, "label": v["label"], "status": "available"} for k, v in PIPELINE_REGISTRY.items()]
+
+
+def build_pipeline(key: str) -> dict[str, object] | None:
+    """Build a pipeline by key."""
+    entry = PIPELINE_REGISTRY.get(key)
+    if not entry:
+        return None
+    return entry["builder"]()

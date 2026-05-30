@@ -3,9 +3,20 @@
     <section class="pipeline-header glass-card">
       <div>
         <span class="eyebrow">Pipeline</span>
-        <h1>Market Regime Calculation Flow</h1>
+        <h1>{{ currentLabel }}</h1>
       </div>
-      <div class="pipeline-meta" v-if="payload">
+      <div class="pipeline-selector" v-if="pipelines.length > 1">
+        <button
+          v-for="p in pipelines"
+          :key="p.key"
+          class="selector-btn"
+          :class="{ active: activeKey === p.key }"
+          @click="switchPipeline(p.key)"
+        >
+          {{ p.label }}
+        </button>
+      </div>
+      <div class="pipeline-meta" v-if="payload && activeKey === 'market_regime'">
         <span :class="regimeClass(payload.summary.confirmed_regime)">{{ payload.summary.confirmed_regime }}</span>
         <strong>{{ scoreText }}</strong>
         <em>{{ payload.summary.detection_method }}</em>
@@ -109,10 +120,17 @@
 import { computed, onMounted, ref } from "vue";
 import { api, type MarketRegimePipelineResponse, type PipelineNode } from "../api";
 
-const payload = ref<MarketRegimePipelineResponse | null>(null);
+const payload = ref<any | null>(null);
 const selectedNodeId = ref("inputs");
 const loading = ref(true);
 const error = ref("");
+const pipelines = ref<{ key: string; label: string; status: string }[]>([]);
+const activeKey = ref("market_regime");
+
+const currentLabel = computed(() => {
+  const p = pipelines.value.find((p) => p.key === activeKey.value);
+  return p ? `${p.label} Pipeline` : "Pipeline";
+});
 
 const selectedNode = computed<PipelineNode | null>(() => {
   const nodes = payload.value?.nodes || [];
@@ -136,7 +154,7 @@ const outputItems = computed(() => {
 });
 
 const adaptiveItems = computed(() => {
-  const params = payload.value?.summary.adaptive_params || {};
+  const params = (payload.value?.summary?.adaptive_params || {}) as Record<string, string | number>;
   return Object.entries(params)
     .filter(([key]) => ["position_size", "max_positions", "stop_loss", "confidence_threshold"].includes(key))
     .map(([key, value]) => ({ label: paramLabel(key), value: formatParam(key, value) }));
@@ -176,10 +194,10 @@ async function loadPipeline() {
   loading.value = true;
   error.value = "";
   try {
-    const data = await api.marketRegimePipeline();
+    const data = await api.pipelineShow(activeKey.value);
     payload.value = data;
-    if (!data.nodes.some((node) => node.id === selectedNodeId.value)) {
-      selectedNodeId.value = data.nodes[0]?.id || "inputs";
+    if (!data.nodes.some((node: any) => node.id === selectedNodeId.value)) {
+      selectedNodeId.value = data.nodes[0]?.id || "";
     }
   } catch (err: any) {
     error.value = err?.message || "Pipeline 加载失败";
@@ -188,7 +206,21 @@ async function loadPipeline() {
   }
 }
 
-onMounted(loadPipeline);
+function switchPipeline(key: string) {
+  activeKey.value = key;
+  selectedNodeId.value = "";
+  loadPipeline();
+}
+
+onMounted(async () => {
+  try {
+    const data = await api.pipelineList();
+    pipelines.value = data.items || [];
+  } catch {
+    pipelines.value = [{ key: "market_regime", label: "Market Regime", status: "available" }];
+  }
+  loadPipeline();
+});
 </script>
 
 <style scoped>
@@ -492,6 +524,30 @@ onMounted(loadPipeline);
   place-items: center;
   color: var(--text-tertiary);
   font-size: 12px;
+}
+.pipeline-selector {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.selector-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #888);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.selector-btn:hover {
+  background: var(--bg-hover, rgba(255,255,255,0.04));
+}
+.selector-btn.active {
+  background: var(--accent-bg, rgba(99,102,241,0.15));
+  border-color: var(--accent, #6366f1);
+  color: var(--accent, #6366f1);
+  font-weight: 600;
 }
 
 @media (max-width: 1180px) {
