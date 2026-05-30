@@ -5,6 +5,7 @@ import sys
 from collections.abc import Sequence
 
 from astrolabe_cli.commands.config import validate_config
+from astrolabe_cli.commands.backtest import check as backtest_check
 from astrolabe_cli.commands.backtest import run_backtest
 from astrolabe_cli.commands.data import repair as data_repair
 from astrolabe_cli.commands.data import status as data_status
@@ -100,6 +101,10 @@ def build_parser() -> argparse.ArgumentParser:
     backtest_run_cmd.add_argument("--dry-run", action="store_true")
     add_common_flags(backtest_run_cmd)
     backtest_run_cmd.set_defaults(handler=lambda args: run_backtest(args.strategy, args.dry_run))
+
+    backtest_check_cmd = backtest_sub.add_parser("check", help="Run backtest quality checks")
+    add_common_flags(backtest_check_cmd)
+    backtest_check_cmd.set_defaults(handler=lambda args: backtest_check())
 
     docs = sub.add_parser("docs", help="Check documentation hygiene")
     docs_sub = docs.add_subparsers(dest="docs_command", required=True)
