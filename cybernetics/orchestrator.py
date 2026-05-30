@@ -316,13 +316,28 @@ _VOLUME_CACHE: Dict[str, Any] = {"expires_at": 0.0, "snapshot": None}
 _REGIME_TRACKER: Optional[RegimeTransitionTracker] = None
 _REGIME_TRACKER_PATH: Optional[str] = None
 
-_REGIME_INDEXES = [
-    ("sh000001", "上证综指", 0.25),
-    ("sh000300", "沪深300", 0.25),
-    ("sz399001", "深证成指", 0.20),
-    ("sz399006", "创业板指", 0.15),
-    ("sh000905", "中证500", 0.15),
-]
+def _get_regime_indexes() -> list[tuple]:
+    """Read regime index weights from config, fallback to defaults."""
+    from core.settings import get_section
+    cfg = get_section("cybernetics.regime_indexes", {}) or {}
+    _INDEX_NAMES = {
+        "sh000001": "上证综指", "sh000300": "沪深300",
+        "sz399001": "深证成指", "sz399006": "创业板指", "sh000905": "中证500",
+    }
+    defaults = {"sh000001": 0.25, "sh000300": 0.25, "sz399001": 0.20, "sz399006": 0.15, "sh000905": 0.15}
+    merged = {**defaults, **cfg}
+    return [(k, _INDEX_NAMES.get(k, k), v) for k, v in merged.items()]
+
+
+# Module-level cache, refreshed lazily
+_REGIME_INDEXES: list[tuple] | None = None
+
+
+def _regime_indexes() -> list[tuple]:
+    global _REGIME_INDEXES
+    if _REGIME_INDEXES is None:
+        _REGIME_INDEXES = _get_regime_indexes()
+    return _REGIME_INDEXES
 
 
 def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
@@ -744,7 +759,7 @@ def _compute_multi_index_trend(index_frames: Dict[str, Any]) -> tuple[float, Dic
     total_weight = 0.0
     detail: Dict[str, float] = {}
 
-    for symbol, _label, weight in _REGIME_INDEXES:
+    for symbol, _label, weight in _regime_indexes():
         strength = _index_trend_strength(index_frames.get(symbol))
         if strength is None:
             continue
@@ -798,7 +813,7 @@ def _compute_risk_strength(
     worst_drawdown = 0.0
     index_detail: Dict[str, float] = {}
 
-    for symbol, _label, weight in _REGIME_INDEXES:
+    for symbol, _label, weight in _regime_indexes():
         metrics = _index_risk_metrics(index_frames.get(symbol))
         if not metrics:
             continue
@@ -880,7 +895,7 @@ def _compute_multi_index_volume(index_frames: Dict[str, Any]) -> tuple[float, Di
     total_weight = 0.0
     detail: Dict[str, float] = {}
 
-    for symbol, _label, weight in _REGIME_INDEXES:
+    for symbol, _label, weight in _regime_indexes():
         metrics = _index_volume_confirmation(index_frames.get(symbol))
         if not metrics:
             continue
@@ -1122,7 +1137,9 @@ def _resolve_regime_decision(
     if hmm_raw_regime == rule_raw_regime:
         return RegimeDecision(hmm_raw_regime, "hmm", probs, "hmm_rule_consensus")
 
-    if hmm_confidence >= 0.80:
+    from core.settings import get_section
+    _hmm_override = float((get_section("cybernetics", {}) or {}).get("hmm_confidence_override", 0.80))
+    if hmm_confidence >= _hmm_override:
         return RegimeDecision(hmm_raw_regime, "hmm", probs, "hmm_high_confidence_override")
 
     rule_weight = min(0.50, max(0.20, 1.0 - hmm_confidence))

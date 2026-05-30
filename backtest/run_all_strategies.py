@@ -36,13 +36,15 @@ def load_prices(pool, start, end):
         if (i+1) % max(1, total//10) == 0 or i == 0:
             print(f"  加载价格: {i+1}/{total}", end="\r", flush=True)
         try:
+            from core.settings import get_section
+            _min_bars = int((get_section("backtest", {}) or {}).get("min_bars", 200))
             df = get_stock_daily(sym)
-            if df is None or len(df) < 200:
+            if df is None or len(df) < _min_bars:
                 continue
             df["date"] = pd.to_datetime(df["date"])
             df = df.set_index("date").sort_index()
             df = df.loc[pd.Timestamp(start):pd.Timestamp(end)]
-            if len(df) < 200:
+            if len(df) < _min_bars:
                 continue
             dfs[sym] = df["close"].rename(sym)
         except Exception:
@@ -363,14 +365,23 @@ def run_pipeline_backtest(name, pool, prices, bench_close, scorer_fn, start, end
         "ml_lgbm": None,
     }
 
+    from core.settings import get_section
+    _bt_cfg = get_section("backtest", {}) or {}
+    _rebal_cfg = _bt_cfg.get("rebalance", {}) or {}
+    _max_pos_cfg = _bt_cfg.get("max_positions", {}) or {}
+    _drift = float(_rebal_cfg.get("drift_threshold", 0.75))
+    _overlap = float(_rebal_cfg.get("overlap_threshold", 0.50))
+    _alpha_min = int(_bt_cfg.get("alpha_min_score", 30))
+
     _sched_configs = {
         "buffett": RebalanceConfig(schedule="drift", force_months=[4, 5], max_idle_days=365),
-        "multifactor": RebalanceConfig(schedule="monthly", drift_threshold=0.75, min_overlap_pct=0.50),
-        "cybernetic": RebalanceConfig(schedule="regime_change", drift_threshold=0.75),
-        "ml_lgbm": RebalanceConfig(schedule="monthly", drift_threshold=0.75),
+        "multifactor": RebalanceConfig(schedule="monthly", drift_threshold=_drift, min_overlap_pct=_overlap),
+        "cybernetic": RebalanceConfig(schedule="regime_change", drift_threshold=_drift),
+        "ml_lgbm": RebalanceConfig(schedule="monthly", drift_threshold=_drift),
     }
 
     _max_pos = {"buffett": 8, "multifactor": 10, "cybernetic": 5, "ml_lgbm": 8}
+    _max_pos = {k: int(_max_pos_cfg.get(k, v)) for k, v in _max_pos.items()}
 
     trigger = _rebal_triggers.get(name)
     sched_cfg = _sched_configs.get(name, RebalanceConfig())
@@ -379,7 +390,7 @@ def run_pipeline_backtest(name, pool, prices, bench_close, scorer_fn, start, end
         name=name,
         label=name,
         scorer=scorer_fn,
-        min_score=30,
+        min_score=_alpha_min,
         rebalance_trigger=trigger,
     )
 
@@ -410,7 +421,8 @@ if __name__ == "__main__":
     pool = list(CIRCLE_STOCKS)
     if pool_size > 0:
         pool = pool[:pool_size]
-    start, end = "2015-01-01", "2026-05-10"
+    start = bt_cfg.get("start_date", "2015-01-01")
+    end = bt_cfg.get("end_date", "2026-05-10")
     runner_label = "pipeline"
     print(f"四策略对比回测 [{runner_label}]: {len(pool)} stocks, {start} ~ {end}")
 

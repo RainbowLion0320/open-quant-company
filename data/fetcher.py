@@ -20,7 +20,8 @@ from typing import Optional, Callable
 import pandas as pd
 
 # SSL hang prevention: AKShare drops connections after ~100 sustained requests
-socket.setdefaulttimeout(30)
+from core.settings import get_section as _get_section
+socket.setdefaulttimeout(int((_get_section("data.fetcher", {}) or {}).get("socket_timeout", 30)))
 
 from data.datahub import get_datahub
 
@@ -57,22 +58,40 @@ CACHE_DIR = str(_HUB.cache_root / "api")
 
 
 # ============================================================
+# 配置读取 — data.fetcher section
+# ============================================================
+
+def _fetcher_cfg() -> dict:
+    from core.settings import get_section
+    return get_section("data.fetcher", {}) or {}
+
+
+# ============================================================
 # 请求节流 — 全局最小间隔，避免触发反爬
 # ============================================================
 
 _throttle_lock = threading.Lock()
 _last_request_time: float = 0.0
-MIN_INTERVAL: float = 3.0  # 每次请求最小间隔（秒），批量模式避免触发反爬
+
+
+def _get_min_interval() -> float:
+    return float(_fetcher_cfg().get("min_interval", 3.0))
+
+
+def _get_jitter_max() -> float:
+    return float(_fetcher_cfg().get("jitter_max", 0.5))
 
 
 def _throttle():
-    """节流：确保两次请求之间至少间隔 MIN_INTERVAL 秒"""
+    """节流：确保两次请求之间至少间隔 min_interval 秒"""
     global _last_request_time
+    min_interval = _get_min_interval()
+    jitter_max = _get_jitter_max()
     with _throttle_lock:
         now = time.monotonic()
         elapsed = now - _last_request_time
-        if elapsed < MIN_INTERVAL:
-            time.sleep(MIN_INTERVAL - elapsed + random.uniform(0, 0.5))
+        if elapsed < min_interval:
+            time.sleep(min_interval - elapsed + random.uniform(0, jitter_max))
         _last_request_time = time.monotonic()
 
 
@@ -95,36 +114,43 @@ RETRYABLE_ERRORS = (
 
 
 def retry_with_backoff(
-    max_retries: int = 3,
-    base_delay: float = 2.0,
-    backoff_factor: float = 2.0,
+    max_retries: int | None = None,
+    base_delay: float | None = None,
+    backoff_factor: float | None = None,
     jitter: bool = True,
 ):
     """
     装饰器：带指数退避和随机抖动的重试
     间隔: base * factor^attempt + random jitter
     例: 2s → 4s → 8s（加随机抖动避免惊群）
+    参数默认值从 data.fetcher 配置读取。
     """
+    cfg = _fetcher_cfg()
+    _max_retries = max_retries if max_retries is not None else int(cfg.get("max_retries", 3))
+    _base_delay = base_delay if base_delay is not None else float(cfg.get("base_delay", 2.0))
+    _backoff_factor = backoff_factor if backoff_factor is not None else float(cfg.get("backoff_factor", 2.0))
+    _jitter_ratio = float(cfg.get("jitter_ratio", 0.3))
+
     def decorator(func: Callable):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             last_error = None
-            for attempt in range(max_retries + 1):
+            for attempt in range(_max_retries + 1):
                 try:
                     return func(*args, **kwargs)
                 except RETRYABLE_ERRORS as e:
                     last_error = e
-                    if attempt < max_retries:
-                        delay = base_delay * (backoff_factor ** attempt)
+                    if attempt < _max_retries:
+                        delay = _base_delay * (_backoff_factor ** attempt)
                         if jitter:
-                            delay += random.uniform(0, delay * 0.3)
+                            delay += random.uniform(0, delay * _jitter_ratio)
                         print(
                             f"  [RETRY] {func.__name__} 第{attempt+1}次失败: {type(e).__name__}, "
                             f"{delay:.1f}s后重试..."
                         )
                         time.sleep(delay)
                     else:
-                        print(f"  [FAIL] {func.__name__} 已重试{max_retries}次，放弃")
+                        print(f"  [FAIL] {func.__name__} 已重试{_max_retries}次，放弃")
             raise last_error  # type: ignore
         return wrapper
     return decorator
@@ -136,7 +162,10 @@ def retry_with_backoff(
 
 # 内存缓存 — 同一会话内避免重复磁盘读取
 _mem_cache: dict = {}
-_MEM_CACHE_MAX = 64  # 最多缓存 64 个 DataFrame
+
+
+def _get_mem_cache_max() -> int:
+    return int(_fetcher_cfg().get("mem_cache_max", 64))
 
 
 def _cache_path(key: str) -> str:
@@ -151,7 +180,7 @@ def _mem_get(key: str) -> Optional[pd.DataFrame]:
 
 def _mem_set(key: str, df: pd.DataFrame):
     """写入内存缓存，维护上限"""
-    if len(_mem_cache) >= _MEM_CACHE_MAX:
+    if len(_mem_cache) >= _get_mem_cache_max():
         # 淘汰最旧的
         oldest = next(iter(_mem_cache))
         del _mem_cache[oldest]
@@ -186,9 +215,16 @@ def _write_cache(key: str, df: pd.DataFrame):
 
 
 # TTL 常量——分三级
-TTL_FOREVER = 365 * 24       # 历史数据：永不失效（annual: 365天 ≈ 永久）
-TTL_DAILY = 24               # 日线数据：建议日常 force_refresh=True
-TTL_REALTIME = 1             # 实时数据：1h
+def _get_ttl_forever() -> int:
+    return int(_fetcher_cfg().get("ttl_forever_hours", 8760))
+
+
+def _get_ttl_daily() -> int:
+    return int(_fetcher_cfg().get("ttl_daily_hours", 24))
+
+
+def _get_ttl_realtime() -> int:
+    return int(_fetcher_cfg().get("ttl_realtime_hours", 1))
 
 
 def _allow_api_fallback() -> bool:
@@ -212,7 +248,7 @@ def get_index_daily(
     """
     cache_key = f"index_daily_{symbol}_{source}"
     if not force_refresh:
-        cached = _read_cache(cache_key, max_age_hours=TTL_DAILY)
+        cached = _read_cache(cache_key, max_age_hours=_get_ttl_daily())
         if cached is not None:
             return cached
 

@@ -5,12 +5,14 @@ from dataclasses import dataclass, field
 from typing import Mapping
 
 
-PRODUCTION_REGIME_SCORE_WEIGHTS = {
-    "trend": 30.0,
-    "breadth": 30.0,
-    "risk": 30.0,
-    "volume": 10.0,
-}
+def _get_score_weights() -> dict[str, float]:
+    from core.settings import get_section
+    cfg = get_section("cybernetics.score_weights", {}) or {}
+    defaults = {"trend": 30.0, "breadth": 30.0, "risk": 30.0, "volume": 10.0}
+    return {**defaults, **{k: float(v) for k, v in cfg.items()}}
+
+
+PRODUCTION_REGIME_SCORE_WEIGHTS = _get_score_weights()
 
 
 @dataclass(frozen=True)

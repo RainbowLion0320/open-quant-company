@@ -79,18 +79,21 @@ def calc_margin_of_safety(
     terminal_g = cfg["growth_rate_terminal"]
     required_margin = cfg["safety_margin_pct"]
 
-    # 两阶段DCF: 高增长期(5年) + 永续期
-    cashflows = [fcf * (1 + growth_rate) ** i for i in range(1, 6)]
+    # 两阶段DCF: 高增长期 + 永续期
+    val_cfg = _load_config().get("valuation", {})
+    _growth_period = int(val_cfg.get("growth_period", 5))
+    _terminal_pe = float(val_cfg.get("terminal_pe", 20))
+    cashflows = [fcf * (1 + growth_rate) ** i for i in range(1, _growth_period + 1)]
 
     # 永续价值 (当 discount ≈ terminal_g 时用有限PE近似)
     if abs(discount - terminal_g) < 1e-10:
-        terminal_value = cashflows[-1] * 20  # 20倍市盈率作为 fallback
+        terminal_value = cashflows[-1] * _terminal_pe
     else:
         terminal_value = cashflows[-1] * (1 + terminal_g) / (discount - terminal_g)
 
     # 折现
     pv_cashflows = sum(cf / (1 + discount) ** i for i, cf in enumerate(cashflows, 1))
-    pv_terminal = terminal_value / (1 + discount) ** 5
+    pv_terminal = terminal_value / (1 + discount) ** _growth_period
 
     enterprise_value = pv_cashflows + pv_terminal
     intrinsic_per_share = enterprise_value / shares_outstanding

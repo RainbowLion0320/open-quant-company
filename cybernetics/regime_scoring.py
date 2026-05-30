@@ -28,11 +28,13 @@ def breadth_strength(
     above_ma120: float,
 ) -> float:
     """Return the 0-1 market breadth strength used by regime scoring."""
+    from core.settings import get_section
+    w = get_section("cybernetics.breadth_weights", {}) or {}
     return clamp(
-        0.35 * advance_ratio
-        + 0.30 * above_ma20
-        + 0.25 * above_ma60
-        + 0.10 * above_ma120
+        float(w.get("advance_ratio", 0.35)) * advance_ratio
+        + float(w.get("above_ma20", 0.30)) * above_ma20
+        + float(w.get("above_ma60", 0.25)) * above_ma60
+        + float(w.get("above_ma120", 0.10)) * above_ma120
     )
 
 

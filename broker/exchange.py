@@ -73,23 +73,16 @@ class AShareExchange(Exchange):
     name = "ashare"
     asset_type = "stock"
 
-    def __init__(
-        self,
-        stamp_tax: float = 0.0005,        # 印花税 (卖出单向)
-        commission: float = 0.00025,       # 佣金 (双向, 万2.5)
-        transfer_fee: float = 0.00001,     # 过户费 (双向, 十万分之一)
-        t_plus: int = 1,                   # T+1
-        min_commission: float = 5.0,       # 最低佣金 (5元)
-        lot_size: int = 100,               # 每手股数
-        stamp_tax_sell_only: bool = True,  # 印花税仅卖出
-    ):
-        self.stamp_tax = stamp_tax
-        self.commission = commission
-        self.transfer_fee = transfer_fee
-        self.t_plus = t_plus
-        self.min_commission = min_commission
-        self.lot_size = lot_size
-        self.stamp_tax_sell_only = stamp_tax_sell_only
+    def __init__(self, **overrides):
+        from core.settings import get_section
+        cfg = get_section("trading.exchange.stock", {}) or {}
+        self.stamp_tax = overrides.get("stamp_tax", float(cfg.get("stamp_tax", 0.0005)))
+        self.commission = overrides.get("commission", float(cfg.get("commission", 0.00025)))
+        self.transfer_fee = overrides.get("transfer_fee", float(cfg.get("transfer_fee", 0.00001)))
+        self.t_plus = overrides.get("t_plus", int(cfg.get("t_plus", 1)))
+        self.min_commission = overrides.get("min_commission", float(cfg.get("min_commission", 5.0)))
+        self.lot_size = overrides.get("lot_size", int(cfg.get("lot_size", 100)))
+        self.stamp_tax_sell_only = overrides.get("stamp_tax_sell_only", True)
 
     def calc_cost(self, price: float, shares: int, side: OrderSide) -> float:
         """
@@ -139,15 +132,12 @@ class ETFExchange(Exchange):
     name = "etf"
     asset_type = "etf"
 
-    def __init__(
-        self,
-        commission: float = 0.00005,       # 佣金 (双向, 万0.5)
-        min_commission: float = 0.10,       # 最低佣金 (0.1元)
-        lot_size: int = 100,
-    ):
-        self.commission = commission
-        self.min_commission = min_commission
-        self.lot_size = lot_size
+    def __init__(self, **overrides):
+        from core.settings import get_section
+        cfg = get_section("trading.exchange.etf", {}) or {}
+        self.commission = overrides.get("commission", float(cfg.get("commission", 0.00005)))
+        self.min_commission = overrides.get("min_commission", float(cfg.get("min_commission", 0.10)))
+        self.lot_size = overrides.get("lot_size", int(cfg.get("lot_size", 100)))
 
     def calc_cost(self, price: float, shares: int, side: OrderSide) -> float:
         """ETF: 佣金双向, 无印花税, 无过户费"""
@@ -174,9 +164,11 @@ class BondExchange(Exchange):
     name = "bond"
     asset_type = "bond"
 
-    def __init__(self, commission: float = 0.00002, min_commission: float = 0.10):
-        self.commission = commission
-        self.min_commission = min_commission
+    def __init__(self, **overrides):
+        from core.settings import get_section
+        cfg = get_section("trading.exchange.bond", {}) or {}
+        self.commission = overrides.get("commission", float(cfg.get("commission", 0.00002)))
+        self.min_commission = overrides.get("min_commission", float(cfg.get("min_commission", 0.10)))
 
     def calc_cost(self, price: float, shares: int, side: OrderSide) -> float:
         amount = price * shares
@@ -196,11 +188,12 @@ class FuturesExchange(Exchange):
     name = "futures"
     asset_type = "futures"
 
-    def __init__(self, commission_per_lot: float = 10.0, lot_size: int = 1,
-                 margin_rate: float = 0.10):
-        self.commission_per_lot = commission_per_lot
-        self.lot_size = lot_size
-        self.margin_rate = margin_rate
+    def __init__(self, **overrides):
+        from core.settings import get_section
+        cfg = get_section("trading.exchange.futures", {}) or {}
+        self.commission_per_lot = overrides.get("commission_per_lot", float(cfg.get("commission_per_lot", 10.0)))
+        self.lot_size = overrides.get("lot_size", int(cfg.get("lot_size", 1)))
+        self.margin_rate = overrides.get("margin_rate", float(cfg.get("margin_rate", 0.10)))
 
     def calc_cost(self, price: float, shares: int, side: OrderSide) -> float:
         """期货: 按手数收佣金 (简化, 实际按合约不同)"""

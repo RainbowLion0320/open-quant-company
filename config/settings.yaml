@@ -42,6 +42,19 @@ backtest:
   pool_size: 0
   risk_free_rate: 0.03
   start_date: '2020-01-01'
+  end_date: '2026-05-10'
+  min_bars: 200
+  min_history: 63
+  alpha_min_score: 30
+  rebalance:
+    drift_threshold: 0.75
+    overlap_threshold: 0.50
+    max_idle_days: 28
+  max_positions:
+    buffett: 8
+    multifactor: 10
+    cybernetic: 5
+    ml_lgbm: 8
   strategy:
     cybernetic:
       ma_long: 20
@@ -139,6 +152,8 @@ buffett:
     growth_default: 0.05
     growth_max: 0.12
     growth_min: 0.03
+    growth_period: 5
+    terminal_pe: 20
 cybernetics:
   adaptive:
     bear:
@@ -173,6 +188,32 @@ cybernetics:
       stop_loss: -0.05
     volatility_adjustment: true
   regime_engine: hybrid  # "hmm" | "rule_based" | "hybrid"
+  regime_indexes:
+    sh000001: 0.25
+    sh000300: 0.25
+    sz399001: 0.20
+    sz399006: 0.15
+    sh000905: 0.15
+  score_weights:
+    trend: 30
+    breadth: 30
+    risk: 30
+    volume: 10
+  breadth_weights:
+    advance_ratio: 0.35
+    above_ma20: 0.30
+    above_ma60: 0.25
+    above_ma120: 0.10
+  risk_strength_weights:
+    drawdown: 0.50
+    volatility: 0.30
+    pressure: 0.20
+  hmm_confidence_override: 0.80
+  min_bars_trend: 60
+  min_bars_risk: 30
+  ma_windows: [20, 60, 120]
+  vol_normalization: [0.12, 0.40]
+  drawdown_normalization: 0.15
   hmm:
     n_states: 3
     max_iter: 100
@@ -222,6 +263,18 @@ cybernetics:
 data:
   cache_days: 1
   cache_dir: data/cache
+  fetcher:
+    min_interval: 3.0
+    jitter_max: 0.5
+    max_retries: 3
+    base_delay: 2.0
+    backoff_factor: 2.0
+    jitter_ratio: 0.3
+    mem_cache_max: 64
+    ttl_forever_hours: 8760
+    ttl_daily_hours: 24
+    ttl_realtime_hours: 1
+    socket_timeout: 30
   index:
     csi300: sh000300
     shanghai: sh000001
@@ -285,6 +338,27 @@ signals:
       multiplier: 250.0
       weight_20d: 0.6
       weight_60d: 0.4
+    momentum:
+      weight_3m: 0.35
+      weight_6m: 0.65
+      strong_threshold: 0.15
+      strong_score: 40
+      multiplier_strong: 400
+      multiplier_normal: 200
+      weak_floor: 20
+    trend_penalty:
+      threshold: -0.05
+      multiplier: 0.55
+    roe_trend:
+      up_threshold: 1.05
+      down_threshold: 0.95
+      min_years: 3
+    volatility:
+      default_volatility: 0.30
+      weight_momentum: 0.6
+      weight_volatility: 0.4
+      vol_max_score: 30
+      vol_penalty_mult: 100
     weights:
       market: 0.10
       quality: 0.35
@@ -510,6 +584,25 @@ trading:
     brokerage: 0.00025
     stamp_duty: 0.0005
     transfer_fee: 1.0e-05
+  exchange:
+    stock:
+      stamp_tax: 0.0005
+      commission: 0.00025
+      transfer_fee: 0.00001
+      min_commission: 5.0
+      lot_size: 100
+      t_plus: 1
+    etf:
+      commission: 0.00005
+      min_commission: 0.10
+      lot_size: 100
+    bond:
+      commission: 0.00002
+      min_commission: 0.10
+    futures:
+      commission_per_lot: 10.0
+      lot_size: 1
+      margin_rate: 0.10
   notification:
     enabled: true
     require_confirmation: false

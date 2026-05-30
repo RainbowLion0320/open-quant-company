@@ -131,7 +131,10 @@ class MultiFactorScorer:
         volatility = f.get("volatility", tc.get("default_volatility", 0.30))
 
         # 动量: 正动量好但不要追涨(太高反而回调风险)
-        mom_composite = mom_3m_skip * 0.35 + mom_6m_skip * 0.65
+        mom_cfg = MFC.get("momentum", {})
+        _w3 = float(mom_cfg.get("weight_3m", 0.35))
+        _w6 = float(mom_cfg.get("weight_6m", 0.65))
+        mom_composite = mom_3m_skip * _w3 + mom_6m_skip * _w6
         mom_strong = tc.get("mom_strong", 0.15)
         if mom_composite > mom_strong:
             mom_score = 40  # 涨太多，等回调
@@ -142,8 +145,11 @@ class MultiFactorScorer:
         else:
             mom_score = 20  # 跌太多，观望
 
-        if trend_strength < -0.05:
-            mom_score *= 0.55
+        tp_cfg = MFC.get("trend_penalty", {})
+        _tp_thresh = float(tp_cfg.get("threshold", -0.05))
+        _tp_mult = float(tp_cfg.get("multiplier", 0.55))
+        if trend_strength < _tp_thresh:
+            mom_score *= _tp_mult
         elif trend_strength > 0:
             mom_score += min(10, trend_strength * 100)
 
@@ -306,11 +312,15 @@ def compute_trend_strength(df: pd.DataFrame, window: int = 120) -> float:
 
 def compute_roe_trend(roe_history: List[float]) -> str:
     """判断ROE趋势"""
-    if len(roe_history) < 3:
+    rt_cfg = (MFC.get("roe_trend", {}) if MFC else {})
+    _min_years = int(rt_cfg.get("min_years", 3))
+    _up = float(rt_cfg.get("up_threshold", 1.05))
+    _down = float(rt_cfg.get("down_threshold", 0.95))
+    if len(roe_history) < _min_years:
         return "flat"
-    recent = roe_history[-3:]
-    if recent[-1] > recent[0] * 1.05:
+    recent = roe_history[-_min_years:]
+    if recent[-1] > recent[0] * _up:
         return "up"
-    elif recent[-1] < recent[0] * 0.95:
+    elif recent[-1] < recent[0] * _down:
         return "down"
     return "flat"
