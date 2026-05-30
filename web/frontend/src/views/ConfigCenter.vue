@@ -228,7 +228,7 @@ onMounted(async () => {
 }
 .config-layout {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 200px minmax(0, 1fr);
   gap: 16px;
   height: calc(100vh - 200px);
 }
@@ -280,6 +280,8 @@ onMounted(async () => {
   flex-direction: column;
   gap: 16px;
   overflow: hidden;
+  min-width: 0;
+  width: 100%;
 }
 .editor-header h3 {
   font-size: 16px;
@@ -298,6 +300,7 @@ onMounted(async () => {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 8px;
+  width: 100%;
 }
 .field-card {
   display: flex;
@@ -308,6 +311,8 @@ onMounted(async () => {
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.08);
+  width: 100%;
+  box-sizing: border-box;
 }
 .field-info {
   display: flex;
@@ -315,6 +320,7 @@ onMounted(async () => {
   gap: 8px;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 .field-label {
   font-size: 12px;
