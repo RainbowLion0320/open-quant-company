@@ -227,7 +227,7 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: 16px;
-  min-height: 500px;
+  height: calc(100vh - 200px);
 }
 .config-nav {
   display: flex;
@@ -235,6 +235,7 @@ onMounted(async () => {
   gap: 2px;
   border-right: 1px solid var(--border, #333);
   padding-right: 12px;
+  overflow-y: auto;
 }
 .nav-item {
   display: flex;
@@ -275,8 +276,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  position: relative;
-  padding-bottom: 60px;
+  overflow: hidden;
 }
 .editor-header h3 {
   font-size: 16px;
@@ -292,6 +292,9 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8px;
 }
 .field-card {
   padding: 12px;
@@ -354,8 +357,7 @@ onMounted(async () => {
   font-family: "JetBrains Mono", monospace;
 }
 .editor-actions {
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -363,7 +365,6 @@ onMounted(async () => {
   padding: 12px 0;
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-page, #0a0f1a);
-  z-index: 10;
 }
 .btn-save {
   padding: 8px 20px;
