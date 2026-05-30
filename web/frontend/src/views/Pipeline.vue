@@ -30,28 +30,23 @@
 
     <section class="pipeline-layout">
       <div class="flow-stage glass-card">
-        <div v-if="loading" class="pipeline-empty">正在加载 Market Regime 计算链路...</div>
-        <div v-else-if="payload" class="flow-canvas">
-          <svg class="flow-arrows" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <div v-if="loading" class="pipeline-empty">正在加载 Pipeline 数据...</div>
+        <div v-else-if="payload" class="flow-canvas" :style="canvasStyle">
+          <svg class="flow-arrows" :viewBox="`0 0 ${svgWidth} ${svgHeight}`" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <marker id="pipeline-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
                 <path d="M0 0 8 4 0 8Z" />
               </marker>
             </defs>
-            <path d="M21 13H29" />
-            <path d="M38 23V31" />
-            <path d="M47 16C54 16 56 39 62 39" />
-            <path d="M47 41C56 41 55 66 62 66" />
-            <path d="M63 50V57" />
-            <path d="M72 66H80" />
-            <path d="M88 77V84" />
+            <path v-for="(arrow, i) in computedArrows" :key="i" :d="arrow" />
           </svg>
 
           <button
             v-for="node in payload.nodes"
             :key="node.id"
             class="flow-node"
-            :class="[node.id, { active: selectedNodeId === node.id }, node.status]"
+            :class="[{ active: selectedNodeId === node.id }, node.status]"
+            :style="nodeStyle(node)"
             type="button"
             @click="selectedNodeId = node.id"
           >
@@ -103,14 +98,10 @@
       </aside>
     </section>
 
-    <section v-if="payload" class="output-band glass-card">
-      <article v-for="item in outputItems" :key="item.label">
+    <section v-if="payload && summaryItems.length" class="output-band glass-card">
+      <article v-for="item in summaryItems" :key="item.label">
         <span>{{ item.label }}</span>
         <strong :class="item.tone">{{ item.value }}</strong>
-      </article>
-      <article v-for="item in adaptiveItems" :key="item.label" class="adaptive">
-        <span>{{ item.label }}</span>
-        <strong>{{ item.value }}</strong>
       </article>
     </section>
   </div>
@@ -118,10 +109,20 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type MarketRegimePipelineResponse, type PipelineNode } from "../api";
+import { api } from "../api";
+
+interface PipelineNodeData {
+  id: string;
+  title: string;
+  subtitle: string;
+  status: string;
+  metrics: any[];
+  inputs: any[];
+  outputs: any[];
+}
 
 const payload = ref<any | null>(null);
-const selectedNodeId = ref("inputs");
+const selectedNodeId = ref("");
 const loading = ref(true);
 const error = ref("");
 const pipelines = ref<{ key: string; label: string; status: string }[]>([]);
@@ -132,42 +133,158 @@ const currentLabel = computed(() => {
   return p ? `${p.label} Pipeline` : "Pipeline";
 });
 
-const selectedNode = computed<PipelineNode | null>(() => {
+const selectedNode = computed<PipelineNodeData | null>(() => {
   const nodes = payload.value?.nodes || [];
-  return nodes.find((node) => node.id === selectedNodeId.value) || nodes[0] || null;
+  return nodes.find((node: PipelineNodeData) => node.id === selectedNodeId.value) || nodes[0] || null;
 });
 
 const scoreText = computed(() => {
-  const score = payload.value?.summary.score;
+  const score = payload.value?.summary?.score;
   return typeof score === "number" && Number.isFinite(score) ? score.toFixed(1) : "—";
 });
 
-const outputItems = computed(() => {
-  if (!payload.value) return [];
-  const summary = payload.value.summary;
-  return [
-    { label: "Confirmed", value: summary.confirmed_regime, tone: regimeClass(summary.confirmed_regime) },
-    { label: "Raw", value: summary.raw_regime, tone: regimeClass(summary.raw_regime) },
-    { label: "Score", value: Number(summary.score).toFixed(1), tone: "accent" },
-    { label: "Method", value: summary.detection_method, tone: "accent" },
-  ];
+// ── Dynamic layout computation ──
+
+interface NodePos { col: number; row: number; id: string; }
+
+const nodeLayout = computed<NodePos[]>(() => {
+  const nodes: PipelineNodeData[] = payload.value?.nodes || [];
+  const edges: { source: string; target: string }[] = payload.value?.edges || [];
+  if (!nodes.length) return [];
+
+  // Build adjacency and compute depth via topological sort
+  const inDegree = new Map<string, number>();
+  const depthMap = new Map<string, number>();
+  const childrenMap = new Map<string, string[]>();
+
+  for (const n of nodes) {
+    inDegree.set(n.id, 0);
+    depthMap.set(n.id, 0);
+    childrenMap.set(n.id, []);
+  }
+  for (const e of edges) {
+    inDegree.set(e.target, (inDegree.get(e.target) || 0) + 1);
+    childrenMap.get(e.source)?.push(e.target);
+  }
+
+  // BFS from roots
+  const queue: string[] = [];
+  for (const n of nodes) {
+    if ((inDegree.get(n.id) || 0) === 0) queue.push(n.id);
+  }
+
+  while (queue.length) {
+    const cur = queue.shift()!;
+    const curDepth = depthMap.get(cur) || 0;
+    for (const child of childrenMap.get(cur) || []) {
+      depthMap.set(child, Math.max(depthMap.get(child) || 0, curDepth + 1));
+      inDegree.set(child, (inDegree.get(child) || 0) - 1);
+      if (inDegree.get(child) === 0) queue.push(child);
+    }
+  }
+
+  // Group nodes by depth
+  const depthGroups = new Map<number, string[]>();
+  for (const n of nodes) {
+    const d = depthMap.get(n.id) || 0;
+    if (!depthGroups.has(d)) depthGroups.set(d, []);
+    depthGroups.get(d)!.push(n.id);
+  }
+
+  // Assign positions
+  const positions: NodePos[] = [];
+  for (const [col, ids] of [...depthGroups.entries()].sort((a, b) => a[0] - b[0])) {
+    ids.forEach((id, row) => {
+      positions.push({ col, row, id });
+    });
+  }
+  return positions;
 });
 
-const adaptiveItems = computed(() => {
-  const params = (payload.value?.summary?.adaptive_params || {}) as Record<string, string | number>;
-  return Object.entries(params)
-    .filter(([key]) => ["position_size", "max_positions", "stop_loss", "confidence_threshold"].includes(key))
-    .map(([key, value]) => ({ label: paramLabel(key), value: formatParam(key, value) }));
+const maxCol = computed(() => Math.max(...nodeLayout.value.map(p => p.col), 0));
+const maxRow = computed(() => Math.max(...nodeLayout.value.map(p => p.row), 0));
+
+const canvasStyle = computed(() => {
+  const cols = maxCol.value + 1;
+  const rows = maxRow.value + 1;
+  return {
+    gridTemplateColumns: `repeat(${cols}, minmax(128px, 1fr))`,
+    gridTemplateRows: `repeat(${rows}, 112px)`,
+  };
 });
 
-function paramLabel(key: string) {
-  return ({
-    position_size: "Position",
-    max_positions: "Max Pos",
-    stop_loss: "Stop",
-    confidence_threshold: "Signal Gate",
-  } as Record<string, string>)[key] || key;
+const svgWidth = computed(() => (maxCol.value + 1) * 25);
+const svgHeight = computed(() => (maxRow.value + 1) * 25);
+
+function nodeStyle(node: PipelineNodeData) {
+  const pos = nodeLayout.value.find(p => p.id === node.id);
+  if (!pos) return {};
+  return {
+    gridColumn: pos.col + 1,
+    gridRow: pos.row + 1,
+  };
 }
+
+// ── Dynamic SVG arrows ──
+
+const computedArrows = computed<string[]>(() => {
+  const edges: { source: string; target: string }[] = payload.value?.edges || [];
+  if (!edges.length || !nodeLayout.value.length) return [];
+
+  const posMap = new Map<string, NodePos>();
+  for (const p of nodeLayout.value) posMap.set(p.id, p);
+
+  const cols = maxCol.value + 1;
+  const rows = maxRow.value + 1;
+
+  return edges.map(e => {
+    const src = posMap.get(e.source);
+    const tgt = posMap.get(e.target);
+    if (!src || !tgt) return "";
+
+    // Convert grid positions to SVG coordinates (percentage-like)
+    const x1 = ((src.col + 0.5) / cols) * 100;
+    const y1 = ((src.row + 1) / rows) * 100;
+    const x2 = ((tgt.col + 0.5) / cols) * 100;
+    const y2 = (tgt.row / rows) * 100;
+
+    // If same column, draw vertical line
+    if (src.col === tgt.col) {
+      return `M${x1} ${y1}L${x2} ${y2}`;
+    }
+    // Otherwise, draw a bezier curve
+    const midY = (y1 + y2) / 2;
+    return `M${x1} ${y1}C${x1} ${midY} ${x2} ${midY} ${x2} ${y2}`;
+  }).filter(Boolean);
+});
+
+// ── Dynamic summary output band ──
+
+const summaryItems = computed(() => {
+  if (!payload.value) return [];
+  const summary = payload.value.summary || {};
+  const skip = new Set(["adaptive_params"]);
+  const items: { label: string; value: string; tone: string }[] = [];
+
+  for (const [key, val] of Object.entries(summary)) {
+    if (skip.has(key)) continue;
+    if (val === null || val === undefined) continue;
+    const displayVal = typeof val === "number" ? (Number.isFinite(val) ? val.toFixed(4) : "—") : String(val);
+    items.push({ label: key, value: displayVal, tone: "neutral" });
+  }
+
+  // Add adaptive_params if present (market_regime)
+  const params = summary.adaptive_params;
+  if (params && typeof params === "object") {
+    for (const [k, v] of Object.entries(params as Record<string, any>)) {
+      items.push({ label: k, value: formatParam(k, v), tone: "accent" });
+    }
+  }
+
+  return items;
+});
+
+// ── Helpers ──
 
 function formatParam(key: string, value: string | number) {
   const n = Number(value);
@@ -196,8 +313,8 @@ async function loadPipeline() {
   try {
     const data = await api.pipelineShow(activeKey.value);
     payload.value = data;
-    if (!data.nodes.some((node: any) => node.id === selectedNodeId.value)) {
-      selectedNodeId.value = data.nodes[0]?.id || "";
+    if (!data.nodes?.some((node: any) => node.id === selectedNodeId.value)) {
+      selectedNodeId.value = data.nodes?.[0]?.id || "";
     }
   } catch (err: any) {
     error.value = err?.message || "Pipeline 加载失败";
@@ -288,8 +405,6 @@ onMounted(async () => {
   position: relative;
   min-height: 572px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(128px, 1fr));
-  grid-template-rows: repeat(4, 112px);
   gap: 24px;
   align-items: stretch;
 }
@@ -393,13 +508,6 @@ onMounted(async () => {
   font-family: "JetBrains Mono", monospace;
   font-weight: 650;
 }
-.inputs { grid-column: 1; grid-row: 1; }
-.features { grid-column: 2; grid-row: 1; }
-.rule_score { grid-column: 2; grid-row: 2; }
-.hmm_inference { grid-column: 3; grid-row: 2; }
-.hybrid_decision { grid-column: 3; grid-row: 3; }
-.stability { grid-column: 4; grid-row: 3; }
-.outputs { grid-column: 4; grid-row: 4; }
 .detail-panel {
   min-width: 0;
 }
@@ -489,7 +597,7 @@ onMounted(async () => {
 }
 .output-band {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
 }
 .output-band article {
@@ -509,9 +617,6 @@ onMounted(async () => {
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
-}
-.adaptive strong {
-  text-transform: none;
 }
 .positive { color: var(--positive) !important; }
 .negative { color: var(--negative) !important; }
