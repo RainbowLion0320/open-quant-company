@@ -57,7 +57,11 @@ def test_market_regime_pipeline_route_contract(monkeypatch, tmp_path):
     assert payload["pipeline_key"] == "market_regime"
     assert [node["id"] for node in payload["nodes"]] == [
         "inputs",
-        "features",
+        "trend",
+        "breadth",
+        "risk",
+        "volume",
+        "hmm_features",
         "rule_score",
         "hmm_inference",
         "hybrid_decision",
