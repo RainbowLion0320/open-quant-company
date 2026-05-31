@@ -36,8 +36,13 @@ def node(
     }
 
 
-def edge(source: str, target: str, label: str = "") -> dict[str, str]:
-    return {"source": source, "target": target, "label": label}
+def edge(source: str, target: str, label: str = "", *, condition: str = "", active: bool = True) -> dict[str, object]:
+    result: dict[str, object] = {"source": source, "target": target, "label": label}
+    if condition:
+        result["condition"] = condition
+    if not active:
+        result["active"] = False
+    return result
 
 
 def pct(raw: object) -> str:

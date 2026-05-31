@@ -46,15 +46,25 @@
                 <path d="M0 0 8 4 0 8Z" fill="rgba(0, 212, 255, 0.8)" />
               </marker>
             </defs>
-            <path
-              v-for="(d, i) in arrowSvgPaths"
-              :key="i"
-              :d="d"
-              fill="none"
-              stroke="rgba(0, 212, 255, 0.45)"
-              stroke-width="1.5"
-              marker-end="url(#arrow-head)"
-            />
+            <g v-for="(arrow, i) in arrowSvgPaths" :key="i">
+              <path
+                :d="arrow.d"
+                fill="none"
+                :stroke="arrow.active ? 'rgba(0, 212, 255, 0.45)' : 'rgba(100, 100, 100, 0.2)'"
+                :stroke-width="arrow.active ? 1.5 : 1"
+                :stroke-dasharray="arrow.active ? 'none' : '4 3'"
+                :marker-end="arrow.active ? 'url(#arrow-head)' : ''"
+              />
+              <text
+                v-if="arrow.label && arrow.active"
+                :x="arrow.labelX"
+                :y="arrow.labelY"
+                fill="rgba(0, 212, 255, 0.7)"
+                font-size="8"
+                text-anchor="middle"
+                dominant-baseline="middle"
+              >{{ arrow.label }}</text>
+            </g>
           </svg>
 
           <button
@@ -150,7 +160,14 @@ const activeKey = ref("market_regime");
 const nodeRefs = new Map<string, Element>();
 const canvasRef = ref<HTMLElement | null>(null);
 const canvasSize = reactive({ w: 800, h: 500 });
-const arrowSvgPaths = ref<string[]>([]);
+interface ArrowPath {
+  d: string;
+  active: boolean;
+  label: string;
+  labelX: number;
+  labelY: number;
+}
+const arrowSvgPaths = ref<ArrowPath[]>([]);
 
 function setNodeRef(id: string, el: any) {
   if (el) nodeRefs.set(id, el.$el || el);
@@ -201,8 +218,8 @@ function updateArrows() {
   canvasSize.w = Math.round(canvasRect.width);
   canvasSize.h = Math.round(canvasRect.height);
 
-  const edges: { source: string; target: string }[] = payload.value?.edges || [];
-  const paths: string[] = [];
+  const edges: { source: string; target: string; label?: string; condition?: string; active?: boolean }[] = payload.value?.edges || [];
+  const paths: ArrowPath[] = [];
 
   for (const edge of edges) {
     const srcEl = nodeRefs.get(edge.source);
@@ -218,14 +235,21 @@ function updateArrows() {
     const x2 = tgtRect.left + tgtRect.width / 2 - canvasRect.left;
     const y2 = tgtRect.top - canvasRect.top;
 
+    let d: string;
     if (Math.abs(x1 - x2) < 2) {
-      // Same column: straight vertical line
-      paths.push(`M${x1} ${y1}L${x2} ${y2}`);
+      d = `M${x1} ${y1}L${x2} ${y2}`;
     } else {
-      // Different columns: smooth S-curve
       const midY = (y1 + y2) / 2;
-      paths.push(`M${x1} ${y1}C${x1} ${midY} ${x2} ${midY} ${x2} ${y2}`);
+      d = `M${x1} ${y1}C${x1} ${midY} ${x2} ${midY} ${x2} ${y2}`;
     }
+
+    paths.push({
+      d,
+      active: edge.active !== false,
+      label: edge.label || edge.condition || "",
+      labelX: (x1 + x2) / 2,
+      labelY: (y1 + y2) / 2,
+    });
   }
   arrowSvgPaths.value = paths;
 }

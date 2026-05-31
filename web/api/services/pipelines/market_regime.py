@@ -205,6 +205,20 @@ def build_market_regime_pipeline() -> dict[str, object]:
             outputs=["Strategy risk overlay", "Asset allocator", "Web telemetry"],
         ),
     ]
+    # Determine which hybrid path was taken
+    is_consensus = decision_reason == "hmm_rule_consensus"
+    is_override = decision_reason == "hmm_high_confidence_override"
+    is_blend = decision_reason == "hybrid_low_confidence_blend"
+    is_rule_only = decision_reason == "rule_only"
+    is_fallback = decision_reason == "hmm_unavailable_fallback"
+
+    # Determine stability state
+    pending_value = stability.get("pending_value")
+    dwell_count = stability.get("pending_count", 0)
+    min_dwell = stability.get("min_dwell", 3)
+    is_confirmed = pending_value is None or pending_value == ""
+    is_pending = not is_confirmed and dwell_count < min_dwell
+
     edges = [
         edge("inputs", "trend"),
         edge("inputs", "breadth"),
@@ -218,8 +232,20 @@ def build_market_regime_pipeline() -> dict[str, object]:
         edge("hmm_features", "hmm_inference"),
         edge("rule_score", "hybrid_decision"),
         edge("hmm_inference", "hybrid_decision"),
-        edge("hybrid_decision", "stability"),
-        edge("stability", "outputs"),
+        # Conditional edges from hybrid_decision
+        edge("hybrid_decision", "stability",
+             label="consensus", condition="rule == HMM", active=is_consensus),
+        edge("hybrid_decision", "stability",
+             label="override", condition="confidence ≥ 0.80", active=is_override),
+        edge("hybrid_decision", "stability",
+             label="blend", condition="confidence < 0.80", active=is_blend),
+        edge("hybrid_decision", "stability",
+             label="rule only", condition="HMM unavailable", active=is_rule_only or is_fallback),
+        # Conditional edges from stability
+        edge("stability", "outputs",
+             label="confirmed", condition="dwell ≥ min_dwell", active=is_confirmed),
+        edge("stability", "outputs",
+             label="pending", condition=f"dwell {dwell_count}/{min_dwell}", active=is_pending),
     ]
 
     return {
