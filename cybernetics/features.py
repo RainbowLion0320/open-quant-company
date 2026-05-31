@@ -358,7 +358,8 @@ def build_observation_matrix(
     columns: list[str] | None = None,
     standardise: bool = True,
     window: int = 252,
-) -> np.ndarray:
+    n_components: int | None = None,
+) -> tuple[np.ndarray, object | None]:
     """Extract the HMM observation matrix from a feature DataFrame.
 
     Parameters
@@ -367,15 +368,17 @@ def build_observation_matrix(
     columns : which columns to use (default: OBSERVATION_COLUMNS)
     standardise : whether to apply rolling z-score
     window : rolling window for standardisation
+    n_components : if set, apply PCA to reduce to this many components.
+                   Prevents any single feature from dominating state assignment.
 
     Returns
     -------
-    np.ndarray of shape (n_samples, n_features), NaN rows dropped.
+    (np.ndarray of shape (n_samples, n_features), fitted PCA object or None)
     """
     cols = columns or OBSERVATION_COLUMNS
     available = [c for c in cols if c in features.columns]
     if not available:
-        return np.array([])
+        return np.array([]), None
 
     data = features[available].copy()
 
@@ -384,7 +387,15 @@ def build_observation_matrix(
             data[col] = _rolling_zscore(data[col], window=window, min_periods=60)
 
     data = data.dropna()
-    return data.values
+    X = data.values
+
+    if n_components is not None and n_components < X.shape[1]:
+        from sklearn.decomposition import PCA
+        pca = PCA(n_components=n_components, whiten=True)
+        X = pca.fit_transform(X)
+        return X, pca
+
+    return X, None
 
 
 def build_feature_index(features: pd.DataFrame) -> pd.DatetimeIndex:
