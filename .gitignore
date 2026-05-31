@@ -79,3 +79,4 @@ data/store/_contracts/
 data/store/_audit/
 data/store/runs.lock
 .codegraph/
+data/models/report.md
