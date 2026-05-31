@@ -21,6 +21,7 @@ from datetime import datetime
 ROOT = Path(__file__).resolve().parent.parent
 
 from data.datahub import get_datahub
+from data.deepseek_usage import append_deepseek_usage
 
 # ── 共享 LLM token 记录器 (供活动监视器) ──
 _LLM_USAGE_FILE = get_datahub().llm_usage_path()
@@ -28,6 +29,7 @@ _LLM_USAGE_FILE = get_datahub().llm_usage_path()
 def _log_llm_usage(source: str, usage, model: str):
     """记录非 Hermes 网关的 LLM token 用量到共享缓存"""
     try:
+        ledger_row = append_deepseek_usage(model, usage, source=source)
         today = datetime.now().strftime("%Y-%m-%d")
         data = {}
         if _LLM_USAGE_FILE.exists():
@@ -35,11 +37,9 @@ def _log_llm_usage(source: str, usage, model: str):
                 data = json.load(f)
         if data.get("date") != today:
             data = {"date": today, "items": [], "total_input": 0, "total_output": 0, "total_cost": 0.0, "calls": 0}
-        inp = usage.prompt_tokens if hasattr(usage, 'prompt_tokens') else usage.get('prompt_tokens', 0)
-        out = usage.completion_tokens if hasattr(usage, 'completion_tokens') else usage.get('completion_tokens', 0)
-        # 费用估算 deepseek-v4-pro: $0.55/M in, $2.19/M out; v4-flash: $0.27/M in, $1.10/M out
-        cost_r = (0.55, 2.19) if "pro" in model else (0.27, 1.10)
-        cost = inp / 1_000_000 * cost_r[0] + out / 1_000_000 * cost_r[1]
+        inp = int(ledger_row.get("input_tokens", 0))
+        out = int(ledger_row.get("output_tokens", 0))
+        cost = float(ledger_row.get("estimated_cost_usd", 0.0))
         data["items"].append({"source": source, "model": model, "input": inp, "output": out, "cost": round(cost, 6), "time": datetime.now().isoformat()})
         data["total_input"] += inp
         data["total_output"] += out

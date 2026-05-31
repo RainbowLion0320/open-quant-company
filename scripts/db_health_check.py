@@ -421,8 +421,8 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         if p.exists():
             records.append(_scan_single(f"paper_{name}", p))
 
-    # ── DeepSeek ──
-    ds = STORE / "deepseek" / "daily_usage.parquet"
+    # ── DeepSeek project API response usage ledger ──
+    ds = STORE / "deepseek" / "project_usage_ledger.parquet"
     if ds.exists():
         records.append(_scan_single("system_deepseek_usage", ds))
 

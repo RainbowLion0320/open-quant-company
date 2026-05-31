@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import sqlite3
 
-import pandas as pd
 import psutil
 
 from data.datahub import get_datahub
+from data.deepseek_usage import fetch_deepseek_balance, summarize_deepseek_project_usage
 from web.api.services.system_common import json_value
 
 
@@ -124,34 +124,17 @@ def system_history_payload(hours: int) -> dict:
 
 
 def deepseek_usage_payload() -> dict:
-    pq = HUB.deepseek_usage_path()
-    if not pq.exists():
-        return {"data": [], "status": "no_data"}
-
-    try:
-        df = HUB.read_parquet(pq, default=pd.DataFrame())
-    except Exception as exc:
-        return {"data": [], "status": "error", "message": f"DeepSeek usage parquet read failed: {str(exc)[:120]}"}
-    if df is None or df.empty or not {"utc_date", "model"}.issubset(df.columns):
-        return {"data": [], "status": "no_data"}
-
-    numeric_cols = [
-        "input_cache_hit", "input_cache_miss", "input_tokens", "output_tokens",
-        "total_tokens", "requests", "cost_cny",
-    ]
-    for col in numeric_cols:
-        if col not in df.columns:
-            df[col] = 0
-        else:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    df["utc_date"] = df["utc_date"].astype(str).str.slice(0, 10)
-    df["model"] = df["model"].astype(str)
-    df = df.sort_values(["utc_date", "model"]).tail(60)
-    records = [{k: json_value(v) for k, v in row.items()} for row in df.to_dict(orient="records")]
+    balance = fetch_deepseek_balance()
+    usage = summarize_deepseek_project_usage(days=30)
+    records = [{k: json_value(v) for k, v in row.items()} for row in usage.get("daily", [])]
+    status = "ok" if balance.get("status") == "ok" or usage.get("status") == "ok" else usage.get("status", "no_data")
     return {
+        "source": "official_balance_api+project_usage_ledger",
+        "balance": balance,
+        "usage": usage,
         "data": records,
-        "models": df["model"].unique().tolist(),
-        "dates": sorted(df["utc_date"].unique().tolist()),
-        "total_cost": float(df["cost_cny"].sum()),
-        "status": "ok",
+        "models": usage.get("models", []),
+        "dates": usage.get("dates", []),
+        "total_cost": float(usage.get("totals", {}).get("estimated_cost_cny", 0) or 0),
+        "status": status,
     }

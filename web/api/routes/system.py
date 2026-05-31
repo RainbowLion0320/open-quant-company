@@ -36,7 +36,7 @@ async def system_history(hours: int = Query(default=24, ge=1, le=720)):
 
 @router.get("/deepseek-usage")
 async def deepseek_usage():
-    """DeepSeek daily token/cost summary from Parquet."""
+    """DeepSeek official balance and project-local API response usage ledger."""
     return deepseek_usage_payload()
 
 

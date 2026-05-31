@@ -64,39 +64,45 @@
         </div>
 
         <div class="usage-summary">
-          <div class="usage-pro">
-            <span>v4-pro tokens</span>
-            <strong>{{ fmtNum(dsTotals?.pro ?? 0) }}</strong>
+          <div class="usage-balance">
+            <span>api balance</span>
+            <strong>{{ dsTotals?.balanceText ?? "—" }}</strong>
+            <small>{{ dsTotals?.balanceStatus ?? "not checked" }}</small>
           </div>
-          <div class="usage-flash">
-            <span>v4-flash tokens</span>
-            <strong>{{ fmtNum(dsTotals?.flash ?? 0) }}</strong>
+          <div class="usage-pro">
+            <span>project tokens</span>
+            <strong>{{ fmtNum(dsTotals?.tokens ?? 0) }}</strong>
+            <small>{{ fmtNum(dsTotals?.requests ?? 0) }} calls</small>
           </div>
           <div class="usage-cost">
-            <span>estimated CNY</span>
-            <strong>¥{{ (dsTotals?.cost ?? 0).toFixed(0) }}</strong>
+            <span>estimated cost</span>
+            <strong>{{ fmtMoney(dsTotals?.costCny ?? 0, "CNY") }}</strong>
+            <small>${{ (dsTotals?.costUsd ?? 0).toFixed(4) }}</small>
           </div>
         </div>
 
-        <div class="chart-stack">
+        <div v-if="dsHasUsage" class="chart-stack">
           <div class="chart-block">
-            <div class="ds-chart-label">v4-pro token stack</div>
+            <div class="ds-chart-label">project v4-pro token stack</div>
             <canvas ref="dsProRef"></canvas>
           </div>
           <div class="chart-block">
-            <div class="ds-chart-label">v4-flash token stack</div>
+            <div class="ds-chart-label">project v4-flash token stack</div>
             <canvas ref="dsFlashRef"></canvas>
           </div>
           <div class="chart-block cost">
-            <div class="ds-chart-label">daily cost</div>
+            <div class="ds-chart-label">estimated daily cost</div>
             <canvas ref="dsCostRef"></canvas>
           </div>
         </div>
-        <div class="chart-legend">
+        <div v-else class="usage-empty">
+          本项目后续 DeepSeek API 调用完成后，会从响应 usage 自动写入本地账本并在这里展示趋势。
+        </div>
+        <div v-if="dsHasUsage" class="chart-legend">
           <span><span class="legend-swatch" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
           <span><span class="legend-swatch" style="background:rgba(6,182,212,0.85)"></span>输出</span>
           <span><span class="legend-swatch" style="background:rgba(6,182,212,0.25);border:1px dashed rgba(6,182,212,0.3)"></span>缓存命中</span>
-          <span><span class="legend-swatch" style="background:rgba(61,21,120,0.85)"></span>v4-flash</span>
+          <span><span class="legend-swatch" style="background:rgba(61,21,120,0.85)"></span>官方余额 + 项目账本</span>
         </div>
       </div>
 
@@ -237,7 +243,17 @@ const cpuChartId = "cpu-chart"; const memChartId = "mem-chart";
 const dsProRef = ref<HTMLCanvasElement | null>(null);
 const dsFlashRef = ref<HTMLCanvasElement | null>(null);
 const dsCostRef = ref<HTMLCanvasElement | null>(null);
-const dsTotals = ref<{ pro: number; flash: number; cost: number } | null>(null);
+const dsHasUsage = ref(false);
+const dsTotals = ref<{
+  pro: number;
+  flash: number;
+  tokens: number;
+  requests: number;
+  costCny: number;
+  costUsd: number;
+  balanceText: string;
+  balanceStatus: string;
+} | null>(null);
 
 const apiHealth = ref<{ items: { name: string; status: string; detail: string }[]; summary: string; all_ok: boolean } | null>(null);
 
@@ -331,6 +347,11 @@ async function fetchApiHealth() {
 function fmtNum(n: number): string {
   return fmtShortCount(n);
 }
+function fmtMoney(n: number, currency: string): string {
+  if (!Number.isFinite(Number(n))) return "—";
+  const prefix = currency === "CNY" ? "¥" : "$";
+  return `${prefix}${Number(n).toFixed(Number(n) >= 100 ? 0 : 2)}`;
+}
 function fmtGb(v: number | undefined | null): string {
   if (v == null || Number.isNaN(Number(v))) return "— GB";
   return `${Number(v).toFixed(1)} GB`;
@@ -396,13 +417,26 @@ function drawCharts() {
 async function drawDSChart() {
   try {
     const d = await api.deepseekUsage();
-    if (!d.data || d.data.length === 0) {
-      dsTotals.value = { pro: 0, flash: 0, cost: 0 };
-      return;
-    }
-    const rows: any[] = d.data;
+    const rows: any[] = d.usage?.daily || d.data || [];
+    dsHasUsage.value = rows.length > 0;
+    const balance = d.balance?.balance_infos?.[0];
+    const balanceText = balance
+      ? fmtMoney(Number(balance.total_balance || 0), balance.currency || "CNY")
+      : "—";
+    const balanceStatus = d.balance?.status === "ok"
+      ? (d.balance?.is_available ? "available" : "unavailable")
+      : (d.balance?.message || d.balance?.status || "missing");
     if (!rows.length) {
-      dsTotals.value = { pro: 0, flash: 0, cost: 0 };
+      dsTotals.value = {
+        pro: 0,
+        flash: 0,
+        tokens: d.usage?.totals?.tokens || 0,
+        requests: d.usage?.totals?.requests || 0,
+        costCny: d.usage?.totals?.estimated_cost_cny || 0,
+        costUsd: d.usage?.totals?.estimated_cost_usd || 0,
+        balanceText,
+        balanceStatus,
+      };
       return;
     }
     const dates = Array.from(new Set(rows.map((r: any) => String(r.utc_date || "").slice(0, 10)).filter(Boolean))).sort();
@@ -414,7 +448,12 @@ async function drawDSChart() {
     dsTotals.value = {
       pro: proRows.reduce((s: number, r: any) => s + (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0), 0),
       flash: flashRows.reduce((s: number, r: any) => s + (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0), 0),
-      cost: rows.reduce((s: number, r: any) => s + (r.cost_cny||0), 0),
+      tokens: d.usage?.totals?.tokens || rows.reduce((s: number, r: any) => s + (r.total_tokens||0), 0),
+      requests: d.usage?.totals?.requests || rows.reduce((s: number, r: any) => s + (r.requests||0), 0),
+      costCny: d.usage?.totals?.estimated_cost_cny || rows.reduce((s: number, r: any) => s + (r.estimated_cost_cny||r.cost_cny||0), 0),
+      costUsd: d.usage?.totals?.estimated_cost_usd || rows.reduce((s: number, r: any) => s + (r.estimated_cost_usd||0), 0),
+      balanceText,
+      balanceStatus,
     };
 
     const models = [
@@ -473,8 +512,8 @@ async function drawDSChart() {
         const W = costCanvas.offsetWidth || 320, H = costCanvas.offsetHeight || 82;
         costCanvas.width = W * dpr; costCanvas.height = H * dpr;
         ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
-        const costs = rows.filter((r: any) => r.cost_cny > 0);
-        const maxCost = Math.max(...costs.map((r: any) => r.cost_cny), 1);
+        const costs = rows.filter((r: any) => (r.estimated_cost_cny || r.cost_cny || 0) > 0);
+        const maxCost = Math.max(...costs.map((r: any) => r.estimated_cost_cny || r.cost_cny || 0), 1);
         const leftPad = 34, botPad = 14, chartH = H - 8 - botPad;
         const slotWc = (W - leftPad - 2) / dates.length;
         const barWc = Math.max(2, Math.min(16, slotWc * 0.38));
@@ -486,7 +525,7 @@ async function drawDSChart() {
           ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W-2, y); ctx.stroke();
         }
         const costByDate: Record<string, number> = {};
-        for (const r of costs) costByDate[r.utc_date] = (costByDate[r.utc_date]||0) + r.cost_cny;
+        for (const r of costs) costByDate[r.utc_date] = (costByDate[r.utc_date]||0) + (r.estimated_cost_cny || r.cost_cny || 0);
         const costDates = dates.filter(d => costByDate[d] > 0);
         if (costDates.length > 0) {
           for (const date of costDates) {
@@ -663,6 +702,16 @@ onUnmounted(() => {
   font-family: "JetBrains Mono", monospace;
   font-size: 15px;
 }
+.usage-summary small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-disabled);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.usage-balance strong { color: rgba(34,197,94,0.95); }
+.usage-balance { border-left: 2px solid rgba(34,197,94,0.35) !important; }
 .usage-pro strong { color: rgba(6,182,212,0.95); }
 .usage-pro { border-left: 2px solid rgba(6,182,212,0.35) !important; }
 .usage-flash strong { color: rgba(124,58,237,0.95); }
@@ -672,6 +721,20 @@ onUnmounted(() => {
 .chart-stack {
   display: grid;
   gap: 10px;
+}
+.usage-empty {
+  min-height: 116px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  border: 1px solid rgba(125, 211, 252, 0.06);
+  border-radius: 7px;
+  background: rgba(3, 10, 18, 0.18);
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
 }
 .chart-block {
   min-height: 142px;

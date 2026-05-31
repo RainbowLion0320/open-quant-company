@@ -105,7 +105,7 @@ strategies:
    日频: scripts/cron_fetch_daily.py → dimension_path("ohlcv_daily", symbol=...)
    慢速: scripts/cron_fetch_extra.py --slow-only
    月频: Macro Monthly Refresh (1日) + Financial Monthly Refresh (3日)
-   DeepSeek: scripts/ingest_deepseek_cdp.py → Chrome CDP
+   DeepSeek: official /user/balance + project API response usage ledger
 
    路径统一由 DataHub.dimension_path() 从 data_registry 的 cache 模式展开:
    data/store/stock/daily/{symbol}.parquet        ← "stock/daily/{symbol}.parquet"

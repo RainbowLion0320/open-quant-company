@@ -187,53 +187,75 @@ def test_limit_list_fetch_does_not_sleep_before_first_request(tmp_path, monkeypa
     assert sleeps == []
 
 
-def test_deepseek_cdp_parser_joins_daily_cost_with_monthly_tokens():
-    from scripts.ingest_deepseek_cdp import _parse_daily
+def test_deepseek_usage_normalizes_api_response_usage_with_official_pricing():
+    from data.deepseek_usage import normalize_deepseek_usage
 
-    amount_payload = {
-        "data": {
-            "biz_data": {
-                "total": [
-                    {
-                        "model": "deepseek-v4-pro",
-                        "usage": [
-                            {"type": "PROMPT_CACHE_MISS_TOKEN", "amount": "10"},
-                            {"type": "RESPONSE_TOKEN", "amount": "5"},
-                            {"type": "REQUEST", "amount": "2"},
-                        ],
-                        "cost": "0.12",
-                    }
-                ]
-            }
-        }
-    }
-    cost_payload = {
-        "data": {
-            "biz_data": {
-                "days": [
-                    {
-                        "date": "2026-06-02",
-                        "data": [
-                            {
-                                "model": "deepseek-v4-pro",
-                                "usage": [
-                                    {"type": "PROMPT_CACHE_MISS_TOKEN", "amount": "0.08"},
-                                    {"type": "RESPONSE_TOKEN", "amount": "0.04"},
-                                ],
-                            }
-                        ],
-                    }
-                ]
-            }
-        }
-    }
+    row = normalize_deepseek_usage(
+        "deepseek-v4-pro",
+        {
+            "prompt_cache_hit_tokens": 1000,
+            "prompt_cache_miss_tokens": 2000,
+            "completion_tokens": 3000,
+            "total_tokens": 6000,
+        },
+        source="unit",
+        created_at="2026-06-02T12:00:00+00:00",
+    )
 
-    df = _parse_daily(cost_payload, amount_payload)
-    row = df.iloc[0].to_dict()
     assert row["utc_date"] == "2026-06-02"
-    assert row["total_tokens"] == 15
-    assert row["requests"] == 2
-    assert row["cost_cny"] == 0.12
+    assert row["usage_source"] == "api_response"
+    assert row["input_cache_hit"] == 1000
+    assert row["input_cache_miss"] == 2000
+    assert row["output_tokens"] == 3000
+    assert row["total_tokens"] == 6000
+    assert row["estimated_cost_usd"] == round((1000 * 0.003625 + 2000 * 0.435 + 3000 * 0.87) / 1_000_000, 9)
+    assert row["estimated_cost_cny"] > row["estimated_cost_usd"]
+
+
+def test_deepseek_usage_payload_combines_official_balance_and_project_ledger(monkeypatch):
+    import web.api.services.system_monitor as monitor
+
+    monkeypatch.setattr(
+        monitor,
+        "fetch_deepseek_balance",
+        lambda: {
+            "status": "ok",
+            "is_available": True,
+            "balance_infos": [{"currency": "CNY", "total_balance": "88.00", "granted_balance": "8.00", "topped_up_balance": "80.00"}],
+        },
+    )
+    monkeypatch.setattr(
+        monitor,
+        "summarize_deepseek_project_usage",
+        lambda days=30: {
+            "daily": [
+                {
+                    "utc_date": "2026-06-02",
+                    "model": "deepseek-v4-pro",
+                    "input_cache_hit": 1000,
+                    "input_cache_miss": 2000,
+                    "output_tokens": 3000,
+                    "total_tokens": 6000,
+                    "requests": 1,
+                    "estimated_cost_usd": 0.0009,
+                    "estimated_cost_cny": 0.0065,
+                    "usage_source": "api_response",
+                }
+            ],
+            "models": ["deepseek-v4-pro"],
+            "dates": ["2026-06-02"],
+            "totals": {"tokens": 6000, "requests": 1, "estimated_cost_usd": 0.0009, "estimated_cost_cny": 0.0065},
+            "status": "ok",
+        },
+    )
+
+    payload = monitor.deepseek_usage_payload()
+
+    assert payload["status"] == "ok"
+    assert payload["source"] == "official_balance_api+project_usage_ledger"
+    assert payload["balance"]["is_available"] is True
+    assert payload["usage"]["totals"]["tokens"] == 6000
+    assert payload["data"][0]["usage_source"] == "api_response"
 
 
 def test_monitor_is_read_only_but_keeps_system_status_cards():
@@ -250,6 +272,37 @@ def test_monitor_is_read_only_but_keeps_system_status_cards():
     assert "api.apiHealth()" in monitor
     assert "api.serviceStatus()" in monitor
     assert "api.cronJobs()" in monitor
+
+
+def test_cron_jobs_payload_coerces_nullable_status_fields(monkeypatch, tmp_path):
+    import json
+    import web.api.services.system_integrations as integrations
+
+    cron_root = tmp_path / ".hermes" / "cron"
+    cron_root.mkdir(parents=True)
+    (cron_root / "jobs.json").write_text(
+        json.dumps({
+            "jobs": [
+                {
+                    "name": "nullable",
+                    "schedule_display": "daily",
+                    "last_run_at": None,
+                    "last_status": None,
+                    "next_run_at": None,
+                    "enabled": True,
+                }
+            ]
+        }),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(integrations.Path, "home", lambda: tmp_path)
+
+    payload = integrations.cron_jobs_payload()
+
+    assert payload["jobs"][0]["last_run"] == ""
+    assert payload["jobs"][0]["last_status"] == ""
+    assert payload["jobs"][0]["next_run"] == ""
 
 
 def test_settings_cancel_reverts_pending_toggle():

@@ -95,9 +95,9 @@ def cron_jobs_payload() -> dict:
         compact.append({
             "name": job.get("name", ""),
             "schedule": job.get("schedule_display", ""),
-            "last_run": job.get("last_run_at"),
-            "last_status": job.get("last_status"),
-            "next_run": job.get("next_run_at"),
+            "last_run": job.get("last_run_at") or "",
+            "last_status": job.get("last_status") or "",
+            "next_run": job.get("next_run_at") or "",
             "enabled": job.get("enabled", True),
             "state": job.get("state", ""),
             "no_agent": job.get("no_agent", False),

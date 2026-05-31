@@ -640,3 +640,29 @@ def test_tracked_project_context_uses_canonical_astrolabe_names():
                 break
 
     assert offenders == []
+
+
+def test_deepseek_usage_no_longer_depends_on_platform_scraping_backfills():
+    assert not Path("scripts", "ingest_deepseek_" + "cdp.py").exists()
+    assert not Path("scripts", "ingest_deepseek_" + "usage.py").exists()
+
+    tracked_files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+    offenders = []
+    forbidden = [
+        "/api/v0/usage/" + "cost",
+        "/api/v0/usage/" + "amount",
+        "daily_" + "usage.parquet",
+        "ingest_deepseek_" + "cdp",
+        "ingest_deepseek_" + "usage",
+        "usage_" + "data_",
+        "amount-*" + ".csv",
+        "cost-*" + ".csv",
+    ]
+    for raw_path in tracked_files:
+        path = Path(raw_path)
+        if not path.exists() or path.suffix not in {".py", ".md", ".ts", ".vue", ".yaml"}:
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        offenders.extend(f"{path}:{token}" for token in forbidden if token in text)
+
+    assert offenders == []

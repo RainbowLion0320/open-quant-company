@@ -93,7 +93,7 @@ COMPUTED_HEALTH_META: dict[str, HealthTableMeta] = {
     "paper_nav": HealthTableMeta("paper_nav", "PaperBroker (模拟)", "模拟交易净值"),
     "paper_state": HealthTableMeta("paper_state", "PaperBroker (模拟)", "模拟账户状态"),
     "system_deepseek_usage": HealthTableMeta(
-        "system_deepseek_usage", "DeepSeek API", "DeepSeek Token 用量",
+        "system_deepseek_usage", "DeepSeek API", "本项目 DeepSeek API 用量账本",
         freshness_sla_days=2, repair_policy="manual", partition_key="utc_date",
     ),
     "features_all": HealthTableMeta("features_all", "Computed (多源融合)", "PIT 特征切片 (全量)", partition_key="month"),

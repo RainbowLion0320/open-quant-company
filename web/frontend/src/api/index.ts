@@ -417,6 +417,22 @@ export interface SystemHistoryResponse {
 
 export interface DeepSeekUsageResponse {
   data: any[];
+  source?: string;
+  balance?: {
+    status: string;
+    is_available: boolean;
+    balance_infos: { currency: string; total_balance: string; granted_balance: string; topped_up_balance: string }[];
+    message?: string;
+  };
+  usage?: {
+    status: string;
+    daily: any[];
+    models: string[];
+    dates: string[];
+    totals: { tokens: number; requests: number; estimated_cost_usd: number; estimated_cost_cny: number };
+    pricing_source?: string;
+  };
+  total_cost?: number;
   status?: string;
   message?: string;
 }
