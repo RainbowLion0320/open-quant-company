@@ -211,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
 import { api, type SystemMonitor } from "../api";
 import { fmtPercentValue, fmtShortCount } from "../utils/format";
 
@@ -439,6 +439,7 @@ async function drawDSChart() {
       };
       return;
     }
+    await nextTick();
     const dates = Array.from(new Set(rows.map((r: any) => String(r.utc_date || "").slice(0, 10)).filter(Boolean))).sort();
     if (!dates.length) return;
     const rowByDate: Record<string, any> = {};
@@ -473,6 +474,15 @@ async function drawDSChart() {
       ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
 
       const modelRows = rows.filter((r: any) => r.model === model.key);
+      const modelHasUsage = modelRows.some((r: any) => (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0) > 0);
+      if (!modelHasUsage) {
+        ctx.fillStyle = "#475569";
+        ctx.font = "10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("no project calls", W / 2, H / 2);
+        ctx.textAlign = "start";
+        continue;
+      }
       const maxVal = Math.max(...modelRows.map((r: any) => (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0)), 1);
       const leftPad = 34, botPad = 16;
       const chartH = H - 6 - botPad;
@@ -518,9 +528,14 @@ async function drawDSChart() {
         const slotWc = (W - leftPad - 2) / dates.length;
         const barWc = Math.max(2, Math.min(16, slotWc * 0.38));
         ctx.fillStyle = "#64748b"; ctx.font = "8px monospace";
+        const fmtCostTick = (v: number) => {
+          if (maxCost >= 100) return "¥" + v.toFixed(0);
+          if (maxCost >= 1) return "¥" + v.toFixed(2);
+          return "¥" + v.toFixed(3);
+        };
         for (let t = 0; t <= maxCost; t += maxCost / 3) {
           const y = H - botPad - (t / maxCost) * chartH;
-          ctx.fillText("¥"+t.toFixed(0), 2, y+3);
+          ctx.fillText(fmtCostTick(t), 2, y+3);
           ctx.strokeStyle = "rgba(148,163,184,0.05)"; ctx.lineWidth = 0.5;
           ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W-2, y); ctx.stroke();
         }

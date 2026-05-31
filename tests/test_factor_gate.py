@@ -173,3 +173,34 @@ class TestFormulaToDSL:
         from scripts.factor_hypothesis import _formula_to_dsl
         result = _formula_to_dsl("open_t", "test_factor")
         assert "Ref('open')" in result
+
+
+class TestLLMFactorParsing:
+    def test_parses_unfenced_json_array(self):
+        from scripts.factor_hypothesis import _parse_llm_candidates
+
+        text = """
+        [
+          {"name": "flow_reversal", "formula": "MF_MAIN_NET / volume_t", "expected_sign": "positive", "description": "flow pressure"},
+          {"name": "holder_squeeze", "formula": "-HOLDER_CHANGE", "expected_sign": "positive"}
+        ]
+        """
+
+        candidates = _parse_llm_candidates(text)
+
+        assert [c.name for c in candidates] == ["flow_reversal", "holder_squeeze"]
+        assert candidates[0].formula == "MF_MAIN_NET / volume_t"
+
+    def test_parses_fenced_json_object(self):
+        from scripts.factor_hypothesis import _parse_llm_candidates
+
+        text = """
+        ```json
+        {"name": "vol_breakout", "formula": "volume_t / MA(volume,20)", "expected_sign": "positive"}
+        ```
+        """
+
+        candidates = _parse_llm_candidates(text)
+
+        assert len(candidates) == 1
+        assert candidates[0].name == "vol_breakout"

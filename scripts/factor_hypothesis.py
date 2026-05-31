@@ -198,24 +198,81 @@ def generate_via_llm(n: int, existing: List[str],
     if hasattr(response, 'usage') and response.usage:
         _log_llm_usage("factor_hypothesis", response.usage, "deepseek-v4-pro")
 
+    return _parse_llm_candidates(text)
+
+
+def _parse_llm_candidates(text: str) -> List[FactorCandidate]:
+    """Parse factor candidates from fenced or plain JSON LLM output."""
     candidates = []
-    json_blocks = re.findall(r'```json\s*(.*?)\s*```', text, re.DOTALL)
-    for block in json_blocks:
+    blocks = re.findall(r'```(?:json)?\s*(.*?)\s*```', text or "", re.DOTALL)
+    if not blocks:
+        blocks = _extract_json_fragments(text or "")
+
+    for block in blocks:
         try:
             items = json.loads(block)
-            if isinstance(items, dict):
-                items = [items]
-            for item in items:
-                candidates.append(FactorCandidate(
-                    name=item.get("name", ""),
-                    formula=item.get("formula", ""),
-                    expected_sign=item.get("expected_sign", ""),
-                    description=item.get("description", ""),
-                ))
         except json.JSONDecodeError:
-            pass
+            continue
+        if isinstance(items, dict):
+            items = [items]
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name", "")).strip()
+            formula = str(item.get("formula", "")).strip()
+            if not name or not formula:
+                continue
+            candidates.append(FactorCandidate(
+                name=name,
+                formula=formula,
+                expected_sign=str(item.get("expected_sign", "")).strip(),
+                description=str(item.get("description", "")).strip(),
+            ))
 
     return candidates
+
+
+def _extract_json_fragments(text: str) -> List[str]:
+    """Extract top-level JSON object/array fragments from free-form text."""
+    fragments = []
+    stack = []
+    start = None
+    in_string = False
+    escape = False
+
+    for i, ch in enumerate(text):
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+            continue
+        if ch in "[{":
+            if not stack:
+                start = i
+            stack.append(ch)
+            continue
+        if ch not in "]}":
+            continue
+        if not stack:
+            continue
+        opener = stack.pop()
+        if (opener, ch) not in {("[", "]"), ("{", "}")}:
+            stack.clear()
+            start = None
+            continue
+        if not stack and start is not None:
+            fragments.append(text[start : i + 1])
+            start = None
+    return fragments
 
 
 # ══════════════════════════════════════════════════════════
