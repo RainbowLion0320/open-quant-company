@@ -155,6 +155,56 @@ def _extract_index_features(df: pd.DataFrame) -> pd.DataFrame:
 # Bond correlation (optional)
 # ---------------------------------------------------------------------------
 
+
+def load_bond_returns() -> pd.Series | None:
+    """Load 10Y treasury bond daily returns from local parquet.
+
+    Returns a pd.Series indexed by date, or None if data unavailable.
+    Uses the same synthetic return formula as research/regime_training.py.
+    """
+    from pathlib import Path
+
+    path = Path("data/store/bond/treasury_yields.parquet")
+    if not path.exists():
+        return None
+    try:
+        import pyarrow.parquet as pq
+        frame = pq.read_table(path).to_pandas()
+    except Exception:
+        return None
+
+    if frame.empty:
+        return None
+
+    # Find the 10Y yield column
+    yld_col = None
+    for candidate in ["中国国债收益率10年", "cn10y", "10y"]:
+        if candidate in frame.columns:
+            yld_col = candidate
+            break
+    if yld_col is None:
+        return None
+
+    # Parse dates
+    if "date" in frame.columns:
+        dates = pd.to_datetime(frame["date"], errors="coerce")
+    elif "日期" in frame.columns:
+        dates = pd.to_datetime(frame["日期"], errors="coerce")
+    else:
+        dates = pd.to_datetime(frame.index, errors="coerce")
+
+    yld = pd.to_numeric(frame[yld_col], errors="coerce")
+    proxy = pd.DataFrame({"date": dates.values, "yield": yld.values}).dropna().sort_values("date")
+    if proxy.empty:
+        return None
+
+    rate = proxy["yield"] / 100.0
+    duration = 7.0
+    daily_return = (rate.shift(1).fillna(rate) / 252.0) - duration * rate.diff().fillna(0.0)
+    daily_return = daily_return.clip(-0.03, 0.03).fillna(0.0)
+    daily_return.index = pd.to_datetime(proxy["date"])
+    return daily_return
+
 def _compute_stock_bond_correlation(
     equity_returns: pd.Series,
     bond_returns: pd.Series | None,
@@ -243,10 +293,27 @@ def build_regime_features(
     if feat.empty:
         return pd.DataFrame()
 
-    # Compute breadth_raw from provided metrics
-    feat["breadth_raw"] = breadth_strength(
-        advance_ratio, breadth_above_ma20, breadth_above_ma60, breadth_above_ma120
-    )
+    # Compute breadth_raw as a rolling time series from index data.
+    # The scalar breadth_* parameters are the latest snapshot; for HMM features
+    # we need a historical series so that breadth_momentum = diff(5) has real variation.
+    close = data["close"].astype(float)
+    ret = close.pct_change()
+    ma20 = close.rolling(20, min_periods=20).mean()
+    ma60 = close.rolling(60, min_periods=60).mean()
+    ma120 = close.rolling(120, min_periods=120).mean()
+
+    # Rolling proxies for breadth components
+    rolling_advance = (ret > 0).astype(float).rolling(5, min_periods=3).mean()
+    rolling_above_ma20 = (close > ma20).astype(float)
+    rolling_above_ma60 = (close > ma60).astype(float)
+    rolling_above_ma120 = (close > ma120).astype(float)
+
+    feat["breadth_raw"] = (
+        0.35 * rolling_advance
+        + 0.30 * rolling_above_ma20
+        + 0.25 * rolling_above_ma60
+        + 0.10 * rolling_above_ma120
+    ).fillna(0.0)
 
     # Volume raw from volume_strength
     vol_value, _vol_label, _vol_detail = volume_strength(

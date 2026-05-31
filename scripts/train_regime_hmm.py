@@ -52,7 +52,7 @@ def _build_features_for_training(
     breadth_history: pd.DataFrame | None,
 ) -> pd.DataFrame:
     """Build the feature DataFrame for HMM training."""
-    from cybernetics.features import build_regime_features
+    from cybernetics.features import build_regime_features, load_bond_returns
 
     breadth_kwargs = {}
     if breadth_history is not None and not breadth_history.empty:
@@ -68,7 +68,8 @@ def _build_features_for_training(
             "sample_size": int(latest.get("sample_size", 0)),
         }
 
-    features = build_regime_features(index_frames, **breadth_kwargs)
+    bond_ret = load_bond_returns()
+    features = build_regime_features(index_frames, bond_returns=bond_ret, **breadth_kwargs)
     return features
 
 

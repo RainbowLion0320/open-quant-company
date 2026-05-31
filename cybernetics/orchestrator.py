@@ -895,6 +895,10 @@ def _hmm_detect(
         raise FileNotFoundError(f"HMM model not found at {mp}")
 
     # Build features
+    # Load bond returns for stock-bond correlation feature
+    from cybernetics.features import load_bond_returns
+    bond_ret = load_bond_returns()
+
     features = build_regime_features(
         index_frames,
         breadth_raw=_score_breadth_strength(
@@ -907,6 +911,7 @@ def _hmm_detect(
         advance_ratio=breadth.advance_ratio,
         up_amount_ratio=volume.up_amount_ratio,
         sample_size=breadth.sample_size,
+        bond_returns=bond_ret,
     )
     if features.empty:
         raise ValueError("Feature construction returned empty DataFrame")
