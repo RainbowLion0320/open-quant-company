@@ -1,6 +1,8 @@
 """Data health and repair job services for system API routes."""
 from __future__ import annotations
 
+import contextlib
+import io
 import os
 import subprocess
 import sys
@@ -94,6 +96,18 @@ def repairable_tables() -> set[str]:
             "stock_moneyflow_daily", "stock_moneyflow_tushare_daily", "stock_moneyflow_monthly",
             "fund_daily", "fund_portfolio", "fund_nav", "futures_daily",
         }
+
+
+def freshness_gate_from_health_check() -> tuple[dict[str, object], int]:
+    """Run DB health check quietly and return the shared freshness gate payload."""
+    from data.freshness_gate import freshness_gate_from_health_result
+    from scripts.db_health_check import run_health_check
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        result = run_health_check()
+    return freshness_gate_from_health_result(result)
 
 
 def run_repair(table: str, job_id: str) -> None:

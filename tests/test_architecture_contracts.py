@@ -307,6 +307,39 @@ def test_system_route_delegates_large_status_domains_to_services():
     assert "def _repairable_tables(" not in route_text
 
 
+def test_web_api_does_not_depend_on_cli_commands():
+    offenders = []
+    for path in Path("web/api").rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        if "astrolabe_cli" in text:
+            offenders.append(str(path))
+
+    assert offenders == []
+
+
+def test_pipeline_service_does_not_depend_on_entrypoint_scripts():
+    text = Path("web/api/services/pipeline.py").read_text(encoding="utf-8")
+
+    assert "from scripts." not in text
+    assert "import scripts." not in text
+
+
+def test_data_freshness_gate_is_shared_outside_cli_layer():
+    from data.freshness_gate import freshness_gate, health_result_to_gate_data
+
+    rows = health_result_to_gate_data([
+        {"table": "stock_daily", "freshness_status": "stale", "missing_pct": 0},
+        {"table": "macro_gdp", "freshness_status": "missing", "missing_pct": 100},
+        {"table": "features_all", "freshness_status": "fresh", "missing_pct": 0},
+    ])
+
+    assert freshness_gate(rows) == {
+        "ok": False,
+        "stale": ["stock_daily"],
+        "missing": ["macro_gdp"],
+    }
+
+
 def test_portfolio_sector_exposure_reuses_sector_service():
     route_text = Path("web/api/routes/portfolio.py").read_text()
 

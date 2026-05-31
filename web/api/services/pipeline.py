@@ -225,6 +225,7 @@ def build_market_regime_pipeline() -> dict[str, object]:
 def build_data_quality_pipeline() -> dict[str, object]:
     """Build Data Quality pipeline payload."""
     from data.data_registry import get_registry
+    from web.api.services.system_data_health import freshness_gate_from_health_check
 
     reg = get_registry()
     dims = reg.get_enabled() if hasattr(reg, "get_enabled") else []
@@ -234,7 +235,6 @@ def build_data_quality_pipeline() -> dict[str, object]:
     stale_count = 0
     missing_count = 0
     try:
-        from astrolabe_cli.commands.data import freshness_gate_from_health_check
         gate, _rows = freshness_gate_from_health_check()
         gate_ok = gate.get("ok", True)
         stale_count = len(gate.get("stale", []))

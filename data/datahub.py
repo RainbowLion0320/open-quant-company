@@ -2,54 +2,26 @@
 DataHub — centralized data storage facade.
 
 The project deliberately keeps Parquet as the durable store and DuckDB as the
-query engine.  DataHub is the missing middle layer: one place for paths,
-atomic Parquet writes, append semantics, latest-batch reads and lightweight
-storage auditing.
+query engine. DataHub is the stable facade: one public entry point for paths,
+atomic Parquet writes, append semantics, latest-batch reads, dimensions,
+manifest metadata, and lightweight storage auditing.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import re
-import hashlib
 import uuid
-import fcntl
-from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
 
 import pandas as pd
 
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-
-def _resolve_path(path: str | os.PathLike, base: Path = PROJECT_ROOT) -> Path:
-    raw = os.path.expandvars(os.path.expanduser(str(path)))
-    resolved = Path(raw)
-    if not resolved.is_absolute():
-        resolved = base / resolved
-    return resolved.resolve()
-
-
-def _safe_leaf(value: str, label: str = "name") -> str:
-    text = str(value).strip()
-    if not text or "/" in text or "\\" in text or text in {".", ".."}:
-        raise ValueError(f"Invalid {label}: {value!r}")
-    return text
-
-
-_PLACEHOLDER_RE = re.compile(r"\{([A-Za-z0-9_]+)\}")
-_DATE_COLUMNS = ("date", "trade_date", "ann_date", "end_date", "ts", "quarter", "utc_date", "month")
-
-
-def _ensure_relative_store_pattern(pattern: str) -> Path:
-    path = Path(str(pattern).strip())
-    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
-        raise ValueError(f"Invalid registry cache pattern: {pattern!r}")
-    return path
+from data.datahub_dimensions import DimensionStore
+from data.datahub_manifest import ManifestStore
+from data.datahub_parquet import ParquetStore
+from data.datahub_paths import DataHubPaths, PROJECT_ROOT, env_first, resolve_path
 
 
 @dataclass(frozen=True)
@@ -63,14 +35,6 @@ class DatasetSpec:
     description: str = ""
 
 
-def _env_first(*names: str) -> str:
-    for name in names:
-        value = os.environ.get(name, "")
-        if value:
-            return value
-    return ""
-
-
 class DataHub:
     """Unified local data hub for the 星盘 repository."""
 
@@ -81,188 +45,152 @@ class DataHub:
         project_root: str | os.PathLike | None = None,
         create: bool = True,
     ):
-        self.project_root = _resolve_path(project_root or PROJECT_ROOT)
-        store_default = _env_first("ASTROLABE_STORE") or self.project_root / "data" / "store"
-        cache_default = _env_first("ASTROLABE_CACHE") or self.project_root / "data" / "cache"
-        self.store_root = _resolve_path(store_root or store_default, self.project_root)
-        self.cache_root = _resolve_path(cache_root or cache_default, self.project_root)
+        project = resolve_path(project_root or PROJECT_ROOT)
+        store_default = env_first("ASTROLABE_STORE") or project / "data" / "store"
+        cache_default = env_first("ASTROLABE_CACHE") or project / "data" / "cache"
+
+        self.paths = DataHubPaths(project, store_root or store_default, cache_root or cache_default)
+        self.project_root = self.paths.project_root
+        self.store_root = self.paths.store_root
+        self.cache_root = self.paths.cache_root
+
+        self.manifest = ManifestStore(self.paths)
+        self.parquet = ParquetStore(self.paths, self.manifest)
+        self.dimensions = DimensionStore(self.paths, self.parquet.list_parquet)
+
         if create:
             self.ensure_layout()
+
+    @property
+    def project_root(self) -> Path:
+        return self.paths.project_root
+
+    @project_root.setter
+    def project_root(self, value: str | os.PathLike) -> None:
+        self.paths.project_root = resolve_path(value)
+
+    @property
+    def store_root(self) -> Path:
+        return self.paths.store_root
+
+    @store_root.setter
+    def store_root(self, value: str | os.PathLike) -> None:
+        self.paths.store_root = resolve_path(value, self.paths.project_root)
+
+    @property
+    def cache_root(self) -> Path:
+        return self.paths.cache_root
+
+    @cache_root.setter
+    def cache_root(self, value: str | os.PathLike) -> None:
+        self.paths.cache_root = resolve_path(value, self.paths.project_root)
 
     # ── Directory layout ─────────────────────────────────────
 
     def ensure_layout(self) -> None:
-        for path in [
-            self.store_root,
-            self.cache_root,
-            self.manifest_dir(),
-            self.signals_dir(),
-            self.signals_prev_dir(),
-            self.features_dir(),
-            self.paper_dir(),
-            self.store_path("stock"),
-            self.store_path("macro"),
-            self.store_path("fund"),
-            self.store_path("futures"),
-            self.store_path("bond"),
-            self.store_path("sector"),
-        ]:
-            path.mkdir(parents=True, exist_ok=True)
+        self.paths.ensure_layout()
 
     def resolve_path(self, path: str | os.PathLike, base: Path | None = None) -> Path:
-        return _resolve_path(path, base or self.project_root)
+        return self.paths.resolve_path(path, base)
 
     def store_path(self, asset_type: str | None = None) -> Path:
-        """Return a store path without creating directories."""
-        if asset_type is None:
-            return self.store_root
-        return self.store_root / _safe_leaf(asset_type, "asset_type")
+        return self.paths.store_path(asset_type)
 
     def store_dir(self, asset_type: str | None = None) -> Path:
-        if asset_type is None:
-            return self.store_root
-        path = self.store_path(asset_type)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+        return self.paths.store_dir(asset_type)
 
     def stock_data_dir(self, name: str) -> Path:
-        """Stock-level data directory under data/store/stock/{name}/."""
-        path = self.store_root / "stock" / _safe_leaf(name, "name")
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+        return self.paths.stock_data_dir(name)
 
     def signals_dir(self) -> Path:
-        return self.store_root / "signals"
+        return self.paths.signals_dir()
 
     def signals_prev_dir(self) -> Path:
-        return self.store_root / "signals_prev"
+        return self.paths.signals_prev_dir()
 
     def signal_path(self, strategy: str) -> Path:
-        return self.signals_dir() / f"{_safe_leaf(strategy, 'strategy')}.parquet"
+        return self.paths.signal_path(strategy)
 
     def signal_prev_path(self, strategy: str) -> Path:
-        return self.signals_prev_dir() / f"{_safe_leaf(strategy, 'strategy')}.parquet"
+        return self.paths.signal_prev_path(strategy)
 
     def buffett_scan_path(self) -> Path:
-        return self.signals_dir() / "buffett_scan.parquet"
+        return self.paths.buffett_scan_path()
 
     def scan_meta_path(self) -> Path:
-        return self.store_root / "scan_meta.parquet"
+        return self.paths.scan_meta_path()
 
     def features_dir(self) -> Path:
-        return self.store_root / "features"
+        return self.paths.features_dir()
 
     def feature_path(self, month: str) -> Path:
-        return self.features_dir() / f"{_safe_leaf(month, 'month')}.parquet"
+        return self.paths.feature_path(month)
 
     def paper_dir(self) -> Path:
-        return self.store_root / "paper"
+        return self.paths.paper_dir()
 
     def paper_path(self, name: str) -> Path:
-        return self.paper_dir() / f"{_safe_leaf(name, 'paper dataset')}.parquet"
+        return self.paths.paper_path(name)
 
     def macro_path(self, name: str) -> Path:
-        return self.store_path("macro") / f"{_safe_leaf(name, 'macro dataset')}.parquet"
+        return self.paths.macro_path(name)
 
     def asset_daily_path(self, asset_type: str, symbol: str) -> Path:
-        return self.store_path(asset_type) / "daily" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+        return self.paths.asset_daily_path(asset_type, symbol)
 
     def stock_daily_path(self, symbol: str) -> Path:
-        """OHLCV 日线 per-symbol parquet."""
-        return self.store_path("stock") / "daily" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+        return self.paths.stock_daily_path(symbol)
 
     def stock_financial_path(self, symbol: str) -> Path:
-        """财务摘要 per-symbol parquet."""
-        return self.store_path("stock") / "financials" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+        return self.paths.stock_financial_path(symbol)
 
     def stock_fina_indicator_path(self, symbol: str) -> Path:
-        """Tushare 财务指标 per-symbol parquet."""
-        return self.store_path("stock") / "fina_indicator" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+        return self.paths.stock_fina_indicator_path(symbol)
 
     def stock_valuation_path(self, symbol: str) -> Path:
-        """每日估值 PE/PB/PS per-symbol parquet."""
-        return self.store_path("stock") / "valuation" / f"{_safe_leaf(symbol, 'symbol')}.parquet"
+        return self.paths.stock_valuation_path(symbol)
 
     def model_path(self, name: str) -> Path:
-        return self.project_root / "data" / "models" / f"{_safe_leaf(name, 'model dataset')}.parquet"
+        return self.paths.model_path(name)
 
     def system_monitor_path(self) -> Path:
-        return self.store_root / "system_monitor.db"
+        return self.paths.system_monitor_path()
 
     def token_usage_path(self) -> Path:
-        return self.cache_root / "token_usage.json"
+        return self.paths.token_usage_path()
 
     def llm_usage_path(self) -> Path:
-        return self.cache_root / "llm_usage_today.json"
+        return self.paths.llm_usage_path()
 
     def hindsight_tokens_path(self) -> Path:
-        return self.cache_root / "hindsight_tokens.json"
+        return self.paths.hindsight_tokens_path()
 
     def deepseek_usage_path(self) -> Path:
-        return self.store_path("deepseek") / "daily_usage.parquet"
+        return self.paths.deepseek_usage_path()
 
     def manifest_dir(self) -> Path:
-        return self.store_root / "_manifest"
+        return self.paths.manifest_dir()
 
     def manifest_path(self) -> Path:
-        return self.manifest_dir() / "datasets.parquet"
+        return self.paths.manifest_path()
 
     # ── Registry-backed dimension paths ─────────────────────
 
     def dimension_root(self, key: str) -> Path:
         """Return the stable root directory/file prefix for a data_registry dimension."""
-        from data.data_registry import get_registry
-
-        dim = get_registry().get(key)
-        if dim is None or not dim.cache:
-            raise KeyError(f"Unknown or uncached data dimension: {key}")
-        return self._registry_cache_root(dim.cache)
+        return self.dimensions.dimension_root(key)
 
     def dimension_path(self, key: str, **values: Any) -> Path:
-        """
-        Expand a data_registry cache pattern into a concrete path.
-
-        Example:
-          dimension_path("ohlcv_daily", symbol="000001")
-          -> data/store/stock/daily/000001.parquet
-        """
-        from data.data_registry import get_registry
-
-        dim = get_registry().get(key)
-        if dim is None or not dim.cache:
-            raise KeyError(f"Unknown or uncached data dimension: {key}")
-        pattern = str(_ensure_relative_store_pattern(dim.cache))
-        missing: list[str] = []
-
-        def repl(match: re.Match[str]) -> str:
-            name = match.group(1)
-            if name not in values:
-                missing.append(name)
-                return match.group(0)
-            return _safe_leaf(str(values[name]), name)
-
-        expanded = _PLACEHOLDER_RE.sub(repl, pattern)
-        if missing:
-            raise KeyError(f"Missing cache placeholder(s) for {key}: {', '.join(sorted(set(missing)))}")
-        rel = _ensure_relative_store_pattern(expanded)
-        return self.store_root.joinpath(*rel.parts)
+        """Expand a data_registry cache pattern into a concrete path."""
+        return self.dimensions.dimension_path(key, **values)
 
     def list_dimension_snapshots(self, key: str, pattern: str = "*.parquet") -> list[Path]:
         """Return sorted parquet snapshots for a registry-backed dimension."""
-        try:
-            root = self.dimension_root(key)
-        except Exception:
-            return []
-        if root.is_file():
-            return [root]
-        if not root.exists():
-            return []
-        return self.list_parquet(root, pattern)
+        return self.dimensions.list_dimension_snapshots(key, pattern)
 
     def latest_dimension_snapshot(self, key: str, pattern: str = "*.parquet") -> Path | None:
         """Return the latest parquet snapshot for a registry-backed dimension."""
-        candidates = self.list_dimension_snapshots(key, pattern)
-        return candidates[-1] if candidates else None
+        return self.dimensions.latest_dimension_snapshot(key, pattern)
 
     # ── Parquet helpers ──────────────────────────────────────
 
@@ -272,15 +200,7 @@ class DataHub:
         default: Optional[pd.DataFrame] = None,
         columns: Optional[Sequence[str]] = None,
     ) -> Optional[pd.DataFrame]:
-        target = self.resolve_path(path)
-        if not target.exists():
-            return default
-        try:
-            return pd.read_parquet(target, columns=columns)
-        except Exception:
-            if default is not None:
-                return default
-            raise
+        return self.parquet.read(path, default=default, columns=columns)
 
     def write_parquet(
         self,
@@ -291,17 +211,7 @@ class DataHub:
         producer: str | None = None,
         record_manifest: bool = True,
     ) -> Path:
-        target = self.resolve_path(path)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        tmp = target.with_name(f".tmp-{uuid.uuid4().hex}-{target.name}")
-        try:
-            df.to_parquet(tmp, index=index)
-            os.replace(tmp, target)
-        finally:
-            tmp.unlink(missing_ok=True)
-        if record_manifest and not self._is_manifest_path(target):
-            self._record_manifest(target, df, producer=producer)
-        return target
+        return self.parquet.write(df, path, index=index, producer=producer, record_manifest=record_manifest)
 
     def append_parquet(
         self,
@@ -310,137 +220,39 @@ class DataHub:
         dedupe_subset: Iterable[str] | None = None,
         sort_by: Iterable[str] | None = None,
     ) -> Path:
-        target = self.resolve_path(path)
-        if isinstance(rows, pd.DataFrame):
-            new_df = rows.copy()
-        elif isinstance(rows, dict):
-            new_df = pd.DataFrame([rows])
-        else:
-            new_df = pd.DataFrame(list(rows))
-
-        lock_path = target.with_suffix(".lock")
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(lock_path, "w") as lock_f:
-            fcntl.flock(lock_f, fcntl.LOCK_EX)
-            try:
-                existing = self.read_parquet(target, default=pd.DataFrame())
-                merged = pd.concat([existing, new_df], ignore_index=True) if existing is not None and len(existing) else new_df
-
-                if dedupe_subset:
-                    subset = [c for c in dedupe_subset if c in merged.columns]
-                    if subset:
-                        merged = merged.drop_duplicates(subset=subset, keep="last")
-                if sort_by:
-                    cols = [c for c in sort_by if c in merged.columns]
-                    if cols:
-                        merged = merged.sort_values(cols)
-
-                result = self.write_parquet(merged, target)
-            finally:
-                fcntl.flock(lock_f, fcntl.LOCK_UN)
-        return result
+        return self.parquet.append(path, rows, dedupe_subset=dedupe_subset, sort_by=sort_by)
 
     def latest_batch(self, path: str | os.PathLike, ts_col: str = "computed_at") -> pd.DataFrame:
-        df = self.read_parquet(path, default=pd.DataFrame())
-        if df is None or df.empty or ts_col not in df.columns:
-            return pd.DataFrame() if df is None else df
-        valid = df[ts_col].dropna()
-        if valid.empty:
-            return df
-        latest = valid.max()
-        return df[df[ts_col] == latest].copy()
+        return self.parquet.latest_batch(path, ts_col=ts_col)
 
     def list_parquet(self, directory: str | os.PathLike, pattern: str = "*.parquet") -> list[Path]:
-        path = self.resolve_path(directory)
-        if not path.exists():
-            return []
-        return sorted(path.glob(pattern))
+        return self.parquet.list_parquet(directory, pattern)
 
     # ── Manifest helpers ────────────────────────────────────
 
     def read_manifest(self) -> pd.DataFrame:
-        manifest = self.read_parquet(self.manifest_path(), default=pd.DataFrame())
-        return manifest if manifest is not None else pd.DataFrame()
+        return self.manifest.read()
 
     def manifest_for(self, path: str | os.PathLike) -> dict[str, Any]:
-        target = self.resolve_path(path)
-        rel = self._relative_to_project(target)
-        manifest = self.read_manifest()
-        if manifest.empty or "path" not in manifest.columns:
-            return {}
-        rows = manifest[manifest["path"] == rel]
-        if rows.empty:
-            return {}
-        return rows.iloc[-1].to_dict()
+        return self.manifest.for_path(path)
 
     def _is_manifest_path(self, target: Path) -> bool:
-        try:
-            target.relative_to(self.manifest_dir())
-            return True
-        except ValueError:
-            return False
+        return self.manifest.is_manifest_path(target)
 
     def _relative_to_project(self, target: Path) -> str:
-        try:
-            return str(target.relative_to(self.project_root))
-        except ValueError:
-            return str(target)
+        return self.manifest.relative_to_project(target)
 
     def _schema_hash(self, df: pd.DataFrame) -> str:
-        schema = "|".join(f"{col}:{df[col].dtype}" for col in df.columns)
-        return hashlib.sha256(schema.encode("utf-8")).hexdigest()[:16]
+        return self.manifest.schema_hash(df)
 
     def _file_sha256(self, path: Path) -> str:
-        digest = hashlib.sha256()
-        with open(path, "rb") as f:
-            for chunk in iter(lambda: f.read(1024 * 1024), b""):
-                digest.update(chunk)
-        return digest.hexdigest()
+        return self.manifest.file_sha256(path)
 
     def _date_range(self, df: pd.DataFrame) -> tuple[str, str, str]:
-        for col in df.columns:
-            if str(col).lower() not in _DATE_COLUMNS:
-                continue
-            try:
-                series = pd.to_datetime(df[col], errors="coerce").dropna()
-            except Exception:
-                continue
-            if not series.empty:
-                return col, series.min().date().isoformat(), series.max().date().isoformat()
-        return "", "", ""
+        return self.manifest.date_range(df)
 
     def _record_manifest(self, target: Path, df: pd.DataFrame, producer: str | None = None) -> None:
-        try:
-            date_col, date_min, date_max = self._date_range(df)
-            record = {
-                "path": self._relative_to_project(target),
-                "producer": producer or _env_first("ASTROLABE_PRODUCER"),
-                "row_count": int(len(df)),
-                "column_count": int(len(df.columns)),
-                "date_column": date_col,
-                "date_min": date_min,
-                "date_max": date_max,
-                "schema_hash": self._schema_hash(df),
-                "file_sha256": self._file_sha256(target),
-                "size_bytes": int(target.stat().st_size),
-                "updated_at": datetime.now().isoformat(),
-            }
-            manifest_path = self.manifest_path()
-            manifest_path.parent.mkdir(parents=True, exist_ok=True)
-            existing = pd.read_parquet(manifest_path) if manifest_path.exists() else pd.DataFrame()
-            next_df = pd.DataFrame([record])
-            if not existing.empty and "path" in existing.columns:
-                existing = existing[existing["path"] != record["path"]]
-                next_df = pd.concat([existing, next_df], ignore_index=True)
-            tmp = manifest_path.with_name(f".tmp-{uuid.uuid4().hex}-{manifest_path.name}")
-            try:
-                next_df.sort_values("path").to_parquet(tmp, index=False)
-                os.replace(tmp, manifest_path)
-            finally:
-                tmp.unlink(missing_ok=True)
-        except Exception:
-            # Manifest is observability metadata; it must never break data writes.
-            return
+        self.manifest.record(target, df, producer=producer)
 
     # ── JSON helpers ────────────────────────────────────────
 
@@ -449,7 +261,7 @@ class DataHub:
         if not target.exists():
             return default
         try:
-            with open(target) as f:
+            with open(target, encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return default
@@ -459,7 +271,7 @@ class DataHub:
         target.parent.mkdir(parents=True, exist_ok=True)
         tmp = target.with_name(f".tmp-{uuid.uuid4().hex}-{target.name}")
         try:
-            with open(tmp, "w") as f:
+            with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=indent)
             os.replace(tmp, target)
         finally:
@@ -500,13 +312,7 @@ class DataHub:
         return catalog
 
     def _registry_cache_root(self, pattern: str) -> Path:
-        rel = _ensure_relative_store_pattern(pattern)
-        parts = []
-        for part in rel.parts:
-            if "{" in part and "}" in part:
-                break
-            parts.append(part)
-        return self.store_root.joinpath(*parts) if parts else self.store_root
+        return self.paths.registry_cache_root(pattern)
 
     def audit(self, include_rows: bool = False) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []

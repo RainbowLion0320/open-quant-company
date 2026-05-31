@@ -65,6 +65,17 @@
 
 ### 2.2 DataHub — 统一数据中台
 
+`DataHub` 是外部稳定 facade，目标是把数据访问中心化，而不是让业务模块绕开它各自读写路径。内部实现按职责拆分：
+
+| 内部组件 | 文件 | 职责 |
+|----------|------|------|
+| `DataHubPaths` | `data/datahub_paths.py` | project/store/cache 路径、逻辑数据集路径、registry cache pattern 展开 |
+| `ParquetStore` | `data/datahub_parquet.py` | Parquet 读写、原子写入、追加锁、最新批次、目录扫描 |
+| `ManifestStore` | `data/datahub_manifest.py` | `_manifest/datasets.parquet` 读写、schema hash、文件 hash、日期范围 |
+| `DimensionStore` | `data/datahub_dimensions.py` | DataRegistry 维度 root/path/list/latest 解析 |
+
+上层模块继续只依赖 `data.datahub.DataHub` / `get_datahub()`。内部组件是 DataHub 的实现细节，用来降低维护复杂度，不替代 DataHub facade。
+
 | 操作 | 方法 | 关键保障 |
 |------|------|---------|
 | 读 | `read_parquet(path)` | 文件不存在返回 default |
@@ -151,6 +162,7 @@ AKShare/Tushare API
 | 注册表驱动路径 | dimension_path(key, **params) | 消除硬编码路径，新增维度只需改 yaml |
 | API 安全阀 | 默认不触网 | 回测和研究路径不应隐式触发网络请求 |
 | 财务数据三层缓存 | 内存→Parquet→API | 财务数据拉取慢（逐只股票），最大化缓存命中 |
+| DataHub facade | 外部 API 稳定，内部组件化 | 降低 DataHub 文件复杂度，不打散数据访问中心 |
 
 ## 5. 接口合约
 

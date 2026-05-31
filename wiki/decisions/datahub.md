@@ -23,9 +23,18 @@ tags: [datahub, storage, parquet, duckdb, architecture]
 
 ## 实现
 
-核心模块: `data/datahub.py`
+核心 facade: `data/datahub.py`
 
-DataHub 负责:
+DataHub 对外继续负责统一入口。内部实现拆为小组件，避免单文件承担过多细节:
+
+| 组件 | 文件 | 边界 |
+|------|------|------|
+| `DataHubPaths` | `data/datahub_paths.py` | 路径解析、目录 helper、registry cache pattern 展开 |
+| `ParquetStore` | `data/datahub_parquet.py` | Parquet 原子读写、追加锁、latest batch、目录扫描 |
+| `ManifestStore` | `data/datahub_manifest.py` | manifest 记录、schema hash、文件 hash、日期范围 |
+| `DimensionStore` | `data/datahub_dimensions.py` | DataRegistry 维度 root/path/list/latest |
+
+DataHub facade 负责:
 
 - 统一目录: `store_root`, `cache_root`, `signals`, `features`, `macro`, `paper`, `system_monitor`, token cache。
 - 统一路径: `signal_path(strategy)`, `feature_path(month)`, `macro_path(name)`, `paper_path(name)`。
@@ -36,6 +45,8 @@ DataHub 负责:
 - 追加写入: `append_parquet(..., dedupe_subset=...)` 统一处理追加和去重。
 - 最新批次: `latest_batch(path, ts_col="computed_at")` 统一读取策略最新信号。
 - 轻量审计: `audit()` 返回已知逻辑数据集的存在性、文件数量和大小。
+
+设计约束: 很多模块依赖 DataHub 是合理的，因为 DataHub 是数据访问边界。反向依赖不合理: DataHub 及其内部组件不得依赖策略、Web、CLI、执行层业务逻辑。业务模块也不应绕过 DataHub/registry 自己拼深层存储路径。
 
 ## 接入范围
 

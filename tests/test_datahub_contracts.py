@@ -50,6 +50,32 @@ def test_datahub_writes_manifest_for_parquet(tmp_path):
     assert manifest["file_sha256"]
 
 
+def test_datahub_facade_delegates_to_internal_components(tmp_path):
+    from data.datahub import DataHub
+    from data.datahub_dimensions import DimensionStore
+    from data.datahub_manifest import ManifestStore
+    from data.datahub_parquet import ParquetStore
+    from data.datahub_paths import DataHubPaths
+
+    hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
+
+    assert isinstance(hub.paths, DataHubPaths)
+    assert isinstance(hub.parquet, ParquetStore)
+    assert isinstance(hub.manifest, ManifestStore)
+    assert isinstance(hub.dimensions, DimensionStore)
+
+    assert hub.signal_path("unit_strategy") == hub.paths.signal_path("unit_strategy")
+    assert hub.dimension_path("ohlcv_daily", symbol="000001") == (
+        tmp_path / "store" / "stock" / "daily" / "000001.parquet"
+    )
+
+    target = hub.signal_path("unit_strategy")
+    hub.write_parquet(pd.DataFrame({"date": ["2026-05-20"], "signal": ["buy"]}), target, producer="facade-test")
+
+    assert hub.read_parquet(target)["signal"].tolist() == ["buy"]
+    assert hub.manifest_for(target)["producer"] == "facade-test"
+
+
 def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatch):
     from data.datahub import DataHub, reset_datahub
 
