@@ -1,10 +1,12 @@
 """系统配置路由 — 读写 config/settings.yaml (auth + audit)"""
 
+import copy
 import os
 import yaml
 from fastapi import APIRouter, HTTPException, Request
 
-from core.settings import clear_settings_cache, resolve_settings_path
+from core.settings import clear_settings_cache, get_dotted, resolve_settings_path, set_dotted
+from web.api.settings_schema import validate_settings_section
 
 router = APIRouter(prefix="/api/settings", tags=["Settings"])
 
@@ -54,15 +56,6 @@ def _write_config(data: dict):
         os.remove(bak)
 
 
-# ── Run mode check ──
-
-RUN_MODE_READONLY_SECTIONS = frozenset({
-    "risk_control", "strategies", "data_registry", "backtest",
-    "buffett", "cybernetics", "signals", "signal_selection",
-    "ml", "assets", "asset_allocation", "trading", "data_cleaning",
-})
-
-
 def _check_writable(section: str) -> None:
     """Raise 403 if current run mode disallows writing to this section."""
     from web.api.auth import get_run_mode
@@ -100,27 +93,6 @@ def _audit_change(request: Request, section: str, method: str, old_data: dict, n
         )
     except Exception:
         pass  # audit failure must not block config writes
-
-
-def _get_nested(data: dict, dotted_key: str, default=None):
-    current = data
-    for part in dotted_key.split("."):
-        if not isinstance(current, dict) or part not in current:
-            return default
-        current = current[part]
-    return current
-
-
-def _set_nested(data: dict, dotted_key: str, value: dict) -> None:
-    parts = dotted_key.split(".")
-    current = data
-    for part in parts[:-1]:
-        child = current.get(part)
-        if not isinstance(child, dict):
-            child = {}
-            current[part] = child
-        current = child
-    current[parts[-1]] = value
 
 
 # ── GET ────────────────────────────────────────────────────
@@ -191,14 +163,14 @@ async def update_section(section: str, data: dict, request: Request):
     _check_writable(section)
 
     # Validate against schema if available
-    errors = _validate_section(section, data)
+    errors = validate_settings_section(section, data)
     if errors:
         raise HTTPException(status_code=422, detail={"validation_errors": errors})
 
     config = _read_config()
-    old_section = _get_nested(config, section, {})
+    old_section = copy.deepcopy(get_dotted(config, section, {}))
 
-    _set_nested(config, section, data)
+    set_dotted(config, section, data)
     try:
         _write_config(config)
     except Exception as e:
@@ -207,56 +179,3 @@ async def update_section(section: str, data: dict, request: Request):
     _audit_change(request, section, "PATCH", old_section, data)
 
     return {"status": "saved", "section": section}
-
-
-def _validate_section(section: str, data: dict) -> list[str]:
-    """Validate section data against schema. Returns list of error messages."""
-    from web.api.settings_schema import SETTINGS_SECTIONS
-
-    errors = []
-    # Match schemas where key starts with section (e.g., "data" matches "data.fetcher")
-    matching_schemas = [s for s in SETTINGS_SECTIONS if s["key"] == section or s["key"].startswith(section + ".")]
-    if not matching_schemas:
-        return []  # No schema = no validation
-
-    for schema in matching_schemas:
-        for field in schema["fields"]:
-            key = field["key"]
-            # Support dotted keys (e.g., "max_single_position.max_pct")
-            parts = key.split(".")
-            val = data
-            for p in parts:
-                if isinstance(val, dict):
-                    val = val.get(p)
-                else:
-                    val = None
-                    break
-
-            if val is None:
-                continue  # Missing = use default, not an error
-
-            ftype = field.get("type", "float")
-            fmin = field.get("min")
-            fmax = field.get("max")
-
-            # Type check
-            if ftype == "int" and not isinstance(val, int):
-                try:
-                    val = int(val)
-                except (ValueError, TypeError):
-                    errors.append(f"{key}: expected int, got {type(val).__name__}")
-                    continue
-            elif ftype == "float" and not isinstance(val, (int, float)):
-                try:
-                    val = float(val)
-                except (ValueError, TypeError):
-                    errors.append(f"{key}: expected float, got {type(val).__name__}")
-                    continue
-
-            # Range check
-            if fmin is not None and val < fmin:
-                errors.append(f"{key}: {val} < min ({fmin})")
-            if fmax is not None and val > fmax:
-                errors.append(f"{key}: {val} > max ({fmax})")
-
-    return errors

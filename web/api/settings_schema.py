@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.settings import get_dotted
+
 
 def _field(key: str, label: str, typ: str = "float", *,
            description: str = "", min_val: Any = None, max_val: Any = None,
@@ -210,3 +212,46 @@ def get_settings_schema() -> dict:
         "total_sections": len(SETTINGS_SECTIONS),
         "total_fields": sum(len(s["fields"]) for s in SETTINGS_SECTIONS),
     }
+
+
+def validate_settings_section(section: str, data: dict[str, Any]) -> list[str]:
+    """Validate one config section payload against the editable settings schema."""
+    matching_schemas = [
+        schema
+        for schema in SETTINGS_SECTIONS
+        if schema["key"] == section or schema["key"].startswith(section + ".")
+    ]
+    if not matching_schemas:
+        return []
+
+    errors: list[str] = []
+    for schema in matching_schemas:
+        for field in schema["fields"]:
+            key = field["key"]
+            val = get_dotted(data, key)
+            if val is None:
+                continue
+
+            ftype = field.get("type", "float")
+            fmin = field.get("min")
+            fmax = field.get("max")
+
+            if ftype == "int" and not isinstance(val, int):
+                try:
+                    val = int(val)
+                except (ValueError, TypeError):
+                    errors.append(f"{key}: expected int, got {type(val).__name__}")
+                    continue
+            elif ftype == "float" and not isinstance(val, (int, float)):
+                try:
+                    val = float(val)
+                except (ValueError, TypeError):
+                    errors.append(f"{key}: expected float, got {type(val).__name__}")
+                    continue
+
+            if fmin is not None and val < fmin:
+                errors.append(f"{key}: {val} < min ({fmin})")
+            if fmax is not None and val > fmax:
+                errors.append(f"{key}: {val} > max ({fmax})")
+
+    return errors

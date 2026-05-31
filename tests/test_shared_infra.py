@@ -1,6 +1,23 @@
 import pandas as pd
 
 
+def test_dotted_settings_helpers_read_write_nested_mappings_without_flat_keys():
+    from core.settings import get_dotted, set_dotted
+
+    data = {"data": {"fetcher": {"min_interval": 3.0}}}
+
+    assert get_dotted(data, "data.fetcher.min_interval") == 3.0
+    assert get_dotted(data, "data.fetcher.max_retries", default=3) == 3
+    assert get_dotted({"data.fetcher": {"bad": True}}, "data.fetcher") is None
+
+    set_dotted(data, "data.fetcher.max_retries", 4)
+    set_dotted(data, "signals.multifactor.weights.quality", 0.35)
+
+    assert data["data"]["fetcher"]["max_retries"] == 4
+    assert data["signals"]["multifactor"]["weights"]["quality"] == 0.35
+    assert "data.fetcher" not in data
+
+
 def test_settings_loader_supports_project_root_env_and_dotted_sections(tmp_path, monkeypatch):
     root = tmp_path / "project"
     cfg_dir = root / "config"

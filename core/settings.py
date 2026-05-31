@@ -6,7 +6,7 @@ import copy
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, MutableMapping
 
 import yaml
 
@@ -70,14 +70,32 @@ def clear_settings_cache() -> None:
     _cached_settings.cache_clear()
 
 
+def get_dotted(data: Mapping[str, Any], dotted_key: str, default: Any = None) -> Any:
+    """Read a dotted key from a nested mapping without treating flat keys as sections."""
+    current: Any = data
+    for part in dotted_key.split("."):
+        if not isinstance(current, Mapping) or part not in current:
+            return default
+        current = current[part]
+    return current
+
+
+def set_dotted(data: MutableMapping[str, Any], dotted_key: str, value: Any) -> None:
+    """Write a dotted key into a nested mutable mapping, creating parents as needed."""
+    parts = dotted_key.split(".")
+    current: MutableMapping[str, Any] = data
+    for part in parts[:-1]:
+        child = current.get(part)
+        if not isinstance(child, MutableMapping):
+            child = {}
+            current[part] = child
+        current = child
+    current[parts[-1]] = value
+
+
 def get_section(section: str, default: Any = None, *, path: str | os.PathLike | None = None) -> Any:
     """Return a dotted settings section such as ``signals.multifactor``."""
-    current: Any = get_settings(path)
-    for part in section.split("."):
-        if not isinstance(current, dict) or part not in current:
-            return copy.deepcopy(default)
-        current = current[part]
-    return copy.deepcopy(current)
+    return copy.deepcopy(get_dotted(get_settings(path), section, default))
 
 
 def get_tushare_token() -> str:
