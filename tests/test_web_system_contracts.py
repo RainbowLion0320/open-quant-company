@@ -264,14 +264,23 @@ def test_monitor_is_read_only_but_keeps_system_status_cards():
     assert "api.saveSettings" not in monitor
     assert "saveWithConfirm" not in monitor
     assert "API HEALTH" in monitor
-    assert "SERVICES" in monitor
     assert "CRON JOBS" in monitor
     assert "RESOURCE HISTORY" in monitor
     assert "TOP PROCESSES" in monitor
     assert "Telegram" in monitor
     assert "api.apiHealth()" in monitor
-    assert "api.serviceStatus()" in monitor
     assert "api.cronJobs()" in monitor
+    assert "serviceStatus" not in monitor
+
+
+def test_legacy_service_status_route_is_removed(monkeypatch):
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+
+    res = TestClient(create_app()).get("/api/system/service-status")
+
+    assert res.status_code == 404
 
 
 def test_cron_jobs_payload_coerces_nullable_status_fields(monkeypatch, tmp_path):

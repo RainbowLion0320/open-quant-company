@@ -99,7 +99,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Pipeline | `routes/pipeline.py` | `GET /pipeline`, `GET /pipeline/market-regime`, `GET /pipeline/{pipeline_key}` |
 | Assets | `routes/assets.py` | `GET /assets/overview` |
 | Settings | `routes/settings.py` | `GET /settings`, `GET /settings/schema`, `PUT /settings`, `PATCH /settings/section/{section}` |
-| System | `routes/system.py` | `GET /system/monitor`, `GET /system/history`, `GET /system/deepseek-usage`, `GET /system/api-health`, `GET /system/cron-jobs`, `GET /system/service-status`, `GET /system/audit`, `GET /system/mode` |
+| System | `routes/system.py` | `GET /system/monitor`, `GET /system/history`, `GET /system/deepseek-usage`, `GET /system/api-health`, `GET /system/cron-jobs`, `GET /system/audit`, `GET /system/mode` |
 | Hindsight | `routes/hindsight.py` | `GET /hindsight/graph` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
 

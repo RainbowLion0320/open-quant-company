@@ -170,26 +170,6 @@
       </div>
       <div class="glass-card ops-card">
         <div class="panel-head">
-          <span>SERVICES</span>
-          <em v-if="serviceSummary" :class="['source-badge', serviceBadgeClass(), 'summary-badge']">{{ serviceSummary }}</em>
-        </div>
-        <div class="source-list">
-          <template v-if="serviceItems.length">
-            <div v-for="svc in serviceItems" :key="svc.name">
-              <span>{{ svc.name }}</span>
-              <em :class="['source-badge', apiBadgeClass(svc.status)]">
-                {{ svc.detail }}
-                <span v-if="svc.cookie_remaining_days != null" class="badge-note">
-                  ({{ formatCookieDays(svc.cookie_remaining_days) }})
-                </span>
-              </em>
-            </div>
-          </template>
-          <div v-else><span>Services</span><em class="source-badge muted">加载中...</em></div>
-        </div>
-      </div>
-      <div class="glass-card ops-card">
-        <div class="panel-head">
           <span>CRON JOBS</span>
           <em v-if="cronSummary" :class="['source-badge', cronSummaryBadge, 'summary-badge']">{{ cronSummary }}</em>
         </div>
@@ -310,25 +290,6 @@ async function fetchCronJobs() {
     cronJobs.value = data.jobs || [];
     cronSummary.value = data.summary || "";
   } catch { cronJobs.value = []; cronSummary.value = ""; }
-}
-
-// Services (CDP, cookie)
-const serviceItems = ref<any[]>([]);
-const serviceSummary = ref("");
-function serviceBadgeClass(): string {
-  if (!serviceSummary.value) return "muted";
-  return serviceSummary.value.includes("异常") ? "limited" : "ok";
-}
-function formatCookieDays(days: number): string {
-  const whole = Number(days || 0).toFixed(0);
-  return Number(days) < 7 ? `${whole}d low` : `${whole}d`;
-}
-async function fetchServiceStatus() {
-  try {
-    const data = await api.serviceStatus();
-    serviceItems.value = data.items || [];
-    serviceSummary.value = data.summary || "";
-  } catch { serviceItems.value = []; serviceSummary.value = ""; }
 }
 
 function apiBadgeClass(status: string): string {
@@ -572,7 +533,6 @@ onMounted(() => {
   fetchSlowData();
   fetchApiHealth();
   fetchCronJobs();
-  fetchServiceStatus();
   timer = window.setInterval(fetchData, 10_000);
   slowTimer = window.setInterval(fetchSlowData, 60_000);
   elapTimer = window.setInterval(() => { elapsed.value = Math.round((Date.now() - lastFetch.value) / 1000); }, 1000);
@@ -603,7 +563,7 @@ onUnmounted(() => {
 }
 .ops-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 .telemetry-card,
@@ -842,10 +802,6 @@ onUnmounted(() => {
 .summary-badge {
   font-weight: 400;
   cursor: default;
-}
-.badge-note {
-  margin-left: 4px;
-  opacity: 0.85;
 }
 .source-badge.ok {
   background: rgba(16,185,129,0.15);

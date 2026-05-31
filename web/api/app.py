@@ -16,7 +16,7 @@ for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy
     os.environ.pop(key, None)
 os.environ["no_proxy"] = "eastmoney.com,10jqka.com.cn,sina.com.cn,qianlong.com,163.com,qq.com"
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -97,6 +97,8 @@ def create_app() -> FastAPI:
         from fastapi.responses import FileResponse
         @app.get("/{full_path:path}")
         async def spa_fallback(full_path: str):
+            if full_path.startswith("api/"):
+                raise HTTPException(status_code=404, detail="Not Found")
             index = static_dir / "index.html"
             if index.exists():
                 return FileResponse(index, media_type="text/html")

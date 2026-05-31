@@ -300,7 +300,8 @@ def test_system_route_delegates_large_status_domains_to_services():
 
     assert callable(monitor.system_monitor_payload)
     assert callable(data_health.db_health_payload)
-    assert callable(integrations.service_status_payload)
+    assert callable(integrations.api_health_payload)
+    assert callable(integrations.cron_jobs_payload)
     assert "def _query(" not in route_text
     assert "def _read_token(" not in route_text
     assert "def _run_repair(" not in route_text

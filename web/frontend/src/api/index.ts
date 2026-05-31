@@ -681,9 +681,8 @@ export const api = {
   deepseekUsage: () => get<DeepSeekUsageResponse>("/api/system/deepseek-usage"),
 
   // System Monitor
-  apiHealth: () => get<{ items: { name: string; status: string; detail: string; cookie_remaining_days?: number }[]; summary: string; all_ok: boolean }>("/api/system/api-health"),
+  apiHealth: () => get<{ items: { name: string; status: string; detail: string }[]; summary: string; all_ok: boolean }>("/api/system/api-health"),
   cronJobs: () => get<{ jobs: { name: string; schedule: string; last_run: string | null; last_status: string | null; next_run: string | null; enabled: boolean; state: string; no_agent: boolean }[]; summary: string }>("/api/system/cron-jobs"),
-  serviceStatus: () => get<{ items: { name: string; status: string; detail: string; cookie_remaining_days?: number }[]; summary: string; all_ok: boolean }>("/api/system/service-status"),
   dbHealth: () => get<DbHealthResponse>("/api/system/db-health"),
   dbHealthRepair: (table: string) => post<DbRepairResponse>(`/api/system/db-health/repair/${encodeURIComponent(table)}`),
   dbHealthRepairStatus: (jobId: string) => get<DbRepairResponse>(`/api/system/db-health/repair-status/${encodeURIComponent(jobId)}`),

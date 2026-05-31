@@ -18,7 +18,6 @@ uvicorn[standard]>=0.30.0
 pydantic>=2.0
 httpx>=0.27.0
 openai>=1.0.0
-websocket-client>=1.8.0
 
 # ML (可选，训练/调参时需要)
 scipy>=1.11

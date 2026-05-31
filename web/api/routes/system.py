@@ -12,7 +12,6 @@ from web.api.services.system_data_health import (
 from web.api.services.system_integrations import (
     api_health_payload,
     cron_jobs_payload,
-    service_status_payload,
 )
 from web.api.services.system_monitor import (
     deepseek_usage_payload,
@@ -70,12 +69,6 @@ async def api_health():
 async def cron_jobs():
     """Cron job 状态 (读取 ~/.hermes/cron/jobs.json)"""
     return cron_jobs_payload()
-
-
-@router.get("/service-status")
-async def service_status():
-    """CDP / MCP / Cookie 状态检查"""
-    return service_status_payload()
 
 
 @router.get("/quality-gate")
