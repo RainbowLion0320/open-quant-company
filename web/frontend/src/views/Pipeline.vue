@@ -127,6 +127,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { api } from "../api";
+import { buildPipelineLayout } from "../utils/pipelineLayout";
 
 interface PipelineNodeData {
   id: string;
@@ -171,55 +172,10 @@ const scoreText = computed(() => {
   return typeof score === "number" && Number.isFinite(score) ? score.toFixed(1) : "—";
 });
 
-// ── Dynamic layout: top-to-bottom, depth = row, siblings = columns ──
-
-interface NodePos { row: number; col: number; id: string }
-
-const nodeLayout = computed<NodePos[]>(() => {
+const nodeLayout = computed(() => {
   const nodes: PipelineNodeData[] = payload.value?.nodes || [];
   const edges: { source: string; target: string }[] = payload.value?.edges || [];
-  if (!nodes.length) return [];
-
-  // 1. Compute depth via topological BFS
-  const inDegree = new Map<string, number>();
-  const children = new Map<string, string[]>();
-  for (const n of nodes) {
-    inDegree.set(n.id, 0);
-    children.set(n.id, []);
-  }
-  for (const e of edges) {
-    inDegree.set(e.target, (inDegree.get(e.target) || 0) + 1);
-    children.get(e.source)?.push(e.target);
-  }
-
-  const depth = new Map<string, number>();
-  const queue: string[] = [];
-  for (const n of nodes) {
-    depth.set(n.id, 0);
-    if ((inDegree.get(n.id) || 0) === 0) queue.push(n.id);
-  }
-  while (queue.length) {
-    const cur = queue.shift()!;
-    for (const child of children.get(cur) || []) {
-      depth.set(child, Math.max(depth.get(child) || 0, (depth.get(cur) || 0) + 1));
-      inDegree.set(child, (inDegree.get(child) || 0) - 1);
-      if (inDegree.get(child) === 0) queue.push(child);
-    }
-  }
-
-  // 2. Group by row (depth), assign columns
-  const rowGroups = new Map<number, string[]>();
-  for (const n of nodes) {
-    const row = depth.get(n.id) || 0;
-    if (!rowGroups.has(row)) rowGroups.set(row, []);
-    rowGroups.get(row)!.push(n.id);
-  }
-
-  const positions: NodePos[] = [];
-  for (const [row, ids] of [...rowGroups.entries()].sort((a, b) => a[0] - b[0])) {
-    ids.forEach((id, col) => positions.push({ row, col, id }));
-  }
-  return positions;
+  return buildPipelineLayout(nodes, edges);
 });
 
 const numCols = computed(() => Math.max(...nodeLayout.value.map(p => p.col), 0) + 1);

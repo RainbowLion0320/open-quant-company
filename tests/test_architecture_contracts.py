@@ -324,6 +324,70 @@ def test_pipeline_service_does_not_depend_on_entrypoint_scripts():
     assert "import scripts." not in text
 
 
+def test_pipeline_service_is_registry_facade_not_monolithic_builders():
+    service_text = Path("web/api/services/pipeline.py").read_text(encoding="utf-8")
+    pipeline_modules = {
+        path.name
+        for path in Path("web/api/services/pipelines").glob("*.py")
+        if path.name != "__init__.py"
+    }
+
+    assert {"common.py", "market_regime.py", "data_quality.py", "strategy_evidence.py", "portfolio_execution.py"}.issubset(
+        pipeline_modules
+    )
+    assert "from cybernetics.orchestrator import QuantOrchestrator" not in service_text
+    assert "from core.settings import get_section" not in service_text
+    assert "from research.strategy_evaluation import list_evidence_artifacts" not in service_text
+    assert "def build_market_regime_pipeline(" not in service_text
+    assert "def build_data_quality_pipeline(" not in service_text
+    assert "def build_strategy_evidence_pipeline(" not in service_text
+    assert "def build_portfolio_execution_pipeline(" not in service_text
+
+
+def test_cybernetics_runtime_types_live_in_dedicated_module():
+    orchestrator_text = Path("cybernetics/orchestrator.py").read_text(encoding="utf-8")
+    types_path = Path("cybernetics/types.py")
+
+    assert types_path.exists()
+    assert "from cybernetics.types import" in orchestrator_text
+    assert "class MarketContext" not in orchestrator_text
+    assert "class MarketBreadth" not in orchestrator_text
+    assert "class MarketVolume" not in orchestrator_text
+    assert "class TradeRecord" not in orchestrator_text
+
+
+def test_backtest_regime_replay_lives_in_dedicated_module():
+    runner_text = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
+    replay_text = Path("backtest/regime_replay.py").read_text(encoding="utf-8")
+
+    assert "from backtest.regime_replay import build_production_regime_map" in runner_text
+    assert "def build_production_regime_map(" not in runner_text
+    assert "def _benchmark_close_frame(" not in runner_text
+    assert "def build_production_regime_map(" in replay_text
+    assert "CHAMPION_POLICY" in replay_text
+    assert "apply_policy" in replay_text
+
+
+def test_regime_training_policy_types_live_in_dedicated_module():
+    training_text = Path("research/regime_training.py").read_text(encoding="utf-8")
+    types_text = Path("research/regime_types.py").read_text(encoding="utf-8")
+
+    assert "from research.regime_types import" in training_text
+    assert "class RegimePolicy" not in training_text
+    assert "class PromotionGateResult" not in training_text
+    assert "class RegimePolicy" in types_text
+    assert "class PromotionGateResult" in types_text
+
+
+def test_pipeline_vue_uses_shared_layout_utility():
+    vue_text = Path("web/frontend/src/views/Pipeline.vue").read_text(encoding="utf-8")
+    utility_text = Path("web/frontend/src/utils/pipelineLayout.ts").read_text(encoding="utf-8")
+
+    assert "buildPipelineLayout" in vue_text
+    assert "export function buildPipelineLayout" in utility_text
+    assert "Compute depth via topological BFS" not in vue_text
+
+
 def test_data_freshness_gate_is_shared_outside_cli_layer():
     from data.freshness_gate import freshness_gate, health_result_to_gate_data
 
@@ -491,10 +555,12 @@ def test_backtest_entrypoint_no_longer_exposes_legacy_runner():
 
 
 def test_backtest_regime_replay_uses_production_policy_not_monthly_ma_chain():
-    text = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
+    text = Path("backtest/regime_replay.py").read_text(encoding="utf-8")
+    runner = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
     tournament = Path("scripts/strategy_tournament.py").read_text(encoding="utf-8")
     multi_asset = Path("scripts/multi_asset_tournament.py").read_text(encoding="utf-8")
 
+    assert "build_production_regime_map" in runner
     assert "build_production_regime_map" in text
     assert "CHAMPION_POLICY" in text
     assert "apply_policy" in text

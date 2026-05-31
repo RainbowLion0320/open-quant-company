@@ -8,7 +8,7 @@ from cybernetics.orchestrator import MarketRegime
 def test_market_regime_pipeline_route_contract(monkeypatch, tmp_path):
     from web.api import auth
     from web.api.app import create_app
-    from web.api.services import pipeline as pipeline_service
+    from web.api.services.pipelines import market_regime as market_regime_pipeline
 
     class FakeOrchestrator:
         params = {"position_size": 0.22, "stop_loss": -0.05, "max_positions": 6}
@@ -43,9 +43,9 @@ def test_market_regime_pipeline_route_contract(monkeypatch, tmp_path):
     (model_dir / "meta.json").write_text('{"n_samples": 3921, "trained_at": "2026-05-29"}', encoding="utf-8")
 
     monkeypatch.setattr(auth, "get_api_key", lambda: "")
-    monkeypatch.setattr(pipeline_service, "QuantOrchestrator", FakeOrchestrator)
+    monkeypatch.setattr(market_regime_pipeline, "QuantOrchestrator", FakeOrchestrator)
     monkeypatch.setattr(
-        pipeline_service,
+        market_regime_pipeline,
         "get_section",
         lambda name, default=None: {"regime_engine": "hybrid", "hmm": {"model_path": str(model_dir)}},
     )
