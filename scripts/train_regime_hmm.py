@@ -78,6 +78,7 @@ def _train_single_hmm(
     n_states: int = 3,
     n_init: int = 5,
     random_seed: int = 42,
+    forward_returns: np.ndarray | None = None,
 ) -> dict:
     """Train a single HMM and return metrics."""
     from cybernetics.hmm_engine import HMMConfig, StudentTHMM, align_states
@@ -91,7 +92,7 @@ def _train_single_hmm(
     )
 
     hmm = StudentTHMM(config)
-    result = hmm.fit(X)
+    result = hmm.fit(X, forward_returns=forward_returns)
 
     return {
         "result": result,
@@ -156,6 +157,7 @@ def _evaluate_regime_quality(
 def _walk_forward_hmm(
     features: pd.DataFrame,
     close: pd.Series,
+    index_frames: dict | None = None,
     n_states: int = 3,
     train_years: int = 4,
     validate_years: int = 1,
@@ -181,15 +183,29 @@ def _walk_forward_hmm(
             continue
 
         # Build observation matrices
-        train_X = build_observation_matrix(train_features)
-        validate_X = build_observation_matrix(validate_features)
+        train_X, _pca = build_observation_matrix(train_features)
+        validate_X, _pca2 = build_observation_matrix(validate_features)
 
         if len(train_X) == 0 or len(validate_X) == 0:
             continue
 
+        # Compute forward returns for training alignment
+        train_fwd = None
+        if index_frames:
+            bench = list(index_frames.values())[0].copy()
+            if "date" in bench.columns and bench.index.name != "date":
+                bench["date"] = pd.to_datetime(bench["date"], errors="coerce")
+                bench = bench.dropna(subset=["date"]).set_index("date").sort_index()
+            if "close" in bench.columns:
+                bench_close = pd.to_numeric(bench["close"], errors="coerce")
+                fwd = bench_close.pct_change(20).shift(-20)
+                obs_cols = [c for c in OBSERVATION_COLUMNS if c in train_features.columns]
+                obs_idx = train_features.dropna(subset=obs_cols).index
+                train_fwd = np.nan_to_num(fwd.reindex(obs_idx).values, nan=0.0)
+
         # Train on training window
         try:
-            hmm_result = _train_single_hmm(train_X, n_states=n_states, n_init=3)
+            hmm_result = _train_single_hmm(train_X, n_states=n_states, n_init=3, forward_returns=train_fwd)
             hmm = hmm_result["hmm"]
         except Exception as e:
             log.warning(f"Walk-forward train failed for {train_years_set}: {e}")
@@ -273,6 +289,7 @@ def main() -> int:
     parser.add_argument("--output", required=True, help="Output directory")
     parser.add_argument("--n-states", type=int, default=3, help="Number of HMM states")
     parser.add_argument("--n-init", type=int, default=5, help="Number of random initialisations")
+    parser.add_argument("--pca-components", type=int, default=None, help="PCA components (None=disable)")
     parser.add_argument("--symbol", default="sh000001", help="Benchmark index symbol")
     parser.add_argument("--skip-breadth", action="store_true", help="Skip full-market breadth")
     args = parser.parse_args()
@@ -323,12 +340,32 @@ def main() -> int:
     from cybernetics.features import OBSERVATION_COLUMNS, build_observation_matrix
     from cybernetics.hmm_engine import HMMConfig, StudentTHMM, save_hmm_model
 
-    X = build_observation_matrix(features)
-    log.info(f"Observation matrix: {X.shape}")
+    X, pca = build_observation_matrix(features, n_components=args.pca_components)
+    log.info(f"Observation matrix: {X.shape}" + (f" (PCA {args.pca_components} components)" if pca else ""))
+
+    # Compute forward returns for state alignment
+    # Use 20-day forward return from the benchmark index
+    bench_df = index_frames.get(args.symbol, index_frames.get("sh000001"))
+    if bench_df is not None and "close" in bench_df.columns:
+        bench = bench_df.copy()
+        # Ensure date is the index for proper alignment
+        if "date" in bench.columns and bench.index.name != "date":
+            bench["date"] = pd.to_datetime(bench["date"], errors="coerce")
+            bench = bench.dropna(subset=["date"]).set_index("date").sort_index()
+        bench_close = pd.to_numeric(bench["close"], errors="coerce")
+        fwd_ret_20 = bench_close.pct_change(20).shift(-20)
+        # Align with observation matrix index
+        obs_index = features.dropna(subset=[c for c in OBSERVATION_COLUMNS if c in features.columns]).index
+        fwd_aligned = fwd_ret_20.reindex(obs_index).values
+        fwd_aligned = np.nan_to_num(fwd_aligned, nan=0.0)
+        log.info(f"Forward returns: {np.count_nonzero(fwd_aligned)} non-zero / {len(fwd_aligned)} total")
+    else:
+        fwd_aligned = None
+        log.warning("No close column in benchmark, forward return alignment disabled")
 
     # Train final model on all data
     log.info("Training final HMM model...")
-    train_result = _train_single_hmm(X, n_states=args.n_states, n_init=args.n_init)
+    train_result = _train_single_hmm(X, n_states=args.n_states, n_init=args.n_init, forward_returns=fwd_aligned)
     hmm = train_result["hmm"]
     result = train_result["result"]
 
@@ -360,7 +397,7 @@ def main() -> int:
 
     # Walk-forward validation
     log.info("Running walk-forward validation...")
-    wf_results = _walk_forward_hmm(features, close, n_states=args.n_states)
+    wf_results = _walk_forward_hmm(features, close, index_frames=index_frames, n_states=args.n_states)
     log.info(f"Walk-forward windows: {len(wf_results)}")
 
     # Compare with champion

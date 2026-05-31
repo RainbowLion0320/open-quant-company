@@ -444,25 +444,37 @@ def _viterbi(
 # State alignment
 # ---------------------------------------------------------------------------
 
-def align_states(result: HMMResult, X: np.ndarray | None = None) -> HMMResult:
+def align_states(result: HMMResult, X: np.ndarray | None = None, forward_returns: np.ndarray | None = None) -> HMMResult:
     """Align state labels so that:
-    - State with highest mean return_1d → index 0 (bull)
-    - State with lowest mean return_1d  → index 2 (bear)
+    - State with highest forward return → index 0 (bull)
+    - State with lowest forward return  → index 2 (bear)
     - Middle                           → index 1 (sideways)
 
-    Uses a composite score of return_1d (feature 0) and realized_vol_20d (feature 1)
-    for more robust alignment: high return + low vol = bull, low return + high vol = bear.
+    If forward_returns is provided (shape [n_samples]), uses mean forward return
+    per state for alignment. This ensures states are labeled by predictive power,
+    not by current feature values.
+
+    Falls back to emission means if forward_returns is not available.
     """
     K = result.means.shape[0]
     if K != 3:
         return result  # only align for 3-state models
 
-    # Composite alignment score: return_1d mean - 0.3 * vol mean
-    # Bull: high return, low vol → high score
-    # Bear: low return, high vol → low score
-    return_means = result.means[:, 0]  # return_1d
-    vol_means = result.means[:, 1] if result.means.shape[1] > 1 else np.zeros(K)
-    alignment_score = return_means - 0.3 * vol_means
+    if forward_returns is not None and len(forward_returns) == len(result.viterbi_states):
+        # Use forward returns: mean return per state
+        alignment_score = np.zeros(K)
+        for k in range(K):
+            mask = result.viterbi_states == k
+            if mask.sum() > 0:
+                alignment_score[k] = np.nanmean(forward_returns[mask])
+            else:
+                alignment_score[k] = 0.0
+    else:
+        # Fallback: emission means composite
+        return_means = result.means[:, 0]  # return_1d
+        vol_means = result.means[:, 1] if result.means.shape[1] > 1 else np.zeros(K)
+        alignment_score = return_means - 0.3 * vol_means
+
     order = np.argsort(-alignment_score)  # descending: [bull_idx, sideways_idx, bear_idx]
 
     if np.array_equal(order, [0, 1, 2]):
@@ -509,12 +521,15 @@ class StudentTHMM:
         self._params: dict | None = None
         self._result: HMMResult | None = None
 
-    def fit(self, X: np.ndarray) -> HMMResult:
+    def fit(self, X: np.ndarray, forward_returns: np.ndarray | None = None) -> HMMResult:
         """Fit the model using multiple random initialisations.
 
         Parameters
         ----------
         X : observation matrix, shape (N, D)
+        forward_returns : optional array of forward returns (N,) for state alignment.
+                          If provided, states are labeled by mean forward return
+                          (highest = bull, lowest = bear) instead of emission means.
 
         Returns
         -------
@@ -554,7 +569,7 @@ class StudentTHMM:
         self._result = best_result
 
         # Align states
-        self._result = align_states(self._result, X)
+        self._result = align_states(self._result, X, forward_returns=forward_returns)
         self._params = {
             "means": self._result.means,
             "covars": self._result.covars,

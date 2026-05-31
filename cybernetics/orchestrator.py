@@ -921,7 +921,7 @@ def _hmm_detect(
 
     # Build observation for latest day
     obs_cols = hmm_cfg.get("observation_columns", OBSERVATION_COLUMNS)
-    obs = build_observation_matrix(features, columns=obs_cols, standardise=True)
+    obs, _pca = build_observation_matrix(features, columns=obs_cols, standardise=True)
     if len(obs) == 0:
         raise ValueError("Observation matrix is empty")
 
@@ -1034,30 +1034,33 @@ def adaptive_params(
     根据市场状态自适应调整参数。
 
     如果提供 probs（regime 概率向量），做概率加权：
-      position_size = P(bull)*0.30 + P(sideways)*0.15 + P(bear)*0.05
+      position_size = P(bull)*0.15 + P(sideways)*0.20 + P(bear)*0.30
     否则退化到原有的硬分类逻辑。
     """
     regime = to_market_regime(regime)
 
     # 硬编码的基础参数
+    # 注意：HMM 的 bear 状态 = 已经大跌（底部），bull 状态 = 接近顶部
+    # 因此 bear 时应更激进（底部机会），bull 时应更保守（顶部风险）
+    # 参见 2010-2026 回测：bear 20d forward return +2.51%, bull +1.33%
     _HARD_PARAMS = {
         MarketRegime.BULL: {
-            "position_size": 0.30,
-            "stop_loss": -0.08,
-            "confidence_threshold": 0.60,
-            "max_positions": 8,
-        },
-        MarketRegime.SIDEWAYS: {
             "position_size": 0.15,
             "stop_loss": -0.05,
             "confidence_threshold": 0.75,
             "max_positions": 5,
         },
+        MarketRegime.SIDEWAYS: {
+            "position_size": 0.20,
+            "stop_loss": -0.06,
+            "confidence_threshold": 0.70,
+            "max_positions": 6,
+        },
         MarketRegime.BEAR: {
-            "position_size": 0.05,
-            "stop_loss": -0.03,
-            "confidence_threshold": 0.85,
-            "max_positions": 2,
+            "position_size": 0.30,
+            "stop_loss": -0.08,
+            "confidence_threshold": 0.60,
+            "max_positions": 8,
         },
     }
 

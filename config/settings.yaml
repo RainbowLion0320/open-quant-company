@@ -157,15 +157,15 @@ buffett:
 cybernetics:
   adaptive:
     bear:
-      confidence_threshold: 0.85
-      max_positions: 2
-      position_size: 0.05
-      stop_loss: -0.03
-    bull:
       confidence_threshold: 0.6
       max_positions: 8
       position_size: 0.3
       stop_loss: -0.08
+    bull:
+      confidence_threshold: 0.75
+      max_positions: 5
+      position_size: 0.15
+      stop_loss: -0.05
     detection:
       breadth_bear_threshold: 0.4
       breadth_bull_threshold: 0.55
@@ -182,10 +182,10 @@ cybernetics:
     market_regime_detection: true
     param_tuning_frequency: monthly
     sideways:
-      confidence_threshold: 0.75
-      max_positions: 5
-      position_size: 0.15
-      stop_loss: -0.05
+      confidence_threshold: 0.7
+      max_positions: 6
+      position_size: 0.2
+      stop_loss: -0.06
     volatility_adjustment: true
   regime_engine: hybrid
   regime_indexes:

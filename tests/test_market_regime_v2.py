@@ -351,7 +351,7 @@ def test_detect_uses_hybrid_probabilities_for_adaptive_params(monkeypatch):
     assert qo.params["position_size"] < 0.30
     assert qo.params["position_size"] > 0.05
     expected = sum(
-        snapshot.regime_probs[key] * {"bull": 0.30, "sideways": 0.15, "bear": 0.05}[key]
+        snapshot.regime_probs[key] * {"bull": 0.15, "sideways": 0.20, "bear": 0.30}[key]
         for key in ("bull", "sideways", "bear")
     )
     assert round(qo.params["position_size"], 6) == round(expected, 6)
