@@ -198,8 +198,8 @@ const nodeLayout = computed(() => {
 const numCols = computed(() => Math.max(...nodeLayout.value.map(p => p.col), 0) + 1);
 
 const canvasStyle = computed(() => ({
-  gridTemplateColumns: `repeat(${numCols.value}, minmax(140px, 1fr))`,
-  gridAutoRows: "112px",
+  gridTemplateColumns: `repeat(${numCols.value}, minmax(160px, 240px))`,
+  gridAutoRows: "100px",
 }));
 
 function nodeStyle(node: PipelineNodeData) {
@@ -438,8 +438,10 @@ onMounted(async () => {
 .flow-canvas {
   position: relative;
   display: grid;
-  gap: 24px;
+  gap: 32px 48px;
   justify-items: center;
+  align-content: start;
+  padding: 16px 0;
 }
 .flow-arrows {
   position: absolute;
@@ -452,7 +454,7 @@ onMounted(async () => {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 280px;
+  max-width: 220px;
   padding: 12px;
   border: 1px solid var(--border-default);
   border-radius: 8px;
