@@ -346,6 +346,8 @@ class PipelineEdge(BaseModel):
     source: str = ""
     target: str = ""
     label: str = ""
+    condition: str = ""
+    active: bool = True
 
 class PipelineDetailResponse(BaseModel):
     pipeline_key: str = ""
