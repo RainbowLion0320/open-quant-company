@@ -199,7 +199,7 @@ const numCols = computed(() => Math.max(...nodeLayout.value.map(p => p.col), 0) 
 
 const canvasStyle = computed(() => ({
   gridTemplateColumns: `repeat(${numCols.value}, minmax(160px, 220px))`,
-  gridAutoRows: "200px",
+  gridAutoRows: "100px",
   justifyContent: "center",
 }));
 
@@ -439,7 +439,7 @@ onMounted(async () => {
 .flow-canvas {
   position: relative;
   display: grid;
-  gap: 32px 48px;
+  gap: 80px 48px;
   justify-items: center;
   justify-content: center;
   align-content: start;
