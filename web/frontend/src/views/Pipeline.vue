@@ -198,8 +198,9 @@ const nodeLayout = computed(() => {
 const numCols = computed(() => Math.max(...nodeLayout.value.map(p => p.col), 0) + 1);
 
 const canvasStyle = computed(() => ({
-  gridTemplateColumns: `repeat(${numCols.value}, minmax(160px, 240px))`,
-  gridAutoRows: "100px",
+  gridTemplateColumns: `repeat(${numCols.value}, minmax(160px, 220px))`,
+  gridAutoRows: "200px",
+  justifyContent: "center",
 }));
 
 function nodeStyle(node: PipelineNodeData) {
@@ -440,6 +441,7 @@ onMounted(async () => {
   display: grid;
   gap: 32px 48px;
   justify-items: center;
+  justify-content: center;
   align-content: start;
   padding: 16px 0;
 }
