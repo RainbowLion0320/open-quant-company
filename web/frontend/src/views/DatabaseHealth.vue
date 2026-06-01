@@ -83,7 +83,7 @@
           </tr>
         </thead>
         <tbody>
-          <template v-for="(row, i) in rows" :key="i">
+          <template v-for="(row, i) in sortedRows" :key="row.table">
             <tr :class="{ 'row-error': row.error }">
               <td class="table-name" :title="row.table">
                 <span class="name-text">{{ row.label_zh || row.table }}</span>
@@ -115,8 +115,8 @@
                 <button
                   v-if="hasDetail(row)"
                   class="detail-btn"
-                  @click="toggleDetail(i)"
-                >{{ expanded === i ? '收起' : '展开' }}</button>
+                  @click="toggleDetail(row.table)"
+                >{{ expanded === row.table ? '收起' : '展开' }}</button>
               </td>
               <td class="repair-cell">
                 <button
@@ -135,7 +135,7 @@
             </tr>
 
             <!-- Expanded detail row -->
-            <tr v-if="expanded === i" class="detail-row">
+            <tr v-if="expanded === row.table" class="detail-row">
               <td :colspan="13">
                 <div class="detail-panel">
                   <div v-if="row.missing_cols && Object.keys(row.missing_cols).length" class="detail-section">
@@ -222,9 +222,20 @@ const rows = ref<HealthRow[]>([]);
 const summary = ref<HealthSummary | null>(null);
 const status = ref<"loading" | "ok" | "no_data" | "error">("loading");
 const statusMessage = ref("");
-const expanded = ref<number | null>(null);
+const expanded = ref<string | null>(null);
 const apiFallback = ref(false);
 const repairing = ref<Record<string, string>>({});  // table -> status
+
+const sortedRows = computed(() => {
+  const arr = [...rows.value];
+  arr.sort((a, b) => {
+    const sa = (a.source || '').toLowerCase();
+    const sb = (b.source || '').toLowerCase();
+    if (sa !== sb) return sa.localeCompare(sb, 'zh-CN');
+    return (a.label_zh || a.table).localeCompare(b.label_zh || b.table, 'zh-CN');
+  });
+  return arr;
+});
 
 const statusClass = computed(() => `dot-${status.value}`);
 const statusText = computed(() => {
@@ -364,8 +375,8 @@ function hasDetail(row: HealthRow): boolean {
   );
 }
 
-function toggleDetail(i: number) {
-  expanded.value = expanded.value === i ? null : i;
+function toggleDetail(table: string) {
+  expanded.value = expanded.value === table ? null : table;
 }
 
 async function startRepair(table: string) {
