@@ -1,5 +1,6 @@
 import json
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -159,3 +160,35 @@ def test_strategy_ab_rows_include_required_baselines():
         "trend_breadth_baseline",
         "best_challenger",
     }.issubset(strategy_names)
+
+
+def test_observation_frame_matches_matrix_rows_after_standardisation():
+    from cybernetics.features import build_observation_frame, build_observation_matrix, build_regime_features
+
+    dates = pd.date_range("2020-01-01", periods=320, freq="B")
+    close = pd.Series(100 + np.arange(len(dates)) * 0.2, index=dates)
+    frame = pd.DataFrame({"close": close, "volume": 1000.0, "amount": close * 1000.0}, index=dates)
+    features = build_regime_features({"sh000001": frame})
+
+    observations = build_observation_frame(features)
+    matrix, _ = build_observation_matrix(features)
+
+    assert len(observations) == len(matrix)
+    assert observations.index[0] > features.index[0]
+
+
+def test_forward_return_alignment_uses_observation_index_after_standardisation():
+    from cybernetics.features import build_observation_frame, build_regime_features
+    from scripts.train_regime_hmm import _align_forward_returns_to_observations
+
+    dates = pd.date_range("2020-01-01", periods=320, freq="B")
+    close = pd.Series(100 + np.arange(len(dates)) * 0.2, index=dates)
+    frame = pd.DataFrame({"close": close, "volume": 1000.0, "amount": close * 1000.0}, index=dates)
+    features = build_regime_features({"sh000001": frame})
+
+    observations = build_observation_frame(features)
+    aligned = _align_forward_returns_to_observations(features, close)
+    expected = close.pct_change(20).shift(-20).reindex(observations.index).fillna(0.0).to_numpy()
+
+    assert len(aligned) == len(observations)
+    assert aligned[0] == pytest.approx(expected[0])

@@ -338,6 +338,7 @@ class PipelineNode(BaseModel):
     title: str = ""
     subtitle: str = ""
     status: str = ""
+    kind: str = "stage"
     metrics: List[Any] = []
     inputs: List[Any] = []
     outputs: List[Any] = []

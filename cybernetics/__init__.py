@@ -6,5 +6,18 @@ from .orchestrator import (
     TradeRecord,
     adaptive_params,
 )
-from .features import RegimeFeatureSet, build_regime_features, build_observation_matrix, OBSERVATION_COLUMNS
-from .hmm_engine import StudentTHMM, HMMConfig, HMMResult, save_hmm_model, load_hmm_model
+from .features import (
+    OBSERVATION_COLUMNS,
+    RegimeFeatureSet,
+    build_observation_frame,
+    build_observation_matrix,
+    build_regime_features,
+)
+from .hmm_engine import (
+    HMMConfig,
+    HMMResult,
+    StudentTHMM,
+    apply_hmm_preprocessor,
+    load_hmm_model,
+    save_hmm_model,
+)

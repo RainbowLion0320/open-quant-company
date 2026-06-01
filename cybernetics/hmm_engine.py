@@ -61,6 +61,7 @@ class HMMResult:
     n_samples: int
     n_features: int
     config: HMMConfig = field(default_factory=HMMConfig)
+    preprocessor: dict[str, Any] | None = None
 
     def to_dict(self) -> dict:
         """Serialise to JSON-compatible dict (arrays → lists)."""
@@ -78,6 +79,13 @@ class HMMResult:
             "n_features": self.n_features,
             "config": self.config.to_dict(),
         }
+        if self.preprocessor:
+            d["preprocessor"] = {
+                "kind": self.preprocessor.get("kind"),
+                "n_components": int(np.asarray(self.preprocessor.get("components")).shape[0]),
+                "n_features_in": int(np.asarray(self.preprocessor.get("mean")).shape[0]),
+                "whiten": bool(self.preprocessor.get("whiten", False)),
+            }
         return d
 
 
@@ -506,6 +514,7 @@ def align_states(result: HMMResult, X: np.ndarray | None = None, forward_returns
         n_samples=result.n_samples,
         n_features=result.n_features,
         config=result.config,
+        preprocessor=result.preprocessor,
     )
 
 
@@ -684,10 +693,53 @@ class StudentTHMM:
 # Persistence
 # ---------------------------------------------------------------------------
 
-def save_hmm_model(result: HMMResult, path: str | Path) -> None:
+def _normalise_hmm_preprocessor(preprocessor: Any | None) -> dict[str, Any] | None:
+    """Convert supported preprocessors to a small numpy-serialisable dict."""
+    if preprocessor is None:
+        return None
+    if isinstance(preprocessor, dict):
+        if preprocessor.get("kind") != "pca":
+            raise ValueError(f"Unsupported HMM preprocessor: {preprocessor.get('kind')}")
+        return preprocessor
+    if hasattr(preprocessor, "components_") and hasattr(preprocessor, "mean_"):
+        return {
+            "kind": "pca",
+            "components": np.asarray(preprocessor.components_, dtype=np.float64),
+            "mean": np.asarray(preprocessor.mean_, dtype=np.float64),
+            "explained_variance": np.asarray(preprocessor.explained_variance_, dtype=np.float64),
+            "whiten": bool(getattr(preprocessor, "whiten", False)),
+        }
+    raise ValueError(f"Unsupported HMM preprocessor type: {type(preprocessor).__name__}")
+
+
+def apply_hmm_preprocessor(X: np.ndarray, preprocessor: dict[str, Any] | None) -> np.ndarray:
+    """Apply a persisted HMM input preprocessor to raw observation rows."""
+    X = np.asarray(X, dtype=np.float64)
+    if X.ndim == 1:
+        X = X.reshape(1, -1)
+    if preprocessor is None:
+        return X
+    if preprocessor.get("kind") != "pca":
+        raise ValueError(f"Unsupported HMM preprocessor: {preprocessor.get('kind')}")
+
+    mean = np.asarray(preprocessor["mean"], dtype=np.float64)
+    components = np.asarray(preprocessor["components"], dtype=np.float64)
+    if X.shape[1] != mean.shape[0]:
+        raise ValueError(f"HMM preprocessor expects {mean.shape[0]} features, got {X.shape[1]}")
+
+    transformed = (X - mean) @ components.T
+    if preprocessor.get("whiten", False):
+        scale = np.sqrt(np.asarray(preprocessor["explained_variance"], dtype=np.float64))
+        scale = np.where(scale > np.finfo(float).eps, scale, 1.0)
+        transformed = transformed / scale
+    return transformed
+
+
+def save_hmm_model(result: HMMResult, path: str | Path, preprocessor: Any | None = None) -> None:
     """Save model parameters to disk."""
     path = Path(path)
     path.mkdir(parents=True, exist_ok=True)
+    preprocessor_data = _normalise_hmm_preprocessor(preprocessor or result.preprocessor)
 
     # Save arrays
     np.savez(
@@ -709,6 +761,25 @@ def save_hmm_model(result: HMMResult, path: str | Path) -> None:
         "n_features": result.n_features,
         "config": result.config.to_dict(),
     }
+    if preprocessor_data:
+        meta["preprocessor"] = {
+            "kind": preprocessor_data["kind"],
+            "n_components": int(np.asarray(preprocessor_data["components"]).shape[0]),
+            "n_features_in": int(np.asarray(preprocessor_data["mean"]).shape[0]),
+            "whiten": bool(preprocessor_data.get("whiten", False)),
+        }
+        np.savez(
+            path / "preprocessor.npz",
+            kind=np.array(preprocessor_data["kind"]),
+            components=preprocessor_data["components"],
+            mean=preprocessor_data["mean"],
+            explained_variance=preprocessor_data["explained_variance"],
+            whiten=np.array(bool(preprocessor_data.get("whiten", False))),
+        )
+    else:
+        stale_preprocessor = path / "preprocessor.npz"
+        if stale_preprocessor.exists():
+            stale_preprocessor.unlink()
     (path / "meta.json").write_text(json.dumps(meta, indent=2))
 
 
@@ -718,6 +789,17 @@ def load_hmm_model(path: str | Path, config: HMMConfig | None = None) -> HMMResu
 
     data = np.load(path / "params.npz")
     meta = json.loads((path / "meta.json").read_text())
+    preprocessor = None
+    preprocessor_path = path / "preprocessor.npz"
+    if preprocessor_path.exists():
+        pre_data = np.load(preprocessor_path)
+        preprocessor = {
+            "kind": str(pre_data["kind"].item()),
+            "components": pre_data["components"],
+            "mean": pre_data["mean"],
+            "explained_variance": pre_data["explained_variance"],
+            "whiten": bool(pre_data["whiten"].item()),
+        }
 
     cfg = config or HMMConfig(**meta.get("config", {}))
 
@@ -736,4 +818,5 @@ def load_hmm_model(path: str | Path, config: HMMConfig | None = None) -> HMMResu
         n_samples=meta["n_samples"],
         n_features=meta["n_features"],
         config=cfg,
+        preprocessor=preprocessor,
     )

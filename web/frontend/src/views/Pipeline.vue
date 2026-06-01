@@ -30,11 +30,11 @@
     </div>
 
     <section class="pipeline-layout">
-      <div class="flow-stage glass-card">
+      <div ref="stageRef" class="flow-stage glass-card">
         <div v-if="loading" class="pipeline-empty">正在加载 Pipeline 数据...</div>
         <div v-else-if="payload" ref="canvasRef" class="flow-canvas" :style="canvasStyle">
           <svg
-            v-if="arrowSvgPaths.length"
+            v-if="visibleArrowPaths.length"
             class="flow-arrows"
             :viewBox="`0 0 ${canvasSize.w} ${canvasSize.h}`"
             :width="canvasSize.w"
@@ -46,20 +46,30 @@
                 <path d="M0 0 8 4 0 8Z" fill="rgba(0, 212, 255, 0.8)" />
               </marker>
             </defs>
-            <g v-for="(arrow, i) in arrowSvgPaths" :key="i">
+            <g v-for="arrow in visibleArrowPaths" :key="arrow.id">
               <path
                 :d="arrow.d"
                 fill="none"
-                :stroke="arrow.active ? 'rgba(0, 212, 255, 0.45)' : 'rgba(100, 100, 100, 0.2)'"
-                :stroke-width="arrow.active ? 1.5 : 1"
+                :stroke="arrow.active ? 'rgba(0, 212, 255, 0.45)' : 'rgba(255, 255, 255, 0.45)'"
+                :stroke-width="1.5"
                 :stroke-dasharray="arrow.active ? 'none' : '4 3'"
                 :marker-end="arrow.active ? 'url(#arrow-head)' : ''"
               />
+              <path
+                v-if="isSelectedEdge(arrow)"
+                class="flow-edge-highlight"
+                :d="arrow.d"
+                fill="none"
+                :stroke="arrow.active ? 'rgba(0, 212, 255, 0.95)' : 'rgba(255, 255, 255, 0.88)'"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-dasharray="7 9"
+              />
               <text
-                v-if="arrow.label && arrow.active"
+                v-if="arrow.label"
                 :x="arrow.labelX"
                 :y="arrow.labelY"
-                fill="rgba(0, 212, 255, 0.7)"
+                :fill="arrow.active ? 'rgba(0, 212, 255, 0.7)' : 'rgba(255, 255, 255, 0.62)'"
                 font-size="8"
                 text-anchor="middle"
                 dominant-baseline="middle"
@@ -72,7 +82,7 @@
             :key="node.id"
             :ref="(el) => setNodeRef(node.id, el)"
             class="flow-node"
-            :class="[{ active: selectedNodeId === node.id }, node.status]"
+            :class="[{ active: selectedNodeId === node.id }, node.status, node.kind]"
             :style="nodeStyle(node)"
             type="button"
             @click="selectedNodeId = node.id"
@@ -82,7 +92,7 @@
             <em>{{ node.subtitle }}</em>
             <div class="node-metrics">
               <span
-                v-for="metric in node.metrics.slice(0, 3)"
+                v-for="metric in node.metrics"
                 :key="`${node.id}-${metric.label}`"
                 :class="metricClass(metric.tone)"
               >
@@ -135,15 +145,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { api } from "../api";
-import { buildPipelineLayout } from "../utils/pipelineLayout";
+import {
+  layoutPipelineGraph,
+  offsetPipelineEdgePath,
+  visiblePipelineEdges,
+  type PipelineEdgePath,
+  type PipelineLayoutEdge,
+  type PipelineNodePosition,
+} from "../utils/pipelineLayout";
 
 interface PipelineNodeData {
   id: string;
   title: string;
   subtitle: string;
   status: string;
+  kind?: string;
   metrics: any[];
   inputs: any[];
   outputs: any[];
@@ -156,18 +174,21 @@ const error = ref("");
 const pipelines = ref<{ key: string; label: string; status: string }[]>([]);
 const activeKey = ref("market_regime");
 
-// Node DOM refs for measuring positions
+const NODE_WIDTH = 176;
+const CANVAS_PAD_X = 18;
+const CANVAS_PAD_Y = 18;
+const COMPACT_BREAKPOINT = 760;
+
+// Node DOM refs for measuring adaptive node heights
 const nodeRefs = new Map<string, Element>();
+const stageRef = ref<HTMLElement | null>(null);
 const canvasRef = ref<HTMLElement | null>(null);
 const canvasSize = reactive({ w: 800, h: 500 });
-interface ArrowPath {
-  d: string;
-  active: boolean;
-  label: string;
-  labelX: number;
-  labelY: number;
-}
-const arrowSvgPaths = ref<ArrowPath[]>([]);
+const nodeSizes = ref<Record<string, { width: number; height: number }>>({});
+const nodePositions = ref<Record<string, PipelineNodePosition>>({});
+const arrowSvgPaths = ref<PipelineEdgePath[]>([]);
+let layoutRunId = 0;
+let layoutFrame = 0;
 
 function setNodeRef(id: string, el: any) {
   if (el) nodeRefs.set(id, el.$el || el);
@@ -189,75 +210,155 @@ const scoreText = computed(() => {
   return typeof score === "number" && Number.isFinite(score) ? score.toFixed(1) : "—";
 });
 
-const nodeLayout = computed(() => {
-  const nodes: PipelineNodeData[] = payload.value?.nodes || [];
-  const edges: { source: string; target: string }[] = payload.value?.edges || [];
-  return buildPipelineLayout(nodes, edges);
-});
-
-const numCols = computed(() => Math.max(...nodeLayout.value.map(p => p.col), 0) + 1);
-
 const canvasStyle = computed(() => ({
-  gridTemplateColumns: `repeat(${numCols.value}, minmax(160px, 220px))`,
-  gridAutoRows: "100px",
-  justifyContent: "center",
+  width: `${canvasSize.w}px`,
+  height: `${canvasSize.h}px`,
+  minWidth: "100%",
 }));
 
+const visibleArrowPaths = computed(() => visiblePipelineEdges(arrowSvgPaths.value, selectedNodeId.value));
+
+function isSelectedEdge(arrow: PipelineEdgePath) {
+  return arrow.source === selectedNodeId.value || arrow.target === selectedNodeId.value;
+}
+
 function nodeStyle(node: PipelineNodeData) {
-  const pos = nodeLayout.value.find(p => p.id === node.id);
-  if (!pos) return {};
-  return { gridColumn: pos.col + 1, gridRow: pos.row + 1 };
+  const pos = nodePositions.value[node.id];
+  if (!pos) return { opacity: 0 };
+  return {
+    left: `${pos.x}px`,
+    top: `${pos.y}px`,
+    width: `${pos.width}px`,
+  };
 }
 
-// ── Measure node positions and compute arrow SVG paths ──
+// ── ELK layered layout with measured node heights ──
 
-function updateArrows() {
-  const canvas = canvasRef.value;
-  if (!canvas) { arrowSvgPaths.value = []; return; }
+function schedulePipelineLayout() {
+  if (layoutFrame) window.cancelAnimationFrame(layoutFrame);
+  layoutFrame = window.requestAnimationFrame(() => {
+    layoutFrame = 0;
+    void updatePipelineLayout();
+  });
+}
 
-  const canvasRect = canvas.getBoundingClientRect();
-  canvasSize.w = Math.round(canvasRect.width);
-  canvasSize.h = Math.round(canvasRect.height);
-
-  const edges: { source: string; target: string; label?: string; condition?: string; active?: boolean }[] = payload.value?.edges || [];
-  const paths: ArrowPath[] = [];
-
-  for (const edge of edges) {
-    const srcEl = nodeRefs.get(edge.source);
-    const tgtEl = nodeRefs.get(edge.target);
-    if (!srcEl || !tgtEl) continue;
-
-    const srcRect = srcEl.getBoundingClientRect();
-    const tgtRect = tgtEl.getBoundingClientRect();
-
-    // Source: bottom center → Target: top center
-    const x1 = srcRect.left + srcRect.width / 2 - canvasRect.left;
-    const y1 = srcRect.bottom - canvasRect.top;
-    const x2 = tgtRect.left + tgtRect.width / 2 - canvasRect.left;
-    const y2 = tgtRect.top - canvasRect.top;
-
-    let d: string;
-    if (Math.abs(x1 - x2) < 2) {
-      d = `M${x1} ${y1}L${x2} ${y2}`;
-    } else {
-      const midY = (y1 + y2) / 2;
-      d = `M${x1} ${y1}C${x1} ${midY} ${x2} ${midY} ${x2} ${y2}`;
-    }
-
-    paths.push({
-      d,
-      active: edge.active !== false,
-      label: edge.label || edge.condition || "",
-      labelX: (x1 + x2) / 2,
-      labelY: (y1 + y2) / 2,
-    });
+async function updatePipelineLayout(allowMeasure = true) {
+  const data = payload.value;
+  if (loading.value || !data?.nodes?.length || !canvasRef.value) {
+    arrowSvgPaths.value = [];
+    return;
   }
-  arrowSvgPaths.value = paths;
+
+  const runId = ++layoutRunId;
+  const nodes: PipelineNodeData[] = data.nodes || [];
+  const edges: PipelineLayoutEdge[] = data.edges || [];
+  const stageWidth = Math.max(stageRef.value?.clientWidth || 800, 320);
+
+  if (isCompactFlow()) {
+    applyCompactLayout(nodes, stageWidth);
+  } else {
+    try {
+      const result = await layoutPipelineGraph(
+        nodes.map((node) => ({
+          id: node.id,
+          width: nodeSizes.value[node.id]?.width || NODE_WIDTH,
+          height: nodeSizes.value[node.id]?.height || estimateNodeHeight(node),
+        })),
+        edges,
+        { nodeSpacing: stageWidth < 1080 ? 18 : 34, layerSpacing: 118 },
+      );
+      if (runId !== layoutRunId) return;
+      applyElkLayout(result, stageWidth);
+    } catch (err) {
+      console.error("Pipeline ELK layout failed", err);
+      applyCompactLayout(nodes, stageWidth);
+    }
+  }
+
+  await nextTick();
+  if (allowMeasure && measureNodeSizes(nodes)) {
+    await updatePipelineLayout(false);
+  }
 }
 
-watch(payload, () => nextTick(updateArrows), { deep: true });
-watch(activeKey, () => nextTick(updateArrows));
-onMounted(() => window.addEventListener("resize", updateArrows));
+function applyElkLayout(
+  result: { width: number; height: number; nodes: PipelineNodePosition[]; edges: PipelineEdgePath[] },
+  stageWidth: number,
+) {
+  const layoutWidth = Math.max(Math.ceil(result.width), 1);
+  const layoutHeight = Math.max(Math.ceil(result.height), 1);
+  const canvasWidth = Math.max(layoutWidth + CANVAS_PAD_X * 2, stageWidth - 30, 320);
+  const offsetX = Math.max(CANVAS_PAD_X, Math.round((canvasWidth - layoutWidth) / 2));
+  const offsetY = CANVAS_PAD_Y;
+
+  nodePositions.value = Object.fromEntries(result.nodes.map((node) => [
+    node.id,
+    {
+      ...node,
+      x: Math.round(node.x + offsetX),
+      y: Math.round(node.y + offsetY),
+    },
+  ]));
+  arrowSvgPaths.value = result.edges
+    .filter((edge) => edge.d)
+    .map((edge) => offsetPipelineEdgePath(edge, offsetX, offsetY))
+    .sort((a, b) => Number(a.active) - Number(b.active));
+  canvasSize.w = Math.round(canvasWidth);
+  canvasSize.h = Math.max(layoutHeight + CANVAS_PAD_Y * 2, 240);
+}
+
+function applyCompactLayout(nodes: PipelineNodeData[], stageWidth: number) {
+  const canvasWidth = Math.max(stageWidth - 30, 260);
+  const x = Math.max(14, Math.round((canvasWidth - NODE_WIDTH) / 2));
+  let y = CANVAS_PAD_Y;
+  const positions: Record<string, PipelineNodePosition> = {};
+
+  for (const node of nodes) {
+    const height = nodeSizes.value[node.id]?.height || estimateNodeHeight(node);
+    positions[node.id] = { id: node.id, x, y, width: NODE_WIDTH, height };
+    y += height + 18;
+  }
+
+  nodePositions.value = positions;
+  arrowSvgPaths.value = [];
+  canvasSize.w = Math.round(canvasWidth);
+  canvasSize.h = Math.max(y + CANVAS_PAD_Y, 240);
+}
+
+function estimateNodeHeight(node: PipelineNodeData) {
+  const metrics = node.metrics?.length || 0;
+  const metricRows = Math.max(1, Math.ceil(metrics / 2));
+  const subtitleRows = Math.max(1, Math.ceil(String(node.subtitle || "").length / 38));
+  return Math.max(112, 54 + subtitleRows * 13 + metricRows * 17);
+}
+
+function measureNodeSizes(nodes: PipelineNodeData[]) {
+  let changed = false;
+  const nextSizes = { ...nodeSizes.value };
+
+  for (const node of nodes) {
+    const el = nodeRefs.get(node.id) as HTMLElement | undefined;
+    if (!el) continue;
+
+    const width = NODE_WIDTH;
+    const height = Math.max(96, Math.ceil(el.getBoundingClientRect().height));
+    const previous = nextSizes[node.id];
+    if (!previous || Math.abs(previous.height - height) > 1 || Math.abs(previous.width - width) > 1) {
+      nextSizes[node.id] = { width, height };
+      changed = true;
+    }
+  }
+
+  if (changed) nodeSizes.value = nextSizes;
+  return changed;
+}
+
+function isCompactFlow() {
+  return window.innerWidth <= COMPACT_BREAKPOINT;
+}
+
+watch(payload, () => nextTick(schedulePipelineLayout), { deep: true });
+watch(loading, () => nextTick(schedulePipelineLayout));
 
 // ── Dynamic summary output band ──
 
@@ -325,10 +426,14 @@ async function loadPipeline() {
 function switchPipeline(key: string) {
   activeKey.value = key;
   selectedNodeId.value = "";
+  nodeSizes.value = {};
+  nodePositions.value = {};
+  arrowSvgPaths.value = [];
   loadPipeline();
 }
 
 onMounted(async () => {
+  window.addEventListener("resize", schedulePipelineLayout);
   try {
     const data = await api.pipelineList();
     pipelines.value = data.items || [];
@@ -336,6 +441,11 @@ onMounted(async () => {
     pipelines.value = [{ key: "market_regime", label: "Market Regime", status: "available" }];
   }
   loadPipeline();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", schedulePipelineLayout);
+  if (layoutFrame) window.cancelAnimationFrame(layoutFrame);
 });
 </script>
 
@@ -436,14 +546,15 @@ onMounted(async () => {
 .output-band {
   padding: 14px;
 }
+.flow-stage {
+  position: relative;
+  overflow-x: auto;
+}
 .flow-canvas {
   position: relative;
-  display: grid;
-  gap: 80px 48px;
-  justify-items: center;
-  justify-content: center;
-  align-content: start;
-  padding: 16px 0;
+  display: block;
+  margin: 0 auto;
+  padding: 0;
 }
 .flow-arrows {
   position: absolute;
@@ -452,12 +563,27 @@ onMounted(async () => {
   pointer-events: none;
   overflow: visible;
 }
+.flow-edge-highlight {
+  animation: pipeline-flow 0.75s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.62));
+  stroke-dashoffset: 0;
+}
+@keyframes pipeline-flow {
+  from {
+    stroke-dashoffset: 16;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
 .flow-node {
-  position: relative;
+  position: absolute;
   z-index: 1;
-  width: 100%;
-  max-width: 220px;
-  padding: 12px;
+  width: 176px;
+  min-width: 0;
+  min-height: 112px;
+  max-width: 176px;
+  padding: 10px;
   border: 1px solid var(--border-default);
   border-radius: 8px;
   background:
@@ -465,6 +591,7 @@ onMounted(async () => {
     radial-gradient(circle at 16% 12%, rgba(0, 212, 255, 0.12), transparent 42%);
   color: var(--text-secondary);
   text-align: left;
+  overflow-wrap: anywhere;
   cursor: pointer;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
@@ -482,21 +609,42 @@ onMounted(async () => {
 .flow-node.fallback {
   border-color: rgba(234, 179, 8, 0.25);
 }
+.flow-node.decision {
+  border-color: rgba(167, 139, 250, 0.42);
+  background:
+    linear-gradient(145deg, rgba(19, 18, 42, 0.96), rgba(8, 17, 32, 0.90)),
+    radial-gradient(circle at 16% 12%, rgba(167, 139, 250, 0.16), transparent 44%);
+}
+.flow-node.decision .node-status {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: #a78bfa;
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.68);
+  transform: rotate(45deg);
+}
+.flow-node.path {
+  border-style: dashed;
+  background:
+    linear-gradient(145deg, rgba(10, 24, 36, 0.94), rgba(6, 15, 28, 0.88)),
+    radial-gradient(circle at 16% 12%, rgba(34, 197, 94, 0.10), transparent 42%);
+}
 .flow-node strong {
   display: block;
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.15;
   font-weight: 680;
+  overflow-wrap: anywhere;
 }
 .flow-node em {
   display: block;
-  margin-top: 5px;
-  min-height: 30px;
+  margin-top: 4px;
   color: var(--text-tertiary);
   font-size: 10px;
-  line-height: 1.35;
+  line-height: 1.25;
   font-style: normal;
+  overflow-wrap: anywhere;
 }
 .node-status {
   position: absolute;
@@ -515,18 +663,20 @@ onMounted(async () => {
 .node-metrics {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 8px;
+  gap: 2px;
+  margin-top: 6px;
 }
 .node-metrics span {
+  min-width: 0;
   max-width: 100%;
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 5px;
   background: rgba(125, 211, 252, 0.06);
   color: var(--text-tertiary);
   font-size: 9px;
-  line-height: 1.3;
-  white-space: nowrap;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .node-metrics b {
   margin-left: 3px;
@@ -680,6 +830,9 @@ onMounted(async () => {
   }
   .flow-arrows {
     display: none;
+  }
+  .flow-canvas {
+    margin: 0 auto;
   }
   .flow-node {
     min-height: 102px;

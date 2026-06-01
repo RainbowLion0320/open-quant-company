@@ -69,6 +69,25 @@ def build_market_regime_pipeline() -> dict[str, object]:
         "adaptive_params": adaptive_params,
     }
 
+    # Determine which explicit control-flow path was taken.
+    is_consensus = decision_reason == "hmm_rule_consensus"
+    is_override = decision_reason == "hmm_high_confidence_override"
+    is_blend = decision_reason == "hybrid_low_confidence_blend"
+    is_hmm_only = decision_reason == "hmm_only"
+    is_rule_only = decision_reason == "rule_only"
+    is_fallback = decision_reason == "hmm_unavailable_fallback"
+    is_hmm_candidate = engine in {"hmm", "hybrid"}
+    is_hybrid_path = is_consensus or is_override or is_blend
+    hmm_available = bool(regime_probs) and not is_fallback
+    override_threshold = safe_float(cfg.get("hmm_confidence_override", 0.80), 0.80)
+
+    # Determine stability state.
+    pending_value = stability.get("pending_value")
+    dwell_count = stability.get("pending_count", 0)
+    min_dwell = stability.get("min_dwell", 3)
+    is_confirmed = pending_value is None or pending_value == ""
+    is_pending = not is_confirmed and dwell_count < min_dwell
+
     nodes = [
         node(
             "inputs",
@@ -79,7 +98,41 @@ def build_market_regime_pipeline() -> dict[str, object]:
                 metric("As of", breadth_detail.get("as_of") or getattr(snapshot, "date", "")),
             ],
             inputs=["A-share index OHLCV", "Full-market breadth", "Full-market volume"],
-            outputs=["Benchmark frame", "Breadth snapshot", "Volume snapshot"],
+            outputs=["Raw index frame", "Breadth source", "Volume source"],
+        ),
+        node(
+            "benchmark_frame",
+            "Benchmark Frame",
+            "Normalize index OHLCV and align latest date",
+            metrics=[
+                metric("As of", breadth_detail.get("as_of") or getattr(snapshot, "date", "")),
+                metric("Indexes", "configured"),
+            ],
+            inputs=["Raw index frame"],
+            outputs=["Benchmark close/volume frame"],
+        ),
+        node(
+            "breadth_snapshot",
+            "Breadth Snapshot",
+            "Full-market participation and advance ratio",
+            metrics=[
+                metric("Sample", int(safe_float(breadth_detail.get("sample_size"), 0)), "accent"),
+                metric("Advance", pct(breadth_detail.get("advance_ratio"))),
+                metric("Above MA20", pct(breadth_detail.get("above_ma20"))),
+            ],
+            inputs=["Breadth source"],
+            outputs=["Breadth snapshot"],
+        ),
+        node(
+            "volume_snapshot",
+            "Volume Snapshot",
+            "Market amount and up-volume activity",
+            metrics=[
+                metric("Amount 5/20", pct(score_components.get("amount_ratio_5_20"))),
+                metric("Up amount", pct(score_components.get("up_amount_ratio"))),
+            ],
+            inputs=["Volume source"],
+            outputs=["Volume snapshot"],
         ),
         node(
             "trend",
@@ -169,27 +222,158 @@ def build_market_regime_pipeline() -> dict[str, object]:
             outputs=["Regime probability vector", f"Confidence {summary['confidence']:.2f}"],
         ),
         node(
-            "hybrid_decision",
-            "Hybrid Decision",
-            "Consensus, high-confidence override, or blended vote",
+            "engine_route",
+            "Engine Route?",
+            "Choose rule, HMM, or hybrid decision branch",
+            kind="decision",
             metrics=[
                 metric("Engine", engine.upper(), "accent"),
                 metric("Method", str(detection_method).upper(), "accent"),
+            ],
+            inputs=["Rule raw regime", "Configured engine"],
+            outputs=["Rule branch", "HMM availability check"],
+        ),
+        node(
+            "hmm_availability",
+            "HMM Available?",
+            "Check model inference and probability vector",
+            kind="decision",
+            status="ready" if hmm_available else "fallback",
+            metrics=[
+                metric("Available", "yes" if hmm_available else "no", "positive" if hmm_available else "negative"),
+                metric("Confidence", f"{summary['confidence']:.2f}"),
+            ],
+            inputs=["HMM probability vector", "Configured engine"],
+            outputs=["HMM-only branch", "Hybrid branch", "Rule fallback"],
+        ),
+        node(
+            "mode_rule_only",
+            "Rule-Only Path",
+            "Use weighted rule score when rule engine or fallback wins",
+            kind="path",
+            status="fallback" if is_fallback else "ready",
+            metrics=[
+                metric("Reason", "fallback" if is_fallback else "rule_only", "warning" if is_fallback else "accent"),
+                metric("Raw", value(raw_regime)),
+            ],
+            inputs=["Rule score", "Engine route"],
+            outputs=["Raw regime candidate"],
+        ),
+        node(
+            "mode_hmm_only",
+            "HMM-Only Path",
+            "Use HMM argmax when engine is HMM",
+            kind="path",
+            metrics=[
+                metric("Reason", "hmm_only"),
+                metric("Raw", summary["raw_regime"], "accent"),
+            ],
+            inputs=["HMM probability vector"],
+            outputs=["Raw regime candidate"],
+        ),
+        node(
+            "hybrid_compare",
+            "Rule == HMM?",
+            "Hybrid consensus check before confidence override",
+            kind="decision",
+            metrics=[
+                metric("Reason", decision_reason or "rule_only"),
+                metric("Consensus", "yes" if is_consensus else "no"),
+            ],
+            inputs=["Rule raw regime", "HMM raw regime"],
+            outputs=["Consensus path", "Disagreement path"],
+        ),
+        node(
+            "path_consensus",
+            "Consensus Path",
+            "Rule and HMM agree; use HMM probabilities",
+            kind="path",
+            metrics=[
+                metric("Reason", "hmm_rule_consensus"),
+                metric("Raw", summary["raw_regime"], "accent"),
+            ],
+            inputs=["Consensus result"],
+            outputs=["Raw regime candidate"],
+        ),
+        node(
+            "confidence_gate",
+            "Confidence >= Threshold?",
+            "Decide HMM override versus blended rule/HMM vote",
+            kind="decision",
+            metrics=[
+                metric("Confidence", f"{summary['confidence']:.2f}", "accent"),
+                metric("Threshold", f"{override_threshold:.2f}"),
+            ],
+            inputs=["Disagreement result", "HMM confidence"],
+            outputs=["Override path", "Blend path"],
+        ),
+        node(
+            "path_override",
+            "Override Path",
+            "High-confidence HMM overrides rule regime",
+            kind="path",
+            metrics=[
+                metric("Reason", "hmm_high_confidence_override"),
+                metric("Raw", summary["raw_regime"], "accent"),
+            ],
+            inputs=["HMM argmax regime"],
+            outputs=["Raw regime candidate"],
+        ),
+        node(
+            "path_blend",
+            "Blend Path",
+            "Low-confidence disagreement blends HMM probabilities with rule vote",
+            kind="path",
+            metrics=[
+                metric("Reason", "hybrid_low_confidence_blend", "accent"),
+                metric("Raw", summary["raw_regime"]),
+            ],
+            inputs=["Rule vote", "HMM probabilities"],
+            outputs=["Raw regime candidate"],
+        ),
+        node(
+            "raw_regime",
+            "Raw Regime",
+            "Resolved pre-dwell market regime",
+            metrics=[
+                metric("Raw", summary["raw_regime"], "accent"),
                 metric("Reason", decision_reason or "rule_only"),
             ],
-            inputs=["Rule raw regime", "HMM probabilities"],
+            inputs=["Active decision path"],
             outputs=[f"Raw regime: {summary['raw_regime']}"],
         ),
         node(
             "stability",
-            "Dwell Stability",
+            "Dwell Gate?",
             "Minimum unique observations before confirmed switch",
+            kind="decision",
             metrics=[
                 metric("Confirmed", stability.get("confirmed_value", summary["confirmed_regime"]), "accent"),
                 metric("Pending", stability.get("pending_value") or "idle"),
                 metric("Dwell", f"{stability.get('pending_count', 0)}/{stability.get('min_dwell', 3)}"),
             ],
             inputs=["Raw regime"],
+            outputs=["Confirmed branch", "Pending branch"],
+        ),
+        node(
+            "stability_confirmed",
+            "Confirmed Path",
+            "No pending transition or dwell requirement satisfied",
+            kind="path",
+            metrics=[metric("Confirmed", summary["confirmed_regime"], "accent")],
+            inputs=["Dwell gate"],
+            outputs=[f"Confirmed regime: {summary['confirmed_regime']}"],
+        ),
+        node(
+            "stability_pending",
+            "Pending Hold",
+            "Keep prior confirmed regime until dwell threshold is met",
+            kind="path",
+            metrics=[
+                metric("Pending", stability.get("pending_value") or "idle", "warning"),
+                metric("Dwell", f"{dwell_count}/{min_dwell}"),
+            ],
+            inputs=["Dwell gate"],
             outputs=[f"Confirmed regime: {summary['confirmed_regime']}"],
         ),
         node(
@@ -205,47 +389,61 @@ def build_market_regime_pipeline() -> dict[str, object]:
             outputs=["Strategy risk overlay", "Asset allocator", "Web telemetry"],
         ),
     ]
-    # Determine which hybrid path was taken
-    is_consensus = decision_reason == "hmm_rule_consensus"
-    is_override = decision_reason == "hmm_high_confidence_override"
-    is_blend = decision_reason == "hybrid_low_confidence_blend"
-    is_rule_only = decision_reason == "rule_only"
-    is_fallback = decision_reason == "hmm_unavailable_fallback"
-
-    # Determine stability state
-    pending_value = stability.get("pending_value")
-    dwell_count = stability.get("pending_count", 0)
-    min_dwell = stability.get("min_dwell", 3)
-    is_confirmed = pending_value is None or pending_value == ""
-    is_pending = not is_confirmed and dwell_count < min_dwell
 
     edges = [
-        edge("inputs", "trend"),
-        edge("inputs", "breadth"),
-        edge("inputs", "risk"),
-        edge("inputs", "volume"),
-        edge("inputs", "hmm_features"),
+        edge("inputs", "benchmark_frame"),
+        edge("inputs", "breadth_snapshot"),
+        edge("inputs", "volume_snapshot"),
+        edge("benchmark_frame", "trend"),
+        edge("benchmark_frame", "risk"),
+        edge("benchmark_frame", "hmm_features"),
+        edge("breadth_snapshot", "breadth"),
+        edge("breadth_snapshot", "risk"),
+        edge("breadth_snapshot", "hmm_features"),
+        edge("volume_snapshot", "volume"),
+        edge("volume_snapshot", "hmm_features"),
         edge("trend", "rule_score"),
         edge("breadth", "rule_score"),
         edge("risk", "rule_score"),
         edge("volume", "rule_score"),
         edge("hmm_features", "hmm_inference"),
-        edge("rule_score", "hybrid_decision"),
-        edge("hmm_inference", "hybrid_decision"),
-        # Conditional edges from hybrid_decision
-        edge("hybrid_decision", "stability",
-             label="consensus", condition="rule == HMM", active=is_consensus),
-        edge("hybrid_decision", "stability",
-             label="override", condition="confidence ≥ 0.80", active=is_override),
-        edge("hybrid_decision", "stability",
-             label="blend", condition="confidence < 0.80", active=is_blend),
-        edge("hybrid_decision", "stability",
-             label="rule only", condition="HMM unavailable", active=is_rule_only or is_fallback),
-        # Conditional edges from stability
-        edge("stability", "outputs",
+        edge("rule_score", "engine_route"),
+        edge("hmm_inference", "hmm_availability", active=is_hmm_candidate),
+        edge("engine_route", "mode_rule_only",
+             label="rule only", condition="engine == rule_based", active=is_rule_only),
+        edge("engine_route", "hmm_availability",
+             label="hmm/hybrid", condition="engine in {hmm, hybrid}", active=is_hmm_candidate),
+        edge("hmm_availability", "mode_rule_only",
+             label="fallback", condition="HMM unavailable", active=is_fallback),
+        edge("hmm_availability", "mode_hmm_only",
+             label="hmm only", condition="engine == HMM", active=is_hmm_only),
+        edge("hmm_availability", "hybrid_compare",
+             label="hybrid", condition="engine == hybrid", active=is_hybrid_path),
+        edge("hybrid_compare", "path_consensus",
+             label="yes", condition="rule == HMM", active=is_consensus),
+        edge("hybrid_compare", "confidence_gate",
+             label="no", condition="rule != HMM", active=is_override or is_blend),
+        edge("confidence_gate", "path_override",
+             label="override", condition=f"confidence >= {override_threshold:.2f}", active=is_override),
+        edge("confidence_gate", "path_blend",
+             label="blend", condition=f"confidence < {override_threshold:.2f}", active=is_blend),
+        edge("mode_rule_only", "raw_regime",
+             label="rule raw", active=is_rule_only or is_fallback),
+        edge("mode_hmm_only", "raw_regime",
+             label="hmm raw", active=is_hmm_only),
+        edge("path_consensus", "raw_regime",
+             label="consensus", active=is_consensus),
+        edge("path_override", "raw_regime",
+             label="override", active=is_override),
+        edge("path_blend", "raw_regime",
+             label="blend", active=is_blend),
+        edge("raw_regime", "stability"),
+        edge("stability", "stability_confirmed",
              label="confirmed", condition="dwell ≥ min_dwell", active=is_confirmed),
-        edge("stability", "outputs",
+        edge("stability", "stability_pending",
              label="pending", condition=f"dwell {dwell_count}/{min_dwell}", active=is_pending),
+        edge("stability_confirmed", "outputs", active=is_confirmed),
+        edge("stability_pending", "outputs", active=is_pending),
     ]
 
     return {

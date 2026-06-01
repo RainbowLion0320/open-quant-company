@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -54,3 +55,13 @@ def test_acceptance_matrix_summary_counts_match_domain_rows():
                 summary_counts["合计"] = int(cols[1])
 
     assert summary_counts == {**row_counts, "合计": sum(row_counts.values())}
+
+
+def test_committed_mcp_config_does_not_embed_brave_api_key():
+    path = Path(".mcp.json")
+    if not path.exists():
+        return
+
+    text = path.read_text(encoding="utf-8")
+
+    assert re.search(r"\bBSA[A-Za-z0-9_-]{20,}\b", text) is None

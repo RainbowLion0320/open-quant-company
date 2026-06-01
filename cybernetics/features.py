@@ -213,7 +213,7 @@ def _compute_stock_bond_correlation(
     """60-day rolling correlation between equity and bond returns."""
     if bond_returns is None or bond_returns.empty:
         return pd.Series(0.0, index=equity_returns.index)
-    aligned = pd.concat([equity_returns, bond_returns], axis=1).dropna()
+    aligned = pd.concat([equity_returns, bond_returns], axis=1, sort=False).dropna()
     if aligned.empty or aligned.shape[1] < 2:
         return pd.Series(0.0, index=equity_returns.index)
     corr = aligned.iloc[:, 0].rolling(window, min_periods=20).corr(aligned.iloc[:, 1])
@@ -353,6 +353,31 @@ def build_regime_features(
     return result
 
 
+def build_observation_frame(
+    features: pd.DataFrame,
+    columns: list[str] | None = None,
+    standardise: bool = True,
+    window: int = 252,
+) -> pd.DataFrame:
+    """Return the exact feature rows used as HMM observations.
+
+    Keeping the row index with the standardised matrix prevents forward-return
+    labels and evaluation series from drifting after rolling z-score drops.
+    """
+    cols = columns or OBSERVATION_COLUMNS
+    available = [c for c in cols if c in features.columns]
+    if not available:
+        return pd.DataFrame()
+
+    data = features[available].copy()
+
+    if standardise:
+        for col in available:
+            data[col] = _rolling_zscore(data[col], window=window, min_periods=60)
+
+    return data.dropna()
+
+
 def build_observation_matrix(
     features: pd.DataFrame,
     columns: list[str] | None = None,
@@ -375,21 +400,20 @@ def build_observation_matrix(
     -------
     (np.ndarray of shape (n_samples, n_features), fitted PCA object or None)
     """
-    cols = columns or OBSERVATION_COLUMNS
-    available = [c for c in cols if c in features.columns]
-    if not available:
+    data = build_observation_frame(features, columns=columns, standardise=standardise, window=window)
+    if data.empty:
         return np.array([]), None
 
-    data = features[available].copy()
-
-    if standardise:
-        for col in available:
-            data[col] = _rolling_zscore(data[col], window=window, min_periods=60)
-
-    data = data.dropna()
     X = data.values
 
-    if n_components is not None and n_components < X.shape[1]:
+    if n_components is not None:
+        if n_components < 1:
+            raise ValueError("n_components must be positive")
+        if n_components > min(X.shape):
+            raise ValueError("n_components cannot exceed min(n_samples, n_features)")
+        if n_components >= X.shape[1]:
+            return X, None
+
         from sklearn.decomposition import PCA
         pca = PCA(n_components=n_components, whiten=True)
         X = pca.fit_transform(X)

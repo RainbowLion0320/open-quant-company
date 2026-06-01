@@ -73,6 +73,42 @@ def _build_features_for_training(
     return features
 
 
+def _normalise_close_series(close: pd.Series) -> pd.Series:
+    """Return a numeric close series with a DatetimeIndex."""
+    result = pd.to_numeric(close, errors="coerce").copy()
+    result.index = pd.to_datetime(result.index, errors="coerce")
+    result = result[~result.index.isna()]
+    return result.sort_index().dropna()
+
+
+def _close_from_frame(frame: pd.DataFrame | None) -> pd.Series | None:
+    """Extract a DatetimeIndex close series from an index frame."""
+    if frame is None or frame.empty or "close" not in frame.columns:
+        return None
+    data = frame.copy()
+    if "date" in data.columns and data.index.name != "date":
+        data["date"] = pd.to_datetime(data["date"], errors="coerce")
+        data = data.dropna(subset=["date"]).set_index("date").sort_index()
+    return _normalise_close_series(data["close"])
+
+
+def _align_forward_returns_to_observations(
+    features: pd.DataFrame,
+    close: pd.Series,
+    *,
+    horizon: int = 20,
+) -> np.ndarray:
+    """Align forward returns to the exact standardised observation rows."""
+    from cybernetics.features import build_observation_frame
+
+    observations = build_observation_frame(features)
+    if observations.empty:
+        return np.array([])
+    close = _normalise_close_series(close)
+    fwd = close.pct_change(horizon).shift(-horizon)
+    return np.nan_to_num(fwd.reindex(observations.index).to_numpy(), nan=0.0)
+
+
 def _train_single_hmm(
     X: np.ndarray,
     n_states: int = 3,
@@ -81,7 +117,7 @@ def _train_single_hmm(
     forward_returns: np.ndarray | None = None,
 ) -> dict:
     """Train a single HMM and return metrics."""
-    from cybernetics.hmm_engine import HMMConfig, StudentTHMM, align_states
+    from cybernetics.hmm_engine import HMMConfig, StudentTHMM
 
     config = HMMConfig(
         n_states=n_states,
@@ -163,8 +199,7 @@ def _walk_forward_hmm(
     validate_years: int = 1,
 ) -> list[dict]:
     """Walk-forward validation for HMM."""
-    from cybernetics.features import OBSERVATION_COLUMNS, build_observation_matrix
-    from cybernetics.hmm_engine import StudentTHMM, HMMConfig
+    from cybernetics.features import build_observation_frame
 
     results = []
     years = sorted(set(features.index.year))
@@ -182,9 +217,11 @@ def _walk_forward_hmm(
         if len(train_features) < 252 or len(validate_features) < 60:
             continue
 
-        # Build observation matrices
-        train_X, _pca = build_observation_matrix(train_features)
-        validate_X, _pca2 = build_observation_matrix(validate_features)
+        # Build observation matrices and keep their exact row indexes.
+        train_observations = build_observation_frame(train_features)
+        validate_observations = build_observation_frame(validate_features)
+        train_X = train_observations.to_numpy()
+        validate_X = validate_observations.to_numpy()
 
         if len(train_X) == 0 or len(validate_X) == 0:
             continue
@@ -192,16 +229,9 @@ def _walk_forward_hmm(
         # Compute forward returns for training alignment
         train_fwd = None
         if index_frames:
-            bench = list(index_frames.values())[0].copy()
-            if "date" in bench.columns and bench.index.name != "date":
-                bench["date"] = pd.to_datetime(bench["date"], errors="coerce")
-                bench = bench.dropna(subset=["date"]).set_index("date").sort_index()
-            if "close" in bench.columns:
-                bench_close = pd.to_numeric(bench["close"], errors="coerce")
-                fwd = bench_close.pct_change(20).shift(-20)
-                obs_cols = [c for c in OBSERVATION_COLUMNS if c in train_features.columns]
-                obs_idx = train_features.dropna(subset=obs_cols).index
-                train_fwd = np.nan_to_num(fwd.reindex(obs_idx).values, nan=0.0)
+            bench_close = _close_from_frame(list(index_frames.values())[0])
+            if bench_close is not None:
+                train_fwd = _align_forward_returns_to_observations(train_features, bench_close)
 
         # Train on training window
         try:
@@ -216,9 +246,7 @@ def _walk_forward_hmm(
         validate_states = hmm.predict(validate_X)
 
         # Evaluate
-        validate_close = close[close.index.isin(validate_features.index)]
-        if len(validate_close) != len(validate_states):
-            validate_close = validate_close.iloc[:len(validate_states)]
+        validate_close = _normalise_close_series(close).reindex(validate_observations.index).ffill()
 
         quality = _evaluate_regime_quality(validate_probs, validate_close, validate_states)
 
@@ -337,27 +365,19 @@ def main() -> int:
         return 1
 
     # Build observation matrix
-    from cybernetics.features import OBSERVATION_COLUMNS, build_observation_matrix
-    from cybernetics.hmm_engine import HMMConfig, StudentTHMM, save_hmm_model
+    from cybernetics.features import build_observation_frame, build_observation_matrix
+    from cybernetics.hmm_engine import save_hmm_model
 
+    observation_frame = build_observation_frame(features)
     X, pca = build_observation_matrix(features, n_components=args.pca_components)
     log.info(f"Observation matrix: {X.shape}" + (f" (PCA {args.pca_components} components)" if pca else ""))
 
     # Compute forward returns for state alignment
     # Use 20-day forward return from the benchmark index
     bench_df = index_frames.get(args.symbol, index_frames.get("sh000001"))
-    if bench_df is not None and "close" in bench_df.columns:
-        bench = bench_df.copy()
-        # Ensure date is the index for proper alignment
-        if "date" in bench.columns and bench.index.name != "date":
-            bench["date"] = pd.to_datetime(bench["date"], errors="coerce")
-            bench = bench.dropna(subset=["date"]).set_index("date").sort_index()
-        bench_close = pd.to_numeric(bench["close"], errors="coerce")
-        fwd_ret_20 = bench_close.pct_change(20).shift(-20)
-        # Align with observation matrix index
-        obs_index = features.dropna(subset=[c for c in OBSERVATION_COLUMNS if c in features.columns]).index
-        fwd_aligned = fwd_ret_20.reindex(obs_index).values
-        fwd_aligned = np.nan_to_num(fwd_aligned, nan=0.0)
+    bench_close = _close_from_frame(bench_df)
+    if bench_close is not None:
+        fwd_aligned = _align_forward_returns_to_observations(features, bench_close)
         log.info(f"Forward returns: {np.count_nonzero(fwd_aligned)} non-zero / {len(fwd_aligned)} total")
     else:
         fwd_aligned = None
@@ -376,7 +396,7 @@ def main() -> int:
 
     # Save model
     model_path = output / "regime_hmm"
-    save_hmm_model(result, model_path)
+    save_hmm_model(result, model_path, preprocessor=pca)
     log.info(f"Model saved to {model_path}")
 
     # Evaluate on full data
@@ -390,7 +410,7 @@ def main() -> int:
         bench_data["date"] = pd.to_datetime(bench_data["date"], errors="coerce")
         bench_data = bench_data.dropna(subset=["date"]).set_index("date")
     bench_data["close"] = pd.to_numeric(bench_data["close"], errors="coerce")
-    close = bench_data["close"].reindex(features.index).ffill().dropna()
+    close = bench_data["close"].reindex(observation_frame.index).ffill().dropna()
 
     quality = _evaluate_regime_quality(probs, close.iloc[:len(states)], states)
     log.info(f"Regime quality: {json.dumps(quality, indent=2)}")
@@ -402,7 +422,7 @@ def main() -> int:
 
     # Compare with champion
     log.info("Comparing with champion...")
-    comparison = _compare_with_champion(features, close, probs, states)
+    comparison = _compare_with_champion(features.loc[observation_frame.index], close, probs, states)
 
     # Write report
     report = {

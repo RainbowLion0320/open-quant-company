@@ -880,7 +880,7 @@ def _hmm_detect(
     import numpy as np
 
     from cybernetics.features import OBSERVATION_COLUMNS, build_observation_matrix, build_regime_features
-    from cybernetics.hmm_engine import HMMConfig, HMMResult, StudentTHMM, load_hmm_model
+    from cybernetics.hmm_engine import StudentTHMM, apply_hmm_preprocessor, load_hmm_model
 
     # Check model path
     try:
@@ -927,6 +927,9 @@ def _hmm_detect(
 
     # Use the last observation
     latest = obs[-1:]  # (1, D)
+    latest = apply_hmm_preprocessor(latest, result.preprocessor)
+    if latest.shape[1] != result.n_features:
+        raise ValueError(f"HMM model expects {result.n_features} features, got {latest.shape[1]}")
 
     # Predict probabilities
     hmm = StudentTHMM(result.config)

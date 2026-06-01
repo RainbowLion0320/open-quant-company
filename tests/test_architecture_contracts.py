@@ -383,9 +383,22 @@ def test_regime_training_policy_types_live_in_dedicated_module():
 def test_pipeline_vue_uses_shared_layout_utility():
     vue_text = Path("web/frontend/src/views/Pipeline.vue").read_text(encoding="utf-8")
     utility_text = Path("web/frontend/src/utils/pipelineLayout.ts").read_text(encoding="utf-8")
+    package_text = Path("web/frontend/package.json").read_text(encoding="utf-8")
 
-    assert "buildPipelineLayout" in vue_text
-    assert "export function buildPipelineLayout" in utility_text
+    assert "elkjs" in package_text
+    assert "layoutPipelineGraph" in vue_text
+    assert "visiblePipelineEdges" in vue_text
+    assert "export async function layoutPipelineGraph" in utility_text
+    assert "elk.algorithm" in utility_text
+    assert "layered" in utility_text
+    assert "elk.edgeRouting" in utility_text
+    assert "ORTHOGONAL" in utility_text
+    assert "balanceLayerCenters" in utility_text
+    assert "routePipelineEdges" in utility_text
+    assert "isSelectedEdge" in vue_text
+    assert "flow-edge-highlight" in vue_text
+    assert "pipeline-flow" in vue_text
+    assert "stroke-dashoffset" in vue_text
     assert "Compute depth via topological BFS" not in vue_text
 
 
