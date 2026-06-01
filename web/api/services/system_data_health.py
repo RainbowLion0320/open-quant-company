@@ -63,6 +63,11 @@ def db_health_payload() -> dict:
         rec["time_breakdown"] = json_map(rec.get("time_breakdown"))
         records.append(rec)
 
+    records.sort(key=lambda x: (
+        (x.get("source") or "").lower(),
+        (x.get("label_zh") or x.get("table") or "").lower(),
+    ))
+
     return {
         "data": records,
         "summary": summary,
