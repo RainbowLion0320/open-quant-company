@@ -12,6 +12,22 @@ from web.api.serializers import safe_float
 from web.api.services.pipelines.common import edge, metric, node, pct, score, updated_timestamp, value
 
 
+DEFAULT_SCORE_WEIGHTS = {"trend": 30.0, "breadth": 30.0, "risk": 30.0, "volume": 10.0}
+DEFAULT_BREADTH_WEIGHTS = {"advance_ratio": 0.35, "above_ma20": 0.30, "above_ma60": 0.25, "above_ma120": 0.10}
+DEFAULT_RISK_WEIGHTS = {"drawdown": 0.50, "volatility": 0.30, "pressure": 0.20}
+DEFAULT_DETECTION = {
+    "regime_bull_threshold": 60.0,
+    "regime_bear_threshold": 40.0,
+    "regime_trend_confirm": 0.55,
+    "regime_bear_trend_breakdown": 0.40,
+    "breadth_bull_threshold": 0.55,
+    "breadth_bear_threshold": 0.40,
+    "regime_min_dwell": 3,
+    "volume_expansion": 1.20,
+    "volume_contraction": 0.80,
+}
+
+
 def _resolve_model_path(model_path: object) -> Path:
     path = Path(str(model_path or "data/models/regime_hmm"))
     return path if path.is_absolute() else Path.cwd() / path
@@ -27,10 +43,41 @@ def _read_model_meta(model_path: Path) -> dict[str, Any]:
         return {}
 
 
+def _configured_numbers(raw: object, defaults: dict[str, float]) -> dict[str, float]:
+    if not isinstance(raw, dict):
+        raw = {}
+    return {key: safe_float(raw.get(key), default) for key, default in defaults.items()}
+
+
+def _fmt_percent_points(raw: object) -> str:
+    value_num = safe_float(raw, 0.0)
+    rounded = round(value_num)
+    return f"{rounded:.0f}%" if abs(value_num - rounded) < 1e-9 else f"{value_num:.1f}%"
+
+
+def _fmt_ratio(raw: object) -> str:
+    return f"{safe_float(raw, 0.0):.2f}"
+
+
+def _fmt_scalar(raw: object) -> str:
+    value_num = safe_float(raw, 0.0)
+    return f"{value_num:.0f}" if float(value_num).is_integer() else f"{value_num:.1f}"
+
+
+def _component_with_weight(component: object, weight: object) -> str:
+    base = "—" if component in (None, "—") else score(component)
+    return f"{base} · W {_fmt_percent_points(weight)}"
+
+
 def build_market_regime_pipeline() -> dict[str, object]:
     """Build Market Regime calculation pipeline payload."""
     cfg = get_section("cybernetics", {}) or {}
     hmm_cfg = cfg.get("hmm", {}) or {}
+    detection_cfg = ((cfg.get("adaptive", {}) or {}).get("detection", {}) or {})
+    score_weights = _configured_numbers(cfg.get("score_weights"), DEFAULT_SCORE_WEIGHTS)
+    breadth_weights = _configured_numbers(cfg.get("breadth_weights"), DEFAULT_BREADTH_WEIGHTS)
+    risk_weights = _configured_numbers(cfg.get("risk_strength_weights"), DEFAULT_RISK_WEIGHTS)
+    detection = _configured_numbers(detection_cfg, DEFAULT_DETECTION)
     engine = str(cfg.get("regime_engine", "rule_based"))
     model_path = _resolve_model_path(hmm_cfg.get("model_path", "data/models/regime_hmm"))
     model_meta = _read_model_meta(model_path)
@@ -80,6 +127,8 @@ def build_market_regime_pipeline() -> dict[str, object]:
     is_hybrid_path = is_consensus or is_override or is_blend
     hmm_available = bool(regime_probs) and not is_fallback
     override_threshold = safe_float(cfg.get("hmm_confidence_override", 0.80), 0.80)
+    blend_rule_weight = min(0.50, max(0.20, 1.0 - summary["confidence"]))
+    blend_hmm_weight = 1.0 - blend_rule_weight
 
     # Determine stability state.
     pending_value = stability.get("pending_value")
@@ -119,6 +168,10 @@ def build_market_regime_pipeline() -> dict[str, object]:
                 metric("Sample", int(safe_float(breadth_detail.get("sample_size"), 0)), "accent"),
                 metric("Advance", pct(breadth_detail.get("advance_ratio"))),
                 metric("Above MA20", pct(breadth_detail.get("above_ma20"))),
+                metric("Adv W", _fmt_percent_points(breadth_weights["advance_ratio"] * 100)),
+                metric("MA20 W", _fmt_percent_points(breadth_weights["above_ma20"] * 100)),
+                metric("MA60 W", _fmt_percent_points(breadth_weights["above_ma60"] * 100)),
+                metric("MA120 W", _fmt_percent_points(breadth_weights["above_ma120"] * 100)),
             ],
             inputs=["Breadth source"],
             outputs=["Breadth snapshot"],
@@ -154,6 +207,10 @@ def build_market_regime_pipeline() -> dict[str, object]:
                 metric("Breadth", pct(score_components.get("breadth_raw")), "accent"),
                 metric("Advance", pct(breadth_detail.get("advance_ratio"))),
                 metric("Above MA20", pct(breadth_detail.get("above_ma20"))),
+                metric("Adv W", _fmt_percent_points(breadth_weights["advance_ratio"] * 100)),
+                metric("MA20 W", _fmt_percent_points(breadth_weights["above_ma20"] * 100)),
+                metric("MA60 W", _fmt_percent_points(breadth_weights["above_ma60"] * 100)),
+                metric("MA120 W", _fmt_percent_points(breadth_weights["above_ma120"] * 100)),
             ],
             inputs=["Breadth snapshot"],
             outputs=["Breadth raw score"],
@@ -166,6 +223,9 @@ def build_market_regime_pipeline() -> dict[str, object]:
                 metric("Risk", pct(score_components.get("risk_raw")), "accent"),
                 metric("Drawdown", pct(score_components.get("risk_drawdown_raw"))),
                 metric("Volatility", pct(score_components.get("risk_volatility_raw"))),
+                metric("DD W", _fmt_percent_points(risk_weights["drawdown"] * 100)),
+                metric("Vol W", _fmt_percent_points(risk_weights["volatility"] * 100)),
+                metric("Pressure W", _fmt_percent_points(risk_weights["pressure"] * 100)),
             ],
             inputs=["Benchmark frame", "Breadth snapshot"],
             outputs=["Risk raw score"],
@@ -178,6 +238,8 @@ def build_market_regime_pipeline() -> dict[str, object]:
                 metric("Volume", pct(score_components.get("volume_raw")), "accent"),
                 metric("Amount 5/20", pct(score_components.get("amount_ratio_5_20"))),
                 metric("Up amount", pct(score_components.get("up_amount_ratio"))),
+                metric("Expand", f"> {_fmt_ratio(detection['volume_expansion'])}"),
+                metric("Contract", f"< {_fmt_ratio(detection['volume_contraction'])}"),
             ],
             inputs=["Volume snapshot"],
             outputs=["Volume raw score"],
@@ -196,13 +258,18 @@ def build_market_regime_pipeline() -> dict[str, object]:
         node(
             "rule_score",
             "Rule Score Composition",
-            "Weighted sum: 30*trend + 30*breadth + 30*risk + 10*volume",
+            (
+                f"Weighted sum: trend {score_weights['trend']:.0f}% + breadth {score_weights['breadth']:.0f}% "
+                f"+ risk {score_weights['risk']:.0f}% + volume {score_weights['volume']:.0f}%"
+            ),
             metrics=[
                 metric("Score", score(getattr(snapshot, "regime_score", 0.0)), "accent"),
-                metric("Trend", score_components.get("trend", "—")),
-                metric("Breadth", score_components.get("breadth", "—")),
-                metric("Risk", score_components.get("risk", "—")),
-                metric("Volume", score_components.get("volume", "—")),
+                metric("Trend", _component_with_weight(score_components.get("trend"), score_weights["trend"])),
+                metric("Breadth", _component_with_weight(score_components.get("breadth"), score_weights["breadth"])),
+                metric("Risk", _component_with_weight(score_components.get("risk"), score_weights["risk"])),
+                metric("Volume", _component_with_weight(score_components.get("volume"), score_weights["volume"])),
+                metric("Bull gate", f"≥ {_fmt_scalar(detection['regime_bull_threshold'])}"),
+                metric("Bear gate", f"≤ {_fmt_scalar(detection['regime_bear_threshold'])}"),
             ],
             inputs=["Trend raw", "Breadth raw", "Risk raw", "Volume raw"],
             outputs=[f"Rule raw: {value(raw_regime)}", f"Score: {score(getattr(snapshot, 'regime_score', 0.0))}"],
@@ -303,6 +370,8 @@ def build_market_regime_pipeline() -> dict[str, object]:
             metrics=[
                 metric("Confidence", f"{summary['confidence']:.2f}", "accent"),
                 metric("Threshold", f"{override_threshold:.2f}"),
+                metric("Trend gate", f"≥ {_fmt_ratio(detection['regime_trend_confirm'])}"),
+                metric("Breadth gate", f"≥ {_fmt_ratio(detection['breadth_bull_threshold'])}"),
             ],
             inputs=["Disagreement result", "HMM confidence"],
             outputs=["Override path", "Blend path"],
@@ -327,6 +396,8 @@ def build_market_regime_pipeline() -> dict[str, object]:
             metrics=[
                 metric("Reason", "hybrid_low_confidence_blend", "accent"),
                 metric("Raw", summary["raw_regime"]),
+                metric("Rule W", _fmt_percent_points(blend_rule_weight * 100)),
+                metric("HMM W", _fmt_percent_points(blend_hmm_weight * 100)),
             ],
             inputs=["Rule vote", "HMM probabilities"],
             outputs=["Raw regime candidate"],
@@ -351,6 +422,7 @@ def build_market_regime_pipeline() -> dict[str, object]:
                 metric("Confirmed", stability.get("confirmed_value", summary["confirmed_regime"]), "accent"),
                 metric("Pending", stability.get("pending_value") or "idle"),
                 metric("Dwell", f"{stability.get('pending_count', 0)}/{stability.get('min_dwell', 3)}"),
+                metric("Min dwell", str(int(detection["regime_min_dwell"]))),
             ],
             inputs=["Raw regime"],
             outputs=["Confirmed branch", "Pending branch"],
@@ -382,6 +454,7 @@ def build_market_regime_pipeline() -> dict[str, object]:
             "Risk budget and adaptive execution parameters",
             metrics=[
                 metric("Position", pct(adaptive_params.get("position_size")), "accent"),
+                metric("Conf th", pct(adaptive_params.get("confidence_threshold"))),
                 metric("Max positions", adaptive_params.get("max_positions", "—")),
                 metric("Stop loss", pct(adaptive_params.get("stop_loss"))),
             ],

@@ -1,3 +1,5 @@
+import pytest
+
 from cybernetics.regime_scoring import (
     breadth_strength,
     classify_regime_value,
@@ -96,3 +98,35 @@ def test_classify_regime_value_uses_score_trend_and_breadth_gates():
     assert classify_regime_value(62, trend_raw=0.60, breadth_raw=0.70, advance_ratio=0.58) == "bull"
     assert classify_regime_value(39, trend_raw=0.50, breadth_raw=0.50, advance_ratio=0.45) == "bear"
     assert classify_regime_value(50, trend_raw=0.35, breadth_raw=0.35, advance_ratio=0.45) == "bear"
+
+
+def test_risk_strength_uses_configured_component_weights(monkeypatch):
+    from cybernetics import orchestrator
+    from cybernetics.types import MarketBreadth
+
+    monkeypatch.setattr(
+        orchestrator,
+        "_load_config",
+        lambda: {"risk_strength_weights": {"drawdown": 1.0, "volatility": 0.0, "pressure": 0.0}},
+    )
+    monkeypatch.setattr(orchestrator, "_regime_indexes", lambda: [("idx", "Index", 1.0)])
+    monkeypatch.setattr(
+        orchestrator,
+        "_index_risk_metrics",
+        lambda _df: {
+            "vol_score": 0.10,
+            "drawdown_score": 0.80,
+            "realized_vol_20d": 0.20,
+            "drawdown_60d": -0.05,
+        },
+    )
+
+    strength, detail = orchestrator._compute_risk_strength(
+        {"idx": object()},
+        MarketBreadth(above_ma20=0.5, above_ma60=0.5, up_count=50, down_count=50, unchanged_count=0),
+    )
+
+    assert strength == pytest.approx(0.80)
+    assert detail["risk_drawdown_weight"] == 1.0
+    assert detail["risk_volatility_weight"] == 0.0
+    assert detail["risk_pressure_weight"] == 0.0

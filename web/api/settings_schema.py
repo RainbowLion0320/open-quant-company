@@ -69,6 +69,32 @@ SETTINGS_SECTIONS: list[dict[str, Any]] = [
         ],
     },
     {
+        "key": "cybernetics.risk_strength_weights",
+        "label": "风险强度权重",
+        "description": "风险强度中回撤、波动和下跌压力的组合权重",
+        "fields": [
+            _field("drawdown", "回撤权重", "float", min_val=0, max_val=1, default=0.50),
+            _field("volatility", "波动权重", "float", min_val=0, max_val=1, default=0.30),
+            _field("pressure", "下跌压力权重", "float", min_val=0, max_val=1, default=0.20),
+        ],
+    },
+    {
+        "key": "cybernetics.adaptive.detection",
+        "label": "Regime 判定阈值",
+        "description": "牛熊阈值、趋势/广度确认、驻留门槛和量能确认阈值",
+        "fields": [
+            _field("regime_bull_threshold", "牛市评分阈值", "float", min_val=0, max_val=100, default=60),
+            _field("regime_bear_threshold", "熊市评分阈值", "float", min_val=0, max_val=100, default=40),
+            _field("regime_trend_confirm", "牛市趋势确认", "float", min_val=0, max_val=1, default=0.55),
+            _field("breadth_bull_threshold", "牛市广度确认", "float", min_val=0, max_val=1, default=0.55),
+            _field("regime_bear_trend_breakdown", "熊市趋势击穿", "float", min_val=0, max_val=1, default=0.40),
+            _field("breadth_bear_threshold", "熊市广度击穿", "float", min_val=0, max_val=1, default=0.40),
+            _field("regime_min_dwell", "状态切换最小驻留", "int", min_val=1, max_val=20, default=3),
+            _field("volume_expansion", "放量阈值", "float", min_val=1.0, max_val=3.0, default=1.20),
+            _field("volume_contraction", "缩量阈值", "float", min_val=0.1, max_val=1.0, default=0.80),
+        ],
+    },
+    {
         "key": "cybernetics",
         "label": "Regime 检测参数",
         "description": "HMM 置信度、缓存、最小数据量等",

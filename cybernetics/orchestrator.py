@@ -663,6 +663,21 @@ def _compute_risk_strength(
     index_frames: Dict[str, Any],
     breadth: MarketBreadth,
 ) -> tuple[float, Dict[str, float]]:
+    try:
+        risk_weights = (_load_config().get("risk_strength_weights", {}) or {})
+    except Exception:
+        risk_weights = {}
+    drawdown_weight = float(risk_weights.get("drawdown", 0.50))
+    volatility_weight = float(risk_weights.get("volatility", 0.30))
+    pressure_weight = float(risk_weights.get("pressure", 0.20))
+    total_component_weight = drawdown_weight + volatility_weight + pressure_weight
+    if total_component_weight <= 0:
+        drawdown_weight, volatility_weight, pressure_weight = 0.50, 0.30, 0.20
+        total_component_weight = 1.0
+    drawdown_weight /= total_component_weight
+    volatility_weight /= total_component_weight
+    pressure_weight /= total_component_weight
+
     weighted_vol_score = 0.0
     weighted_drawdown_score = 0.0
     weighted_realized_vol = 0.0
@@ -704,11 +719,18 @@ def _compute_risk_strength(
     )
     pressure_health = 1.0 - _clamp((pressure_raw - 0.40) / 0.35)
 
-    strength = 0.50 * drawdown_health + 0.30 * vol_health + 0.20 * pressure_health
+    strength = (
+        drawdown_weight * drawdown_health
+        + volatility_weight * vol_health
+        + pressure_weight * pressure_health
+    )
     return strength, {
         "risk_drawdown_raw": round(drawdown_health, 4),
         "risk_volatility_raw": round(vol_health, 4),
         "risk_pressure_raw": round(pressure_health, 4),
+        "risk_drawdown_weight": round(drawdown_weight, 4),
+        "risk_volatility_weight": round(volatility_weight, 4),
+        "risk_pressure_weight": round(pressure_weight, 4),
         "market_down_pressure": round(pressure_raw, 4),
         "market_down_ratio": round(down_ratio, 4),
         "realized_vol_20d": round(weighted_realized_vol, 4),
@@ -810,7 +832,7 @@ def _compute_regime_score_v2(
     breadth: MarketBreadth,
     market_volume: Optional[MarketVolume] = None,
 ) -> tuple[float, Dict[str, float]]:
-    """Compute validated regime score: trend 30%, breadth 30%, risk 30%, volume 10%."""
+    """Compute validated regime score using configured component weights."""
     trend_raw, index_trend = _compute_multi_index_trend(index_frames)
     risk_raw, risk_detail = _compute_risk_strength(index_frames, breadth)
     volume_snapshot = market_volume or _compute_full_market_volume()
@@ -1042,7 +1064,7 @@ def adaptive_params(
     """
     regime = to_market_regime(regime)
 
-    # 硬编码的基础参数
+    # 基础默认参数；config/settings.yaml 的 cybernetics.adaptive 会覆盖这些值。
     # 注意：HMM 的 bear 状态 = 已经大跌（底部），bull 状态 = 接近顶部
     # 因此 bear 时应更激进（底部机会），bull 时应更保守（顶部风险）
     # 参见 2010-2026 回测：bear 20d forward return +2.51%, bull +1.33%
