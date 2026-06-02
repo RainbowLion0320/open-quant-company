@@ -13,6 +13,11 @@ data/cache/
 # Node (frontend)
 node_modules/
 
+# Root-level npm artifacts from local scratch installs.
+# The real frontend package files live under web/frontend/ and remain tracked.
+/package.json
+/package-lock.json
+
 # Progress files
 .financials_progress.json
 
