@@ -524,6 +524,20 @@ def test_current_project_docs_do_not_repeat_known_stale_facts():
         "底部 ticker",
         "点位与日涨跌",
         "Regime Score",
+        "7 节点",
+        "七个固定节点",
+        "v1 展示 Market Regime",
+        "CSS grid + inline SVG",
+        "GET /signals/buffett",
+        "POST /backtest/run",
+        "GET /system/health",
+        "GET /stocks/{code}/kline",
+        "POST /signals/scan",
+        "GET /system/cron-log",
+        "Canvas力导向图",
+        "Canvas 力导向图",
+        "11个业务路由模块",
+        "routes/ (11 domain modules)",
     )
 
     offenders = []
@@ -557,6 +571,59 @@ def test_web_docs_match_current_market_regime_layout_contract():
     )
 
     missing = [token for token in required_tokens if token not in combined]
+    assert missing == []
+
+
+def test_web_docs_match_current_api_pipeline_and_schema_contracts():
+    spec = Path("docs/specs/05-web-platform.md").read_text(encoding="utf-8")
+    decision = Path("wiki/decisions/web-architecture.md").read_text(encoding="utf-8")
+    acceptance = Path("docs/acceptance-matrix.md").read_text(encoding="utf-8")
+    schema_reference = Path("wiki/reference/data-schema.md").read_text(encoding="utf-8")
+    api_init = Path("web/api/__init__.py").read_text(encoding="utf-8")
+
+    required_by_source = {
+        "web spec": (
+            "routes/ (12 domain modules)",
+            "`elkjs` layered + orthogonal routing",
+            "GET /api/stocks",
+            "POST /api/stocks/dcf",
+            "GET /api/system/quality-gate",
+            "GET /api/system/providers/health",
+            "GET /api/strategies/jobs/{job_id}",
+        ),
+        "web decision": (
+            "四条关键链路",
+            "`elkjs` layered + orthogonal routing",
+            "Three.js WebGL 3D 星空图",
+        ),
+        "acceptance matrix": (
+            "GET /api/system/db-health",
+            "GET /api/strategies/buffett",
+            "WARN",
+            "vendor / ECharts / DWP chunk",
+        ),
+        "schema reference": (
+            "`web/api/schemas/*` 分域 schema",
+            "`web/api/models.py` 兼容聚合入口",
+        ),
+        "api init": (
+            "12个业务路由模块",
+            "细分 schema 位于 schemas/",
+        ),
+    }
+    source_text = {
+        "web spec": spec,
+        "web decision": decision,
+        "acceptance matrix": acceptance,
+        "schema reference": schema_reference,
+        "api init": api_init,
+    }
+
+    missing = []
+    for source, tokens in required_by_source.items():
+        text = source_text[source]
+        missing.extend(f"{source}:{token}" for token in tokens if token not in text)
+
     assert missing == []
 
 

@@ -1,6 +1,6 @@
 # Spec: Web 平台 (Web Platform)
 
-> 版本: 2.4 | 更新: 2026-05-30 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
+> 版本: 2.5 | 更新: 2026-06-02 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
@@ -25,7 +25,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 ┌──────────────────────▼──────────────────────────────┐
 │              web/api/ (FastAPI)                        │
 │   create_app() → CORS → Router → Error Handler        │
-│   routes/ (11 domain modules) + ws.py + jobs.py        │
+│   routes/ (12 domain modules) + ws.py + jobs.py        │
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
@@ -45,9 +45,9 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 |------|------|------|
 | `/` | 市场总览 | Regime 球体 + 数值分数 + 4 个小仪表盘 + 状态卡 + 核心指数相对强弱图 + 宏观快照 + 热门行业脉冲 |
 | `/research` | 市场研究 | 二级 tab: 行业雷达、个股搜索；行业雷达以行业资金方块矩阵为主视图，个股详情仍使用隐藏路由 `/stocks/:code` |
-| `/strategy-lab` | 策略实验室 | 二级 tab: 策略目录、信号历史、回测证据 |
+| `/strategy-lab` | 策略实验室 | 二级 tab: 策略目录、信号历史、回测分析、证据面板 |
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
-| `/pipeline` | 流程图 | 关键参数计算透明度入口；v1 展示 Market Regime 7 节点计算链路 |
+| `/pipeline` | 流程图 | 关键参数计算透明度入口；展示四条关键链路，Market Regime 为细粒度 DAG |
 | `/datahub` | 数据中台 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
 | `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、配置中心、记忆图谱 |
 
@@ -77,8 +77,8 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 **Pipeline 页面契约：**
 
 - `/pipeline` 是一级页面，不归入 Market 或 System 的二级 tab。
-- 当前支持 `market_regime`、`data_quality`、`strategy_evidence`、`portfolio_execution` 四条关键链路。`market_regime` 固定展示 `inputs`、`features`、`rule_score`、`hmm_inference`、`hybrid_decision`、`stability`、`outputs` 七个节点。
-- 前端不引入新图形库，使用 Vue + CSS grid + inline SVG arrows；节点可点击，右侧详情面板展示节点输入、输出和关键指标。
+- 当前支持 `market_regime`、`data_quality`、`strategy_evidence`、`portfolio_execution` 四条关键链路。`market_regime` 展示从市场输入、benchmark/breadth/volume 快照、规则评分、HMM 特征与推断、engine/hybrid/置信度决策分支、raw regime、dwell gate 到下游输出的细粒度 DAG。
+- 前端使用 `elkjs` layered + orthogonal routing 生成流程布局，节点高度按内容测量自适应；节点可点击，右侧详情面板展示节点输入、输出和全部关键指标；选中节点时关联边保持可见并显示流动高亮。
 - Pipeline 页面用于解释关键参数如何形成，不替代市场总览页面的行情、宏观和热门行业展示。
 
 ### 2.2 后端架构 (FastAPI)
@@ -89,18 +89,18 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 
 | 模块 | 文件 | 端点 |
 |------|------|------|
-| Market | `routes/market.py` | `GET /market`, `GET /market/regime` |
-| Stocks | `routes/stocks.py` | `GET /stocks/{code}`, `GET /stocks/{code}/kline` |
-| Signals | `routes/signals.py` | `GET /signals/changes`, `GET /signals/{strategy}` |
-| Strategies | `routes/strategies.py` | `GET /strategies`, `GET /strategies/catalog`, `GET /strategies/evaluation`, `GET /strategies/evidence`, `GET /strategies/{name}`, `GET /strategies/statuses`, `POST /strategies/run` |
-| Backtest | `routes/backtest.py` | `GET /backtest`, `GET /backtest/{key}` |
-| Portfolio | `routes/portfolio.py` | `GET /portfolio/positions`, `GET /portfolio/balance`, `POST /portfolio/order` |
-| Sectors | `routes/sectors.py` | `GET /sectors/overview`, `GET /sectors/exposure`, `GET /sectors/{industry}` |
-| Pipeline | `routes/pipeline.py` | `GET /pipeline`, `GET /pipeline/market-regime`, `GET /pipeline/{pipeline_key}` |
-| Assets | `routes/assets.py` | `GET /assets/overview` |
-| Settings | `routes/settings.py` | `GET /settings`, `GET /settings/schema`, `PUT /settings`, `PATCH /settings/section/{section}` |
-| System | `routes/system.py` | `GET /system/monitor`, `GET /system/history`, `GET /system/deepseek-usage`, `GET /system/api-health`, `GET /system/cron-jobs`, `GET /system/audit`, `GET /system/mode` |
-| Hindsight | `routes/hindsight.py` | `GET /hindsight/graph` |
+| Market | `routes/market.py` | `GET /api/market`, `GET /api/market/regime` |
+| Stocks | `routes/stocks.py` | `GET /api/stocks`, `GET /api/stocks/{code}`, `POST /api/stocks/dcf` |
+| Signals | `routes/signals.py` | `GET /api/signals/changes` |
+| Strategies | `routes/strategies.py` | `GET /api/strategies`, `GET /api/strategies/statuses`, `GET /api/strategies/governance`, `GET /api/strategies/catalog`, `GET /api/strategies/evaluation`, `GET /api/strategies/evidence`, `GET /api/strategies/evidence/{strategy}`, `GET /api/strategies/jobs/{job_id}`, `GET /api/strategies/{name}`, `POST /api/strategies/run` |
+| Backtest | `routes/backtest.py` | `GET /api/backtest`, `GET /api/backtest/{strategy}` |
+| Portfolio | `routes/portfolio.py` | `GET /api/portfolio/positions`, `GET /api/portfolio/balance`, `GET /api/portfolio/nav`, `GET /api/portfolio/trades`, `GET /api/portfolio/summary`, `GET /api/portfolio/orders`, `GET /api/portfolio/sector-exposure`, `POST /api/portfolio/order`, `POST /api/portfolio/refresh` |
+| Sectors | `routes/sectors.py` | `GET /api/sectors/overview`, `GET /api/sectors/exposure`, `GET /api/sectors/{industry}`, `GET /api/sectors/{industry}/stocks` (410 retired) |
+| Pipeline | `routes/pipeline.py` | `GET /api/pipeline`, `GET /api/pipeline/market-regime`, `GET /api/pipeline/{pipeline_key}` |
+| Assets | `routes/assets.py` | `GET /api/assets/overview` |
+| Settings | `routes/settings.py` | `GET /api/settings`, `GET /api/settings/schema`, `PUT /api/settings`, `PATCH /api/settings/section/{section}` |
+| System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/deepseek-usage`, `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/mode` |
+| Hindsight | `routes/hindsight.py` | `GET /api/hindsight/graph` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
 
 `GET /api/system/deepseek-usage` 只使用公开 API 与本地账本：`/user/balance` 提供账号余额, 本项目 DeepSeek 调用从响应 `usage` 字段写入 `project_usage_ledger.parquet` 后聚合展示。不得重新引入网页 CDP 或 CSV 导入作为历史用量来源。
@@ -112,8 +112,8 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 - `pipeline_key`: `market_regime` / `data_quality` / `strategy_evidence` / `portfolio_execution`
 - `updated`
 - `summary`: confirmed/raw regime、score、engine、detection_method、confidence、entropy、adaptive_params
-- `nodes`: 固定 7 节点数组
-- `edges`: 节点连线数组，source/target 必须引用有效 node id
+- `nodes`: 细粒度节点数组；Market Regime 节点来自 `web/api/services/pipelines/market_regime_nodes.py`
+- `edges`: 节点连线数组，source/target 必须引用有效 node id；边可携带 `label` / `condition` / `active`
 - `warnings`: HMM 模型缺失、fallback、样本不足等提示
 
 服务端复用 `QuantOrchestrator().detect()` 输出的 `score_components`、`breadth_detail`、`regime_probs`、`detection_method` 和 HMM `meta.json`，不得在 API 层重写 Market Regime 计算公式。
@@ -153,12 +153,12 @@ def get_db() -> Database:
 
 ```
 Browser (Vue 3)
-    │  HTTP GET /signals/buffett
+    │  HTTP GET /api/strategies/buffett
     ▼
 FastAPI Route Handler
-    │  hub.read_parquet(signal_path)
+    │  data.results_db.load_strategy_signals(name)
     ▼
-DataHub → pd.read_parquet("data/store/signals/buffett.parquet")
+DataHub → load_strategy_signals("buffett")
     │  DataFrame
     ▼
 Pydantic Model Serialization → JSON Response
@@ -169,10 +169,10 @@ Pinia Store → Vue Component → ECharts 渲染
 
 **WebSocket 流：**
 ```
-POST /backtest/run
+POST /api/strategies/run
     │ 创建 Job
     ▼
-JobQueue.add(job) → 后台线程执行
+JobQueue.add(job) → 后台线程执行策略扫描
     │ 每完成一步
     ▼
 broadcast_progress(job_id, {"step": 3/5, "message": "..."})
@@ -228,7 +228,7 @@ PATCH /api/settings/section/data.fetcher
 REQUIRED_SECTIONS = {"strategies", "risk_control"}
 ```
 
-`PATCH /settings/section/{section}` 支持 dotted section，例如 `data.fetcher`、`buffett.margin_of_safety`。服务端必须写回嵌套 YAML，不允许生成顶层 `data.fetcher:` 这类重复 key。
+`PATCH /api/settings/section/{section}` 支持 dotted section，例如 `data.fetcher`、`buffett.margin_of_safety`。服务端必须写回嵌套 YAML，不允许生成顶层 `data.fetcher:` 这类重复 key。
 
 ## 6. 错误处理
 
@@ -241,7 +241,7 @@ REQUIRED_SECTIONS = {"strategies", "risk_control"}
 ## 7. 测试策略
 
 - **合约测试：** 所有路由返回正确的 HTTP 状态码和 JSON schema
-- **集成测试：** `GET /signals/buffett` 返回实际数据（需本地有信号文件）
+- **集成测试：** `GET /api/strategies/{name}` 返回实际策略信号（需本地有信号文件）
 - **WebSocket 测试：** 创建 Job → 验证进度消息格式
 - **Settings 测试：** 非法配置更新返回 422，dotted section PATCH 不生成顶层重复 key，配置中心 schema 字段必须存在于 canonical settings
 - **边界测试：** 空 Parquet 文件返回空列表，分页越界返回空数组

@@ -26,7 +26,7 @@ Hybrid 决策规则固定为：规则/HMM 一致时使用 HMM 概率；不一致
 
 实时链路通过 `cybernetics/regime_state.py` 做状态稳定确认。Web/API 返回的 `value` 是 confirmed regime，`raw_value` 是单次快照原始分类，`stability` 显示 pending 状态。同一交易日重复刷新不累计 dwell，必须出现连续唯一市场观测后才切换 confirmed regime。
 
-Pipeline 页面 `/pipeline` 是关键参数计算透明度入口，v1 只展示 Market Regime 的输入、特征、规则评分、HMM 推断、Hybrid 决策、Dwell 确认和下游输出；它不替代市场总览页面的行情和 regime 结果展示。
+Pipeline 页面 `/pipeline` 是关键参数计算透明度入口，当前覆盖 Market Regime、Data Quality、Strategy Evidence、Portfolio Execution 四条关键链路。Market Regime 图拆成输入、benchmark/breadth/volume 快照、规则评分、HMM 推断、Hybrid 分支、Dwell 确认和下游输出等细粒度节点；它不替代市场总览页面的行情和 regime 结果展示。
 
 ## Feedback Loop
 

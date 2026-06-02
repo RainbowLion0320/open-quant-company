@@ -65,7 +65,7 @@ astroq web serve --host 0.0.0.0 --port 8501
 文档类改动完成前运行：
 
 ```bash
-rg -n "34 维度|34维度|四维加权|多因子四维|9 页|9页|FastAPI（9|3页|3 页|5517|全局 ticker|底部 ticker|点位与日涨跌|Regime Score" README.md CLAUDE.md docs wiki -g '!docs/DOCUMENTATION.md' -g '!docs/development-plan.md'
+rg -n "34 维度|34维度|四维加权|多因子四维|9 页|9页|FastAPI（9|3页|3 页|5517|全局 ticker|底部 ticker|点位与日涨跌|Regime Score|7 节点|七个固定节点|CSS grid \\+ inline SVG|GET /signals/buffett|POST /backtest/run|GET /system/health|GET /stocks/\\{code\\}/kline|POST /signals/scan|GET /system/cron-log|Canvas力导向图|Canvas 力导向图|11个业务路由模块" README.md CLAUDE.md docs wiki -g '!docs/DOCUMENTATION.md' -g '!docs/development-plan.md'
 git diff --check
 ```
 

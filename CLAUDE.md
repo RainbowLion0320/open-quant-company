@@ -77,7 +77,7 @@
 │   ├── factor_hypothesis.py      # LLM因子发现
 │   ├── run_workflow.py           # qrun YAML工作流
 │   └── cron_fetch_slow.py        # 限流数据日常填充
-├── web/api/routes/{market,strategies,stocks,portfolio,signals,sectors,settings,backtest,system,hindsight}.py
+├── web/api/routes/{market,strategies,stocks,portfolio,signals,sectors,settings,backtest,system,hindsight,pipeline,assets}.py
 ├── web/frontend/                 # Vue 3 SPA 星盘终端
 ├── wiki/                         # 长期概念、架构决策和参考知识
 ├── tests/                        # 合约测试 + 边界测试

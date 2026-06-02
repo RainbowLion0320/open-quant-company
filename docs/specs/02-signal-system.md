@@ -118,7 +118,7 @@
 
 ### 2.5 Market Regime 离线训练与晋级
 
-Market Regime 规则评分层保持确定性和可解释性，但不再只能靠人工拍权重。`research/regime_training.py` 和 `scripts/train_market_regime.py` 提供 champion/challenger 研究闭环：
+Market Regime 规则评分层保持确定性和可解释性，但不再只能靠人工拍权重。`research/regime/` 训练包和 `scripts/train_market_regime.py` 提供 champion/challenger 研究闭环：
 
 - **Champion**：当前生产公式，作为所有候选规则的基准。
 - **Challenger**：离线搜索出的可解释候选规则，包含权重、阈值、平滑窗口和最短持续期。
@@ -142,7 +142,7 @@ Market Regime 规则评分层保持确定性和可解释性，但不再只能靠
 - **V3 最优选择**：报告同时输出 `best_unconstrained_id` 和 `best_validated_id`；最终建议只来自通过验证门槛的最优公式。
 - **反过拟合门槛**：拒绝永久防守、永久进攻、单一 regime 占比过高、输给简单基线或只在样本内好看的候选；换手采用相对 champion 的约束，避免 champion 自己被绝对阈值豁免。
 
-报告写入 `reports/regime_profit_training/`，`recommended_profit_config.yaml` 仍然只是人工审查建议；生产替换必须通过代码评审落到 `cybernetics/regime_policy.py`、`cybernetics/regime_scoring.py`、`cybernetics/regime_state.py`、`config/settings.yaml` 和 `research/regime_training.py`。
+报告写入 `reports/regime_profit_training/`，`recommended_profit_config.yaml` 仍然只是人工审查建议；生产替换必须通过代码评审落到 `cybernetics/regime_policy.py`、`cybernetics/regime_scoring.py`、`cybernetics/regime_state.py`、`config/settings.yaml` 和 `research/regime/` 训练包。
 
 ### 2.6 策略研究治理 (research/strategy_governance.py)
 

@@ -204,7 +204,7 @@ strategies:
 | 系统监视API | `web/api/routes/system.py` | /monitor + /history 端点 |
 | 图谱API | `web/api/routes/hindsight.py` | ★ `/api/hindsight/graph` — 知识图谱数据端点 |
 | 活动监视器 | `web/frontend/src/views/ActivityMonitor.vue` | 🖥️ CPU/内存/Token 仪表盘 |
-| 记忆图谱 | `web/frontend/src/views/HindsightGraph.vue` | ★ Canvas力导向图, Hindsight知识图谱可视化 |
+| 记忆图谱 | `web/frontend/src/views/HindsightGraph.vue` + `web/frontend/src/composables/useHindsightThreeGraph.ts` | ★ Three.js WebGL 3D 图谱, Hindsight知识图谱可视化 |
 | 模拟交易 | `web/frontend/src/views/Portfolio.vue` | ★ PaperBroker 日频模拟, NAV曲线+持仓+交易记录 |
 | 回测引擎 | `backtest/run_all_strategies.py` | 日频引擎 + 策略自主调仓 |
 | 回测评分 | `backtest/buffett_real_scorer.py` | PIT滚动评分器 |
