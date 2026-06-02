@@ -292,6 +292,21 @@ project:
   display_name: 星盘
   english_name: Astrolabe Quant OS
   description: 个人量化研究与执行操作系统 — 日频 · 自托管 · AI增强
+deepseek:
+  pricing:
+    usd_cny: 7.2
+    models:
+      deepseek-v4-flash:
+        cache_hit: 0.0028
+        cache_miss: 0.14
+        output: 0.28
+      deepseek-v4-pro:
+        cache_hit: 0.003625
+        cache_miss: 0.435
+        output: 0.87
+    aliases:
+      deepseek-chat: deepseek-v4-flash
+      deepseek-reasoner: deepseek-v4-flash
 signals:
   multifactor:
     buy_threshold: 52

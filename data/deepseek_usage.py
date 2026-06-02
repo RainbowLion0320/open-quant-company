@@ -12,22 +12,43 @@ from typing import Any
 
 import pandas as pd
 
+from core.settings import get_settings
 from data.datahub import get_datahub
 
 
 BALANCE_URL = "https://api.deepseek.com/user/balance"
 PRICING_SOURCE = "https://api-docs.deepseek.com/quick_start/pricing"
-DEFAULT_USD_CNY = 7.2
 
-# Official DeepSeek V4 prices, USD per 1M tokens, checked 2026-05-31.
-USD_PER_M_TOKENS: dict[str, dict[str, float]] = {
+# Fallback defaults — overridden by config/settings.yaml → deepseek.pricing
+_DEFAULT_USD_CNY = 7.2
+_DEFAULT_MODELS: dict[str, dict[str, float]] = {
     "deepseek-v4-flash": {"cache_hit": 0.0028, "cache_miss": 0.14, "output": 0.28},
     "deepseek-v4-pro": {"cache_hit": 0.003625, "cache_miss": 0.435, "output": 0.87},
 }
-MODEL_ALIASES = {
+_DEFAULT_ALIASES: dict[str, str] = {
     "deepseek-chat": "deepseek-v4-flash",
     "deepseek-reasoner": "deepseek-v4-flash",
 }
+
+
+def _pricing_config() -> dict:
+    """Load pricing from settings.yaml, falling back to hardcoded defaults."""
+    cfg = get_settings().get("deepseek", {}).get("pricing", {})
+    return cfg if isinstance(cfg, dict) else {}
+
+
+def _models() -> dict[str, dict[str, float]]:
+    cfg = _pricing_config().get("models")
+    if isinstance(cfg, dict) and cfg:
+        return cfg
+    return _DEFAULT_MODELS
+
+
+def _aliases() -> dict[str, str]:
+    cfg = _pricing_config().get("aliases")
+    if isinstance(cfg, dict) and cfg:
+        return cfg
+    return _DEFAULT_ALIASES
 
 
 def load_deepseek_api_key() -> str:
@@ -89,15 +110,23 @@ def _usage_value(usage: Any, key: str, default: int = 0) -> int:
 
 
 def _pricing_model(model: str) -> str:
-    canonical = MODEL_ALIASES.get(str(model), str(model))
-    return canonical if canonical in USD_PER_M_TOKENS else "deepseek-v4-flash"
+    aliases = _aliases()
+    models = _models()
+    canonical = aliases.get(str(model), str(model))
+    return canonical if canonical in models else "deepseek-v4-flash"
 
 
 def _fx_rate() -> float:
+    cfg_rate = _pricing_config().get("usd_cny")
+    if cfg_rate is not None:
+        try:
+            return float(cfg_rate)
+        except Exception:
+            pass
     try:
-        return float(os.environ.get("DEEPSEEK_USD_CNY", DEFAULT_USD_CNY))
+        return float(os.environ.get("DEEPSEEK_USD_CNY", _DEFAULT_USD_CNY))
     except Exception:
-        return DEFAULT_USD_CNY
+        return _DEFAULT_USD_CNY
 
 
 def normalize_deepseek_usage(
@@ -125,7 +154,7 @@ def normalize_deepseek_usage(
     total = _usage_value(usage, "total_tokens", hit + miss + output) or (hit + miss + output)
 
     pricing_model = _pricing_model(model)
-    pricing = USD_PER_M_TOKENS[pricing_model]
+    pricing = _models()[pricing_model]
     cost_usd = (
         hit * pricing["cache_hit"]
         + miss * pricing["cache_miss"]
