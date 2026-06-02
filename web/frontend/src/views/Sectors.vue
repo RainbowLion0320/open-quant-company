@@ -2,58 +2,58 @@
   <div class="view-page">
     <div class="surface-toolbar sector-toolbar">
       <div class="surface-copy">
-        <span>SECTOR ROTATION</span>
-        <strong>申万一级行业动量</strong>
+        <span>{{ t('sectors.eyebrow') }}</span>
+        <strong>{{ t('sectors.title') }}</strong>
       </div>
       <div v-if="overview" class="surface-actions sector-toolbar-actions">
-        <div class="sector-toolbar-metrics" aria-label="行业雷达摘要指标">
+        <div class="sector-toolbar-metrics" :aria-label="t('sectors.summaryAria')">
           <span class="sector-metric">
-            <span>强势行业 5日</span>
+            <span>{{ t('sectors.strong5d') }}</span>
             <strong class="metric-positive">{{ top5Return }}%</strong>
           </span>
           <span class="sector-metric">
-            <span>弱势行业 5日</span>
+            <span>{{ t('sectors.weak5d') }}</span>
             <strong class="metric-negative">{{ bottom5Return }}%</strong>
           </span>
           <span class="sector-metric">
-            <span>信号分化度</span>
+            <span>{{ t('sectors.signalDispersion') }}</span>
             <strong>{{ overview.signal_dispersion }}</strong>
           </span>
           <span class="sector-metric">
-            <span>资金集中度</span>
+            <span>{{ t('sectors.capitalConcentration') }}</span>
             <strong>{{ capitalConcentration }}</strong>
           </span>
           <span class="sector-metric">
-            <span>数据日期</span>
+            <span>{{ t('sectors.dataDate') }}</span>
             <strong>{{ perfDate }}</strong>
           </span>
         </div>
         <span class="sector-meta-chip">
-          {{ overview.total_sectors }} 行业 · {{ dataSourceLabel(overview.data_source) }}
+          {{ overview.total_sectors }} {{ t('sectors.industries') }} · {{ dataSourceLabel(overview.data_source) }}
         </span>
       </div>
     </div>
 
     <div v-if="error" class="inline-alert danger">
       <span>{{ error }}</span>
-      <button class="btn btn-xs" @click="fetchData">重试</button>
+      <button class="btn btn-xs" @click="fetchData">{{ t('common.retry') }}</button>
     </div>
 
     <section v-if="overview" class="sector-radar-layout">
       <div class="glass-card sector-map-card">
         <div class="sector-map-head">
           <div class="sector-map-heading">
-            <span class="sector-map-eyebrow">INDUSTRY CAPITAL MAP</span>
+            <span class="sector-map-eyebrow">{{ t('sectors.mapEyebrow') }}</span>
             <div class="sector-map-title-row">
-              <strong>行业资金方块图</strong>
+              <strong>{{ t('sectors.mapTitle') }}</strong>
               <div class="block-map-meta">
-                <span>面积: {{ blockSizeLabel }}</span>
-                <span>颜色: {{ activeBlockHeatMode?.metric }}</span>
-                <span>资金口径: {{ capitalSourceLabel }}</span>
+                <span>{{ t('sectors.area') }}: {{ blockSizeLabel }}</span>
+                <span>{{ t('sectors.color') }}: {{ activeBlockHeatMode?.metric }}</span>
+                <span>{{ t('sectors.capitalMetric') }}: {{ capitalSourceLabel }}</span>
               </div>
             </div>
           </div>
-          <div class="block-mode-tabs" role="tablist" aria-label="行业热力模式">
+          <div class="block-mode-tabs" role="tablist" :aria-label="t('sectors.heatModeAria')">
             <button
               v-for="mode in blockHeatModes"
               :key="mode.key"
@@ -63,7 +63,7 @@
             >{{ mode.label }}</button>
           </div>
         </div>
-        <div v-if="sectorBlockTiles.length" class="sector-block-grid" role="img" aria-label="申万一级行业独立方块矩阵">
+        <div v-if="sectorBlockTiles.length" class="sector-block-grid" role="img" :aria-label="t('sectors.blockAria')">
           <button
             v-for="tile in sectorBlockTiles"
             :key="tile.sector.sector_code"
@@ -85,14 +85,14 @@
             </span>
           </button>
         </div>
-        <div v-else class="empty-state empty-state-compact">暂无可绘制的行业资金数据</div>
+        <div v-else class="empty-state empty-state-compact">{{ t('sectors.noCapitalData') }}</div>
       </div>
     </section>
 
     <!-- Sector Ranking Table -->
     <div class="glass-card card-pad-lg">
       <div v-if="loading && !overview" class="empty-state empty-state-compact">
-        正在加载行业快照...
+        {{ t('sectors.loadingSnapshot') }}
       </div>
       <div v-if="sortedSectors.length" class="table-shell" style="--table-min:780px">
         <table class="data-table">
@@ -108,14 +108,14 @@
           </colgroup>
           <thead>
             <tr>
-              <th>排名</th>
-              <th>行业</th>
-              <th class="text-right">1日</th>
-              <th class="text-right">5日</th>
-              <th class="text-right">20日</th>
-              <th class="text-right">60日</th>
-              <th class="text-right">波动率</th>
-              <th class="text-right">成份股</th>
+              <th>{{ t('sectors.rank') }}</th>
+              <th>{{ t('sectors.industry') }}</th>
+              <th class="text-right">{{ t('sectors.day1') }}</th>
+              <th class="text-right">{{ t('sectors.day5') }}</th>
+              <th class="text-right">{{ t('sectors.day20') }}</th>
+              <th class="text-right">{{ t('sectors.day60') }}</th>
+              <th class="text-right">{{ t('sectors.volatility') }}</th>
+              <th class="text-right">{{ t('sectors.members') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -142,7 +142,7 @@
         </table>
       </div>
       <div v-else-if="!loading" class="empty-state">
-        <span>暂无行业数据 — 运行 <code>python scripts/build_sector_snapshots.py</code> 生成快照</span>
+        <span>{{ t('sectors.noSectorSnapshot') }}</span>
       </div>
     </div>
 
@@ -153,21 +153,21 @@
           {{ activeDetail.sector_name }}
           <span class="text-2xs ml-3" style="color:var(--text-disabled)">{{ activeDetail.sector_code }}</span>
         </h2>
-        <button @click="activeSector = ''" class="btn btn-sm btn-ghost">收起</button>
+        <button @click="activeSector = ''" class="btn btn-sm btn-ghost">{{ t('common.collapse') }}</button>
       </div>
 
       <!-- Signal breakdown -->
       <div v-if="Object.keys(activeDetail.signals).length" class="mb-4">
-        <h3 class="text-xs mb-2" style="color:var(--text-secondary)">策略信号分布</h3>
+        <h3 class="text-xs mb-2" style="color:var(--text-secondary)">{{ t('sectors.strategySignalDistribution') }}</h3>
         <div class="signal-grid">
           <div v-for="(sig, strat) in activeDetail.signals" :key="strat" class="signal-cell">
             <div class="text-2xs mb-1" style="color:var(--text-disabled)">{{ strat }}</div>
             <div class="flex items-center gap-3">
               <span class="text-sm font-semibold" :style="{ color: sig.buy_ratio > 0.5 ? 'var(--positive)' : 'var(--text-secondary)' }">
-                {{ (sig.buy_ratio * 100).toFixed(0) }}% 买入
+                {{ t('sectors.buyRatio', { pct: (sig.buy_ratio * 100).toFixed(0) }) }}
               </span>
               <span class="text-2xs" style="color:var(--text-disabled)">
-                {{ sig.buy_count }}/{{ sig.total }} · 均分 {{ sig.avg_score }}
+                {{ sig.buy_count }}/{{ sig.total }} · {{ t('sectors.avgScore') }} {{ sig.avg_score }}
               </span>
             </div>
             <div class="text-2xs mt-1" style="color:var(--accent)">Top: {{ sig.top_symbol || '—' }}</div>
@@ -183,6 +183,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 import type {
   SectorOverviewResponse,
   SectorCard,
@@ -191,17 +192,18 @@ import { colorBySignedRatio, fmtRatioPct as fmtPct } from "../utils/format";
 import { clampNumber, dataSourceLabel, formatAmount, signalPower } from "../utils/sector";
 
 const loading = ref(false);
+const { t } = useI18n();
 const error = ref("");
 const overview = ref<SectorOverviewResponse | null>(null);
 const activeSector = ref("");
 type BlockHeatMode = "capital" | "momentum" | "signal";
 
 const blockHeatMode = ref<BlockHeatMode>("capital");
-const blockHeatModes: { key: BlockHeatMode; label: string; metric: string }[] = [
-  { key: "capital", label: "资金热力", metric: "5日涨跌幅" },
-  { key: "momentum", label: "动量热力", metric: "20日涨跌幅" },
-  { key: "signal", label: "信号热力", metric: "策略买入集中度" },
-];
+const blockHeatModes = computed<{ key: BlockHeatMode; label: string; metric: string }[]>(() => [
+  { key: "capital", label: t("sectors.modes.capital.label"), metric: t("sectors.modes.capital.metric") },
+  { key: "momentum", label: t("sectors.modes.momentum.label"), metric: t("sectors.modes.momentum.metric") },
+  { key: "signal", label: t("sectors.modes.signal.label"), metric: t("sectors.modes.signal.metric") },
+]);
 
 type SectorBlockTile = {
   sector: SectorCard;
@@ -231,14 +233,14 @@ const bottom5Return = computed(() => {
   return (avg * 100).toFixed(2);
 });
 
-const activeBlockHeatMode = computed(() => blockHeatModes.find(m => m.key === blockHeatMode.value));
+const activeBlockHeatMode = computed(() => blockHeatModes.value.find(m => m.key === blockHeatMode.value));
 
 const capitalSourceLabel = computed(() => dataSourceLabel(overview.value?.capital_source || "missing"));
 
 const blockSizeLabel = computed(() => (
   sortedSectors.value.some(s => Number(s.amount_5d_avg || 0) > 0)
-    ? "近5日平均成交额"
-    : "成份股数量 fallback"
+    ? t("sectors.blockSizeTurnover")
+    : t("sectors.blockSizeFallback")
 ));
 
 const capitalConcentration = computed(() => {
@@ -315,7 +317,7 @@ function industryNameFontSize(sizeRatio: number) {
 
 function industryTooltip(tile: SectorBlockTile) {
   const code = tile.sector.sector_code || "SW1";
-  return `${tile.sector.sector_name} · 行业代码 ${code} · ${blockSizeLabel.value} ${formatAmount(tile.size)} · ${activeBlockHeatMode.value?.metric}: ${tile.metricLabel}`;
+  return `${tile.sector.sector_name} · ${t("sectors.industryCode")} ${code} · ${blockSizeLabel.value} ${formatAmount(tile.size)} · ${activeBlockHeatMode.value?.metric}: ${tile.metricLabel}`;
 }
 
 function heatStyle(metric: number) {
@@ -371,7 +373,7 @@ async function fetchData() {
   try {
     overview.value = await api.sectorOverview();
   } catch (e: any) {
-    error.value = e?.message || "行业快照加载失败";
+    error.value = e?.message || t("sectors.loadError");
     overview.value = null;
   }
   loading.value = false;

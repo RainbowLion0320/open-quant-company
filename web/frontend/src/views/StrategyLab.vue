@@ -1,9 +1,9 @@
 <template>
   <div class="view-page module-page">
     <SectionTabs
-      title="策略实验室"
-      eyebrow="Strategy Lab"
-      subtitle="策略目录、信号变化和回测证据合并为完整研究闭环"
+      :title="t('modules.strategyLab.title')"
+      :eyebrow="t('modules.strategyLab.eyebrow')"
+      :subtitle="t('modules.strategyLab.subtitle')"
       base-path="/strategy-lab"
       default-tab="strategies"
       :items="tabs"
@@ -15,21 +15,32 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import SectionTabs from "../components/SectionTabs.vue";
 import { useModuleTabs } from "../composables/useModuleTabs";
+import { useI18n } from "../i18n";
 import Strategies from "./Strategies.vue";
 import Signals from "./Signals.vue";
 import Backtest from "./Backtest.vue";
 import StrategyEvidence from "./StrategyEvidence.vue";
 
-const tabs = [
-  { key: "strategies", label: "策略目录", meta: "Catalog & gates", description: "查看生产策略和候选策略目录、生命周期、研究扫描与生产隔离状态" },
-  { key: "signals", label: "信号历史", meta: "Signal changes", description: "追踪最近信号迁移，识别新增买入、降级和策略一致性变化" },
-  { key: "backtest", label: "回测证据", meta: "Evidence", description: "对比策略收益、风险、回撤、强基准和晋级证据" },
-  { key: "evidence", label: "证据面板", meta: "Evidence panel", description: "查看策略证据制品、OOS状态、成本模型和晋级决策" },
+const { t } = useI18n();
+
+const tabKeys = [
+  { key: "strategies" },
+  { key: "signals" },
+  { key: "backtest" },
+  { key: "evidence" },
 ];
 
-const { activeComponent } = useModuleTabs(tabs, "strategies", {
+const tabs = computed(() => tabKeys.map(item => ({
+  key: item.key,
+  label: t(`modules.strategyLab.tabs.${item.key}.label`),
+  meta: t(`modules.strategyLab.tabs.${item.key}.meta`),
+  description: t(`modules.strategyLab.tabs.${item.key}.description`),
+})));
+
+const { activeComponent } = useModuleTabs(tabKeys, "strategies", {
   strategies: Strategies,
   signals: Signals,
   backtest: Backtest,

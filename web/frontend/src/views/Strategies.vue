@@ -2,26 +2,26 @@
   <div class="view-page">
     <div class="surface-toolbar">
       <div class="surface-copy">
-        <span>STRATEGY CATALOG</span>
-        <strong>策略目录</strong>
-        <small>统一查看生产策略、候选策略、研究证据和最新扫描状态</small>
+        <span>{{ t('strategies.eyebrow') }}</span>
+        <strong>{{ t('strategies.title') }}</strong>
+        <small>{{ t('strategies.subtitle') }}</small>
       </div>
       <div class="surface-actions">
-        <span v-if="loaded" class="text-2xs" style="color:var(--text-disabled)">{{ catalog.length }} strategies</span>
+        <span v-if="loaded" class="text-2xs" style="color:var(--text-disabled)">{{ t('strategies.count', { count: catalog.length }) }}</span>
         <button @click="runAll" :disabled="store.running" class="btn btn-primary btn-sm">
-          {{ store.running ? `运行中 ${store.progress}%` : '运行生产策略' }}
+          {{ store.running ? t('strategies.running', { progress: store.progress }) : t('strategies.runProduction') }}
         </button>
       </div>
     </div>
 
     <div class="isolation-banner">
-      <strong>生产隔离</strong>
-      <span>生产隔离：candidate/validated 只允许研究扫描和回测，不参与生产信号</span>
+      <strong>{{ t('strategies.isolationTitle') }}</strong>
+      <span>{{ t('strategies.isolationBody') }}</span>
     </div>
 
     <div v-if="store.error" class="inline-alert danger">
       <span>{{ store.error }}</span>
-      <button class="btn btn-xs" @click="reload">重试</button>
+      <button class="btn btn-xs" @click="reload">{{ t('common.retry') }}</button>
     </div>
 
     <div v-if="store.running" class="glass-card card-pad">
@@ -40,38 +40,38 @@
 
     <div class="catalog-controls glass-card">
       <label>
-        <span>生命周期</span>
+        <span>{{ t('strategies.lifecycle') }}</span>
         <select v-model="filters.lifecycle">
-          <option value="">全部</option>
+          <option value="">{{ t('common.all') }}</option>
           <option v-for="item in lifecycleOptions" :key="item" :value="item">{{ lifecycleLabel(item) }}</option>
         </select>
       </label>
       <label>
-        <span>策略类型</span>
+        <span>{{ t('strategies.type') }}</span>
         <select v-model="filters.strategyType">
-          <option value="">全部</option>
+          <option value="">{{ t('common.all') }}</option>
           <option v-for="item in typeOptions" :key="item" :value="item">{{ typeLabel(item) }}</option>
         </select>
       </label>
       <label>
-        <span>研究层级</span>
+        <span>{{ t('strategies.layer') }}</span>
         <select v-model="filters.layer">
-          <option value="">全部</option>
+          <option value="">{{ t('common.all') }}</option>
           <option v-for="item in layerOptions" :key="item" :value="item">{{ layerLabel(item) }}</option>
         </select>
       </label>
       <div class="evaluation-note">
-        <span>候选策略晋级需覆盖 {{ evaluation?.baselines.length || 0 }} 个强基准</span>
+        <span>{{ t('strategies.promotionNote', { count: evaluation?.baselines.length || 0 }) }}</span>
         <small>{{ evaluation?.status || 'research_required' }}</small>
       </div>
     </div>
 
     <div v-if="store.loading && !loaded" class="glass-card card-pad-lg empty-panel">
-      正在加载策略目录...
+      {{ t('strategies.loading') }}
     </div>
 
     <div v-if="loaded && !filteredCatalog.length" class="glass-card card-pad-lg empty-panel">
-      当前筛选条件下没有策略
+      {{ t('strategies.emptyFiltered') }}
     </div>
 
     <div v-if="filteredCatalog.length" class="table-shell catalog-table-shell" style="--table-min:960px">
@@ -87,13 +87,13 @@
         </colgroup>
         <thead>
           <tr>
-            <th>策略</th>
-            <th>生命周期</th>
-            <th>类型</th>
-            <th>层级</th>
-            <th>数据需求</th>
-            <th class="text-right">最新扫描</th>
-            <th class="text-right">动作</th>
+            <th>{{ t('common.strategy') }}</th>
+            <th>{{ t('strategies.lifecycle') }}</th>
+            <th>{{ t('strategies.type') }}</th>
+            <th>{{ t('strategies.layer') }}</th>
+            <th>{{ t('strategies.dataRequirements') }}</th>
+            <th class="text-right">{{ t('strategies.latestScan') }}</th>
+            <th class="text-right">{{ t('common.action') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -121,9 +121,9 @@
               </td>
               <td class="text-right">
                 <div class="row-actions">
-                  <button @click="toggleSignals(item.name)" class="btn btn-xs btn-ghost">信号</button>
+                  <button @click="toggleSignals(item.name)" class="btn btn-xs btn-ghost">{{ t('strategies.signals') }}</button>
                   <button @click="runCatalogStrategy(item)" :disabled="store.running" class="btn btn-xs">
-                    {{ item.lifecycle === 'production' ? '运行' : '研究扫描' }}
+                    {{ item.lifecycle === 'production' ? t('strategies.run') : t('strategies.researchScan') }}
                   </button>
                 </div>
               </td>
@@ -138,7 +138,7 @@
                     <em>{{ signalLabel(sig.signal) }}</em>
                   </div>
                 </div>
-                <div v-else class="signal-empty">暂无已保存信号，先执行扫描后查看。</div>
+                <div v-else class="signal-empty">{{ t('strategies.noSavedSignals') }}</div>
               </td>
             </tr>
           </template>
@@ -149,10 +149,10 @@
     <div v-if="governance" class="governance-panel glass-card">
       <div class="governance-header">
         <div>
-          <span>RESEARCH STACK</span>
-          <strong>策略研究分层</strong>
+          <span>{{ t('strategies.researchStack') }}</span>
+          <strong>{{ t('strategies.researchLayering') }}</strong>
         </div>
-        <div class="gate-chip">Paper gate: Sharpe ≥ {{ paperGateSharpe }} · MaxDD ≤ {{ paperGateDrawdown }}%</div>
+        <div class="gate-chip">{{ t('strategies.paperGate', { sharpe: paperGateSharpe, drawdown: paperGateDrawdown }) }}</div>
       </div>
       <div class="role-grid">
         <div v-for="role in governance.roles" :key="role.name" class="role-card">
@@ -171,6 +171,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from "vue";
 import { useStrategyStore } from "../stores";
+import { useI18n } from "../i18n";
 import {
   api,
   type StrategyCatalogItem,
@@ -179,6 +180,7 @@ import {
 } from "../api";
 
 const store = useStrategyStore();
+const { t } = useI18n();
 const currentStrategy = ref("");
 const signals = ref<any[]>([]);
 const loaded = ref(false);
@@ -186,32 +188,6 @@ const catalog = ref<StrategyCatalogItem[]>([]);
 const governance = ref<StrategyGovernanceResponse | null>(null);
 const evaluation = ref<StrategyEvaluationSummary | null>(null);
 const filters = ref({ lifecycle: "", strategyType: "", layer: "" });
-
-const STATUS_LABELS: Record<string, string> = {
-  candidate: "候选",
-  validated: "已验证",
-  paper: "模拟盘",
-  production: "生产",
-  retired: "已退役",
-};
-
-const TYPE_LABELS: Record<string, string> = {
-  selection: "选股",
-  timing: "择时",
-  sector_rotation: "行业轮动",
-  portfolio: "组合",
-  risk_overlay: "风险覆盖",
-};
-
-const LAYER_LABELS: Record<string, string> = {
-  quality_filter: "质量过滤层",
-  primary_alpha: "主 Alpha",
-  auxiliary_alpha: "辅助 Alpha",
-  candidate_alpha: "候选 Alpha",
-  defensive_alpha: "防御 Alpha",
-  confirmation_alpha: "确认 Alpha",
-  risk_overlay: "风险覆盖层",
-};
 
 const strategyColors: Record<string, string> = {
   buffett: "#00d4ff",
@@ -247,10 +223,10 @@ const layerOptions = computed(() => [...new Set(catalog.value.map(item => item.l
 const statusCards = computed(() => {
   const count = (status: string) => catalog.value.filter(item => item.lifecycle === status).length;
   return [
-    { key: "total", label: "全部策略", value: catalog.value.length },
-    { key: "production", label: "生产", value: count("production") },
-    { key: "paper", label: "模拟盘", value: count("paper") },
-    { key: "candidate", label: "候选策略", value: count("candidate") },
+    { key: "total", label: t("strategies.labels.total"), value: catalog.value.length },
+    { key: "production", label: lifecycleLabel("production"), value: count("production") },
+    { key: "paper", label: lifecycleLabel("paper"), value: count("paper") },
+    { key: "candidate", label: lifecycleLabel("candidate"), value: count("candidate") },
   ];
 });
 
@@ -260,21 +236,26 @@ const paperGateDrawdown = computed(() => {
   return Math.round(v * 100);
 });
 
-function lifecycleLabel(status: string) { return STATUS_LABELS[status] || status; }
-function typeLabel(type: string) { return TYPE_LABELS[type] || type; }
-function layerLabel(layer: string) { return LAYER_LABELS[layer] || layer; }
+function localizedStrategyLabel(key: string) {
+  const messageKey = `strategies.labels.${key}`;
+  const label = t(messageKey);
+  return label === messageKey ? key : label;
+}
+function lifecycleLabel(status: string) { return localizedStrategyLabel(status); }
+function typeLabel(type: string) { return localizedStrategyLabel(type); }
+function layerLabel(layer: string) { return localizedStrategyLabel(layer); }
 function colorFor(name: string) { return strategyColors[name] || "var(--accent)"; }
 function labelFor(name: string) {
   return catalog.value.find(s => s.name === name)?.label || name;
 }
 function signalLabel(signal: string) {
-  return signal === "buy" ? "买入" : signal === "sell" ? "卖出" : "持有";
+  return signal === "buy" ? t("common.buy") : signal === "sell" ? t("common.sell") : t("common.hold");
 }
 function scanMeta(name: string) {
   const meta = scanByName.value[name];
-  if (!meta) return "未扫描";
+  if (!meta) return t("strategies.notScanned");
   const when = meta.last_computed ? meta.last_computed.slice(0, 16) : "";
-  return `${meta.total || 0}只 / ${meta.buys || 0}买入${when ? ` · ${when}` : ""}`;
+  return `${t("strategies.scanMeta", { total: meta.total || 0, buys: meta.buys || 0 })}${when ? ` · ${when}` : ""}`;
 }
 
 async function toggleSignals(name: string) {

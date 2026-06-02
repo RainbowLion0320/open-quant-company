@@ -1,9 +1,9 @@
 <template>
   <div class="view-page module-page">
     <SectionTabs
-      title="市场研究"
-      eyebrow="Research"
-      subtitle="行业轮动、个股搜索和标的深挖集中在一个研究入口"
+      :title="t('modules.research.title')"
+      :eyebrow="t('modules.research.eyebrow')"
+      :subtitle="t('modules.research.subtitle')"
       base-path="/research"
       default-tab="sectors"
       :items="tabs"
@@ -16,17 +16,27 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import SectionTabs from "../components/SectionTabs.vue";
 import { useModuleTabs } from "../composables/useModuleTabs";
+import { useI18n } from "../i18n";
 import Sectors from "./Sectors.vue";
 import Stocks from "./Stocks.vue";
 
-const tabs = [
-  { key: "sectors", label: "行业雷达", meta: "Sector rotation" },
-  { key: "stocks", label: "个股搜索", meta: "Stock research" },
+const { t } = useI18n();
+
+const tabKeys = [
+  { key: "sectors" },
+  { key: "stocks" },
 ];
 
-const { activeComponent } = useModuleTabs(tabs, "sectors", {
+const tabs = computed(() => tabKeys.map(item => ({
+  key: item.key,
+  label: t(`modules.research.tabs.${item.key}.label`),
+  meta: t(`modules.research.tabs.${item.key}.meta`),
+})));
+
+const { activeComponent } = useModuleTabs(tabKeys, "sectors", {
   sectors: Sectors,
   stocks: Stocks,
 });

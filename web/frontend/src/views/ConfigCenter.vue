@@ -1,6 +1,6 @@
 <template>
   <div class="config-center">
-    <div v-if="loading" class="config-loading">加载配置 schema...</div>
+    <div v-if="loading" class="config-loading">{{ t('configCenter.loading') }}</div>
     <div v-else class="config-layout">
       <!-- Left: section list -->
       <nav class="config-nav">
@@ -34,7 +34,7 @@
                 {{ field.min ?? '—' }} ~ {{ field.max ?? '—' }}
               </span>
               <span class="field-default" v-if="field.default !== undefined">
-                默认 {{ field.default }}
+                {{ t('configCenter.defaultValue', { value: field.default }) }}
               </span>
             </div>
             <div class="field-input-wrap">
@@ -88,14 +88,14 @@
             :disabled="!hasChanges || saving"
             @click="saveSection"
           >
-            {{ saving ? '保存中...' : '保存修改' }}
+            {{ saving ? t('common.saving') : t('configCenter.saveChanges') }}
           </button>
           <button
             class="btn-reset"
             :disabled="!hasChanges"
             @click="resetSection"
           >
-            重置
+            {{ t('common.reset') }}
           </button>
           <span v-if="saveMsg" class="save-msg" :class="saveOk ? 'ok' : 'err'">{{ saveMsg }}</span>
         </div>
@@ -107,6 +107,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 
 interface FieldSchema {
   key: string;
@@ -127,6 +128,7 @@ interface SectionSchema {
 }
 
 const schema = ref<SectionSchema[]>([]);
+const { t } = useI18n();
 const config = reactive<Record<string, any>>({});
 const originalConfig = ref<string>(""); // JSON snapshot for change detection
 const activeSection = ref("");
@@ -209,10 +211,10 @@ async function saveSection() {
     const sectionData = clone(getSectionData() || {});
     await api.saveSettingsSection(activeSection.value, sectionData);
     originalConfig.value = JSON.stringify(clone(config));
-    saveMsg.value = "保存成功";
+    saveMsg.value = t("configCenter.saveSuccess");
     saveOk.value = true;
   } catch (err: any) {
-    saveMsg.value = err?.message || "保存失败";
+    saveMsg.value = err?.message || t("configCenter.saveError");
     saveOk.value = false;
   } finally {
     saving.value = false;

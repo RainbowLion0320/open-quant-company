@@ -2,12 +2,12 @@
   <div class="view-page">
     <div class="surface-toolbar">
       <div class="surface-copy">
-        <span>BACKTEST EVIDENCE</span>
+        <span>{{ t('backtest.eyebrow') }}</span>
         <strong>{{ overview.start || '2015-01' }} → {{ overview.end || '2026-05' }}</strong>
-        <small>日频引擎 · 策略自主调仓 · 强基准、成本和晋级证据待统一接入</small>
+        <small>{{ t('backtest.subtitle') }}</small>
       </div>
       <div class="surface-actions">
-        <span class="text-2xs" style="color:var(--text-disabled)">{{ strategies.length }} strategies</span>
+        <span class="text-2xs" style="color:var(--text-disabled)">{{ t('backtest.count', { count: strategies.length }) }}</span>
       </div>
     </div>
 
@@ -42,13 +42,13 @@
           <div class="grid grid-cols-2 gap-x-2 gap-y-1 mt-2">
             <div class="text-[10px]" style="color:var(--text-disabled)">Sharpe</div>
             <div class="text-[10px] font-mono text-right" style="color:var(--text-secondary)">{{ (s.data.sharpe||0).toFixed(2) }}</div>
-            <div class="text-[10px]" style="color:var(--text-disabled)">最大回撤</div>
+            <div class="text-[10px]" style="color:var(--text-disabled)">{{ t('backtest.maxDrawdown') }}</div>
             <div class="text-[10px] font-mono text-right" :style="{ color: (s.data.max_drawdown||0) < -0.2 ? 'var(--negative)' : 'var(--text-secondary)' }">
               {{ fmtReturn(s.data.max_drawdown) }}
             </div>
-            <div class="text-[10px]" style="color:var(--text-disabled)">胜率</div>
+            <div class="text-[10px]" style="color:var(--text-disabled)">{{ t('backtest.winRate') }}</div>
             <div class="text-[10px] font-mono text-right" style="color:var(--text-secondary)">{{ ((s.data.win_rate||0)*100).toFixed(0) }}%</div>
-            <div class="text-[10px]" style="color:var(--text-disabled)">交易</div>
+            <div class="text-[10px]" style="color:var(--text-disabled)">{{ t('backtest.trades') }}</div>
             <div class="text-[10px] font-mono text-right" style="color:var(--text-secondary)">{{ s.data.trade_count }}</div>
           </div>
         </div>
@@ -59,16 +59,18 @@
     </div>
 
     <div v-if="loaded && !strategies.length" class="glass-card card-pad-lg empty-panel">
-      暂无回测结果
+      {{ t('backtest.empty') }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { api } from "../api";
 import { fmtReturn, getECharts, QUANTUM_THEME } from "../charts/useECharts";
+import { useI18n } from "../i18n";
 
+const { currentLocale, t } = useI18n();
 const overview = ref<any>({});
 const strategyList = ref<Array<{ key: string; label: string; color: string }>>([]);
 const loaded = ref(false);
@@ -88,10 +90,10 @@ const summaryCards = computed(() => {
   const avgSharpe = rows.reduce((sum, s) => sum + (s.data.sharpe || 0), 0) / rows.length;
   const trades = rows.reduce((sum, s) => sum + (s.data.trade_count || 0), 0);
   return [
-    { label: "最佳收益", value: `${best.label} ${fmtReturn(best.data.total_return || 0)}`, color: "var(--positive)" },
-    { label: "平均 Sharpe", value: avgSharpe.toFixed(2), color: "var(--accent)" },
-    { label: "最深回撤", value: fmtReturn(worstDrawdown), color: worstDrawdown < -0.2 ? "var(--negative)" : "var(--warning)" },
-    { label: "总交易数", value: String(trades), color: "var(--text-secondary)" },
+    { label: t("backtest.bestReturn"), value: `${best.label} ${fmtReturn(best.data.total_return || 0)}`, color: "var(--positive)" },
+    { label: t("backtest.avgSharpe"), value: avgSharpe.toFixed(2), color: "var(--accent)" },
+    { label: t("backtest.deepestDrawdown"), value: fmtReturn(worstDrawdown), color: worstDrawdown < -0.2 ? "var(--negative)" : "var(--warning)" },
+    { label: t("backtest.totalTrades"), value: String(trades), color: "var(--text-secondary)" },
   ];
 });
 
@@ -152,7 +154,7 @@ async function initAllCharts() {
 
     if (curve.bench?.length) {
       series.push({
-        name: "上证指数",
+        name: t("backtest.benchmark"),
         type: "line",
         data: curve.bench.map((d: any) => d.value),
         lineStyle: { color: "rgba(255,255,255,0.08)", width: 1, type: "dashed" },
@@ -179,7 +181,7 @@ async function initAllCharts() {
         splitLine: { lineStyle: { color: "rgba(255,255,255,0.03)" } },
       },
       legend: {
-        data: [s.label, "上证指数"],
+        data: [s.label, t("backtest.benchmark")],
         textStyle: { color: "#64748b", fontSize: 10 },
         top: 0, right: 0,
       },
@@ -205,13 +207,15 @@ onMounted(async () => {
     }
     await loadAllDetails();
   } catch (e: any) {
-    error.value = e?.message || "回测结果加载失败";
+    error.value = e?.message || t("backtest.loadError");
     strategyList.value = [];
     overview.value = {};
   } finally {
     loaded.value = true;
   }
 });
+
+watch(currentLocale, () => initAllCharts());
 
 onUnmounted(() => {
   Object.values(charts).forEach(c => c.dispose());

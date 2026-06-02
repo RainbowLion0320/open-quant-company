@@ -4,7 +4,7 @@
       <article class="telemetry-card glass-card">
         <div class="metric-head">
           <span>CPU</span>
-          <small>{{ monitor?.cpu?.cores_physical ?? '—' }} cores</small>
+          <small>{{ t('activity.cores', { count: monitor?.cpu?.cores_physical ?? '—' }) }}</small>
         </div>
         <div class="metric-main">
           <strong :style="{ color: cpuColor }">{{ fmtPercent(monitor?.cpu?.percent) }}</strong>
@@ -12,7 +12,7 @@
         </div>
         <div class="meter-track"><i :style="{ width: pctWidth(monitor?.cpu?.percent), background: cpuColor }"></i></div>
         <div class="metric-foot">
-          <span>Load Average</span>
+          <span>{{ t('activity.loadAverage') }}</span>
           <em>{{ loadText }}</em>
         </div>
       </article>
@@ -24,11 +24,11 @@
         </div>
         <div class="metric-main">
           <strong :style="{ color: memColor }">{{ fmtPercent(monitor?.memory?.percent) }}</strong>
-          <span>{{ fmtGb(monitor?.memory?.used_gb) }} used</span>
+          <span>{{ t('activity.used', { value: fmtGb(monitor?.memory?.used_gb) }) }}</span>
         </div>
         <div class="meter-track"><i :style="{ width: pctWidth(monitor?.memory?.percent), background: memColor }"></i></div>
         <div class="metric-foot">
-          <span>Battery</span>
+          <span>{{ t('activity.battery') }}</span>
           <em>{{ batteryText }}</em>
         </div>
       </article>
@@ -40,12 +40,12 @@
         </div>
         <div class="metric-main">
           <strong style="color:var(--text-secondary)">{{ fmtPercent(monitor?.disk?.percent) }}</strong>
-          <span>{{ fmtGb(monitor?.disk?.used_gb) }} used</span>
+          <span>{{ t('activity.used', { value: fmtGb(monitor?.disk?.used_gb) }) }}</span>
         </div>
         <div class="meter-track"><i :style="{ width: pctWidth(monitor?.disk?.percent), background: 'var(--text-secondary)' }"></i></div>
         <div class="metric-foot">
-          <span>Updated {{ elapsed }}s ago</span>
-          <button @click="fetchData" class="icon-button" aria-label="刷新">
+          <span>{{ t('activity.updatedAgo', { seconds: elapsed }) }}</span>
+          <button @click="fetchData" class="icon-button" :aria-label="t('activity.refresh')">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
           </button>
         </div>
@@ -54,28 +54,28 @@
 
     <div v-if="monitorError" class="inline-alert danger">
       <span>{{ monitorError }}</span>
-      <button class="btn btn-xs" @click="fetchData">重试</button>
+      <button class="btn btn-xs" @click="fetchData">{{ t('common.retry') }}</button>
     </div>
 
     <section class="system-grid">
       <div class="deepseek-panel glass-card">
         <div class="panel-head">
-          <span>DEEPSEEK USAGE · RECENT</span>
+          <span>{{ t('activity.deepseekUsage') }}</span>
         </div>
 
         <div class="usage-summary">
           <div class="usage-balance">
-            <span>api balance</span>
+            <span>{{ t('activity.apiBalance') }}</span>
             <strong>{{ dsTotals?.balanceText ?? "—" }}</strong>
-            <small>{{ dsTotals?.balanceStatus ?? "not checked" }}</small>
+            <small>{{ dsTotals?.balanceStatus ?? t('activity.notChecked') }}</small>
           </div>
           <div class="usage-pro">
-            <span>project tokens</span>
+            <span>{{ t('activity.projectTokens') }}</span>
             <strong>{{ fmtNum(dsTotals?.tokens ?? 0) }}</strong>
-            <small>{{ fmtNum(dsTotals?.requests ?? 0) }} calls</small>
+            <small>{{ t('activity.calls', { count: fmtNum(dsTotals?.requests ?? 0) }) }}</small>
           </div>
           <div class="usage-cost">
-            <span>estimated cost</span>
+            <span>{{ t('activity.estimatedCost') }}</span>
             <strong>{{ fmtMoney(dsTotals?.costCny ?? 0, "CNY") }}</strong>
             <small>${{ (dsTotals?.costUsd ?? 0).toFixed(4) }}</small>
           </div>
@@ -96,20 +96,20 @@
           </div>
         </div>
         <div v-else class="usage-empty">
-          本项目后续 DeepSeek API 调用完成后，会从响应 usage 自动写入本地账本并在这里展示趋势。
+          {{ t('activity.usageEmpty') }}
         </div>
         <div v-if="dsHasUsage" class="chart-legend">
-          <span><span class="legend-swatch" style="background:rgba(6,95,107,0.85)"></span>计费输入</span>
-          <span><span class="legend-swatch" style="background:rgba(6,182,212,0.85)"></span>输出</span>
-          <span><span class="legend-swatch" style="background:rgba(6,182,212,0.25);border:1px dashed rgba(6,182,212,0.3)"></span>缓存命中</span>
-          <span><span class="legend-swatch" style="background:rgba(61,21,120,0.85)"></span>官方余额 + 项目账本</span>
+          <span><span class="legend-swatch" style="background:rgba(6,95,107,0.85)"></span>{{ t('activity.billableInput') }}</span>
+          <span><span class="legend-swatch" style="background:rgba(6,182,212,0.85)"></span>{{ t('activity.output') }}</span>
+          <span><span class="legend-swatch" style="background:rgba(6,182,212,0.25);border:1px dashed rgba(6,182,212,0.3)"></span>{{ t('activity.cacheHit') }}</span>
+          <span><span class="legend-swatch" style="background:rgba(61,21,120,0.85)"></span>{{ t('activity.balanceLedger') }}</span>
         </div>
       </div>
 
       <aside class="system-side">
         <div class="glass-card side-card">
           <div class="panel-head">
-            <span>RESOURCE HISTORY</span>
+            <span>{{ t('activity.resourceHistory') }}</span>
             <small>{{ historyHours }}h</small>
           </div>
           <div class="resource-charts">
@@ -126,8 +126,8 @@
 
         <div class="glass-card side-card">
           <div class="panel-head">
-            <span>TOP PROCESSES</span>
-            <small>{{ monitor?.top_processes?.length ?? 0 }} rows</small>
+            <span>{{ t('activity.topProcesses') }}</span>
+            <small>{{ t('activity.rows', { count: monitor?.top_processes?.length ?? 0 }) }}</small>
           </div>
           <div class="table-shell compact-table" style="--table-min:0">
             <table class="data-table">
@@ -135,7 +135,7 @@
                 <col style="width:62%"><col style="width:19%"><col style="width:19%">
               </colgroup>
               <thead>
-                <tr><th>Process</th><th class="text-right">CPU</th><th class="text-right">MEM</th></tr>
+                <tr><th>{{ t('activity.process') }}</th><th class="text-right">CPU</th><th class="text-right">MEM</th></tr>
               </thead>
               <tbody>
                 <tr v-for="p in monitor?.top_processes ?? []" :key="p.pid">
@@ -145,7 +145,7 @@
                 </tr>
               </tbody>
             </table>
-            <div v-if="!(monitor?.top_processes?.length)" class="mini-empty">暂无进程采样</div>
+            <div v-if="!(monitor?.top_processes?.length)" class="mini-empty">{{ t('activity.noProcessSamples') }}</div>
           </div>
         </div>
       </aside>
@@ -154,7 +154,7 @@
     <section class="ops-grid">
       <div class="glass-card ops-card">
         <div class="panel-head">
-          <span>API HEALTH</span>
+          <span>{{ t('activity.apiHealth') }}</span>
           <em v-if="apiHealth" :class="apiHealth.all_ok ? 'source-badge ok' : 'source-badge limited'"
             class="summary-badge">{{ apiHealth.summary }}</em>
         </div>
@@ -165,12 +165,12 @@
               <em :class="['source-badge', apiBadgeClass(api.status)]">{{ api.detail }}</em>
             </div>
           </template>
-          <div v-else><span>API Health</span><em class="source-badge muted">加载中...</em></div>
+          <div v-else><span>{{ t('activity.apiHealth') }}</span><em class="source-badge muted">{{ t('activity.loading') }}</em></div>
         </div>
       </div>
       <div class="glass-card ops-card">
         <div class="panel-head">
-          <span>CRON JOBS</span>
+          <span>{{ t('activity.cronJobs') }}</span>
           <em v-if="cronSummary" :class="['source-badge', cronSummaryBadge, 'summary-badge']">{{ cronSummary }}</em>
         </div>
         <div class="source-list">
@@ -183,7 +183,7 @@
               <em :class="['source-badge', cronBadgeClass(job.last_status)]">{{ jobLastRun(job) }}</em>
             </div>
           </template>
-          <div v-else><span>Cron Jobs</span><em class="source-badge muted">加载中...</em></div>
+          <div v-else><span>{{ t('activity.cronJobs') }}</span><em class="source-badge muted">{{ t('activity.loading') }}</em></div>
         </div>
       </div>
     </section>
@@ -193,9 +193,11 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
 import { api, type SystemMonitor } from "../api";
+import { useI18n } from "../i18n";
 import { fmtPercentValue, fmtShortCount } from "../utils/format";
 
 const monitor = ref<SystemMonitor | null>(null);
+const { currentLocale, t } = useI18n();
 const monitorError = ref("");
 const lastFetch = ref(Date.now());
 const elapsed = ref(0);
@@ -216,7 +218,7 @@ const loadText = computed(() => (monitor.value?.cpu?.load_avg ?? []).map(v => Nu
 const batteryText = computed(() => {
   const bat = monitor.value?.battery;
   if (!bat) return "—";
-  return `${bat.percent ?? "—"}%${bat.charging ? " · charging" : ""}`;
+  return `${bat.percent ?? "—"}%${bat.charging ? ` · ${t("activity.charging")}` : ""}`;
 });
 
 const cpuChartId = "cpu-chart"; const memChartId = "mem-chart";
@@ -263,17 +265,17 @@ function jobNextRun(job: any): string {
   const d = new Date(job.next_run);
   const now = Date.now();
   const diffMin = Math.round((d.getTime() - now) / 60000);
-  if (diffMin < 0) return "pending";
-  if (diffMin < 60) return `in ${diffMin}m`;
-  if (diffMin < 1440) return `in ${Math.round(diffMin / 60)}h`;
-  return d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+  if (diffMin < 0) return t("activity.pending");
+  if (diffMin < 60) return t("activity.inMinutes", { count: diffMin });
+  if (diffMin < 1440) return t("activity.inHours", { count: Math.round(diffMin / 60) });
+  return d.toLocaleDateString(currentLocale.value, { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(currentLocale.value, { hour: "2-digit", minute: "2-digit" });
 }
 function jobLastRun(job: any): string {
-  if (!job.last_run) return "never";
+  if (!job.last_run) return t("activity.never");
   const d = new Date(job.last_run);
   const now = Date.now();
   const diffMin = Math.round((now - d.getTime()) / 60000);
-  const ago = diffMin < 60 ? `${diffMin}m ago` : diffMin < 1440 ? `${Math.round(diffMin / 60)}h ago` : d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+  const ago = diffMin < 60 ? t("activity.agoMinutes", { count: diffMin }) : diffMin < 1440 ? t("activity.agoHours", { count: Math.round(diffMin / 60) }) : d.toLocaleDateString(currentLocale.value, { month: "short", day: "numeric" });
   const st = job.last_status || "—";
   return `${ago} (${st})`;
 }
@@ -331,7 +333,7 @@ async function fetchData() {
     monitor.value = (next as any).status === "no_data" ? null : next;
     lastFetch.value = Date.now();
   } catch (e: any) {
-    monitorError.value = e?.message || "系统监控加载失败";
+    monitorError.value = e?.message || t("activity.retryError");
   }
 }
 
@@ -440,7 +442,7 @@ async function drawDSChart() {
         ctx.fillStyle = "#475569";
         ctx.font = "10px monospace";
         ctx.textAlign = "center";
-        ctx.fillText("no project calls", W / 2, H / 2);
+        ctx.fillText(t("activity.noProjectCalls"), W / 2, H / 2);
         ctx.textAlign = "start";
         continue;
       }

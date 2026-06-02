@@ -14,7 +14,7 @@
 
     <section class="pipeline-header glass-card">
       <div>
-        <span class="eyebrow">Pipeline</span>
+        <span class="eyebrow">{{ t('pipeline.eyebrow') }}</span>
         <h1>{{ currentLabel }}</h1>
       </div>
       <div class="pipeline-meta" v-if="payload && activeKey === 'market_regime'">
@@ -26,12 +26,12 @@
 
     <div v-if="error" class="inline-alert danger">
       <span>{{ error }}</span>
-      <button class="btn btn-xs" @click="loadPipeline">重试</button>
+      <button class="btn btn-xs" @click="loadPipeline">{{ t('common.retry') }}</button>
     </div>
 
     <section class="pipeline-layout">
       <div ref="stageRef" class="flow-stage glass-card">
-        <div v-if="loading" class="pipeline-empty">正在加载 Pipeline 数据...</div>
+        <div v-if="loading" class="pipeline-empty">{{ t('pipeline.loading') }}</div>
         <div v-else-if="payload" ref="canvasRef" class="flow-canvas" :style="canvasStyle">
           <svg
             v-if="visibleArrowPaths.length"
@@ -101,7 +101,7 @@
             </div>
           </button>
         </div>
-        <div v-else class="pipeline-empty">暂无 Pipeline 数据</div>
+        <div v-else class="pipeline-empty">{{ t('pipeline.empty') }}</div>
       </div>
 
       <aside class="detail-panel glass-card" v-if="selectedNode">
@@ -120,11 +120,11 @@
 
         <div class="detail-lists">
           <div>
-            <h3>Inputs</h3>
+            <h3>{{ t('pipeline.inputs') }}</h3>
             <span v-for="item in selectedNode.inputs" :key="item">{{ item }}</span>
           </div>
           <div>
-            <h3>Outputs</h3>
+            <h3>{{ t('pipeline.outputs') }}</h3>
             <span v-for="item in selectedNode.outputs" :key="item">{{ item }}</span>
           </div>
         </div>
@@ -147,6 +147,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 import {
   layoutPipelineGraph,
   offsetPipelineEdgePath,
@@ -168,6 +169,7 @@ interface PipelineNodeData {
 }
 
 const payload = ref<any | null>(null);
+const { t } = useI18n();
 const selectedNodeId = ref("");
 const loading = ref(true);
 const error = ref("");
@@ -197,7 +199,7 @@ function setNodeRef(id: string, el: any) {
 
 const currentLabel = computed(() => {
   const p = pipelines.value.find((p) => p.key === activeKey.value);
-  return p ? `${p.label} Pipeline` : "Pipeline";
+  return p ? `${p.label} ${t("pipeline.titleSuffix")}` : t("pipeline.eyebrow");
 });
 
 const selectedNode = computed<PipelineNodeData | null>(() => {
@@ -417,7 +419,7 @@ async function loadPipeline() {
       selectedNodeId.value = data.nodes?.[0]?.id || "";
     }
   } catch (err: any) {
-    error.value = err?.message || "Pipeline 加载失败";
+    error.value = err?.message || t("pipeline.retryError");
   } finally {
     loading.value = false;
   }

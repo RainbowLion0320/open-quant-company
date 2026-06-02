@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { api, type PositionCapacity } from "../api";
+import { translate } from "../i18n";
 
 export const useMarketStore = defineStore("market", () => {
   const regime = ref<any>(null);
@@ -31,7 +32,7 @@ export const useMarketStore = defineStore("market", () => {
         max: Math.max(data.pool_size || 0, 1),
       };
     } catch (e: any) {
-      error.value = e.message;
+      error.value = e?.message || translate("errors.marketLoad");
     } finally {
       loading.value = false;
     }
@@ -60,7 +61,7 @@ export const useStrategyStore = defineStore("strategy", () => {
       const data = await api.strategies();
       strategies.value = data.strategies || [];
     } catch (e: any) {
-      error.value = e?.message || "策略列表加载失败";
+      error.value = e?.message || translate("errors.strategyListLoad");
     } finally {
       loading.value = false;
     }
@@ -72,7 +73,7 @@ export const useStrategyStore = defineStore("strategy", () => {
       const data = await api.strategyDetail(name);
       signals.value[name] = data.signals || [];
     } catch (e: any) {
-      error.value = e?.message || "策略信号加载失败";
+      error.value = e?.message || translate("errors.strategySignalLoad");
       signals.value[name] = [];
     }
   }
@@ -85,7 +86,7 @@ export const useStrategyStore = defineStore("strategy", () => {
       const data = await api.strategyRun(strategy, limit, params, mode);
       jobId.value = data.job_id;
 
-      // WebSocket 监听进度
+      // Listen for strategy run progress over WebSocket.
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(`${protocol}//${window.location.host}/api/strategies/ws/${data.job_id}`);
       ws.onmessage = (e) => {
@@ -100,11 +101,11 @@ export const useStrategyStore = defineStore("strategy", () => {
       };
       ws.onerror = () => {
         running.value = false;
-        progressMsg.value = "进度连接失败";
+        progressMsg.value = translate("errors.progressConnection");
       };
     } catch (e: any) {
       running.value = false;
-      progressMsg.value = e?.message || "策略运行启动失败";
+      progressMsg.value = e?.message || translate("errors.strategyRunStart");
     }
   }
 

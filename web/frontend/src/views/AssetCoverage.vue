@@ -1,18 +1,18 @@
 <template>
   <div class="asset-coverage">
-    <div v-if="loading" class="loading">Loading asset coverage…</div>
-    <div v-else-if="items.length === 0" class="empty">No asset data available.</div>
+    <div v-if="loading" class="loading">{{ t('assetCoverage.loading') }}</div>
+    <div v-else-if="items.length === 0" class="empty">{{ t('assetCoverage.empty') }}</div>
     <div v-else class="asset-table-wrap">
       <table class="asset-table">
         <thead>
           <tr>
-            <th>Asset Type</th>
-            <th>Label</th>
-            <th>Enabled</th>
-            <th>Data Source</th>
-            <th>Research Ready</th>
-            <th>Tradable</th>
-            <th>Universe Size</th>
+            <th>{{ t('assetCoverage.assetType') }}</th>
+            <th>{{ t('assetCoverage.label') }}</th>
+            <th>{{ t('assetCoverage.enabled') }}</th>
+            <th>{{ t('assetCoverage.dataSource') }}</th>
+            <th>{{ t('assetCoverage.researchReady') }}</th>
+            <th>{{ t('assetCoverage.tradable') }}</th>
+            <th>{{ t('assetCoverage.universeSize') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -21,7 +21,7 @@
             <td>{{ item.label }}</td>
             <td>
               <span class="badge" :class="item.enabled ? 'badge-ok' : 'badge-off'">
-                {{ item.enabled ? 'enabled' : 'disabled' }}
+                {{ item.enabled ? t('common.enabled') : t('common.disabled') }}
               </span>
             </td>
             <td>
@@ -50,7 +50,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 
+const { t } = useI18n();
 const items = ref<any[]>([]);
 const loading = ref(true);
 

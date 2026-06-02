@@ -2,41 +2,41 @@
   <div class="view-page settings-page">
     <div class="surface-toolbar settings-action-bar">
       <div class="surface-copy">
-        <span>CONFIG CONTROL</span>
-        <strong>运行模式与配置写入</strong>
-        <small>认证、通知、数据源、策略状态、风控和最近配置变更集中管理</small>
+        <span>{{ t('settings.eyebrow') }}</span>
+        <strong>{{ t('settings.title') }}</strong>
+        <small>{{ t('settings.subtitle') }}</small>
       </div>
       <div class="surface-actions">
         <span :class="['mode-badge', `mode-${mode}`]">{{ modeLabel }}</span>
-        <button @click="saveWithConfirm" class="btn btn-primary btn-sm">保存</button>
+        <button @click="saveWithConfirm" class="btn btn-primary btn-sm">{{ t('common.save') }}</button>
       </div>
     </div>
 
     <div v-if="saveError" class="inline-alert danger">
       <span>{{ saveError }}</span>
-      <button class="btn btn-xs" @click="saveError = ''">关闭</button>
+      <button class="btn btn-xs" @click="saveError = ''">{{ t('common.close') }}</button>
     </div>
 
     <!-- Run Mode -->
     <div class="glass-card card-pad-lg">
-      <div class="section-heading mb-4">运行模式</div>
+      <div class="section-heading mb-4">{{ t('settings.runMode') }}</div>
       <div class="settings-list">
         <div>
-          <span>当前模式</span>
+          <span>{{ t('settings.currentMode') }}</span>
           <span :class="['badge', modeBadgeClass]">{{ modeLabel }}</span>
         </div>
         <div>
-          <span>Settings 写入</span>
-          <span v-if="modeStatus.allows_settings_write" class="badge badge-green">允许</span>
-          <span v-else class="badge badge-red">只读</span>
+          <span>{{ t('settings.settingsWrite') }}</span>
+          <span v-if="modeStatus.allows_settings_write" class="badge badge-green">{{ t('common.allowed') }}</span>
+          <span v-else class="badge badge-red">{{ t('common.readonly') }}</span>
         </div>
         <div>
-          <span>Paper Trading</span>
-          <span v-if="modeStatus.allows_paper_trading" class="badge badge-green">允许</span>
-          <span v-else class="badge badge-red">禁止</span>
+          <span>{{ t('settings.paperTrading') }}</span>
+          <span v-if="modeStatus.allows_paper_trading" class="badge badge-green">{{ t('common.allowed') }}</span>
+          <span v-else class="badge badge-red">{{ t('common.forbidden') }}</span>
         </div>
         <div v-if="modeStatus.readonly_sections?.length">
-          <span>只读段</span>
+          <span>{{ t('settings.readonlySections') }}</span>
           <span class="badge badge-amber">{{ modeStatus.readonly_sections.join(", ") }}</span>
         </div>
       </div>
@@ -44,37 +44,37 @@
 
     <!-- API Key -->
     <div class="glass-card card-pad-lg">
-      <div class="section-heading mb-4">API 密钥</div>
+      <div class="section-heading mb-4">{{ t('settings.apiKey') }}</div>
       <div class="setting-row">
         <div>
-          <strong>认证状态</strong>
+          <strong>{{ t('settings.authStatus') }}</strong>
           <span>{{ apiKeyStatus }}</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <input
             v-model="apiKeyInput"
             type="password"
-            placeholder="输入 API Key"
+            :placeholder="t('settings.apiKeyPlaceholder')"
             class="key-input"
             @keyup.enter="saveApiKey"
           />
-          <button @click="saveApiKey" class="btn btn-sm" :class="apiKeyInput ? 'btn-primary' : 'btn-muted'">设置</button>
+          <button @click="saveApiKey" class="btn btn-sm" :class="apiKeyInput ? 'btn-primary' : 'btn-muted'">{{ t('settings.set') }}</button>
         </div>
       </div>
     </div>
 
     <!-- Notification -->
     <div class="glass-card card-pad-lg">
-      <div class="section-heading mb-4">Telegram 通知</div>
+      <div class="section-heading mb-4">{{ t('settings.telegram') }}</div>
       <div class="setting-row">
         <div>
-          <strong>启用信号推送</strong>
+          <strong>{{ t('settings.enableSignalPush') }}</strong>
           <span>{{ notificationText }}</span>
         </div>
         <button @click="toggleNotify"
           class="settings-toggle"
           :class="{ active: settings.trading?.notification?.enabled }"
-          aria-label="切换 Telegram 通知">
+          :aria-label="t('settings.toggleTelegram')">
           <span></span>
         </button>
       </div>
@@ -82,7 +82,7 @@
 
     <!-- Data Sources -->
     <div class="glass-card card-pad-lg">
-      <div class="section-heading mb-4">数据源</div>
+      <div class="section-heading mb-4">{{ t('settings.dataSources') }}</div>
       <div class="settings-list">
         <div v-for="src in sourceItems" :key="src.name">
           <span>{{ src.name }}</span>
@@ -90,66 +90,66 @@
         </div>
         <div v-if="sourceItems.length === 0">
           <span>Registry</span>
-          <span class="badge badge-muted">暂无配置</span>
+          <span class="badge badge-muted">{{ t('settings.noConfig') }}</span>
         </div>
       </div>
     </div>
 
     <!-- Strategy Status -->
     <div class="glass-card card-pad-lg">
-      <div class="section-heading mb-4">策略状态</div>
+      <div class="section-heading mb-4">{{ t('settings.strategyStatus') }}</div>
       <div class="settings-list">
         <div v-for="s in strategyStatuses" :key="s.name">
           <span>{{ s.label }}</span>
           <span :class="['badge', statusBadgeClass(s.status)]">{{ s.status_label }}</span>
         </div>
         <div v-if="strategyStatuses.length === 0">
-          <span>策略</span>
-          <span class="badge badge-muted">加载中...</span>
+          <span>{{ t('common.strategy') }}</span>
+          <span class="badge badge-muted">{{ t('settings.strategyLoading') }}</span>
         </div>
       </div>
     </div>
 
     <!-- Risk Control -->
     <div class="glass-card card-pad-lg">
-      <div class="section-heading mb-4">风控参数</div>
+      <div class="section-heading mb-4">{{ t('settings.riskControl') }}</div>
       <div class="settings-list">
         <div v-if="risk.max_single_position?.enabled">
-          <span>单仓位上限</span>
+          <span>{{ t('settings.maxSinglePosition') }}</span>
           <strong>{{ fmtPct(risk.max_single_position?.max_pct) }}</strong>
         </div>
         <div v-if="risk.max_total_exposure?.enabled">
-          <span>总敞口上限</span>
+          <span>{{ t('settings.maxTotalExposure') }}</span>
           <strong>{{ fmtPct(risk.max_total_exposure?.max_pct) }}</strong>
         </div>
         <div v-if="risk.max_orders_per_day?.enabled">
-          <span>单日最大单数</span>
+          <span>{{ t('settings.maxOrdersPerDay') }}</span>
           <strong>{{ risk.max_orders_per_day?.max_count ?? '—' }}</strong>
         </div>
         <div v-if="risk.max_drawdown_circuit_breaker?.enabled">
-          <span>回撤熔断</span>
+          <span>{{ t('settings.drawdownBreaker') }}</span>
           <strong>{{ fmtPct(risk.max_drawdown_circuit_breaker?.max_dd_pct) }}</strong>
         </div>
         <div v-if="!hasRiskConfig">
-          <span>风控</span>
-          <span class="badge badge-muted">未配置</span>
+          <span>{{ t('settings.riskControl') }}</span>
+          <span class="badge badge-muted">{{ t('settings.noRisk') }}</span>
         </div>
       </div>
     </div>
 
     <!-- Audit Log -->
     <div class="glass-card card-pad-lg">
-      <div class="section-heading mb-4">最近配置变更</div>
+      <div class="section-heading mb-4">{{ t('settings.audit') }}</div>
       <div class="source-list">
         <div v-for="entry in auditEntries" :key="entry.timestamp">
           <span>
             <span class="audit-time">{{ fmtAuditTime(entry.timestamp) }}</span>
-            <span class="audit-summary">{{ entry.summary || entry.action || '配置更新' }}</span>
+            <span class="audit-summary">{{ entry.summary || entry.action || t('settings.configUpdate') }}</span>
           </span>
         </div>
         <div v-if="auditEntries.length === 0">
-          <span>审计日志</span>
-          <span class="badge badge-muted">暂无记录</span>
+          <span>{{ t('settings.auditLog') }}</span>
+          <span class="badge badge-muted">{{ t('settings.noRecords') }}</span>
         </div>
       </div>
     </div>
@@ -158,11 +158,11 @@
     <Teleport to="body">
       <div v-if="showConfirm" class="confirm-overlay" @click.self="cancelConfirm">
         <div class="confirm-box glass-card card-pad-lg">
-          <h3>确认保存配置?</h3>
-          <p>修改系统配置可能影响策略运行和风险控制。请确认你了解这些变更的影响。</p>
+          <h3>{{ t('settings.confirmTitle') }}</h3>
+          <p>{{ t('settings.confirmBody') }}</p>
           <div class="confirm-actions">
-            <button @click="cancelConfirm" class="btn btn-muted">取消</button>
-            <button @click="doSave" class="btn btn-primary">确认保存</button>
+            <button @click="cancelConfirm" class="btn btn-muted">{{ t('common.cancel') }}</button>
+            <button @click="doSave" class="btn btn-primary">{{ t('settings.confirmSave') }}</button>
           </div>
         </div>
       </div>
@@ -173,8 +173,10 @@
 <script setup lang="ts">
 import { computed, reactive, ref, onMounted } from "vue";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 import { fmtConfigRatio } from "../utils/format";
 
+const { currentLocale, t } = useI18n();
 const settings = reactive<Record<string, any>>({});
 const showConfirm = ref(false);
 const confirmSnapshot = ref<Record<string, any> | null>(null);
@@ -197,15 +199,15 @@ const modeBadgeClass = computed(() => {
 });
 const apiKeyStatus = computed(() => {
   const has = modeStatus.value?.has_api_key;
-  if (has === undefined) return "检查中...";
-  return has ? "已设置" : "未设置 — 本地开放模式";
+  if (has === undefined) return t("settings.checking");
+  return has ? t("settings.apiKeySet") : t("settings.apiKeyOpen");
 });
 
 const risk = computed(() => settings.risk_control || {});
 const hasRiskConfig = computed(() => Object.keys(risk.value).length > 0 && Object.values(risk.value).some((v: any) => v?.enabled));
 const notificationText = computed(() => {
-  const enabled = settings.trading?.notification?.enabled ? "已启用" : "已关闭";
-  const changeOnly = settings.trading?.notification?.signal_change_only !== false ? "仅信号变化" : "全部信号";
+  const enabled = settings.trading?.notification?.enabled ? t("common.enabled") : t("common.disabled");
+  const changeOnly = settings.trading?.notification?.signal_change_only !== false ? t("settings.signalChangeOnly") : t("settings.allSignals");
   return `Telegram ${enabled} · ${changeOnly}`;
 });
 const sourceItems = computed(() => {
@@ -228,7 +230,7 @@ const sourceItems = computed(() => {
   return Object.values(grouped)
     .sort((a, b) => b.enabled - a.enabled || a.name.localeCompare(b.name))
     .slice(0, 6)
-    .map(item => ({ ...item, summary: item.enabled ? `${item.enabled}/${item.total} dims` : "disabled" }));
+    .map(item => ({ ...item, summary: item.enabled ? `${item.enabled}/${item.total} dims` : t("common.disabled") }));
 });
 
 function fmtPct(v: number | undefined): string {
@@ -238,7 +240,7 @@ function fmtAuditTime(ts: string): string {
   if (!ts) return '—';
   try {
     const d = new Date(ts);
-    return d.toLocaleDateString("zh-CN", { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString(currentLocale.value, { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(currentLocale.value, { hour: "2-digit", minute: "2-digit" });
   } catch { return ts.slice(0, 16); }
 }
 async function fetchStrategyStatuses() {
@@ -304,7 +306,7 @@ async function doSave() {
     confirmSnapshot.value = null;
     showConfirm.value = false;
   } catch (e: any) {
-    saveError.value = e?.message || "配置保存失败";
+    saveError.value = e?.message || t("settings.saveError");
     showConfirm.value = false;
   }
 }

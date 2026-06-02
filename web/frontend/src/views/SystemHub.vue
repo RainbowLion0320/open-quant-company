@@ -1,9 +1,9 @@
 <template>
   <div class="view-page module-page">
     <SectionTabs
-      title="系统控制"
-      eyebrow="System"
-      subtitle="运行观测、配置写入和 AI 记忆工具收敛为系统入口"
+      :title="t('modules.system.title')"
+      :eyebrow="t('modules.system.eyebrow')"
+      :subtitle="t('modules.system.subtitle')"
       base-path="/system"
       default-tab="monitor"
       :items="tabs"
@@ -15,21 +15,32 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import SectionTabs from "../components/SectionTabs.vue";
 import { useModuleTabs } from "../composables/useModuleTabs";
+import { useI18n } from "../i18n";
 import ActivityMonitor from "./ActivityMonitor.vue";
 import Settings from "./Settings.vue";
 import ConfigCenter from "./ConfigCenter.vue";
 import HindsightGraph from "./HindsightGraph.vue";
 
-const tabs = [
-  { key: "monitor", label: "系统信息", meta: "Read-only ops", description: "只读观测系统资源、API 健康、任务计划和服务状态" },
-  { key: "settings", label: "系统设置", meta: "Config writes", description: "集中管理运行模式、认证、通知、数据源、策略状态和风控参数" },
-  { key: "config", label: "配置中心", meta: "Config center", description: "查看和编辑所有系统参数：数据获取、信号、Regime、风控、回测、费率" },
-  { key: "hindsight", label: "记忆图谱", meta: "AI memory", description: "加载 Hindsight 记忆节点，检查经验、观察和实体关系" },
+const { t } = useI18n();
+
+const tabKeys = [
+  { key: "monitor" },
+  { key: "settings" },
+  { key: "config" },
+  { key: "hindsight" },
 ];
 
-const { activeComponent } = useModuleTabs(tabs, "monitor", {
+const tabs = computed(() => tabKeys.map(item => ({
+  key: item.key,
+  label: t(`modules.system.tabs.${item.key}.label`),
+  meta: t(`modules.system.tabs.${item.key}.meta`),
+  description: t(`modules.system.tabs.${item.key}.description`),
+})));
+
+const { activeComponent } = useModuleTabs(tabKeys, "monitor", {
   monitor: ActivityMonitor,
   settings: Settings,
   config: ConfigCenter,

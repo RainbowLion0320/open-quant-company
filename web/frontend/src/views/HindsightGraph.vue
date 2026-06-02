@@ -3,9 +3,9 @@
     <!-- 控制栏 -->
     <div class="graph-toolbar glass-card">
       <div class="toolbar-left">
-        <h2 class="toolbar-title">HINDSIGHT KNOWLEDGE GRAPH</h2>
+        <h2 class="toolbar-title">{{ t('hindsight.title') }}</h2>
         <span class="toolbar-stats" v-if="stats">
-          {{ stats.total_nodes }} NODES · {{ stats.total_links || linkCount }} LINKS
+          {{ t('hindsight.stats', { nodes: stats.total_nodes, links: stats.total_links || linkCount }) }}
         </span>
         <span class="toolbar-error" v-if="loadError">{{ loadError }}</span>
       </div>
@@ -20,7 +20,7 @@
           <svg v-else class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4" />
           </svg>
-          {{ isLoading ? 'FETCHING...' : 'LOAD GRAPH' }}
+          {{ isLoading ? t('hindsight.fetching') : t('hindsight.loadGraph') }}
         </button>
       </div>
     </div>
@@ -29,8 +29,8 @@
     <div class="graph-stage" ref="stageRef">
       <div ref="threeRef" class="three-container"></div>
       <div v-if="!graphLoaded && !isLoading" class="graph-placeholder glass-card">
-        <span>GRAPH STANDBY</span>
-        <strong>等待手动载入</strong>
+        <span>{{ t('hindsight.standby') }}</span>
+        <strong>{{ t('hindsight.waitLoad') }}</strong>
       </div>
 
       <!-- 悬浮提示 -->
@@ -51,7 +51,7 @@
       <!-- 详情面板 -->
       <transition name="panel-slide">
         <div v-if="selectedNode" class="detail-panel glass-card">
-          <button class="panel-close" @click="deselectNode" aria-label="关闭详情">
+          <button class="panel-close" @click="deselectNode" :aria-label="t('hindsight.closeDetail')">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
           </button>
           <div class="panel-header">
@@ -59,27 +59,27 @@
               {{ selectedNode.type }}
             </span>
             <span class="panel-id">#{{ selectedNode.id?.slice(0, 8) }}</span>
-            <span class="panel-degree">deg: {{ selectedNode.degree || 0 }}</span>
+            <span class="panel-degree">{{ t('hindsight.degree', { degree: selectedNode.degree || 0 }) }}</span>
           </div>
           <p class="panel-text">{{ selectedNode.fullText }}</p>
           <div class="panel-section" v-if="selectedNode.entities?.length">
-            <h4>ENTITIES</h4>
+            <h4>{{ t('hindsight.entities') }}</h4>
             <div class="chip-group">
               <span class="chip" v-for="e in selectedNode.entities" :key="e">{{ e }}</span>
             </div>
           </div>
           <div class="panel-section" v-if="selectedNode.tags?.length">
-            <h4>TAGS</h4>
+            <h4>{{ t('hindsight.tags') }}</h4>
             <div class="chip-group">
               <span class="chip tag-chip" v-for="t in selectedNode.tags" :key="t">{{ t }}</span>
             </div>
           </div>
           <div class="panel-meta">
             <div class="meta-row">
-              <span>Date</span><strong>{{ fmtDate(selectedNode.date) }}</strong>
+              <span>{{ t('hindsight.date') }}</span><strong>{{ fmtDate(selectedNode.date) }}</strong>
             </div>
             <div class="meta-row" v-if="selectedNode.proofCount > 1">
-              <span>Proofs</span><strong>{{ selectedNode.proofCount }}</strong>
+              <span>{{ t('hindsight.proofs') }}</span><strong>{{ selectedNode.proofCount }}</strong>
             </div>
           </div>
         </div>
@@ -87,12 +87,12 @@
 
       <!-- 图例 -->
       <div class="legend glass-card">
-        <div class="legend-item"><span class="legend-dot obs"></span> Observation</div>
-        <div class="legend-item"><span class="legend-dot exp"></span> Experience</div>
-        <div class="legend-item"><span class="legend-dot wld"></span> World</div>
-        <div class="legend-item"><span class="legend-line sem"></span> Semantic</div>
-        <div class="legend-item"><span class="legend-line tmp"></span> Temporal</div>
-        <div class="legend-item"><span class="legend-line tag-l"></span> Tag</div>
+        <div class="legend-item"><span class="legend-dot obs"></span> {{ t('hindsight.observation') }}</div>
+        <div class="legend-item"><span class="legend-dot exp"></span> {{ t('hindsight.experience') }}</div>
+        <div class="legend-item"><span class="legend-dot wld"></span> {{ t('hindsight.world') }}</div>
+        <div class="legend-item"><span class="legend-line sem"></span> {{ t('hindsight.semantic') }}</div>
+        <div class="legend-item"><span class="legend-line tmp"></span> {{ t('hindsight.temporal') }}</div>
+        <div class="legend-item"><span class="legend-line tag-l"></span> {{ t('hindsight.tag') }}</div>
       </div>
     </div>
   </div>
@@ -103,6 +103,7 @@ import { ref, onMounted, onUnmounted, nextTick } from "vue";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 
 // ── Types ──
 interface GraphNode {
@@ -134,6 +135,7 @@ interface SimNode extends GraphNode {
 
 // ── Vue state ──
 const threeRef = ref<HTMLElement | null>(null);
+const { t } = useI18n();
 const stageRef = ref<HTMLElement | null>(null);
 const isLoading = ref(false);
 const graphLoaded = ref(false);
@@ -595,7 +597,7 @@ async function loadGraph() {
     cancelAnimationFrame(animFrame);
     animFrame = requestAnimationFrame(tick);
   } catch (e) {
-    loadError.value = e instanceof Error ? e.message : "图谱加载失败";
+    loadError.value = e instanceof Error ? e.message : t("hindsight.loadError");
     console.error("Failed to load graph:", e);
   } finally {
     isLoading.value = false;

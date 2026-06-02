@@ -5,36 +5,36 @@
         <input
           v-model="query"
           type="search"
-          placeholder="输入代码或名称，如 600519 或 茅台"
+          :placeholder="t('stocks.placeholder')"
           class="stock-search-input"
           @keydown.enter="search"
         />
-        <button @click="search" class="btn btn-primary">搜索</button>
+        <button @click="search" class="btn btn-primary">{{ t('common.search') }}</button>
       </div>
       <div class="stock-search-meta">
         <template v-if="stock && !loading">
-          <span>当前 {{ stock.basic.symbol }} {{ stock.basic.name }}</span>
-          <span>行业 {{ stock.basic.industry || '—' }}</span>
+          <span>{{ t('stocks.current', { symbol: stock.basic.symbol, name: stock.basic.name }) }}</span>
+          <span>{{ t('stocks.industry', { industry: stock.basic.industry || '—' }) }}</span>
         </template>
         <template v-else>
-          <span>覆盖 {{ defaultRows.length }} / {{ listTotal }}</span>
-          <span>显示 {{ filteredRows.length }}</span>
-          <span v-if="listUpdated">更新 {{ listUpdated }}</span>
+          <span>{{ t('stocks.coverage', { shown: defaultRows.length, total: listTotal }) }}</span>
+          <span>{{ t('stocks.displayed', { count: filteredRows.length }) }}</span>
+          <span v-if="listUpdated">{{ t('stocks.updated', { date: listUpdated }) }}</span>
         </template>
       </div>
     </div>
 
     <div v-if="error" class="inline-alert danger">
       <span>{{ error }}</span>
-      <button class="btn btn-xs" @click="search">重试</button>
+      <button class="btn btn-xs" @click="search">{{ t('common.retry') }}</button>
     </div>
 
     <div v-if="loading" class="glass-card card-pad empty-state empty-state-compact">
-      正在检索标的...
+      {{ t('stocks.searching') }}
     </div>
 
     <div v-if="listLoading && !stock" class="glass-card card-pad empty-state empty-state-compact">
-      正在加载股票池...
+      {{ t('stocks.loadingPool') }}
     </div>
 
     <!-- Result -->
@@ -56,7 +56,7 @@
       <!-- Buffett Score -->
       <div v-if="stock.buffett" class="grid grid-cols-2 lg:grid-cols-5 gap-3 p-3 rounded-lg mb-4" style="background:var(--bg-deep)">
         <div class="text-center">
-          <div class="text-[10px]" style="color:var(--text-disabled)">巴菲特分</div>
+          <div class="text-[10px]" style="color:var(--text-disabled)">{{ t('stocks.buffettScore') }}</div>
           <div class="text-lg font-bold font-mono mt-1" :style="{ color: (stock.buffett.score||0) >= 70 ? 'var(--positive)' : 'var(--warning)' }">
             {{ stock.buffett.score?.toFixed(0) || '—' }}
           </div>
@@ -66,7 +66,7 @@
           <div class="text-sm font-mono mt-1" style="color:var(--text-secondary)">{{ fmtPct(stock.buffett.roe) }}</div>
         </div>
         <div class="text-center">
-          <div class="text-[10px]" style="color:var(--text-disabled)">毛利率</div>
+          <div class="text-[10px]" style="color:var(--text-disabled)">{{ t('stocks.grossMargin') }}</div>
           <div class="text-sm font-mono mt-1" style="color:var(--text-secondary)">{{ fmtPct(stock.buffett.gross_margin) }}</div>
         </div>
         <div class="text-center">
@@ -74,14 +74,14 @@
           <div class="text-sm font-mono mt-1" style="color:var(--text-secondary)">{{ stock.buffett.debt_equity?.toFixed(2) || '—' }}</div>
         </div>
         <div class="text-center">
-          <div class="text-[10px]" style="color:var(--text-disabled)">DCF 估值</div>
+          <div class="text-[10px]" style="color:var(--text-disabled)">{{ t('stocks.dcfValue') }}</div>
           <div class="text-sm font-mono mt-1" style="color:var(--text-secondary)">{{ stock.buffett.dcf_value?.toFixed(2) || '—' }}</div>
         </div>
       </div>
 
       <!-- Signals -->
       <div v-if="stock.signals && Object.keys(stock.signals).length">
-        <div class="text-xs font-semibold mb-3" style="color:var(--text-tertiary)">策略信号</div>
+        <div class="text-xs font-semibold mb-3" style="color:var(--text-tertiary)">{{ t('stocks.strategySignals') }}</div>
         <div class="table-shell" style="--table-min:420px">
           <table class="data-table">
             <colgroup>
@@ -90,7 +90,7 @@
               <col style="width:30%">
             </colgroup>
             <thead>
-              <tr><th>策略</th><th class="text-right">评分</th><th class="text-right">信号</th></tr>
+              <tr><th>{{ t('common.strategy') }}</th><th class="text-right">{{ t('common.score') }}</th><th class="text-right">{{ t('common.signal') }}</th></tr>
             </thead>
             <tbody>
               <tr v-for="(sigs, strategy) in stock.signals" :key="strategy">
@@ -98,7 +98,7 @@
                 <td class="text-right font-mono">{{ sigs[0]?.score?.toFixed(1) || '—' }}</td>
                 <td class="text-right">
                   <span :style="{ color: sigs[0]?.signal === 'buy' ? 'var(--positive)' : 'var(--text-disabled)' }">
-                    {{ sigs[0]?.signal === 'buy' ? '买入' : '持有' }}
+                    {{ sigs[0]?.signal === 'buy' ? t('common.buy') : t('common.hold') }}
                   </span>
                 </td>
               </tr>
@@ -108,37 +108,37 @@
       </div>
 
       <router-link :to="`/stocks/${stock.basic.symbol}`" class="btn btn-sm mt-4" style="border-color:rgba(0,212,255,0.2); color:var(--accent)">
-        查看详细
+        {{ t('stocks.viewDetail') }}
       </router-link>
     </div>
 
     <div v-else-if="searched && !stock && !loading && !error" class="empty-state">
-      未找到该股票
+      {{ t('stocks.notFound') }}
     </div>
 
     <div v-if="!stock && !loading" class="glass-card stock-list-card">
       <div class="stock-list-head">
         <div>
-          <span>STOCK UNIVERSE</span>
-          <strong>股票池概览</strong>
+          <span>{{ t('stocks.universeEyebrow') }}</span>
+          <strong>{{ t('stocks.universeTitle') }}</strong>
         </div>
-        <div class="stock-list-hint">默认展示前 {{ defaultRows.length }} 只，按策略信号、质量分和市值排序</div>
+        <div class="stock-list-hint">{{ t('stocks.listHint', { count: defaultRows.length }) }}</div>
       </div>
       <div class="stock-list-stats">
         <div>
-          <span>覆盖股票</span>
+          <span>{{ t('stocks.coveredStocks') }}</span>
           <strong>{{ defaultRows.length }} / {{ listTotal }}</strong>
         </div>
         <div>
-          <span>买入候选</span>
+          <span>{{ t('stocks.buyCandidates') }}</span>
           <strong>{{ buyCandidateCount }}</strong>
         </div>
         <div>
-          <span>上涨占比</span>
+          <span>{{ t('stocks.positiveRatio') }}</span>
           <strong>{{ positiveRatio }}</strong>
         </div>
         <div>
-          <span>价值优选</span>
+          <span>{{ t('stocks.valueCandidates') }}</span>
           <strong>{{ valueCandidateCount }}</strong>
         </div>
       </div>
@@ -159,17 +159,17 @@
           </colgroup>
           <thead>
             <tr>
-              <th>股票</th>
-              <th>行业</th>
-              <th class="text-right">价格</th>
-              <th class="text-right">涨跌幅</th>
+              <th>{{ t('stocks.stock') }}</th>
+              <th>{{ t('sectors.industry') }}</th>
+              <th class="text-right">{{ t('stocks.price') }}</th>
+              <th class="text-right">{{ t('stocks.change') }}</th>
               <th class="text-right">PE TTM</th>
               <th class="text-right">PB</th>
-              <th class="text-right">市值(亿)</th>
-              <th class="text-right">价值分</th>
-              <th class="text-right">策略分</th>
-              <th class="text-right">信号</th>
-              <th class="text-right">操作</th>
+              <th class="text-right">{{ t('stocks.marketCap') }}</th>
+              <th class="text-right">{{ t('stocks.valueScore') }}</th>
+              <th class="text-right">{{ t('stocks.strategyScore') }}</th>
+              <th class="text-right">{{ t('common.signal') }}</th>
+              <th class="text-right">{{ t('common.action') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -192,18 +192,18 @@
               <td class="text-right font-mono" :style="{ color: scoreColor(row.signal_score) }">{{ fmtNumber(row.signal_score, 1) }}</td>
               <td class="text-right">
                 <span class="signal-pill" :class="{ buy: row.signal === 'buy' }">
-                  {{ row.signal === 'buy' ? `买入 ${row.buy_signals}/${row.signal_count}` : `持有 ${row.signal_count}` }}
+                  {{ row.signal === 'buy' ? t('stocks.signalBuy', { buy: row.buy_signals, total: row.signal_count }) : t('stocks.signalHold', { total: row.signal_count }) }}
                 </span>
               </td>
               <td class="text-right">
-                <button class="btn btn-xs" @click="openStock(row.symbol)">深挖</button>
+                <button class="btn btn-xs" @click="openStock(row.symbol)">{{ t('stocks.drillDown') }}</button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
       <div v-else-if="!listLoading" class="empty-state empty-state-compact">
-        未找到匹配股票
+        {{ t('stocks.noMatches') }}
       </div>
     </div>
   </div>
@@ -213,8 +213,10 @@
 import { ref, computed, onMounted } from "vue";
 import { api } from "../api";
 import type { StockDetail, StockListItem } from "../api";
+import { useI18n } from "../i18n";
 import { colorBySignedRatio, fmtPercentValue, fmtRatioPct, fmtShortCount, fmtSignedRatioPct } from "../utils/format";
 
+const { t } = useI18n();
 const query = ref("");
 const stock = ref<StockDetail | null>(null);
 const defaultRows = ref<StockListItem[]>([]);
@@ -278,14 +280,14 @@ const detailMetrics = computed(() => {
   const latest = latestKline.value;
   const change = detailChange.value;
   return [
-    { label: "行业", value: s.basic.industry || "—" },
-    { label: "最新收盘", value: fmtPrice(latest?.close) },
-    { label: "日涨跌幅", value: fmtSignedRatioPct(change, 1), color: colorPct(change) },
-    { label: "成交量", value: latest?.volume == null ? "—" : fmtShortCount(latest.volume) },
+    { label: t("sectors.industry"), value: s.basic.industry || "—" },
+    { label: t("stocks.metrics.latestClose"), value: fmtPrice(latest?.close) },
+    { label: t("stocks.metrics.dailyChange"), value: fmtSignedRatioPct(change, 1), color: colorPct(change) },
+    { label: t("stocks.metrics.volume"), value: latest?.volume == null ? "—" : fmtShortCount(latest.volume) },
     { label: "ROE", value: fmtPercentValue(fin?.roe, 1) },
-    { label: "毛利率", value: fmtPercentValue(fin?.gross_margin, 1) },
-    { label: "营收(亿)", value: fmtNumber(fin?.revenue, 1) },
-    { label: "净利润(亿)", value: fmtNumber(fin?.net_profit, 1) },
+    { label: t("stocks.grossMargin"), value: fmtPercentValue(fin?.gross_margin, 1) },
+    { label: t("stocks.metrics.revenue"), value: fmtNumber(fin?.revenue, 1) },
+    { label: t("stocks.metrics.netProfit"), value: fmtNumber(fin?.net_profit, 1) },
   ];
 });
 
@@ -309,7 +311,7 @@ async function search() {
   try {
     stock.value = await api.stock(query.value.trim());
   } catch (e: any) {
-    error.value = e?.message || "标的检索失败";
+    error.value = e?.message || t("stocks.searchError");
     stock.value = null;
   } finally {
     loading.value = false;
@@ -330,7 +332,7 @@ async function loadStockList() {
     listTotal.value = data.total || defaultRows.value.length;
     listUpdated.value = data.updated_at || "";
   } catch (e: any) {
-    error.value = e?.message || "股票池加载失败";
+    error.value = e?.message || t("stocks.poolError");
     defaultRows.value = [];
     listTotal.value = 0;
   } finally {

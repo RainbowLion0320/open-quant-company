@@ -2,12 +2,12 @@
   <div class="view-page">
     <div class="surface-toolbar">
       <div class="surface-copy">
-        <span>SIGNAL CHANGELOG</span>
-        <strong>最近 {{ days }} 天变更</strong>
-        <small>观察新增买入、降级和不同策略之间的信号迁移</small>
+        <span>{{ t('signals.eyebrow') }}</span>
+        <strong>{{ t('signals.title', { days }) }}</strong>
+        <small>{{ t('signals.subtitle') }}</small>
       </div>
       <div class="surface-actions">
-        <div class="filter-tabs" aria-label="信号时间范围">
+        <div class="filter-tabs" :aria-label="t('signals.rangeAria')">
           <button
             v-for="d in dayOptions"
             :key="d"
@@ -20,11 +20,11 @@
 
     <div v-if="error" class="inline-alert danger">
       <span>{{ error }}</span>
-      <button class="btn btn-xs" @click="loadChanges">重试</button>
+      <button class="btn btn-xs" @click="loadChanges">{{ t('common.retry') }}</button>
     </div>
 
     <div class="glass-card card-pad-lg">
-      <div v-if="loading" class="empty-state empty-state-compact">正在加载信号变更...</div>
+      <div v-if="loading" class="empty-state empty-state-compact">{{ t('signals.loading') }}</div>
       <div v-else-if="changes.length" class="table-shell" style="--table-min:680px">
         <table class="data-table">
           <colgroup>
@@ -37,12 +37,12 @@
           </colgroup>
           <thead>
             <tr>
-              <th>日期</th>
-              <th>策略</th>
-              <th>代码</th>
-              <th>名称</th>
-              <th class="text-right">旧信号</th>
-              <th class="text-right">新信号</th>
+              <th>{{ t('portfolio.table.date') }}</th>
+              <th>{{ t('common.strategy') }}</th>
+              <th>{{ t('portfolio.table.code') }}</th>
+              <th>{{ t('portfolio.table.name') }}</th>
+              <th class="text-right">{{ t('signals.oldSignal') }}</th>
+              <th class="text-right">{{ t('signals.newSignal') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -65,7 +65,7 @@
         </table>
       </div>
       <div v-else class="empty-state">
-        <span>暂无信号变更记录</span>
+        <span>{{ t('signals.empty') }}</span>
       </div>
     </div>
   </div>
@@ -75,7 +75,9 @@
 import { ref, onMounted } from "vue";
 import { api } from "../api";
 import type { SignalChange } from "../api";
+import { useI18n } from "../i18n";
 
+const { t } = useI18n();
 const changes = ref<SignalChange[]>([]);
 const days = ref(7);
 const dayOptions = [7, 14, 30];
@@ -88,9 +90,9 @@ function signalColor(s: string) {
   return "var(--text-disabled)";
 }
 function signalLabel(s: string) {
-  if (s === "buy") return "买入";
-  if (s === "sell") return "卖出";
-  return "持有";
+  if (s === "buy") return t("common.buy");
+  if (s === "sell") return t("common.sell");
+  return t("common.hold");
 }
 
 async function loadChanges() {
@@ -99,7 +101,7 @@ async function loadChanges() {
   try {
     changes.value = await api.signalChanges(days.value);
   } catch (e: any) {
-    error.value = e?.message || "信号变更加载失败";
+    error.value = e?.message || t("signals.loadError");
     changes.value = [];
   } finally {
     loading.value = false;

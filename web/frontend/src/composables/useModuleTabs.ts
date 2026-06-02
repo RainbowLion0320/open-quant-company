@@ -3,7 +3,7 @@ import { useRoute } from "vue-router";
 
 export interface ModuleTab {
   key: string;
-  label: string;
+  label?: string;
   meta?: string;
   description?: string;
 }

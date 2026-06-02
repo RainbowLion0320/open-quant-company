@@ -3,34 +3,34 @@
     <!-- Hero summary -->
     <section class="health-hero">
       <article class="telemetry-card glass-card">
-        <div class="metric-head"><span>逻辑表</span></div>
+        <div class="metric-head"><span>{{ t('database.logicalTables') }}</span></div>
         <div class="metric-main">
           <strong style="color:var(--accent)">{{ summary?.tables ?? '—' }}</strong>
-          <span>张表</span>
+          <span>{{ t('database.tablesUnit') }}</span>
         </div>
       </article>
 
       <article class="telemetry-card glass-card">
-        <div class="metric-head"><span>数据量</span></div>
+        <div class="metric-head"><span>{{ t('database.dataVolume') }}</span></div>
         <div class="metric-main">
           <strong style="color:var(--positive)">{{ fmtSize(summary?.total_size_mb) }}</strong>
-          <span>总计</span>
+          <span>{{ t('database.total') }}</span>
         </div>
       </article>
 
       <article class="telemetry-card glass-card">
-        <div class="metric-head"><span>缺失值</span></div>
+        <div class="metric-head"><span>{{ t('database.missingValues') }}</span></div>
         <div class="metric-main">
           <strong :style="{ color: missingColor }">{{ fmtPercent(summary?.avg_missing_pct) }}</strong>
-          <span>平均</span>
+          <span>{{ t('database.average') }}</span>
         </div>
       </article>
 
       <article class="telemetry-card glass-card">
-        <div class="metric-head"><span>异常值</span></div>
+        <div class="metric-head"><span>{{ t('database.outliers') }}</span></div>
         <div class="metric-main">
           <strong :style="{ color: outlierColor }">{{ fmtCount(summary?.total_outliers) }}</strong>
-          <span>总计 (IQR×3)</span>
+          <span>{{ t('database.outliersTotal') }}</span>
         </div>
       </article>
     </section>
@@ -43,7 +43,7 @@
         API_FALLBACK: {{ apiFallback ? 'ON' : 'OFF' }}
       </span>
       <span v-if="summary?.checked_at" class="checked-at">
-        上次检查: {{ fmtTime(summary.checked_at) }}
+        {{ t('database.lastChecked', { time: fmtTime(summary.checked_at) }) }}
       </span>
     </div>
 
@@ -67,19 +67,19 @@
         </colgroup>
         <thead>
           <tr>
-            <th>表名</th>
-            <th>数据源</th>
-            <th class="num">行数</th>
-            <th class="num">列数</th>
-            <th class="num">文件数</th>
-            <th class="num">大小</th>
-            <th class="num">缺失(10y)</th>
-            <th class="num" style="opacity:0.5">缺失(10y+)</th>
-            <th class="num">异常(10y)</th>
-            <th class="num" style="opacity:0.5">异常(10y+)</th>
-            <th class="num">新鲜度</th>
-            <th>详情</th>
-            <th>修复</th>
+            <th>{{ t('database.tableName') }}</th>
+            <th>{{ t('database.dataSource') }}</th>
+            <th class="num">{{ t('database.rows') }}</th>
+            <th class="num">{{ t('database.columns') }}</th>
+            <th class="num">{{ t('database.files') }}</th>
+            <th class="num">{{ t('database.size') }}</th>
+            <th class="num">{{ t('database.missing10y') }}</th>
+            <th class="num" style="opacity:0.5">{{ t('database.missing10yPlus') }}</th>
+            <th class="num">{{ t('database.outlier10y') }}</th>
+            <th class="num" style="opacity:0.5">{{ t('database.outlier10yPlus') }}</th>
+            <th class="num">{{ t('database.freshness') }}</th>
+            <th>{{ t('database.detail') }}</th>
+            <th>{{ t('database.repair') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -116,7 +116,7 @@
                   v-if="hasDetail(row)"
                   class="detail-btn"
                   @click="toggleDetail(row.table)"
-                >{{ expanded === row.table ? '收起' : '展开' }}</button>
+                >{{ expanded === row.table ? t('common.collapse') : t('common.expand') }}</button>
               </td>
               <td class="repair-cell">
                 <button
@@ -128,7 +128,7 @@
                   <span v-if="repairing[row.table] === 'running'" class="spinning">...</span>
                   <span v-else-if="repairing[row.table] === 'done'">OK</span>
                   <span v-else-if="repairing[row.table] === 'failed'">ERR</span>
-                  <span v-else>修复</span>
+                  <span v-else>{{ t('database.repair') }}</span>
                 </button>
                 <span v-else class="repair-na">—</span>
               </td>
@@ -139,7 +139,7 @@
               <td :colspan="13">
                 <div class="detail-panel">
                   <div v-if="row.missing_cols && Object.keys(row.missing_cols).length" class="detail-section">
-                    <strong>缺失值 (按列)</strong>
+                    <strong>{{ t('database.missingByColumn') }}</strong>
                     <div class="tag-list">
                       <span v-for="(pct, col) in row.missing_cols" :key="col" class="health-tag tag-warn">
                         {{ col }}: {{ pct }}%
@@ -147,7 +147,7 @@
                     </div>
                   </div>
                   <div v-if="row.outlier_cols && Object.keys(row.outlier_cols).length" class="detail-section">
-                    <strong>异常值 (按列, IQR×3)</strong>
+                    <strong>{{ t('database.outlierByColumn') }}</strong>
                     <div class="tag-list">
                       <span v-for="(cnt, col) in row.outlier_cols" :key="col" class="health-tag tag-outlier">
                         {{ col }}: {{ cnt }}
@@ -155,17 +155,17 @@
                     </div>
                   </div>
                   <div v-if="row.error" class="detail-section">
-                    <strong>错误</strong>
+                    <strong>{{ t('database.error') }}</strong>
                     <p class="error-text">{{ row.error }}</p>
                   </div>
                   <div v-if="row.time_breakdown && Object.keys(row.time_breakdown).length" class="detail-section">
-                    <strong>按时间分段</strong>
+                    <strong>{{ t('database.timeBreakdown') }}</strong>
                     <div class="breakdown-grid">
                       <div v-for="(info, period) in row.time_breakdown" :key="period" class="breakdown-row">
                         <span class="bd-period">{{ period }}</span>
-                        <span class="bd-rows">{{ info.rows }} 行</span>
-                        <span class="bd-missing" :class="bdMissingClass(info.missing_pct)">缺失 {{ info.missing_pct }}%</span>
-                        <span class="bd-outlier" v-if="info.outliers && Object.keys(info.outliers).length">异常 {{ Object.values(info.outliers).reduce((a,b)=>a+b,0) }}</span>
+                        <span class="bd-rows">{{ t('database.rowUnit', { count: info.rows }) }}</span>
+                        <span class="bd-missing" :class="bdMissingClass(info.missing_pct)">{{ t('database.missingShort', { value: info.missing_pct }) }}</span>
+                        <span class="bd-outlier" v-if="info.outliers && Object.keys(info.outliers).length">{{ t('database.outlierShort', { count: Object.values(info.outliers).reduce((a,b)=>a+b,0) }) }}</span>
                         <span v-if="info.missing_cols && Object.keys(info.missing_cols).length" class="bd-cols">
                           <span v-for="(pct, col) in info.missing_cols" :key="col" class="health-tag tag-warn">{{ col }}:{{ pct }}%</span>
                         </span>
@@ -185,6 +185,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 import { fmtPercentValue, fmtShortCount } from "../utils/format";
 
 interface HealthRow {
@@ -219,6 +220,7 @@ interface HealthSummary {
 }
 
 const rows = ref<HealthRow[]>([]);
+const { currentLocale, t } = useI18n();
 const summary = ref<HealthSummary | null>(null);
 const status = ref<"loading" | "ok" | "no_data" | "error">("loading");
 const statusMessage = ref("");
@@ -231,18 +233,18 @@ const sortedRows = computed(() => {
   arr.sort((a, b) => {
     const sa = (a.source || '').toLowerCase();
     const sb = (b.source || '').toLowerCase();
-    if (sa !== sb) return sa.localeCompare(sb, 'zh-CN');
-    return (a.label_zh || a.table).localeCompare(b.label_zh || b.table, 'zh-CN');
+    if (sa !== sb) return sa.localeCompare(sb, currentLocale.value);
+    return (a.label_zh || a.table).localeCompare(b.label_zh || b.table, currentLocale.value);
   });
   return arr;
 });
 
 const statusClass = computed(() => `dot-${status.value}`);
 const statusText = computed(() => {
-  if (status.value === "loading") return "加载中...";
-  if (status.value === "no_data") return statusMessage.value || "尚未运行健康检查，请等待周六自动扫描";
-  if (status.value === "error") return statusMessage.value || "加载失败";
-  return "健康检查完成";
+  if (status.value === "loading") return t("database.loading");
+  if (status.value === "no_data") return statusMessage.value || t("database.noData");
+  if (status.value === "error") return statusMessage.value || t("database.loadFailed");
+  return t("database.complete");
 });
 
 const missingColor = computed(() => {
@@ -306,13 +308,11 @@ function fmtMiss10yPlus(row: HealthRow): string {
 
 function freshnessLabel(days: number | null): string {
   if (days == null) return "—";
-  if (days < 0) return `${Math.abs(days)}天后`;
-  if (days === 0) return "今天";
-  if (days === 1) return "1天前";
-  if (days <= 7) return `${days}天前`;
-  if (days <= 30) return `${days}天前`;
-  if (days <= 365) return `${Math.round(days / 30)}月前`;
-  return `${Math.round(days / 365)}年前`;
+  if (days < 0) return t("database.inDays", { days: Math.abs(days) });
+  if (days === 0) return t("database.today");
+  if (days <= 30) return t("database.daysAgo", { days });
+  if (days <= 365) return t("database.monthsAgo", { months: Math.round(days / 30) });
+  return t("database.yearsAgo", { years: Math.round(days / 365) });
 }
 
 function missingClass(pct: number | null | undefined): string {
@@ -429,7 +429,7 @@ async function fetchData() {
     }
     if (data.status === "error") {
       status.value = "error";
-      statusMessage.value = data.message || "健康检查结果读取失败";
+      statusMessage.value = data.message || t("database.readFailed");
       rows.value = [];
       summary.value = null;
       return;
@@ -440,7 +440,7 @@ async function fetchData() {
     status.value = "ok";
   } catch (e: any) {
     status.value = "error";
-    statusMessage.value = e?.message || "健康检查加载失败";
+    statusMessage.value = e?.message || t("database.requestFailed");
   }
 }
 

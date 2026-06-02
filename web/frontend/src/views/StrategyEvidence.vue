@@ -1,12 +1,12 @@
 <template>
   <div class="evidence-page">
     <div class="evidence-header">
-      <span class="evidence-count">{{ items.length }} strategies</span>
+      <span class="evidence-count">{{ t('evidence.count', { count: items.length }) }}</span>
     </div>
 
-    <div v-if="loading" class="evidence-loading">Loading evidence artifacts…</div>
+    <div v-if="loading" class="evidence-loading">{{ t('evidence.loading') }}</div>
     <div v-else-if="items.length === 0" class="evidence-empty">
-      No evidence artifact generated yet. Run research backtest before promotion.
+      {{ t('evidence.empty') }}
     </div>
 
     <div v-else class="evidence-grid">
@@ -27,24 +27,24 @@
 
       <div v-if="detail" class="evidence-detail">
         <h3>{{ detail.strategy }}</h3>
-        <div v-if="detail.parse_error" class="detail-error">Parse error: {{ detail.parse_error }}</div>
-        <div v-else-if="!detail.exists" class="detail-missing">No evidence file found.</div>
+        <div v-if="detail.parse_error" class="detail-error">{{ t('evidence.parseError', { error: detail.parse_error }) }}</div>
+        <div v-else-if="!detail.exists" class="detail-missing">{{ t('evidence.missing') }}</div>
         <template v-else>
           <div class="detail-section">
-            <h4>Promotion Decision</h4>
+            <h4>{{ t('evidence.promotionDecision') }}</h4>
             <div class="detail-row">
-              <span>Status:</span>
+              <span>{{ t('evidence.status') }}</span>
               <span :class="detail.summary?.promotion_decision?.passed ? 'text-ok' : 'text-blocked'">
-                {{ detail.summary?.promotion_decision?.passed ? 'PASSED' : 'BLOCKED' }}
+                {{ detail.summary?.promotion_decision?.passed ? t('evidence.passed') : t('evidence.blocked') }}
               </span>
             </div>
             <div v-if="detail.summary?.promotion_decision?.failed_rules?.length" class="detail-row">
-              <span>Failed rules:</span>
+              <span>{{ t('evidence.failedRules') }}</span>
               <span>{{ detail.summary.promotion_decision.failed_rules.join(', ') }}</span>
             </div>
           </div>
           <div class="detail-section">
-            <h4>Metrics</h4>
+            <h4>{{ t('evidence.metrics') }}</h4>
             <div class="detail-row" v-for="(v, k) in (detail.artifact?.metrics || {})" :key="k">
               <span>{{ k }}:</span>
               <span>{{ typeof v === 'number' ? v.toFixed(4) : v }}</span>
@@ -53,23 +53,23 @@
           <div class="detail-section">
             <h4>OOS</h4>
             <div class="detail-row">
-              <span>Months:</span>
+              <span>{{ t('evidence.months') }}</span>
               <span>{{ detail.artifact?.oos?.months ?? 0 }}</span>
             </div>
           </div>
           <div class="detail-section">
-            <h4>Cost Model</h4>
+            <h4>{{ t('evidence.costModel') }}</h4>
             <div class="detail-row">
-              <span>Commission:</span>
+              <span>{{ t('evidence.commission') }}</span>
               <span>{{ detail.artifact?.cost_model?.commission ?? 0 }}</span>
             </div>
             <div class="detail-row">
-              <span>Slippage:</span>
+              <span>{{ t('evidence.slippage') }}</span>
               <span>{{ detail.artifact?.cost_model?.slippage ?? 0 }}</span>
             </div>
           </div>
           <div class="detail-section" v-if="Object.keys(detail.artifact?.regime_breakdown || {}).length">
-            <h4>Regime Breakdown</h4>
+            <h4>{{ t('evidence.regimeBreakdown') }}</h4>
             <div class="detail-row" v-for="(v, k) in detail.artifact.regime_breakdown" :key="k">
               <span>{{ k }}:</span>
               <span>{{ JSON.stringify(v) }}</span>
@@ -78,7 +78,7 @@
         </template>
       </div>
       <div v-else class="evidence-detail evidence-detail-empty">
-        Select a strategy to view evidence details.
+        {{ t('evidence.selectPrompt') }}
       </div>
     </div>
   </div>
@@ -87,7 +87,9 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
 import { api } from "../api";
+import { useI18n } from "../i18n";
 
+const { t } = useI18n();
 const items = ref<any[]>([]);
 const detail = ref<any>(null);
 const selected = ref<string>("");
@@ -122,11 +124,11 @@ function badgeClass(item: any) {
 }
 
 function badgeLabel(item: any) {
-  if (item.parse_error) return "parse_error";
-  if (!item.exists) return "missing";
-  if (item.promotion_decision === "passed") return "promotion_ready";
-  if (item.promotion_decision === "blocked") return "blocked";
-  return "available";
+  if (item.parse_error) return t("evidence.badges.parseError");
+  if (!item.exists) return t("evidence.badges.missing");
+  if (item.promotion_decision === "passed") return t("evidence.badges.ready");
+  if (item.promotion_decision === "blocked") return t("evidence.badges.blocked");
+  return t("evidence.badges.available");
 }
 </script>
 

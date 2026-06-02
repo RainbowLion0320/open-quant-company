@@ -3,7 +3,7 @@
     <section class="market-hero" :class="{ 'is-refreshing': refreshing }">
       <div class="regime-panel glass-card">
         <div class="panel-head">
-          <span>MARKET REGIME</span>
+          <span>{{ t('market.regime') }}</span>
         </div>
         <div class="regime-core">
           <div class="regime-orb" :style="{ '--orb-color': regimeColor, '--orb-score': `${displayScore}%` }">
@@ -47,7 +47,7 @@
 
       <div class="index-panel glass-card">
         <div class="panel-head">
-          <span>CORE INDEX RELATIVE STRENGTH</span>
+          <span>{{ t('market.relativeStrength') }}</span>
           <div class="time-tabs">
             <span v-for="t in timeRanges" :key="t.key" :class="{ active: selectedRange === t.key }" @click="switchRange(t.key)">{{ t.label }}</span>
           </div>
@@ -84,7 +84,7 @@
             :viewBox="`0 0 ${CHART_VIEW_W} ${CHART_VIEW_H}`"
             preserveAspectRatio="none"
             role="img"
-            aria-label="核心指数相对强弱走势图"
+            :aria-label="t('market.chartAria')"
           >
             <g class="chart-grid">
               <line
@@ -114,20 +114,20 @@
               :style="{ left: label.left }"
             >{{ label.label }}</span>
           </div>
-          <div v-if="!relativeChart.lines.length" class="panel-empty chart-empty">暂无核心指数对比数据</div>
+          <div v-if="!relativeChart.lines.length" class="panel-empty chart-empty">{{ t('market.noIndexData') }}</div>
         </div>
       </div>
 
       <div class="macro-panel glass-card">
         <div class="panel-head">
-          <span>MACRO INDICATORS</span>
+          <span>{{ t('market.macroIndicators') }}</span>
           <small>GDP · PMI · CPI · LIQUIDITY · PROFIT</small>
         </div>
         <div class="macro-grid">
           <article v-for="m in macro" :key="m.key">
             <span>{{ m.label }}</span>
             <strong :style="{ color: macroColor(m) }">{{ fmtValue(macroRef(m.key).value, m.unit) }}</strong>
-            <em>prev {{ fmtValue(m.prev, m.unit) }}</em>
+            <em>{{ t('market.prev') }} {{ fmtValue(m.prev, m.unit) }}</em>
             <svg :viewBox="`0 0 ${SPARK_W} ${SPARK_H}`" preserveAspectRatio="none" class="microline">
               <defs>
                 <clipPath :id="sparkClipId(m.key)" clipPathUnits="userSpaceOnUse">
@@ -142,18 +142,18 @@
             </svg>
           </article>
         </div>
-        <div v-if="!macro.length" class="panel-empty">暂无宏观指标数据</div>
+        <div v-if="!macro.length" class="panel-empty">{{ t('market.noMacroData') }}</div>
       </div>
     </section>
 
     <div v-if="store.error" class="inline-alert danger">
       <span>{{ store.error }}</span>
-      <button class="btn btn-xs" @click="refresh">重试</button>
+      <button class="btn btn-xs" @click="refresh">{{ t('common.retry') }}</button>
     </div>
 
     <section class="sector-pulse glass-card" :class="{ 'is-refreshing': refreshing }">
       <div class="panel-head">
-        <span>HOT SECTOR PULSE</span>
+        <span>{{ t('market.hotSectorPulse') }}</span>
         <small>{{ sectorPulseMeta }}</small>
       </div>
       <div v-if="hotSectors.length" class="sector-pulse-grid">
@@ -167,12 +167,12 @@
             <div><span>1D</span><strong :style="{ color: colorPct(sector.return_1d) }">{{ fmtReturn(sector.return_1d) }}</strong></div>
             <div><span>5D</span><strong :style="{ color: colorPct(sector.return_5d) }">{{ fmtReturn(sector.return_5d) }}</strong></div>
             <div><span>20D</span><strong :style="{ color: colorPct(sector.return_20d) }">{{ fmtReturn(sector.return_20d) }}</strong></div>
-            <div><span>Signal</span><strong>{{ fmtSignalPower(sector) }}</strong></div>
+            <div><span>{{ t('market.signal') }}</span><strong>{{ fmtSignalPower(sector) }}</strong></div>
           </div>
         </article>
       </div>
       <div v-else class="panel-empty sector-empty">
-        {{ sectorLoading ? "正在加载行业热点..." : "暂无行业热点数据" }}
+        {{ sectorLoading ? t("market.loadingSectors") : t("market.noSectorData") }}
       </div>
     </section>
   </div>
@@ -182,10 +182,12 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useMarketStore } from "../stores";
 import { api, type MacroCard, type MarketAssetCard, type MarketSeriesPoint, type SectorCard, type SectorOverviewResponse } from "../api";
+import { useI18n } from "../i18n";
 import { colorBySignedRatio, fmtSignedRatioPct } from "../utils/format";
 import { signalPower } from "../utils/sector";
 
 const store = useMarketStore();
+const { t } = useI18n();
 const selectedRange = ref("6M");
 const sectorOverview = ref<SectorOverviewResponse | null>(null);
 const sectorLoading = ref(false);
@@ -218,7 +220,7 @@ const hotSectors = computed(() => {
 const sectorPulseMeta = computed(() => {
   const total = sectorOverview.value?.total_sectors || 0;
   const date = sectorDate.value;
-  if (!total) return "Top 5 · 等待行业快照";
+  if (!total) return `Top 5 · ${t("market.waitingSectorSnapshot")}`;
   return `Top 5 / ${total} · ${date}`;
 });
 const sectorDate = computed(() => {
@@ -281,8 +283,8 @@ const strengthLeader = computed(() => {
 });
 const relativeSubtitle = computed(() => {
   const dates = relativeChart.value.dates;
-  const rangeText = dates.length ? `${dates[0]} → ${dates[dates.length - 1]}` : "等待指数序列";
-  return `${rangeText} · fresh ${store.freshness?.market || "—"}`;
+  const rangeText = dates.length ? `${dates[0]} → ${dates[dates.length - 1]}` : t("market.waitingIndexSeries");
+  return `${rangeText} · ${t("market.fresh")} ${store.freshness?.market || "—"}`;
 });
 
 const regimeLabel = computed(() => {
@@ -342,36 +344,36 @@ const riskBuffer = computed(() => store.regime?.score_components?.risk_raw ?? nu
 const regimeTrendStrength = computed(() => store.regime?.score_components?.trend_raw ?? null);
 const aboveMa20Ratio = computed(() => store.regime?.breadth_detail?.above_ma20 ?? null);
 const regimeStatusCards = computed(() => [
-  { key: "confirmed", label: "Confirmed", value: regimeStabilityState.value.confirmed },
-  { key: "raw", label: "Raw", value: regimeStabilityState.value.raw },
-  { key: "pending", label: "Pending", value: regimeStabilityState.value.pending },
-  { key: "dwell", label: "Dwell", value: regimeStabilityState.value.dwell },
+  { key: "confirmed", label: t("market.labels.confirmed"), value: regimeStabilityState.value.confirmed },
+  { key: "raw", label: t("market.labels.raw"), value: regimeStabilityState.value.raw },
+  { key: "pending", label: t("market.labels.pending"), value: regimeStabilityState.value.pending },
+  { key: "dwell", label: t("market.labels.dwell"), value: regimeStabilityState.value.dwell },
 ]);
 const regimeGaugeMetrics = computed(() => [
   {
     key: "risk",
-    label: "Risk Buffer",
+    label: t("market.labels.riskBuffer"),
     value: fmtRatioPct(displayRiskBuffer.value),
     percent: ratioGauge(displayRiskBuffer.value),
     color: riskColor(displayRiskBuffer.value),
   },
   {
     key: "breadth",
-    label: "A-share Breadth",
+    label: t("market.labels.breadth"),
     value: fmtRatioPct(displayBreadth.value),
     percent: ratioGauge(displayBreadth.value),
     color: "var(--accent)",
   },
   {
     key: "trend",
-    label: "Index Trend",
+    label: t("market.labels.trend"),
     value: fmtRatioPct(displayTrendStrength.value),
     percent: ratioGauge(displayTrendStrength.value),
     color: "var(--positive)",
   },
   {
     key: "above-ma20",
-    label: "Above MA20",
+    label: t("market.labels.aboveMa20"),
     value: fmtRatioPct(displayAboveMa20.value),
     percent: ratioGauge(displayAboveMa20.value),
     color: "var(--warning)",
@@ -480,10 +482,10 @@ function fmtSignalPower(sector: SectorCard) {
 }
 function sectorTag(sector: SectorCard) {
   const sig = signalPower(sector);
-  if (sector.return_20d > 0.10 && sector.volatility > 0.24) return "OVERHEATED";
-  if (sig >= 0.5 && sector.return_5d > 0) return "SIGNAL-BACKED";
-  if (sector.return_5d > 0 && sector.return_20d > 0) return "MOMENTUM";
-  return "WATCH";
+  if (sector.return_20d > 0.10 && sector.volatility > 0.24) return t("market.sectorTags.overheated");
+  if (sig >= 0.5 && sector.return_5d > 0) return t("market.sectorTags.signalBacked");
+  if (sector.return_5d > 0 && sector.return_20d > 0) return t("market.sectorTags.momentum");
+  return t("market.sectorTags.watch");
 }
 function macroColor(m: MacroCard) {
   if (m.key === "pmi" && Number(m.value || 0) < 50) return "var(--warning)";
