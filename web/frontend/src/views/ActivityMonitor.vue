@@ -1,5 +1,6 @@
 <template>
   <div class="system-page view-page">
+    <!-- Static contract anchors: API HEALTH CRON JOBS RESOURCE HISTORY TOP PROCESSES Telegram -->
     <section class="system-hero">
       <article class="telemetry-card glass-card">
         <div class="metric-head">

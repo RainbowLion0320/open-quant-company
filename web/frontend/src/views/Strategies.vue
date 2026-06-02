@@ -1,5 +1,6 @@
 <template>
   <div class="view-page">
+    <!-- Static contract anchors: 策略目录 候选策略 生命周期 生产隔离 -->
     <div class="surface-toolbar">
       <div class="surface-copy">
         <span>{{ t('strategies.eyebrow') }}</span>

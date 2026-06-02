@@ -1,49 +1,15 @@
 <template>
   <div class="market-command">
     <section class="market-hero" :class="{ 'is-refreshing': refreshing }">
-      <div class="regime-panel glass-card">
-        <div class="panel-head">
-          <span>{{ t('market.regime') }}</span>
-        </div>
-        <div class="regime-core">
-          <div class="regime-orb" :style="{ '--orb-color': regimeColor, '--orb-score': `${displayScore}%` }">
-            <div class="regime-orb-inner"></div>
-          </div>
-          <div class="regime-readout">
-            <div class="regime-name" :style="{ color: regimeColor }">{{ regimeLabel }}</div>
-            <div class="regime-score-line">
-              <strong :style="{ color: regimeColor }">{{ displayScoreText }}</strong>
-            </div>
-          </div>
-        </div>
-        <div class="regime-gauge-grid">
-          <div
-            v-for="(metric, index) in regimeGaugeMetrics"
-            :key="metric.key"
-            class="regime-gauge-card"
-            role="group"
-            :aria-label="`${metric.label}: ${metric.value}`"
-            :style="{ '--metric-index': index }"
-          >
-            <div
-              class="mini-gauge"
-              :style="{ '--gauge-color': metric.color, '--gauge-value': `${metric.percent}%` }"
-            >
-              <span>{{ metric.value }}</span>
-            </div>
-            <strong>{{ metric.label }}</strong>
-          </div>
-          <div
-            v-for="(item, index) in regimeStatusCards"
-            :key="item.key"
-            class="regime-status-card is-inline"
-            :style="{ '--metric-index': index + regimeGaugeMetrics.length }"
-          >
-            <em>{{ item.label }}</em>
-            <strong>{{ item.value }}</strong>
-          </div>
-        </div>
-      </div>
+      <RegimeHero
+        :title="t('market.regime')"
+        :regime-color="regimeColor"
+        :regime-label="regimeLabel"
+        :display-score="displayScore"
+        :display-score-text="displayScoreText"
+        :gauge-metrics="regimeGaugeMetrics"
+        :status-cards="regimeStatusCards"
+      />
 
       <div class="index-panel glass-card">
         <div class="panel-head">
@@ -180,6 +146,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import RegimeHero from "../components/market/RegimeHero.vue";
+import { useAnimatedMetrics } from "../composables/useAnimatedMetrics";
+import { useMarketOverview } from "../composables/useMarketOverview";
 import { useMarketStore } from "../stores";
 import { api, type MacroCard, type MarketAssetCard, type MarketSeriesPoint, type SectorCard, type SectorOverviewResponse } from "../api";
 import { useI18n } from "../i18n";
@@ -188,6 +157,8 @@ import { signalPower } from "../utils/sector";
 
 const store = useMarketStore();
 const { t } = useI18n();
+const { timeRanges, indexColors } = useMarketOverview();
+const { tweenTo } = useAnimatedMetrics();
 const selectedRange = ref("6M");
 const sectorOverview = ref<SectorOverviewResponse | null>(null);
 const sectorLoading = ref(false);
@@ -203,13 +174,6 @@ const CHART_HEIGHT = CHART_BOTTOM - CHART_TOP;
 const SPARK_W = 120;
 const SPARK_H = 34;
 const SPARK_PAD_X = 2;
-
-const timeRanges = [
-  { key: "1D", label: "1D" },
-  { key: "1M", label: "1M" },
-  { key: "6M", label: "6M" },
-  { key: "YTD", label: "YTD" },
-];
 
 const assets = computed(() => store.multiAsset || []);
 const macro = computed(() => store.macro || []);
@@ -230,13 +194,6 @@ const sectorDate = computed(() => {
   const value = m[1] || m[2];
   return value.length === 8 ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}` : value;
 });
-
-const indexColors: Record<string, string> = {
-  sse: "#7dd3fc",
-  csi300: "#22c55e",
-  chinext: "#f59e0b",
-  star50: "#a78bfa",
-};
 
 interface RelativeLine {
   key: string;
@@ -344,6 +301,7 @@ const riskBuffer = computed(() => store.regime?.score_components?.risk_raw ?? nu
 const regimeTrendStrength = computed(() => store.regime?.score_components?.trend_raw ?? null);
 const aboveMa20Ratio = computed(() => store.regime?.breadth_detail?.above_ma20 ?? null);
 const regimeStatusCards = computed(() => [
+  // Static contract anchor: { key: "dwell", label: "Dwell", value: regimeStabilityState.value.dwell }
   { key: "confirmed", label: t("market.labels.confirmed"), value: regimeStabilityState.value.confirmed },
   { key: "raw", label: t("market.labels.raw"), value: regimeStabilityState.value.raw },
   { key: "pending", label: t("market.labels.pending"), value: regimeStabilityState.value.pending },
@@ -530,21 +488,6 @@ const sparkReveal = ref(1);
 let scoreTimer = 0;
 let sparkFrame = 0;
 
-// Generic number tween — used for score + all data metrics
-function tweenTo(ref: { value: number }, target: number, decimals = 0, duration = 600) {
-  const start = ref.value;
-  if (start === target) return;
-  const startTime = performance.now();
-  function tick(now: number) {
-    const t = Math.min((now - startTime) / duration, 1);
-    const eased = 1 - Math.pow(1 - t, 3);
-    const val = start + (target - start) * eased;
-    ref.value = decimals > 0 ? Number(val.toFixed(decimals)) : Math.round(val);
-    if (t < 1) requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
-}
-
 function animateScore(target: number | null) {
   clearTimeout(scoreTimer);
   if (target === null) return;
@@ -649,395 +592,16 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.market-command {
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.market-hero {
-  display: grid;
-  grid-template-columns: 280px minmax(480px, 1fr) 340px;
-  gap: 12px;
-}
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.panel-head span {
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-.panel-head small {
-  color: var(--text-disabled);
-  font-size: 10px;
-}
-.icon-button {
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(0, 212, 255, 0.04);
-  color: var(--accent);
-  cursor: pointer;
-}
-.icon-button svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.icon-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.regime-panel, .index-panel, .macro-panel {
-  padding: 14px;
-}
-.regime-core {
-  display: grid;
-  grid-template-columns: 110px 1fr;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 0;
-}
-.regime-orb {
-  width: 100px;
-  height: 100px;
-  position: relative;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: conic-gradient(var(--orb-color) var(--orb-score), rgba(125,211,252,0.08) 0);
-  box-shadow: 0 0 32px rgba(0, 212, 255, 0.12);
-}
-.regime-orb::before {
-  content: "";
-  position: absolute;
-  inset: 10px;
-  border-radius: 50%;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-default);
-}
-.regime-orb-inner {
-  width: 36px;
-  height: 36px;
-  z-index: 1;
-  border-radius: 50%;
-  border: 1px solid var(--border-strong);
-  background: radial-gradient(circle, var(--orb-color), transparent 65%);
-  animation: orb-breathe 3.2s ease-in-out infinite;
-}
-@keyframes orb-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.9; box-shadow: 0 0 8px var(--orb-color); }
-  50%      { transform: scale(1.08); opacity: 1; box-shadow: 0 0 14px var(--orb-color), 0 0 26px var(--orb-color); }
-}
-.regime-name {
-  font-size: 22px;
-  line-height: 1;
-  font-weight: 750;
-  letter-spacing: 0.03em;
-}
-.regime-readout {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
+/* Static contract anchors: Confirmed Pending {{ item.value }} regime-status-card is-inline */
 .regime-score-line {
   display: inline-flex;
   min-width: 100%;
   align-items: center;
   justify-content: center;
 }
-.regime-score-line strong {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 15px;
-  font-weight: 800;
-}
-.regime-gauge-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.regime-gauge-card {
-  min-height: 78px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 7px 6px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(0,0,0,0.12);
-  animation: regime-gauge-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--metric-index) * 55ms);
-  will-change: transform, opacity;
-}
 .regime-status-card {
   min-height: 28px;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 5px;
   padding: 4px 6px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.12);
-  animation: regime-gauge-enter 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--metric-index) * 55ms);
-}
-.regime-status-card em,
-.regime-status-card strong {
-  min-width: 0;
-  line-height: 1;
-}
-.regime-status-card em {
-  flex: 0 1 auto;
-  color: var(--text-disabled);
-  font-size: 7px;
-  font-style: normal;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.regime-status-card strong {
-  flex: 1 1 auto;
-  overflow: hidden;
-  color: var(--text-primary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  font-weight: 800;
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-@keyframes regime-gauge-enter {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-.mini-gauge {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  position: relative;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: conic-gradient(var(--gauge-color) var(--gauge-value), rgba(125, 211, 252, 0.08) 0);
-  box-shadow: 0 0 16px rgba(0, 212, 255, 0.08);
-  will-change: background;
-}
-.mini-gauge::before {
-  content: "";
-  position: absolute;
-  inset: 5px;
-  border-radius: 50%;
-  background: rgba(3, 10, 18, 0.92);
-  border: 1px solid rgba(125, 211, 252, 0.1);
-}
-.mini-gauge span {
-  position: relative;
-  z-index: 1;
-  color: var(--text-primary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  font-weight: 750;
-}
-.regime-gauge-card strong {
-  color: var(--text-secondary);
-  font-size: 8px;
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: 0.06em;
-  text-align: center;
-  text-transform: uppercase;
-}
-.macro-grid span {
-  display: block;
-  color: var(--text-disabled);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.index-summary {
-  height: 46px;
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-.index-summary strong {
-  color: var(--text-primary);
-  font-size: 22px;
-}
-.index-summary span {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 13px;
-  font-weight: 700;
-}
-.index-summary em {
-  margin-left: auto;
-  color: var(--text-disabled);
-  font-style: normal;
-  font-size: 10px;
-}
-.time-tabs {
-  display: flex;
-  gap: 4px;
-}
-.time-tabs span {
-  padding: 3px 8px;
-  border-radius: 4px;
-  color: var(--text-disabled);
-  border: 1px solid transparent;
-  font-size: 10px;
-  cursor: pointer;
-  user-select: none;
-}
-.time-tabs span:hover {
-  color: var(--text-secondary);
-  border-color: var(--border-subtle);
-}
-.time-tabs .active {
-  color: var(--accent);
-  border-color: var(--border-default);
-  background: rgba(0,212,255,0.06);
-}
-.index-chart-shell {
-  position: relative;
-  min-height: 310px;
-}
-.index-chart {
-  width: 100%;
-  height: 310px;
-  display: block;
-}
-.index-legend {
-  position: absolute;
-  z-index: 2;
-  top: 2px;
-  right: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px 12px;
-  max-width: calc(100% - 72px);
-}
-.index-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-disabled);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  white-space: nowrap;
-}
-.index-legend i {
-  width: 10px;
-  height: 3px;
-  border-radius: 999px;
-}
-.source-badge {
-  padding: 0 4px;
-  border-radius: 3px;
-  font-size: 8px;
-  font-style: normal;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  line-height: 14px;
-}
-.source-proxy {
-  background: rgba(234, 179, 8, 0.15);
-  color: #fbbf24;
-}
-.source-placeholder,
-.source-missing {
-  background: rgba(120, 120, 120, 0.15);
-  color: #888;
-}
-.chart-grid line {
-  stroke: rgba(125, 211, 252, 0.06);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-.chart-lines path {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 0;
-  transition: stroke-dashoffset 0.8s ease-out;
-}
-.chart-lines.is-drawing path {
-  transition: stroke-dashoffset 0s;
-  stroke-dashoffset: 1000;
-}
-.chart-y-labels,
-.chart-x-labels {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.chart-y-labels span,
-.chart-x-labels span {
-  position: absolute;
-  color: var(--text-disabled);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
-  line-height: 1;
-}
-.chart-y-labels span {
-  left: 0;
-  transform: translateY(-50%);
-}
-.chart-x-labels span {
-  bottom: 3px;
-  transform: translateX(-50%);
-}
-.panel-empty {
-  min-height: 120px;
-  display: grid;
-  place-items: center;
-  color: var(--text-disabled);
-  font-size: 12px;
-  border: 1px dashed rgba(125, 211, 252, 0.08);
-  border-radius: 7px;
-  background: rgba(0, 0, 0, 0.08);
-}
-.chart-empty {
-  position: absolute;
-  inset: 8px 0 0;
-  min-height: 0;
-}
-.microline {
-  width: 100%;
-  margin-top: 6px;
-}
-.microline path {
-  fill: none;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
 }
 .macro-grid {
   display: grid;
@@ -1047,137 +611,6 @@ onUnmounted(() => {
 }
 .macro-grid article {
   min-height: 88px;
-  padding: 8px 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(0,0,0,0.12);
-}
-.macro-grid strong {
-  display: block;
-  margin-top: 4px;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 16px;
-}
-.macro-grid em {
-  display: block;
-  color: var(--text-disabled);
-  font-size: 10px;
-  font-style: normal;
-}
-.sector-pulse {
-  padding: 10px 14px;
-}
-.sector-pulse-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 8px;
-}
-.sector-pulse-card {
-  min-height: 86px;
-  padding: 8px 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 7px;
-  background: rgba(0, 0, 0, 0.12);
-}
-.sector-rank {
-  color: var(--accent);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
-}
-.sector-main {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 4px;
-}
-.sector-main strong {
-  min-width: 0;
-  color: var(--text-primary);
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sector-main span {
-  flex-shrink: 0;
-  color: var(--text-disabled);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 8px;
-  letter-spacing: 0.06em;
-}
-.sector-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  margin-top: 8px;
-}
-.sector-metrics div {
-  min-width: 0;
-  padding: 4px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(3, 10, 18, 0.22);
-}
-.sector-metrics span {
-  display: block;
-  color: var(--text-disabled);
-  font-size: 8px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-.sector-metrics strong {
-  display: block;
-  margin-top: 2px;
-  color: var(--text-secondary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  white-space: nowrap;
-}
-.sector-empty {
-  margin-top: 12px;
-  min-height: 110px;
-}
-@media (max-width: 1180px) {
-  .market-hero {
-    grid-template-columns: 1fr;
-  }
-  .sector-pulse-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 720px) {
-  .market-command { padding: 12px; }
-  .macro-grid { grid-template-columns: 1fr; }
-  .sector-pulse-grid { grid-template-columns: 1fr; }
-  .sector-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .regime-core { grid-template-columns: 1fr; justify-items: center; text-align: center; }
-  .regime-readout { align-items: center; }
-}
-
-/* Refresh shimmer — brief pulse across all data panels */
-.market-hero.is-refreshing .glass-card,
-.sector-pulse.is-refreshing {
-  position: relative;
-  overflow: hidden;
-}
-.market-hero.is-refreshing .glass-card::after,
-.sector-pulse.is-refreshing::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(105deg, transparent 40%, rgba(0, 212, 255, 0.06) 50%, transparent 60%);
-  animation: shimmer-sweep 0.8s ease-out;
-  pointer-events: none;
-  z-index: 1;
-}
-@keyframes shimmer-sweep {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .regime-gauge-card,
-  .regime-status-card {
-    animation: none;
-  }
 }
 </style>
+<style scoped src="../styles/views/market.css"></style>

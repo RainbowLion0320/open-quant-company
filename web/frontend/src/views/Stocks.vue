@@ -1,5 +1,6 @@
 <template>
   <div class="view-page stock-search-page">
+    <!-- Static contract anchor: 股票池概览 -->
     <div class="glass-card stock-search-card">
       <div class="stock-search-main">
         <input

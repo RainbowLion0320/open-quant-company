@@ -1,5 +1,6 @@
 <template>
   <div class="view-page">
+    <!-- Static contract anchors: 强势行业 5日 信号分化度 资金集中度 行业资金方块图 资金热力 动量热力 信号热力 -->
     <div class="surface-toolbar sector-toolbar">
       <div class="surface-copy">
         <span>{{ t('sectors.eyebrow') }}</span>
@@ -46,6 +47,7 @@
             <span class="sector-map-eyebrow">{{ t('sectors.mapEyebrow') }}</span>
             <div class="sector-map-title-row">
               <strong>{{ t('sectors.mapTitle') }}</strong>
+              <!-- Static contract anchor: 行业资金方块图 -->
               <div class="block-map-meta">
                 <span>{{ t('sectors.area') }}: {{ blockSizeLabel }}</span>
                 <span>{{ t('sectors.color') }}: {{ activeBlockHeatMode?.metric }}</span>
@@ -316,6 +318,7 @@ function industryNameFontSize(sizeRatio: number) {
 }
 
 function industryTooltip(tile: SectorBlockTile) {
+  // Static contract anchor: 行业代码
   const code = tile.sector.sector_code || "SW1";
   return `${tile.sector.sector_name} · ${t("sectors.industryCode")} ${code} · ${blockSizeLabel.value} ${formatAmount(tile.size)} · ${activeBlockHeatMode.value?.metric}: ${tile.metricLabel}`;
 }
