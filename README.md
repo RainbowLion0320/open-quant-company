@@ -1,4 +1,7 @@
 <div align="center">
+  <img src="docs/assets/readme-quant-iceberg.png" alt="蜉蝣见青天，星盘只是量化世界的一瞬微光" width="100%">
+  <p><em>寄蜉蝣于天地，见青天之无垠。</em></p>
+
   <h1>星盘</h1>
   <h3>Astrolabe Quant OS — 个人量化研究与执行操作系统</h3>
   <p>
