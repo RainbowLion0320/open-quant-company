@@ -29,6 +29,27 @@ def _field(key: str, label: str, typ: str = "float", *,
 
 SETTINGS_SECTIONS: list[dict[str, Any]] = [
     {
+        "key": "deepseek.pricing",
+        "label": "DeepSeek 定价",
+        "description": "DeepSeek API 成本参数 (USD/百万token) 及汇率",
+        "fields": [
+            _field("usd_cny", "USD/CNY 汇率", "float", min_val=5.0, max_val=10.0, default=7.2,
+                   description="美元兑人民币汇率，用于估算人民币成本"),
+            _field("models.deepseek-v4-flash.cache_hit", "Flash 缓存命中", "float",
+                   min_val=0, max_val=1, default=0.0028, description="USD/百万token"),
+            _field("models.deepseek-v4-flash.cache_miss", "Flash 缓存未命中", "float",
+                   min_val=0, max_val=5, default=0.14, description="USD/百万token"),
+            _field("models.deepseek-v4-flash.output", "Flash 输出", "float",
+                   min_val=0, max_val=5, default=0.28, description="USD/百万token"),
+            _field("models.deepseek-v4-pro.cache_hit", "Pro 缓存命中", "float",
+                   min_val=0, max_val=1, default=0.003625, description="USD/百万token"),
+            _field("models.deepseek-v4-pro.cache_miss", "Pro 缓存未命中", "float",
+                   min_val=0, max_val=5, default=0.435, description="USD/百万token"),
+            _field("models.deepseek-v4-pro.output", "Pro 输出", "float",
+                   min_val=0, max_val=5, default=0.87, description="USD/百万token"),
+        ],
+    },
+    {
         "key": "data.fetcher",
         "label": "数据获取",
         "description": "API 请求节流、重试、缓存参数",
