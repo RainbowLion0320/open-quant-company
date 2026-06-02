@@ -304,9 +304,6 @@ deepseek:
         cache_hit: 0.003625
         cache_miss: 0.435
         output: 0.87
-    aliases:
-      deepseek-chat: deepseek-v4-flash
-      deepseek-reasoner: deepseek-v4-flash
 signals:
   multifactor:
     buy_threshold: 52
