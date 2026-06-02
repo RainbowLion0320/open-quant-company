@@ -81,6 +81,14 @@ def test_frontend_heavy_views_are_componentized():
     assert _line_count("web/frontend/src/i18n/messages.ts") <= 80
 
 
+def test_market_regime_hero_keeps_ring_gauge_styles_local_to_component():
+    hero = Path("web/frontend/src/components/market/RegimeHero.vue").read_text(encoding="utf-8")
+
+    assert ".regime-orb" in hero
+    assert ".mini-gauge" in hero
+    assert "conic-gradient" in hero
+
+
 def test_api_routes_and_schemas_are_domain_split():
     _assert_exists(
         [
