@@ -165,6 +165,7 @@ Market Regime 规则评分层保持确定性和可解释性，但不再只能靠
 - `strategy_type`: `selection` / `timing` / `sector_rotation` / `portfolio` / `risk_overlay`
 - `layer`
 - `lifecycle`: `candidate` / `validated` / `paper` / `production` / `retired`
+- `config_key`: 对应 `config/settings.yaml` 中该策略主配置段，供配置中心和 agent 定位参数
 - `data_requirements`
 - `output_contract`: 当前统一为 `StrategySignalRows`
 

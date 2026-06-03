@@ -226,7 +226,9 @@ PATCH /api/settings/section/data.fetcher
 REQUIRED_SECTIONS = {"strategies", "risk_control"}
 ```
 
-`PATCH /api/settings/section/{section}` 支持 dotted section，例如 `data.fetcher`、`buffett.margin_of_safety`。服务端必须写回嵌套 YAML，不允许生成顶层 `data.fetcher:` 这类重复 key。
+`GET /api/settings/schema` 返回 `groups` + `sections`：左侧一级域包括策略管理、市场状态、执行与风控、数据与清洗、研究回测、AI 服务；每个 section 带 `group`、`subgroup`、`subgroup_label` 和字段元数据。Config Center 只切一级域，右侧把二级分组纵向展开，不把策略参数平铺成同级 tab。
+
+`PATCH /api/settings/section/{section}` 支持 dotted section，例如 `data.fetcher`、`buffett.margin_of_safety`、`strategies.buffett`、`signal_selection.strategies.multifactor`。服务端必须写回嵌套 YAML，不允许生成顶层 `data.fetcher:` 这类重复 key。
 
 ## 6. 错误处理
 
@@ -241,7 +243,7 @@ REQUIRED_SECTIONS = {"strategies", "risk_control"}
 - **合约测试：** 所有路由返回正确的 HTTP 状态码和 JSON schema
 - **集成测试：** `GET /api/strategies/{name}` 返回实际策略信号（需本地有信号文件）
 - **WebSocket 测试：** 创建 Job → 验证进度消息格式
-- **Settings 测试：** 非法配置更新返回 422，dotted section PATCH 不生成顶层重复 key，配置中心 schema 字段必须存在于 canonical settings
+- **Settings 测试：** 非法配置更新返回 422，dotted section PATCH 不生成顶层重复 key，配置中心 schema 字段必须存在于 canonical settings，并保持 group/subgroup 二级配置模型
 - **边界测试：** 空 Parquet 文件返回空列表，分页越界返回空数组
 
 ## 8. 已知限制 & 未来方向

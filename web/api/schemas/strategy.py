@@ -85,6 +85,7 @@ class StrategyCatalogItemResponse(BaseModel):
     strategy_type: str
     layer: str
     lifecycle: str
+    config_key: str
     data_requirements: list[str]
     parameters: dict[str, Any] = Field(default_factory=dict)
     output_contract: str

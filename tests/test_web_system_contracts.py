@@ -331,11 +331,29 @@ def test_config_center_preserves_dotted_section_paths():
 
     assert "function getNestedValue" in config_center_logic
     assert "function setNestedValue" in config_center_logic
-    assert "setNestedValue(config, activeSection.value" in config_center_logic
+    assert "setNestedValue(config, sectionKey" in config_center_logic
     assert "config[activeSection.value]" not in config_center_logic
     assert "function patch<T>" in api_client
     assert "saveSettingsSection" in api_client
     assert "patch<Record<string, any>>" in api_client
+
+
+def test_config_center_uses_grouped_expandable_settings_model():
+    config_center = Path("web/frontend/src/views/ConfigCenter.vue").read_text()
+    config_center_logic = Path("web/frontend/src/view-models/useConfigCenter.ts").read_text()
+    css = Path("web/frontend/src/styles/views/config-center.css").read_text()
+
+    assert "activeGroup" in config_center_logic
+    assert "groups.value = schemaData.groups" in config_center_logic
+    assert "groupedSections" in config_center_logic
+    assert "sectionHasChanges(section.key)" in config_center
+    assert 'v-for="group in groups"' in config_center
+    assert 'v-for="subgroup in groupedSections"' in config_center
+    assert 'v-for="section in subgroup.sections"' in config_center
+    assert 'v-for="section in schema"' not in config_center
+    assert ".config-subgroup" in css
+    assert ".section-panel" in css
+    assert ".field-switch" in css
 
 
 def test_frontend_router_does_not_keep_legacy_redirect_routes():

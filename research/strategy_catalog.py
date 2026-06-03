@@ -19,6 +19,7 @@ class StrategyCatalogItem:
     strategy_type: str
     layer: str
     lifecycle: str
+    config_key: str
     data_requirements: list[str]
     parameters: dict[str, Any] = field(default_factory=dict)
     output_contract: str = "StrategySignalRows"
@@ -83,6 +84,7 @@ def catalog_items() -> list[StrategyCatalogItem]:
                 strategy_type=_text_value(raw.get("strategy_type"), strategy_type),
                 layer=_text_value(raw.get("layer"), layer),
                 lifecycle=raw.get("status", "candidate"),
+                config_key=_text_value(raw.get("config_key"), raw["name"]),
                 data_requirements=_list_value(raw.get("data_requirements"), requirements),
                 parameters=dict(raw.get("parameters", {})),
                 output_contract=_text_value(raw.get("output_contract"), "StrategySignalRows"),

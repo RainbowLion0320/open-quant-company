@@ -68,6 +68,7 @@ export interface StrategyCatalogItem {
   strategy_type: string;
   layer: string;
   lifecycle: string;
+  config_key: string;
   data_requirements: string[];
   parameters?: Record<string, any>;
   output_contract: string;

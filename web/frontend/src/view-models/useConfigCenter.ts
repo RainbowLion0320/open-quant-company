@@ -1,4 +1,4 @@
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { api } from "../api";
 import { useI18n } from "../i18n";
 
@@ -19,22 +19,55 @@ export function useConfigCenter() {
     key: string;
     label: string;
     description: string;
+    group: string;
+    subgroup?: string;
+    subgroup_label?: string;
+    order?: number;
     fields: FieldSchema[];
   }
 
+  interface GroupSchema {
+    key: string;
+    label: string;
+    description: string;
+    section_count: number;
+    field_count: number;
+  }
+
   const schema = ref<SectionSchema[]>([]);
+  const groups = ref<GroupSchema[]>([]);
   const { t } = useI18n();
   const config = reactive<Record<string, any>>({});
   const originalConfig = ref<string>(""); // JSON snapshot for change detection
-  const activeSection = ref("");
+  const activeGroup = ref("");
   const loading = ref(true);
-  const saving = ref(false);
+  const savingSection = ref("");
+  const saveMsgSection = ref("");
   const saveMsg = ref("");
   const saveOk = ref(false);
 
-  const currentSection = computed(() =>
-    schema.value.find(s => s.key === activeSection.value) || null
+  const activeGroupInfo = computed(() =>
+    groups.value.find(group => group.key === activeGroup.value) || null
   );
+
+  const activeSections = computed(() =>
+    schema.value.filter(section => section.group === activeGroup.value)
+  );
+
+  const groupedSections = computed(() => {
+    const map: Record<string, { key: string; label: string; sections: SectionSchema[] }> = {};
+    for (const section of activeSections.value) {
+      const key = section.subgroup || section.key;
+      if (!map[key]) {
+        map[key] = { key, label: section.subgroup_label || section.label, sections: [] };
+      }
+      map[key].sections.push(section);
+    }
+    return Object.values(map).map(group => ({
+      ...group,
+      sections: group.sections.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    }));
+  });
 
   const hasChanges = computed(() =>
     JSON.stringify(config) !== originalConfig.value
@@ -68,43 +101,57 @@ export function useConfigCenter() {
     current[parts[parts.length - 1]] = value;
   }
 
-  function getSectionData(): any {
-    if (!activeSection.value) return undefined;
-    return getNestedValue(config, activeSection.value);
+  function getSectionData(sectionKey: string): any {
+    if (!sectionKey) return undefined;
+    return getNestedValue(config, sectionKey);
   }
 
-  function getFieldValue(fieldKey: string): any {
-    const sectionData = getSectionData();
+  function getFieldValue(sectionKey: string, fieldKey: string): any {
+    const sectionData = getSectionData(sectionKey);
     if (!sectionData) return undefined;
     return getNestedValue(sectionData, fieldKey);
   }
 
-  function setFieldValue(fieldKey: string, value: any) {
-    if (!activeSection.value) return;
-    const sectionData = getSectionData() ?? {};
-    setNestedValue(config, activeSection.value, sectionData);
+  function setFieldValue(sectionKey: string, fieldKey: string, value: any) {
+    if (!sectionKey) return;
+    const sectionData = getSectionData(sectionKey) ?? {};
+    setNestedValue(config, sectionKey, sectionData);
     setNestedValue(sectionData, fieldKey, value);
   }
 
-  function onSliderInput(field: FieldSchema, event: Event) {
+  function onSliderInput(sectionKey: string, field: FieldSchema, event: Event) {
     const raw = parseFloat((event.target as HTMLInputElement).value);
     const value = field.type === "int" ? Math.round(raw) : parseFloat(raw.toFixed(6));
-    setFieldValue(field.key, value);
+    setFieldValue(sectionKey, field.key, value);
   }
 
-  function resetSection() {
-    if (!activeSection.value) return;
+  function coerceNumericField(field: FieldSchema, event: Event) {
+    const raw = (event.target as HTMLInputElement).value;
+    if (raw === "") return undefined;
+    return field.type === "int" ? parseInt(raw) : parseFloat(raw);
+  }
+
+  function sectionHasChanges(sectionKey: string) {
+    if (!originalConfig.value || !sectionKey) return false;
     const original = JSON.parse(originalConfig.value);
-    setNestedValue(config, activeSection.value, clone(getNestedValue(original, activeSection.value) || {}));
+    return JSON.stringify(getNestedValue(config, sectionKey) ?? {}) !==
+      JSON.stringify(getNestedValue(original, sectionKey) ?? {});
   }
 
-  async function saveSection() {
-    if (!activeSection.value) return;
-    saving.value = true;
+  function resetSection(sectionKey: string) {
+    if (!sectionKey) return;
+    const original = JSON.parse(originalConfig.value);
+    setNestedValue(config, sectionKey, clone(getNestedValue(original, sectionKey) || {}));
+  }
+
+  async function saveSection(sectionKey: string) {
+    if (!sectionKey) return;
+    savingSection.value = sectionKey;
+    saveMsgSection.value = sectionKey;
     saveMsg.value = "";
     try {
-      const sectionData = clone(getSectionData() || {});
-      await api.saveSettingsSection(activeSection.value, sectionData);
+      const sectionData = clone(getSectionData(sectionKey) || {});
+      await api.saveSettingsSection(sectionKey, sectionData);
       originalConfig.value = JSON.stringify(clone(config));
       saveMsg.value = t("configCenter.saveSuccess");
       saveOk.value = true;
@@ -112,9 +159,13 @@ export function useConfigCenter() {
       saveMsg.value = err?.message || t("configCenter.saveError");
       saveOk.value = false;
     } finally {
-      saving.value = false;
+      savingSection.value = "";
       setTimeout(() => { saveMsg.value = ""; }, 3000);
     }
+  }
+
+  function isSaving(sectionKey: string) {
+    return savingSection.value === sectionKey;
   }
 
   onMounted(async () => {
@@ -124,9 +175,10 @@ export function useConfigCenter() {
         api.settings(),
       ]);
       schema.value = schemaData.sections || [];
+      groups.value = schemaData.groups || [];
       Object.assign(config, clone(settingsData));
       originalConfig.value = JSON.stringify(clone(config));
-      activeSection.value = schema.value[0]?.key || "";
+      activeGroup.value = groups.value[0]?.key || schema.value[0]?.group || "";
     } catch (err) {
       console.error("Failed to load config schema:", err);
     } finally {
@@ -136,15 +188,19 @@ export function useConfigCenter() {
 
   return {
     schema,
+    groups,
     t,
     config,
     originalConfig,
-    activeSection,
+    activeGroup,
     loading,
-    saving,
+    savingSection,
+    saveMsgSection,
     saveMsg,
     saveOk,
-    currentSection,
+    activeGroupInfo,
+    activeSections,
+    groupedSections,
     hasChanges,
     getNestedValue,
     setNestedValue,
@@ -152,7 +208,10 @@ export function useConfigCenter() {
     getFieldValue,
     setFieldValue,
     onSliderInput,
+    coerceNumericField,
+    sectionHasChanges,
     resetSection,
     saveSection,
+    isSaving,
   };
 }

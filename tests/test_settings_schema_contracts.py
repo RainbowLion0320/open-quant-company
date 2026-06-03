@@ -21,6 +21,41 @@ def test_settings_schema_fields_exist_in_canonical_settings():
     assert missing == []
 
 
+def test_settings_schema_exposes_grouped_strategy_management_model():
+    from web.api.settings_schema import get_settings_schema
+
+    schema = get_settings_schema()
+    groups = {group["key"]: group for group in schema["groups"]}
+    sections = {section["key"]: section for section in schema["sections"]}
+
+    assert "strategy_management" in groups
+    assert groups["strategy_management"]["section_count"] > 10
+    assert schema["total_groups"] == len(schema["groups"])
+    assert all(section.get("group") for section in schema["sections"])
+
+    for key in (
+        "strategies.buffett",
+        "strategies.trend_following",
+        "signal_selection",
+        "signal_selection.strategies.multifactor",
+        "signals.multifactor",
+        "buffett.margin_of_safety",
+        "ml",
+    ):
+        assert sections[key]["group"] == "strategy_management"
+        assert sections[key].get("subgroup")
+
+
+def test_settings_schema_validation_covers_bool_and_select_fields():
+    from web.api.settings_schema import validate_settings_section
+
+    assert validate_settings_section("strategies.buffett", {"enabled": True, "status": "production"}) == []
+
+    errors = validate_settings_section("strategies.buffett", {"enabled": "yes", "status": "unknown"})
+    assert "enabled: expected bool, got str" in errors
+    assert any(error.startswith("status: unknown not in options") for error in errors)
+
+
 def test_settings_yaml_does_not_contain_top_level_dotted_sections():
     cfg = yaml.safe_load(open("config/settings.yaml", encoding="utf-8")) or {}
 
