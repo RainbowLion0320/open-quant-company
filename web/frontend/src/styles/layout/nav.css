@@ -1,0 +1,113 @@
+.nav-rail {
+  width: 72px;
+  padding: 16px 8px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  border-right: 1px solid rgba(125, 211, 252, 0.12);
+  background: linear-gradient(180deg, rgba(3, 10, 19, 0.86), rgba(5, 13, 25, 0.62));
+  backdrop-filter: blur(18px);
+  z-index: 10;
+  flex-shrink: 0;
+}
+.brand-mark {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: transparent;
+  filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.22));
+  cursor: default;
+  user-select: none;
+}
+.brand-mark img {
+  width: 34px;
+  height: 34px;
+  display: block;
+}
+.nav-stack {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.nav-node {
+  width: 46px;
+  height: 46px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.nav-node svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nav-node:hover,
+.nav-node.active {
+  color: var(--accent);
+  border-color: rgba(0, 212, 255, 0.22);
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.12), rgba(34, 197, 94, 0.04));
+}
+.nav-node.active::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  width: 2px;
+  height: 24px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: var(--glow-cyan);
+}
+.nav-tooltip {
+  position: absolute;
+  left: 56px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: rgba(5, 12, 22, 0.94);
+  color: var(--text-primary);
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-4px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  box-shadow: var(--panel-shadow);
+}
+.nav-node:hover .nav-tooltip {
+  opacity: 1;
+  transform: translateX(0);
+}
+.core-status {
+  width: 48px;
+  padding: 7px 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.16);
+}
+.core-status span {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: var(--text-disabled);
+}
+.core-status strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+}

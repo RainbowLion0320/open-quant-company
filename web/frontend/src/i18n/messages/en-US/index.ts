@@ -1,0 +1,45 @@
+import { app } from "./app";
+import { common } from "./common";
+import { errors } from "./errors";
+import { nav } from "./nav";
+import { modules } from "./modules";
+import { market } from "./market";
+import { pipeline } from "./pipeline";
+import { portfolio } from "./portfolio";
+import { sectors } from "./sectors";
+import { stocks } from "./stocks";
+import { stockDetail } from "./stockDetail";
+import { settings } from "./settings";
+import { strategies } from "./strategies";
+import { signals } from "./signals";
+import { backtest } from "./backtest";
+import { evidence } from "./evidence";
+import { database } from "./database";
+import { assetCoverage } from "./assetCoverage";
+import { activity } from "./activity";
+import { configCenter } from "./configCenter";
+import { hindsight } from "./hindsight";
+
+export const enUS = {
+  app,
+  common,
+  errors,
+  nav,
+  modules,
+  market,
+  pipeline,
+  portfolio,
+  sectors,
+  stocks,
+  stockDetail,
+  settings,
+  strategies,
+  signals,
+  backtest,
+  evidence,
+  database,
+  assetCoverage,
+  activity,
+  configCenter,
+  hindsight,
+} as const;

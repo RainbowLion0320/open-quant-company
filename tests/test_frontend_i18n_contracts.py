@@ -8,6 +8,22 @@ def read_frontend(path: str) -> str:
     return (FRONTEND_SRC / path).read_text(encoding="utf-8")
 
 
+VIEW_MODEL_BY_VIEW = {
+    "Portfolio.vue": "usePortfolioView.ts",
+    "Sectors.vue": "useSectorsView.ts",
+    "Stocks.vue": "useStocksView.ts",
+    "Settings.vue": "useSettingsView.ts",
+}
+
+
+def read_view_with_support(view: str) -> str:
+    text = read_frontend(f"views/{view}")
+    view_model = VIEW_MODEL_BY_VIEW.get(view)
+    if view_model:
+        text += "\n" + read_frontend(f"view-models/{view_model}")
+    return text
+
+
 def test_frontend_i18n_module_has_bilingual_contract():
     index = FRONTEND_SRC / "i18n/index.ts"
     messages = FRONTEND_SRC / "i18n/messages.ts"
@@ -60,6 +76,6 @@ def test_high_traffic_views_use_i18n_for_static_copy():
         "Stocks.vue",
         "Settings.vue",
     ):
-        text = read_frontend(f"views/{view}")
+        text = read_view_with_support(view)
         assert "useI18n" in text
         assert "t(" in text

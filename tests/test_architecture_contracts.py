@@ -437,14 +437,15 @@ def test_regime_training_reuses_shared_metric_helpers():
 
 def test_frontend_sector_metrics_are_shared():
     sectors = Path("web/frontend/src/views/Sectors.vue").read_text()
+    sectors_view_model = Path("web/frontend/src/view-models/useSectorsView.ts").read_text()
     market = Path("web/frontend/src/views/Market.vue").read_text()
     sector_utils = Path("web/frontend/src/utils/sector.ts").read_text()
 
-    assert "../utils/sector" in sectors
+    assert "../utils/sector" in sectors_view_model
     assert "../utils/sector" in market
     assert "export function signalPower" in sector_utils
     assert "export function dataSourceLabel" in sector_utils
-    assert "function signalPower(" not in sectors
+    assert "function signalPower(" not in sectors_view_model
     assert "function signalPower(" not in market
 
 

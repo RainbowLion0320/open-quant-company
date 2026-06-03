@@ -70,6 +70,11 @@ def test_frontend_heavy_views_are_componentized():
             "web/frontend/src/composables/useMarketOverview.ts",
             "web/frontend/src/composables/usePipelineData.ts",
             "web/frontend/src/composables/useHindsightThreeGraph.ts",
+            "web/frontend/src/composables/hindsight/types.ts",
+            "web/frontend/src/composables/hindsight/scene.ts",
+            "web/frontend/src/composables/hindsight/graphBuilder.ts",
+            "web/frontend/src/composables/hindsight/simulation.ts",
+            "web/frontend/src/composables/hindsight/interaction.ts",
             "web/frontend/src/i18n/messages/zh-CN.ts",
             "web/frontend/src/i18n/messages/en-US.ts",
         ]
@@ -77,6 +82,7 @@ def test_frontend_heavy_views_are_componentized():
     assert _line_count("web/frontend/src/views/Market.vue") <= 760
     assert _line_count("web/frontend/src/views/Pipeline.vue") <= 520
     assert _line_count("web/frontend/src/views/HindsightGraph.vue") <= 420
+    assert _line_count("web/frontend/src/composables/useHindsightThreeGraph.ts") <= 260
     assert _line_count("web/frontend/src/api/index.ts") <= 120
     assert _line_count("web/frontend/src/i18n/messages.ts") <= 80
 
@@ -106,3 +112,72 @@ def test_api_routes_and_schemas_are_domain_split():
     assert _line_count("web/api/models.py") <= 80
     assert _line_count("web/api/routes/stocks.py") <= 180
     assert _line_count("web/api/routes/system.py") <= 260
+
+
+def test_p0_p2_modularization_hotspots_are_split():
+    _assert_exists(
+        [
+            "web/frontend/src/view-models/useActivityMonitor.ts",
+            "web/frontend/src/view-models/useDatabaseHealth.ts",
+            "web/frontend/src/view-models/useSectorsView.ts",
+            "web/frontend/src/styles/views/activity-monitor.css",
+            "web/frontend/src/styles/views/database-health.css",
+            "web/frontend/src/styles/views/sectors.css",
+            "web/frontend/src/styles/base/tokens.css",
+            "web/frontend/src/styles/base/base.css",
+            "web/frontend/src/styles/layout/app-shell.css",
+            "web/frontend/src/styles/layout/nav.css",
+            "web/frontend/src/styles/components/common.css",
+            "web/frontend/src/api/types/market.ts",
+            "web/frontend/src/api/types/strategy.ts",
+            "web/frontend/src/api/types/portfolio.ts",
+            "web/frontend/src/api/types/system.ts",
+            "web/frontend/src/api/types/sectors.ts",
+            "web/frontend/src/api/types/stocks.ts",
+            "web/frontend/src/api/types/pipeline.ts",
+            "web/frontend/src/i18n/messages/zh-CN/index.ts",
+            "web/frontend/src/i18n/messages/en-US/index.ts",
+            "cybernetics/observations/sources.py",
+            "cybernetics/observations/breadth.py",
+            "cybernetics/observations/trend_risk.py",
+            "cybernetics/observations/volume.py",
+            "cybernetics/observations/scoring.py",
+            "cybernetics/observations/hmm_detection.py",
+            "cybernetics/hmm/core.py",
+            "cybernetics/hmm/io.py",
+            "cybernetics/hmm/preprocessing.py",
+            "research/factors/hypothesis/core.py",
+            "research/factors/hypothesis/candidates.py",
+            "research/factors/hypothesis/llm.py",
+            "research/factors/hypothesis/persistence.py",
+            "data/sector_pipeline/membership.py",
+            "data/sector_pipeline/performance.py",
+            "data/sector_pipeline/amounts.py",
+            "data/sector_pipeline/signals.py",
+            "data/sector_pipeline/exposure.py",
+            "broker/models.py",
+            "broker/base.py",
+            "broker/paper_orders.py",
+            "broker/paper_state.py",
+        ]
+    )
+
+    assert _line_count("web/frontend/src/views/ActivityMonitor.vue") <= 240
+    assert _line_count("web/frontend/src/views/DatabaseHealth.vue") <= 240
+    assert _line_count("web/frontend/src/views/Sectors.vue") <= 240
+    assert _line_count("web/frontend/src/views/Strategies.vue") <= 240
+    assert _line_count("web/frontend/src/views/Settings.vue") <= 240
+    assert _line_count("web/frontend/src/views/ConfigCenter.vue") <= 180
+    assert _line_count("web/frontend/src/views/Stocks.vue") <= 260
+    assert _line_count("web/frontend/src/views/Portfolio.vue") <= 260
+
+    assert _line_count("web/frontend/src/assets/astrolabe-quant.css") <= 80
+    assert _line_count("web/frontend/src/api/types.ts") <= 80
+    assert _line_count("web/frontend/src/i18n/messages/zh-CN.ts") <= 80
+    assert _line_count("web/frontend/src/i18n/messages/en-US.ts") <= 80
+
+    assert _line_count("cybernetics/market_observations.py") <= 120
+    assert _line_count("cybernetics/hmm_engine.py") <= 120
+    assert _line_count("scripts/factor_hypothesis.py") <= 140
+    assert _line_count("data/sectors.py") <= 140
+    assert _line_count("broker/paper.py") <= 260

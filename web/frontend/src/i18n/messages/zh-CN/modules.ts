@@ -1,0 +1,82 @@
+export const modules = {
+      research: {
+        title: "市场研究",
+        eyebrow: "Research",
+        subtitle: "行业轮动、个股搜索和标的深挖集中在一个研究入口",
+        tabs: {
+          sectors: { label: "行业雷达", meta: "Sector rotation" },
+          stocks: { label: "个股搜索", meta: "Stock research" },
+        },
+      },
+      datahub: {
+        title: "数据中台",
+        eyebrow: "DataHub",
+        subtitle: "数据注册表、健康扫描和修复动作收敛到统一入口",
+        tabs: {
+          health: {
+            label: "健康扫描",
+            meta: "Registry health",
+            description: "按表检查新鲜度、缺失、异常和可修复数据维度",
+          },
+          assets: {
+            label: "资产覆盖",
+            meta: "Asset coverage",
+            description: "查看多资产数据来源、研究就绪度和交易能力",
+          },
+        },
+      },
+      strategyLab: {
+        title: "策略实验室",
+        eyebrow: "Strategy Lab",
+        subtitle: "策略目录、信号变化和回测证据合并为完整研究闭环",
+        tabs: {
+          strategies: {
+            label: "策略目录",
+            meta: "Catalog & gates",
+            description: "查看生产策略和候选策略目录、生命周期、研究扫描与生产隔离状态",
+          },
+          signals: {
+            label: "信号历史",
+            meta: "Signal changes",
+            description: "追踪最近信号迁移，识别新增买入、降级和策略一致性变化",
+          },
+          backtest: {
+            label: "回测证据",
+            meta: "Evidence",
+            description: "对比策略收益、风险、回撤、强基准和晋级证据",
+          },
+          evidence: {
+            label: "证据面板",
+            meta: "Evidence panel",
+            description: "查看策略证据制品、OOS状态、成本模型和晋级决策",
+          },
+        },
+      },
+      system: {
+        title: "系统控制",
+        eyebrow: "System",
+        subtitle: "运行观测、配置写入和 AI 记忆工具收敛为系统入口",
+        tabs: {
+          monitor: {
+            label: "系统信息",
+            meta: "Read-only ops",
+            description: "只读观测系统资源、API 健康、任务计划和服务状态",
+          },
+          settings: {
+            label: "系统设置",
+            meta: "Config writes",
+            description: "集中管理运行模式、认证、通知、数据源、策略状态和风控参数",
+          },
+          config: {
+            label: "配置中心",
+            meta: "Config center",
+            description: "查看和编辑所有系统参数：数据获取、信号、Regime、风控、回测、费率",
+          },
+          hindsight: {
+            label: "记忆图谱",
+            meta: "AI memory",
+            description: "加载 Hindsight 记忆节点，检查经验、观察和实体关系",
+          },
+        },
+      },
+    } as const;

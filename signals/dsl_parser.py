@@ -36,10 +36,12 @@ def _translate_formula(formula: str) -> str:
     formula = re.sub(r'Delta\(\s*(\w+?)(?:_t)?\s*,\s*(\d+)\s*\)', r'__delta("\1",\2)', formula)
     
     # 2. 变量: close_t → __ref("close",0), close_t-5 → __ref("close",-5)
+    # Offset forms must be translated before the bare ``*_t`` token; otherwise
+    # ``close_t-5`` is parsed as "today's close minus 5" instead of lagged close.
     for col in ["close", "open", "high", "low", "volume"]:
-        formula = re.sub(rf'\b{col}_t\b', f'__ref("{col}",0)', formula)
         formula = re.sub(rf'\b{col}_t-(\d+)\b', rf'__ref("{col}",-\1)', formula)
         formula = re.sub(rf'\b{col}_t_(\d+)\b', rf'__ref("{col}",-\1)', formula)
+        formula = re.sub(rf'\b{col}_t\b', f'__ref("{col}",0)', formula)
     
     return formula
 

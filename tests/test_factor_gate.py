@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-# Real expression.py path that promote_candidate_factor writes to
+# Real expression.py template copied into temp files for promotion tests.
 _EXPR_PATH = Path(__file__).resolve().parent.parent / "signals" / "expression.py"
 
 
@@ -48,11 +48,12 @@ def clean_pool(temp_pool_path):
 
 
 @pytest.fixture
-def safe_expr():
-    """Backup and restore the real expression.py around promote tests."""
-    backup = _EXPR_PATH.read_text()
-    yield
-    _EXPR_PATH.write_text(backup)
+def temp_expression_path(tmp_path):
+    """Patch factor promotion to write to an isolated expression.py copy."""
+    path = tmp_path / "expression.py"
+    path.write_text(_EXPR_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    with patch("scripts.factor_hypothesis.EXPRESSION_PATH", path):
+        yield path
 
 
 # ── Tests ──
@@ -125,11 +126,11 @@ class TestListCandidateFactors:
 
 
 class TestPromoteCandidateFactor:
-    def test_promote_nonexistent_factor_returns_false(self, clean_pool, safe_expr):
+    def test_promote_nonexistent_factor_returns_false(self, clean_pool, temp_expression_path):
         from scripts.factor_hypothesis import promote_candidate_factor
         assert promote_candidate_factor("nonexistent_factor") is False
 
-    def test_promote_updates_status(self, clean_pool, safe_expr):
+    def test_promote_updates_status(self, clean_pool, temp_expression_path):
         from scripts.factor_hypothesis import save_to_candidate_pool, promote_candidate_factor, list_candidate_factors
 
         save_to_candidate_pool([FakeFactorCandidate("promo_test", "ts_rank(volume, 5)")])
@@ -140,7 +141,7 @@ class TestPromoteCandidateFactor:
         pool = list_candidate_factors()
         assert pool["promo_test"]["status"] == "promoted"
 
-    def test_promote_already_promoted_returns_false(self, clean_pool, safe_expr):
+    def test_promote_already_promoted_returns_false(self, clean_pool, temp_expression_path):
         from scripts.factor_hypothesis import (
             save_to_candidate_pool, promote_candidate_factor,
             list_candidate_factors,
@@ -150,7 +151,7 @@ class TestPromoteCandidateFactor:
         assert promote_candidate_factor("double_promo") is True
         assert promote_candidate_factor("double_promo") is False
 
-    def test_promote_writes_to_expression_file(self, clean_pool, safe_expr):
+    def test_promote_writes_to_expression_file(self, clean_pool, temp_expression_path):
         """Promote should inject factor DSL into expression.py."""
         from scripts.factor_hypothesis import save_to_candidate_pool, promote_candidate_factor
 
@@ -159,7 +160,7 @@ class TestPromoteCandidateFactor:
         result = promote_candidate_factor("expr_test")
         assert result is True
 
-        content = _EXPR_PATH.read_text()
+        content = temp_expression_path.read_text(encoding="utf-8")
         assert '"expr_test"' in content
 
 

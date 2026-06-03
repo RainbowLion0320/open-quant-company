@@ -1,0 +1,49 @@
+/* ── Design Tokens ── */
+:root {
+  /* Deep space backgrounds */
+  --bg-void:       #02060d;  /* deepest void */
+  --bg-deep:       #050b16;  /* page background */
+  --bg-panel:      #081321;  /* card/panel surface */
+  --bg-elevated:   #0d1a2a;  /* lifted surface */
+  --bg-hover:      rgba(0, 212, 255, 0.04);
+  --bg-active:     rgba(0, 212, 255, 0.08);
+
+  /* Electric cyan primary */
+  --accent:        #00d4ff;
+  --accent-glow:   #00e5ff;
+  --accent-dim:    #0088aa;
+  --accent-bg:     rgba(0, 212, 255, 0.08);
+  --accent-ring:   rgba(0, 212, 255, 0.2);
+
+  /* Stellar violet — data/ML accent */
+  --stellar:       #7c3aed;
+  --stellar-glow:  #a78bfa;
+
+  /* Semantic colors */
+  --positive:      #22c55e;
+  --negative:      #ef4444;
+  --warning:       #eab308;
+  --amber:         #f59e0b;
+
+  /* Borders — glass morphism */
+  --border-subtle:  rgba(125, 211, 252, 0.07);
+  --border-default: rgba(125, 211, 252, 0.11);
+  --border-strong:  rgba(125, 211, 252, 0.18);
+
+  /* Text */
+  --text-primary:   #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-tertiary:  #64748b;
+  --text-disabled:  #334155;
+
+  /* Glass */
+  --glass-bg:     rgba(8, 19, 33, 0.72);
+  --glass-border: rgba(125, 211, 252, 0.11);
+  --glass-blur:   12px;
+
+  /* Shadows / Glow */
+  --glow-cyan:    0 0 20px rgba(0, 212, 255, 0.15);
+  --glow-stellar: 0 0 20px rgba(124, 58, 237, 0.15);
+  --glow-text:    0 0 10px rgba(0, 212, 255, 0.4);
+  --panel-shadow: 0 18px 60px rgba(0, 0, 0, 0.36);
+}

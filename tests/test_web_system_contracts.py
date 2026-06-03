@@ -260,6 +260,7 @@ def test_deepseek_usage_payload_combines_official_balance_and_project_ledger(mon
 
 def test_monitor_is_read_only_but_keeps_system_status_cards():
     monitor = Path("web/frontend/src/views/ActivityMonitor.vue").read_text()
+    monitor_logic = Path("web/frontend/src/view-models/useActivityMonitor.ts").read_text()
 
     assert "api.saveSettings" not in monitor
     assert "saveWithConfirm" not in monitor
@@ -268,8 +269,8 @@ def test_monitor_is_read_only_but_keeps_system_status_cards():
     assert "RESOURCE HISTORY" in monitor
     assert "TOP PROCESSES" in monitor
     assert "Telegram" in monitor
-    assert "api.apiHealth()" in monitor
-    assert "api.cronJobs()" in monitor
+    assert "api.apiHealth()" in monitor_logic
+    assert "api.cronJobs()" in monitor_logic
     assert "serviceStatus" not in monitor
 
 
@@ -325,12 +326,13 @@ def test_settings_cancel_reverts_pending_toggle():
 
 def test_config_center_preserves_dotted_section_paths():
     config_center = Path("web/frontend/src/views/ConfigCenter.vue").read_text()
+    config_center_logic = Path("web/frontend/src/view-models/useConfigCenter.ts").read_text()
     api_client = Path("web/frontend/src/api/index.ts").read_text()
 
-    assert "function getNestedValue" in config_center
-    assert "function setNestedValue" in config_center
-    assert "setNestedValue(config, activeSection.value" in config_center
-    assert "config[activeSection.value]" not in config_center
+    assert "function getNestedValue" in config_center_logic
+    assert "function setNestedValue" in config_center_logic
+    assert "setNestedValue(config, activeSection.value" in config_center_logic
+    assert "config[activeSection.value]" not in config_center_logic
     assert "function patch<T>" in api_client
     assert "saveSettingsSection" in api_client
     assert "patch<Record<string, any>>" in api_client
@@ -415,6 +417,8 @@ def test_market_macro_panel_supports_six_indicator_layout():
 
 def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
     sectors = Path("web/frontend/src/views/Sectors.vue").read_text(encoding="utf-8")
+    sector_logic = Path("web/frontend/src/view-models/useSectorsView.ts").read_text(encoding="utf-8")
+    sector_css = Path("web/frontend/src/styles/views/sectors.css").read_text(encoding="utf-8")
     api = Path("web/frontend/src/api/index.ts").read_text(encoding="utf-8")
 
     assert "sectorBlockTiles" in sectors
@@ -438,17 +442,17 @@ def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
     assert "industry-block-button" not in sectors
     assert "stock-block" not in sectors
     assert "sectorBlockSpan" in sectors
-    assert "gridColumn: `span ${tile.span}`" in sectors
-    assert "gridRow: `span ${tile.span}`" in sectors
-    assert "stockSquareSpan" not in sectors
-    assert "stockMosaicBlocks" not in sectors
-    assert "openConstituent" not in sectors
-    assert "memberStocks" not in sectors
-    assert "sectorBlockSizeClass" not in sectors
-    assert "splitTreemap" not in sectors
-    assert "linear-gradient" not in sectors
-    assert "backgroundColor: tone.backgroundColor" in sectors
-    assert "boxShadow: tone.boxShadow" in sectors
+    assert "gridColumn: `span ${tile.span}`" in sector_logic
+    assert "gridRow: `span ${tile.span}`" in sector_logic
+    assert "stockSquareSpan" not in sector_logic
+    assert "stockMosaicBlocks" not in sector_logic
+    assert "openConstituent" not in sector_logic
+    assert "memberStocks" not in sector_logic
+    assert "sectorBlockSizeClass" not in sector_logic
+    assert "splitTreemap" not in sector_logic
+    assert "linear-gradient" not in sector_css
+    assert "backgroundColor: tone.backgroundColor" in sector_logic
+    assert "boxShadow: tone.boxShadow" in sector_logic
     assert "资金热力" in sectors
     assert "动量热力" in sectors
     assert "信号热力" in sectors
@@ -465,12 +469,14 @@ def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
     assert map_head.index('class="block-map-meta"') < map_head.index('class="block-mode-tabs"')
     assert '</div>\n        <div class="block-map-meta">' not in sectors
 
-    block_grid_style = sectors.split(".sector-block-grid {", 1)[1].split("}", 1)[0]
+    block_grid_style = sector_css.split(".sector-block-grid {", 1)[1].split("}", 1)[0]
     assert "margin-top: 12px;" in block_grid_style
 
 
 def test_sector_capital_blocks_prioritize_metric_then_centered_industry_name():
     sectors = Path("web/frontend/src/views/Sectors.vue").read_text(encoding="utf-8")
+    sector_logic = Path("web/frontend/src/view-models/useSectorsView.ts").read_text(encoding="utf-8")
+    sector_css = Path("web/frontend/src/styles/views/sectors.css").read_text(encoding="utf-8")
 
     block_template = sectors.split('class="industry-block"', 1)[1].split("</button>", 1)[0]
     assert 'class="industry-amount"' in block_template
@@ -482,40 +488,41 @@ def test_sector_capital_blocks_prioritize_metric_then_centered_industry_name():
     assert 'class="industry-code"' not in block_template
     assert "tile.sector.sector_code || 'SW1'" not in block_template
 
-    tooltip_block = sectors.split("function industryTooltip", 1)[1].split("function heatStyle", 1)[0]
+    tooltip_block = sector_logic.split("function industryTooltip", 1)[1].split("function heatStyle", 1)[0]
     assert "行业代码" in tooltip_block
 
-    name_style = sectors.split(".industry-name {", 1)[1].split("}", 1)[0]
+    name_style = sector_css.split(".industry-name {", 1)[1].split("}", 1)[0]
     assert "align-self: center;" in name_style
     assert "justify-self: center;" in name_style
     assert "text-align: center;" in name_style
     assert "font-size: var(--industry-name-size, 12px);" in name_style
-    assert "sizeRatio" in sectors
-    assert "function industryNameFontSize" in sectors
-    assert '"--industry-name-size": industryNameFontSize(tile.sizeRatio)' in sectors
-    assert "Math.pow(clampNumber(sizeRatio, 0, 1), 0.8)" in sectors
-    assert "12 + visualWeight * 18" in sectors
+    assert "sizeRatio" in sector_logic
+    assert "function industryNameFontSize" in sector_logic
+    assert '"--industry-name-size": industryNameFontSize(tile.sizeRatio)' in sector_logic
+    assert "Math.pow(clampNumber(sizeRatio, 0, 1), 0.8)" in sector_logic
+    assert "12 + visualWeight * 18" in sector_logic
 
-    metric_style = sectors.split(".industry-metric {", 1)[1].split("}", 1)[0]
+    metric_style = sector_css.split(".industry-metric {", 1)[1].split("}", 1)[0]
     assert "--industry-name-size" not in metric_style
     assert "justify-self: center;" in metric_style
     assert "text-align: center;" in metric_style
 
-    stack_style = sectors.split(".industry-center-stack {", 1)[1].split("}", 1)[0]
+    stack_style = sector_css.split(".industry-center-stack {", 1)[1].split("}", 1)[0]
     assert "align-self: center;" in stack_style
     assert "justify-self: center;" in stack_style
     assert "align-items: center;" in stack_style
 
-    tooltip_style = sectors.split(".industry-block::after {", 1)[1].split("}", 1)[0]
+    tooltip_style = sector_css.split(".industry-block::after {", 1)[1].split("}", 1)[0]
     assert "content: attr(data-tooltip);" in tooltip_style
 
 
 def test_stock_search_view_defaults_to_stock_table():
     stocks = Path("web/frontend/src/views/Stocks.vue").read_text(encoding="utf-8")
+    stocks_logic = Path("web/frontend/src/view-models/useStocksView.ts").read_text(encoding="utf-8")
     api = Path("web/frontend/src/api/index.ts").read_text(encoding="utf-8")
 
-    assert "api.stockList" in stocks
-    assert "onMounted(loadStockList)" in stocks
+    assert "api.stockList" in stocks_logic
+    assert "onMounted(loadStockList)" in stocks_logic
     assert "stock-list-table" in stocks
     assert "defaultRows" in stocks
     assert "filteredRows" in stocks

@@ -1,0 +1,15 @@
+export const backtest = {
+      eyebrow: "BACKTEST EVIDENCE",
+      subtitle: "日频引擎 · 策略自主调仓 · 强基准、成本和晋级证据待统一接入",
+      count: "{count} strategies",
+      maxDrawdown: "最大回撤",
+      winRate: "胜率",
+      trades: "交易",
+      empty: "暂无回测结果",
+      bestReturn: "最佳收益",
+      avgSharpe: "平均 Sharpe",
+      deepestDrawdown: "最深回撤",
+      totalTrades: "总交易数",
+      benchmark: "上证指数",
+      loadError: "回测结果加载失败",
+    } as const;

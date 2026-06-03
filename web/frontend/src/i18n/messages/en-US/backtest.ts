@@ -1,0 +1,15 @@
+export const backtest = {
+      eyebrow: "BACKTEST EVIDENCE",
+      subtitle: "Daily engine · autonomous rebalancing · strong baselines, costs, and promotion evidence pending integration",
+      count: "{count} strategies",
+      maxDrawdown: "Max Drawdown",
+      winRate: "Win Rate",
+      trades: "Trades",
+      empty: "No backtest results",
+      bestReturn: "Best Return",
+      avgSharpe: "Average Sharpe",
+      deepestDrawdown: "Deepest Drawdown",
+      totalTrades: "Total Trades",
+      benchmark: "SSE Index",
+      loadError: "Backtest results failed to load",
+    } as const;

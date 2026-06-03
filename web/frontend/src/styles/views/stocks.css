@@ -1,0 +1,151 @@
+.stock-search-page {
+  gap: 12px;
+}
+.stock-search-card {
+  padding: 12px;
+}
+.stock-search-main {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.stock-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.stock-search-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--text-disabled);
+  font-size: 10px;
+}
+.stock-list-card {
+  padding: 12px;
+}
+.stock-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.stock-detail-metric {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.36);
+}
+.stock-detail-metric span {
+  display: block;
+  color: var(--text-disabled);
+  font-size: 10px;
+}
+.stock-detail-metric strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+}
+.stock-list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.stock-list-head span {
+  display: block;
+  color: var(--text-disabled);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.stock-list-head strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+.stock-list-hint {
+  color: var(--text-disabled);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.stock-list-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.stock-list-stats > div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.34);
+}
+.stock-list-stats span {
+  display: block;
+  color: var(--text-disabled);
+  font-size: 10px;
+}
+.stock-list-stats strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+}
+.stock-cell {
+  display: grid;
+  gap: 2px;
+}
+.stock-cell strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.stock-cell span {
+  color: var(--text-disabled);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+}
+.signal-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.signal-pill.buy {
+  border-color: rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--positive);
+}
+@media (max-width: 640px) {
+  .stock-search-main {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .stock-list-head {
+    flex-direction: column;
+  }
+  .stock-detail-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stock-list-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stock-list-hint {
+    white-space: normal;
+  }
+}

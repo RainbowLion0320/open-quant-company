@@ -40,7 +40,7 @@
                        │
 ┌──────────────────────▼──────────────────────────────┐
 │              Factor DSL Layer                         │
-│  expression.py — 声明式因子表达 (RSI/MA/MACD/Delta)   │
+│  expression.py — 声明式因子表达 (Ref/Ret/MA/Std/Delta) │
 │  dsl_parser.py — LLM 公式 → 可执行计算 + IC 检验      │
 └─────────────────────────────────────────────────────┘
 ┌─────────────────────────────────────────────────────┐
@@ -208,15 +208,16 @@ Market Regime 规则评分层保持确定性和可解释性，但不再只能靠
 
 ```python
 # 示例: 20日动量因子
-Mom20 = Delta(Close(), 20) / Close()
+close = Ref("close")
+Mom20 = Delta(close, 20) / close
 
-# 示例: RSI
-RSI14 = SMA(Max(Delta(Close(), 1), 0), 14) / SMA(Abs(Delta(Close(), 1)), 14) * 100
+# 示例: 波动率因子
+Vol20 = Std(Ret("close"), 20)
 ```
 
-**运算符支持：** `+`, `-`, `*`, `/`, `**`, `>`, `<`, `>=`, `<=`, `==`, `!=`, `&`, `|`
+**运算符支持：** `+`, `-`, `*`, `/`, `>`, `<`
 
-**内置因子：** `Close`, `Open`, `High`, `Low`, `Volume`, `SMA(expr, window)`, `EMA(expr, window)`, `Delta(expr, window)`, `Max(expr, window)`, `Min(expr, window)`, `Rank(expr, window)`, `Std(expr, window)`, `Corr(expr1, expr2, window)`, `TsRank(expr, window)`, `Delay(expr, d)`
+**内置因子：** `Ref(col, offset)`, `Ret(col)`, `MA(expr, window)`, `Std(expr, window)`, `Min(expr, window)`, `Max(expr, window)`, `Delta(expr, window)`, `Gt(expr, value)`, `Lt(expr, value)`, `CrossSectionalRank(expr)`；`alpha_factors()` 提供常用收益率、均线偏离、波动率、量价和自动注册因子。
 
 **LLM 因子发现：** `dsl_parser.py` 解析 LLM 生成的公式文本 → 计算因子值 → IC 检验 → 报告结果。`scripts/factor_hypothesis.py` 批量运行因子假设检验。
 
@@ -303,15 +304,17 @@ signals = generate_ml_signals(pool, date, model_name="lgbm_20260501")
 ### 因子 DSL 接口
 
 ```python
-from signals.expression import Close, SMA, Delta, parse_formula
+from signals.expression import Ref, MA, Std, Delta, Ret
+from signals.dsl_parser import compute_formula
 
 # 声明式
-mom = Delta(Close(), 20) / Close()
+close = Ref("close")
+mom = Delta(close, 20) / close
 val = mom.compute(df, idx=100)
 
 # LLM 公式解析
-from signals.dsl_parser import parse_and_compute
-parse_and_compute("SMA(Delta(close, 1), 20)", df)
+compute_formula("Delta(close, 1) / close_t", df, idx=100)
+compute_formula("close_t / close_t-20 - 1", df, idx=100)
 ```
 
 ## 6. 错误处理
@@ -324,7 +327,7 @@ parse_and_compute("SMA(Delta(close, 1), 20)", df)
 ## 7. 测试策略
 
 - **合约测试：** 每种策略的 `compute_signals()` 返回 DataFrame schema 不变（columns: symbol, score, signal）
-- **公式测试：** RSI/MACD/MA 计算结果与 ta-lib 对比（误差 < 1e-6）
+- **公式测试：** `Ret/MA/Std/Delta`、`close_t-N` 滞后引用、缺失列和 NaN 边界由 `tests/test_boundary.py` 覆盖
 - **边界测试：** 空股票池、全 NaN 数据、单只股票排名
 - **回归测试：** 固定日期+固定股票池，评分结果哈希不变
 
