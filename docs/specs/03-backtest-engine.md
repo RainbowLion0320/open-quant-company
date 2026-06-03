@@ -1,6 +1,6 @@
 # Spec: 回测引擎 (Backtest Engine)
 
-> 版本: 1.1 | 日期: 2026-05-29 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md) [Execution Layer](04-execution-layer.md)
+> 版本: 1.2 | 日期: 2026-06-03 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md) [Execution Layer](04-execution-layer.md)
 
 ## 1. 概述
 
@@ -8,7 +8,7 @@
 
 **设计原则：**
 - **PIT 零容忍** — 任何前视偏差都是 bug，不是 feature
-- **策略可插拔** — `backtest/strategies/` 下每个策略独立文件
+- **策略可插拔** — `backtest/strategies/base.py` 定义评分/调仓接口，生产锦标赛复用信号层 scorer 和注册表
 - **自研非 Backtrader** — 需要 PIT 特征存储和锦标赛对比，Backtrader 不满足
 - **证据先行** — 候选策略晋级必须有强基准、OOS、walk-forward、成本模型和 regime 分解证据
 
@@ -24,8 +24,8 @@
        │               │               │               │
 ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
 │ base.py     │ │ml_strategy  │ │buffett_real │ │ pipeline.py │
-│ 动量+等权    │ │ LightGBM    │ │ _scorer.py  │ │ 可插拔流水线 │
-│ 基准策略     │ │ 月度调仓     │ │ 滚动PIT评分  │ │ 自定义组合   │
+│ BaseStrategy│ │ LightGBM    │ │ _scorer.py  │ │ 可插拔流水线 │
+│ + Registry  │ │ 月度调仓     │ │ 滚动PIT评分  │ │ 自定义组合   │
 └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
        │               │               │               │
        └───────────────┼───────────────┴───────────────┘
@@ -45,7 +45,7 @@
 1. 加载价格矩阵（N 只股票 × T 个交易日）
 2. 每月初运行策略评分 → 调仓
 3. 每日计算持仓市值 → NAV
-4. 扣除交易成本（印花税 0.1% + 佣金 0.03% + 滑点 0.1%）
+4. 通过 `pipeline.execution.ExecutionRouter` / `AShareExchange` 扣除交易成本（默认回测 commission_rate=0.00081、卖出 stamp_duty=0.0005，可注入交易所覆盖）
 
 **锦标赛模式：** 同一时间区间内运行所有已注册策略，输出对比排名表。
 
@@ -56,10 +56,10 @@
 
 ### 2.2 策略基类 (strategies/base.py)
 
-**DefaultStrategy：** 等权动量策略，作为基准对比。
-- 每月选择动量最强的前 N 只
-- 等权分配资金
-- 100 股整数倍约束
+**BaseStrategy：** 统一策略抽象和注册表。
+- `score(symbol, prices, idx, regime, **kwargs)` 输出 0-100 横截面评分
+- `should_rebalance()` 默认月度再平衡，可由子类覆写
+- `get_positions()` 根据评分、当前持仓、价格和资金生成 100 股整数倍目标持仓
 
 ### 2.3 ML 策略 (strategies/ml_strategy.py)
 
@@ -70,13 +70,23 @@
 ### 2.4 可插拔流水线 (pipeline.py)
 
 ```python
-Pipeline([
-    DataStep("load_prices"),
-    StrategyStep("compute_signals"),
-    SelectionStep("top_n", n=10),
-    RiskStep("max_position_20pct"),
-    ExecutionStep("equal_weight"),
-])
+from backtest.pipeline import (
+    Context,
+    Pipeline,
+    DataLoader,
+    FactorStage,
+    MultiFactorSignal,
+    EqualWeightPortfolio,
+    BacktestStage,
+)
+
+ctx = Pipeline([
+    DataLoader(["000001", "600519"], "2020-01-01", "2026-05-31"),
+    FactorStage(factors, names),
+    MultiFactorSignal({"momentum": 0.6, "value": 0.4}, top_n=10),
+    EqualWeightPortfolio(),
+    BacktestStage(),
+]).run(Context())
 ```
 
 ### 2.5 风险分析 (analytics.py)
@@ -147,7 +157,7 @@ data/store/signals/*.parquet  (预计算信号)
     └────────┬────────┘
              │ NAV series
              ▼
-    RiskAnalytics.compute(nav, benchmark)
+    RiskAnalytics.compute(daily_returns, benchmark_returns)
              │
              ▼
     FullReport: {metrics, trades, monthly_returns}
@@ -176,23 +186,32 @@ data/store/signals/*.parquet  (预计算信号)
 ### 策略接口
 
 ```python
-class Strategy(ABC):
+class BaseStrategy(ABC):
     @abstractmethod
-    def generate_signals(
+    def score(
         self,
-        prices: pd.DataFrame,     # N stocks × T days
-        date: pd.Timestamp,
-        holdings: dict,           # current positions
-        cash: float,
-    ) -> list[Signal]:            # buy/sell signals
+        symbol: str,
+        prices: pd.Series | pd.DataFrame,
+        idx: int,
+        regime: str,
+        **kwargs,
+    ) -> float:
+        """返回 0-100 横截面评分。"""
         ...
 
-@dataclass
-class Signal:
-    symbol: str
-    action: str       # "buy" | "sell"
-    weight: float     # 0.0 ~ 1.0
-    reason: str = ""
+    def should_rebalance(self, dt, regime, last_regime=None, *args, **kwargs) -> bool:
+        ...
+
+    def get_positions(
+        self,
+        scores: dict[str, float],
+        current_holdings: dict[str, int],
+        prices: pd.Series,
+        capital: float,
+        max_positions: int = 8,
+        position_ratio: float = 0.30,
+    ) -> tuple[dict[str, int], float]:
+        ...
 ```
 
 ### 分析接口
@@ -200,9 +219,13 @@ class Signal:
 ```python
 from backtest.analytics import RiskAnalytics, FullReport
 
-analytics = RiskAnalytics(nav_series, benchmark_series, risk_free_rate=0.02)
-metrics: dict = analytics.compute_all()
-report = FullReport(metrics, trades, monthly_returns)
+report: FullReport = RiskAnalytics.compute(
+    daily_returns,
+    benchmark_returns,
+    risk_free=0.03,
+    periods_per_year=252,
+)
+metrics: dict = report.to_dict()
 ```
 
 ## 6. 错误处理
@@ -215,9 +238,9 @@ report = FullReport(metrics, trades, monthly_returns)
 
 ## 7. 测试策略
 
-- **合约测试：** 所有策略的 `generate_signals()` 返回 `list[Signal]` 类型
+- **合约测试：** `BaseStrategy.score()` / `get_positions()` 和 Pipeline stage 契约保持稳定
 - **PIT 测试：** 在已知未来暴涨的数据上运行回测，验证策略不会提前买入
-- **公式测试：** Sortino/Beta/Sharpe 计算结果与 `empyrical` 库对比（误差 < 1e-6）
+- **公式测试：** Sortino/Beta/Sharpe、退化收益序列和 NaN 边界由 `tests/test_boundary.py` 覆盖
 - **边界测试：** 单日回测、单只股票、负价格、全 NaN NAV
 - **回归测试：** 固定随机种子 + 固定数据，回测结果可复现
 - **证据测试：** `tests/test_strategy_backtest_evidence.py` 验证强基准和晋级门槛字段完整
@@ -225,6 +248,6 @@ report = FullReport(metrics, trades, monthly_returns)
 ## 8. 已知限制 & 未来方向
 
 - **无分钟级回测：** 当前仅支持日频，分钟级需要完全不同的事件驱动架构
-- **无多资产联合回测：** 股票/ETF 联合回测在 `multi_asset_tournament.py` 中独立实现，未集成到主回测引擎
+- **多资产联合回测独立入口：** 股票/ETF 联合回测在 `scripts/multi_asset_tournament.py` 中实现，未并入主 N 策略锦标赛入口
 - **无交易成本模型细化：** 未考虑冲击成本（大单对市场价格的影响）
-- **未来：** 支持自定义基准（沪深300/中证500/自定义组合）
+- **未来：** 在当前 `backtest.benchmark` 单基准配置之外，支持沪深300/中证500/自定义组合等对比篮子

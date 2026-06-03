@@ -1,6 +1,6 @@
 # Spec: 执行层 (Execution Layer)
 
-> 版本: 1.0 | 日期: 2026-05-21 | 关联: [PRD](../PRD.md) [Backtest Engine](03-backtest-engine.md) [Multi-Asset](06-multi-asset.md)
+> 版本: 1.1 | 日期: 2026-06-03 | 关联: [PRD](../PRD.md) [Backtest Engine](03-backtest-engine.md) [Multi-Asset](06-multi-asset.md)
 
 ## 1. 概述
 
@@ -22,10 +22,10 @@
                        │
 ┌──────────────────────▼──────────────────────────────┐
 │                   PaperBroker                         │
-│   submit_order() → RiskManager.check() → 模拟撮合     │
+│   submit_order() → RiskManager.check_order() → 模拟撮合│
 │   get_positions() / get_balance() / get_orders()      │
-│   record_order() / cancel_order()                     │
-│   update_positions(prices) — 日末盯市                  │
+│   cancel_order() / get_today_trades() / end_of_day()  │
+│   set_prices(prices) — 刷新行情；end_of_day() 盯市      │
 └──────┬──────────────┬──────────────┬────────────────┘
        │              │              │
 ┌──────▼──────┐ ┌─────▼─────┐ ┌─────▼──────────────┐
@@ -42,22 +42,24 @@
 ```python
 class Broker(ABC):
     @abstractmethod
-    def submit_order(self, symbol, price, volume, side) -> Order
+    def submit_order(self, code: str, price: float, volume: int, side: str) -> str
     @abstractmethod
     def cancel_order(self, order_id) -> bool
     @abstractmethod
-    def get_positions(self) -> dict[str, Position]
+    def get_positions(self) -> list[Position]
     @abstractmethod
     def get_balance(self) -> Account
     @abstractmethod
     def get_orders(self) -> list[Order]
+    @abstractmethod
+    def get_today_trades(self) -> list[Order]
 ```
 
 **模拟撮合逻辑：**
 - 买入：以当日收盘价成交（日频无日内价格）
 - 卖出：同价成交
 - 约束：100 股整数倍（A 股规则）
-- 成本：印花税 0.1%（卖出）+ 佣金 0.03%（买卖）+ 滑点 0.1%
+- 成本：由 `paper_trading.commission_rate` 和 `broker/exchange.py` 的资产费率模型配置驱动
 
 **订单生命周期：** `PENDING` → `FILLED`（成交）/ `REJECTED`（风控拒绝）/ `CANCELLED`（撤单）
 
@@ -68,13 +70,13 @@ class Broker(ABC):
 | 1 | `MaxSinglePositionRule` | 单只 ≤ 25% 总权益 | 计算持仓+拟购后的比例 |
 | 2 | `MaxTotalExposureRule` | 总敞口 ≤ 80% | 预留 20% 现金缓冲 |
 | 3 | `MaxOrdersPerDayRule` | 每日 ≤ 20 笔 | 防止过度交易 |
-| 4 | `DrawdownCircuitBreaker` | 回撤 > 20% 熔断 | 熔断后所有买单自动拒绝 |
-| 5 | `MaxSingleOrderAmountRule` | 单笔 ≤ 10% 总资金 | 分散入场，避免冲击 |
+| 4 | `DrawdownCircuitBreaker` | 回撤超过 `max_drawdown_pct` | 回撤规则不通过时拒绝买单 |
+| 5 | `MaxSingleOrderAmountRule` | 单笔金额 ≤ 配置上限 | 分散入场，避免冲击 |
 
 **熔断机制：**
-- 触发条件：`1 - NAV/NAV_peak > circuit_breaker_threshold`（默认 0.20）
-- 熔断后行为：所有买单自动拒绝，只允许卖出
-- 恢复条件：需手动重置（`reset_circuit_breaker()`）
+- 触发条件：`portfolio.drawdown_pct <= max_drawdown_pct`（当前默认 `-0.15`）
+- 行为：作为 `RiskRule` 的一次性下单检查结果返回，不维护独立 latch 状态
+- 恢复：由组合净值和 `peak_equity` 更新自然恢复；当前没有 `reset_circuit_breaker()` 公共接口
 
 **可插拔设计：** 每个规则继承 `RiskRule` 基类，实现 `check(context) → RiskCheckResult`。新增规则只需创建子类并注册到配置。
 
@@ -82,18 +84,20 @@ class Broker(ABC):
 
 ```python
 class AShareExchange:
-    commission_rate: 0.0003   # 万三
-    stamp_tax: 0.001          # 千一 (仅卖出)
-    min_lot: 100              # 1手=100股
-    slippage: 0.001           # 千一滑点
+    commission: 0.00025       # 配置默认，最低佣金 5 元
+    stamp_tax: 0.0005         # 卖出单向
+    transfer_fee: 0.00001
+    lot_size: 100             # 1手=100股
 
 class ETFExchange:
-    commission_rate: 0.0001   # 万一
-    stamp_tax: 0.0            # ETF 免印花税
-    min_lot: 100
+    commission: 0.00005       # 配置默认，最低佣金 0.1 元
+    lot_size: 100
+
+class BondExchange:
+    commission: 0.00002       # 配置默认，最低佣金 0.1 元
 ```
 
-`calc_cost(price, volume, side)` → 统一计算含印花税+佣金+滑点的总成本。
+`calc_cost(price, shares, side)` → 统一计算当前资产的佣金、印花税和过户费等成本；费率从 `trading.exchange.*` 读取，可通过构造参数覆盖。
 
 ### 2.4 Persistence — 状态持久化
 
@@ -101,14 +105,14 @@ class ETFExchange:
 
 | 表 | 路径 | Schema |
 |----|------|--------|
-| `trades` | `data/store/paper/trades.parquet` | order_id, symbol, side, price, volume, cost, timestamp |
-| `nav` | `data/store/paper/nav.parquet` | date, nav, cash, market_value, daily_return |
-| `state` | `data/store/paper/state.parquet` | symbol, shares, avg_cost, last_price, market_value |
+| `trades` | `data/store/paper/trades.parquet` | date, code, name, side, price, volume, amount, strategy |
+| `nav` | `data/store/paper/nav.parquet` | date, total_asset, cash, market_value |
+| `state` | `data/store/paper/state.parquet` | cash, frozen_cash, peak_equity, positions(JSON), order_counter, updated_at |
 
 **保存时机：**
 - 每次 `submit_order()` 成交后 → 更新 trades + state
 - 每日收盘后 → 追加 NAV 记录
-- `update_positions(prices)` → 更新 state 中 last_price 和 market_value
+- `set_prices(prices)` 刷新行情；`end_of_day()` 更新持仓可卖数量、峰值权益和 NAV 快照
 
 ### 2.5 Cron 调度
 
@@ -133,12 +137,12 @@ class ETFExchange:
   ┌──────────────────────────────┐
   │  读取信号 → 生成订单           │
   │  for signal in buy_signals:  │
-  │    order = Order(symbol, ...) │
-  │    broker.submit_order(order) │
+  │    broker.set_prices(...)     │
+  │    broker.submit_order(...)   │
   └────────────┬─────────────────┘
                │
                ▼
-  RiskManager.check_order(order, portfolio)
+  RiskManager.check_order(code, amount, portfolio)
                │
        ┌───────┴───────┐
        ▼               ▼
@@ -148,10 +152,10 @@ class ETFExchange:
   模拟撮合成交      记录拒绝原因
        │
        ▼
-  Persistence.save_trade() + update_state()
+  append_trade() + save_state()
        │
        ▼
-  Persistence.save_nav(date, nav)
+  append_nav(date, total_asset, cash, market_value)
 ```
 
 ## 4. 关键设计决策
@@ -172,33 +176,35 @@ class ETFExchange:
 broker = PaperBroker(initial_cash=1_000_000)
 
 # 下单 — 自动过风控
-order = broker.submit_order("000001", price=12.5, volume=100, side="buy")
-# order.status ∈ {"filled", "rejected"}
+order_id_or_reason = broker.submit_order("000001", price=12.5, volume=100, side="buy")
+# 成功返回 PAPER_* order id；拒绝返回可读原因字符串
 
 # 查询
-broker.get_positions()    → {"000001": Position(shares=100, avg_cost=12.5, ...)}
+broker.get_positions()    → [Position(code="000001", volume=100, avg_cost=12.5, ...)]
 broker.get_balance()      → Account(cash=987500, market_value=1250, ...)
 broker.get_orders()       → [Order(...), ...]
-broker.get_nav_history()  → pd.DataFrame
+broker.get_today_trades() → [Order(...), ...]
+
+# NAV 由 API 或持久化层读取
+load_nav() / GET /api/portfolio/nav → pd.DataFrame / JSON
 ```
 
 ### RiskManager 接口
 
 ```python
 rm = RiskManager(config)
-result: RiskCheckResult = rm.check_order(symbol, amount, portfolio)
-# result.passed: bool, result.reason: str
-
-# 熔断
-rm.is_circuit_breaker_triggered() → bool
-rm.reset_circuit_breaker()
+passed, results = rm.check_order(code, amount, portfolio)
+# passed: bool
+# results: list[RiskCheckResult]，每条包含 rule / passed / reason / severity
+rm.record_order(order_date)
+rm.check_portfolio(portfolio) → list[RiskCheckResult]
 ```
 
 ## 6. 错误处理
 
-- **风控拒绝：** 订单状态设为 REJECTED，记录拒绝原因到 order.reason
+- **风控拒绝：** `submit_order()` 返回拒绝原因，订单簿保留 REJECTED 订单和状态历史
 - **资金不足：** 订单 REJECTED，不影响现有持仓
-- **价格缺失：** `update_positions()` 保持上次已知价格，不抛异常
+- **价格缺失：** `set_prices()` 可只更新有报价的标的，持仓保留上次 `current_price`
 - **持仓状态文件丢失：** 从零开始（空持仓+初始资金），不崩溃
 - **并发写 trades：** 通过 DataHub.append_parquet() 的 fcntl 锁保护
 
@@ -208,7 +214,7 @@ rm.reset_circuit_breaker()
 - **风控规则测试：** 每条规则独立测试（单只超限/总敞口超限/回撤熔断/单笔超限/日频超限）
 - **状态持久化测试：** 创建 Broker → 下单 → 保存 → 重新加载 → 验证状态一致
 - **NAV 计算测试：** 手工计算 vs PaperBroker 输出对比
-- **边界测试：** 零资金、全持仓卖出、熔断后恢复、空信号执行
+- **边界测试：** 零资金、全持仓卖出、回撤规则拒绝买单、空信号执行
 
 ## 8. 已知限制 & 未来方向
 

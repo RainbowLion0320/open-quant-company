@@ -1,7 +1,7 @@
 ---
 title: Buffett Filter (Triple-Filter Stock Screen)
 created: 2026-05-12
-updated: 2026-05-12
+updated: 2026-06-03
 type: concept
 tags: [buffett, screening, value-investing, moat, margin-of-safety, backtest]
 ---
@@ -54,4 +54,4 @@ tags: [buffett, screening, value-investing, moat, margin-of-safety, backtest]
 - [[buffett-rolling-backtest]] — 回测中如何使用此过滤器
 - [[dcf-valuation]] — DCF 方法细节
 - [[financial-cache]] — 财务数据缓存架构
-- [[strategy-evolution]] — 四策略对比
+- [[strategy-evolution]] — 多策略锦标赛与晋级证据

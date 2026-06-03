@@ -1,6 +1,6 @@
 # Spec: 数据管道 (Data Pipeline)
 
-> 版本: 1.1 | 更新: 2026-05-23 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md)
+> 版本: 1.2 | 更新: 2026-06-03 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
@@ -105,18 +105,22 @@
 
 ### 2.4 Cleaner — 6 规则数据清洗
 
-1. **MissingValueRule** — 缺失值前向填充
-2. **OutlierDetectionRule** — 涨跌幅 > 阈值（默认 11%）用前一日收盘价修正
-3. **SuspensionRule** — 连续停牌 > N 天标记
-4. **DuplicateRule** — 按 date 去重
-5. **NegativePriceRule** — 负价格修正为 NaN
-6. **VolumeSpikeRule** — 成交量突增 > N 倍标准差标记
+规则注册表位于 `data/cleaner.py` 的 `RULE_CLASSES`，启用和参数由 `config/settings.yaml` → `data_cleaning` 控制。
+
+1. **OHLCVIntegrityRule** — 验证必需 OHLCV 列、修正 high/low/close 区间、移除非正价格或负成交量
+2. **OutlierDetectionRule** — 对收益率极端值、异常单日涨跌幅和成交量尖峰做缩尾/回补
+3. **SuspendedDetectionRule** — 连续价格不变超过阈值的停牌/退市段落移除
+4. **MissingValueRule** — OHLCV 缺失值有限前向填充，仍缺 close 的行移除
+5. **FinancialValidationRule** — 财务因子边界裁剪（ROE、利润率、D/E、PE、PB）
+6. **WinsorizeRule** — 特征列按 1%/99% 默认分位缩尾
 
 ### 2.5 Feature Store — PIT 特征工程
 
 **Point-in-Time 严格性：** 每个月切片使用该月最后一天之前的所有数据构建特征，绝不使用未来信息。
 - 输出：`data/store/features/YYYY-MM.parquet`
-- `enrich()` 方法支持当日因子实时计算（不上报 PIT 特征存储）
+- 构建入口：`FeatureStoreBuilder.build_month(month, symbols)` / `build_all(start_month, end_month, symbols)`
+- 读取入口：`iter_feature_files()`、`load_feature_panel()`、`latest_feature_frame()`、`FeatureStoreBuilder.load_month(month)`
+- 注册表扩展：`enrich_from_registry(df, month, symbols)` 从 DataRegistry 维度补充资金流、持有人、宏观等 PIT 因子
 
 ### 2.6 Cron Logger — 可观测性
 
@@ -140,13 +144,13 @@ AKShare/Tushare API
   AKShare API 调用 → DataFrame
        │
        ▼ (清洗管道)
-  CleanerRule.apply() × 6
+  CleanerRule.apply() × enabled rules
        │
        ▼ (原子写入)
   DataHub.write_parquet(): tmp → os.replace → manifest
        │
        ▼ (PIT 特征构建)
-  FeatureStore.build_slice(month)
+  FeatureStoreBuilder.build_month(month, symbols)
        │
        ▼ (上层消费)
   Signals / Backtest / Broker / Web
@@ -193,6 +197,17 @@ get_stock_spot()                            → pd.DataFrame
 provider.fetch("sw_daily", trade_date=...)  → pd.DataFrame
 ```
 
+### Feature Store 核心接口
+
+```python
+builder = FeatureStoreBuilder(alpha_factors())
+builder.build_month("2026-05", symbols)
+builder.build_all("2020-01", "2026-05", symbols)
+FeatureStoreBuilder.load_month("2026-05")   → pd.DataFrame | None
+latest_feature_frame()                      → pd.DataFrame
+load_feature_panel()                        → pd.DataFrame
+```
+
 ### DataRegistry 核心接口
 
 ```python
@@ -223,6 +238,6 @@ reg.health_metadata()           → dict[str, HealthTableMeta]
 ## 8. 已知限制 & 未来方向
 
 - **AKShare 网络不稳定：** 新浪源偶尔限流，已通过 3 源 fallback 缓解
-- **多资产回测数据质量不均：** ETF 适配器已有真实行情路径，但 `multi_asset_tournament.py` 仍可能在缺少本地缓存时使用 proxy（见 [06-multi-asset.md](06-multi-asset.md)）
+- **多资产回测数据质量不均：** ETF 适配器已有真实行情路径，但 `scripts/multi_asset_tournament.py` 仍可能在缺少本地缓存时使用 proxy（见 [06-multi-asset.md](06-multi-asset.md)）
 - **Tushare 2000 积分限制：** 部分维度 status=rate_limited，需 `cron_fetch_slow.py` 分批拉取
 - **未来：** 可接入 Wind/Choice 等专业数据终端，并把付费/限流源统一纳入 DataRegistry SLA

@@ -15,7 +15,7 @@
 | 1.5 | AKShare 3 源 fallback (新浪→东财→腾讯) | `data/fetcher.py` | `test_data_fetcher_resilience.py` | — | `python -c "from data.fetcher import get_stock_daily; print(get_stock_daily('000001'))"` | OK | — |
 | 1.6 | API 安全阀 (默认不触网) | `data/fetcher.py` | `test_architecture_contracts.py:test_stock_daily_read_path_does_not_implicitly_fetch_api` | — | 设置 `QUANT_ALLOW_API_FALLBACK=0` 验证不触网 | OK | — |
 | 1.7 | 请求节流 3s + 指数退避重试 3 次 | `data/fetcher.py` | `test_data_fetcher_resilience.py` | — | 观察 cron 日志无频率限制错误 | OK | — |
-| 1.8 | 6 规则数据清洗 | `data/cleaner.py` | `test_data_cleaner_contracts.py` | — | `python -c "from data.cleaner import clean_ohlcv; ..."` | OK | — |
+| 1.8 | 6 规则数据清洗 | `data/cleaner.py` | `test_data_cleaner_contracts.py` | — | `python -c "from data.cleaner import DataCleaner; print(DataCleaner().rule_count)"` | OK | — |
 | 1.9 | 财务数据三层缓存 (内存→Parquet→API) | `data/financials.py` | `test_datahub_contracts.py:test_financials_uses_canonical_symbol_path` | — | 第二次查询同一股票财务数据应瞬间返回 | OK | — |
 | 1.10 | PIT 特征构建 (月度切片) | `data/feature_store.py` | `test_architecture_contracts.py:test_build_features_import_is_safe` | — | `python scripts/build_features.py` 生成 `data/store/features/YYYY-MM.parquet` | OK | 待增强自动化前视检测 |
 | 1.11 | Cron Logger (JSONL + 自动轮转 500 行) | `data/cron_logger.py` | `test_cron_logger_contracts.py` | `GET /api/system/cron-jobs` → `ActivityMonitor.vue` cron 状态 | 检查 `data/store/_cron_log/` 有日志文件 | OK | — |
@@ -32,11 +32,11 @@
 | 2.4 | 控制论自适应 Hybrid Regime 检测 + 参数调整 | `cybernetics/orchestrator.py`, `cybernetics/hmm_engine.py`, `cybernetics/regime.py`, `cybernetics/regime_policy.py`, `cybernetics/regime_scoring.py`, `cybernetics/regime_state.py`, `data/models/regime_hmm/` | `test_market_regime_v2.py`, `test_hmm_engine.py`, `test_regime_scoring.py`, `test_regime_state.py` | `GET /api/market/regime` → `Market.vue`, `GET /api/pipeline/market-regime` → `Pipeline.vue` | Hybrid 默认引擎；规则评分输出 score/components，HMM 输出概率/confidence/entropy；不一致低置信 blended vote；实时 confirmed regime 按唯一观测日执行 `min_dwell=3` | OK | — |
 | 2.5 | 因子 DSL 表达式引擎 (声明式因子) | `signals/expression.py` | `test_boundary.py` (Ret/MA/Std/Delta/缺失输入) | — | `python -c "from signals.expression import Ref,MA,Std,Delta,Ret; ..."` | OK | — |
 | 2.6 | DSL 公式解析 (LLM→计算) | `signals/dsl_parser.py` | `test_boundary.py` (公式解析) | — | `python scripts/factor_hypothesis.py` | OK | — |
-| 2.7 | 横截面排名 → buy/sell/hold 信号 | `signals/selection.py` | `test_boundary.py` (apply_ranked_buys) | — | 验证信号文件符合 schema (symbol, score, signal) | OK | — |
+| 2.7 | 横截面排名 → 受限 buy list + hold rows | `signals/selection.py` | `test_boundary.py` (apply_ranked_buys) | — | 验证信号文件符合 schema (symbol, score, signal, detail.selection_*) | OK | — |
 | 2.8 | 策略插件注册表 (动态 import) | `data/strategy_plugins.py` | `test_architecture_contracts.py:test_enabled_strategy_plugins_have_runners` | `GET /api/strategies` → `Strategies.vue` | 新增策略只需改 yaml 配置 | OK | — |
 | 2.9 | Regime 自适应权重调整 | `signals/multifactor.py` | `test_sector_pipeline.py:test_regime_affects_market_score_but_not_industry` | — | bull/bear/sideways 三种 regime 下权重分布不同 | OK | — |
 | 2.10 | 行业动量因子集成 | `signals/multifactor.py:_industry_score()` | — | 多因子评分含 industry 维度, 组合敞口 API | 行业动量已纳入五维评分, detail 含 industry 分 | OK | — |
-| 2.11 | 策略研究治理和晋级门槛 | `research/strategy_governance.py` | `test_strategy_research_governance.py` | `GET /api/strategies/governance` → `Strategies.vue` | 四策略分层、paper/production 门槛、ML 默认为 paper | OK | — |
+| 2.11 | 策略研究治理和晋级门槛 | `research/strategy_governance.py` | `test_strategy_research_governance.py` | `GET /api/strategies/governance` → `Strategies.vue` | 内置策略分层、paper/production 门槛、ML 默认为 paper | OK | — |
 | 2.12 | 因子研究诊断 | `signals/factor_research.py` | `test_strategy_research_governance.py:test_factor_diagnostics_rank_ic_quantile_spread_and_correlation_clusters` | — | 输出 IC/ICIR/分组收益 spread/相关性聚类 | OK | — |
 | 2.13 | Market Regime 离线训练与晋级 | `research/regime/`, `scripts/train_market_regime.py` | `test_regime_training.py` | `reports/regime_training/summary.json` | champion/challenger、walk-forward、策略 A/B、默认不自动替换生产公式 | OK | — |
 | 2.14 | Market Regime 挣钱导向训练 | `research/regime/`, `scripts/train_market_regime_profit.py`, `cybernetics/regime_policy.py` | `test_regime_profit_training.py` | `reports/regime_profit_training/summary.json` | 可交易资产 risk-on/risk-off、强 baseline、walk-forward OOS、champion 同标准诊断、best validated 选择，`w0611` 已作为规则评分基线并由统一 production policy 常量约束 | OK | — |
@@ -48,13 +48,13 @@
 
 | # | PRD/Spec 条目 | 代码文件 | 测试 | API / Web | 手工验收 | 状态 | 缺口 |
 |---|--------------|---------|------|-----------|---------|------|------|
-| 3.1 | N 策略锦标赛对比 | `backtest/run_all_strategies.py` | — | `GET /backtest` → `Backtest.vue` | `make backtest` 输出排名表 | OK | — |
+| 3.1 | N 策略锦标赛对比 | `backtest/run_all_strategies.py` | — | `GET /api/backtest` → `/strategy-lab?tab=backtest` (`Backtest.vue`) | `make backtest` 输出排名表 | OK | — |
 | 3.2 | 15 项风险指标 (Sharpe/Sortino/Calmar...) | `backtest/analytics.py` | `test_boundary.py` (Sharpe/MaxDD/WinRate/Beta/Alpha) | `Backtest.vue` 雷达图 | 手工验证 Sortino 用 RMS 法、Beta 用 cov 矩阵 | OK | — |
 | 3.3 | PIT 零前视偏差 | `backtest/run_all_strategies.py` | `test_backtest_pit_contracts.py` | — | 构造未来暴涨样本 → 策略不提前买入 | OK | — |
 | 3.4 | Regime 回测用生产 policy 且滞后一月 | `backtest/run_all_strategies.py:build_production_regime_map()` | `test_architecture_contracts.py:test_backtest_regime_replay_uses_production_policy_not_monthly_ma_chain` | — | 历史回放 `CHAMPION_POLICY`，当月只使用上一期可得 regime，禁止旧 MA 链路 | OK | — |
 | 3.5 | 巴菲特滚动窗口逐年评分 | `backtest/buffett_real_scorer.py` | — | — | 验证滚动评分器每次策略评分前重置年度缓存，且只使用当期可得财报 | OK | — |
 | 3.6 | 回测结果可复现 | `backtest/run_all_strategies.py` / deterministic fixture | `test_backtest_reproducibility.py` | — | 同一数据+种子 → 同一结果 | OK | — |
-| 3.7 | 可插拔回测流水线 | `backtest/pipeline.py` | `test_backtest_pipeline_contracts.py` | — | 自定义 Pipeline 组合 Data/Strategy/Selection/Risk/Execution | OK | — |
+| 3.7 | 可插拔回测流水线 | `backtest/pipeline.py` | `test_backtest_pipeline_contracts.py` | — | 自定义 Pipeline 组合 DataLoader/FactorStage/MultiFactorSignal/Portfolio/Backtest/Evidence stages | OK | — |
 | 3.8 | 基准使用上证综指 (非个股) | `config/settings.yaml` backtest.benchmark | — | — | 确认 benchmark=sh000001 (非 000001) | OK (已修复) | — |
 | 3.9 | 约束组合构建 | `pipeline/portfolio.py:ConstrainedPortfolioConstructor` | `test_strategy_research_governance.py:test_constrained_portfolio_constructor_caps_sector_and_single_name_weight` | — | Top-N 同时受单票/行业/总仓位上限约束 | OK | — |
 | 3.10 | 候选策略证据报告契约 | `research/strategy_evaluation.py`, `backtest/run_all_strategies.py` | `test_strategy_backtest_evidence.py`, `test_strategy_evaluation.py` | `data/store/research/strategy_evidence/*.json` | 报告含强基准、metrics、OOS、成本、regime breakdown 和 promotion decision | OK | 待接入更多真实 baseline 结果 |
@@ -63,8 +63,8 @@
 
 | # | PRD/Spec 条目 | 代码文件 | 测试 | API / Web | 手工验收 | 状态 | 缺口 |
 |---|--------------|---------|------|-----------|---------|------|------|
-| 4.1 | PaperBroker 模拟券商 (ABC 接口) | `broker/__init__.py` | `test_boundary.py` (买入/卖出/T+1/资金不足) | `GET /portfolio` → `Portfolio.vue` | 手工下单 → 验证持仓/余额/NAV 更新 | OK | — |
-| 4.2 | T+1 交易约束 | `broker/__init__.py` | `test_boundary.py` (T+1限制卖出/隔日解除) | — | 当日买入的股票当日不能卖出 | OK | — |
+| 4.1 | PaperBroker 模拟券商 (ABC 接口) | `broker/base.py`, `broker/paper_core.py`, `broker/paper_orders.py` | `test_boundary.py` (买入/卖出/T+1/资金不足) | `/portfolio` + `GET /api/portfolio/*` | 手工下单 → 验证持仓/余额/NAV 更新 | OK | — |
+| 4.2 | T+1 交易约束 | `broker/paper_orders.py` | `test_boundary.py` (T+1限制卖出/隔日解除) | — | 当日买入的股票当日不能卖出 | OK | — |
 | 4.3 | 5 规则风控 | `broker/risk.py` | `test_broker_risk_persistence_allocator.py:test_risk_manager_rejects_each_configured_limit`, `test_broker_risk_persistence_allocator.py:test_risk_manager_enforces_daily_order_count` | — | 逐规则验证 (仓位上限/总敞口/日频/熔断/单笔) | OK | — |
 | 4.4 | 熔断机制 (回撤 > 阈值自动拒绝买单) | `broker/risk.py` | `test_broker_risk_persistence_allocator.py:test_risk_manager_rejects_each_configured_limit` | — | 模拟回撤超限 → 验证买单全拒绝 | OK | — |
 | 4.5 | Parquet 状态持久化 (trades/nav/state) | `broker/persistence.py`, `broker/state.py` | `test_broker_risk_persistence_allocator.py:test_paper_state_persistence_round_trip_uses_public_state_model` | — | 创建 Broker → 下单 → 重启 → 状态恢复一致 | OK | — |
@@ -78,7 +78,7 @@
 |---|--------------|---------|------|-----------|---------|------|------|
 | 5.1 | Vue 3 SPA + Pinia + ECharts + Tailwind | `web/frontend/` | — | 7 个一级入口 + 二级 tab 工作区 | `npm run build` 通过 | OK | — |
 | 5.2 | FastAPI 12 业务路由模块 | `web/api/routes/` (12 文件) | `test_web_system_contracts.py` (strategy jobs 路由) | 全部业务路由模块 | `python -m uvicorn web.api.app:create_app --factory` 启动无报错 | OK | — |
-| 5.3 | WebSocket 实时进度推送 | `web/api/ws.py`, `web/api/jobs.py` | `test_websocket_contracts.py` | Strategy run/backtest 进度条 | 触发回测 → 前端进度条实时更新 | OK | — |
+| 5.3 | WebSocket 实时进度推送 | `web/api/ws.py`, `web/api/jobs.py` | `test_websocket_contracts.py` | Strategy run 进度条 | 触发策略扫描 → 前端进度条实时更新 | OK | — |
 | 5.4 | DuckDB :memory: 零锁查询 | `web/api/db.py` / `data/db.py` | `test_boundary.py` (DuckDB CRUD) | 所有数据查询端点 | Web 页面数据加载无延迟 | OK | — |
 | 5.5 | API 错误响应统一 + 稳定端点 response_model | 各路由文件 + `web/api/errors.py` + `web/api/schemas/*` + `web/api/models.py` 兼容入口 | `test_web_system_contracts.py`, `test_market_route_contracts.py`, `test_pipeline_route_contracts.py` | — | 4xx/5xx 错误结构一致，关键成功响应有 Pydantic schema | OK | — |
 | 5.6 | Settings API YAML 读写 + schema 配置中心 + 审计 | `web/api/routes/settings.py`, `web/api/settings_schema.py`, `ConfigCenter.vue` | `test_audit.py`, `test_auth.py`, `test_settings_schema_contracts.py` | `/system?tab=settings`, `/system?tab=config`, `GET /api/settings/schema` | 基础设置由 Settings 管理；参数 schema 由 Config Center 管理；dotted section 写回嵌套 YAML；保存写入 audit ledger | OK | — |
@@ -101,10 +101,10 @@
 | 6.2 | Stock 资产 (AKShare + Tushare) | `data/assets/stock.py` | — | `GET /api/stocks` → `/research?tab=stocks` | 全量 A 股股票池可查询 | OK | — |
 | 6.3 | ETF 资产 (AKShare `fund_etf_hist_em`) | `data/assets/etf.py` | `test_asset_contracts.py::TestETFAssetContracts` | — | fetch_daily 返回标准 OHLCV, data_source="real" | OK | — |
 | 6.4 | Bond/Futures/Crypto 适配器 | `data/assets/{bond,futures,crypto}.py` | `test_asset_contracts.py` (5 classes) | — | Bond=proxy, Futures=real, Crypto=placeholder | OK | — |
-| 6.5 | AssetAllocator regime 动态权重 | `broker/allocator.py` | `test_broker_risk_persistence_allocator.py:test_asset_allocator_normalizes_regime_enum_and_unknown` | — | bull: stock 60%, bear: stock 10%, sideways: 35% | OK | — |
+| 6.5 | AssetAllocator regime 动态权重 | `broker/allocator.py` | `test_broker_risk_persistence_allocator.py:test_asset_allocator_normalizes_regime_enum_and_unknown` | — | bull: stock 60%, bear: stock 15%, sideways: 35%；allocate 对启用资产归一化 | OK | — |
 | 6.6 | 资产开关控制 (enabled: true/false) | `config/settings.yaml` assets.*.enabled, `data/assets/overview.py` | `test_multi_asset_tournament.py::TestAssetOverviewContracts` | `GET /api/assets/overview` → `/datahub?tab=assets` | 关闭资产在 CLI/API/Web 中显示 disabled，不进入 allocation | OK | — |
-| 6.7 | 多资产回测对比 | `backtest/multi_asset_tournament.py` | `test_multi_asset_tournament.py` | — | stock-only vs ETF-only vs multi 三组对比，proxy fallback 保留 `data_source` | OK | — |
-| 6.8 | 差异化费率 (A股/ETF/债券) | `broker/exchange.py` | — | — | A股印花税 0.1% vs ETF 免印花税 | OK | — |
+| 6.7 | 多资产回测对比 | `scripts/multi_asset_tournament.py` | `test_multi_asset_tournament.py` | — | stock-only vs ETF-only vs multi 三组对比，proxy fallback 保留 `data_source` | OK | — |
+| 6.8 | 差异化费率 (A股/ETF/债券) | `broker/exchange.py` | — | — | A股卖出印花税 0.05% vs ETF 免印花税 | OK | — |
 | 6.9 | 行业/板块数据维度 | `data/sectors.py` + `scripts/build_sector_snapshots.py` | — | `GET /api/sectors/*` | 申万行业指数 + 行业映射 + 信号聚合 + 敞口 | OK | — |
 | 6.10 | 行业 Web 雷达页面 | `web/frontend/src/views/Sectors.vue` + `data/sectors.py` | `test_sector_pipeline.py`, `test_web_system_contracts.py` | `/research?tab=sectors` | 申万行业资金方块矩阵 + 按资金量映射面积 + 排名表 + 行业级信号分布，不显示行业内个股 | OK | — |
 

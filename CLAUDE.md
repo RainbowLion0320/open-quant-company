@@ -10,7 +10,7 @@
 ## 环境
 - Python: `~/.hermes/hermes-agent/venv/bin/python3`
 - 数据: AKShare 1.18.60, 优先用新浪源, 东方财富/腾讯作备选
-- 回测: Backtrader 1.9.78
+- 回测: 自研日频回测与 PipelineBacktest（非 Backtrader）
 - 缓存: parquet (需 pyarrow)
 - 代理: fetcher.py 会自动绕过 v2ray
 
@@ -55,7 +55,7 @@
 │   ├── buffett.py                # 巴菲特价值过滤 (安全边际/DCF)
 │   ├── multifactor.py            # 多因子打分 (五维加权含行业动量)
 │   ├── ml_signals.py             # ML信号生成
-│   └── selection.py              # 横截面排名→交易信号
+│   └── selection.py              # 横截面排名→受限 buy list + hold rows
 ├── cybernetics/
 │   └── orchestrator.py           # 市场状态检测 + 自适应参数
 ├── models/__init__.py            # LightGBM + 注册表

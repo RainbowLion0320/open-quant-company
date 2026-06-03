@@ -1,7 +1,7 @@
 ---
 title: Cybernetics Regime Detection
 created: 2026-05-12
-updated: 2026-05-30
+updated: 2026-06-03
 type: concept
 tags: [cybernetics, market-regime, profit-trained-policy, position-sizing, sector-rotation, rebalance-frequency]
 ---
@@ -48,6 +48,6 @@ Pipeline 页面 `/pipeline` 是关键参数计算透明度入口，当前覆盖 
 
 ## See Also
 
-- [[strategy-evolution]] — 四策略回测完整历史 (含 regime fix 前后对比)
+- [[strategy-evolution]] — 多策略回测和 regime policy 演进
 - [[system-architecture]] — Regime 检测在五层架构中的位置
 - [[buffett-filter]] — 底层选股池

@@ -131,7 +131,7 @@ paper_trading:
 | `scripts/execute_paper_trades.py` | 日频执行脚本 (初始化/执行/回放/dry-run) |
 | `web/api/routes/portfolio.py` | Web API 端点 (nav/trades/summary/refresh) |
 | `web/frontend/src/views/Portfolio.vue` | 前端页面 (NAV 曲线+持仓+交易记录) |
-| `broker/__init__.py` | PaperBroker (T+1/佣金/风控) |
+| `broker/{base,paper_core,paper_orders}.py` | PaperBroker ABC、核心状态和下单/T+1逻辑 |
 | `broker/risk.py` | RiskManager (5 规则预检) |
 | `config/settings.yaml` | 模拟交易配置段 |
 

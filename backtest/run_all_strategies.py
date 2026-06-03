@@ -1,5 +1,5 @@
 """
-四策略对比回测 — 逐日引擎，策略自主调仓
+多策略对比回测 — 逐日引擎，策略自主调仓
 产量: data/backtest_<strategy>.pkl + data/backtest_comparison.pkl
 """
 import os, pickle
@@ -152,7 +152,7 @@ def _get_multifactor_fin_inputs(sym, ind):
 
 
 def multifactor_scorer(sym, series, idx, regime):
-    """多因子评分: 质量(40%)+估值(30%)+技术(15%)+市场(15%)"""
+    """多因子评分: 质量/估值/技术/市场/行业动量五维，权重来自 settings。"""
     from signals.multifactor import MultiFactorScorer
     from data.symbols import SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
 
@@ -387,7 +387,7 @@ if __name__ == "__main__":
     start = bt_cfg.get("start_date", "2015-01-01")
     end = bt_cfg.get("end_date", "2026-05-10")
     runner_label = "pipeline"
-    print(f"四策略对比回测 [{runner_label}]: {len(pool)} stocks, {start} ~ {end}")
+    print(f"策略对比回测 [{runner_label}]: {len(pool)} stocks, {start} ~ {end}")
 
     prices = load_prices(pool, start, end)
     bench = get_index_daily("sh000001")
@@ -455,7 +455,7 @@ if __name__ == "__main__":
         pickle.dump(comparison, f)
 
     print(f"\n{'='*60}")
-    print(f"四策略对比 [{runner_label}]:")
+    print(f"策略对比 [{runner_label}]:")
     print(f"基准: {comparison['bench_return']*100:+.2f}%")
     for name, r in comparison["strategies"].items():
         print(f"  {name}: {r['total_return']*100:+.2f}%  Sharpe {r['sharpe']:.2f}  MaxDD {r['max_drawdown']*100:.1f}%  Win {r['win_rate']*100:.0f}%  {r['trade_count']}笔")

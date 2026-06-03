@@ -4,7 +4,8 @@ Astrolabe Quant API v2 — FastAPI 应用工厂
 模块化设计:
   web/api/
     __main__.py  → 启动入口 (python -m web.api)
-    __init__.py  → 应用工厂 create_app()
+    __init__.py  → 包级说明
+    app.py       → 应用工厂 create_app()
     routes/      → 12个业务路由模块
     models.py    → Pydantic 类型兼容入口；细分 schema 位于 schemas/
     jobs.py      → 异步任务队列

@@ -1,6 +1,6 @@
 # Spec: Web 平台 (Web Platform)
 
-> 版本: 2.5 | 更新: 2026-06-02 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
+> 版本: 2.6 | 更新: 2026-06-03 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
@@ -9,7 +9,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 **设计原则：**
 - **前后端分离** — Vue 3 (Vite) + FastAPI，独立开发/部署
 - **零锁查询** — DuckDB :memory: 模式直接读 Parquet，不经过数据库锁
-- **实时推送** — WebSocket 推送长时间任务（回测/训练）的进度
+- **异步进度** — WebSocket 跟踪策略扫描等后台任务的进度
 - **职责分离** — `/system?tab=monitor` 只读观测, `/system?tab=settings` 管理基础设置, `/system?tab=config` 编辑参数 schema, 不交叉
 
 ## 2. 组件架构
@@ -24,7 +24,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
                        │ HTTP REST + WebSocket
 ┌──────────────────────▼──────────────────────────────┐
 │              web/api/ (FastAPI)                        │
-│   create_app() → CORS → Router → Error Handler        │
+│   app.py:create_app() → CORS → Router → Error Handler │
 │   routes/ (12 domain modules) + ws.py + jobs.py        │
 └──────────────────────┬──────────────────────────────┘
                        │
@@ -83,7 +83,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 
 ### 2.2 后端架构 (FastAPI)
 
-**应用工厂：** `web/api/__init__.py` → `create_app()` → 注册路由 + CORS + 异常处理
+**应用工厂：** `web/api/app.py` → `create_app()` → 注册 CORS、AuthMiddleware、12 个业务路由、错误处理和生产静态文件 fallback。`web/api/__init__.py` 只保留包级说明。
 
 **12 个业务路由模块 + Auth/WS/Jobs：**
 
@@ -118,9 +118,9 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 
 服务端复用 `QuantOrchestrator().detect()` 输出的 `score_components`、`breadth_detail`、`regime_probs`、`detection_method` 和 HMM `meta.json`，不得在 API 层重写 Market Regime 计算公式。
 
-**WebSocket：** `ws.py` → `/ws/{job_id}` — 任务进度实时推送。`broadcast_progress()` 使用 `list()` 拍平连接集合避免并发修改异常。
+**WebSocket：** `routes/strategies.py` 暴露 `/api/strategies/ws/{job_id}` 并委托 `web/api/ws.py:ws_endpoint()`。连接后按 `job_id` 校验任务存在性；服务端每秒读取 `web/api/jobs.py` 中的 `_jobs` 状态并发送 `{job_id,status,progress,message}`，收到文本 `ping` 时返回 `pong`。
 
-**任务队列：** `jobs.py` → `JobQueue` — 异步执行数据拉取/回测/模型训练，进度通过 WebSocket 推送。
+**任务队列：** `jobs.py` 提供 `create_job()` / `run_job()` / `run_strategy_async()`，用后台线程执行策略扫描，并通过 `progress_callback` 更新 job 状态；WebSocket 只读取并转发该状态，不跨 event loop 直接广播。
 
 ### 2.3 DuckDB :memory: 查询
 
@@ -172,10 +172,10 @@ Pinia Store → Vue Component → ECharts 渲染
 POST /api/strategies/run
     │ 创建 Job
     ▼
-JobQueue.add(job) → 后台线程执行策略扫描
-    │ 每完成一步
+create_job() → run_job() 后台线程执行策略扫描
+    │ progress_callback 更新 _jobs[job_id]
     ▼
-broadcast_progress(job_id, {"step": 3/5, "message": "..."})
+ws_endpoint() 每秒读取 job 状态
     │ WebSocket
     ▼
 Vue Component 实时更新进度条
@@ -188,7 +188,7 @@ Vue Component 实时更新进度条
 | 前端框架 | Vue 3 + Vite | 轻量 SPA，Vite HMR 开发体验好，Tailwind 原子化 CSS |
 | 后端框架 | FastAPI | 原生 async、自动 OpenAPI 文档、Pydantic 类型校验 |
 | 数据库 | DuckDB :memory:（只读 Parquet） | 查询零锁等待，不需要数据库服务器 |
-| 长任务处理 | WebSocket 推送进度 | 回测/训练可能跑几分钟，HTTP 轮询太低效 |
+| 长任务处理 | WebSocket 推送进度 | 策略扫描等异步任务可能跑一段时间，HTTP 轮询太低效 |
 | 状态管理 | Pinia (per-page stores) | 页面间独立，不需要全局状态 |
 | 配置管理 | YAML + schema 校验 | settings.yaml 人类可读写 + API 层字段/范围校验 |
 
@@ -206,12 +206,10 @@ Vue Component 实时更新进度条
 
 ```json
 {
-  "type": "progress",
   "job_id": "uuid",
-  "step": 3,
-  "total_steps": 5,
-  "message": "Training LightGBM model...",
-  "percent": 60.0
+  "status": "running",
+  "progress": 60,
+  "message": "LightGBM ML done"
 }
 ```
 
@@ -235,7 +233,7 @@ REQUIRED_SECTIONS = {"strategies", "risk_control"}
 - **404：** 资源不存在 → `{"error": "Stock not found: 999999", "timestamp": "..."}`
 - **422：** Pydantic 校验失败 → FastAPI 自动返回字段级错误
 - **500：** 未捕获异常 → `errors.py` 全局处理器统一格式化
-- **WebSocket 断连：** 前端指数退避重连（1s → 2s → 4s，最多 5 次）
+- **WebSocket 断连：** 前端显示进度连接失败并停止当前运行态；后续可补指数退避重连
 - **Settings 更新非法：** 更新端点校验 run mode、schema 字段类型和范围，非法配置返回 4xx/422
 
 ## 7. 测试策略

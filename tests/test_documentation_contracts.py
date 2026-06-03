@@ -65,3 +65,45 @@ def test_committed_mcp_config_does_not_embed_brave_api_key():
     text = path.read_text(encoding="utf-8")
 
     assert re.search(r"\bBSA[A-Za-z0-9_-]{20,}\b", text) is None
+
+
+def test_spec_docs_describe_current_runtime_contracts():
+    required_by_spec = {
+        Path("docs/specs/01-data-pipeline.md"): (
+            "OHLCVIntegrityRule",
+            "FeatureStoreBuilder.build_month",
+            "latest_feature_frame()",
+        ),
+        Path("docs/specs/02-signal-system.md"): (
+            "buffett_filter",
+            "compute_ml_signals",
+            "detail.selection_rank",
+        ),
+        Path("docs/specs/03-backtest-engine.md"): (
+            "BaseStrategy",
+            "RiskAnalytics.compute",
+            "scripts/multi_asset_tournament.py",
+        ),
+        Path("docs/specs/04-execution-layer.md"): (
+            "submit_order(self, code: str, price: float, volume: int, side: str) -> str",
+            "load_nav() / GET /api/portfolio/nav",
+            "positions(JSON)",
+        ),
+        Path("docs/specs/05-web-platform.md"): (
+            "web/api/app.py",
+            "/api/strategies/ws/{job_id}",
+            "{job_id,status,progress,message}",
+        ),
+        Path("docs/specs/06-multi-asset.md"): (
+            "get_universe(self)",
+            "get_metadata(self, symbol)",
+            "allocate(regime, enabled_assets, asset_signals",
+        ),
+    }
+
+    missing = []
+    for path, tokens in required_by_spec.items():
+        text = path.read_text(encoding="utf-8")
+        missing.extend(f"{path}:{token}" for token in tokens if token not in text)
+
+    assert missing == []

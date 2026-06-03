@@ -1,6 +1,6 @@
 # Spec: 信号系统 (Signal System)
 
-> 版本: 1.3 | 更新: 2026-05-30 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Backtest Engine](03-backtest-engine.md)
+> 版本: 1.4 | 更新: 2026-06-03 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Backtest Engine](03-backtest-engine.md)
 
 ## 1. 概述
 
@@ -34,7 +34,7 @@
                        │
 ┌──────────────────────▼──────────────────────────────┐
 │                  selection.py                         │
-│         横截面排名 → 交易信号 (buy/sell/hold)           │
+│         横截面排名 → 受限 buy list + hold rows          │
 │         输出: data/store/signals/{strategy}.parquet    │
 └──────────────────────┬──────────────────────────────┘
                        │
@@ -232,13 +232,14 @@ Vol20 = Std(Ret("close"), 20)
 ### 2.9 横截面排名 (selection.py)
 
 **输入：** 各策略的原始评分 DataFrame（symbol × score）
-**输出：** 交易信号 `{symbol, strategy, signal (buy/sell/hold), score, rank}`
+**输出：** 信号行 `{symbol, strategy, signal (buy/hold), score, detail.selection_*}`
 
 **规则：**
-- Top-N 排名 → buy（N 按策略配置）
-- 跌出 Top-N → sell
-- 在 Top-N 内但已在持仓 → hold
-- 停牌/ST 股票自动过滤
+- 按 `score` 降序对完整候选池排序
+- `min_score`、`top_pct`、`min_buys`、`max_buys` 从 `signal_selection` 全局配置和策略级配置合并
+- 最高 ranked 的 eligible rows 标为 `buy`，其他行保留为 `hold`，用于 Web/历史可观测性
+- 输出写入 `detail.selection_rank`、`selection_min_score`、`selection_target_n`
+- sell、停牌/ST 过滤和实际订单约束不在 `selection.py` 完成，由信号变更、执行层和交易约束承担
 
 ## 3. 数据流
 
@@ -256,7 +257,7 @@ Market Data (DataHub)
 ┌──────────────────┐
 │  selection.py     │
 │  横截面排名        │
-│  buy/sell/hold    │
+│  buy list + hold  │
 └──────┬───────────┘
        │ signals
        ▼
@@ -281,24 +282,26 @@ Market Data (DataHub)
 ### 策略评分接口
 
 ```python
-# 所有策略遵循统一接口
-def compute_signals(pool: list[str], date: str) -> pd.DataFrame:
-    """返回 DataFrame: symbol, score, signal, details"""
-    ...
+# data.strategy_plugins 是 CLI/Web 统一运行入口
+from data.strategy_plugins import run_registered_strategies, get_strategy_plugin
+
+rows = run_registered_strategies("all", limit=0, mode="production")
+plugin = get_strategy_plugin("multifactor")
+signals: list[dict] = plugin.compute(limit=100)
 
 # 巴菲特
-from signals.buffett import BuffettFilter
-bf = BuffettFilter()
-result: BuffettScore = bf.evaluate(symbol, financials, price_data)
+from signals.buffett import buffett_filter, BuffettScore
+result: BuffettScore = buffett_filter(symbol, name, industry, sector, ...)
 
 # 多因子
 from signals.multifactor import MultiFactorScorer
 scorer = MultiFactorScorer(regime="bull")
 score = scorer.score(factors_dict)
+components = scorer.score_components(factors_dict)
 
 # ML
-from signals.ml_signals import generate_ml_signals
-signals = generate_ml_signals(pool, date, model_name="lgbm_20260501")
+from signals.ml_signals import compute_ml_signals
+signals = compute_ml_signals(limit=100, model_version="best")
 ```
 
 ### 因子 DSL 接口
@@ -319,14 +322,14 @@ compute_formula("close_t / close_t-20 - 1", df, idx=100)
 
 ## 6. 错误处理
 
-- **数据不足：** 评分返回 0 或 NaN，selection 阶段自动过滤
+- **数据不足：** 评分返回 0 或 NaN；selection 只对低于 `min_score` 的候选保留 hold，不做执行层过滤
 - **模型文件缺失：** `load_model()` 返回 None，上层回退到等权打分
-- **因子公式非法：** `dsl_parser` 返回错误信息（不抛异常），含行号和期望 token
+- **因子公式非法：** `compute_formula()` 捕获解析/求值异常并返回 `np.nan`
 - **IC 检验样本不足：** 跳过该因子，记录 insufficient_data 日志
 
 ## 7. 测试策略
 
-- **合约测试：** 每种策略的 `compute_signals()` 返回 DataFrame schema 不变（columns: symbol, score, signal）
+- **合约测试：** `data.strategy_plugins` runner 返回 `list[dict]`，持久化后的 StrategySignalRows schema 保持 `symbol/name/industry/score/signal/detail`
 - **公式测试：** `Ret/MA/Std/Delta`、`close_t-N` 滞后引用、缺失列和 NaN 边界由 `tests/test_boundary.py` 覆盖
 - **边界测试：** 空股票池、全 NaN 数据、单只股票排名
 - **回归测试：** 固定日期+固定股票池，评分结果哈希不变

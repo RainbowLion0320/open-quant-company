@@ -1,7 +1,7 @@
 ---
 title: 多因子打分引擎
 created: 2026-05-12
-updated: 2026-05-23
+updated: 2026-06-03
 type: concept
 tags: [multifactor, strategy]
 confidence: medium
@@ -33,17 +33,16 @@ confidence: medium
 ## 历史 Bug
 
 - ~~momentum/volatility 硬编码为 0~~ → 已修复，接入实时行情
-- ~~buy 阈值过高导致 0 buys~~ → 已从 60 下调
-- 当前: 185 buys (1000 stocks, regime=bull)
+- ~~buy 阈值过高导致 0 buys~~ → 已改为配置驱动的 `signals.multifactor.buy_threshold` 和 `signal_selection` gates
 
 ## 文件
 
 - 引擎: `signals/multifactor.py`
-- 因子表达式: `signals/factors.py`（借鉴 qlib DSL）
-- 回测: `backtest/run_all_strategies.py`（四策略对比）
+- 因子表达式: `signals/expression.py` + `signals/dsl_parser.py`
+- 回测: `backtest/run_all_strategies.py`（多策略锦标赛）
 
 ## 相关
 
 - [[buffett-filter]] (评分输入)
 - [[cybernetics-regime]] (市场维度输入)
-- [[strategy-evolution]] (四策略对比)
+- [[strategy-evolution]] (多策略锦标赛)

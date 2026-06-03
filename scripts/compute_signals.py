@@ -4,7 +4,7 @@
 
 策略:
   buffett     — 巴菲特三层过滤器 (能力圈→护城河→安全边际)
-  multifactor — 多因子打分 (质量40%+估值30%+技术15%+市场15%)
+  multifactor — 多因子打分 (质量/估值/技术/市场/行业动量五维，权重来自 settings)
   cybernetic  — 控制论市场状态信号 (基于当前市场regime)
   ml_lgbm     — LightGBM PIT特征模型
 

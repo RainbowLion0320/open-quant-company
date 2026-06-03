@@ -1,7 +1,7 @@
 ---
 title: Wiki Index
 created: 2026-05-13
-updated: 2026-06-02
+updated: 2026-06-03
 type: meta
 tags: [index]
 ---
@@ -19,7 +19,7 @@ tags: [index]
 - [[buffett-rolling-backtest]] — 滚动回测：按年重新过滤，消除前视偏差
 - [[cybernetics-regime]] — 市场状态检测：profit-trained 权重公式 + confirmed 状态机
 - [[dcf-valuation]] — DCF估值方法
-- [[multifactor-scoring]] — 五维打分引擎（含行业动量），四策略对比体系
+- [[multifactor-scoring]] — 五维打分引擎（含行业动量），Strategy Catalog 体系
 - [[financial-cache]] — 三层财务缓存 + PIT基本面/估值/资金/筹码/宏观因子提取
 
 - [[hindsight-architecture]] — Hindsight 记忆引擎深层架构：配置详解, 端口陷阱, 生命周期, 检索策略
@@ -42,4 +42,4 @@ tags: [index]
 
 ## Comparisons
 - [[data-sources]] — AKShare(日线+财务+宏观+资金) vs Tushare(三张表+指标+moneyflow+holders)
-- [[strategy-evolution]] — 四策略回测对比：ML — 见 `data/tournament/`
+- [[strategy-evolution]] — 多策略回测对比与证据入口：见 `data/tournament/` 和 strategy evidence artifacts

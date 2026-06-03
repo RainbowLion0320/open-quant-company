@@ -162,10 +162,10 @@ strategies:
 | 风险控制 | `broker/risk.py` | RiskManager 5规则预检 |
 | 因子 DSL | `signals/expression.py` | 因子声明式表达式 |
 | DSL 解析器 | `signals/dsl_parser.py` | LLM公式→计算 |
-| 信号选择 | `signals/selection.py` | ★ 横截面排名→交易信号 (Codex) |
+| 信号选择 | `signals/selection.py` | ★ 横截面排名→受限 buy list + hold rows |
 | 巴菲特过滤 | `signals/buffett.py` | 安全边际+DCF+三重过滤 |
 | 多因子打分 | `signals/multifactor.py` | 五维加权 (质量/估值/技术/市场/行业动量) |
-| ML 信号 | `signals/ml_signals.py` | 模型预测→买卖信号 |
+| ML 信号 | `signals/ml_signals.py` | 模型预测→评分和信号行 |
 | 特征存储 | `data/feature_store.py` | PIT特征 + enrich_from_registry |
 | 模型层 | `models/__init__.py` | LightGBM + 注册表 |
 | 数据清洗 | `data/cleaner.py` | DataCleaner 规则化清洗 |

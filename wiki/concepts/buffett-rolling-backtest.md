@@ -1,7 +1,7 @@
 ---
 title: Buffett Rolling Backtest (巴菲特滚动回测)
 created: 2026-05-12
-updated: 2026-05-15
+updated: 2026-06-03
 type: concept
 tags: [buffett, backtest, lookahead-bias, rolling-window, financial-cache]
 ---
@@ -39,9 +39,7 @@ buffett_real_scorer:
 
 ## 回测结果
 
-四策略日频引擎 (2020-2026): ML +28% / 多因子 +5% / 控制论 +0.5% / 巴菲特 n/a（财务数据依赖）。
-
-详见 [[strategy-evolution]] 最新结果。
+滚动评分结果通过 `backtest/run_all_strategies.py` 和 `research/strategy_evaluation.py` 进入 strategy evidence artifacts。动态收益和排名不写入 wiki，详见 `data/store/research/strategy_evidence/` 与 [[strategy-evolution]]。
 
 ## 相关
 

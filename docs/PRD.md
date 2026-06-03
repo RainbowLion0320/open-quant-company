@@ -120,7 +120,7 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 │   ├── buffett.py                # 巴菲特三重过滤
 │   ├── multifactor.py            # 多因子五维打分
 │   ├── ml_signals.py             # ML 信号生成
-│   └── selection.py              # 横截面排名→交易信号
+│   └── selection.py              # 横截面排名→受限 buy list + hold rows
 ├── backtest/                     # 回测层
 │   ├── run_all_strategies.py     # N 策略锦标赛
 │   ├── analytics.py              # 15 项风险指标

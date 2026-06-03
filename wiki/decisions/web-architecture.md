@@ -94,5 +94,5 @@ Web 以 DuckDB `:memory:` 注册 Parquet 视图，只读查询不持有单文件
 
 - [[duckdb-migration]] — Web 查询 DuckDB
 - [[tushare-mcp]] — Token 管理: 环境变量优先, 统一由 data/tushare_utils.py 获取
-- [[strategy-evolution]] — 回测页展示四策略对比
+- [[strategy-evolution]] — 回测页展示多策略对比
 - [[system-architecture]] — 完整系统分层
