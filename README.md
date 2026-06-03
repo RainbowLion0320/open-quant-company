@@ -1,6 +1,5 @@
 <div align="center">
   <img src="docs/assets/readme-quant-iceberg.png" alt="蜉蝣望青天，星盘只是量化世界的一瞬微光" width="100%">
-  <p><em>你若不懂量化，看星盘似有几分模样；你若懂量化，看星盘不过蜉蝣望青天。</em></p>
 
   <h1>星盘</h1>
   <h3>Astrolabe Quant OS — 个人量化研究与执行操作系统</h3>
