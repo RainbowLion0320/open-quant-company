@@ -8,7 +8,7 @@ hold rows for observability in Web and history views.
 from __future__ import annotations
 
 from math import ceil
-from typing import Iterable, List
+from typing import Iterable, List, Mapping
 
 from core.settings import get_settings
 
@@ -47,6 +47,7 @@ def apply_ranked_buys(
     default_top_pct: float = 0.05,
     default_min_buys: int = 5,
     default_max_buys: int = 80,
+    selection_overrides: Mapping[str, float | int] | None = None,
 ) -> List[dict]:
     """
     Mark only the highest ranked eligible rows as buy and keep all others hold.
@@ -59,7 +60,9 @@ def apply_ranked_buys(
         return []
 
     cfg = _load_config()
-    strat_cfg = cfg.get("strategies", {}).get(strategy, {}) or {}
+    strat_cfg = dict(cfg.get("strategies", {}).get(strategy, {}) or {})
+    if selection_overrides:
+        strat_cfg.update(dict(selection_overrides))
     min_score = float(strat_cfg.get("min_score", cfg.get("min_score", default_min_score)))
     top_pct = float(strat_cfg.get("top_pct", cfg.get("top_pct", default_top_pct)))
     min_buys = int(strat_cfg.get("min_buys", cfg.get("min_buys", default_min_buys)))

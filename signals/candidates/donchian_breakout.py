@@ -17,12 +17,15 @@ from signals.candidates.common import (
     stock_name,
     volume_ratio,
 )
+from signals.candidates.params import candidate_strategy_params
 
 
 def compute(limit: int = 0) -> list[dict]:
+    params = candidate_strategy_params("donchian_breakout")
+    weights = params["score_weights"]
     metrics: list[dict] = []
     for symbol in candidate_symbols(limit):
-        df = price_frame(symbol, min_rows=60)
+        df = price_frame(symbol, min_rows=int(params["min_history_days"]))
         if df.empty:
             continue
         close = close_series(df)
@@ -30,13 +33,13 @@ def compute(limit: int = 0) -> list[dict]:
         if close.empty or high.empty:
             continue
         latest = safe_float(close.iloc[-1])
-        high_55 = safe_float(high.tail(55).max())
+        high_window = safe_float(high.tail(int(params["breakout_window"])).max())
         metrics.append(
             {
                 "symbol": symbol,
-                "proximity": bounded_score(latest / high_55 * 100.0 if high_55 else 0.0),
-                "volume_ratio": volume_ratio(df, 20),
-                "volatility": annualized_volatility(close, 20),
+                "proximity": bounded_score(latest / high_window * 100.0 if high_window else 0.0),
+                "volume_ratio": volume_ratio(df, int(params["volume_window"])),
+                "volatility": annualized_volatility(close, int(params["volatility_window"])),
             }
         )
 
@@ -46,9 +49,9 @@ def compute(limit: int = 0) -> list[dict]:
     for item in metrics:
         symbol = item["symbol"]
         score = (
-            item["proximity"] * 0.60
-            + volume_rank.get(symbol, 0.0) * 0.20
-            + inverse_vol_rank.get(symbol, 0.0) * 0.20
+            item["proximity"] * float(weights["breakout_proximity"])
+            + volume_rank.get(symbol, 0.0) * float(weights["volume"])
+            + inverse_vol_rank.get(symbol, 0.0) * float(weights["inverse_volatility"])
         )
         rows.append(
             build_signal_row(
@@ -59,12 +62,12 @@ def compute(limit: int = 0) -> list[dict]:
                 signal="hold",
                 detail={
                     "strategy": "donchian_breakout",
-                    "high_55_proximity": item["proximity"],
-                    "volume_ratio_20d": round(item["volume_ratio"], 3),
+                    "breakout_proximity": item["proximity"],
+                    "volume_ratio": round(item["volume_ratio"], 3),
                     "volume_rank": volume_rank.get(symbol, 0.0),
-                    "volatility_20d": round(item["volatility"], 4),
+                    "volatility": round(item["volatility"], 4),
                     "inverse_vol_rank": inverse_vol_rank.get(symbol, 0.0),
                 },
             )
         )
-    return selected_candidate_rows(rows, "donchian_breakout", min_score=60.0, max_buys=20)
+    return selected_candidate_rows(rows, "donchian_breakout")

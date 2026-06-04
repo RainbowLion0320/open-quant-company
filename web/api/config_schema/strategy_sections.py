@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from data.registry import ALLOWED_STATUSES
+from signals.candidates.params import CANDIDATE_PARAM_FIELDS
 from web.api.config_schema.fields import field
 
 
@@ -17,6 +18,18 @@ def _strategy_label(registry: dict[str, Any], name: str) -> str:
 
 def _status_options() -> list[dict[str, str]]:
     return [{"label": status, "value": status} for status in ALLOWED_STATUSES]
+
+
+def _candidate_param_field(raw: dict[str, Any]) -> dict[str, Any]:
+    return field(
+        str(raw["key"]),
+        str(raw["label"]),
+        str(raw.get("type", "float")),
+        description=str(raw.get("description", "")),
+        min_val=raw.get("min"),
+        max_val=raw.get("max"),
+        default=raw.get("default"),
+    )
 
 
 def build_strategy_sections(config: dict[str, Any]) -> list[dict[str, Any]]:
@@ -49,6 +62,26 @@ def build_strategy_sections(config: dict[str, Any]) -> list[dict[str, Any]]:
                 }
             )
 
+    if isinstance(registry, dict):
+        for index, (name, raw) in enumerate(registry.items()):
+            if name not in CANDIDATE_PARAM_FIELDS:
+                continue
+            raw = raw if isinstance(raw, dict) else {}
+            sections.append(
+                {
+                    "key": f"strategies.{name}.params",
+                    "label": f"{raw.get('label') or name} · 核心参数",
+                    "description": "该候选策略的研究窗口、评分权重、过滤阈值和组合规则；用于研究扫描与回测，不直接放行生产信号。",
+                    "group": "strategy_management",
+                    "subgroup": "strategy_params",
+                    "subgroup_label": "策略核心参数",
+                    "strategy_name": name,
+                    "strategy_label": raw.get("label") or name,
+                    "order": 1500 + index,
+                    "fields": [_candidate_param_field(item) for item in CANDIDATE_PARAM_FIELDS[name]],
+                }
+            )
+
     if isinstance(selection_by_strategy, dict):
         for index, (name, raw) in enumerate(selection_by_strategy.items()):
             if not isinstance(raw, dict):
@@ -67,6 +100,8 @@ def build_strategy_sections(config: dict[str, Any]) -> list[dict[str, Any]]:
                     "order": 2000 + index,
                     "fields": [
                         field("min_score", "最低买入分", "float", min_val=0, max_val=100, default=raw.get("min_score", 55)),
+                        field("top_pct", "Top 比例", "float", min_val=0.001, max_val=1, default=raw.get("top_pct", selection.get("top_pct", 0.05))),
+                        field("min_buys", "最小买入数", "int", min_val=0, max_val=500, default=raw.get("min_buys", selection.get("min_buys", 5))),
                         field("max_buys", "最大买入数", "int", min_val=1, max_val=500, default=raw.get("max_buys", 20)),
                     ],
                 }

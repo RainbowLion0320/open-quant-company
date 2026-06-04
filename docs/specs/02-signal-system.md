@@ -201,7 +201,7 @@ Market Regime 规则评分层保持确定性和可解释性，但不再只能靠
 - 量能确认候选
 - Regime 门控候选
 
-候选策略全部是 `status=candidate`，默认买入上限不超过 20，只能进入研究扫描、回测、证据报告和人工晋级流程。公式细节见 [Candidate Strategies](../strategies/candidate-strategies.md)。
+候选策略全部是 `status=candidate`，默认买入上限不超过 20，只能进入研究扫描、回测、证据报告和人工晋级流程。每个候选策略都有独立 `strategies.<name>.params` 参数段，窗口期、评分权重、过滤阈值和 regime blend 规则由 `signals/candidates/params.py` 提供默认值与 Config Center 字段元数据，runner 运行时从 `config/settings.yaml` 合并读取。公式细节见 [Candidate Strategies](../strategies/candidate-strategies.md)。
 
 ### 2.7 因子 DSL (expression.py + dsl_parser.py)
 

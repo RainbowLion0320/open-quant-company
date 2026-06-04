@@ -46,6 +46,93 @@ def test_settings_schema_exposes_grouped_strategy_management_model():
         assert sections[key].get("subgroup")
     assert sections["signal_selection"]["subgroup"] == "strategy_global"
 
+    selection_fields = {field["key"] for field in sections["signal_selection.strategies.trend_following"]["fields"]}
+    assert {"min_score", "top_pct", "min_buys", "max_buys"} <= selection_fields
+
+
+def test_settings_schema_exposes_candidate_strategy_core_params():
+    from signals.candidates.params import CANDIDATE_PARAM_FIELDS
+    from web.api.settings_schema import get_settings_schema
+
+    schema = get_settings_schema()
+    sections = {section["key"]: section for section in schema["sections"]}
+
+    expected_required_fields = {
+        "trend_following": {
+            "min_history_days",
+            "short_ma_window",
+            "medium_ma_window",
+            "long_ma_window",
+            "momentum_window",
+            "score_weights.trend",
+            "score_weights.above_long_ma",
+            "score_weights.momentum",
+            "trend_score_values.strong",
+        },
+        "donchian_breakout": {
+            "min_history_days",
+            "breakout_window",
+            "volume_window",
+            "volatility_window",
+            "score_weights.breakout_proximity",
+        },
+        "rps_relative_strength": {
+            "min_history_days",
+            "short_return_window",
+            "long_return_window",
+            "skip_recent_window",
+            "trend_ma_window",
+            "score_weights.short_rps",
+        },
+        "sector_rotation": {
+            "min_history_days",
+            "short_return_window",
+            "long_return_window",
+            "score_weights.industry_short",
+            "score_weights.stock_inside_industry",
+        },
+        "quality_value": {
+            "recent_period_count",
+            "score_weights.roe",
+            "score_weights.gross_margin",
+            "score_weights.inverse_pe",
+            "score_weights.inverse_pb",
+        },
+        "low_vol_defensive": {
+            "min_history_days",
+            "volatility_window",
+            "drawdown_window",
+            "trend_window",
+            "liquidity_window",
+            "score_weights.inverse_volatility",
+        },
+        "volume_confirmation": {
+            "min_history_days",
+            "volume_window",
+            "momentum_window",
+            "flow_window",
+            "score_weights.volume",
+        },
+        "regime_gated": {
+            "min_active_weight",
+            "bear_cash_probability_threshold",
+            "bear_max_buys",
+            "cash_score",
+            "regime_weights.bull.trend_following",
+            "regime_weights.sideways.quality_value",
+            "regime_weights.bear.low_vol_defensive",
+        },
+    }
+
+    assert set(CANDIDATE_PARAM_FIELDS) == set(expected_required_fields)
+    for strategy, required_fields in expected_required_fields.items():
+        section = sections[f"strategies.{strategy}.params"]
+        assert section["group"] == "strategy_management"
+        assert section["strategy_name"] == strategy
+        assert section["subgroup"] == "strategy_params"
+        field_keys = {field["key"] for field in section["fields"]}
+        assert required_fields <= field_keys
+
 
 def test_settings_schema_validation_covers_bool_and_select_fields():
     from web.api.settings_schema import validate_settings_section

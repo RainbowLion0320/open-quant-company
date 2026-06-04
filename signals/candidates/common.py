@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Mapping
 
 import pandas as pd
 
@@ -125,6 +125,7 @@ def selected_candidate_rows(
     *,
     min_score: float = 55.0,
     max_buys: int = 20,
+    selection_overrides: Mapping[str, float | int] | None = None,
 ) -> list[dict]:
     return apply_ranked_buys(
         rows,
@@ -133,6 +134,7 @@ def selected_candidate_rows(
         default_top_pct=0.05,
         default_min_buys=1,
         default_max_buys=max_buys,
+        selection_overrides=selection_overrides,
     )
 
 

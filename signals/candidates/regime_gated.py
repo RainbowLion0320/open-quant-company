@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from signals.candidates.common import build_signal_row, selected_candidate_rows
 from signals.candidates import low_vol_defensive, quality_value, rps_relative_strength, trend_following
+from signals.candidates.params import candidate_strategy_params
 
 
 def _current_regime() -> tuple[str, dict[str, float]]:
@@ -68,32 +69,18 @@ def _merge_rows(weighted_sources: Iterable[tuple[str, float, list[dict]]], regim
 
 
 def compute(limit: int = 0) -> list[dict]:
+    params = candidate_strategy_params("regime_gated")
+    regime_weights = params["regime_weights"]
     regime, probs = _current_regime()
 
-    # Strategy weights per regime
-    REGIME_STRATEGIES = {
-        "bull": [
-            ("trend_following", 0.55),
-            ("rps_relative_strength", 0.45),
-        ],
-        "sideways": [
-            ("quality_value", 0.55),
-            ("low_vol_defensive", 0.45),
-        ],
-        "bear": [
-            ("low_vol_defensive", 1.0),
-        ],
-    }
-
-    # Probability-weighted blend
-    # For each strategy, compute final weight = sum over regimes of P(regime) * weight_in_regime
     strategy_weights: dict[str, float] = {}
-    for r, r_strategies in REGIME_STRATEGIES.items():
-        p = probs.get(r, 0.0)
-        for strat_name, strat_weight in r_strategies:
-            strategy_weights[strat_name] = strategy_weights.get(strat_name, 0.0) + p * strat_weight
+    for regime_name, regime_strategy_weights in regime_weights.items():
+        if not isinstance(regime_strategy_weights, Mapping):
+            continue
+        probability = float(probs.get(regime_name, 0.0))
+        for strat_name, strat_weight in regime_strategy_weights.items():
+            strategy_weights[strat_name] = strategy_weights.get(strat_name, 0.0) + probability * float(strat_weight)
 
-    # Compute all needed strategies
     strategy_fns = {
         "trend_following": trend_following.compute,
         "rps_relative_strength": rps_relative_strength.compute,
@@ -102,33 +89,38 @@ def compute(limit: int = 0) -> list[dict]:
     }
 
     weighted_sources = []
+    min_active_weight = float(params["min_active_weight"])
     for strat_name, weight in strategy_weights.items():
-        if weight > 0.01:  # skip negligible weights
+        if weight > min_active_weight:
             fn = strategy_fns.get(strat_name)
             if fn:
                 weighted_sources.append((strat_name, weight, fn(limit=limit)))
 
     if not weighted_sources:
-        # Fallback to sideways
+        sideways_weights = regime_weights.get("sideways", {})
         weighted_sources = [
-            ("quality_value", 0.55, quality_value.compute(limit=limit)),
-            ("low_vol_defensive", 0.45, low_vol_defensive.compute(limit=limit)),
+            (strat_name, float(weight), strategy_fns[strat_name](limit=limit))
+            for strat_name, weight in sideways_weights.items()
+            if strat_name in strategy_fns and float(weight) > min_active_weight
         ]
 
     rows = _merge_rows(weighted_sources, regime)
 
-    # Bear: add cash proxy and scale defensive scores
     bear_prob = probs.get("bear", 0.0)
-    if bear_prob > 0.3:
+    if bear_prob > float(params["bear_cash_probability_threshold"]):
         cash_row = build_signal_row(
             symbol="CASH",
             name="现金防御代理",
             industry="防御资产",
-            score=80.0 * bear_prob,
+            score=float(params["cash_score"]) * bear_prob,
             signal="hold",
             detail={"strategy": "regime_gated", "regime": regime, "role": "cash_defense_proxy"},
         )
         rows = [cash_row] + rows
 
-    max_buys = 20 if regime != "bear" else 10
-    return selected_candidate_rows(rows, "regime_gated", min_score=55.0, max_buys=max_buys)
+    max_buys = int(params["bear_max_buys"] if regime == "bear" else params["normal_max_buys"])
+    return selected_candidate_rows(
+        rows,
+        "regime_gated",
+        selection_overrides={"max_buys": max_buys},
+    )

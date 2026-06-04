@@ -77,9 +77,10 @@ export function useConfigCenter() {
   }
 
   function strategySectionRank(section: SectionSchema): number {
-    if (section.key.startsWith("strategies.")) return 0;
-    if (section.key.startsWith("signal_selection.strategies.")) return 1;
-    return 2;
+    if (section.key.startsWith("strategies.") && !section.key.endsWith(".params")) return 0;
+    if (section.key.startsWith("strategies.") && section.key.endsWith(".params")) return 1;
+    if (section.key.startsWith("signal_selection.strategies.")) return 2;
+    return 3;
   }
 
   const groupedSections = computed(() => {

@@ -14,12 +14,15 @@ from signals.candidates.common import (
     stock_industry,
     stock_name,
 )
+from signals.candidates.params import candidate_strategy_params
 
 
 def compute(limit: int = 0) -> list[dict]:
+    params = candidate_strategy_params("sector_rotation")
+    weights = params["score_weights"]
     metrics: list[dict] = []
     for symbol in candidate_symbols(limit):
-        df = price_frame(symbol, min_rows=70)
+        df = price_frame(symbol, min_rows=int(params["min_history_days"]))
         if df.empty:
             continue
         close = close_series(df)
@@ -27,8 +30,8 @@ def compute(limit: int = 0) -> list[dict]:
             {
                 "symbol": symbol,
                 "industry": stock_industry(symbol),
-                "return_20d": pct_return(close, 20),
-                "return_60d": pct_return(close, 60),
+                "short_return": pct_return(close, int(params["short_return_window"])),
+                "long_return": pct_return(close, int(params["long_return_window"])),
             }
         )
 
@@ -36,23 +39,23 @@ def compute(limit: int = 0) -> list[dict]:
         return []
 
     metric_df = pd.DataFrame(metrics)
-    industry_20d = metric_df.groupby("industry")["return_20d"].median()
-    industry_60d = metric_df.groupby("industry")["return_60d"].median()
-    industry_20d_rank = percentile_score(industry_20d)
-    industry_60d_rank = percentile_score(industry_60d)
+    industry_short = metric_df.groupby("industry")["short_return"].median()
+    industry_long = metric_df.groupby("industry")["long_return"].median()
+    industry_short_rank = percentile_score(industry_short)
+    industry_long_rank = percentile_score(industry_long)
 
     stock_rank: dict[str, float] = {}
     for _, group in metric_df.groupby("industry"):
-        stock_rank.update(percentile_score(group.set_index("symbol")["return_20d"]))
+        stock_rank.update(percentile_score(group.set_index("symbol")["short_return"]))
 
     rows: list[dict] = []
     for item in metrics:
         symbol = item["symbol"]
         industry = item["industry"]
         score = (
-            industry_20d_rank.get(industry, 0.0) * 0.60
-            + industry_60d_rank.get(industry, 0.0) * 0.25
-            + stock_rank.get(symbol, 0.0) * 0.15
+            industry_short_rank.get(industry, 0.0) * float(weights["industry_short"])
+            + industry_long_rank.get(industry, 0.0) * float(weights["industry_long"])
+            + stock_rank.get(symbol, 0.0) * float(weights["stock_inside_industry"])
         )
         rows.append(
             build_signal_row(
@@ -63,12 +66,12 @@ def compute(limit: int = 0) -> list[dict]:
                 signal="hold",
                 detail={
                     "strategy": "sector_rotation",
-                    "industry_return_20d": round(float(industry_20d.get(industry, 0.0)), 4),
-                    "industry_return_60d": round(float(industry_60d.get(industry, 0.0)), 4),
-                    "industry_20d_rank": industry_20d_rank.get(industry, 0.0),
-                    "industry_60d_rank": industry_60d_rank.get(industry, 0.0),
+                    "industry_short_return": round(float(industry_short.get(industry, 0.0)), 4),
+                    "industry_long_return": round(float(industry_long.get(industry, 0.0)), 4),
+                    "industry_short_rank": industry_short_rank.get(industry, 0.0),
+                    "industry_long_rank": industry_long_rank.get(industry, 0.0),
                     "stock_score_inside_industry": stock_rank.get(symbol, 0.0),
                 },
             )
         )
-    return selected_candidate_rows(rows, "sector_rotation", min_score=55.0, max_buys=20)
+    return selected_candidate_rows(rows, "sector_rotation")

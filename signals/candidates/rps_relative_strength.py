@@ -16,35 +16,46 @@ from signals.candidates.common import (
     stock_industry,
     stock_name,
 )
+from signals.candidates.params import candidate_strategy_params
 
 
 def compute(limit: int = 0) -> list[dict]:
+    params = candidate_strategy_params("rps_relative_strength")
+    weights = params["score_weights"]
     metrics: list[dict] = []
     for symbol in candidate_symbols(limit):
-        df = price_frame(symbol, min_rows=130)
+        df = price_frame(symbol, min_rows=int(params["min_history_days"]))
         if df.empty:
             continue
         close = close_series(df)
         latest = safe_float(close.iloc[-1])
-        ma120 = moving_average(close, 120)
+        trend_ma = moving_average(close, int(params["trend_ma_window"]))
         metrics.append(
             {
                 "symbol": symbol,
-                "rps_3m_skip_1m": pct_return(close, 42, skip_recent=21),
-                "rps_6m_skip_1m": pct_return(close, 105, skip_recent=21),
-                "trend_filter": 100.0 if ma120 and latest > ma120 else 0.0,
+                "short_rps_return": pct_return(
+                    close,
+                    int(params["short_return_window"]),
+                    skip_recent=int(params["skip_recent_window"]),
+                ),
+                "long_rps_return": pct_return(
+                    close,
+                    int(params["long_return_window"]),
+                    skip_recent=int(params["skip_recent_window"]),
+                ),
+                "trend_filter": 100.0 if trend_ma and latest > trend_ma else 0.0,
             }
         )
 
-    rps_3m_rank = percentile_score(pd.Series({m["symbol"]: m["rps_3m_skip_1m"] for m in metrics}))
-    rps_6m_rank = percentile_score(pd.Series({m["symbol"]: m["rps_6m_skip_1m"] for m in metrics}))
+    short_rps_rank = percentile_score(pd.Series({m["symbol"]: m["short_rps_return"] for m in metrics}))
+    long_rps_rank = percentile_score(pd.Series({m["symbol"]: m["long_rps_return"] for m in metrics}))
     rows: list[dict] = []
     for item in metrics:
         symbol = item["symbol"]
         score = (
-            rps_3m_rank.get(symbol, 0.0) * 0.45
-            + rps_6m_rank.get(symbol, 0.0) * 0.45
-            + item["trend_filter"] * 0.10
+            short_rps_rank.get(symbol, 0.0) * float(weights["short_rps"])
+            + long_rps_rank.get(symbol, 0.0) * float(weights["long_rps"])
+            + item["trend_filter"] * float(weights["trend_filter"])
         )
         rows.append(
             build_signal_row(
@@ -55,12 +66,12 @@ def compute(limit: int = 0) -> list[dict]:
                 signal="hold",
                 detail={
                     "strategy": "rps_relative_strength",
-                    "rps_3m_skip_1m": round(item["rps_3m_skip_1m"], 4),
-                    "rps_3m_rank": rps_3m_rank.get(symbol, 0.0),
-                    "rps_6m_skip_1m": round(item["rps_6m_skip_1m"], 4),
-                    "rps_6m_rank": rps_6m_rank.get(symbol, 0.0),
+                    "short_rps_return": round(item["short_rps_return"], 4),
+                    "short_rps_rank": short_rps_rank.get(symbol, 0.0),
+                    "long_rps_return": round(item["long_rps_return"], 4),
+                    "long_rps_rank": long_rps_rank.get(symbol, 0.0),
                     "trend_filter": item["trend_filter"],
                 },
             )
         )
-    return selected_candidate_rows(rows, "rps_relative_strength", min_score=55.0, max_buys=20)
+    return selected_candidate_rows(rows, "rps_relative_strength")
