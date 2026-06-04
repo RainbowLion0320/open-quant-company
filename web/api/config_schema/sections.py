@@ -13,8 +13,8 @@ BASE_SECTIONS: list[dict[str, Any]] = [
         "label": "全局选股门槛",
         "description": "所有策略共享的 Top-N、最低分和买入数量默认值；策略级覆盖在下方独立展示。",
         "group": "strategy_management",
-        "subgroup": "strategy_selection",
-        "subgroup_label": "策略级选股门槛",
+        "subgroup": "strategy_global",
+        "subgroup_label": "全局策略设置",
         "order": 100,
         "fields": [
             field("top_pct", "Top 百分比", "float", min_val=0.001, max_val=1.0, default=0.05),

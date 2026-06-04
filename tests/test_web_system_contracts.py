@@ -429,6 +429,21 @@ def test_config_center_uses_grouped_expandable_settings_model():
     assert ".field-switch" in css
 
 
+def test_config_center_strategy_management_has_secondary_navigation():
+    config_center = Path("web/frontend/src/views/ConfigCenter.vue").read_text()
+    config_center_logic = Path("web/frontend/src/view-models/useConfigCenter.ts").read_text()
+    css = Path("web/frontend/src/styles/views/config-center.css").read_text()
+
+    assert "data-strategy-subnav" in config_center
+    assert "strategyNavItems" in config_center
+    assert "jumpToSubgroup(item.key)" in config_center
+    assert "sectionStrategyName" in config_center_logic
+    assert "strategy:${strategyName}" in config_center_logic
+    assert "strategyNavItems = computed" in config_center_logic
+    assert ".config-body.has-strategy-nav" in css
+    assert ".strategy-subnav" in css
+
+
 def test_frontend_router_does_not_keep_legacy_redirect_routes():
     router = Path("web/frontend/src/router/index.ts").read_text()
 

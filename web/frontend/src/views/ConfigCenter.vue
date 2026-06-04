@@ -8,7 +8,7 @@
           :key="group.key"
           class="nav-item"
           :class="{ active: activeGroup === group.key }"
-          @click="activeGroup = group.key"
+          @click="setActiveGroup(group.key)"
         >
           <span class="nav-copy">
             <span class="nav-label">{{ group.label }}</span>
@@ -27,11 +27,36 @@
           <span>{{ t('configCenter.sectionSummary', { sections: activeGroupInfo.section_count, fields: activeGroupInfo.field_count }) }}</span>
         </div>
 
-        <div class="subgroup-stack">
-          <section v-for="subgroup in groupedSections" :key="subgroup.key" class="config-subgroup">
+        <div class="config-body" :class="{ 'has-strategy-nav': strategyNavItems.length }">
+          <aside v-if="strategyNavItems.length" class="strategy-subnav" data-strategy-subnav :aria-label="t('configCenter.strategyQuickNav')">
+            <div class="strategy-subnav-title">
+              <span>{{ t('configCenter.strategyQuickNav') }}</span>
+              <small>{{ strategyNavItems.length }}</small>
+            </div>
+            <button
+              v-for="item in strategyNavItems"
+              :key="item.key"
+              class="strategy-subnav-item"
+              :class="{ active: visibleSubgroupKey === item.key }"
+              :title="navButtonTitle(item)"
+              @click="jumpToSubgroup(item.key)"
+            >
+              <span>{{ item.label }}</span>
+              <small>{{ navItemMeta(item) }}</small>
+            </button>
+          </aside>
+
+          <div ref="editorScrollRef" class="subgroup-stack">
+          <section
+            v-for="subgroup in groupedSections"
+            :id="subgroupDomId(subgroup.key)"
+            :key="subgroup.key"
+            class="config-subgroup"
+            :data-config-subgroup="subgroup.key"
+          >
             <div class="subgroup-header">
               <h4>{{ subgroup.label }}</h4>
-              <span>{{ t('configCenter.subgroupSummary', { count: subgroup.sections.length }) }}</span>
+              <span>{{ subgroupMeta(subgroup.sections) }}</span>
             </div>
 
             <article v-for="section in subgroup.sections" :key="section.key" class="section-panel">
@@ -80,6 +105,7 @@
               </div>
             </article>
           </section>
+          </div>
         </div>
       </div>
     </div>
@@ -89,7 +115,7 @@
 <script setup lang="ts">
 import { useConfigCenter } from "../view-models/useConfigCenter";
 
-const { groups, t, activeGroup, loading, saveMsgSection, saveMsg, saveOk, activeGroupInfo, groupedSections, getFieldValue, setFieldValue, onSliderInput, coerceNumericField, sectionHasChanges, resetSection, saveSection, isSaving } = useConfigCenter();
+const { groups, t, activeGroup, loading, saveMsgSection, saveMsg, saveOk, editorScrollRef, activeGroupInfo, groupedSections, strategyNavItems, visibleSubgroupKey, setActiveGroup, jumpToSubgroup, subgroupDomId, navItemMeta, navButtonTitle, subgroupMeta, getFieldValue, setFieldValue, onSliderInput, coerceNumericField, sectionHasChanges, resetSection, saveSection, isSaving } = useConfigCenter();
 </script>
 
 <style scoped src="../styles/views/config-center.css"></style>

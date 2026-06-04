@@ -44,6 +44,7 @@ def test_settings_schema_exposes_grouped_strategy_management_model():
     ):
         assert sections[key]["group"] == "strategy_management"
         assert sections[key].get("subgroup")
+    assert sections["signal_selection"]["subgroup"] == "strategy_global"
 
 
 def test_settings_schema_validation_covers_bool_and_select_fields():
