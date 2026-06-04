@@ -187,10 +187,11 @@ def test_limit_list_fetch_does_not_sleep_before_first_request(tmp_path, monkeypa
     assert sleeps == []
 
 
-def test_deepseek_usage_normalizes_api_response_usage_with_official_pricing():
-    from data.deepseek_usage import normalize_deepseek_usage
+def test_llm_usage_normalizes_provider_response_usage_with_configured_pricing():
+    from data.llm_usage import normalize_llm_usage
 
-    row = normalize_deepseek_usage(
+    row = normalize_llm_usage(
+        "deepseek",
         "deepseek-v4-pro",
         {
             "prompt_cache_hit_tokens": 1000,
@@ -203,7 +204,10 @@ def test_deepseek_usage_normalizes_api_response_usage_with_official_pricing():
     )
 
     assert row["utc_date"] == "2026-06-02"
+    assert row["provider"] == "deepseek"
+    assert row["pricing_model"] == "deepseek-v4-pro"
     assert row["usage_source"] == "api_response"
+    assert row["usage_schema"] == "openai_cache"
     assert row["input_cache_hit"] == 1000
     assert row["input_cache_miss"] == 2000
     assert row["output_tokens"] == 3000
@@ -212,25 +216,87 @@ def test_deepseek_usage_normalizes_api_response_usage_with_official_pricing():
     assert row["estimated_cost_cny"] > row["estimated_cost_usd"]
 
 
-def test_deepseek_usage_payload_combines_official_balance_and_project_ledger(monkeypatch):
+def test_llm_factor_hypothesis_runtime_resolves_from_use_case_config():
+    from data.llm_usage import resolve_llm_use_case
+
+    runtime = resolve_llm_use_case("factor_hypothesis")
+
+    assert runtime["provider"] == "deepseek"
+    assert runtime["model"] == "deepseek-v4-pro"
+    assert runtime["base_url"].startswith("https://")
+    assert runtime["api_key_env"] == "DEEPSEEK_API_KEY"
+
+
+def test_llm_usage_supports_total_token_and_request_pricing(monkeypatch):
+    import data.llm_usage as usage
+
+    monkeypatch.setattr(
+        usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "providers": {
+                    "unit": {
+                        "enabled": True,
+                        "label": "Unit",
+                        "pricing": {
+                            "usd_cny": 7.0,
+                            "models": {"unit-total": {"total": 1.5, "request": 0.01}},
+                        },
+                    }
+                }
+            }
+        },
+    )
+
+    row = usage.normalize_llm_usage(
+        "unit",
+        "unit-total",
+        {"total_tokens": 2000},
+        source="unit",
+        created_at="2026-06-02T12:00:00+00:00",
+    )
+
+    assert row["pricing_model"] == "unit-total"
+    assert row["estimated_cost_usd"] == round((2000 * 1.5 / 1_000_000) + 0.01, 9)
+    assert row["estimated_cost_cny"] == round(row["estimated_cost_usd"] * 7.0, 9)
+
+
+def test_llm_provider_balance_reports_unknown_provider_without_default_fallback(monkeypatch):
+    import data.llm_usage as usage
+
+    monkeypatch.setattr(usage, "get_settings", lambda: {"llm": {"providers": {}}})
+
+    balances = usage.fetch_provider_balances("missing-provider")
+
+    assert balances["missing-provider"]["status"] == "unknown"
+    assert balances["missing-provider"]["message"] == "provider not configured"
+
+
+def test_llm_usage_payload_combines_provider_balance_and_project_ledger(monkeypatch):
     import web.api.services.system_monitor as monitor
 
     monkeypatch.setattr(
         monitor,
-        "fetch_deepseek_balance",
-        lambda: {
-            "status": "ok",
-            "is_available": True,
-            "balance_infos": [{"currency": "CNY", "total_balance": "88.00", "granted_balance": "8.00", "topped_up_balance": "80.00"}],
+        "fetch_provider_balances",
+        lambda provider=None: {
+            provider or "deepseek": {
+                "provider": provider or "deepseek",
+                "label": "DeepSeek",
+                "status": "ok",
+                "is_available": True,
+                "balance_infos": [{"currency": "CNY", "total_balance": "88.00", "granted_balance": "8.00", "topped_up_balance": "80.00"}],
+            }
         },
     )
     monkeypatch.setattr(
         monitor,
-        "summarize_deepseek_project_usage",
-        lambda days=30: {
+        "summarize_llm_project_usage",
+        lambda days=30, provider=None: {
             "daily": [
                 {
                     "utc_date": "2026-06-02",
+                    "provider": provider or "deepseek",
                     "model": "deepseek-v4-pro",
                     "input_cache_hit": 1000,
                     "input_cache_miss": 2000,
@@ -242,6 +308,7 @@ def test_deepseek_usage_payload_combines_official_balance_and_project_ledger(mon
                     "usage_source": "api_response",
                 }
             ],
+            "providers": [provider or "deepseek"],
             "models": ["deepseek-v4-pro"],
             "dates": ["2026-06-02"],
             "totals": {"tokens": 6000, "requests": 1, "estimated_cost_usd": 0.0009, "estimated_cost_cny": 0.0065},
@@ -249,13 +316,19 @@ def test_deepseek_usage_payload_combines_official_balance_and_project_ledger(mon
         },
     )
 
-    payload = monitor.deepseek_usage_payload()
+    payload = monitor.llm_usage_payload(provider="deepseek")
 
     assert payload["status"] == "ok"
-    assert payload["source"] == "official_balance_api+project_usage_ledger"
+    assert payload["source"] == "provider_balance_api+project_usage_ledger"
+    assert payload["provider"] == "deepseek"
+    assert payload["providers"] == ["deepseek"]
     assert payload["balance"]["is_available"] is True
     assert payload["usage"]["totals"]["tokens"] == 6000
     assert payload["data"][0]["usage_source"] == "api_response"
+
+    compat_payload = monitor.deepseek_usage_payload()
+    assert compat_payload["provider"] == "deepseek"
+    assert compat_payload["usage"]["totals"]["requests"] == 1
 
 
 def test_monitor_is_read_only_but_keeps_system_status_cards():

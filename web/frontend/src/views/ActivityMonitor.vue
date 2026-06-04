@@ -59,47 +59,43 @@
     </div>
 
     <section class="system-grid">
-      <div class="deepseek-panel glass-card">
+      <div class="llm-panel glass-card">
         <div class="panel-head">
-          <span>{{ t('activity.deepseekUsage') }}</span>
+          <span>{{ t('activity.llmUsage') }}</span>
         </div>
 
         <div class="usage-summary">
           <div class="usage-balance">
             <span>{{ t('activity.apiBalance') }}</span>
-            <strong>{{ dsTotals?.balanceText ?? "—" }}</strong>
-            <small>{{ dsTotals?.balanceStatus ?? t('activity.notChecked') }}</small>
+            <strong>{{ llmTotals?.balanceText ?? "—" }}</strong>
+            <small>{{ llmTotals?.balanceStatus ?? t('activity.notChecked') }}</small>
           </div>
-          <div class="usage-pro">
+          <div class="usage-tokens">
             <span>{{ t('activity.projectTokens') }}</span>
-            <strong>{{ fmtNum(dsTotals?.tokens ?? 0) }}</strong>
-            <small>{{ t('activity.calls', { count: fmtNum(dsTotals?.requests ?? 0) }) }}</small>
+            <strong>{{ fmtNum(llmTotals?.tokens ?? 0) }}</strong>
+            <small>{{ t('activity.calls', { count: fmtNum(llmTotals?.requests ?? 0) }) }}</small>
           </div>
           <div class="usage-cost">
             <span>{{ t('activity.estimatedCost') }}</span>
-            <strong>{{ fmtMoney(dsTotals?.costCny ?? 0, "CNY") }}</strong>
-            <small>${{ (dsTotals?.costUsd ?? 0).toFixed(4) }}</small>
+            <strong>{{ fmtMoney(llmTotals?.costCny ?? 0, "CNY") }}</strong>
+            <small>${{ (llmTotals?.costUsd ?? 0).toFixed(4) }}</small>
           </div>
         </div>
 
-        <div v-if="dsHasUsage" class="chart-stack">
-          <div class="chart-block">
-            <div class="ds-chart-label">project v4-pro token stack</div>
-            <canvas ref="dsProRef"></canvas>
-          </div>
-          <div class="chart-block">
-            <div class="ds-chart-label">project v4-flash token stack</div>
-            <canvas ref="dsFlashRef"></canvas>
+        <div v-if="llmHasUsage" class="chart-stack">
+          <div v-for="series in llmChartSeries" :key="series.key" class="chart-block">
+            <div class="llm-chart-label">{{ t('activity.modelTokenStack', { model: series.label }) }}</div>
+            <canvas :ref="el => setLlmModelCanvas(series.key, el)"></canvas>
           </div>
           <div class="chart-block cost">
-            <div class="ds-chart-label">estimated daily cost</div>
-            <canvas ref="dsCostRef"></canvas>
+            <div class="llm-chart-label">{{ t('activity.estimatedDailyCost') }}</div>
+            <canvas ref="llmCostRef"></canvas>
           </div>
         </div>
         <div v-else class="usage-empty">
           {{ t('activity.usageEmpty') }}
         </div>
-        <div v-if="dsHasUsage" class="chart-legend">
+        <div v-if="llmHasUsage" class="chart-legend">
           <span><span class="legend-swatch" style="background:rgba(6,95,107,0.85)"></span>{{ t('activity.billableInput') }}</span>
           <span><span class="legend-swatch" style="background:rgba(6,182,212,0.85)"></span>{{ t('activity.output') }}</span>
           <span><span class="legend-swatch" style="background:rgba(6,182,212,0.25);border:1px dashed rgba(6,182,212,0.3)"></span>{{ t('activity.cacheHit') }}</span>
@@ -194,7 +190,7 @@
 <script setup lang="ts">
 import { useActivityMonitor } from "../view-models/useActivityMonitor";
 
-const { monitor, currentLocale, t, monitorError, lastFetch, elapsed, historyHours, cpuColor, memColor, loadText, batteryText, cpuChartId, memChartId, dsProRef, dsFlashRef, dsCostRef, dsHasUsage, dsTotals, apiHealth, API_HEALTH_ORDER, apiHealthOrdered, cronJobs, cronSummary, cronSummaryBadge, jobLabel, jobNextRun, jobLastRun, cronBadgeClass, fetchCronJobs, apiBadgeClass, fetchApiHealth, fmtNum, fmtMoney, fmtGb, fmtPercent, pctWidth, fetchData, fetchSlowData, drawCharts, drawDSChart } = useActivityMonitor();
+const { monitor, currentLocale, t, monitorError, lastFetch, elapsed, historyHours, cpuColor, memColor, loadText, batteryText, cpuChartId, memChartId, llmCostRef, llmHasUsage, llmChartSeries, llmTotals, setLlmModelCanvas, apiHealth, API_HEALTH_ORDER, apiHealthOrdered, cronJobs, cronSummary, cronSummaryBadge, jobLabel, jobNextRun, jobLastRun, cronBadgeClass, fetchCronJobs, apiBadgeClass, fetchApiHealth, fmtNum, fmtMoney, fmtGb, fmtPercent, pctWidth, fetchData, fetchSlowData, drawCharts, drawLlmUsageChart } = useActivityMonitor();
 </script>
 
 <style scoped src="../styles/views/activity-monitor.css"></style>

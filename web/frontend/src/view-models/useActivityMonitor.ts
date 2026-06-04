@@ -1,4 +1,4 @@
-import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
+import { ref, computed, nextTick, onMounted, onUnmounted, type ComponentPublicInstance } from "vue";
 import { api, type SystemMonitor } from "../api";
 import { useI18n } from "../i18n";
 import { fmtPercentValue, fmtShortCount } from "../utils/format";
@@ -31,13 +31,11 @@ export function useActivityMonitor() {
   });
 
   const cpuChartId = "cpu-chart"; const memChartId = "mem-chart";
-  const dsProRef = ref<HTMLCanvasElement | null>(null);
-  const dsFlashRef = ref<HTMLCanvasElement | null>(null);
-  const dsCostRef = ref<HTMLCanvasElement | null>(null);
-  const dsHasUsage = ref(false);
-  const dsTotals = ref<{
-    pro: number;
-    flash: number;
+  const llmModelRefs = ref<Record<string, HTMLCanvasElement | null>>({});
+  const llmCostRef = ref<HTMLCanvasElement | null>(null);
+  const llmHasUsage = ref(false);
+  const llmChartSeries = ref<{ key: string; label: string }[]>([]);
+  const llmTotals = ref<{
     tokens: number;
     requests: number;
     costCny: number;
@@ -50,12 +48,18 @@ export function useActivityMonitor() {
 
 
   // Fixed API health display order: data → AI → infra → messaging
-  const API_HEALTH_ORDER = ["AKShare", "Tushare", "DeepSeek", "Hindsight", "Telegram"];
+  const API_HEALTH_ORDER = ["AKShare", "Tushare", "LLM:DeepSeek", "Hindsight", "Telegram"];
   const apiHealthOrdered = computed(() => {
     if (!apiHealth.value) return [];
     const byName = new Map(apiHealth.value.items.map(i => [i.name, i]));
-    return API_HEALTH_ORDER.map(name => byName.get(name)).filter(Boolean) as { name: string; status: string; detail: string }[];
+    const ordered = API_HEALTH_ORDER.map(name => byName.get(name)).filter(Boolean) as { name: string; status: string; detail: string }[];
+    const known = new Set(API_HEALTH_ORDER);
+    return ordered.concat(apiHealth.value.items.filter(item => !known.has(item.name)));
   });
+
+  function setLlmModelCanvas(modelKey: string, el: Element | ComponentPublicInstance | null): void {
+    llmModelRefs.value[modelKey] = typeof HTMLCanvasElement !== "undefined" && el instanceof HTMLCanvasElement ? el : null;
+  }
 
   // Cron jobs
   const cronJobs = ref<any[]>([]);
@@ -148,7 +152,7 @@ export function useActivityMonitor() {
 
   function fetchSlowData() {
     drawCharts();
-    drawDSChart();
+    drawLlmUsageChart();
   }
 
   function drawCharts() {
@@ -186,22 +190,44 @@ export function useActivityMonitor() {
     }).catch(() => {});
   }
 
-  async function drawDSChart() {
+  async function drawLlmUsageChart() {
     try {
-      const d = await api.deepseekUsage();
+      const d = await api.llmUsage();
       const rows: any[] = d.usage?.daily || d.data || [];
-      dsHasUsage.value = rows.length > 0;
-      const balance = d.balance?.balance_infos?.[0];
+      llmHasUsage.value = rows.length > 0;
+      const balances = d.balances && typeof d.balances === "object" ? Object.values(d.balances) as any[] : [];
+      const providerBalance = d.balance || balances[0];
+      const balance = providerBalance?.balance_infos?.[0];
       const balanceText = balance
         ? fmtMoney(Number(balance.total_balance || 0), balance.currency || "CNY")
         : "—";
-      const balanceStatus = d.balance?.status === "ok"
-        ? (d.balance?.is_available ? "available" : "unavailable")
-        : (d.balance?.message || d.balance?.status || "missing");
+      const balanceStatus = providerBalance?.status === "ok"
+        ? (providerBalance?.is_available ? "available" : "unavailable")
+        : (providerBalance?.message || providerBalance?.status || "missing");
+      const providers = Array.from(new Set(rows.map((r: any) => String(r.provider || "").trim()).filter(Boolean)));
+      const chartKey = (row: any) => `${String(row.provider || "default")}::${String(row.model || "unknown")}`;
+      const chartLabel = (key: string) => {
+        const [provider, model] = key.split("::");
+        return providers.length > 1 ? `${provider}:${model}` : model;
+      };
+      const tokenTotal = (row: any) => {
+        const hit = Number(row.input_cache_hit || 0);
+        const miss = Number(row.input_cache_miss || Math.max(Number(row.input_tokens || 0) - hit, 0));
+        return hit + miss + Number(row.output_tokens || 0);
+      };
+      const seriesTotals = new Map<string, number>();
+      for (const row of rows) {
+        const key = chartKey(row);
+        seriesTotals.set(key, (seriesTotals.get(key) || 0) + tokenTotal(row));
+      }
+      llmChartSeries.value = Array.from(seriesTotals.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([key]) => ({ key, label: chartLabel(key) }));
+
       if (!rows.length) {
-        dsTotals.value = {
-          pro: 0,
-          flash: 0,
+        llmChartSeries.value = [];
+        llmTotals.value = {
           tokens: d.usage?.totals?.tokens || 0,
           requests: d.usage?.totals?.requests || 0,
           costCny: d.usage?.totals?.estimated_cost_cny || 0,
@@ -215,12 +241,21 @@ export function useActivityMonitor() {
       const dates = Array.from(new Set(rows.map((r: any) => String(r.utc_date || "").slice(0, 10)).filter(Boolean))).sort();
       if (!dates.length) return;
       const rowByDate: Record<string, any> = {};
-      for (const r of rows) rowByDate[r.utc_date + "|" + r.model] = r;
-      const proRows = rows.filter((r: any) => r.model === "deepseek-v4-pro");
-      const flashRows = rows.filter((r: any) => r.model === "deepseek-v4-flash");
-      dsTotals.value = {
-        pro: proRows.reduce((s: number, r: any) => s + (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0), 0),
-        flash: flashRows.reduce((s: number, r: any) => s + (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0), 0),
+      for (const r of rows) {
+        const date = String(r.utc_date || "").slice(0, 10);
+        if (!date) continue;
+        const key = date + "|" + chartKey(r);
+        const existing = rowByDate[key] || {};
+        rowByDate[key] = {
+          ...existing,
+          ...r,
+          input_cache_hit: Number(existing.input_cache_hit || 0) + Number(r.input_cache_hit || 0),
+          input_cache_miss: Number(existing.input_cache_miss || 0) + Number(r.input_cache_miss || Math.max(Number(r.input_tokens || 0) - Number(r.input_cache_hit || 0), 0)),
+          output_tokens: Number(existing.output_tokens || 0) + Number(r.output_tokens || 0),
+          total_tokens: Number(existing.total_tokens || 0) + Number(r.total_tokens || tokenTotal(r)),
+        };
+      }
+      llmTotals.value = {
         tokens: d.usage?.totals?.tokens || rows.reduce((s: number, r: any) => s + (r.total_tokens||0), 0),
         requests: d.usage?.totals?.requests || rows.reduce((s: number, r: any) => s + (r.requests||0), 0),
         costCny: d.usage?.totals?.estimated_cost_cny || rows.reduce((s: number, r: any) => s + (r.estimated_cost_cny||r.cost_cny||0), 0),
@@ -229,14 +264,18 @@ export function useActivityMonitor() {
         balanceStatus,
       };
 
-      const models = [
-        { key: "deepseek-v4-pro",   ref: dsProRef,   colors: ["rgba(6,95,107,0.85)","rgba(6,182,212,0.85)","rgba(6,182,212,0.28)"] },
-        { key: "deepseek-v4-flash", ref: dsFlashRef, colors: ["rgba(61,21,120,0.85)","rgba(124,58,237,0.85)","rgba(124,58,237,0.28)"] },
+      const palettes = [
+        ["rgba(6,95,107,0.85)", "rgba(6,182,212,0.85)", "rgba(6,182,212,0.28)"],
+        ["rgba(61,21,120,0.85)", "rgba(124,58,237,0.85)", "rgba(124,58,237,0.28)"],
+        ["rgba(3,105,161,0.85)", "rgba(56,189,248,0.85)", "rgba(56,189,248,0.28)"],
+        ["rgba(21,128,61,0.85)", "rgba(34,197,94,0.85)", "rgba(34,197,94,0.28)"],
       ];
       const layers = ["input_cache_miss", "output_tokens", "input_cache_hit"];
 
-      for (const model of models) {
-        const canvas = model.ref.value;
+      for (let si = 0; si < llmChartSeries.value.length; si++) {
+        const series = llmChartSeries.value[si];
+        const colors = palettes[si % palettes.length];
+        const canvas = llmModelRefs.value[series.key];
         if (!canvas) continue;
         const ctx = canvas.getContext("2d");
         if (!ctx) continue;
@@ -245,8 +284,8 @@ export function useActivityMonitor() {
         canvas.width = W * dpr; canvas.height = H * dpr;
         ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
 
-        const modelRows = rows.filter((r: any) => r.model === model.key);
-        const modelHasUsage = modelRows.some((r: any) => (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0) > 0);
+        const modelRows = rows.filter((r: any) => chartKey(r) === series.key);
+        const modelHasUsage = modelRows.some((r: any) => tokenTotal(r) > 0);
         if (!modelHasUsage) {
           ctx.fillStyle = "#475569";
           ctx.font = "10px monospace";
@@ -255,7 +294,7 @@ export function useActivityMonitor() {
           ctx.textAlign = "start";
           continue;
         }
-        const maxVal = Math.max(...modelRows.map((r: any) => (r.input_cache_miss||0)+(r.output_tokens||0)+(r.input_cache_hit||0)), 1);
+        const maxVal = Math.max(...modelRows.map((r: any) => tokenTotal(r)), 1);
         const leftPad = 34, botPad = 16;
         const chartH = H - 6 - botPad;
         const slotW = (W - leftPad - 2) / dates.length;
@@ -269,14 +308,14 @@ export function useActivityMonitor() {
           ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W-2, y); ctx.stroke();
         }
         dates.forEach((date, di) => {
-          const row = rowByDate[date + "|" + model.key];
+          const row = rowByDate[date + "|" + series.key];
           if (!row) return;
           const x0 = leftPad + di * slotW + (slotW - barW) / 2;
           let yBottom = H - botPad;
           layers.forEach((layer, li) => {
             const val = row[layer] || 0;
             const h = (val / maxVal) * chartH;
-            ctx.fillStyle = model.colors[li];
+            ctx.fillStyle = colors[li];
             ctx.fillRect(x0, yBottom - h, barW, h);
             yBottom -= h;
           });
@@ -286,7 +325,7 @@ export function useActivityMonitor() {
       }
 
       // Cost chart
-      const costCanvas = dsCostRef.value;
+      const costCanvas = llmCostRef.value;
       if (costCanvas) {
         const ctx = costCanvas.getContext("2d");
         if (ctx) {
@@ -294,8 +333,14 @@ export function useActivityMonitor() {
           const W = costCanvas.offsetWidth || 320, H = costCanvas.offsetHeight || 82;
           costCanvas.width = W * dpr; costCanvas.height = H * dpr;
           ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
-          const costs = rows.filter((r: any) => (r.estimated_cost_cny || r.cost_cny || 0) > 0);
-          const maxCost = Math.max(...costs.map((r: any) => r.estimated_cost_cny || r.cost_cny || 0), 1);
+          const costByDate: Record<string, number> = {};
+          for (const r of rows) {
+            const date = String(r.utc_date || "").slice(0, 10);
+            if (!date) continue;
+            costByDate[date] = (costByDate[date] || 0) + Number(r.estimated_cost_cny || r.cost_cny || 0);
+          }
+          const costs = Object.values(costByDate).filter(cost => cost > 0);
+          const maxCost = Math.max(...costs, 1);
           const leftPad = 34, botPad = 14, chartH = H - 8 - botPad;
           const slotWc = (W - leftPad - 2) / dates.length;
           const barWc = Math.max(2, Math.min(16, slotWc * 0.38));
@@ -311,8 +356,6 @@ export function useActivityMonitor() {
             ctx.strokeStyle = "rgba(148,163,184,0.05)"; ctx.lineWidth = 0.5;
             ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W-2, y); ctx.stroke();
           }
-          const costByDate: Record<string, number> = {};
-          for (const r of costs) costByDate[r.utc_date] = (costByDate[r.utc_date]||0) + (r.estimated_cost_cny || r.cost_cny || 0);
           const costDates = dates.filter(d => costByDate[d] > 0);
           if (costDates.length > 0) {
             for (const date of costDates) {
@@ -368,11 +411,11 @@ export function useActivityMonitor() {
     batteryText,
     cpuChartId,
     memChartId,
-    dsProRef,
-    dsFlashRef,
-    dsCostRef,
-    dsHasUsage,
-    dsTotals,
+    llmCostRef,
+    llmHasUsage,
+    llmChartSeries,
+    llmTotals,
+    setLlmModelCanvas,
     apiHealth,
     API_HEALTH_ORDER,
     apiHealthOrdered,
@@ -394,6 +437,6 @@ export function useActivityMonitor() {
     fetchData,
     fetchSlowData,
     drawCharts,
-    drawDSChart,
+    drawLlmUsageChart,
   };
 }

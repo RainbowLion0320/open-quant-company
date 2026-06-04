@@ -191,7 +191,7 @@ python -m pip install -r requirements-dev.txt
 | 环境变量 | 用途 |
 |----------|------|
 | `TUSHARE_TOKEN` / `TUSHARE_PRO_TOKEN` | Tushare 数据，包括估值、资金流、部分财务扩展 |
-| `DEEPSEEK_API_KEY` | LLM 因子发现、DeepSeek 用量监控 |
+| `DEEPSEEK_API_KEY` | 默认 DeepSeek provider 的 LLM 因子发现、通用 LLM 用量监控 |
 | `ASTROLABE_API_KEY` | FastAPI Bearer Token 保护 |
 | `ASTROLABE_STORE` | 覆盖默认 `data/store/` |
 | `ASTROLABE_CACHE` | 覆盖默认 `data/cache/` |

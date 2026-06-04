@@ -38,12 +38,11 @@ def api_health_payload() -> dict:
     else:
         results.append({"name": "Tushare", "status": "missing", "detail": "未配置 TUSHARE_TOKEN"})
 
-    ds_key = os.environ.get("DEEPSEEK_API_KEY")
-    if ds_key:
-        masked = ds_key[:4] + "****" + ds_key[-4:] if len(ds_key) > 8 else "****"
-        results.append({"name": "DeepSeek", "status": "ok", "detail": f"已配置 ({masked})"})
-    else:
-        results.append({"name": "DeepSeek", "status": "missing", "detail": "未配置 DEEPSEEK_API_KEY"})
+    try:
+        from data.llm_usage import provider_health_items
+        results.extend(provider_health_items())
+    except Exception as exc:
+        results.append({"name": "LLM", "status": "warn", "detail": f"无法读取 provider 配置: {str(exc)[:60]}"})
 
     try:
         import httpx

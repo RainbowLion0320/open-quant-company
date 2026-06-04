@@ -15,6 +15,7 @@ from web.api.services.system_integrations import (
 )
 from web.api.services.system_monitor import (
     deepseek_usage_payload,
+    llm_usage_payload,
     system_history_payload,
     system_monitor_payload,
 )
@@ -43,8 +44,14 @@ async def system_history(hours: int = Query(default=24, ge=1, le=720)):
 
 @router.get("/deepseek-usage")
 async def deepseek_usage():
-    """DeepSeek official balance and project-local API response usage ledger."""
+    """Backward-compatible DeepSeek provider usage endpoint."""
     return deepseek_usage_payload()
+
+
+@router.get("/llm-usage")
+async def llm_usage(provider: str | None = Query(default=None)):
+    """Generic LLM provider balance and project-local API response usage ledger."""
+    return llm_usage_payload(provider=provider)
 
 
 @router.get("/db-health")

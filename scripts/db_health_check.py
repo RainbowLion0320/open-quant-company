@@ -421,10 +421,10 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         if p.exists():
             records.append(_scan_single(f"paper_{name}", p))
 
-    # ── DeepSeek project API response usage ledger ──
-    ds = STORE / "deepseek" / "project_usage_ledger.parquet"
-    if ds.exists():
-        records.append(_scan_single("system_deepseek_usage", ds))
+    # ── Generic LLM project API response usage ledger ──
+    llm = STORE / "llm" / "project_usage_ledger.parquet"
+    if llm.exists():
+        records.append(_scan_single("system_llm_usage", llm))
 
     # ── data/cache/api/ (AKShare API response cache) ──
     api_cache = STORE.parent / "cache" / "api"

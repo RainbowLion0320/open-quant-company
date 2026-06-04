@@ -5,6 +5,7 @@ from typing import List
 
 from data.datahub import get_datahub
 from data.feature_store import iter_feature_files
+from data.llm_usage import resolve_llm_use_case
 from research.factors.hypothesis.candidates import FactorCandidate
 from research.factors.hypothesis.evaluation import evaluate_factor_oos, get_feature_importance_hints
 from research.factors.hypothesis.llm import generate_via_llm
@@ -26,7 +27,8 @@ def run_research_loop(
     print(f"   Candidates/round: {n_candidates}")
     print(f"   IC threshold: {ic_threshold}")
     print(f"   Max rounds: {max_rounds}")
-    print(f"   Model: deepseek-v4-pro")
+    llm_runtime = resolve_llm_use_case("factor_hypothesis")
+    print(f"   Model: {llm_runtime['provider']}:{llm_runtime['model']}")
     print(f"   Save accepted candidates: {save_candidates}")
     print(f"{'='*60}")
 

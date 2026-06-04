@@ -20,7 +20,7 @@
   gap: 12px;
 }
 .telemetry-card,
-.deepseek-panel,
+.llm-panel,
 .side-card,
 .ops-card {
   padding: 14px;
@@ -140,10 +140,8 @@
 }
 .usage-balance strong { color: rgba(34,197,94,0.95); }
 .usage-balance { border-left: 2px solid rgba(34,197,94,0.35) !important; }
-.usage-pro strong { color: rgba(6,182,212,0.95); }
-.usage-pro { border-left: 2px solid rgba(6,182,212,0.35) !important; }
-.usage-flash strong { color: rgba(124,58,237,0.95); }
-.usage-flash { border-left: 2px solid rgba(124,58,237,0.35) !important; }
+.usage-tokens strong { color: rgba(6,182,212,0.95); }
+.usage-tokens { border-left: 2px solid rgba(6,182,212,0.35) !important; }
 .usage-cost strong { color: rgba(232,168,64,0.95); }
 .usage-cost { border-left: 2px solid rgba(232,168,64,0.35) !important; }
 .chart-stack {
@@ -182,7 +180,7 @@
 .chart-block.cost canvas {
   height: 82px;
 }
-.ds-chart-label {
+.llm-chart-label {
   font-size: 9px;
   color: var(--text-disabled);
   letter-spacing: 0.09em;

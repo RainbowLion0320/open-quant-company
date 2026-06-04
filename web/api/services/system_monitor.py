@@ -6,7 +6,7 @@ import sqlite3
 import psutil
 
 from data.datahub import get_datahub
-from data.deepseek_usage import fetch_deepseek_balance, summarize_deepseek_project_usage
+from data.llm_usage import fetch_provider_balances, summarize_llm_project_usage
 from web.api.services.system_common import json_value
 
 
@@ -123,18 +123,28 @@ def system_history_payload(hours: int) -> dict:
     }
 
 
-def deepseek_usage_payload() -> dict:
-    balance = fetch_deepseek_balance()
-    usage = summarize_deepseek_project_usage(days=30)
+def llm_usage_payload(provider: str | None = None) -> dict:
+    balances = fetch_provider_balances(provider)
+    usage = summarize_llm_project_usage(days=30, provider=provider)
     records = [{k: json_value(v) for k, v in row.items()} for row in usage.get("daily", [])]
-    status = "ok" if balance.get("status") == "ok" or usage.get("status") == "ok" else usage.get("status", "no_data")
+    balance_status_ok = any(item.get("status") == "ok" for item in balances.values())
+    status = "ok" if balance_status_ok or usage.get("status") == "ok" else usage.get("status", "no_data")
+    primary_balance = next(iter(balances.values()), {})
     return {
-        "source": "official_balance_api+project_usage_ledger",
-        "balance": balance,
+        "source": "provider_balance_api+project_usage_ledger",
+        "provider": provider or "all",
+        "balances": balances,
+        "balance": primary_balance,
         "usage": usage,
         "data": records,
+        "providers": usage.get("providers", []),
         "models": usage.get("models", []),
         "dates": usage.get("dates", []),
         "total_cost": float(usage.get("totals", {}).get("estimated_cost_cny", 0) or 0),
         "status": status,
     }
+
+
+def deepseek_usage_payload() -> dict:
+    """Backward-compatible alias for older API/UI callers."""
+    return llm_usage_payload(provider="deepseek")

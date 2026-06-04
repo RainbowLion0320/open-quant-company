@@ -5,7 +5,7 @@ Astrolabe Quant API v2 -- Application Factory
 import os, sys
 from pathlib import Path
 
-# Load ~/.hermes/.env (DeepSeek key etc.)
+# Load ~/.hermes/.env (LLM provider keys etc.)
 _env_path = Path.home() / ".hermes" / ".env"
 if _env_path.exists():
     from dotenv import load_dotenv

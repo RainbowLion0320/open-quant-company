@@ -156,6 +156,9 @@ class DataHubPaths:
     def hindsight_tokens_path(self) -> Path:
         return self.cache_root / "hindsight_tokens.json"
 
+    def llm_project_usage_path(self) -> Path:
+        return self.store_path("llm") / "project_usage_ledger.parquet"
+
     def deepseek_project_usage_path(self) -> Path:
         return self.store_path("deepseek") / "project_usage_ledger.parquet"
 

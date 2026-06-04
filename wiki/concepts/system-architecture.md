@@ -66,7 +66,7 @@ LLM Research → 自动化R&D      Circuit Breaker → -15%熔断  Self-healing 
 │  ML / AI Layer                                           │
 │  Feature Store (PIT monthly slices)                      │
 │  Model Registry (LightGBM+Optuna)                        │
-│  LLM Hypothesis (DeepSeek v4-pro → DSL Parser)           │
+│  LLM Hypothesis (provider model → DSL Parser)            │
 ├──────────────────────────────────────────────────────────┤
 │  Strategy Layer                                          │
 │  BaseStrategy + unified runtime registry                 │
@@ -105,7 +105,7 @@ strategies:
    日频: scripts/cron_fetch_daily.py → dimension_path("ohlcv_daily", symbol=...)
    慢速: scripts/cron_fetch_extra.py --slow-only
    月频: Macro Monthly Refresh (1日) + Financial Monthly Refresh (3日)
-   DeepSeek: official /user/balance + project API response usage ledger
+   LLM providers: provider balance API + project API response usage ledger
 
    路径统一由 DataHub.dimension_path() 从 data_registry 的 cache 模式展开:
    data/store/stock/daily/{symbol}.parquet        ← "stock/daily/{symbol}.parquet"
@@ -227,7 +227,7 @@ strategies:
 |价格范围 | 2 | Qlib Alpha158 | amplitude, high_low_ratio |
 |趋势 | 2 | Qlib Alpha158 | ma5_20_cross, ma20_60_cross |
 |动量 | 1 | Qlib Alpha158 | rsi_14 |
-|**LLM发现** | **7** | **deepseek-v4-pro** ★ | vol_adj_mom_5d, midpoint_bias 等 |
+|**LLM发现** | **7** | `llm.use_cases.factor_hypothesis` 配置的 provider/model ★ | vol_adj_mom_5d, midpoint_bias 等 |
 |**动量增强** | **4** | **Codex 4.4** ★ | mom_3m_skip_1m, mom_6m_skip_1m, trend_strength, ma120_deviation |
 
 ### 外部富化因子 (9, enrich_from_registry)

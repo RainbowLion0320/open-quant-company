@@ -292,18 +292,37 @@ project:
   display_name: 星盘
   english_name: Astrolabe Quant OS
   description: 个人量化研究与执行操作系统 — 日频 · 自托管 · AI增强
-deepseek:
-  pricing:
-    usd_cny: 7.2
-    models:
-      deepseek-v4-flash:
-        cache_hit: 0.0028
-        cache_miss: 0.14
-        output: 0.28
-      deepseek-v4-pro:
-        cache_hit: 0.003625
-        cache_miss: 0.435
-        output: 0.87
+llm:
+  default_provider: deepseek
+  use_cases:
+    factor_hypothesis:
+      provider: deepseek
+      model: deepseek-v4-pro
+  providers:
+    deepseek:
+      enabled: true
+      label: DeepSeek
+      api_key_env: DEEPSEEK_API_KEY
+      env_file: ~/.hermes/.env
+      base_url: https://api.deepseek.com/v1
+      default_model: deepseek-v4-flash
+      balance_url: https://api.deepseek.com/user/balance
+      pricing_source: https://api-docs.deepseek.com/quick_start/pricing
+      usage_schema: openai_cache
+      pricing:
+        usd_cny: 7.2
+        aliases:
+          deepseek-chat: deepseek-v4-flash
+          deepseek-reasoner: deepseek-v4-flash
+        models:
+          deepseek-v4-flash:
+            input_cache_hit: 0.0028
+            input_cache_miss: 0.14
+            output: 0.28
+          deepseek-v4-pro:
+            input_cache_hit: 0.003625
+            input_cache_miss: 0.435
+            output: 0.87
 signals:
   multifactor:
     buy_threshold: 52

@@ -19,10 +19,22 @@ export interface SystemHistoryResponse {
   data: any[];
 }
 
-export interface DeepSeekUsageResponse {
+export interface LlmUsageResponse {
   data: any[];
   source?: string;
+  provider?: string;
+  providers?: string[];
+  balances?: Record<string, {
+    provider?: string;
+    label?: string;
+    status: string;
+    is_available: boolean;
+    balance_infos: { currency: string; total_balance: string; granted_balance: string; topped_up_balance: string }[];
+    message?: string;
+  }>;
   balance?: {
+    provider?: string;
+    label?: string;
     status: string;
     is_available: boolean;
     balance_infos: { currency: string; total_balance: string; granted_balance: string; topped_up_balance: string }[];
@@ -40,6 +52,8 @@ export interface DeepSeekUsageResponse {
   status?: string;
   message?: string;
 }
+
+export type DeepSeekUsageResponse = LlmUsageResponse;
 
 export interface DbHealthResponse {
   data: any[];

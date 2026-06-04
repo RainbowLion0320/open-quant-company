@@ -99,11 +99,13 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Pipeline | `routes/pipeline.py` | `GET /api/pipeline`, `GET /api/pipeline/market-regime`, `GET /api/pipeline/{pipeline_key}` |
 | Assets | `routes/assets.py` | `GET /api/assets/overview` |
 | Settings | `routes/settings.py` | `GET /api/settings`, `GET /api/settings/schema`, `PUT /api/settings`, `PATCH /api/settings/section/{section}` |
-| System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/deepseek-usage`, `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/mode` |
+| System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/llm-usage`, `GET /api/system/deepseek-usage` (compat), `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/mode` |
 | Hindsight | `routes/hindsight.py` | `GET /api/hindsight/graph` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
 
-`GET /api/system/deepseek-usage` 只使用公开 API 与本地账本：`/user/balance` 提供账号余额, 本项目 DeepSeek 调用从响应 `usage` 字段写入 `project_usage_ledger.parquet` 后聚合展示。不得重新引入网页 CDP 或 CSV 导入作为历史用量来源。
+`GET /api/system/llm-usage` 只使用 provider 公开余额 API 与本地账本：启用 provider 的 `balance_url` 提供账号余额，本项目 LLM 调用从响应 `usage` 字段写入 `data/store/llm/project_usage_ledger.parquet` 后按 provider/model 聚合展示。`/api/system/deepseek-usage` 仅作为兼容别名；不得重新引入网页 CDP 或 CSV 导入作为历史用量来源。
+
+LLM 成本配置以 `llm.providers.{provider}` 为边界，`llm.use_cases.*` 只声明调用路由。定价支持 `input_cache_hit` / `input_cache_miss` / `input` / `output`，也支持 `total` token 和 `request` 固定调用成本；不同 provider 可用 `usage_schema` 标明自己的响应范式。
 
 **Pipeline API 契约：**
 

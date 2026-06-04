@@ -165,6 +165,9 @@ class DataHub:
     def hindsight_tokens_path(self) -> Path:
         return self.paths.hindsight_tokens_path()
 
+    def llm_project_usage_path(self) -> Path:
+        return self.paths.llm_project_usage_path()
+
     def deepseek_project_usage_path(self) -> Path:
         return self.paths.deepseek_project_usage_path()
 
@@ -291,7 +294,7 @@ class DataHub:
             "manifest": DatasetSpec("manifest", self.manifest_path(), "parquet", "datahub", "DataHub parquet write manifest"),
             "system_monitor": DatasetSpec("system_monitor", self.system_monitor_path(), "sqlite", "system", "System metrics time-series DB"),
             "token_usage": DatasetSpec("token_usage", self.token_usage_path(), "json", "system", "LLM token usage cache"),
-            "deepseek_usage": DatasetSpec("deepseek_usage", self.deepseek_project_usage_path(), "parquet", "system", "DeepSeek project API response usage ledger"),
+            "llm_usage": DatasetSpec("llm_usage", self.llm_project_usage_path(), "parquet", "system", "Generic LLM provider response usage ledger"),
         }
         try:
             from data.data_registry import get_registry

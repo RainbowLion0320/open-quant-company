@@ -2,26 +2,25 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from datetime import datetime
 from typing import Dict, List, Optional
 
 from data.datahub import get_datahub
 from data.data_registry import get_registry
-from data.deepseek_usage import append_deepseek_usage
+from data.llm_usage import append_llm_usage, load_provider_api_key, resolve_llm_use_case
 from research.factors.hypothesis.candidates import FactorCandidate
 
 _LLM_USAGE_FILE = get_datahub().llm_usage_path()
 
-def _log_llm_usage(source: str, usage, model: str):
+def _log_llm_usage(source: str, usage, provider: str, model: str):
     """记录非 Hermes 网关的 LLM token 用量到共享缓存"""
     try:
-        ledger_row = append_deepseek_usage(model, usage, source=source)
+        ledger_row = append_llm_usage(provider, model, usage, source=source)
         today = datetime.now().strftime("%Y-%m-%d")
         data = {}
         if _LLM_USAGE_FILE.exists():
-            with open(_LLM_USAGE_FILE) as f:
+            with open(_LLM_USAGE_FILE, encoding="utf-8") as f:
                 data = json.load(f)
         if data.get("date") != today:
             data = {"date": today, "items": [], "total_input": 0, "total_output": 0, "total_cost": 0.0, "calls": 0}
@@ -34,7 +33,7 @@ def _log_llm_usage(source: str, usage, model: str):
         data["total_cost"] += cost
         data["calls"] += 1
         _LLM_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(_LLM_USAGE_FILE, "w") as f:
+        with open(_LLM_USAGE_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f)
     except Exception:
         pass  # 静默失败, 不影响主流程
@@ -132,23 +131,23 @@ def generate_via_llm(n: int, existing: List[str],
         print("openai not installed. pip install openai")
         return []
 
-    env_path = os.path.expanduser("~/.hermes/.env")
-    api_key = ""
-    if os.path.exists(env_path):
-        for line in open(env_path):
-            if line.startswith("DEEPSEEK_API_KEY="):
-                api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                break
-
+    runtime = resolve_llm_use_case("factor_hypothesis")
+    provider = runtime["provider"]
+    model = runtime["model"]
+    api_key = load_provider_api_key(provider)
     if not api_key:
-        print("No DEEPSEEK_API_KEY in ~/.hermes/.env")
+        hint = runtime.get("api_key_env") or "provider API key"
+        print(f"No API key configured for LLM provider {provider} ({hint})")
         return []
 
-    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+    client_kwargs = {"api_key": api_key}
+    if runtime.get("base_url"):
+        client_kwargs["base_url"] = runtime["base_url"]
+    client = OpenAI(**client_kwargs)
     prompt = build_hypothesis_prompt(n, existing, importance_hints)
 
     response = client.chat.completions.create(
-        model="deepseek-v4-pro",
+        model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.8,
     )
@@ -156,7 +155,7 @@ def generate_via_llm(n: int, existing: List[str],
 
     # 记录 token 用量到共享缓存 (供活动监视器统计)
     if hasattr(response, 'usage') and response.usage:
-        _log_llm_usage("factor_hypothesis", response.usage, "deepseek-v4-pro")
+        _log_llm_usage("factor_hypothesis", response.usage, provider, model)
 
     return _parse_llm_candidates(text)
 

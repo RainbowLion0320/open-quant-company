@@ -757,6 +757,18 @@ def test_tracked_project_context_uses_canonical_astrolabe_names():
 def test_deepseek_usage_no_longer_depends_on_platform_scraping_backfills():
     assert not Path("scripts", "ingest_deepseek_" + "cdp.py").exists()
     assert not Path("scripts", "ingest_deepseek_" + "usage.py").exists()
+    monitor_logic = Path("web/frontend/src/view-models/useActivityMonitor.ts").read_text(encoding="utf-8")
+    system_api = Path("web/frontend/src/api/modules/system.ts").read_text(encoding="utf-8")
+    datahub = Path("data/datahub.py").read_text(encoding="utf-8")
+    factor_llm = Path("research/factors/hypothesis/llm.py").read_text(encoding="utf-8")
+
+    assert "api.llmUsage()" in monitor_logic
+    assert "api.deepseekUsage()" not in monitor_logic
+    assert "/api/system/llm-usage" in system_api
+    assert "llm_project_usage_path" in datahub
+    assert "resolve_llm_use_case" in factor_llm
+    assert "https://api.deepseek.com/v1" not in factor_llm
+    assert "DEEPSEEK_API_KEY" not in factor_llm
 
     tracked_files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
     offenders = []
