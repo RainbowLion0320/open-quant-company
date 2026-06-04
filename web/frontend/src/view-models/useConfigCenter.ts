@@ -36,6 +36,14 @@ export function useConfigCenter() {
     field_count: number;
   }
 
+  interface StrategyNavItem {
+    key: string;
+    label: string;
+    sectionCount: number;
+    fieldCount: number;
+    enabled: boolean | null;
+  }
+
   const schema = ref<SectionSchema[]>([]);
   const groups = ref<GroupSchema[]>([]);
   const { t } = useI18n();
@@ -113,6 +121,7 @@ export function useConfigCenter() {
       label: group.label,
       sectionCount: group.sections.length,
       fieldCount: group.sections.reduce((sum, section) => sum + section.fields.length, 0),
+      enabled: group.strategyName ? getNestedValue(config, `strategies.${group.strategyName}.enabled`) !== false : null,
     }));
   });
 
@@ -142,16 +151,23 @@ export function useConfigCenter() {
     container.scrollTo({ top: Math.max(0, top - 2), behavior: "smooth" });
   }
 
-  function navItemLabel(item: { label: string; sectionCount: number; fieldCount: number }): string {
+  function navItemLabel(item: StrategyNavItem): string {
     return `${item.label} · ${item.sectionCount} / ${item.fieldCount}`;
   }
 
-  function navItemMeta(item: { sectionCount: number; fieldCount: number }): string {
+  function navItemMeta(item: StrategyNavItem): string {
     return t("configCenter.strategyNavMeta", { sections: item.sectionCount, fields: item.fieldCount });
   }
 
-  function navButtonTitle(item: { label: string; sectionCount: number; fieldCount: number }): string {
-    return t("configCenter.strategyJumpTo", { label: navItemLabel(item) });
+  function strategyStatusLabel(item: StrategyNavItem): string {
+    if (item.enabled === null) return "";
+    return t(item.enabled ? "configCenter.strategyEnabled" : "configCenter.strategyDisabled");
+  }
+
+  function navButtonTitle(item: StrategyNavItem): string {
+    const status = strategyStatusLabel(item);
+    const label = status ? `${navItemLabel(item)} · ${status}` : navItemLabel(item);
+    return t("configCenter.strategyJumpTo", { label });
   }
 
   function subgroupMeta(sections: SectionSchema[]): string {
@@ -300,6 +316,7 @@ export function useConfigCenter() {
     jumpToSubgroup,
     subgroupDomId,
     navItemMeta,
+    strategyStatusLabel,
     navButtonTitle,
     subgroupMeta,
     getNestedValue,

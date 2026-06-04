@@ -6,6 +6,8 @@ export const configCenter = {
       subgroupFieldSummary: "{sections} sections · {fields} fields",
       strategyQuickNav: "Strategy quick nav",
       strategyNavMeta: "{sections} sections / {fields} fields",
+      strategyEnabled: "Strategy enabled",
+      strategyDisabled: "Strategy disabled",
       strategyJumpTo: "Jump to {label}",
       saveChanges: "Save Changes",
       saveSuccess: "Saved",

@@ -436,12 +436,17 @@ def test_config_center_strategy_management_has_secondary_navigation():
 
     assert "data-strategy-subnav" in config_center
     assert "strategyNavItems" in config_center
+    assert "strategy-status-dot" in config_center
+    assert "strategyStatusLabel(item)" in config_center
     assert "jumpToSubgroup(item.key)" in config_center
     assert "sectionStrategyName" in config_center_logic
     assert "strategy:${strategyName}" in config_center_logic
+    assert "strategies.${group.strategyName}.enabled" in config_center_logic
     assert "strategyNavItems = computed" in config_center_logic
     assert ".config-body.has-strategy-nav" in css
     assert ".strategy-subnav" in css
+    assert ".strategy-status-dot.enabled" in css
+    assert ".strategy-status-dot.disabled" in css
 
 
 def test_frontend_router_does_not_keep_legacy_redirect_routes():

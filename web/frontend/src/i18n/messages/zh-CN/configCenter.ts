@@ -6,6 +6,8 @@ export const configCenter = {
       subgroupFieldSummary: "{sections} 个配置块 · {fields} 个参数",
       strategyQuickNav: "策略快速导航",
       strategyNavMeta: "{sections} 块 / {fields} 项",
+      strategyEnabled: "策略已启用",
+      strategyDisabled: "策略未启用",
       strategyJumpTo: "跳转到 {label}",
       saveChanges: "保存修改",
       saveSuccess: "保存成功",

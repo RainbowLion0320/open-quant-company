@@ -41,7 +41,16 @@
               :title="navButtonTitle(item)"
               @click="jumpToSubgroup(item.key)"
             >
-              <span>{{ item.label }}</span>
+              <span class="strategy-subnav-label">
+                <i
+                  v-if="item.enabled !== null"
+                  class="strategy-status-dot"
+                  :class="item.enabled ? 'enabled' : 'disabled'"
+                  :title="strategyStatusLabel(item)"
+                  aria-hidden="true"
+                ></i>
+                <span>{{ item.label }}</span>
+              </span>
               <small>{{ navItemMeta(item) }}</small>
             </button>
           </aside>
@@ -115,7 +124,7 @@
 <script setup lang="ts">
 import { useConfigCenter } from "../view-models/useConfigCenter";
 
-const { groups, t, activeGroup, loading, saveMsgSection, saveMsg, saveOk, editorScrollRef, activeGroupInfo, groupedSections, strategyNavItems, visibleSubgroupKey, setActiveGroup, jumpToSubgroup, subgroupDomId, navItemMeta, navButtonTitle, subgroupMeta, getFieldValue, setFieldValue, onSliderInput, coerceNumericField, sectionHasChanges, resetSection, saveSection, isSaving } = useConfigCenter();
+const { groups, t, activeGroup, loading, saveMsgSection, saveMsg, saveOk, editorScrollRef, activeGroupInfo, groupedSections, strategyNavItems, visibleSubgroupKey, setActiveGroup, jumpToSubgroup, subgroupDomId, navItemMeta, strategyStatusLabel, navButtonTitle, subgroupMeta, getFieldValue, setFieldValue, onSliderInput, coerceNumericField, sectionHasChanges, resetSection, saveSection, isSaving } = useConfigCenter();
 </script>
 
 <style scoped src="../styles/views/config-center.css"></style>
