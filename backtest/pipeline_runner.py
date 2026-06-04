@@ -50,6 +50,16 @@ class PipelineBacktest:
         """Run the backtest day by day and return the standard result dict."""
         if universe is None:
             universe = list(prices.columns)
+        else:
+            universe = [symbol for symbol in universe if symbol in prices.columns]
+        price_history = prices.ffill()
+        price_history.attrs = {}
+        try:
+            from backtest.candidate_alpha import transfer_price_panels
+
+            transfer_price_panels(prices, price_history)
+        except Exception:
+            pass
 
         holdings: dict[str, int] = {}
         cost_basis: dict[str, float] = {}
@@ -61,14 +71,14 @@ class PipelineBacktest:
 
         for day_idx in range(total_days):
             dt = prices.index[day_idx]
-            current_prices_raw = prices.iloc[day_idx]
+            current_prices_raw = price_history.iloc[day_idx].reindex(universe)
 
             # Current prices as dict
-            current_prices: dict[str, float] = {}
-            for sym in universe:
-                val = self._safe_price(prices[sym], day_idx)
-                if val and val > 0:
-                    current_prices[sym] = val
+            current_prices = {
+                str(sym): float(val)
+                for sym, val in current_prices_raw.dropna().items()
+                if float(val) > 0
+            }
 
             # Regime
             regime = "sideways"
@@ -97,7 +107,7 @@ class PipelineBacktest:
                     date=dt.date() if hasattr(dt, "date") else dt,
                     universe=universe,
                     prices=current_prices,
-                    price_history=prices,
+                    price_history=price_history,
                     regime=regime,
                     cash=cash,
                     holdings=dict(holdings),
@@ -105,7 +115,7 @@ class PipelineBacktest:
                 )
 
                 # Stage 1: Alpha
-                ctx.signals = self.alpha.generate_alpha(universe, prices, day_idx, regime)
+                ctx.signals = self.alpha.generate_alpha(universe, price_history, day_idx, regime)
 
                 # Stage 2: Portfolio
                 ctx.targets = self.portfolio.construct(ctx.signals, ctx)

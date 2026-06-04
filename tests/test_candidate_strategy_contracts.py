@@ -54,6 +54,38 @@ def test_candidate_strategy_runners_return_signal_rows_for_small_limit():
             assert 0 <= row["score"] <= 100
 
 
+def test_quality_value_backtest_inputs_are_cut_to_rebalance_date(monkeypatch):
+    from backtest import candidate_alpha
+
+    fin = pd.DataFrame(
+        {
+            "报告期": ["2019-12-31", "2025-12-31"],
+            "净资产收益率": ["10%", "50%"],
+            "销售毛利率": ["20%", "80%"],
+        }
+    )
+    valuation = pd.DataFrame(
+        {
+            "trade_date": ["2020-01-02", "2025-01-02"],
+            "pe_ttm": [20.0, 1.0],
+            "pb": [3.0, 0.5],
+        }
+    )
+
+    monkeypatch.setattr("data.fetchers.financial.read_financial_summary", lambda symbol: fin)
+    monkeypatch.setattr("data.fetchers.financial.read_valuation", lambda symbol: valuation)
+    candidate_alpha._quality_inputs.cache_clear()
+
+    inputs = candidate_alpha._quality_inputs("000001", 1, "2020-06-01")
+
+    assert inputs == {
+        "roe": 0.10,
+        "gross_margin": 0.20,
+        "pe_ttm": 20.0,
+        "pb": 3.0,
+    }
+
+
 def test_trend_following_reads_core_params_from_settings(tmp_path, monkeypatch):
     from core.settings import clear_settings_cache
     from signals.candidates import trend_following

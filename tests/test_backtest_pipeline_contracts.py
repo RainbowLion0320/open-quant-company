@@ -8,6 +8,9 @@ import pandas as pd
 import pytest
 
 from backtest.pipeline import Context, Pipeline, Stage
+from backtest.pipeline_runner import PipelineBacktest
+from pipeline.alpha import AlphaModel
+from pipeline.types import AlphaSignal
 
 
 class FakeDataStage(Stage):
@@ -81,6 +84,23 @@ class RiskRejectingStage(Stage):
         return ctx
 
 
+class SingleSymbolAlpha(AlphaModel):
+    name = "single_symbol"
+    label = "Single Symbol"
+
+    def generate_alpha(self, universe, prices, date_idx, regime):
+        return [
+            AlphaSignal(
+                symbol=symbol,
+                strategy=self.name,
+                direction="buy",
+                confidence=0.8,
+                score=80,
+            )
+            for symbol in universe
+        ]
+
+
 class TestPipelineContract:
 
     def test_stages_run_in_order(self):
@@ -143,3 +163,16 @@ class TestPipelineContract:
         pipeline = Pipeline(stages=[], name="EmptyPipeline")
         result = pipeline.run(ctx)
         assert isinstance(result, Context)
+
+    def test_pipeline_backtest_filters_universe_to_available_price_columns(self):
+        dates = pd.date_range("2024-01-02", periods=5, freq="B")
+        prices = pd.DataFrame({"AAA": [10, 11, 12, 11, 13]}, index=dates)
+        bench = pd.Series([100, 101, 102, 101, 103], index=dates)
+
+        result = PipelineBacktest(alpha=SingleSymbolAlpha()).run(
+            prices,
+            bench,
+            universe=["AAA", "MISSING"],
+        )
+
+        assert result["trade_count"] > 0

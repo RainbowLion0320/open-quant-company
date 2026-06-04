@@ -5,6 +5,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import subprocess
+import sys
 
 
 def test_build_features_import_is_safe():
@@ -180,6 +182,65 @@ def test_backtest_strategy_scorers_reuse_shared_signal_scoring_helpers():
     assert "bull_sectors =" not in text
     assert "bear_sectors =" not in text
     assert "sideways_sectors =" not in text
+
+
+def test_backtest_runner_covers_all_enabled_backtest_strategies():
+    from data.registry import get_enabled_strategies
+    from backtest.run_all_strategies import backtest_strategy_names
+
+    enabled_backtest = {
+        item["name"]
+        for item in get_enabled_strategies()
+        if "backtest" in item.get("capabilities", ["backtest"])
+    }
+
+    assert enabled_backtest <= set(backtest_strategy_names())
+
+
+def test_multifactor_backtest_uses_point_in_time_financial_snapshots(monkeypatch):
+    import backtest.run_all_strategies as runner
+
+    series = pd.Series(
+        [10.0 + i * 0.01 for i in range(160)],
+        index=pd.date_range("2020-01-02", periods=160, freq="B"),
+    )
+    pit_inputs = {
+        "AAA": {
+            "fcf": 1.0,
+            "growth_rate": 0.05,
+            "shares_outstanding": 1.0,
+            "roe_history": [0.12, 0.13, 0.14, 0.15, 0.16],
+            "gross_margin_history": [0.35, 0.36, 0.37, 0.38, 0.39],
+            "net_margin_history": [0.12, 0.12, 0.13, 0.13, 0.14],
+            "debt_equity": 0.3,
+            "sector": "consumer",
+            "industry": "测试行业",
+        }
+    }
+    built_years = []
+
+    def fake_build_pit_financial_inputs(year, pool, *, log_label="财务PIT"):
+        built_years.append((year, list(pool), log_label))
+        return pit_inputs
+
+    def fail_realtime_financial_inputs(*args, **kwargs):
+        raise AssertionError("multifactor backtest must not call realtime Buffett inputs")
+
+    monkeypatch.setattr(runner, "build_pit_financial_inputs", fake_build_pit_financial_inputs)
+    monkeypatch.setattr("data.financials.get_buffett_inputs", fail_realtime_financial_inputs)
+    runner._multifactor_fin_cache.clear()
+    runner.multifactor_scorer._pool = ["AAA"]
+
+    score = runner.multifactor_scorer("AAA", series, len(series) - 1, "sideways")
+
+    assert score >= 0
+    assert built_years == [(2020, ["AAA"], "多因子")]
+
+
+def test_backtest_runner_persists_each_strategy_result_file():
+    text = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
+
+    assert 'DATA_DIR / f"backtest_{name}.pkl"' in text
 
 
 def test_multi_asset_tournament_reuses_shared_momentum_helpers():
@@ -664,6 +725,16 @@ def test_backtest_entrypoint_no_longer_exposes_legacy_runner():
     assert "def run_backtest(" not in text
     assert "--legacy" not in text
     assert "legacy hand-rolled" not in text
+
+
+def test_backtest_script_entrypoint_resolves_project_pipeline_package():
+    result = subprocess.run(
+        [sys.executable, "backtest/run_all_strategies.py", "--help"],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_backtest_regime_replay_uses_production_policy_not_monthly_ma_chain():

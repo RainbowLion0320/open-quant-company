@@ -2,10 +2,13 @@
 多策略对比回测 — 逐日引擎，策略自主调仓
 产量: data/backtest_<strategy>.pkl + data/backtest_comparison.pkl
 """
-import os, pickle
+import hashlib
+import os, pickle, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 for k in list(os.environ.keys()):
     if k.lower() in ('http_proxy','https_proxy','all_proxy'):
         del os.environ[k]
@@ -15,12 +18,20 @@ import pandas as pd
 from datetime import datetime
 
 from core.settings import get_settings
-from data.fetcher import get_stock_daily, get_index_daily
+from data.fetcher import get_index_daily
 from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
 from backtest.regime_replay import build_production_regime_map
 from signals.scoring import estimate_buffett_score, score_cybernetic_from_factors
 from signals.technical import technical_factors_from_series
 from research.strategy_evaluation import write_backtest_evidence
+from backtest.buffett_real_scorer import build_pit_financial_inputs
+from backtest.candidate_alpha import (
+    CandidateStrategyAlphaModel,
+    candidate_backtest_strategy_names,
+    candidate_max_positions,
+    is_candidate_backtest_strategy,
+    register_price_panels,
+)
 
 DATA_DIR = ROOT / "data"
 
@@ -31,29 +42,74 @@ def _settings() -> dict:
 
 def load_prices(pool, start, end):
     """加载价格矩阵"""
+    from core.settings import get_section
+    from data.datahub import get_datahub
+
+    hub = get_datahub()
+    min_bars = int((get_section("backtest", {}) or {}).get("min_bars", 200))
+    existing_paths = []
+    latest_mtime = 0
+    for sym in pool:
+        path = hub.stock_daily_path(sym)
+        if not path.exists():
+            continue
+        existing_paths.append((sym, path))
+        latest_mtime = max(latest_mtime, path.stat().st_mtime_ns)
+
+    cache_seed = f"{start}|{end}|{min_bars}|{len(pool)}|{len(existing_paths)}|{latest_mtime}"
+    cache_key = hashlib.md5(cache_seed.encode()).hexdigest()[:12]
+    cache_path = DATA_DIR / f"backtest_price_matrix_{cache_key}.pkl"
+    if cache_path.exists():
+        with open(cache_path, "rb") as f:
+            cached = pickle.load(f)
+        if isinstance(cached, dict) and "prices" in cached:
+            prices = cached["prices"]
+            panel_frames = cached.get("panels", {})
+        else:
+            prices = cached
+            panel_frames = prices.attrs.get("panels", {})
+        register_price_panels(prices, panel_frames)
+        prices.attrs = {}
+        print(f"  价格矩阵缓存命中: {len(prices.columns)}/{len(pool)} 有效")
+        return prices
+
     dfs = {}
-    total = len(pool)
-    for i, sym in enumerate(pool):
+    panels = {"high": {}, "volume": {}, "amount": {}, "turnover": {}}
+    total = len(existing_paths)
+    for i, (sym, path) in enumerate(existing_paths):
         if (i+1) % max(1, total//10) == 0 or i == 0:
             print(f"  加载价格: {i+1}/{total}", end="\r", flush=True)
         try:
-            from core.settings import get_section
-            _min_bars = int((get_section("backtest", {}) or {}).get("min_bars", 200))
-            df = get_stock_daily(sym)
-            if df is None or len(df) < _min_bars:
+            df = hub.read_parquet(path)
+            if df is None or len(df) < min_bars:
                 continue
             df["date"] = pd.to_datetime(df["date"])
             df = df.set_index("date").sort_index()
             df = df.loc[pd.Timestamp(start):pd.Timestamp(end)]
-            if len(df) < _min_bars:
+            if len(df) < min_bars:
                 continue
+            for column, panel in panels.items():
+                if column in df.columns:
+                    panel[sym] = pd.to_numeric(df[column], errors="coerce").rename(sym)
+                else:
+                    panel[sym] = pd.to_numeric(df["close"], errors="coerce").rename(sym)
             dfs[sym] = df["close"].rename(sym)
         except Exception:
             continue
     if not dfs:
         return None
     print(f"  加载价格: {len(dfs)}/{total} 有效")  # 换行
-    return pd.concat(dfs.values(), axis=1, keys=dfs.keys())
+    prices = pd.concat(dfs.values(), axis=1, keys=dfs.keys())
+    panel_frames = {
+        key: pd.concat(values.values(), axis=1, keys=values.keys()).reindex(prices.index)
+        for key, values in panels.items()
+        if values
+    }
+    register_price_panels(prices, panel_frames)
+    prices.attrs = {}
+    with open(cache_path, "wb") as f:
+        pickle.dump({"prices": prices, "panels": panel_frames}, f)
+    return prices
 
 
 # ══════════════════════════════════════════════════════════
@@ -132,23 +188,20 @@ def _buffett_rebal(dt, regime, last_regime, holdings, current_price):
 buffett_scorer.should_rebalance = _buffett_rebal
 
 
-# ── 多因子财务缓存（避免每只股票每次调仓都拉取同花顺） ──
+# ── 多因子财务缓存（按回测年份缓存PIT财务快照） ──
 _multifactor_fin_cache = {}
 
 
-def _get_multifactor_fin_inputs(sym, ind):
-    """缓存式获取财务数据，首次拉取后复用"""
-    cache_key = sym
-    if cache_key in _multifactor_fin_cache:
-        return _multifactor_fin_cache[cache_key]
-    try:
-        from data.financials import get_buffett_inputs
-        inputs = get_buffett_inputs(sym, current_price=0, industry=ind)
-        _multifactor_fin_cache[cache_key] = inputs
-        return inputs
-    except Exception:
-        _multifactor_fin_cache[cache_key] = None
-        return None
+def _get_multifactor_fin_inputs(sym, ind, year):
+    """从回测年份的PIT财务快照获取输入，避免实时财务路径和前视偏差。"""
+    if year not in _multifactor_fin_cache:
+        pool_ref = getattr(multifactor_scorer, "_pool", [])
+        _multifactor_fin_cache[year] = build_pit_financial_inputs(
+            year,
+            pool_ref,
+            log_label="多因子",
+        )
+    return _multifactor_fin_cache.get(year, {}).get(sym)
 
 
 def multifactor_scorer(sym, series, idx, regime):
@@ -169,8 +222,13 @@ def multifactor_scorer(sym, series, idx, regime):
         current_price = 0.0
         tech = technical_factors_from_series(pd.Series(dtype="float64"))
 
-    # 财务数据从缓存获取（每个symbol首次拉取，之后复用）
-    inputs = _get_multifactor_fin_inputs(sym, ind)
+    try:
+        year = pd.Timestamp(series.index[idx]).year
+    except Exception:
+        year = datetime.now().year
+
+    # 财务数据从回测年份PIT缓存获取（同年首次构建，之后复用）
+    inputs = _get_multifactor_fin_inputs(sym, ind, year)
     buffett_score = 40
     safety_margin = 0.0
     if inputs and current_price > 0:
@@ -232,6 +290,7 @@ multifactor_scorer.max_positions = lambda regime: int(_settings().get("backtest"
 multifactor_scorer.record_target = lambda target: setattr(multifactor_scorer, "_last_target", set(target))
 multifactor_scorer._last_target = set()
 multifactor_scorer._last_rebalance_date = None
+multifactor_scorer._pool = []
 
 
 def cybernetic_scorer(sym, series, idx, regime):
@@ -302,31 +361,49 @@ ml_lgbm_scorer.max_positions = lambda regime: 8
 ml_lgbm_scorer._last_rebalance_date = None
 
 
+def backtest_strategy_names() -> list[str]:
+    """Return registered strategy names with a concrete backtest adapter."""
+    names = {"buffett", "multifactor", "cybernetic", "ml_lgbm"}
+    names.update(candidate_backtest_strategy_names())
+    return sorted(names)
+
+
+def _strategy_alpha_model(name: str, label: str, scorer_fn, alpha_min_score: int):
+    from pipeline.alpha import StrategyAlphaAdapter
+
+    if is_candidate_backtest_strategy(name):
+        return CandidateStrategyAlphaModel(name=name, label=label)
+    return StrategyAlphaAdapter(
+        name=name,
+        label=name,
+        scorer=scorer_fn,
+        min_score=alpha_min_score,
+        rebalance_trigger=_strategy_trigger(name),
+    )
+
+
+def _strategy_trigger(name: str):
+    return {
+        "buffett": (lambda d, r, h:
+                    d.month in (4, 5) and getattr(run_pipeline_backtest, '_last_buffett_year', 0) != d.year
+                    and not setattr(run_pipeline_backtest, '_last_buffett_year', d.year)),
+    }.get(name)
+
+
 # ══════════════════════════════════════════════════════════
 # Pipeline-based backtest — uses the same Alpha→Portfolio→Risk→Execution
 # stages as paper trading.
 # ══════════════════════════════════════════════════════════
 
 def run_pipeline_backtest(name, pool, prices, bench_close, scorer_fn, start, end,
-                          cash=1_000_000, monthly_regimes=None):
+                          cash=1_000_000, monthly_regimes=None, label=None):
     """Run backtest via the pipeline stages shared with paper trading."""
-    from pipeline.alpha import StrategyAlphaAdapter
     from pipeline.portfolio import EqualWeightConstructor
     from pipeline.scheduler import RebalanceScheduler, RebalanceConfig
 
     # Pre-compute production policy regimes if not provided
     if monthly_regimes is None:
         monthly_regimes = build_production_regime_map(bench_close)
-
-    # Strategy-specific rebalance triggers
-    _rebal_triggers = {
-        "buffett": (lambda d, r, h:
-                    d.month in (4, 5) and getattr(run_pipeline_backtest, '_last_buffett_year', 0) != d.year
-                    and not setattr(run_pipeline_backtest, '_last_buffett_year', d.year)),
-        "multifactor": None,  # uses scheduler built-in logic
-        "cybernetic": None,
-        "ml_lgbm": None,
-    }
 
     from core.settings import get_section
     _bt_cfg = get_section("backtest", {}) or {}
@@ -341,21 +418,24 @@ def run_pipeline_backtest(name, pool, prices, bench_close, scorer_fn, start, end
         "multifactor": RebalanceConfig(schedule="monthly", drift_threshold=_drift, min_overlap_pct=_overlap),
         "cybernetic": RebalanceConfig(schedule="regime_change", drift_threshold=_drift),
         "ml_lgbm": RebalanceConfig(schedule="monthly", drift_threshold=_drift),
+        "trend_following": RebalanceConfig(schedule="monthly", drift_threshold=_drift, min_overlap_pct=_overlap),
+        "donchian_breakout": RebalanceConfig(schedule="monthly", drift_threshold=_drift, min_overlap_pct=_overlap),
+        "rps_relative_strength": RebalanceConfig(schedule="monthly", drift_threshold=_drift, min_overlap_pct=_overlap),
+        "sector_rotation": RebalanceConfig(schedule="monthly", drift_threshold=_drift, min_overlap_pct=_overlap),
+        "quality_value": RebalanceConfig(schedule="monthly", drift_threshold=_drift, min_overlap_pct=_overlap),
+        "low_vol_defensive": RebalanceConfig(schedule="monthly", drift_threshold=_drift, min_overlap_pct=_overlap),
+        "volume_confirmation": RebalanceConfig(schedule="monthly", drift_threshold=_drift, min_overlap_pct=_overlap),
+        "regime_gated": RebalanceConfig(schedule="regime_change", drift_threshold=_drift, min_overlap_pct=_overlap),
     }
 
     _max_pos = {"buffett": 8, "multifactor": 10, "cybernetic": 5, "ml_lgbm": 8}
+    for candidate_name in candidate_backtest_strategy_names():
+        _max_pos[candidate_name] = candidate_max_positions(candidate_name)
     _max_pos = {k: int(_max_pos_cfg.get(k, v)) for k, v in _max_pos.items()}
 
-    trigger = _rebal_triggers.get(name)
     sched_cfg = _sched_configs.get(name, RebalanceConfig())
 
-    alpha = StrategyAlphaAdapter(
-        name=name,
-        label=name,
-        scorer=scorer_fn,
-        min_score=_alpha_min,
-        rebalance_trigger=trigger,
-    )
+    alpha = _strategy_alpha_model(name, label or name, scorer_fn, _alpha_min)
 
     portfolio = EqualWeightConstructor(max_positions=_max_pos.get(name, 8))
     scheduler = RebalanceScheduler(sched_cfg)
@@ -405,6 +485,8 @@ if __name__ == "__main__":
         "cybernetic": cybernetic_scorer,
         "ml_lgbm": ml_lgbm_scorer,
     }
+    for candidate_name in candidate_backtest_strategy_names():
+        _scorer_map[candidate_name] = None
 
     results = {}
     enabled_strategies = get_enabled_strategies()
@@ -416,11 +498,13 @@ if __name__ == "__main__":
     for s in enabled_strategies:
         name = s["name"]
         scorer = _scorer_map.get(name)
-        if scorer is None:
+        if name not in _scorer_map:
             print(f"  跳过 {name}: 无对应评分器")
             continue
         if name == "buffett":
-            scorer._pool = pool
+            scorer._pool = list(prices.columns)
+        if name == "multifactor":
+            scorer._pool = list(prices.columns)
 
         _sched_desc = {
             "buffett": "年报季+漂移", "multifactor": "月度+漂移",
@@ -431,7 +515,11 @@ if __name__ == "__main__":
         results[name] = run_pipeline_backtest(
             name, pool, prices, bc, scorer, start, end,
             monthly_regimes=monthly_regimes,
+            cash=float(bt_cfg.get("initial_cash", 1_000_000)),
+            label=s.get("label", name),
         )
+        with open(DATA_DIR / f"backtest_{name}.pkl", "wb") as f:
+            pickle.dump(results[name], f)
         write_backtest_evidence(
             name,
             s.get("status", "candidate"),

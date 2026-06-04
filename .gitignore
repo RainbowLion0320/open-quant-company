@@ -57,6 +57,7 @@ data/store/deepseek/
 data/store/bond/
 data/store/_manifest/
 data/store/signals_prev/
+data/store/research/strategy_evidence/
 data/store/scan_meta.parquet
 data/store/db_health.parquet
 data/models/*.pkl
