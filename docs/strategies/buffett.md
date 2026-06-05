@@ -12,10 +12,10 @@
 
 | 维度 | 来源 | 频率 |
 |------|------|------|
-| ohlcv_daily | AKShare | daily |
+| ohlcv_daily (qfq via PriceService) | AKShare + adj_factor | daily |
 | financial_summary | AKShare | quarterly |
 | fina_indicator | Tushare | quarterly |
-| adj_factor | AKShare | daily |
+| adj_factor | Tushare | daily |
 
 ## 参数空间
 
@@ -29,6 +29,8 @@
 | min_gross_margin | 30% | 最低毛利率 |
 | max_debt_equity | 1.5 | 最高负债权益比 |
 | 行业白名单 | 31 行业 | 排除金融/ST/亏损 |
+
+价格口径权威来源为 `data/price_service.py`。研究、信号和回测使用 `PriceUseCase.SIGNAL/BACKTEST` 的 `qfq` 口径；DCF 当前价和执行价使用 `raw`。
 
 ## 结果来源
 

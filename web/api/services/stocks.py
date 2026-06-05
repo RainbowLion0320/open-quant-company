@@ -93,7 +93,6 @@ def build_stock_list(limit: int, q: str = "") -> tuple[list[dict], int]:
 
 
 def build_stock_detail(code: str) -> StockResponse:
-    from data.fetcher import get_stock_daily
     from data.financials import (
         extract_debt_equity_ratio,
         extract_gross_margin_history,
@@ -103,6 +102,8 @@ def build_stock_detail(code: str) -> StockResponse:
         extract_roe_history,
         get_financial_summary,
     )
+    from data.price_service import get_stock_prices
+    from data.price_types import PriceUseCase
     from data.registry import get_enabled_strategies
     from data.results_db import load_buffett_results, load_strategy_signals
     from data.symbols import FALLBACK_SECTOR, SYMBOL_INDUSTRY, SYMBOL_NAME, SYMBOL_SECTOR
@@ -186,7 +187,7 @@ def build_stock_detail(code: str) -> StockResponse:
 
     kline = []
     try:
-        kdf = get_stock_daily(code)
+        kdf = get_stock_prices(code, use_case=PriceUseCase.DISPLAY)
         if kdf is not None and len(kdf) > 0:
             recent = kdf.sort_values("date").tail(120)
             for _, row in recent.iterrows():

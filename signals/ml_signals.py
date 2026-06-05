@@ -12,7 +12,8 @@ import numpy as np
 
 
 from data.symbols import CIRCLE_STOCKS, SYMBOL_NAME, SYMBOL_INDUSTRY
-from data.fetcher import get_stock_daily
+from data.price_service import get_stock_prices
+from data.price_types import PriceUseCase
 from signals.expression import alpha_factors
 from signals.selection import apply_ranked_buys
 from models import MODEL_DIR
@@ -181,7 +182,7 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
                     continue
                 fallback_rows += 1
                 used_fallback = True
-                df = get_stock_daily(sym)
+                df = get_stock_prices(sym, use_case=PriceUseCase.SIGNAL)
                 if df is None or len(df) < 60:
                     continue
                 df["date"] = pd.to_datetime(df["date"])

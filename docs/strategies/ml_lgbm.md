@@ -14,10 +14,10 @@
 
 | 维度 | 来源 | 频率 |
 |------|------|------|
-| ohlcv_daily | AKShare | daily |
+| ohlcv_daily (qfq via PriceService) | AKShare + adj_factor | daily |
 | financial_summary | AKShare | quarterly |
 | fina_indicator | Tushare | quarterly |
-| adj_factor | AKShare | daily |
+| adj_factor | Tushare | daily |
 | valuation_daily | Tushare | daily |
 | moneyflow_daily | AKShare | daily |
 | features_all (PIT) | Computed | monthly |
@@ -31,6 +31,8 @@
 | score_scale | 5.0 | Sigmoid 压缩系数 |
 | allow_stale_features | false | 过期特征处理 |
 | allow_live_factor_fallback | false | 实时因子回退 |
+
+价格口径权威来源为 `data/price_service.py`。PIT 特征、信号和回测使用 `PriceUseCase.RESEARCH/SIGNAL/BACKTEST` 的 `qfq` 口径，实时执行和估值路径另走 `raw`。
 
 ## 结果来源
 

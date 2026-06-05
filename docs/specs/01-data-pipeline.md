@@ -1,15 +1,16 @@
 # Spec: 数据管道 (Data Pipeline)
 
-> 版本: 1.2 | 更新: 2026-06-03 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md)
+> 版本: 1.3 | 更新: 2026-06-05 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
-数据管道负责从多源拉取、清洗、缓存、存储 A 股全量数据，并通过 DataHub 统一路径向上层（信号/回测/执行/Web）暴露。覆盖维度由 `config/settings.yaml` 的 `data_registry` 声明，按频率分为日频（行情/估值/资金流向/行业快照）、月频/季频（财务指标/三张表）、事件驱动（龙虎榜/研报/限售解禁）。
+数据管道负责从多源拉取、清洗、缓存、存储 A 股全量数据，并通过 DataHub 统一路径向上层（信号/回测/执行/Web）暴露。覆盖维度由 `config/settings.yaml` 的 `data_registry` 声明，按频率分为日频（行情/估值/资金流向/行业快照）、月频/季频（财务指标/三张表）、事件驱动（龙虎榜/研报/限售解禁/公司行动）。
 
 **核心理念：**
 - **离线优先** — 所有数据存储为本地 Parquet，不依赖云端数据库
 - **多源互补** — AKShare（免费不限流，行情）+ Tushare（深度财务数据）
 - **声明式注册** — 数据维度统一在 `settings.yaml` → `DataRegistry` 中声明，含 source/label/SLA/repair/partition
+- **价格口径显式** — OHLCV 通过 `PriceService` 声明 `raw` / `qfq` / `hfq`，消费者按 use case 取价，避免复权语义散落在业务代码里
 
 ## 2. 组件架构
 
@@ -76,6 +77,16 @@
 
 上层模块继续只依赖 `data.datahub.DataHub` / `get_datahub()`。内部组件是 DataHub 的实现细节，用来降低维护复杂度，不替代 DataHub facade。
 
+股票价格路径按口径显式分层：
+
+| 维度 | 路径 | 语义 |
+|------|------|------|
+| `ohlcv_daily` | `stock/daily/{symbol}.parquet` | 当前兼容维度，默认 `qfq` |
+| `ohlcv_daily_raw` | `stock/daily_raw/{symbol}.parquet` | 未复权市场成交价 |
+| `ohlcv_daily_hfq` | `stock/daily_hfq/{symbol}.parquet` | 后复权视图 |
+| `adj_factor` | `stock/adj_factor/{symbol}.parquet` | Tushare 复权因子 |
+| `corporate_actions` | `stock/corporate_actions/{symbol}.parquet` | 标准化现金分红和送转/拆股事件 |
+
 | 操作 | 方法 | 关键保障 |
 |------|------|---------|
 | 读 | `read_parquet(path)` | 文件不存在返回 default |
@@ -85,7 +96,24 @@
 | 清单 | `manifest` → `datasets.parquet` | 每次 write 记录 schema_hash/size/date_range |
 | 审计 | `audit()` / `catalog()` | 遍历所有 dataset，统计文件数/大小 |
 
-### 2.3 Fetcher — 数据获取层
+### 2.3 PriceService — 价格口径契约
+
+`data/price_service.py` 是股票价格的统一入口。Fetcher 可以继续负责拉取和缓存，但策略、特征、回测、估值、执行和 Web 不应直接猜测某个 Parquet 的复权语义。
+
+| Use case | 默认口径 | 典型消费者 |
+|----------|----------|------------|
+| `research` | `qfq` | 特征工程、研究分析 |
+| `backtest` | `qfq` | 回测价格矩阵 |
+| `signal` | `qfq` | 技术因子和策略信号 |
+| `execution` | `raw` | PaperBroker/委托价格 |
+| `valuation` | `raw` | DCF 当前价、持仓市值 |
+| `display` | `raw` | Web 个股 K 线展示 |
+
+`qfq` / `hfq` 优先由 `raw + adj_factor` 派生；历史数据尚未补齐 raw 时，允许显式记录 fallback 到本地 `qfq` 兼容数据。DataHub manifest 会记录 `requested_price_mode`、`price_mode`、`price_adjustment_source` 和 fallback reason。
+
+公司行动不直接混入 OHLCV。`data/corporate_actions.py` 把 `dividend` 原始事件归一为 `corporate_actions`，并提供 `apply_corporate_actions_to_position()` 给未来回测账本处理现金分红、送转和拆股。
+
+### 2.4 Fetcher — 数据获取层
 
 **多源 fallback 链：** 新浪 → 东方财富 → 腾讯
 **稳定性机制：**
@@ -103,7 +131,7 @@
 
 **API 调用安全阀：** 默认 `get_stock_daily()` 只读本地 Parquet，不触网。设置 `QUANT_ALLOW_API_FALLBACK=1` 或 `force_refresh=True` 才发起 API 请求。
 
-### 2.4 Cleaner — 6 规则数据清洗
+### 2.5 Cleaner — 6 规则数据清洗
 
 规则注册表位于 `data/cleaner.py` 的 `RULE_CLASSES`，启用和参数由 `config/settings.yaml` → `data_cleaning` 控制。
 
@@ -114,7 +142,7 @@
 5. **FinancialValidationRule** — 财务因子边界裁剪（ROE、利润率、D/E、PE、PB）
 6. **WinsorizeRule** — 特征列按 1%/99% 默认分位缩尾
 
-### 2.5 Feature Store — PIT 特征工程
+### 2.6 Feature Store — PIT 特征工程
 
 **Point-in-Time 严格性：** 每个月切片使用该月最后一天之前的所有数据构建特征，绝不使用未来信息。
 - 输出：`data/store/features/YYYY-MM.parquet`
@@ -176,6 +204,9 @@ AKShare/Tushare API
 # 路径解析 — 上层不应硬编码路径
 hub.dimension_path("ohlcv_daily", symbol="000001")
 # → data/store/stock/daily/000001.parquet
+hub.stock_daily_raw_path("000001")
+hub.stock_adj_factor_path("000001")
+hub.stock_corporate_actions_path("000001")
 
 # 读写
 hub.read_parquet(path, default=pd.DataFrame())
@@ -195,6 +226,16 @@ get_index_daily(symbol="sh000001")          → pd.DataFrame
 get_financial_indicator(symbol)             → pd.DataFrame
 get_stock_spot()                            → pd.DataFrame
 provider.fetch("sw_daily", trade_date=...)  → pd.DataFrame
+```
+
+### PriceService 核心接口
+
+```python
+get_stock_prices("000001", use_case="backtest")   → qfq OHLCV
+get_stock_prices("000001", use_case="execution")  → raw OHLCV
+get_stock_price_matrix(pool, use_case="backtest") → qfq close matrix + panels
+load_corporate_actions("000001")                  → normalized corporate_actions
+apply_corporate_actions_to_position(...)          → adjusted shares/cash
 ```
 
 ### Feature Store 核心接口
@@ -229,7 +270,7 @@ reg.health_metadata()           → dict[str, HealthTableMeta]
 
 ## 7. 测试策略
 
-- **合约测试：** `tests/` 中验证 DataRegistry.validate() 对所有已知维度的配置格式正确
+- **合约测试：** `tests/` 中验证 DataRegistry.validate() 对所有已知维度的配置格式正确，`tests/test_price_service_contracts.py` 覆盖 `PriceService` 口径、manifest 元数据、`corporate_actions` 和主要消费者 use case
 - **边界测试：** 空 DataFrame 读写、不存在文件读取、并发追加去重
 - **集成测试：** `get_stock_daily("000001")` 返回有效 DataFrame（需本地已有数据）
 - **回归测试：** Manifest schema_hash 变化检测

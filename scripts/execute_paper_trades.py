@@ -55,17 +55,18 @@ def load_config() -> dict:
 def _get_close_prices(symbols: List[str], target_date: Optional[date] = None) -> Dict[str, float]:
     """
     获取股票最近收盘价。
-    通过 data.fetcher.get_stock_daily (含两层缓存) 获取，取最后一根K线收盘价。
+    通过 data.price_service 获取 raw 最新价；无 raw 时允许最新 qfq 兼容回退。
     Paper trading 需要实时价格 — 启用 API fallback，允许从 AKShare 拉取未缓存的股票。
     """
     import os as _os
     _os.environ.setdefault("QUANT_ALLOW_API_FALLBACK", "1")
-    from data.fetcher import get_stock_daily
+    from data.price_service import get_stock_prices
+    from data.price_types import PriceUseCase
 
     prices: Dict[str, float] = {}
     for sym in symbols:
         try:
-            df = get_stock_daily(sym)
+            df = get_stock_prices(sym, use_case=PriceUseCase.EXECUTION)
             if df is None or df.empty:
                 continue
             if target_date:
@@ -242,8 +243,9 @@ def _execute_signals_via_pipeline(
                 ctx.universe.append(s.symbol)
                 if s.symbol not in ctx.prices:
                     try:
-                        from data.fetcher import get_stock_daily
-                        df = get_stock_daily(s.symbol)
+                        from data.price_service import get_stock_prices
+                        from data.price_types import PriceUseCase
+                        df = get_stock_prices(s.symbol, use_case=PriceUseCase.EXECUTION)
                         if df is not None and len(df):
                             ctx.prices[s.symbol] = float(df.iloc[-1]["close"])
                     except Exception:

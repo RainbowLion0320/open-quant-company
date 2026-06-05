@@ -2,7 +2,6 @@
 多策略对比回测 — 逐日引擎，策略自主调仓
 产量: data/backtest_<strategy>.pkl + data/backtest_comparison.pkl
 """
-import hashlib
 import os, pickle, sys
 from pathlib import Path
 
@@ -43,72 +42,23 @@ def _settings() -> dict:
 def load_prices(pool, start, end):
     """加载价格矩阵"""
     from core.settings import get_section
-    from data.datahub import get_datahub
+    from data.price_service import get_stock_price_matrix
+    from data.price_types import PriceUseCase
 
-    hub = get_datahub()
     min_bars = int((get_section("backtest", {}) or {}).get("min_bars", 200))
-    existing_paths = []
-    latest_mtime = 0
-    for sym in pool:
-        path = hub.stock_daily_path(sym)
-        if not path.exists():
-            continue
-        existing_paths.append((sym, path))
-        latest_mtime = max(latest_mtime, path.stat().st_mtime_ns)
-
-    cache_seed = f"{start}|{end}|{min_bars}|{len(pool)}|{len(existing_paths)}|{latest_mtime}"
-    cache_key = hashlib.md5(cache_seed.encode()).hexdigest()[:12]
-    cache_path = DATA_DIR / f"backtest_price_matrix_{cache_key}.pkl"
-    if cache_path.exists():
-        with open(cache_path, "rb") as f:
-            cached = pickle.load(f)
-        if isinstance(cached, dict) and "prices" in cached:
-            prices = cached["prices"]
-            panel_frames = cached.get("panels", {})
-        else:
-            prices = cached
-            panel_frames = prices.attrs.get("panels", {})
-        register_price_panels(prices, panel_frames)
-        prices.attrs = {}
-        print(f"  价格矩阵缓存命中: {len(prices.columns)}/{len(pool)} 有效")
-        return prices
-
-    dfs = {}
-    panels = {"high": {}, "volume": {}, "amount": {}, "turnover": {}}
-    total = len(existing_paths)
-    for i, (sym, path) in enumerate(existing_paths):
-        if (i+1) % max(1, total//10) == 0 or i == 0:
-            print(f"  加载价格: {i+1}/{total}", end="\r", flush=True)
-        try:
-            df = hub.read_parquet(path)
-            if df is None or len(df) < min_bars:
-                continue
-            df["date"] = pd.to_datetime(df["date"])
-            df = df.set_index("date").sort_index()
-            df = df.loc[pd.Timestamp(start):pd.Timestamp(end)]
-            if len(df) < min_bars:
-                continue
-            for column, panel in panels.items():
-                if column in df.columns:
-                    panel[sym] = pd.to_numeric(df[column], errors="coerce").rename(sym)
-                else:
-                    panel[sym] = pd.to_numeric(df["close"], errors="coerce").rename(sym)
-            dfs[sym] = df["close"].rename(sym)
-        except Exception:
-            continue
-    if not dfs:
+    prices, panel_frames = get_stock_price_matrix(
+        pool,
+        use_case=PriceUseCase.BACKTEST,
+        start=start,
+        end=end,
+        min_bars=min_bars,
+        cache_dir=DATA_DIR,
+    )
+    if prices.empty:
         return None
-    print(f"  加载价格: {len(dfs)}/{total} 有效")  # 换行
-    prices = pd.concat(dfs.values(), axis=1, keys=dfs.keys())
-    panel_frames = {
-        key: pd.concat(values.values(), axis=1, keys=values.keys()).reindex(prices.index)
-        for key, values in panels.items()
-        if values
-    }
     register_price_panels(prices, panel_frames)
     prices.attrs = {}
-    with open(cache_path, "wb") as f:
-        pickle.dump({"prices": prices, "panels": panel_frames}, f)
+    print(f"  价格矩阵: {len(prices.columns)}/{len(pool)} 有效 (mode=qfq)")
     return prices
 
 

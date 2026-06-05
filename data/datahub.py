@@ -141,6 +141,18 @@ class DataHub:
     def stock_daily_path(self, symbol: str) -> Path:
         return self.paths.stock_daily_path(symbol)
 
+    def stock_daily_raw_path(self, symbol: str) -> Path:
+        return self.paths.stock_daily_raw_path(symbol)
+
+    def stock_daily_hfq_path(self, symbol: str) -> Path:
+        return self.paths.stock_daily_hfq_path(symbol)
+
+    def stock_adj_factor_path(self, symbol: str) -> Path:
+        return self.paths.stock_adj_factor_path(symbol)
+
+    def stock_corporate_actions_path(self, symbol: str) -> Path:
+        return self.paths.stock_corporate_actions_path(symbol)
+
     def stock_financial_path(self, symbol: str) -> Path:
         return self.paths.stock_financial_path(symbol)
 

@@ -27,8 +27,9 @@ import numpy as np
 import pandas as pd
 
 from data.datahub import get_datahub
-from data.fetcher import get_stock_daily
 from data.feature_store import FEATURES_DIR, enrich_from_registry, iter_feature_files
+from data.price_service import get_stock_prices
+from data.price_types import PriceUseCase
 from data.symbols import CIRCLE_STOCKS
 from signals.expression import alpha_factors
 
@@ -73,7 +74,7 @@ def _load_price_cache(symbols: list[str]) -> dict[str, pd.DataFrame]:
     total = len(symbols)
     for i, sym in enumerate(symbols, 1):
         try:
-            df = get_stock_daily(sym)
+            df = get_stock_prices(sym, use_case=PriceUseCase.RESEARCH)
             if df is not None and len(df) >= 120:
                 df = df.copy()
                 df["date"] = pd.to_datetime(df["date"])

@@ -791,7 +791,29 @@ data_registry:
     enabled: true
     label: 日线行情 OHLCV
     cache: stock/daily/{symbol}.parquet
-    description: 全A股日线, 通过新浪源获取
+    description: 全A股日线, 默认前复权(qfq), 通过统一价格服务按用途选择口径
+  ohlcv_daily_raw:
+    source: akshare
+    asset: stock
+    status: available
+    freq: daily
+    enabled: true
+    label: 日线行情 OHLCV 原始价
+    cache: stock/daily_raw/{symbol}.parquet
+    description: 未复权市场成交价, 用于执行、估值和行情展示
+    health:
+      enabled: false
+  ohlcv_daily_hfq:
+    source: computed
+    asset: stock
+    status: available
+    freq: daily
+    enabled: true
+    label: 日线行情 OHLCV 后复权
+    cache: stock/daily_hfq/{symbol}.parquet
+    description: 由原始行情和 adj_factor 派生的后复权视图
+    health:
+      enabled: false
   adj_factor:
     source: tushare_free
     asset: stock
@@ -800,6 +822,7 @@ data_registry:
     enabled: true
     label: 复权因子
     cache: stock/adj_factor/{symbol}.parquet
+    description: Tushare adj_factor, 统一价格服务用它从 raw 派生 qfq/hfq
   financial_summary:
     source: akshare
     asset: stock
@@ -927,6 +950,18 @@ data_registry:
     enabled: true
     label: 分红送股
     cache: stock/dividend/all_dividends.parquet
+    description: Tushare 原始分红送股全量缓存
+  corporate_actions:
+    source: computed
+    asset: stock
+    status: available
+    freq: event
+    enabled: true
+    label: 标准化公司行动
+    cache: stock/corporate_actions/{symbol}.parquet
+    description: 从 dividend 等事件源归一出的现金分红和送转/拆股事件, 供回测账本消费
+    health:
+      enabled: false
   cyq_chips:
     source: tushare_paid
     asset: stock

@@ -12,10 +12,10 @@
 
 | 维度 | 来源 | 频率 |
 |------|------|------|
-| ohlcv_daily | AKShare | daily |
+| ohlcv_daily (qfq via PriceService) | AKShare + adj_factor | daily |
 | financial_summary | AKShare | quarterly |
 | fina_indicator | Tushare | quarterly |
-| adj_factor | AKShare | daily |
+| adj_factor | Tushare | daily |
 | valuation_daily | Tushare | daily |
 | sector_membership_snapshot | computed | daily |
 | sector_performance_snapshot | computed | daily |
@@ -35,6 +35,8 @@
 | score_base | 50 | 基准分 |
 
 参数权威来源为 `config/settings.yaml` → `signals.multifactor`，上表只记录当前默认值。
+
+价格口径权威来源为 `data/price_service.py`。研究、信号和回测使用 `PriceUseCase.SIGNAL/BACKTEST` 的 `qfq` 口径，执行和估值路径另走 `raw`。
 
 ## 结果来源
 

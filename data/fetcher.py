@@ -283,7 +283,7 @@ def get_stock_daily(
     from data.fetchers.stock_daily import read_one, fetch_one
 
     if not force_refresh:
-        df = read_one(symbol)
+        df = read_one(symbol, adjust=adjust)
         if df is not None and len(df) > 0:
             return df
         if not _allow_api_fallback():

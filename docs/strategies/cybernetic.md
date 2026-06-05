@@ -12,9 +12,9 @@
 
 | 维度 | 来源 | 频率 |
 |------|------|------|
-| ohlcv_daily | AKShare | daily |
+| ohlcv_daily (qfq via PriceService) | AKShare + adj_factor | daily |
 | moneyflow_daily | AKShare | daily |
-| adj_factor | AKShare | daily |
+| adj_factor | Tushare | daily |
 
 ## 参数空间
 
@@ -27,6 +27,8 @@
 | 反馈审查周期 | 30 天 | | |
 | 最大连续亏损 | 3 次 | | |
 | 最低胜率 | 35% | | |
+
+价格口径权威来源为 `data/price_service.py`。研究、信号和回测使用 `PriceUseCase.SIGNAL/BACKTEST` 的 `qfq` 口径，执行和估值路径另走 `raw`。
 
 ## 结果来源
 

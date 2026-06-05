@@ -193,8 +193,9 @@ async def submit_order(req: OrderRequest):
     # 市价单: 尝试获取行情
     if req.price <= 0:
         try:
-            from data.fetcher import get_stock_daily
-            df = get_stock_daily(req.code)
+            from data.price_service import get_stock_prices
+            from data.price_types import PriceUseCase
+            df = get_stock_prices(req.code, use_case=PriceUseCase.EXECUTION)
             if df is not None and len(df) > 0:
                 current = float(df.sort_values("date").iloc[-1]["close"])
                 broker.set_prices({req.code: current})

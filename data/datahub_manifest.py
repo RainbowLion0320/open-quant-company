@@ -94,6 +94,12 @@ class ManifestStore:
                 "file_sha256": self.file_sha256(target),
                 "size_bytes": int(target.stat().st_size),
                 "updated_at": datetime.now().isoformat(),
+                "requested_price_mode": str(df.attrs.get("requested_price_mode", "")),
+                "price_mode": str(df.attrs.get("price_mode", "")),
+                "price_adjusted": bool(df.attrs.get("price_adjusted", False)),
+                "price_source": str(df.attrs.get("price_source", "")),
+                "price_adjustment_source": str(df.attrs.get("price_adjustment_source", "")),
+                "price_fallback_reason": str(df.attrs.get("price_fallback_reason", "")),
             }
             manifest_path = self.paths.manifest_path()
             manifest_path.parent.mkdir(parents=True, exist_ok=True)

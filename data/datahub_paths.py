@@ -132,6 +132,18 @@ class DataHubPaths:
     def stock_daily_path(self, symbol: str) -> Path:
         return self.store_path("stock") / "daily" / f"{safe_leaf(symbol, 'symbol')}.parquet"
 
+    def stock_daily_raw_path(self, symbol: str) -> Path:
+        return self.store_path("stock") / "daily_raw" / f"{safe_leaf(symbol, 'symbol')}.parquet"
+
+    def stock_daily_hfq_path(self, symbol: str) -> Path:
+        return self.store_path("stock") / "daily_hfq" / f"{safe_leaf(symbol, 'symbol')}.parquet"
+
+    def stock_adj_factor_path(self, symbol: str) -> Path:
+        return self.store_path("stock") / "adj_factor" / f"{safe_leaf(symbol, 'symbol')}.parquet"
+
+    def stock_corporate_actions_path(self, symbol: str) -> Path:
+        return self.store_path("stock") / "corporate_actions" / f"{safe_leaf(symbol, 'symbol')}.parquet"
+
     def stock_financial_path(self, symbol: str) -> Path:
         return self.store_path("stock") / "financials" / f"{safe_leaf(symbol, 'symbol')}.parquet"
 

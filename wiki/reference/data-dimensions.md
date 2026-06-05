@@ -1,7 +1,7 @@
 ---
 title: Data Dimensions Reference
 created: 2026-05-14
-updated: 2026-05-23
+updated: 2026-06-05
 type: reference
 tags: [data, registry, datahub, parquet]
 confidence: high
@@ -61,6 +61,7 @@ python -c "from data.datahub import get_datahub; print(get_datahub().catalog())"
 | 家族 | 示例 | 消费方 |
 |--------|----------|----------|
 | 股票市场数据 | OHLCV、复权因子、估值、资金流 | Signals、backtest、个股页 |
+| 价格口径视图 | `ohlcv_daily`(qfq)、`ohlcv_daily_raw`(raw)、`ohlcv_daily_hfq`(hfq)、`adj_factor`、`corporate_actions` | `PriceService`、回测、估值、执行、公司行动账本 |
 | 财报和财务指标 | financial summary、fina indicator、income/balance/cashflow | Buffett、多因子、ML 特征 |
 | 宏观数据 | GDP、CPI、PMI、SHIBOR、黄金 | 市场总览、regime context |
 | 行业数据 | 行业日线、成员映射、绩效、信号聚合、组合敞口 | 市场总览 Top5 热点、行业雷达、多因子行业动量；组合敞口在组合执行页承载 |
@@ -75,6 +76,14 @@ python -c "from data.datahub import get_datahub; print(get_datahub().catalog())"
 4. 生产代码使用 `DataHub.dimension_path()` 或 `dimension_root()`。
 5. 补路径展开、契约形态和主要消费方测试。
 6. 只有行为或契约变化时才更新 `docs/specs/01-data-pipeline.md`。
+
+## 价格口径约定
+
+股票 OHLCV 不再只依赖生产者口头说明。`PriceService` 按 use case 选择 `raw`、`qfq`、`hfq`：
+
+- 研究、信号、回测默认使用 `qfq`，优先由 raw OHLCV + `adj_factor` 派生。
+- 执行、估值、展示默认使用 `raw`，避免用复权价模拟真实成交价或当前市值。
+- `corporate_actions` 是标准化公司行动事件层，独立于 OHLCV，用于现金分红、送转和拆股对账。
 
 ## 相关
 

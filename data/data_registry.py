@@ -35,7 +35,10 @@ SOURCE_LABELS = {
 
 DEFAULT_HEALTH_TABLES = {
     "ohlcv_daily": "stock_daily",
+    "ohlcv_daily_raw": "stock_daily_raw",
+    "ohlcv_daily_hfq": "stock_daily_hfq",
     "adj_factor": "stock_adj_factor",
+    "corporate_actions": "stock_corporate_actions",
     "financial_summary": "stock_financials",
     "fina_indicator": "stock_fina_indicator",
     "valuation_daily": "stock_valuation",

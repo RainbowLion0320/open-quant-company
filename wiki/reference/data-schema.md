@@ -1,7 +1,7 @@
 ---
 title: Data Schema Reference
 created: 2026-05-14
-updated: 2026-06-02
+updated: 2026-06-05
 type: reference
 tags: [data, schema, parquet, contract]
 confidence: high
@@ -47,7 +47,8 @@ pytest tests/test_datahub_contracts.py tests/test_sector_pipeline.py
 
 | 家族 | 必要概念 |
 |--------|----------------|
-| OHLCV | symbol/date/open/high/low/close/volume 等字段，复权语义由生产者说明 |
+| OHLCV | symbol/date/open/high/low/close/volume 等字段；`PriceService` 显式声明 `raw` / `qfq` / `hfq`，DataHub manifest 记录 requested/actual price mode |
+| 公司行动 | `corporate_actions` 标准事件：symbol/ex_date/cash_dividend_per_share/share_multiplier；从 `dividend` 等原始事件归一，供回测账本处理现金分红和送转/拆股 |
 | 财务指标 | symbol/report date/period 字段，加财务比率或报表值 |
 | PIT 特征 | symbol/date/month 特征，严格避免未来数据泄漏 |
 | 策略信号 | symbol/date/strategy/score/signal/detail，供 Web、回测、broker 消费 |

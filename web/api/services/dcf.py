@@ -7,14 +7,15 @@ from web.api.models import DCFParams, DCFResult
 
 
 def compute_dcf_result(code: str, params: DCFParams | None) -> DCFResult:
-    from data.fetcher import get_stock_daily
+    from data.price_service import get_stock_prices
+    from data.price_types import PriceUseCase
 
     if params is None:
         raise InvalidParameterError("params", "missing", "DCFParams body required")
 
     current_price = 0.0
     try:
-        kdf = get_stock_daily(code)
+        kdf = get_stock_prices(code, use_case=PriceUseCase.VALUATION)
         if kdf is not None and len(kdf) > 0:
             current_price = float(kdf.sort_values("date").iloc[-1]["close"])
     except Exception:
@@ -23,7 +24,7 @@ def compute_dcf_result(code: str, params: DCFParams | None) -> DCFResult:
     shares = params.shares
     if shares <= 0:
         try:
-            kdf = get_stock_daily(code)
+            kdf = get_stock_prices(code, use_case=PriceUseCase.VALUATION)
             if kdf is not None and "outstanding_share" in kdf.columns:
                 shares = float(kdf["outstanding_share"].iloc[-1]) / 1e8
         except Exception:

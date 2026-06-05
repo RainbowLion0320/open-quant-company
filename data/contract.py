@@ -97,6 +97,8 @@ class DataContract:
     pit_rule: str = "none"  # "as_of_date" | "latest" | "none"
     owner: str = ""
     description: str = ""
+    price_mode: str = ""
+    adjustment_source: str = ""
     migrations: list[SchemaMigration] = field(default_factory=list)
 
     # ── Validation ──
@@ -244,6 +246,8 @@ class DataContract:
             "pit_rule": self.pit_rule,
             "owner": self.owner,
             "description": self.description,
+            "price_mode": self.price_mode,
+            "adjustment_source": self.adjustment_source,
             "migrations": [
                 {
                     "from_version": m.from_version,
@@ -301,6 +305,8 @@ class DataContract:
             pit_rule=data.get("pit_rule", "none"),
             owner=data.get("owner", ""),
             description=data.get("description", ""),
+            price_mode=data.get("price_mode", ""),
+            adjustment_source=data.get("adjustment_source", ""),
             migrations=migrations,
         )
 
@@ -329,6 +335,14 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
             "date": "object", "open": "float64", "high": "float64",
             "low": "float64", "close": "float64", "volume": "float64",
         },
+        "ohlcv_daily_raw": {
+            "date": "object", "open": "float64", "high": "float64",
+            "low": "float64", "close": "float64", "volume": "float64",
+        },
+        "ohlcv_daily_hfq": {
+            "date": "object", "open": "float64", "high": "float64",
+            "low": "float64", "close": "float64", "volume": "float64",
+        },
         "financial_summary": {
             "报告期": "object", "净利润": "object", "净利润同比增长率": "object",
             "营业总收入": "object", "营业总收入同比增长率": "object",
@@ -350,6 +364,10 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
         },
         "adj_factor": {
             "ts_code": "object", "trade_date": "object", "adj_factor": "float64",
+        },
+        "corporate_actions": {
+            "symbol": "object", "ex_date": "datetime64[ns]",
+            "cash_dividend_per_share": "float64", "share_multiplier": "float64",
         },
         "holder_number": {
             "ts_code": "object", "ann_date": "object", "end_date": "object",
@@ -419,7 +437,7 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
         columns = _known_columns.get(key, {})
         pk = []
         date_key = next(
-            (c for c in ("date", "trade_date", "ann_date", "end_date", "报告期", "日期") if c in columns),
+            (c for c in ("date", "trade_date", "ex_date", "ann_date", "end_date", "报告期", "日期") if c in columns),
             "",
         )
         symbol_key = next((c for c in ("symbol", "ts_code") if c in columns), "")
@@ -427,6 +445,18 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
             pk = [symbol_key, date_key] if symbol_key else [date_key]
             if dim.freq in ("monthly", "quarterly") and "report_date" in columns:
                 pk = [symbol_key, "report_date"] if symbol_key else ["report_date"]
+
+        price_mode = ""
+        adjustment_source = ""
+        if key == "ohlcv_daily":
+            price_mode = "qfq"
+            adjustment_source = "provider_adjusted"
+        elif key == "ohlcv_daily_raw":
+            price_mode = "raw"
+            adjustment_source = "raw"
+        elif key == "ohlcv_daily_hfq":
+            price_mode = "hfq"
+            adjustment_source = "adj_factor"
 
         contracts[key] = DataContract(
             dimension=key,
@@ -438,6 +468,8 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
             pit_rule="as_of_date" if key.startswith("ohlcv") else "none",
             owner=dim.source or dim.asset,
             description=dim.description or dim.label,
+            price_mode=price_mode,
+            adjustment_source=adjustment_source,
         )
 
     return contracts

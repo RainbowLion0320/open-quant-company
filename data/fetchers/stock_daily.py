@@ -18,6 +18,7 @@ import pandas as pd
 
 from data.datahub import get_datahub
 from data.fetchers.base import throttle
+from data.price_types import PriceFrameMetadata, PriceMode, attach_price_metadata, normalize_price_mode
 from data.symbol_utils import normalize_symbol, to_sina_symbol
 
 HUB = get_datahub()
@@ -32,6 +33,15 @@ def _to_plain(symbol: str) -> str:
     return normalize_symbol(symbol)
 
 
+def _path_for_adjust(symbol: str, adjust: str | None = "qfq"):
+    mode = normalize_price_mode(adjust)
+    if mode == PriceMode.RAW:
+        return HUB.stock_daily_raw_path(symbol)
+    if mode == PriceMode.HFQ:
+        return HUB.stock_daily_hfq_path(symbol)
+    return HUB.stock_daily_path(symbol)
+
+
 def fetch_one(
     symbol: str,
     source: str = "sina",
@@ -44,7 +54,8 @@ def fetch_one(
     返回 DataFrame 或 None。
     """
     symbol = normalize_symbol(symbol)
-    path = HUB.stock_daily_path(symbol)
+    mode = normalize_price_mode(adjust)
+    path = _path_for_adjust(symbol, mode.value)
 
     # 如果文件已存在且不强制，增量更新
     if path.exists() and not force:
@@ -62,7 +73,10 @@ def fetch_one(
     throttle()
     try:
         if source == "sina":
-            df = ak.stock_zh_a_daily(symbol=_to_sina(symbol), adjust=adjust)
+            df = ak.stock_zh_a_daily(
+                symbol=_to_sina(symbol),
+                adjust="" if mode == PriceMode.RAW else mode.value,
+            )
             df = df.rename(columns={
                 "date": "date", "open": "open", "close": "close",
                 "high": "high", "low": "low", "volume": "volume",
@@ -80,7 +94,11 @@ def fetch_one(
                 "high": "high", "low": "low", "amount": "volume",
             })
         else:
-            df = ak.stock_zh_a_hist(symbol=_to_plain(symbol), period="daily", adjust=adjust)
+            df = ak.stock_zh_a_hist(
+                symbol=_to_plain(symbol),
+                period="daily",
+                adjust="" if mode == PriceMode.RAW else mode.value,
+            )
             df = df.rename(columns={
                 "日期": "date", "开盘": "open", "收盘": "close",
                 "最高": "high", "最低": "low", "成交量": "volume",
@@ -94,6 +112,15 @@ def fetch_one(
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce") if col != "date" else pd.to_datetime(df[col], errors="coerce")
 
+        attach_price_metadata(
+            df,
+            PriceFrameMetadata(
+                requested_mode=mode,
+                actual_mode=mode,
+                source=f"akshare:{source}",
+                adjustment_source="raw" if mode == PriceMode.RAW else "provider_adjusted",
+            ),
+        )
         HUB.write_parquet(df, path)
         return df
     except Exception as e:
@@ -101,12 +128,24 @@ def fetch_one(
         return None
 
 
-def read_one(symbol: str) -> Optional[pd.DataFrame]:
+def read_one(symbol: str, adjust: str = "qfq") -> Optional[pd.DataFrame]:
     """
     纯本地读取 — 消费者唯一入口。不从 API 拉。
     """
     symbol = normalize_symbol(symbol)
-    return HUB.read_parquet(HUB.stock_daily_path(symbol))
+    mode = normalize_price_mode(adjust)
+    df = HUB.read_parquet(_path_for_adjust(symbol, mode.value))
+    if df is not None and len(df) > 0:
+        attach_price_metadata(
+            df,
+            PriceFrameMetadata(
+                requested_mode=mode,
+                actual_mode=mode,
+                source="local_parquet",
+                adjustment_source="raw" if mode == PriceMode.RAW else "provider_adjusted",
+            ),
+        )
+    return df
 
 
 def fetch_all(

@@ -14,12 +14,10 @@ from signals.technical import technical_factors_from_frame
 def _get_latest_price(symbol: str) -> float:
     """Return latest cached/refreshed close price, or 0 when unavailable."""
     try:
-        from data.fetcher import get_stock_daily
+        from data.price_service import get_latest_price
+        from data.price_types import PriceUseCase
 
-        df = get_stock_daily(symbol)
-        if df is None or len(df) == 0:
-            return 0.0
-        return float(df.sort_values("date").iloc[-1]["close"])
+        return get_latest_price(symbol, use_case=PriceUseCase.VALUATION)
     except Exception:
         return 0.0
 
@@ -204,9 +202,10 @@ def _get_technical_factors(symbol: str) -> dict:
         "volatility": 0.30,
     }
     try:
-        from data.fetcher import get_stock_daily
+        from data.price_service import get_stock_prices
+        from data.price_types import PriceUseCase
 
-        df = get_stock_daily(symbol)
+        df = get_stock_prices(symbol, use_case=PriceUseCase.SIGNAL)
         if df is None or len(df) < 63:
             return fallback
         df = df.sort_values("date") if "date" in df.columns else df
