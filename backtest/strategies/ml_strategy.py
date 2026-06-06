@@ -17,7 +17,7 @@ from backtest.strategies.base import BaseStrategy
 from signals.expression import alpha_factors
 from models import MODEL_DIR
 from models.lgbm_runtime import global_model_candidates, load_lgbm_bundle, regime_model_candidates
-from data.features.feature_store import feature_date_key, feature_key_to_date, load_feature_panel
+from data.features.feature_store import load_feature_panel
 from data.market.symbols import SYMBOL_NAME
 from pipeline.alpha import AlphaModel
 from pipeline.types import AlphaSignal
@@ -96,9 +96,10 @@ class MLStrategy(BaseStrategy):
         out = panel.copy()
         out["month"] = out["month"].astype(str)
         if "as_of_date" not in out.columns:
-            out["as_of_date"] = out["month"].map(
-                lambda month: feature_date_key(feature_key_to_date(month)) if feature_key_to_date(month) is not None else None
-            )
+            self._feature_panel = pd.DataFrame()
+            self._feature_months = []
+            self._feature_dates = []
+            return
         else:
             out["as_of_date"] = pd.to_datetime(out["as_of_date"], errors="coerce").dt.strftime("%Y-%m-%d")
         out["symbol"] = out["symbol"].astype(str)

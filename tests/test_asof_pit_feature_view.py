@@ -28,7 +28,7 @@ def test_feature_store_selects_latest_slice_on_or_before_as_of(tmp_path):
     assert selected.name == "2026-05-07.parquet"
 
 
-def test_feature_store_loads_legacy_month_slice_with_asof_date(tmp_path):
+def test_feature_store_ignores_month_keyed_feature_slices(tmp_path):
     from data.features.feature_store import load_feature_panel
 
     pd.DataFrame({"symbol": ["000001"], "month": ["2026-04"], "daily_close": [9.0]}).to_parquet(
@@ -36,10 +36,12 @@ def test_feature_store_loads_legacy_month_slice_with_asof_date(tmp_path):
         index=False,
     )
 
-    panel = load_feature_panel(directory=tmp_path)
-
-    assert panel.loc[0, "as_of_date"] == "2026-04-30"
-    assert panel.loc[0, "month"] == "2026-04"
+    try:
+        load_feature_panel(directory=tmp_path)
+    except RuntimeError as exc:
+        assert "No features found" in str(exc)
+    else:
+        raise AssertionError("month-keyed feature slices must not be loaded")
 
 
 def test_build_asof_uses_exact_daily_price_not_month_end(tmp_path, monkeypatch):

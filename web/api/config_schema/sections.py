@@ -383,7 +383,7 @@ BASE_SECTIONS: list[dict[str, Any]] = [
         ],
     },
     {
-        "key": "data.fetcher",
+        "key": "ingestion.fetcher",
         "label": "数据获取",
         "description": "API 请求节流、重试、缓存参数",
         "group": "data_ops",

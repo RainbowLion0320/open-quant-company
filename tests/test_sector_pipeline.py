@@ -46,7 +46,7 @@ def _patch_hub_store(tmp_path: Path, monkeypatch):
 # ═══════════════════════════════════════════════════════════
 
 def test_build_membership_columns(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
     mem_path = tmp_path / "sector_membership.parquet"
@@ -60,7 +60,7 @@ def test_build_membership_columns(tmp_path, monkeypatch):
 
 
 def test_build_membership_uses_sw_industries(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
     from data.market.symbols import SW_INDUSTRY_FIRST
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
@@ -79,7 +79,7 @@ def test_build_membership_uses_sw_industries(tmp_path, monkeypatch):
 # ═══════════════════════════════════════════════════════════
 
 def test_build_sector_performance_with_mock_data(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
 
@@ -118,7 +118,7 @@ def test_build_sector_performance_with_mock_data(tmp_path, monkeypatch):
 
 
 def test_build_sector_performance_prefers_sw_daily_real_data(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
 
@@ -153,7 +153,7 @@ def test_build_sector_performance_prefers_sw_daily_real_data(tmp_path, monkeypat
 
 
 def test_build_performance_empty_membership_returns_empty(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
     monkeypatch.setattr(hub, "dimension_path", lambda dim, **kw: tmp_path / "nonexistent.parquet")
@@ -166,7 +166,7 @@ def test_build_performance_empty_membership_returns_empty(tmp_path, monkeypatch)
 # ═══════════════════════════════════════════════════════════
 
 def test_build_signal_aggregation_with_mock_data(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
 
@@ -210,7 +210,7 @@ def test_build_signal_aggregation_with_mock_data(tmp_path, monkeypatch):
 # ═══════════════════════════════════════════════════════════
 
 def test_build_exposure_with_mock_positions(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
 
@@ -246,7 +246,7 @@ def test_build_exposure_with_mock_positions(tmp_path, monkeypatch):
 
 
 def test_build_exposure_no_positions(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
     df = sectors.build_exposure(hub)
@@ -254,7 +254,7 @@ def test_build_exposure_no_positions(tmp_path, monkeypatch):
 
 
 def test_build_exposure_reads_canonical_paper_state(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
 
@@ -309,7 +309,7 @@ def test_industry_score_with_real_sector_data(monkeypatch):
 def test_industry_score_fallback_when_no_data(tmp_path, monkeypatch):
     """When no sector performance data, industry score should default to 50."""
     from signals import multifactor as mf
-    from data import datahub
+    from data.storage import datahub
 
     datahub.reset_datahub()
     hub = datahub.get_datahub()
@@ -333,7 +333,7 @@ def test_industry_score_fallback_when_no_data(tmp_path, monkeypatch):
 
 def test_get_sector_momentum_cache(tmp_path, monkeypatch):
     from signals import multifactor as mf
-    from data import datahub
+    from data.storage import datahub
 
     datahub.reset_datahub()
     hub = datahub.get_datahub()
@@ -363,7 +363,7 @@ def test_get_sector_momentum_cache(tmp_path, monkeypatch):
 
 
 def test_sector_performance_aggregates_turnover_amount_from_member_ohlcv(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
     monkeypatch.setattr(sectors, "SW_INDUSTRIES", {"801780": "银行", "801750": "计算机"})
@@ -418,7 +418,7 @@ def test_sector_performance_aggregates_turnover_amount_from_member_ohlcv(tmp_pat
 
 def test_lookup_sector_from_membership(tmp_path, monkeypatch):
     from signals import multifactor as mf
-    from data import datahub
+    from data.storage import datahub
 
     datahub.reset_datahub()
     hub = datahub.get_datahub()
@@ -536,7 +536,7 @@ def test_portfolio_sector_exposure_fields(api_client):
 # ═══════════════════════════════════════════════════════════
 
 def test_all_builders_run_without_exception(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
     monkeypatch.setattr(hub, "dimension_path", lambda dim, **kw: tmp_path / f"{dim}.parquet")
@@ -597,7 +597,7 @@ def test_sector_performance_snapshot_contract():
 # ═══════════════════════════════════════════════════════════
 
 def test_full_sector_flow_membership_to_performance(tmp_path, monkeypatch):
-    from data import sectors
+    from data.market import sectors
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
     # 1. Build membership

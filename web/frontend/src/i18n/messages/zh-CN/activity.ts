@@ -7,7 +7,6 @@ export const activity = {
       refresh: "刷新",
       retryError: "系统监控加载失败",
       llmUsage: "LLM USAGE · RECENT",
-      deepseekUsage: "LLM USAGE · RECENT",
       apiBalance: "provider balance",
       notChecked: "not checked",
       projectTokens: "project tokens",

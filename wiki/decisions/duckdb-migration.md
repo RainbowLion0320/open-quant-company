@@ -117,4 +117,4 @@ db.execute("CREATE VIEW features_2024_01 AS SELECT * FROM read_parquet('var/stor
 
 - Web: `duckdb.connect(":memory:")` + `CREATE VIEW FROM read_parquet()` → 永不锁
 - Cron: `pd.DataFrame.to_parquet()` → 直接写文件, 不经过 DuckDB
-- Features: `scripts/build_features.py --frequency daily` → `to_parquet()` → 按 as-of 日期存储，月末快照兼容
+- Features: `scripts/build_features.py --frequency daily` → `to_parquet()` → 按 as-of 日期存储

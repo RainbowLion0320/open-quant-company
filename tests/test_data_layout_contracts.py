@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import importlib
 import subprocess
+import sys
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 
@@ -49,34 +50,6 @@ def test_datahub_runtime_env_overrides(tmp_path, monkeypatch):
     assert hub.cache_root == tmp_path / "custom-cache"
     assert hub.artifact_dir("models") == tmp_path / "custom-artifacts" / "models"
     assert hub.db_path("x.duckdb") == tmp_path / "custom-db" / "x.duckdb"
-
-
-def test_datahub_reads_legacy_store_but_writes_to_var(tmp_path, monkeypatch):
-    from data.storage.datahub import DataHub, reset_datahub
-
-    for name in (
-        "ASTROLABE_VAR",
-        "ASTROLABE_STORE",
-        "ASTROLABE_CACHE",
-        "ASTROLABE_ARTIFACTS",
-        "ASTROLABE_DB",
-    ):
-        monkeypatch.delenv(name, raising=False)
-    reset_datahub()
-
-    legacy_signal = tmp_path / "data" / "store" / "signals" / "legacy.parquet"
-    legacy_signal.parent.mkdir(parents=True)
-    pd.DataFrame([{"symbol": "000001", "score": 88.0}]).to_parquet(legacy_signal, index=False)
-
-    hub = DataHub(project_root=tmp_path, create=False)
-    with pytest.warns(RuntimeWarning, match="Legacy data layout detected"):
-        frame = hub.read_parquet(hub.signal_path("legacy"), default=pd.DataFrame())
-
-    assert frame["symbol"].tolist() == ["000001"]
-
-    hub.write_parquet(pd.DataFrame([{"symbol": "000002"}]), hub.signal_path("legacy"), record_manifest=False)
-    assert (tmp_path / "var" / "store" / "signals" / "legacy.parquet").exists()
-    assert legacy_signal.exists()
 
 
 def test_data_registry_cache_patterns_are_relative_to_store_root():
@@ -185,8 +158,10 @@ def test_data_layout_migration_apply_does_not_overwrite_existing_targets(tmp_pat
     assert item["sha256"]
 
 
-def test_data_root_contains_source_not_runtime_artifacts():
+def test_data_root_contains_only_init_and_canonical_packages():
     root = Path(__file__).resolve().parents[1] / "data"
+    root_files = sorted(p.name for p in root.iterdir() if p.is_file())
+    forbidden_legacy_packages = ["assets", "fetchers", "sector_pipeline"]
     forbidden_suffixes = {".pkl", ".db", ".duckdb"}
     forbidden_files = [
         p
@@ -195,12 +170,14 @@ def test_data_root_contains_source_not_runtime_artifacts():
     ]
     forbidden_dirs = [p for p in ("store", "cache", "tournament", "models") if (root / p).exists()]
 
+    assert root_files == ["__init__.py"]
+    assert [name for name in forbidden_legacy_packages if (root / name).exists()] == []
     assert forbidden_files == []
     assert forbidden_dirs == []
 
 
-def test_canonical_data_imports_and_legacy_shims_are_available():
-    from data.storage.datahub import DataHub as CanonicalDataHub
+def test_canonical_data_imports_are_available():
+    from data.storage.datahub import DataHub
     from data.storage.dimensions import DataRegistry
     from data.ingestion.fetcher import get_stock_daily
     from data.market.price_service import get_stock_prices
@@ -208,10 +185,8 @@ def test_canonical_data_imports_and_legacy_shims_are_available():
     from data.quality.cleaner import DataCleaner
     from data.ops.cron_logger import cron_run
     from data.rates.risk_free_rates import RiskFreeRateProvider
-    from data.strategy.catalog import get_enabled_strategies
-    from data import datahub as legacy_datahub
 
-    assert legacy_datahub.DataHub is CanonicalDataHub
+    assert DataHub
     assert DataRegistry
     assert get_stock_daily
     assert get_stock_prices
@@ -219,7 +194,23 @@ def test_canonical_data_imports_and_legacy_shims_are_available():
     assert DataCleaner
     assert cron_run
     assert RiskFreeRateProvider
-    assert get_enabled_strategies
+
+
+def test_legacy_data_imports_are_removed():
+    legacy_modules = [
+        ".".join(("data", "datahub")),
+        ".".join(("data", "fetcher")),
+        ".".join(("data", "feature_store")),
+        ".".join(("data", "price_service")),
+        ".".join(("data", "strategy_plugins")),
+        ".".join(("data", "assets", "stock")),
+        ".".join(("data", "fetchers", "base")),
+        ".".join(("data", "sector_pipeline", "membership")),
+    ]
+    for name in legacy_modules:
+        sys.modules.pop(name, None)
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(name)
 
 
 def _write_legacy_layout(root: Path) -> None:

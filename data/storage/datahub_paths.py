@@ -60,9 +60,6 @@ class DataHubPaths:
         self.cache_root = resolve_path(cache_root, self.project_root)
         self.artifact_root = resolve_path(artifact_root, self.project_root)
         self.db_root = resolve_path(db_root, self.project_root)
-        self.legacy_store_root: Path | None = None
-        self.legacy_cache_root: Path | None = None
-        self._legacy_warning_emitted = False
 
     def ensure_layout(self) -> None:
         for path in [
@@ -92,35 +89,6 @@ class DataHubPaths:
 
     def resolve_path(self, path: str | os.PathLike, base: Path | None = None) -> Path:
         return resolve_path(path, base or self.project_root)
-
-    def enable_legacy_read_fallback(
-        self,
-        *,
-        store_root: str | os.PathLike | None = None,
-        cache_root: str | os.PathLike | None = None,
-    ) -> None:
-        if store_root is not None:
-            self.legacy_store_root = resolve_path(store_root, self.project_root)
-        if cache_root is not None:
-            self.legacy_cache_root = resolve_path(cache_root, self.project_root)
-
-    def legacy_read_path(self, path: str | os.PathLike) -> Path | None:
-        target = self.resolve_path(path)
-        candidates = [
-            (self.store_root, self.legacy_store_root),
-            (self.cache_root, self.legacy_cache_root),
-        ]
-        for current_root, legacy_root in candidates:
-            if legacy_root is None:
-                continue
-            try:
-                rel = target.relative_to(current_root)
-            except ValueError:
-                continue
-            legacy = legacy_root / rel
-            if legacy.exists():
-                return legacy
-        return None
 
     def store_path(self, asset_type: str | None = None) -> Path:
         if asset_type is None:
@@ -183,8 +151,8 @@ class DataHubPaths:
     def features_dir(self) -> Path:
         return self.store_root / "features"
 
-    def feature_path(self, month: str) -> Path:
-        return self.features_dir() / f"{safe_leaf(month, 'month')}.parquet"
+    def feature_path(self, as_of_key: str) -> Path:
+        return self.features_dir() / f"{safe_leaf(as_of_key, 'as_of_key')}.parquet"
 
     def paper_dir(self) -> Path:
         return self.store_root / "paper"
@@ -239,9 +207,6 @@ class DataHubPaths:
 
     def llm_project_usage_path(self) -> Path:
         return self.store_path("llm") / "project_usage_ledger.parquet"
-
-    def deepseek_project_usage_path(self) -> Path:
-        return self.store_path("deepseek") / "project_usage_ledger.parquet"
 
     def manifest_dir(self) -> Path:
         return self.store_root / "_manifest"

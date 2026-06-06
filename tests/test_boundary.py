@@ -148,7 +148,7 @@ def test_paper_broker_boundary_enforces_t_plus_one_and_affordability():
 def test_datahub_duckdb_and_results_store_boundary_are_isolated(tmp_path, monkeypatch):
     from data.storage.datahub import DataHub
     import data.storage.db as db_module
-    from data import results_db
+    from data.storage import results_db
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     monkeypatch.setattr(db_module, "_HUB", hub)

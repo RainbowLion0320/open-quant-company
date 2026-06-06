@@ -279,6 +279,7 @@ cybernetics:
 data:
   cache_days: 1
   cache_dir: var/cache
+ingestion:
   fetcher:
     min_interval: 3.0
     jitter_max: 0.5

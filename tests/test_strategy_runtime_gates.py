@@ -19,12 +19,12 @@ def test_production_mode_excludes_candidate_strategies(monkeypatch):
             "status": "candidate",
         },
     ]
-    monkeypatch.setattr("data.strategy_plugins.get_enabled_strategies", lambda: fake_registry)
+    monkeypatch.setattr("data.strategy.plugins.get_enabled_strategies", lambda: fake_registry)
     monkeypatch.setattr(
-        "data.strategy_plugins.get_strategy",
+        "data.strategy.plugins.get_strategy",
         lambda name: next((s for s in fake_registry if s["name"] == name), None),
     )
-    monkeypatch.setattr("data.strategy_plugins.list_strategy_names", lambda: [s["name"] for s in fake_registry])
+    monkeypatch.setattr("data.strategy.plugins.list_strategy_names", lambda: [s["name"] for s in fake_registry])
 
     names = [plugin.name for plugin in iter_strategy_plugins("all", mode="production")]
 
@@ -52,12 +52,12 @@ def test_research_mode_can_include_candidate_strategies(monkeypatch):
             "status": "candidate",
         },
     ]
-    monkeypatch.setattr("data.strategy_plugins.get_enabled_strategies", lambda: fake_registry)
+    monkeypatch.setattr("data.strategy.plugins.get_enabled_strategies", lambda: fake_registry)
     monkeypatch.setattr(
-        "data.strategy_plugins.get_strategy",
+        "data.strategy.plugins.get_strategy",
         lambda name: next((s for s in fake_registry if s["name"] == name), None),
     )
-    monkeypatch.setattr("data.strategy_plugins.list_strategy_names", lambda: [s["name"] for s in fake_registry])
+    monkeypatch.setattr("data.strategy.plugins.list_strategy_names", lambda: [s["name"] for s in fake_registry])
 
     names = [plugin.name for plugin in iter_strategy_plugins("all", mode="research")]
 

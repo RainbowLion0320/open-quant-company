@@ -111,7 +111,7 @@ Defaults are declared in `config/settings.yaml`:
 ## Developer Rules
 
 - New code uses canonical imports such as `data.storage.datahub`, `data.ingestion.fetcher`, `data.market.price_service`, and `data.features.feature_store`.
-- Legacy imports such as `data.datahub` are compatibility shims only.
+- Historical top-level data imports have been removed. Use canonical domain packages only.
 - `data_registry.cache` remains relative to the DataHub store root. Do not put `var/store` or absolute paths in dimension cache patterns.
 - Runtime outputs must go through DataHub path helpers or the `paths.*` config section.
 - `data/` root must not contain `.pkl`, `.db`, `.duckdb`, cache/store/tournament directories, or trained model outputs.

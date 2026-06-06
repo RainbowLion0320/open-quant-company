@@ -39,7 +39,7 @@ DataHub facade 负责:
 
 - 统一目录: `runtime_root`, `store_root`, `cache_root`, `artifact_root`, `db_root`, `signals`, `features`, `macro`, `paper`, `system_monitor`, token cache。
 - 运行产物 API: `runtime_dir()`, `artifact_dir(kind)`, `artifact_path(kind, name)`, `db_path(name)`, `migration_dir()`。
-- 统一路径: `signal_path(strategy)`, `feature_path(month)`, `macro_path(name)`, `paper_path(name)`。
+- 统一路径: `signal_path(strategy)`, `feature_path(as_of_key)`, `macro_path(name)`, `paper_path(name)`。
 - 注册表路径展开: `dimension_root(key)` / `dimension_path(key, **values)` 从 `data_registry.cache` 占位符模式生成真实路径。**设计理由**: 路径只定义一次（config.yaml），消费脚本不硬编码深层目录。占位符 `{symbol}`/`{YYYYMMDD}` 在调用点展开，`validate()` 拒绝 `..` 和绝对路径。
 - 路径 vs 创建分离: `store_path(asset)` 纯路径计算（dimension 展开用），`store_dir(asset)` 创建目录（init 用）。**设计理由**: dimension 路径展开不应产生空目录副作用。
 - 原子写入: Parquet/JSON 先写临时文件，再 `os.replace` 覆盖，降低半写入风险。

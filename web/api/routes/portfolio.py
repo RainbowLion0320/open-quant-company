@@ -5,7 +5,7 @@ PaperBroker 实例从 Parquet 恢复，确保服务器重启不丢状态。
 """
 
 from fastapi import APIRouter, HTTPException
-from web.api.models import OrderRequest, PositionItem, AccountInfo, OrderItem
+from web.api.schemas.portfolio import AccountInfo, OrderItem, OrderRequest, PositionItem
 from web.api.errors import InvalidParameterError
 from web.api.services.sectors import build_sector_exposure
 

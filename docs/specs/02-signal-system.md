@@ -89,10 +89,10 @@
 
 **模型：** LightGBM 二分类（未来 20 日收益 > 中位数 = 正样本）
 
-**PIT 特征：** 优先从 `var/store/features/YYYY-MM-DD.parquet` 读取不晚于预测日的最新 as-of 特征视图；历史 `YYYY-MM.parquet` 月末快照继续兼容。训练/预测严格只使用 as-of 日期之前已可见的数据。
+**PIT 特征：** 从 `var/store/features/YYYY-MM-DD.parquet` 读取不晚于预测日的最新 as-of 特征视图。训练/预测严格只使用 as-of 日期之前已可见的数据；`YYYY-MM.parquet` 月末特征切片不是正式输入。
 
 **训练流程：**
-1. `scripts/build_features.py` — 批量构建月度 PIT 特征切片
+1. `scripts/build_features.py --frequency daily` — 批量构建日频 as-of PIT 特征切片
 2. `scripts/tune_model.py` — Optuna 超参搜索，输出到 `var/artifacts/models/`
 3. `scripts/weekly_retrain.py` — Cron 周六自动重训
 

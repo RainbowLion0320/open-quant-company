@@ -156,9 +156,9 @@ def test_settings_schema_validation_is_reusable_outside_routes():
     valid = {"min_interval": "4.5", "max_retries": "4"}
     invalid = {"min_interval": 0.1, "max_retries": "many"}
 
-    assert validate_settings_section("data.fetcher", valid) == []
+    assert validate_settings_section("ingestion.fetcher", valid) == []
 
-    errors = validate_settings_section("data.fetcher", invalid)
+    errors = validate_settings_section("ingestion.fetcher", invalid)
     assert "min_interval: 0.1 < min (0.5)" in errors
     assert "max_retries: expected int, got str" in errors
 

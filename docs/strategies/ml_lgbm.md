@@ -10,7 +10,7 @@
 
 当前定位为辅助 Alpha，不直接作为 production 主策略。进入 production 前必须通过策略晋级门槛：足够 OOS 月数、交易次数、Sharpe、最大回撤、换手、IC 和 ICIR。
 
-运行时模型加载由 `models/lgbm_runtime.py` 统一处理。生产信号和回测都会优先加载 regime-aware 模型；当前兼容历史遗留的 `lgbm_lgbm_{regime}.pkl` 文件名，但新产物应使用规范命名 `lgbm_{regime}.pkl`。
+运行时模型加载由 `models/lgbm_runtime.py` 统一处理。生产信号和回测都会优先加载 regime-aware 模型；regime 专属模型文件名为 `lgbm_{regime}.pkl`，元数据为 `lgbm_{regime}_meta.json`。
 
 ## 数据依赖
 
@@ -22,7 +22,7 @@
 | adj_factor | Tushare | daily |
 | valuation_daily | Tushare | daily |
 | moneyflow_daily | AKShare | daily |
-| features_all (PIT) | Computed | daily as-of preferred; monthly compatible |
+| features_all (PIT) | Computed | daily as-of |
 
 ## 参数空间
 
@@ -41,7 +41,7 @@
 
 回测入口 `backtest/run_all_strategies.py --strategy ml_lgbm` 使用 `MLFeatureStoreAlphaModel`，按调仓日选择不晚于该日的最新 PIT as-of 特征视图一次性批量预测全股票池，再交给统一 Pipeline 执行组合构建、风控和成交模拟。不要退回通用逐股 `StrategyAlphaAdapter`，否则正式全池回测会退化为数千只股票逐个 `predict()`。
 
-日频价量、估值和资金流特征应使用 `scripts/build_features.py --frequency daily` 构建到 `var/store/features/YYYY-MM-DD.parquet`。历史 `YYYY-MM.parquet` 文件仍可读取，但只代表月末兼容快照，不是长期精度目标。
+日频价量、估值和资金流特征使用 `scripts/build_features.py --frequency daily` 构建到 `var/store/features/YYYY-MM-DD.parquet`。`YYYY-MM.parquet` 月末切片不是正式输入。
 
 特征矩阵进入模型前会统一 `to_numeric(errors="coerce")`，再处理 `inf`/`nan`，避免 Parquet 中对象类型列导致 LightGBM 拒绝预测。
 

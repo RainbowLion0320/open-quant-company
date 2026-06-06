@@ -52,7 +52,7 @@ class TestExecutionDryRun:
     def test_dry_run_blocks_buy_orders_when_freshness_gate_fails(self, monkeypatch):
         """Dry-run checks current DB health rows before proposing buy orders."""
         monkeypatch.setattr(
-            "data.results_db.load_latest_signals",
+            "data.storage.results_db.load_latest_signals",
             lambda: [
                 {"strategy": "multifactor", "symbol": "600000", "signal": "buy"},
                 {"strategy": "buffett", "symbol": "600519", "signal": "buy"},

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Query
 
 from web.api.errors import InvalidParameterError
-from web.api.models import CronJobsResponse, SystemHealthResponse
+from web.api.schemas.system import CronJobsResponse, SystemHealthResponse
 from web.api.services.system_data_health import (
     db_health_payload,
     repair_status_payload,
@@ -14,7 +14,6 @@ from web.api.services.system_integrations import (
     cron_jobs_payload,
 )
 from web.api.services.system_monitor import (
-    deepseek_usage_payload,
     llm_usage_payload,
     system_history_payload,
     system_monitor_payload,
@@ -41,12 +40,6 @@ async def system_monitor():
 async def system_history(hours: int = Query(default=24, ge=1, le=720)):
     """历史趋势数据 — CPU/内存/Token 时间序列"""
     return system_history_payload(hours)
-
-@router.get("/deepseek-usage")
-async def deepseek_usage():
-    """Backward-compatible DeepSeek provider usage endpoint."""
-    return deepseek_usage_payload()
-
 
 @router.get("/llm-usage")
 async def llm_usage(provider: str | None = Query(default=None)):

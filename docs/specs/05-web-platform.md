@@ -99,11 +99,11 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Pipeline | `routes/pipeline.py` | `GET /api/pipeline`, `GET /api/pipeline/market-regime`, `GET /api/pipeline/{pipeline_key}` |
 | Assets | `routes/assets.py` | `GET /api/assets/overview` |
 | Settings | `routes/settings.py` | `GET /api/settings`, `GET /api/settings/schema`, `PUT /api/settings`, `PATCH /api/settings/section/{section}` |
-| System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/llm-usage`, `GET /api/system/deepseek-usage` (compat), `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/mode` |
+| System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/llm-usage`, `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/mode` |
 | Hindsight | `routes/hindsight.py` | `GET /api/hindsight/graph` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
 
-`GET /api/system/llm-usage` 只使用 provider 公开余额 API 与本地账本：启用 provider 的 `balance_url` 提供账号余额，本项目 LLM 调用从响应 `usage` 字段写入 `var/store/llm/project_usage_ledger.parquet` 后按 provider/model 聚合展示。`/api/system/deepseek-usage` 仅作为兼容别名；不得重新引入网页 CDP 或 CSV 导入作为历史用量来源。
+`GET /api/system/llm-usage` 只使用 provider 公开余额 API 与本地账本：启用 provider 的 `balance_url` 提供账号余额，本项目 LLM 调用从响应 `usage` 字段写入 `var/store/llm/project_usage_ledger.parquet` 后按 provider/model 聚合展示。不得重新引入 provider 专用别名、网页 CDP 或 CSV 导入作为历史用量来源。
 
 LLM 成本配置以 `llm.providers.{provider}` 为边界，`llm.use_cases.*` 只声明调用路由。定价支持 `input_cache_hit` / `input_cache_miss` / `input` / `output`，也支持 `total` token 和 `request` 固定调用成本；不同 provider 可用 `usage_schema` 标明自己的响应范式。
 
@@ -222,7 +222,7 @@ Vue Component 实时更新进度条
 GET /api/settings/schema
 
 # Dotted section patch keeps canonical nested YAML:
-PATCH /api/settings/section/data.fetcher
+PATCH /api/settings/section/ingestion.fetcher
 
 # 必须段校验
 REQUIRED_SECTIONS = {"strategies", "risk_control"}
@@ -230,7 +230,7 @@ REQUIRED_SECTIONS = {"strategies", "risk_control"}
 
 `GET /api/settings/schema` 返回 `groups` + `sections`：左侧一级域包括策略管理、市场状态、执行与风控、数据与清洗、研究回测、AI 服务；每个 section 带 `group`、`subgroup`、`subgroup_label` 和字段元数据。Config Center 只切一级域，右侧把二级分组纵向展开，不把策略参数平铺成同级 tab。
 
-`PATCH /api/settings/section/{section}` 支持 dotted section，例如 `data.fetcher`、`buffett.margin_of_safety`、`strategies.buffett`、`signal_selection.strategies.multifactor`。服务端必须写回嵌套 YAML，不允许生成顶层 `data.fetcher:` 这类重复 key。
+`PATCH /api/settings/section/{section}` 支持 dotted section，例如 `ingestion.fetcher`、`buffett.margin_of_safety`、`strategies.buffett`、`signal_selection.strategies.multifactor`。服务端必须写回嵌套 YAML，不允许生成顶层 `ingestion.fetcher:` 这类重复 key。
 
 ## 6. 错误处理
 

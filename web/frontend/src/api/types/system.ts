@@ -53,8 +53,6 @@ export interface LlmUsageResponse {
   message?: string;
 }
 
-export type DeepSeekUsageResponse = LlmUsageResponse;
-
 export interface DbHealthResponse {
   data: any[];
   summary: any | null;

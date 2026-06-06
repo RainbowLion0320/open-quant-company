@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Query
 
-from web.api.models import MarketOverviewResponse, MarketRegimeResponse
+from web.api.schemas.market import MarketOverviewResponse, MarketRegimeResponse
 from web.api.services import market as market_service
 
 router = APIRouter(prefix="/api/market", tags=["Market"])

@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 
 from web.api.errors import DataNotFoundError
-from web.api.models import FinancialData, KLineItem, StockDetail, StockResponse, StrategySignal
+from web.api.schemas.market import KLineItem
+from web.api.schemas.portfolio import FinancialData, StockDetail, StockResponse
+from web.api.schemas.strategy import StrategySignal
 
 
 def build_stock_list(limit: int, q: str = "") -> tuple[list[dict], int]:

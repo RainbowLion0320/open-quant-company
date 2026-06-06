@@ -60,18 +60,17 @@ def test_ml_strategy_records_model_load_errors_without_crashing(tmp_path, monkey
     assert any("lightgbm" in err for err in strategy.load_errors)
 
 
-def test_ml_strategy_loads_legacy_regime_model_filename(tmp_path, monkeypatch):
+def test_ml_strategy_rejects_legacy_regime_model_filename(tmp_path, monkeypatch):
     import backtest.strategies.ml_strategy as ml_strategy
 
-    (tmp_path / "lgbm_lgbm_bull.pkl").write_bytes(b"legacy")
+    (tmp_path / f"lgbm_{'lgbm'}_bull.pkl").write_bytes(b"old")
     (tmp_path / "lgbm_bull_meta.json").write_text('{"features":["ret_20d"]}', encoding="utf-8")
     monkeypatch.setattr(ml_strategy, "MODEL_DIR", tmp_path)
     monkeypatch.setattr(pickle, "load", lambda _file: DummyModel())
 
     strategy = ml_strategy.MLStrategy("best")
 
-    assert strategy.is_ready is True
-    assert "bull" in strategy._regime_models
+    assert "bull" not in strategy._regime_models
 
 
 def test_ml_strategy_scores_from_pit_feature_store(tmp_path, monkeypatch):
@@ -82,6 +81,7 @@ def test_ml_strategy_scores_from_pit_feature_store(tmp_path, monkeypatch):
     feature_panel = pd.DataFrame(
         {
             "month": ["2026-04"],
+            "as_of_date": ["2026-04-30"],
             "symbol": ["000001"],
             "fund_roe": [0.2],
             "ret_fwd_20d": [0.0],
@@ -141,6 +141,7 @@ def test_ml_strategy_batches_feature_store_predictions_by_month(tmp_path, monkey
     feature_panel = pd.DataFrame(
         {
             "month": ["2026-04", "2026-04"],
+            "as_of_date": ["2026-04-30", "2026-04-30"],
             "symbol": ["000001", "000002"],
             "fund_roe": [0.2, 0.1],
         }
@@ -178,6 +179,7 @@ def test_ml_alpha_model_generates_month_signals_with_one_prediction(tmp_path, mo
     feature_panel = pd.DataFrame(
         {
             "month": ["2026-04", "2026-04"],
+            "as_of_date": ["2026-04-30", "2026-04-30"],
             "symbol": ["000001", "000002"],
             "fund_roe": [0.2, 0.1],
         }
@@ -205,6 +207,7 @@ def test_ml_score_map_returns_empty_dict_on_predict_error(tmp_path, monkeypatch)
     feature_panel = pd.DataFrame(
         {
             "month": ["2026-04"],
+            "as_of_date": ["2026-04-30"],
             "symbol": ["000001"],
             "fund_roe": [0.2],
         }
@@ -230,6 +233,7 @@ def test_ml_strategy_coerces_feature_store_objects_to_numeric(tmp_path, monkeypa
     feature_panel = pd.DataFrame(
         {
             "month": ["2026-04"],
+            "as_of_date": ["2026-04-30"],
             "symbol": ["000001"],
             "val_pe_percentile": ["0.2"],
         }

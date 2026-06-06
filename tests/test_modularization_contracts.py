@@ -109,7 +109,7 @@ def test_api_routes_and_schemas_are_domain_split():
             "web/api/services/system_orders.py",
         ]
     )
-    assert _line_count("web/api/models.py") <= 80
+    assert not (Path("web/api") / "models.py").exists()
     assert _line_count("web/api/routes/stocks.py") <= 180
     assert _line_count("web/api/routes/system.py") <= 260
 
@@ -150,11 +150,11 @@ def test_p0_p2_modularization_hotspots_are_split():
             "research/factors/hypothesis/candidates.py",
             "research/factors/hypothesis/llm.py",
             "research/factors/hypothesis/persistence.py",
-            "data/sector_pipeline/membership.py",
-            "data/sector_pipeline/performance.py",
-            "data/sector_pipeline/amounts.py",
-            "data/sector_pipeline/signals.py",
-            "data/sector_pipeline/exposure.py",
+            "data/market/sector_pipeline/membership.py",
+            "data/market/sector_pipeline/performance.py",
+            "data/market/sector_pipeline/amounts.py",
+            "data/market/sector_pipeline/signals.py",
+            "data/market/sector_pipeline/exposure.py",
             "broker/models.py",
             "broker/base.py",
             "broker/paper_orders.py",
@@ -179,5 +179,5 @@ def test_p0_p2_modularization_hotspots_are_split():
     assert _line_count("cybernetics/market_observations.py") <= 120
     assert _line_count("cybernetics/hmm_engine.py") <= 120
     assert _line_count("scripts/factor_hypothesis.py") <= 140
-    assert _line_count("data/sectors.py") <= 140
+    assert _line_count("data/market/sectors.py") <= 140
     assert _line_count("broker/paper.py") <= 260

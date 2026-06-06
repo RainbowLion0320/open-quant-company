@@ -331,7 +331,7 @@ def test_datahub_catalog_includes_data_registry_dimensions():
 
 
 def test_stock_daily_read_path_does_not_implicitly_fetch_api(monkeypatch):
-    from data import fetcher
+    from data.ingestion import fetcher
     import data.ingestion.fetchers.stock_daily as stock_daily
 
     monkeypatch.delenv("QUANT_ALLOW_API_FALLBACK", raising=False)
@@ -696,11 +696,11 @@ def test_web_docs_match_current_api_pipeline_and_schema_contracts():
         ),
         "schema reference": (
             "`web/api/schemas/*` 分域 schema",
-            "`web/api/models.py` 兼容聚合入口",
+            "路由 response models",
         ),
         "api init": (
             "12个业务路由模块",
-            "细分 schema 位于 schemas/",
+            "Pydantic 类型分域定义",
         ),
     }
     source_text = {
@@ -834,7 +834,6 @@ def test_deepseek_usage_no_longer_depends_on_platform_scraping_backfills():
     factor_llm = Path("research/factors/hypothesis/llm.py").read_text(encoding="utf-8")
 
     assert "api.llmUsage()" in monitor_logic
-    assert "api.deepseekUsage()" not in monitor_logic
     assert "/api/system/llm-usage" in system_api
     assert "llm_project_usage_path" in datahub
     assert "resolve_llm_use_case" in factor_llm

@@ -1,6 +1,6 @@
 """Asset overview route — exposes multi-asset provenance and readiness."""
 from fastapi import APIRouter
-from web.api.models import AssetOverviewItem, AssetOverviewResponse
+from web.api.schemas.portfolio import AssetOverviewItem, AssetOverviewResponse
 
 router = APIRouter(prefix="/api/assets", tags=["Assets"])
 

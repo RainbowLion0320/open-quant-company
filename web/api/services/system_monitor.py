@@ -143,8 +143,3 @@ def llm_usage_payload(provider: str | None = None) -> dict:
         "total_cost": float(usage.get("totals", {}).get("estimated_cost_cny", 0) or 0),
         "status": status,
     }
-
-
-def deepseek_usage_payload() -> dict:
-    """Backward-compatible alias for older API/UI callers."""
-    return llm_usage_payload(provider="deepseek")

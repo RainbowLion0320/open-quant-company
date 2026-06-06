@@ -41,13 +41,7 @@ DEFAULT_END = os.environ.get(
     "QUANT_FEATURE_END",
     (pd.Timestamp.today().to_period("M") - 1).strftime("%Y-%m"),
 )
-try:
-    from core.settings import get_section
-
-    _ML_CFG = get_section("ml", {}) or {}
-except Exception:
-    _ML_CFG = {}
-DEFAULT_FREQUENCY = os.environ.get("QUANT_FEATURE_FREQUENCY", str(_ML_CFG.get("feature_frequency", "monthly")))
+DEFAULT_FREQUENCY = "daily"
 SKIP_PREFIXES = ("92", "83", "87", "43")
 
 
@@ -293,19 +287,6 @@ def _build_asof(
     )
 
 
-def _build_month(
-    month: str,
-    price_cache: dict[str, pd.DataFrame],
-    fin_cache: dict[str, pd.DataFrame],
-    daily_cache: dict[str, pd.DataFrame],
-    factors: dict,
-    force: bool = False,
-) -> int:
-    month_dt = pd.Timestamp(month + "-01")
-    month_end = month_dt + pd.offsets.MonthEnd(0)
-    return _build_feature_slice(month, month_end, price_cache, fin_cache, daily_cache, factors, force=force)
-
-
 def _date_range_bounds(start: str, end: str) -> tuple[pd.Timestamp, pd.Timestamp]:
     start_ts = pd.Timestamp(start + "-01") if len(start) == 7 else pd.Timestamp(start)
     if len(end) == 7:
@@ -337,8 +318,8 @@ def build_features(
     include_tushare: bool = True,
     frequency: str = DEFAULT_FREQUENCY,
 ) -> None:
-    frequency = str(frequency or "monthly").lower()
-    if frequency not in {"monthly", "daily"}:
+    frequency = str(frequency or DEFAULT_FREQUENCY).lower()
+    if frequency != "daily":
         raise ValueError(f"unsupported feature frequency: {frequency}")
 
     print(f"批量构建 PIT 特征: {n_stocks}只, {start}→{end}, frequency={frequency}")
@@ -348,24 +329,16 @@ def build_features(
     daily_cache = _load_daily_basic_cache(list(price_cache.keys()), start, end) if include_tushare else {}
     factors = alpha_factors()
 
-    if frequency == "daily":
-        dates = _daily_asof_dates(start, end, price_cache)
-        print(f"\n[4/4] 构建特征 ({len(dates)}个交易日)...")
-        for as_of in dates:
-            key = as_of.strftime("%Y-%m-%d")
-            rows = _build_asof(key, price_cache, fin_cache, daily_cache, factors, force=force)
-            print(f"  {key}: {rows} stocks" if rows else f"  {key}: skipped")
-    else:
-        months = pd.date_range(start, end, freq="MS")
-        print(f"\n[4/4] 构建特征 ({len(months)}个月)...")
-        for month_dt in months:
-            month = month_dt.strftime("%Y-%m")
-            rows = _build_month(month, price_cache, fin_cache, daily_cache, factors, force=force)
-            print(f"  {month}: {rows} stocks" if rows else f"  {month}: skipped")
+    dates = _daily_asof_dates(start, end, price_cache)
+    print(f"\n[4/4] 构建特征 ({len(dates)}个交易日)...")
+    for as_of in dates:
+        key = as_of.strftime("%Y-%m-%d")
+        rows = _build_asof(key, price_cache, fin_cache, daily_cache, factors, force=force)
+        print(f"  {key}: {rows} stocks" if rows else f"  {key}: skipped")
 
     pq_files = iter_feature_files()
     total_rows = sum(len(HUB.read_parquet(pq, default=pd.DataFrame())) for pq in pq_files)
-    print(f"\n完成: {len(pq_files)} 个月, {total_rows} 总行")
+    print(f"\n完成: {len(pq_files)} 个 as-of 特征切片, {total_rows} 总行")
 
 
 def _recent_month_window(months: int, today: pd.Timestamp | None = None) -> tuple[str, str]:
@@ -381,7 +354,7 @@ def rebuild_recent(
     force: bool = False,
     frequency: str = DEFAULT_FREQUENCY,
 ) -> None:
-    """Incrementally rebuild recent monthly feature slices."""
+    """Incrementally rebuild daily as-of feature slices for recent month windows."""
     if months <= 0:
         return
     start, end = _recent_month_window(months)
@@ -393,14 +366,14 @@ def main() -> int:
     parser.add_argument("--n-stocks", type=int, default=DEFAULT_N_STOCKS)
     parser.add_argument("--start", default=DEFAULT_START)
     parser.add_argument("--end", default=DEFAULT_END)
-    parser.add_argument("--force", action="store_true", help="overwrite existing monthly slices")
+    parser.add_argument("--force", action="store_true", help="overwrite existing daily as-of slices")
     parser.add_argument("--no-tushare", action="store_true", help="skip Tushare daily_basic enrichment")
     parser.add_argument("--recent-months", type=int, default=0, help="rebuild only recent N months")
     parser.add_argument(
         "--frequency",
-        choices=["monthly", "daily"],
+        choices=["daily"],
         default=DEFAULT_FREQUENCY,
-        help="feature as-of cadence: daily keeps daily price/valuation precision; monthly is compatibility mode",
+        help="feature as-of cadence; daily is the only supported canonical mode",
     )
     args = parser.parse_args()
 

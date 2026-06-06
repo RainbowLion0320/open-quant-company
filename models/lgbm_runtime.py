@@ -22,14 +22,9 @@ class LoadedModelBundle:
 
 
 def regime_model_candidates(model_dir: Path, regime: str) -> list[tuple[Path, Path, str]]:
-    """Return canonical plus legacy regime-aware artifact names."""
+    """Return canonical regime-aware artifact names."""
     return [
         (model_dir / f"lgbm_{regime}.pkl", model_dir / f"lgbm_{regime}_meta.json", f"regime:{regime}"),
-        (
-            model_dir / f"lgbm_lgbm_{regime}.pkl",
-            model_dir / f"lgbm_{regime}_meta.json",
-            f"regime:{regime}:legacy",
-        ),
     ]
 
 

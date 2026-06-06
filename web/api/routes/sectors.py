@@ -4,7 +4,7 @@ from urllib.parse import unquote
 
 from fastapi import APIRouter, HTTPException
 
-from web.api.models import SectorOverviewResponse
+from web.api.schemas.market import SectorOverviewResponse
 from web.api.services import sectors as sector_service
 
 router = APIRouter(prefix="/api/sectors", tags=["Sectors"])

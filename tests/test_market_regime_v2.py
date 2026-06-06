@@ -134,7 +134,7 @@ def test_detect_returns_full_breadth_detail_and_score_components(monkeypatch):
     def fake_index(symbol, *args, **kwargs):
         return bench
 
-    monkeypatch.setattr("data.fetcher.get_index_daily", fake_index)
+    monkeypatch.setattr("data.ingestion.fetcher.get_index_daily", fake_index)
     monkeypatch.setattr(
         orchestrator,
         "_compute_full_market_breadth",
@@ -181,7 +181,7 @@ def test_detect_applies_min_dwell_across_request_scoped_orchestrators(monkeypatc
         MarketRegime.BEAR,
     ])
 
-    monkeypatch.setattr("data.fetcher.get_index_daily", fake_index)
+    monkeypatch.setattr("data.ingestion.fetcher.get_index_daily", fake_index)
     monkeypatch.setattr(
         orchestrator,
         "_compute_full_market_breadth",
@@ -226,7 +226,7 @@ def test_detect_exposes_raw_and_stabilized_regime_metadata(monkeypatch):
     _force_regime_engine(monkeypatch, "rule_based")
     bench = _index_frame("up")
 
-    monkeypatch.setattr("data.fetcher.get_index_daily", lambda *args, **kwargs: bench)
+    monkeypatch.setattr("data.ingestion.fetcher.get_index_daily", lambda *args, **kwargs: bench)
     monkeypatch.setattr(
         orchestrator,
         "_compute_full_market_breadth",
@@ -305,7 +305,7 @@ def test_detect_uses_hybrid_probabilities_for_adaptive_params(monkeypatch):
     _force_regime_engine(monkeypatch, "hybrid")
     bench = _index_frame("up")
 
-    monkeypatch.setattr("data.fetcher.get_index_daily", lambda *args, **kwargs: bench)
+    monkeypatch.setattr("data.ingestion.fetcher.get_index_daily", lambda *args, **kwargs: bench)
     monkeypatch.setattr(
         orchestrator,
         "_compute_full_market_breadth",

@@ -71,7 +71,7 @@ def test_spec_docs_describe_current_runtime_contracts():
     required_by_spec = {
         Path("docs/specs/01-data-pipeline.md"): (
             "OHLCVIntegrityRule",
-            "FeatureStoreBuilder.build_month",
+            "FeatureStoreBuilder.build_asof",
             "latest_feature_frame()",
         ),
         Path("docs/specs/02-signal-system.md"): (

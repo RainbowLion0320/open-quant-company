@@ -3,7 +3,6 @@ Point-in-Time 特征存储
 
 设计:
   var/store/features/YYYY-MM-DD.parquet  — 每个 as-of 交易日一个 Parquet 文件
-  var/store/features/YYYY-MM.parquet     — 兼容的月末快照
   每行一只股票, 每列一个因子, 用 as-of 当时已知的数据计算
 
 关键约束:
@@ -13,8 +12,7 @@ Point-in-Time 特征存储
 
 用法:
   builder = FeatureStoreBuilder(alpha_factors())
-  builder.build_month("2020-01")
-  builder.build_all("2015-01", "2026-05")
+  builder.build_asof("2026-05-08", symbols)
 """
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -39,11 +37,12 @@ def feature_key_to_date(key: str) -> pd.Timestamp | None:
     if not text:
         return None
     try:
-        if len(text) == 7:
-            return pd.Timestamp(text + "-01") + pd.offsets.MonthEnd(0)
-        return pd.Timestamp(text)
+        parsed = pd.Timestamp(text)
     except Exception:
         return None
+    if parsed.strftime("%Y-%m-%d") != text:
+        return None
+    return parsed
 
 
 def feature_date_key(as_of: str | pd.Timestamp) -> str:
@@ -59,7 +58,11 @@ def iter_feature_files(directory: Path | None = None) -> list[Path]:
     root = directory or FEATURES_DIR
     if not root.exists():
         return []
-    return sorted(path for path in root.glob("*.parquet") if path.stem not in FEATURE_METADATA_STEMS)
+    return sorted(
+        path
+        for path in root.glob("*.parquet")
+        if path.stem not in FEATURE_METADATA_STEMS and feature_key_to_date(path.stem) is not None
+    )
 
 
 def latest_feature_file(directory: Path | None = None, as_of: str | pd.Timestamp | None = None) -> Path | None:
@@ -82,7 +85,9 @@ def write_feature_slice(
     hub=None,
 ) -> Path:
     """Write a PIT feature slice with normalized date metadata."""
-    as_of = feature_key_to_date(key) or pd.Timestamp(key)
+    as_of = feature_key_to_date(key)
+    if as_of is None:
+        raise ValueError("feature slice key must use YYYY-MM-DD")
     out = df.copy()
     out["as_of_date"] = feature_date_key(as_of)
     if "month" not in out.columns:
@@ -98,19 +103,19 @@ def write_feature_slice(
 
 
 def _read_feature_file(path: Path, hub=None) -> pd.DataFrame:
+    inferred_as_of = feature_key_to_date(path.stem)
+    if inferred_as_of is None:
+        return pd.DataFrame()
     store = hub or HUB
     df = store.read_parquet(path, default=pd.DataFrame())
     if df is None or df.empty:
         return pd.DataFrame()
     out = df.copy()
-    inferred_as_of = feature_key_to_date(path.stem)
     if "as_of_date" not in out.columns:
-        if inferred_as_of is not None:
-            out["as_of_date"] = feature_date_key(inferred_as_of)
+        out["as_of_date"] = feature_date_key(inferred_as_of)
     else:
         parsed = pd.to_datetime(out["as_of_date"], errors="coerce")
-        if inferred_as_of is not None:
-            parsed = parsed.fillna(inferred_as_of)
+        parsed = parsed.fillna(inferred_as_of)
         out["as_of_date"] = parsed.dt.strftime("%Y-%m-%d")
     if "month" not in out.columns:
         if "as_of_date" in out.columns:
@@ -165,7 +170,7 @@ def feature_period_key(values) -> pd.Series:
 
 
 class FeatureStoreBuilder:
-    """逐月构建 PIT 特征"""
+    """Build PIT feature slices for explicit as-of dates."""
 
     _MAX_CACHE_SIZE = 128
 
@@ -184,26 +189,20 @@ class FeatureStoreBuilder:
     def _cache_get(self, key: str) -> Optional[pd.DataFrame]:
         return self._price_cache.get(key)
 
-    def build_month(
+    def build_asof(
         self,
-        month: str,          # "YYYY-MM"
+        as_of_date: str,
         symbols: List[str],
         start_date: str = "2015-01-01",
     ) -> Optional[pd.DataFrame]:
-        """
-        构建单月特征表。
-
-        只使用 month 之前(含)的价格数据, 确保 PIT 正确性。
-        """
+        """Build one PIT feature slice using only data visible at ``as_of_date``."""
         from data.ingestion.fetcher import get_stock_daily
 
-        month_dt = pd.Timestamp(month)
-        # 该月最后一个交易日
-        month_end = month_dt + pd.offsets.MonthEnd(0)
+        as_of = pd.Timestamp(as_of_date).normalize()
+        as_of_key = feature_date_key(as_of)
 
         rows = []
         for sym in symbols:
-            # 拉取该股票的历史日线 (截断到 month_end)
             df = self._cache_get(sym)
             if df is None:
                 try:
@@ -216,13 +215,12 @@ class FeatureStoreBuilder:
                     self._cache_put(sym, df)
                 except Exception:
                     continue
-            # PIT 约束: 只用 month_end 及之前的数据
-            df_pit = df[df.index <= month_end]
+            df_pit = df[df.index <= as_of]
             if len(df_pit) < 60:  # 至少需要60天数据
                 continue
 
             last_idx = len(df_pit) - 1
-            row = {"symbol": sym}
+            row = {"symbol": sym, "as_of_date": as_of_key, "month": feature_month_key(as_of)}
             for name, factor in self.factors.items():
                 val = factor.compute(df_pit, last_idx)
                 row[name] = val if not pd.isna(val) else None
@@ -233,41 +231,8 @@ class FeatureStoreBuilder:
             return None
 
         result = pd.DataFrame(rows)
-        # 保存
-        pq_path = HUB.feature_path(month)
-        HUB.write_parquet(result, pq_path)
+        write_feature_slice(result, as_of_key, hub=HUB)
         return result
-
-    def build_all(
-        self,
-        start_month: str,
-        end_month: str,
-        symbols: List[str],
-    ) -> List[str]:
-        """批量构建所有月份的特征"""
-        months = pd.date_range(start_month, end_month, freq="MS")
-        built = []
-        for m in months:
-            key = m.strftime("%Y-%m")
-            pq_path = FEATURES_DIR / f"{key}.parquet"
-            if pq_path.exists():
-                print(f"  {key}: skip (exists)")
-                continue
-            df = self.build_month(key, symbols)
-            if df is not None:
-                print(f"  {key}: {len(df)} stocks, {len(self.factors)} factors")
-                built.append(key)
-            else:
-                print(f"  {key}: no data")
-        return built
-
-    @staticmethod
-    def load_month(month: str) -> Optional[pd.DataFrame]:
-        """加载单月特征"""
-        pq = HUB.feature_path(month)
-        if pq.exists():
-            return HUB.read_parquet(pq)
-        return None
 
 
 class TimeSeriesSplitter:
@@ -306,20 +271,22 @@ class TimeSeriesSplitter:
         return splits
 
     def load_split(self, split: tuple) -> tuple:
-        """加载一个 split 的训练和测试数据"""
+        """Load one train/test split from canonical daily as-of feature slices."""
         train_months, test_months = split
-        train_dfs = []
-        test_dfs = []
-        for m in train_months:
-            df = FeatureStoreBuilder.load_month(m)
-            if df is not None:
-                train_dfs.append(df)
-        for m in test_months:
-            df = FeatureStoreBuilder.load_month(m)
-            if df is not None:
-                test_dfs.append(df)
-        train = pd.concat(train_dfs, ignore_index=True) if train_dfs else None
-        test = pd.concat(test_dfs, ignore_index=True) if test_dfs else None
+        try:
+            panel = load_feature_panel()
+        except Exception:
+            return None, None
+        if panel.empty:
+            return None, None
+        key_col = feature_time_key_column(panel)
+        periods = feature_period_key(panel[key_col])
+        train = panel.loc[periods.isin(train_months)].copy()
+        test = panel.loc[periods.isin(test_months)].copy()
+        if train.empty:
+            train = None
+        if test.empty:
+            test = None
         return train, test
 
 
@@ -329,7 +296,7 @@ class TimeSeriesSplitter:
 
 def enrich_from_registry(
     df: pd.DataFrame,
-    month: str,
+    as_of_key: str,
     symbols: List[str],
 ) -> pd.DataFrame:
     """
@@ -342,7 +309,7 @@ def enrich_from_registry(
     """
     from data.storage.dimensions import get_registry
 
-    as_of_date = feature_key_to_date(month) or pd.Timestamp(month)
+    as_of_date = feature_key_to_date(as_of_key) or pd.Timestamp(as_of_key)
     reg = get_registry()
 
     # ── Moneyflow factors ──

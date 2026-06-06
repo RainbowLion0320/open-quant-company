@@ -7,7 +7,7 @@ Astrolabe Quant API v2 — FastAPI 应用工厂
     __init__.py  → 包级说明
     app.py       → 应用工厂 create_app()
     routes/      → 12个业务路由模块
-    models.py    → Pydantic 类型兼容入口；细分 schema 位于 schemas/
+    schemas/     → Pydantic 类型分域定义
     jobs.py      → 异步任务队列
     ws.py        → WebSocket
     errors.py    → 错误处理

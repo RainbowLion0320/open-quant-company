@@ -4,18 +4,18 @@ import pandas as pd
 def test_dotted_settings_helpers_read_write_nested_mappings_without_flat_keys():
     from core.settings import get_dotted, set_dotted
 
-    data = {"data": {"fetcher": {"min_interval": 3.0}}}
+    data = {"ingestion": {"fetcher": {"min_interval": 3.0}}}
 
-    assert get_dotted(data, "data.fetcher.min_interval") == 3.0
-    assert get_dotted(data, "data.fetcher.max_retries", default=3) == 3
-    assert get_dotted({"data.fetcher": {"bad": True}}, "data.fetcher") is None
+    assert get_dotted(data, "ingestion.fetcher.min_interval") == 3.0
+    assert get_dotted(data, "ingestion.fetcher.max_retries", default=3) == 3
+    assert get_dotted({"ingestion.fetcher": {"bad": True}}, "ingestion.fetcher") is None
 
-    set_dotted(data, "data.fetcher.max_retries", 4)
+    set_dotted(data, "ingestion.fetcher.max_retries", 4)
     set_dotted(data, "signals.multifactor.weights.quality", 0.35)
 
-    assert data["data"]["fetcher"]["max_retries"] == 4
+    assert data["ingestion"]["fetcher"]["max_retries"] == 4
     assert data["signals"]["multifactor"]["weights"]["quality"] == 0.35
-    assert "data.fetcher" not in data
+    assert "ingestion.fetcher" not in data
 
 
 def test_settings_loader_supports_project_root_env_and_dotted_sections(tmp_path, monkeypatch):
@@ -140,14 +140,17 @@ def test_datahub_lists_dimension_snapshots_for_file_and_partitioned_dimensions(t
 
 
 def test_feature_store_loads_feature_files_panel_and_latest_frame(tmp_path, monkeypatch):
-    from data import feature_store
+    from data.features import feature_store
     from data.storage.datahub import DataHub
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     feature_dir = hub.features_dir()
     feature_dir.mkdir(parents=True, exist_ok=True)
-    hub.write_parquet(pd.DataFrame({"symbol": ["A"], "factor": [1.0]}), feature_dir / "2026-04.parquet")
-    hub.write_parquet(pd.DataFrame({"symbol": ["B"], "factor": [2.0], "month": ["manual"]}), feature_dir / "2026-05.parquet")
+    hub.write_parquet(pd.DataFrame({"symbol": ["A"], "factor": [1.0]}), feature_dir / "2026-04-30.parquet")
+    hub.write_parquet(
+        pd.DataFrame({"symbol": ["B"], "factor": [2.0], "month": ["manual"]}),
+        feature_dir / "2026-05-07.parquet",
+    )
     hub.write_parquet(pd.DataFrame({"symbol": ["META"]}), feature_dir / "scan_meta.parquet")
 
     monkeypatch.setattr(feature_store, "HUB", hub)
@@ -157,7 +160,7 @@ def test_feature_store_loads_feature_files_panel_and_latest_frame(tmp_path, monk
     panel = feature_store.load_feature_panel()
     latest = feature_store.latest_feature_frame()
 
-    assert [path.name for path in files] == ["2026-04.parquet", "2026-05.parquet"]
+    assert [path.name for path in files] == ["2026-04-30.parquet", "2026-05-07.parquet"]
     assert panel[["symbol", "month"]].to_dict(orient="records") == [
         {"symbol": "A", "month": "2026-04"},
         {"symbol": "B", "month": "manual"},

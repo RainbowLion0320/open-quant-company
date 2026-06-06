@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException
 
-from web.api.models import PipelineDetailResponse, PipelineRegistryResponse
+from web.api.schemas.pipeline import PipelineDetailResponse, PipelineRegistryResponse
 from web.api.services import pipeline as pipeline_service
 
 router = APIRouter(prefix="/api/pipeline", tags=["Pipeline"])

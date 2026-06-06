@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from web.api.errors import InvalidParameterError
-from web.api.models import DCFParams, DCFResult
+from web.api.schemas.portfolio import DCFParams, DCFResult
 
 
 def compute_dcf_result(code: str, params: DCFParams | None) -> DCFResult:

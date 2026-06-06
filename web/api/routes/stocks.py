@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Query
 
-from web.api.models import DCFParams, DCFResult, StockListResponse, StockResponse
+from web.api.schemas.portfolio import DCFParams, DCFResult, StockListResponse, StockResponse
 from web.api.services.dcf import compute_dcf_result
 from web.api.services.stocks import build_stock_detail, build_stock_list, safe_text
 

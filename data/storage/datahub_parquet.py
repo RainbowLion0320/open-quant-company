@@ -5,7 +5,6 @@ from __future__ import annotations
 import fcntl
 import os
 import uuid
-import warnings
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
@@ -30,19 +29,7 @@ class ParquetStore:
     ) -> Optional[pd.DataFrame]:
         target = self.paths.resolve_path(path)
         if not target.exists():
-            legacy = self.paths.legacy_read_path(target)
-            if legacy is not None:
-                if not self.paths._legacy_warning_emitted:
-                    warnings.warn(
-                        "Legacy data layout detected. Reading from data/store or data/cache for compatibility; "
-                        "new writes use var/. Run scripts/migrate_data_layout.py --apply to migrate.",
-                        RuntimeWarning,
-                        stacklevel=2,
-                    )
-                    self.paths._legacy_warning_emitted = True
-                target = legacy
-            else:
-                return default
+            return default
         try:
             return pd.read_parquet(target, columns=columns)
         except Exception:
@@ -121,8 +108,5 @@ class ParquetStore:
     def list_parquet(self, directory: str | os.PathLike, pattern: str = "*.parquet") -> list[Path]:
         path = self.paths.resolve_path(directory)
         if not path.exists():
-            legacy = self.paths.legacy_read_path(path)
-            if legacy is None or not legacy.exists():
-                return []
-            path = legacy
+            return []
         return sorted(path.glob(pattern))

@@ -121,16 +121,16 @@ class TestAuthMiddleware:
             client = TestClient(create_app())
 
             resp = client.patch(
-                "/api/settings/section/data.fetcher",
+                "/api/settings/section/ingestion.fetcher",
                 json={"min_interval": 4.5, "max_retries": 4},
                 headers={"Authorization": "Bearer test-secret-key"},
             )
 
         assert resp.status_code == 200
         saved = yaml.safe_load(config_file.read_text(encoding="utf-8"))
-        assert saved["data"]["fetcher"]["min_interval"] == 4.5
-        assert saved["data"]["fetcher"]["max_retries"] == 4
-        assert "data.fetcher" not in saved
+        assert saved["ingestion"]["fetcher"]["min_interval"] == 4.5
+        assert saved["ingestion"]["fetcher"]["max_retries"] == 4
+        assert "ingestion.fetcher" not in saved
 
 
 class TestRunModeEnforcement:

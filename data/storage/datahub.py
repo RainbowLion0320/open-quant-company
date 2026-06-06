@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 import os
 import uuid
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
@@ -70,11 +69,6 @@ class DataHub:
         db_default = db_root or env_db_root or path_cfg.get("db_root") or Path(runtime_default) / "db"
 
         self.paths = DataHubPaths(project, runtime_default, store_default, cache_default, artifact_default, db_default)
-        self._configure_legacy_read_fallback(
-            explicit_runtime=runtime_root is not None or bool(env_var_root),
-            explicit_store=store_root is not None or bool(env_store_root),
-            explicit_cache=cache_root is not None or bool(env_cache_root),
-        )
         self.project_root = self.paths.project_root
         self.store_root = self.paths.store_root
         self.cache_root = self.paths.cache_root
@@ -85,26 +79,6 @@ class DataHub:
 
         if create:
             self.ensure_layout()
-
-    def _configure_legacy_read_fallback(
-        self,
-        *,
-        explicit_runtime: bool,
-        explicit_store: bool,
-        explicit_cache: bool,
-    ) -> None:
-        if explicit_runtime:
-            return
-        legacy_store = self.paths.project_root / "data" / "store"
-        legacy_cache = self.paths.project_root / "data" / "cache"
-        fallback_store = None
-        fallback_cache = None
-        if not explicit_store and not self.paths.store_root.exists() and legacy_store.exists():
-            fallback_store = legacy_store
-        if not explicit_cache and not self.paths.cache_root.exists() and legacy_cache.exists():
-            fallback_cache = legacy_cache
-        if fallback_store is not None or fallback_cache is not None:
-            self.paths.enable_legacy_read_fallback(store_root=fallback_store, cache_root=fallback_cache)
 
     @property
     def project_root(self) -> Path:
@@ -183,8 +157,8 @@ class DataHub:
     def features_dir(self) -> Path:
         return self.paths.features_dir()
 
-    def feature_path(self, month: str) -> Path:
-        return self.paths.feature_path(month)
+    def feature_path(self, as_of_key: str) -> Path:
+        return self.paths.feature_path(as_of_key)
 
     def paper_dir(self) -> Path:
         return self.paths.paper_dir()
@@ -239,9 +213,6 @@ class DataHub:
 
     def llm_project_usage_path(self) -> Path:
         return self.paths.llm_project_usage_path()
-
-    def deepseek_project_usage_path(self) -> Path:
-        return self.paths.deepseek_project_usage_path()
 
     def manifest_dir(self) -> Path:
         return self.paths.manifest_dir()
@@ -334,18 +305,7 @@ class DataHub:
     def read_json(self, path: str | os.PathLike, default: Any = None) -> Any:
         target = self.resolve_path(path)
         if not target.exists():
-            legacy = self.paths.legacy_read_path(target)
-            if legacy is None:
-                return default
-            if not self.paths._legacy_warning_emitted:
-                warnings.warn(
-                    "Legacy data layout detected. Reading from data/store or data/cache for compatibility; "
-                    "new writes use var/. Run scripts/migrate_data_layout.py --apply to migrate.",
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
-                self.paths._legacy_warning_emitted = True
-            target = legacy
+            return default
         try:
             with open(target, encoding="utf-8") as f:
                 return json.load(f)

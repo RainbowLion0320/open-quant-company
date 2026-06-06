@@ -326,10 +326,6 @@ def test_llm_usage_payload_combines_provider_balance_and_project_ledger(monkeypa
     assert payload["usage"]["totals"]["tokens"] == 6000
     assert payload["data"][0]["usage_source"] == "api_response"
 
-    compat_payload = monitor.deepseek_usage_payload()
-    assert compat_payload["provider"] == "deepseek"
-    assert compat_payload["usage"]["totals"]["requests"] == 1
-
 
 def test_monitor_is_read_only_but_keeps_system_status_cards():
     monitor = Path("web/frontend/src/views/ActivityMonitor.vue").read_text()

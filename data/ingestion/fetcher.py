@@ -21,7 +21,7 @@ import pandas as pd
 
 # SSL hang prevention: AKShare drops connections after ~100 sustained requests
 from core.settings import get_section as _get_section
-socket.setdefaulttimeout(int((_get_section("data.fetcher", {}) or {}).get("socket_timeout", 30)))
+socket.setdefaulttimeout(int((_get_section("ingestion.fetcher", {}) or {}).get("socket_timeout", 30)))
 
 from data.storage.datahub import get_datahub
 
@@ -58,12 +58,12 @@ CACHE_DIR = str(_HUB.cache_root / "api")
 
 
 # ============================================================
-# 配置读取 — data.fetcher section
+# 配置读取 — ingestion.fetcher section
 # ============================================================
 
 def _fetcher_cfg() -> dict:
     from core.settings import get_section
-    return get_section("data.fetcher", {}) or {}
+    return get_section("ingestion.fetcher", {}) or {}
 
 
 # ============================================================
@@ -123,7 +123,7 @@ def retry_with_backoff(
     装饰器：带指数退避和随机抖动的重试
     间隔: base * factor^attempt + random jitter
     例: 2s → 4s → 8s（加随机抖动避免惊群）
-    参数默认值从 data.fetcher 配置读取。
+    参数默认值从 ingestion.fetcher 配置读取。
     """
     cfg = _fetcher_cfg()
     _max_retries = max_retries if max_retries is not None else int(cfg.get("max_retries", 3))

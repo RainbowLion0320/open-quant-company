@@ -76,7 +76,7 @@
 | `ManifestStore` | `data/storage/datahub_manifest.py` | `_manifest/datasets.parquet` 读写、schema hash、文件 hash、日期范围 |
 | `DimensionStore` | `data/storage/datahub_dimensions.py` | DataRegistry 维度 root/path/list/latest 解析 |
 
-仓库内部新代码依赖 canonical import：`data.storage.datahub.DataHub` / `get_datahub()`。旧入口仅作为迁移期兼容 re-export，不承载真实实现。内部组件是 DataHub 的实现细节，用来降低维护复杂度，不替代 DataHub facade。
+仓库内部代码依赖 canonical import：`data.storage.datahub.DataHub` / `get_datahub()`。`data/` 根目录不保留历史快捷入口；业务代码必须从对应领域分包导入。内部组件是 DataHub 的实现细节，用来降低维护复杂度，不替代 DataHub facade。
 
 默认路径配置：
 
@@ -167,9 +167,8 @@ hub.migration_dir()
 
 **Point-in-Time 严格性：** 每个 as-of 切片只使用该日期及之前已可见的数据构建特征，绝不使用未来信息。日频价量、估值、资金流可以按交易日更新；财务、宏观、持有人等低频特征自然取 as-of 之前最新已披露值。
 - 目标输出：`var/store/features/YYYY-MM-DD.parquet`
-- 兼容输出：`var/store/features/YYYY-MM.parquet`，表示该月月末 as-of 快照
-- 构建入口：`scripts/build_features.py --frequency daily` / `--frequency monthly`，以及 `FeatureStoreBuilder.build_month()` 兼容接口
-- 读取入口：`iter_feature_files()`、`load_feature_panel()`、`latest_feature_frame()`、`FeatureStoreBuilder.load_month(month)`
+- 构建入口：`scripts/build_features.py --frequency daily`，以及 `FeatureStoreBuilder.build_asof(as_of_date, symbols)`
+- 读取入口：`iter_feature_files()`、`load_feature_panel()`、`latest_feature_frame()`
 - 注册表扩展：`enrich_from_registry(df, as_of_key, symbols)` 从 DataRegistry 维度补充资金流、持有人、宏观等 PIT 因子
 
 ### 2.6 Cron Logger — 可观测性
@@ -266,9 +265,7 @@ apply_corporate_actions_to_position(...)          → adjusted shares/cash
 
 ```python
 builder = FeatureStoreBuilder(alpha_factors())
-builder.build_month("2026-05", symbols)
-builder.build_all("2020-01", "2026-05", symbols)
-FeatureStoreBuilder.load_month("2026-05")   → pd.DataFrame | None
+builder.build_asof("2026-05-08", symbols)   → pd.DataFrame | None
 latest_feature_frame()                      → pd.DataFrame
 load_feature_panel()                        → pd.DataFrame
 ```

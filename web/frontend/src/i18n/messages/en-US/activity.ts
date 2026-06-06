@@ -7,7 +7,6 @@ export const activity = {
       refresh: "Refresh",
       retryError: "System monitor failed to load",
       llmUsage: "LLM USAGE · RECENT",
-      deepseekUsage: "LLM USAGE · RECENT",
       apiBalance: "provider balance",
       notChecked: "not checked",
       projectTokens: "project tokens",

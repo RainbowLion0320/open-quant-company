@@ -42,7 +42,7 @@ ma_golden = Gt(MA("close", 5), MA("close", 20))
 
 ## 2. PIT 特征存储
 
-特征以 as-of 日期视图写入 `var/store/features/YYYY-MM-DD.parquet`。历史 `YYYY-MM.parquet` 仍可读取，但只代表月末兼容快照。构建入口是 `scripts/build_features.py`，必须通过 CLI 或显式函数调用启动，不能在 import 时执行重任务。
+特征以 as-of 日期视图写入 `var/store/features/YYYY-MM-DD.parquet`。构建入口是 `scripts/build_features.py --frequency daily`，必须通过 CLI 或显式函数调用启动，不能在 import 时执行重任务。
 
 关键约束：
 

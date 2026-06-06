@@ -64,16 +64,10 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 
 
 def llm_config() -> dict[str, Any]:
-    """Load generic LLM config and bridge legacy deepseek.pricing when present."""
+    """Load generic LLM provider config."""
     settings = get_settings()
     cfg = settings.get("llm", {}) if isinstance(settings.get("llm"), dict) else {}
-    merged = _deep_merge(DEFAULT_LLM_CONFIG, cfg)
-
-    legacy_pricing = settings.get("deepseek", {}).get("pricing", {}) if isinstance(settings.get("deepseek"), dict) else {}
-    if legacy_pricing and not cfg.get("providers", {}).get("deepseek", {}).get("pricing"):
-        provider = merged["providers"].setdefault("deepseek", {})
-        provider["pricing"] = _normalize_pricing_config(legacy_pricing)
-    return merged
+    return _deep_merge(DEFAULT_LLM_CONFIG, cfg)
 
 
 def enabled_providers() -> list[str]:
@@ -391,23 +385,20 @@ def record_llm_response_usage(response: Any, *, provider: str, model: str, sourc
 def _read_usage_frames() -> list[pd.DataFrame]:
     hub = get_datahub()
     frames: list[pd.DataFrame] = []
-    for path, provider in (
-        (hub.llm_project_usage_path(), ""),
-        (hub.deepseek_project_usage_path(), "deepseek"),
-    ):
-        if not path.exists():
-            continue
-        df = hub.read_parquet(path, default=pd.DataFrame())
-        if df is None or df.empty:
-            continue
-        if "provider" not in df.columns:
-            df["provider"] = provider or DEFAULT_PROVIDER
-        frames.append(df)
+    path = hub.llm_project_usage_path()
+    if not path.exists():
+        return frames
+    df = hub.read_parquet(path, default=pd.DataFrame())
+    if df is None or df.empty:
+        return frames
+    if "provider" not in df.columns:
+        df["provider"] = DEFAULT_PROVIDER
+    frames.append(df)
     return frames
 
 
 def summarize_llm_project_usage(days: int = 30, provider: str | None = None) -> dict[str, Any]:
-    """Return daily usage aggregated from generic and legacy local ledgers."""
+    """Return daily usage aggregated from the generic local ledger."""
     frames = _read_usage_frames()
     if not frames:
         return empty_usage_summary("no_data", days=days)
