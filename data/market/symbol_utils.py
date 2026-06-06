@@ -13,8 +13,10 @@ def normalize_symbol(symbol: object) -> str:
 
 
 def infer_exchange(symbol: object) -> str:
-    """Infer SH/SZ exchange from a plain A-share code."""
+    """Infer Tushare exchange suffix from a plain A-share code."""
     code = normalize_symbol(symbol)
+    if code.startswith(("43", "83", "87", "88", "92")):
+        return "BJ"
     return "SH" if code.startswith(("5", "6", "9")) else "SZ"
 
 

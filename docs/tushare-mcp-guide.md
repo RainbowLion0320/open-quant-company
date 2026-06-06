@@ -6,9 +6,11 @@
 ## 接入方式
 
 Tushare MCP Server 通过 Streamable HTTP 协议运行:
-- MCP URL: `https://api.tushare.pro/mcp/?token=<token>`（配置在 `~/.hermes/config.yaml` → `mcp_servers.tushare`）
-- Token: `config/settings.yaml` → `data.tushare.token`
+- MCP URL: `https://api.tushare.pro/mcp/?token=<token>`（MCP 客户端侧配置）
+- Token: 项目运行代码只读系统环境变量 `TUSHARE_TOKEN`，兼容别名 `TUSHARE_PRO_TOKEN`
 - 共 258 个 MCP 工具，覆盖 15 个数据大类
+
+本项目不从 `config/settings.yaml` 或 `.env` 文件读取 Tushare token。用 `astroq config env --json` 检查当前进程环境，用 `astroq data tushare-audit --json` 检查账号权限和本地覆盖率。
 
 ## 数据等级与用途
 
@@ -23,7 +25,7 @@ Tushare MCP Server 通过 Streamable HTTP 协议运行:
 | `cashflow` | 完整现金流量表（80+字段） | FCF/现金质量因子 | P0 |
 | `stock_basic` | 全A股列表+行业+上市日期+是否ST | 股票池和基础元数据补充 | P1 |
 | `index_classify` | 申万2014/2021版行业分类（三级） | `data/market/symbols.py`已内置 | - |
-| `sw_daily` | 申万行业指数日行情 | 行业雷达和多因子行业动量；已接入 provider/registry | P1 |
+| `sw_daily` | 申万行业指数日行情 | 行业雷达和多因子行业动量；已接入 provider/registry，当前账号频率为 1 次/小时，按 cron/补数任务逐行业积累 | P1 |
 
 ### 二级：策略增强（2000积分解锁，AKShare没有）
 

@@ -71,3 +71,68 @@ def repair(table: str, limit: int, days: int, dry_run: bool) -> CliResult:
         message=f"Repair complete: {table}",
         data={"table": table, "limit": limit, "days": days},
     )
+
+
+def tushare_audit(probe_network: bool = True) -> CliResult:
+    from data.ingestion.tushare_governance import run_tushare_audit
+
+    try:
+        result = run_tushare_audit(probe_network=probe_network)
+    except Exception as exc:
+        return CliResult(
+            ok=False,
+            command="data tushare-audit",
+            message="Tushare audit failed",
+            errors=[str(exc)],
+        )
+
+    capabilities = result.get("capabilities", {})
+    coverage = result.get("coverage", {})
+    no_permission = sorted(
+        name for name, item in capabilities.items()
+        if isinstance(item, dict) and item.get("status") == "no_permission"
+    )
+    token = result.get("token")
+    missing_secret = isinstance(token, dict) and token.get("status") != "ok"
+    return CliResult(
+        ok=not missing_secret,
+        command="data tushare-audit",
+        message="Tushare audit complete" if not missing_secret else "Tushare token missing",
+        data={
+            **result,
+            "capability_count": len(capabilities),
+            "coverage_count": len(coverage),
+            "no_permission": no_permission,
+        },
+        errors=["missing TUSHARE_TOKEN/TUSHARE_PRO_TOKEN"] if missing_secret else [],
+    )
+
+
+def tushare_backfill(scope: str, resume: bool, dry_run: bool, limit: int, days: int) -> CliResult:
+    from data.ingestion.tushare_governance import run_tushare_backfill
+
+    try:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            result = run_tushare_backfill(scope=scope, resume=resume, dry_run=dry_run, limit=limit, days=days)
+    except Exception as exc:
+        return CliResult(
+            ok=False,
+            command="data tushare-backfill",
+            message="Tushare backfill failed",
+            errors=[str(exc)],
+            data={"scope": scope, "resume": resume, "dry_run": dry_run, "limit": limit, "days": days},
+        )
+
+    logs = (stdout.getvalue() + stderr.getvalue()).strip()
+    if logs:
+        result = {**result, "log_excerpt": logs[-4000:]}
+    failed = result.get("failed", [])
+    return CliResult(
+        ok=not failed,
+        command="data tushare-backfill",
+        message="Dry run: Tushare backfill plan" if dry_run else "Tushare backfill complete",
+        data=result,
+        errors=[str(item) for item in failed],
+    )

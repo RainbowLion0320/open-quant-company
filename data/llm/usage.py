@@ -8,11 +8,11 @@ import os
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
+from core.env_secrets import read_env_secret
 from core.settings import get_settings
 from data.storage.datahub import get_datahub
 
@@ -31,7 +31,6 @@ DEFAULT_LLM_CONFIG: dict[str, Any] = {
             "enabled": True,
             "label": "DeepSeek",
             "api_key_env": "DEEPSEEK_API_KEY",
-            "env_file": "~/.hermes/.env",
             "base_url": "https://api.deepseek.com/v1",
             "default_model": "deepseek-v4-flash",
             "balance_url": "https://api.deepseek.com/user/balance",
@@ -176,30 +175,11 @@ def _env_names(provider: str) -> list[str]:
 
 
 def load_provider_api_key(provider: str = DEFAULT_PROVIDER) -> str:
-    """Load provider API key from env, then optional provider env file."""
-    for env_name in _env_names(provider):
-        key = os.environ.get(env_name, "").strip()
-        if key:
-            return key
-
-    env_file = str(provider_config(provider).get("env_file") or "").strip()
-    if not env_file:
+    """Load provider API key from process environment only."""
+    names = _env_names(provider)
+    if not names:
         return ""
-    path = Path(os.path.expanduser(env_file))
-    if not path.exists():
-        return ""
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except Exception:
-        return ""
-    wanted = set(_env_names(provider))
-    for line in lines:
-        if "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        if key.strip() in wanted:
-            return value.strip().strip('"').strip("'")
-    return ""
+    return read_env_secret(names[0], aliases=names[1:])
 
 
 def provider_health_items() -> list[dict[str, str]]:

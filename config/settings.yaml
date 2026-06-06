@@ -297,8 +297,6 @@ ingestion:
     shanghai: sh000001
     shenzhen: sz399001
   provider: akshare
-  tushare:
-    token: ''
 project:
   name: astrolabe-quant
   display_name: 星盘
@@ -315,7 +313,6 @@ llm:
       enabled: true
       label: DeepSeek
       api_key_env: DEEPSEEK_API_KEY
-      env_file: ~/.hermes/.env
       base_url: https://api.deepseek.com/v1
       default_model: deepseek-v4-flash
       balance_url: https://api.deepseek.com/user/balance
@@ -797,6 +794,35 @@ paper_trading:
   execution_price: close
   auto_execute: false
 data_registry:
+  stock_basic:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: event
+    enabled: true
+    label: Tushare 股票基础信息
+    cache: stock/basic.parquet
+    description: Tushare stock_basic 原始股票列表, 用于 universe 和权限覆盖审计
+  trade_cal:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: daily
+    enabled: true
+    label: Tushare 交易日历
+    cache: stock/trade_cal.parquet
+    description: SSE 交易日历, 用于补数缺口计划和交易日对齐
+  tushare_stock_daily:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: daily
+    enabled: true
+    label: Tushare 原始日线行情
+    cache: stock/tushare_daily/{YYYYMMDD}.parquet
+    description: Tushare daily 按交易日全市场分区的原始行情副本, 不替代价格服务当前复权口径
+    health:
+      enabled: false
   ohlcv_daily:
     source: akshare
     asset: stock
@@ -890,6 +916,15 @@ data_registry:
     label: 日频资金流向 (Tushare全市场)
     cache: stock/moneyflow/daily/{YYYYMMDD}.parquet
     description: Tushare moneyflow, 按交易日全市场分区
+  moneyflow_mkt_dc:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: daily
+    enabled: true
+    label: 大盘资金流向 (Tushare)
+    cache: stock/moneyflow/mkt_dc.parquet
+    description: Tushare moneyflow_mkt_dc 大盘资金流向原始缓存
   holder_number:
     source: tushare_free
     asset: stock
@@ -985,6 +1020,15 @@ data_registry:
     label: 筹码分布 (需5000积分)
     cache: stock/cyq/{YYYYMMDD}.parquet
     description: 每日筹码分布, 各价位占比
+  cyq_perf:
+    source: tushare_paid
+    asset: stock
+    status: paid
+    freq: daily
+    enabled: false
+    label: 筹码分布胜率 (Tushare)
+    cache: stock/cyq_perf/{YYYYMMDD}.parquet
+    description: Tushare cyq_perf 筹码分布表现; 若当前账号权限可用, 由 tushare-backfill 补齐
   stk_factor_pro:
     source: tushare_paid
     asset: stock
@@ -1083,14 +1127,23 @@ data_registry:
     enabled: true
     label: 基金日线
     cache: fund/daily/{symbol}.parquet
-  fund_portfolio:
+  fund_basic:
     source: tushare_free
     asset: fund
     status: available
+    freq: event
+    enabled: true
+    label: 基金基础信息
+    cache: fund/basic.parquet
+  fund_portfolio:
+    source: tushare_free
+    asset: fund
+    status: rate_limited
     freq: quarterly
     enabled: true
     label: 基金持仓
     cache: fund/portfolio/{report_date}.parquet
+    description: Tushare fund_portfolio; 当前账号频率为1次/小时, 按季度逐步积累
   fund_nav:
     source: tushare_free
     asset: fund
@@ -1118,12 +1171,12 @@ data_registry:
   sector_sw_daily:
     source: tushare_free
     asset: sector
-    status: available
+    status: rate_limited
     freq: daily
     enabled: true
     label: 申万行业指数日行情
     cache: sector/sw_daily/{symbol}.parquet
-    description: 28个申万一级行业指数, 来自 Tushare sw_daily
+    description: 31个申万一级行业指数, 来自 Tushare sw_daily; 当前账号接口频率为1次/小时, cron后台逐行业积累
   sector_membership:
     source: computed
     asset: sector

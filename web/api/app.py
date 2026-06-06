@@ -5,13 +5,6 @@ Astrolabe Quant API v2 -- Application Factory
 import os, sys
 from pathlib import Path
 
-# Load ~/.hermes/.env (LLM provider keys etc.)
-_env_path = Path.home() / ".hermes" / ".env"
-if _env_path.exists():
-    from dotenv import load_dotenv
-    load_dotenv(_env_path)
-
-
 for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
     os.environ.pop(key, None)
 os.environ["no_proxy"] = "eastmoney.com,10jqka.com.cn,sina.com.cn,qianlong.com,163.com,qq.com"

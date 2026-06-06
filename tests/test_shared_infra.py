@@ -45,7 +45,7 @@ signals:
     assert resolve_settings_path() == cfg_dir / "settings.yaml"
     assert get_settings(refresh=True)["project"]["name"] == "test-project"
     assert get_section("signals.multifactor") == {"buy_threshold": 60}
-    assert get_tushare_token() == "file-token"
+    assert get_tushare_token() == ""
 
     monkeypatch.setenv("TUSHARE_TOKEN", "env-token")
     assert get_tushare_token() == "env-token"
@@ -61,6 +61,7 @@ def test_symbol_helpers_normalize_a_share_codes_and_exchange_formats():
     assert to_sina_symbol("000001") == "sz000001"
     assert to_ts_code("600519") == "600519.SH"
     assert to_ts_code("000001") == "000001.SZ"
+    assert to_ts_code("920001") == "920001.BJ"
 
 
 def test_fetcher_base_rate_limiter_uses_configurable_jitter(monkeypatch):

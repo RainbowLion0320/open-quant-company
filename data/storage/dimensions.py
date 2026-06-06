@@ -34,6 +34,9 @@ SOURCE_LABELS = {
 }
 
 DEFAULT_HEALTH_TABLES = {
+    "stock_basic": "stock_basic",
+    "trade_cal": "trade_cal",
+    "tushare_stock_daily": "tushare_stock_daily",
     "ohlcv_daily": "stock_daily",
     "ohlcv_daily_raw": "stock_daily_raw",
     "ohlcv_daily_hfq": "stock_daily_hfq",
@@ -43,6 +46,7 @@ DEFAULT_HEALTH_TABLES = {
     "fina_indicator": "stock_fina_indicator",
     "valuation_daily": "stock_valuation",
     "moneyflow_monthly": "stock_moneyflow_monthly",
+    "moneyflow_mkt_dc": "stock_moneyflow_mkt_dc",
     "moneyflow_daily": "stock_moneyflow_daily",
     "moneyflow_tushare_daily": "stock_moneyflow_tushare_daily",
     "holder_number": "stock_holders",
@@ -52,6 +56,8 @@ DEFAULT_HEALTH_TABLES = {
     "broker_recommend": "stock_broker_recommend",
     "research_report": "stock_research_report",
     "dividend": "stock_dividend",
+    "fund_basic": "fund_basic",
+    "cyq_perf": "stock_cyq_perf",
     "sector_sw_daily": "sector_sw_daily",
     "sector_membership": "sector_membership",
     "sector_performance_snapshot": "sector_performance_snapshot",

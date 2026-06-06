@@ -10,6 +10,8 @@ from typing import Any, Mapping, MutableMapping
 
 import yaml
 
+from core.env_secrets import read_env_secret
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SETTINGS_RELATIVE_PATH = Path("config") / "settings.yaml"
 
@@ -99,12 +101,5 @@ def get_section(section: str, default: Any = None, *, path: str | os.PathLike | 
 
 
 def get_tushare_token() -> str:
-    """Load Tushare token from environment first, then settings fallback."""
-    token = os.environ.get("TUSHARE_TOKEN") or os.environ.get("TUSHARE_PRO_TOKEN")
-    if token:
-        return token.strip()
-
-    token = str(get_section("data.tushare.token", "") or "").strip()
-    if token.startswith("${") and token.endswith("}"):
-        return ""
-    return token
+    """Load Tushare token from process environment only."""
+    return read_env_secret("TUSHARE_TOKEN", aliases=("TUSHARE_PRO_TOKEN",))

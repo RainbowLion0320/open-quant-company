@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
+
+from core.env_secrets import read_env_secret
 
 
 def api_health_payload() -> dict:
@@ -16,7 +17,7 @@ def api_health_payload() -> dict:
     except ImportError:
         results.append({"name": "AKShare", "status": "error", "detail": "未安装"})
 
-    token = os.environ.get("TUSHARE_TOKEN") or os.environ.get("TUSHARE_PRO_TOKEN")
+    token = read_env_secret("TUSHARE_TOKEN", aliases=("TUSHARE_PRO_TOKEN",))
     if token:
         try:
             import requests as _r

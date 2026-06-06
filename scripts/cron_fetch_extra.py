@@ -22,6 +22,9 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import tushare as ts
+from data.market.assets.etf import ETF_UNIVERSE
+from data.market.assets.futures import FUTURES_UNIVERSE
+from data.market.symbol_utils import to_ts_code
 from data.storage.datahub import get_datahub
 from data.ingestion.tushare_utils import get_tushare_token
 
@@ -49,6 +52,40 @@ def api():
 
 def _throttle(secs=0.5):
     time.sleep(secs)
+
+
+FUTURES_TUSHARE_EXCHANGE = {
+    "IF": "CFX",
+    "IC": "CFX",
+    "IH": "CFX",
+    "IM": "CFX",
+    "T": "CFX",
+    "TF": "CFX",
+    "TS": "CFX",
+    "RB": "SHF",
+    "AU": "SHF",
+    "CU": "SHF",
+    "SC": "INE",
+}
+
+
+def etf_ts_codes() -> list[str]:
+    return [to_ts_code(code) for code in ETF_UNIVERSE]
+
+
+def futures_ts_codes() -> list[str]:
+    codes = []
+    for code in FUTURES_UNIVERSE:
+        text = str(code).strip().upper()
+        if not text:
+            continue
+        if "." in text:
+            codes.append(text)
+            continue
+        exchange = FUTURES_TUSHARE_EXCHANGE.get(text)
+        if exchange:
+            codes.append(f"{text}.{exchange}")
+    return codes
 
 # ═══════════════════════════════════════
 # 1. limit_list — 涨跌停 (1次/小时, 增量每次最多请求1天)
@@ -188,13 +225,10 @@ def fetch_dividend(full_history=False):
 # 5. fund_daily — 基金日线 (分批拉取)
 # ═══════════════════════════════════════
 def fetch_fund_daily(full_history=False):
-    """拉取主流 ETF 日线 (上证50/沪深300/中证500/创业板/科创50)。"""
+    """拉取项目 ETF universe 日线。"""
     api_ = api()
-    # Top ETFs by AUM
-    codes = ["510050.SH", "510300.SH", "510500.SH", "159915.SZ", "588000.SH",
-             "512880.SH", "159949.SZ", "512100.SH", "512010.SH", "510880.SH"]
     fetched = 0
-    for code in codes:
+    for code in etf_ts_codes():
         pq = FUND_D_STORE / f"{code}.parquet"
         if pq.exists() and not full_history:
             continue
@@ -255,10 +289,8 @@ def fetch_fund_portfolio(full_history=False):
 # ═══════════════════════════════════════
 def fetch_fund_nav(full_history=False):
     api_ = api()
-    codes = ["510050.SH", "510300.SH", "510500.SH", "159915.SZ", "588000.SH",
-             "512880.SH", "159949.SZ", "512100.SH", "512010.SH", "510880.SH"]
     fetched = 0
-    for code in codes:
+    for code in etf_ts_codes():
         pq = FUND_N_STORE / f"{code}.parquet"
         if pq.exists() and not full_history:
             continue
@@ -280,22 +312,8 @@ def fetch_fund_nav(full_history=False):
 # ═══════════════════════════════════════
 def fetch_futures_daily(full_history=False):
     api_ = api()
-    # Main continuous contracts (well-known codes)
-    contracts = [
-        # Stock index futures (CFFEX)
-        "IF.CFX", "IC.CFX", "IH.CFX", "IM.CFX",
-        # Shanghai (SHFE) — active contracts
-        "CU.SHF", "AL.SHF", "ZN.SHF", "RB.SHF", "HC.SHF",
-        # Dalian (DCE)
-        "I.DCE", "J.DCE", "JM.DCE", "M.DCE", "Y.DCE", "P.DCE",
-        # Zhengzhou (CZCE)
-        "SR.CZC", "TA.CZC", "MA.CZC",
-        # INE
-        "SC.INE", "FU.INE",
-    ]
-
     fetched = 0
-    for ct in contracts:
+    for ct in futures_ts_codes():
         pq = FUT_STORE / f"{ct}.parquet"
         if pq.exists() and not full_history:
             continue

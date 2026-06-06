@@ -186,7 +186,7 @@ python -m pip install -r requirements-dev.txt
 
 ### 2. 配置密钥和数据目录
 
-基础 Web 和部分本地功能可以无密钥启动，但完整数据和 AI 因子研究需要额外配置。
+基础 Web 和部分本地功能可以无密钥启动，但完整数据和 AI 因子研究需要额外配置。API token/key 只从进程系统环境变量读取；不要写入 `config/settings.yaml`、`.env` 或其他项目文件。
 
 | 环境变量 | 用途 |
 |----------|------|
@@ -202,6 +202,12 @@ python -m pip install -r requirements-dev.txt
 | `WECHAT_WEBHOOK_URL`, `FEISHU_WEBHOOK_URL` | 企业微信 / 飞书通知 webhook |
 
 真实通知配置文件应放在 `config/notify.yaml`，该文件已被 `.gitignore` 忽略。
+
+检查当前进程环境变量状态：
+
+```bash
+astroq config env --json
+```
 
 ### 3. 启动后端和前端
 

@@ -57,13 +57,18 @@
 - `source`: akshare / tushare_free / tushare_paid / computed
 - `asset`: stock / sector / macro / fund / futures / bond
 - `status`: available / rate_limited / paid / planned
-- `freq`: daily / monthly / quarterly / event
+- `freq`: daily / monthly / quarterly / event / minute
 - `cache`: 相对路径模板，如 `stock/daily/{symbol}.parquet`
 - `health`: table / label / freshness_sla_days / repair_policy / partition_key
 
 `DataRegistry.validate()` 在启动时运行合约检验，确保所有 enabled 维度 source/asset/status/freq/cache 字段合法。
 
 行业/板块相关维度同样通过注册表管理，包括行业指数行情、行业成员映射、行业动量快照、行业信号聚合和组合行业敞口。上层代码不应硬编码任何 `var/store/*` 深层路径，而应使用 `DataHub.dimension_root()` 或 `DataHub.dimension_path()`。
+
+Tushare 维度治理入口统一在 CLI：
+- `astroq config env --json` 检查当前进程是否已配置 `TUSHARE_TOKEN` / `TUSHARE_PRO_TOKEN` 和 LLM provider key，输出只包含脱敏状态。
+- `astroq data tushare-audit --json` 探测当前账号可访问接口，并输出本地 `var/store` 覆盖率。
+- `astroq data tushare-backfill --scope missing --resume --json` 按缺口补齐非分钟维度；`stk_mins` 分钟接口只审计权限，不默认全市场全历史拉取。
 
 ### 2.2 DataHub — 统一数据中台
 
@@ -301,5 +306,5 @@ reg.health_metadata()           → dict[str, HealthTableMeta]
 
 - **AKShare 网络不稳定：** 新浪源偶尔限流，已通过 3 源 fallback 缓解
 - **多资产回测数据质量不均：** ETF 适配器已有真实行情路径，但 `scripts/multi_asset_tournament.py` 仍可能在缺少本地缓存时使用 proxy（见 [06-multi-asset.md](06-multi-asset.md)）
-- **Tushare 2000 积分限制：** 部分维度 status=rate_limited，需 `cron_fetch_slow.py` 分批拉取
+- **Tushare 权限与限流：** 以 `astroq data tushare-audit --json` 的当前账号探测为准；权限缺失标记为 `no_permission`，限流维度由 `tushare-backfill`/cron 分批补齐
 - **未来：** 可接入 Wind/Choice 等专业数据终端，并把付费/限流源统一纳入 DataRegistry SLA

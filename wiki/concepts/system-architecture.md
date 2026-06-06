@@ -172,7 +172,8 @@ strategies:
 | 模型层 | `models/__init__.py` | LightGBM + 注册表 |
 | 数据清洗 | `data/quality/cleaner.py` | DataCleaner 规则化清洗 |
 | 数据注册 | `data/storage/dimensions.py` | ★ 维度+健康元数据: source/label/SLA/repair/partition 单源管理 |
-| Tushare工具 | `data/ingestion/tushare_utils.py` | Token统一(环境变量优先→config兜底) |
+| Tushare工具 | `data/ingestion/tushare_utils.py` | Token 只读系统环境变量 |
+| Tushare治理 | `data/ingestion/tushare_governance.py` | 权限审计、覆盖率检查、缺口补数编排 |
 | 多资产基类 | `data/market/assets/base.py` | AssetAdapter ABC + AssetRegistry |
 | 股票适配器 | `data/market/assets/stock.py` | StockAsset |
 | ETF适配器 | `data/market/assets/etf.py` | ETFAsset (宽基/行业/黄金/债券/货币) |

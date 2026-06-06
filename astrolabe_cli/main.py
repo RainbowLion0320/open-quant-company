@@ -4,10 +4,13 @@ import argparse
 import sys
 from collections.abc import Sequence
 
+from astrolabe_cli.commands.config import env_status
 from astrolabe_cli.commands.config import validate_config
 from astrolabe_cli.commands.backtest import check as backtest_check
 from astrolabe_cli.commands.backtest import run_backtest
 from astrolabe_cli.commands.data import repair as data_repair
+from astrolabe_cli.commands.data import tushare_audit as data_tushare_audit
+from astrolabe_cli.commands.data import tushare_backfill as data_tushare_backfill
 from astrolabe_cli.commands.execution import dry_run as execution_dry_run
 from astrolabe_cli.commands.pipeline import list_pipelines, show_pipeline
 from astrolabe_cli.commands.assets import overview as assets_overview
@@ -46,6 +49,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_flags(config_validate)
     config_validate.set_defaults(handler=lambda args: validate_config())
 
+    config_env = config_sub.add_parser("env", help="Inspect required environment secrets")
+    add_common_flags(config_env)
+    config_env.set_defaults(handler=lambda args: env_status())
+
     strategy = sub.add_parser("strategy", help="Inspect and run registered strategies")
     strategy_sub = strategy.add_subparsers(dest="strategy_command", required=True)
 
@@ -83,6 +90,23 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_flags(data_repair_cmd)
     data_repair_cmd.set_defaults(
         handler=lambda args: data_repair(args.table, args.limit, args.days, args.dry_run)
+    )
+
+    data_tushare_audit_cmd = data_sub.add_parser("tushare-audit", help="Audit Tushare capabilities and local coverage")
+    data_tushare_audit_cmd.add_argument("--offline", action="store_true", help="Skip network capability probes")
+    add_common_flags(data_tushare_audit_cmd)
+    data_tushare_audit_cmd.set_defaults(handler=lambda args: data_tushare_audit(not args.offline))
+
+    data_tushare_backfill_cmd = data_sub.add_parser("tushare-backfill", help="Backfill missing Tushare dimensions")
+    data_tushare_backfill_cmd.add_argument("--scope", choices=["missing", "all", "p0", "p1", "p2"], default="missing")
+    data_tushare_backfill_cmd.add_argument("--resume", action="store_true", default=True)
+    data_tushare_backfill_cmd.add_argument("--no-resume", dest="resume", action="store_false")
+    data_tushare_backfill_cmd.add_argument("--dry-run", action="store_true")
+    data_tushare_backfill_cmd.add_argument("--limit", type=int, default=0)
+    data_tushare_backfill_cmd.add_argument("--days", type=int, default=365)
+    add_common_flags(data_tushare_backfill_cmd)
+    data_tushare_backfill_cmd.set_defaults(
+        handler=lambda args: data_tushare_backfill(args.scope, args.resume, args.dry_run, args.limit, args.days)
     )
 
     regime = sub.add_parser("regime", help="Inspect and train Market Regime policy")
