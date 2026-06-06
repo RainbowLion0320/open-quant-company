@@ -83,6 +83,35 @@ def _get_close_prices(symbols: List[str], target_date: Optional[date] = None) ->
 
 # ── 信号读取 ──
 
+def _iter_paper_strategy_configs(cfg: dict):
+    from data.registry import can_run_paper
+
+    strategies = cfg.get("strategies", {}) or {}
+    configured = cfg.get("paper_trading", {}).get("strategies") or list(strategies.keys())
+    for strategy_name in configured:
+        strategy_cfg = strategies.get(strategy_name, {})
+        if not strategy_cfg.get("enabled", True):
+            continue
+        if not can_run_paper(strategy_name):
+            continue
+        yield strategy_name, strategy_cfg
+
+
+def _latest_fresh_signal_batch(sig_file, paper_cfg: dict) -> pd.DataFrame:
+    df = HUB.latest_batch(sig_file)
+    if df is None or df.empty:
+        return pd.DataFrame()
+    max_age_days = int(paper_cfg.get("max_signal_age_days", 2))
+    if max_age_days <= 0 or "computed_at" not in df.columns:
+        return df
+    computed = pd.to_datetime(df["computed_at"], errors="coerce").dropna()
+    if computed.empty:
+        return pd.DataFrame()
+    age = pd.Timestamp.now(tz=None) - computed.max().tz_localize(None)
+    if age > pd.Timedelta(days=max_age_days):
+        return pd.DataFrame()
+    return df
+
 def _read_latest_signals() -> Dict[str, List[Tuple[str, str, float]]]:
     """
     读取各策略最新信号。
@@ -90,21 +119,18 @@ def _read_latest_signals() -> Dict[str, List[Tuple[str, str, float]]]:
     信号 parquet 使用 computed_at 列 (ISO格式), 取最新批次。
     """
     cfg = load_config()
-    strategies = cfg.get("strategies", {})
     paper_cfg = cfg.get("paper_trading", {})
     max_per_strategy = int(paper_cfg.get("max_orders_per_strategy", 5))
 
     result: Dict[str, List[Tuple[str, str, float]]] = {}
 
-    for strategy_name, strategy_cfg in strategies.items():
-        if not strategy_cfg.get("enabled", True):
-            continue
+    for strategy_name, strategy_cfg in _iter_paper_strategy_configs(cfg):
         signal_name = strategy_cfg.get("signal_name", strategy_name)
         sig_file = HUB.signal_path(signal_name)
         if not sig_file.exists():
             continue
         try:
-            df = HUB.latest_batch(sig_file)
+            df = _latest_fresh_signal_batch(sig_file, paper_cfg)
             if df.empty or "signal" not in df.columns:
                 continue
 
@@ -200,7 +226,6 @@ def _execute_signals_via_pipeline(
         cost_basis=cost_basis,
     )
 
-    strategies = cfg.get("strategies", {})
     paper_cfg = cfg.get("paper_trading", {})
     max_signals = int(paper_cfg.get("max_orders_per_strategy", 5))
 
@@ -218,12 +243,12 @@ def _execute_signals_via_pipeline(
     all_fills = []
     total_trades = 0
 
-    for strat_name, strat_cfg in strategies.items():
-        if not strat_cfg.get("enabled", True):
-            continue
+    for strat_name, strat_cfg in _iter_paper_strategy_configs(cfg):
         signal_name = strat_cfg.get("signal_name", strat_name)
         sig_file = HUB.signal_path(signal_name)
         if not sig_file.exists():
+            continue
+        if _latest_fresh_signal_batch(sig_file, paper_cfg).empty:
             continue
 
         alpha = SignalParquetAlphaModel(

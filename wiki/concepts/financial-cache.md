@@ -78,7 +78,7 @@ get_financial_summary(symbol)
 
 ### PIT 构建集成
 
-基本面+估值数据在 `FeatureStoreBuilder.build_month()` 中与价量因子合并:
+基本面+估值数据在 PIT as-of 特征构建中与价量因子合并。日频构建使用交易日 as-of，月末兼容构建使用月末 as-of：
 
 ```python
 # data/feature_store.py

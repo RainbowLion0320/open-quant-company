@@ -17,7 +17,7 @@
 | 1.7 | 请求节流 3s + 指数退避重试 3 次 | `data/fetcher.py` | `test_data_fetcher_resilience.py` | — | 观察 cron 日志无频率限制错误 | OK | — |
 | 1.8 | 6 规则数据清洗 | `data/cleaner.py` | `test_data_cleaner_contracts.py` | — | `python -c "from data.cleaner import DataCleaner; print(DataCleaner().rule_count)"` | OK | — |
 | 1.9 | 财务数据三层缓存 (内存→Parquet→API) | `data/financials.py` | `test_datahub_contracts.py:test_financials_uses_canonical_symbol_path` | — | 第二次查询同一股票财务数据应瞬间返回 | OK | — |
-| 1.10 | PIT 特征构建 (月度切片) | `data/feature_store.py` | `test_architecture_contracts.py:test_build_features_import_is_safe` | — | `python scripts/build_features.py` 生成 `data/store/features/YYYY-MM.parquet` | OK | 待增强自动化前视检测 |
+| 1.10 | PIT 特征构建 (as-of 日期视图) | `data/feature_store.py`, `scripts/build_features.py` | `test_architecture_contracts.py:test_build_features_import_is_safe`, `test_asof_pit_feature_view.py` | — | `python scripts/build_features.py --frequency daily` 生成 `data/store/features/YYYY-MM-DD.parquet`；`YYYY-MM.parquet` 月末快照兼容 | OK | — |
 | 1.11 | Cron Logger (JSONL + 自动轮转 500 行) | `data/cron_logger.py` | `test_cron_logger_contracts.py` | `GET /api/system/cron-jobs` → `ActivityMonitor.vue` cron 状态 | 检查 `data/store/_cron_log/` 有日志文件 | OK | — |
 | 1.12 | DataRegistry.validate() 合约检验 | `data/data_registry.py` | `test_datahub_contracts.py:test_data_registry_contract_is_valid` | `DatabaseHealth.vue` 健康状态列 | 启动时自动运行 validate() | OK | — |
 | 1.13 | DB Health 扫描 | `data/results_db.py` | `test_datahub_contracts.py:test_db_health_scans_moneyflow_symbol_and_tushare_daily` | `GET /api/system/db-health` → `DatabaseHealth.vue` | Web 页面按 DataRegistry 启用维度展示状态表格 | OK | — |
@@ -28,11 +28,11 @@
 |---|--------------|---------|------|-----------|---------|------|------|
 | 2.1 | 巴菲特三重过滤 (能力圈→护城河→安全边际) | `signals/buffett.py` | `test_buffett_financial_sector.py` | `GET /api/strategies/buffett` → `Strategies.vue` 信号展开 | `make scan` 生成 `data/store/signals/buffett_scan.parquet` | OK | — |
 | 2.2 | 多因子五维加权打分 | `signals/multifactor.py` | `test_boundary.py` (动量计算), `test_sector_pipeline.py:test_multifactor_weights_sum_to_one` | `GET /api/strategies/multifactor` → `Strategies.vue` 信号展开 | 固定日期+股票池评分结果可复现，detail 含 industry 分 | OK | — |
-| 2.3 | ML LightGBM 信号 | `signals/ml_signals.py` | `test_architecture_contracts.py:test_model_evaluate_datetime_index_icir_does_not_crash` | `GET /api/strategies/ml_lgbm` | `python scripts/tune_model.py` 和 `weekly_retrain.py` | OK | — |
+| 2.3 | ML LightGBM 信号 | `signals/ml_signals.py`, `models/lgbm_runtime.py` | `test_architecture_contracts.py:test_model_evaluate_datetime_index_icir_does_not_crash`, `test_ml_lgbm_closure.py` | `GET /api/strategies/ml_lgbm` | `python scripts/tune_model.py` 和 `weekly_retrain.py` | OK | — |
 | 2.4 | 控制论自适应 Hybrid Regime 检测 + 参数调整 | `cybernetics/orchestrator.py`, `cybernetics/hmm_engine.py`, `cybernetics/regime.py`, `cybernetics/regime_policy.py`, `cybernetics/regime_scoring.py`, `cybernetics/regime_state.py`, `data/models/regime_hmm/` | `test_market_regime_v2.py`, `test_hmm_engine.py`, `test_regime_scoring.py`, `test_regime_state.py` | `GET /api/market/regime` → `Market.vue`, `GET /api/pipeline/market-regime` → `Pipeline.vue` | Hybrid 默认引擎；规则评分输出 score/components，HMM 输出概率/confidence/entropy；不一致低置信 blended vote；实时 confirmed regime 按唯一观测日执行 `min_dwell=3` | OK | — |
 | 2.5 | 因子 DSL 表达式引擎 (声明式因子) | `signals/expression.py` | `test_boundary.py` (Ret/MA/Std/Delta/缺失输入) | — | `python -c "from signals.expression import Ref,MA,Std,Delta,Ret; ..."` | OK | — |
 | 2.6 | DSL 公式解析 (LLM→计算) | `signals/dsl_parser.py` | `test_boundary.py` (公式解析) | — | `python scripts/factor_hypothesis.py` | OK | — |
-| 2.7 | 横截面排名 → 受限 buy list + hold rows | `signals/selection.py` | `test_boundary.py` (apply_ranked_buys) | — | 验证信号文件符合 schema (symbol, score, signal, detail.selection_*) | OK | — |
+| 2.7 | 横截面排名 → 受限 buy list + hold rows | `signals/selection.py`, `signals/tradability.py` | `test_boundary.py` (apply_ranked_buys), `test_ml_lgbm_closure.py` | — | 验证信号文件符合 schema (symbol, score, signal, detail.selection_*)，ST/退市风险行保留 hold 且带 `detail.tradability_blocked` | OK | — |
 | 2.8 | 策略插件注册表 (动态 import) | `data/strategy_plugins.py` | `test_architecture_contracts.py:test_enabled_strategy_plugins_have_runners` | `GET /api/strategies` → `Strategies.vue` | 新增策略只需改 yaml 配置 | OK | — |
 | 2.9 | Regime 自适应权重调整 | `signals/multifactor.py` | `test_sector_pipeline.py:test_regime_affects_market_score_but_not_industry` | — | bull/bear/sideways 三种 regime 下权重分布不同 | OK | — |
 | 2.10 | 行业动量因子集成 | `signals/multifactor.py:_industry_score()` | — | 多因子评分含 industry 维度, 组合敞口 API | 行业动量已纳入五维评分, detail 含 industry 分 | OK | — |
@@ -49,7 +49,7 @@
 | # | PRD/Spec 条目 | 代码文件 | 测试 | API / Web | 手工验收 | 状态 | 缺口 |
 |---|--------------|---------|------|-----------|---------|------|------|
 | 3.1 | N 策略锦标赛对比 | `backtest/run_all_strategies.py` | — | `GET /api/backtest` → `/strategy-lab?tab=backtest` (`Backtest.vue`) | `make backtest` 输出排名表 | OK | — |
-| 3.2 | 15 项风险指标 (Sharpe/Sortino/Calmar...) | `backtest/analytics.py` | `test_boundary.py` (Sharpe/MaxDD/WinRate/Beta/Alpha) | `Backtest.vue` 雷达图 | 手工验证 Sortino 用 RMS 法、Beta 用 cov 矩阵 | OK | — |
+| 3.2 | 15 项风险指标 (Sharpe/Sortino/Calmar...) | `backtest/analytics.py`, `data/risk_free_rates.py` | `test_boundary.py` (Sharpe/MaxDD/WinRate/Beta/Alpha), `test_risk_free_rates.py` | `Backtest.vue` 雷达图 | 手工验证 Sortino 用 RMS 法、Beta 用 cov 矩阵；Sharpe/Alpha 必须使用本地 risk-free curve，缺数据停止计算 | OK | — |
 | 3.3 | PIT 零前视偏差 | `backtest/run_all_strategies.py` | `test_backtest_pit_contracts.py` | — | 构造未来暴涨样本 → 策略不提前买入 | OK | — |
 | 3.4 | Regime 回测用生产 policy 且滞后一月 | `backtest/run_all_strategies.py:build_production_regime_map()` | `test_architecture_contracts.py:test_backtest_regime_replay_uses_production_policy_not_monthly_ma_chain` | — | 历史回放 `CHAMPION_POLICY`，当月只使用上一期可得 regime，禁止旧 MA 链路 | OK | — |
 | 3.5 | 巴菲特滚动窗口逐年评分 | `backtest/buffett_real_scorer.py` | — | — | 验证滚动评分器每次策略评分前重置年度缓存，且只使用当期可得财报 | OK | — |
@@ -112,15 +112,15 @@
 
 | 能力域 | 总条目 | 功能可验收 | 质量债条目 | 待补自动化测试 |
 |--------|-------|------------|------------|----------------|
-| 数据管道 | 13 | 13 | 1 | 1 |
+| 数据管道 | 13 | 13 | 0 | 0 |
 | 信号系统 | 17 | 17 | 1 | 0 |
 | 回测引擎 | 10 | 10 | 1 | 0 |
 | 执行层 | 8 | 8 | 0 | 0 |
 | Web 平台 | 16 | 16 | 1 | 0 |
 | 多资产架构 | 10 | 10 | 0 | 0 |
-| **合计** | **74** | **74** | **4** | **1** |
+| **合计** | **74** | **74** | **3** | **0** |
 
-> **说明：** `功能可验收` 表示该能力有可用代码路径。`质量债条目` 统计"缺口"列非 `—` 的行。当前剩余 4 项质量债：PIT 特征前视检测需继续强化、候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化。
+> **说明：** `功能可验收` 表示该能力有可用代码路径。`质量债条目` 统计"缺口"列非 `—` 的行。当前剩余 3 项质量债：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化。
 
 **维护说明:**
 

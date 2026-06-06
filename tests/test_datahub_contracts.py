@@ -128,6 +128,29 @@ def test_datahub_uses_canonical_astrolabe_env(tmp_path, monkeypatch):
     assert hub.cache_root == astrolabe_cache.resolve()
 
 
+def test_default_datahub_rebuilds_when_astrolabe_env_changes(tmp_path, monkeypatch):
+    from data.datahub import get_datahub, reset_datahub
+
+    first_store = tmp_path / "first-store"
+    first_cache = tmp_path / "first-cache"
+    second_store = tmp_path / "second-store"
+    second_cache = tmp_path / "second-cache"
+
+    monkeypatch.setenv("ASTROLABE_STORE", str(first_store))
+    monkeypatch.setenv("ASTROLABE_CACHE", str(first_cache))
+    reset_datahub()
+    first = get_datahub()
+    assert first.store_root == first_store.resolve()
+
+    monkeypatch.setenv("ASTROLABE_STORE", str(second_store))
+    monkeypatch.setenv("ASTROLABE_CACHE", str(second_cache))
+    second = get_datahub()
+
+    assert second.store_root == second_store.resolve()
+    assert second.cache_root == second_cache.resolve()
+    reset_datahub()
+
+
 def test_daily_cron_ohlcv_uses_stock_daily_module(monkeypatch):
     import scripts.cron_fetch_daily as daily
     import data.fetchers.stock_daily as stock_daily

@@ -39,7 +39,7 @@
 ┌──────▼──────┐ ┌─────▼─────┐ ┌─────▼──────────────┐
 │   fetcher   │ │ cleaner   │ │  feature_store      │
 │ AKShare 3源 │ │ 6 规则清洗 │ │ PIT 特征构建         │
-│ 节流+重试   │ │ 异常值检测 │ │ 月度切片 (YYYY-MM)  │
+│ 节流+重试   │ │ 异常值检测 │ │ as-of 日期视图       │
 │ 两层缓存    │ │ 停牌填充  │ │ enrich 当日因子     │
 └──────┬──────┘ └─────┬─────┘ └────────────────────┘
        │              │
@@ -144,11 +144,12 @@
 
 ### 2.6 Feature Store — PIT 特征工程
 
-**Point-in-Time 严格性：** 每个月切片使用该月最后一天之前的所有数据构建特征，绝不使用未来信息。
-- 输出：`data/store/features/YYYY-MM.parquet`
-- 构建入口：`FeatureStoreBuilder.build_month(month, symbols)` / `build_all(start_month, end_month, symbols)`
+**Point-in-Time 严格性：** 每个 as-of 切片只使用该日期及之前已可见的数据构建特征，绝不使用未来信息。日频价量、估值、资金流可以按交易日更新；财务、宏观、持有人等低频特征自然取 as-of 之前最新已披露值。
+- 目标输出：`data/store/features/YYYY-MM-DD.parquet`
+- 兼容输出：`data/store/features/YYYY-MM.parquet`，表示该月月末 as-of 快照
+- 构建入口：`scripts/build_features.py --frequency daily` / `--frequency monthly`，以及 `FeatureStoreBuilder.build_month()` 兼容接口
 - 读取入口：`iter_feature_files()`、`load_feature_panel()`、`latest_feature_frame()`、`FeatureStoreBuilder.load_month(month)`
-- 注册表扩展：`enrich_from_registry(df, month, symbols)` 从 DataRegistry 维度补充资金流、持有人、宏观等 PIT 因子
+- 注册表扩展：`enrich_from_registry(df, as_of_key, symbols)` 从 DataRegistry 维度补充资金流、持有人、宏观等 PIT 因子
 
 ### 2.6 Cron Logger — 可观测性
 
@@ -178,7 +179,7 @@ AKShare/Tushare API
   DataHub.write_parquet(): tmp → os.replace → manifest
        │
        ▼ (PIT 特征构建)
-  FeatureStoreBuilder.build_month(month, symbols)
+  build_features.py --frequency daily
        │
        ▼ (上层消费)
   Signals / Backtest / Broker / Web

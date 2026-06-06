@@ -64,7 +64,7 @@ LLM Research → 自动化R&D      Circuit Breaker → -15%熔断  Self-healing 
 │  run_workflow.py + config/workflows/*.yaml                │
 ├──────────────────────────────────────────────────────────┤
 │  ML / AI Layer                                           │
-│  Feature Store (PIT monthly slices)                      │
+│  Feature Store (PIT as-of date views)                    │
 │  Model Registry (LightGBM+Optuna)                        │
 │  LLM Hypothesis (provider model → DSL Parser)            │
 ├──────────────────────────────────────────────────────────┤
@@ -73,6 +73,7 @@ LLM Research → 自动化R&D      Circuit Breaker → -15%熔断  Self-healing 
 ├──────────────────────────────────────────────────────────┤
 │  Data Layer                                              │
 │  AKShare (OHLCV/财务/宏观) + Tushare (PE/PB/资金/筹码)   │
+│  RiskFreeRateProvider (bond treasury curve → analytics)  │
 │  Parquet Store (stock/ETF/bond/futures/macro)            │
 │  Data Cleaner → Enrich                                   │
 │  Data Registry                                           │
@@ -106,6 +107,7 @@ strategies:
    慢速: scripts/cron_fetch_extra.py --slow-only
    月频: Macro Monthly Refresh (1日) + Financial Monthly Refresh (3日)
    LLM providers: provider balance API + project API response usage ledger
+   Risk-free curve: data/store/bond/treasury_yields.parquet → data/risk_free_rates.py
 
    路径统一由 DataHub.dimension_path() 从 data_registry 的 cache 模式展开:
    data/store/stock/daily/{symbol}.parquet        ← "stock/daily/{symbol}.parquet"
@@ -122,7 +124,7 @@ strategies:
    → 清洗报告 (丢弃/填充/缩尾统计)
 
 4. 特征构建 (scripts/build_features.py)
-   因子 × 股票 × 月数 → data/store/features/YYYY-MM.parquet (PIT, 零前视)
+   因子 × 股票 × as_of_date → data/store/features/YYYY-MM-DD.parquet (PIT, 零前视)
 
 5. 模型训练 (scripts/tune_model.py)
    LightGBM + Optuna + 滚动窗口CV (48月训练/6月测试)
@@ -257,7 +259,7 @@ strategies:
 
 - **策略可插拔**: 新增策略 = config注册 + runner契约 + 信号输出契约
 - **数据层零锁**: Parquet存储 + DuckDB `:memory:` → cron写不影响Web读
-- **PIT零前视**: 所有特征按月切片, `as_of` 参数严格限制数据可用范围
+- **PIT零前视**: 所有特征按 as-of 日期视图读取，`as_of` 参数严格限制数据可用范围；月度切片仅作为月末兼容快照
 - **因子可组合**: DSL表达式声明式, 可缓存, 可序列化
 - **ML可重现**: 模型版本化 (registry.json), 训练参数全记录
 - **注册表驱动**: 维度路径通过 `DataHub.dimension_path(key, **placeholders)` 从 `data_registry.cache` 展开, 路径只定义一次; DB Health 的 source/label/SLA/repair/partition 全从 DataDimension 字段派生, 不硬编码

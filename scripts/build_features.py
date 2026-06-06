@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build point-in-time monthly features into ``data/store/features``.
+"""Build point-in-time as-of features into ``data/store/features``.
 
 The previous version executed the full feature build at import time.  This file
 is intentionally import-safe so cron jobs and agent tools can import
@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 
 from data.datahub import get_datahub
-from data.feature_store import FEATURES_DIR, enrich_from_registry, iter_feature_files
+from data.feature_store import FEATURES_DIR, enrich_from_registry, iter_feature_files, write_feature_slice
 from data.price_service import get_stock_prices
 from data.price_types import PriceUseCase
 from data.symbols import CIRCLE_STOCKS
@@ -41,6 +41,13 @@ DEFAULT_END = os.environ.get(
     "QUANT_FEATURE_END",
     (pd.Timestamp.today().to_period("M") - 1).strftime("%Y-%m"),
 )
+try:
+    from core.settings import get_section
+
+    _ML_CFG = get_section("ml", {}) or {}
+except Exception:
+    _ML_CFG = {}
+DEFAULT_FREQUENCY = os.environ.get("QUANT_FEATURE_FREQUENCY", str(_ML_CFG.get("feature_frequency", "monthly")))
 SKIP_PREFIXES = ("92", "83", "87", "43")
 
 
@@ -208,27 +215,30 @@ def _compute_valuation_factors(daily_df: pd.DataFrame, as_of: pd.Timestamp) -> d
     return result
 
 
-def _build_month(
-    month: str,
+def _build_feature_slice(
+    storage_key: str,
+    as_of_date: str | pd.Timestamp,
     price_cache: dict[str, pd.DataFrame],
     fin_cache: dict[str, pd.DataFrame],
     daily_cache: dict[str, pd.DataFrame],
     factors: dict,
     force: bool = False,
+    min_bars: int = 60,
 ) -> int:
-    pq_path = FEATURES_DIR / f"{month}.parquet"
+    pq_path = FEATURES_DIR / f"{storage_key}.parquet"
     if pq_path.exists() and not force:
         return 0
 
-    month_dt = pd.Timestamp(month + "-01")
-    month_end = month_dt + pd.offsets.MonthEnd(0)
+    as_of = pd.Timestamp(as_of_date).normalize()
+    as_of_key = as_of.strftime("%Y-%m-%d")
+    month = as_of.to_period("M").strftime("%Y-%m")
     rows = []
     for sym, df in price_cache.items():
-        df_pit = df[df.index <= month_end]
-        if len(df_pit) < 60:
+        df_pit = df[df.index <= as_of]
+        if len(df_pit) < min_bars:
             continue
         idx = len(df_pit) - 1
-        row = {"symbol": sym, "month": month}
+        row = {"symbol": sym, "as_of_date": as_of_key, "month": month}
 
         for fname, factor in factors.items():
             val = factor.compute(df_pit, idx)
@@ -236,11 +246,11 @@ def _build_month(
 
         fin_df = fin_cache.get(sym)
         if fin_df is not None:
-            row.update(_compute_fundamental_factors(fin_df, month_end))
+            row.update(_compute_fundamental_factors(fin_df, as_of))
 
         daily_df = daily_cache.get(sym)
         if daily_df is not None:
-            row.update(_compute_valuation_factors(daily_df, month_end))
+            row.update(_compute_valuation_factors(daily_df, as_of))
 
         full_idx = df.index.get_indexer([df_pit.index[-1]])[0]
         fwd_idx = full_idx + 20
@@ -256,9 +266,67 @@ def _build_month(
 
         cleaner = DataCleaner()
         result_df, _ = cleaner.clean_features(result_df)
-        result_df = enrich_from_registry(result_df, month, list(price_cache.keys()))
-        HUB.write_parquet(result_df, pq_path)
+        result_df = enrich_from_registry(result_df, as_of_key, list(price_cache.keys()))
+        write_feature_slice(result_df, storage_key, directory=FEATURES_DIR, hub=HUB)
     return len(rows)
+
+
+def _build_asof(
+    as_of_date: str,
+    price_cache: dict[str, pd.DataFrame],
+    fin_cache: dict[str, pd.DataFrame],
+    daily_cache: dict[str, pd.DataFrame],
+    factors: dict,
+    force: bool = False,
+    min_bars: int = 60,
+) -> int:
+    key = pd.Timestamp(as_of_date).strftime("%Y-%m-%d")
+    return _build_feature_slice(
+        key,
+        key,
+        price_cache,
+        fin_cache,
+        daily_cache,
+        factors,
+        force=force,
+        min_bars=min_bars,
+    )
+
+
+def _build_month(
+    month: str,
+    price_cache: dict[str, pd.DataFrame],
+    fin_cache: dict[str, pd.DataFrame],
+    daily_cache: dict[str, pd.DataFrame],
+    factors: dict,
+    force: bool = False,
+) -> int:
+    month_dt = pd.Timestamp(month + "-01")
+    month_end = month_dt + pd.offsets.MonthEnd(0)
+    return _build_feature_slice(month, month_end, price_cache, fin_cache, daily_cache, factors, force=force)
+
+
+def _date_range_bounds(start: str, end: str) -> tuple[pd.Timestamp, pd.Timestamp]:
+    start_ts = pd.Timestamp(start + "-01") if len(start) == 7 else pd.Timestamp(start)
+    if len(end) == 7:
+        end_ts = pd.Timestamp(end + "-01") + pd.offsets.MonthEnd(0)
+    else:
+        end_ts = pd.Timestamp(end)
+    return start_ts.normalize(), end_ts.normalize()
+
+
+def _daily_asof_dates(
+    start: str,
+    end: str,
+    price_cache: dict[str, pd.DataFrame],
+) -> list[pd.Timestamp]:
+    start_ts, end_ts = _date_range_bounds(start, end)
+    dates: set[pd.Timestamp] = set()
+    for frame in price_cache.values():
+        idx = pd.DatetimeIndex(frame.index)
+        eligible = idx[(idx >= start_ts) & (idx <= end_ts)]
+        dates.update(pd.Timestamp(dt).normalize() for dt in eligible)
+    return sorted(dates)
 
 
 def build_features(
@@ -267,20 +335,33 @@ def build_features(
     end: str = DEFAULT_END,
     force: bool = False,
     include_tushare: bool = True,
+    frequency: str = DEFAULT_FREQUENCY,
 ) -> None:
-    print(f"批量构建 PIT 特征: {n_stocks}只, {start}→{end}")
+    frequency = str(frequency or "monthly").lower()
+    if frequency not in {"monthly", "daily"}:
+        raise ValueError(f"unsupported feature frequency: {frequency}")
+
+    print(f"批量构建 PIT 特征: {n_stocks}只, {start}→{end}, frequency={frequency}")
     symbols = _select_symbols(n_stocks)
     price_cache = _load_price_cache(symbols)
     fin_cache = _load_financial_cache(list(price_cache.keys()))
     daily_cache = _load_daily_basic_cache(list(price_cache.keys()), start, end) if include_tushare else {}
     factors = alpha_factors()
 
-    months = pd.date_range(start, end, freq="MS")
-    print(f"\n[4/4] 构建特征 ({len(months)}个月)...")
-    for month_dt in months:
-        month = month_dt.strftime("%Y-%m")
-        rows = _build_month(month, price_cache, fin_cache, daily_cache, factors, force=force)
-        print(f"  {month}: {rows} stocks" if rows else f"  {month}: skipped")
+    if frequency == "daily":
+        dates = _daily_asof_dates(start, end, price_cache)
+        print(f"\n[4/4] 构建特征 ({len(dates)}个交易日)...")
+        for as_of in dates:
+            key = as_of.strftime("%Y-%m-%d")
+            rows = _build_asof(key, price_cache, fin_cache, daily_cache, factors, force=force)
+            print(f"  {key}: {rows} stocks" if rows else f"  {key}: skipped")
+    else:
+        months = pd.date_range(start, end, freq="MS")
+        print(f"\n[4/4] 构建特征 ({len(months)}个月)...")
+        for month_dt in months:
+            month = month_dt.strftime("%Y-%m")
+            rows = _build_month(month, price_cache, fin_cache, daily_cache, factors, force=force)
+            print(f"  {month}: {rows} stocks" if rows else f"  {month}: skipped")
 
     pq_files = iter_feature_files()
     total_rows = sum(len(HUB.read_parquet(pq, default=pd.DataFrame())) for pq in pq_files)
@@ -294,26 +375,37 @@ def _recent_month_window(months: int, today: pd.Timestamp | None = None) -> tupl
     return str(start_period), str(end_period)
 
 
-def rebuild_recent(months: int = 3, n_stocks: int = DEFAULT_N_STOCKS, force: bool = False) -> None:
+def rebuild_recent(
+    months: int = 3,
+    n_stocks: int = DEFAULT_N_STOCKS,
+    force: bool = False,
+    frequency: str = DEFAULT_FREQUENCY,
+) -> None:
     """Incrementally rebuild recent monthly feature slices."""
     if months <= 0:
         return
     start, end = _recent_month_window(months)
-    build_features(n_stocks=n_stocks, start=start, end=end, force=force)
+    build_features(n_stocks=n_stocks, start=start, end=end, force=force, frequency=frequency)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build PIT monthly feature store")
+    parser = argparse.ArgumentParser(description="Build PIT as-of feature store")
     parser.add_argument("--n-stocks", type=int, default=DEFAULT_N_STOCKS)
     parser.add_argument("--start", default=DEFAULT_START)
     parser.add_argument("--end", default=DEFAULT_END)
     parser.add_argument("--force", action="store_true", help="overwrite existing monthly slices")
     parser.add_argument("--no-tushare", action="store_true", help="skip Tushare daily_basic enrichment")
     parser.add_argument("--recent-months", type=int, default=0, help="rebuild only recent N months")
+    parser.add_argument(
+        "--frequency",
+        choices=["monthly", "daily"],
+        default=DEFAULT_FREQUENCY,
+        help="feature as-of cadence: daily keeps daily price/valuation precision; monthly is compatibility mode",
+    )
     args = parser.parse_args()
 
     if args.recent_months > 0:
-        rebuild_recent(months=args.recent_months, n_stocks=args.n_stocks, force=args.force)
+        rebuild_recent(months=args.recent_months, n_stocks=args.n_stocks, force=args.force, frequency=args.frequency)
     else:
         build_features(
             n_stocks=args.n_stocks,
@@ -321,6 +413,7 @@ def main() -> int:
             end=args.end,
             force=args.force,
             include_tushare=not args.no_tushare,
+            frequency=args.frequency,
         )
     print("✅ 特征构建完成")
     return 0

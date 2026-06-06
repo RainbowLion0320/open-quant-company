@@ -10,7 +10,7 @@ import os, json
 import pandas as pd
 
 from data.datahub import get_datahub
-from data.feature_store import load_feature_panel
+from data.feature_store import feature_period_key, feature_time_key_column, load_feature_panel
 from models import LightGBMRegressor, prepare_xy, MODEL_DIR
 
 HUB = get_datahub()
@@ -34,7 +34,9 @@ def train_regime_models():
 
     # 2. Load all feature data and assign regime
     all_features = load_feature_panel(hub=HUB)
-    all_features["regime"] = all_features["month"].map(regime_map).fillna("unknown")
+    time_key = feature_time_key_column(all_features)
+    all_features["_regime_month"] = feature_period_key(all_features[time_key])
+    all_features["regime"] = all_features["_regime_month"].map(regime_map).fillna("unknown")
 
     # 3. Train per regime
     results = {}

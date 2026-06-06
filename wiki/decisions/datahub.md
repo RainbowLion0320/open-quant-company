@@ -54,7 +54,7 @@ DataHub facade 负责:
 
 - `data/db.py`: DuckDB 视图注册统一使用 DataHub 的 store/cache 目录。
 - `data/results_db.py`: 策略结果、巴菲特扫描、scan meta 改为 DataHub 原子写入。
-- `data/feature_store.py`: PIT 月切片和 registry enrichment 改为 DataHub 路径。
+- `data/feature_store.py`: PIT as-of 日期视图、兼容月末快照和 registry enrichment 改为 DataHub 路径。
 - `broker/persistence.py`: paper trading 状态目录改为 DataHub，并修复相对配置路径解析。
 - `scripts/execute_paper_trades.py`: 使用 `latest_batch` 读取最新信号。
 - `web/api/routes/system.py`, `scripts/collect_system_metrics.py`: 系统监控库和 token cache 不再写死绝对路径。

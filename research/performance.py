@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from backtest.analytics import RiskAnalytics
+from data.risk_free_rates import risk_free_series_for_index
 
 
 def clean_daily_returns(daily_return: pd.Series) -> pd.Series:
@@ -15,6 +16,7 @@ def portfolio_metrics(
     daily_return: pd.Series,
     *,
     periods_per_year: int = 252,
+    risk_free_rates: pd.Series | None = None,
     turnover_proxy: float = 0.0,
     include_series: bool = True,
 ) -> dict[str, float | pd.Series]:
@@ -33,7 +35,9 @@ def portfolio_metrics(
             metrics.update({"daily_return": returns, "equity_curve": equity_curve})
         return metrics
 
-    report = RiskAnalytics.compute(returns, risk_free=0.0, periods_per_year=periods_per_year)
+    if risk_free_rates is None:
+        risk_free_rates = risk_free_series_for_index(returns.index)
+    report = RiskAnalytics.compute(returns, risk_free_rates=risk_free_rates, periods_per_year=periods_per_year)
     metrics = {
         "cagr": round(float(report.annual_return), 6),
         "sharpe": round(float(report.sharpe), 6),

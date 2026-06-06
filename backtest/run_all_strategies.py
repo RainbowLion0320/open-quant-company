@@ -323,6 +323,10 @@ def _strategy_alpha_model(name: str, label: str, scorer_fn, alpha_min_score: int
 
     if is_candidate_backtest_strategy(name):
         return CandidateStrategyAlphaModel(name=name, label=label)
+    if name == "ml_lgbm":
+        from backtest.strategies.ml_strategy import MLFeatureStoreAlphaModel
+
+        return MLFeatureStoreAlphaModel(label=label, min_score=alpha_min_score)
     return StrategyAlphaAdapter(
         name=name,
         label=name,

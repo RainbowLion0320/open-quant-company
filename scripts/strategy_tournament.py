@@ -204,7 +204,10 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
         aligned = pd.concat([returns, bench_ret], axis=1, join="inner").dropna()
 
         if len(aligned) > 0:
-            report = RiskAnalytics.compute(aligned.iloc[:, 0], aligned.iloc[:, 1])
+            from data.risk_free_rates import risk_free_series_for_index
+
+            risk_free_rates = risk_free_series_for_index(aligned.index)
+            report = RiskAnalytics.compute(aligned.iloc[:, 0], aligned.iloc[:, 1], risk_free_rates=risk_free_rates)
         else:
             report = FullReport()
 

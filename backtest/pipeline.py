@@ -233,10 +233,12 @@ class BacktestStage(Stage):
 
         try:
             from backtest.analytics import RiskAnalytics
+            from data.risk_free_rates import risk_free_series_for_index
             # 这里做实际回测计算...
             # 简化: 假设已计算出 daily_returns
             if ctx.daily_returns is not None:
-                report = RiskAnalytics.compute(ctx.daily_returns)
+                risk_free_rates = risk_free_series_for_index(ctx.daily_returns.dropna().index)
+                report = RiskAnalytics.compute(ctx.daily_returns, risk_free_rates=risk_free_rates)
                 ctx.info(report.summary())
         except ImportError:
             pass

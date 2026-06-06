@@ -63,9 +63,10 @@
 
 ### 2.3 ML 策略 (strategies/ml_strategy.py)
 
-- 每月从 PIT 特征切片加载特征
-- LightGBM 预测未来 20 日收益概率
-- 按预测概率排序选 Top-N
+- `MLFeatureStoreAlphaModel` 按调仓日选择不晚于该日的最新 PIT as-of 特征视图，批量预测全股票池 score map
+- 模型加载复用 `models/lgbm_runtime.py`，支持 global 与 regime-aware LightGBM 模型
+- 特征矩阵进入 LightGBM 前统一数值化，避免 Parquet 对象 dtype 破坏正式回测
+- Pipeline 继续负责 Top-N 组合构建、风控和成交模拟
 
 ### 2.4 可插拔流水线 (pipeline.py)
 
@@ -99,8 +100,8 @@ ctx = Pipeline([
 | 收益 | 年化收益率 (CAGR) | (NAV[-1]/NAV[0])^(252/n) - 1 |
 | 风险 | 年化波动率 | std(daily_returns) × √252 |
 | 风险 | 下行风险 | RMS(min(0, daily_returns)) × √252 |
-| 风险收益 | Sharpe Ratio | (CAGR - Rf) / 年化波动率 |
-| 风险收益 | Sortino Ratio | (CAGR - Rf) / 下行风险 |
+| 风险收益 | Sharpe Ratio | mean(daily_returns - daily_rf) / std(daily_returns) × √252 |
+| 风险收益 | Sortino Ratio | mean(daily_returns - daily_rf) / downside_risk × √252 |
 | 风险收益 | Calmar Ratio | CAGR / MaxDD |
 | 回撤 | Max Drawdown | max(1 - NAV/cummax(NAV)) |
 | 回撤 | MaxDD Duration | 最长水下天数 |
@@ -157,7 +158,7 @@ data/store/signals/*.parquet  (预计算信号)
     └────────┬────────┘
              │ NAV series
              ▼
-    RiskAnalytics.compute(daily_returns, benchmark_returns)
+    RiskAnalytics.compute(daily_returns, benchmark_returns, risk_free_rates=rf_curve)
              │
              ▼
     FullReport: {metrics, trades, monthly_returns}
@@ -177,6 +178,7 @@ data/store/signals/*.parquet  (预计算信号)
 | Regime 检测 | 生产 policy 历史回放 + 滞后一期 | 避免前视偏差，同时保证回测、锦标赛和 Web/API 采用同一套 regime 语义 |
 | 调仓频率 | 月初第一个交易日 | 日频调仓成本过高，月度再平衡是行业惯例 |
 | 基准选择 | 上证综指 (sh000001) | 全市场代表性最强 |
+| 无风险利率 | 本地收益率曲线 (默认 CN 2Y) | Sharpe/Sortino/Alpha 不能使用固定值或静默 fallback |
 | 交易约束 | 100 股整数倍 + 手续费 | 模拟真实 A 股交易规则 |
 | 巴菲特评分 | 滚动窗口逐年评估 | 避免全局数据泄露 |
 | 候选晋级证据 | 统一 JSON artifact | 避免 UI、文档和研究脚本各自解释策略是否可晋级 |
@@ -218,21 +220,26 @@ class BaseStrategy(ABC):
 
 ```python
 from backtest.analytics import RiskAnalytics, FullReport
+from data.risk_free_rates import risk_free_series_for_index
 
+rf_curve = risk_free_series_for_index(daily_returns.index)
 report: FullReport = RiskAnalytics.compute(
     daily_returns,
     benchmark_returns,
-    risk_free=0.03,
+    risk_free_rates=rf_curve,
     periods_per_year=252,
 )
 metrics: dict = report.to_dict()
 ```
 
+无风险利率必须来自本地曲线数据，默认配置为 `backtest.risk_free.mode=curve`、`market=CN`、`tenor=2Y`。缺少或过期的曲线数据会抛出 `RiskFreeRateDataError` 并停止指标计算，不允许固定值或 fallback rate。
+
 ## 6. 错误处理
 
 - **股票池为空：** 返回 0 收益，不崩溃
 - **价格数据缺失：** `get_stock_daily()` 返回空 DataFrame → 该股票被跳过
-- **基准数据缺失：** Alpha/Beta/IR 返回 NaN，收益类指标照常计算
+- **基准数据缺失：** 相对基准指标不计算，收益类指标照常计算
+- **无风险曲线缺失/过期：** 抛出 `RiskFreeRateDataError`，停止风险收益指标计算
 - **除零保护：** 所有比率计算前检查分母 > 0
 - **全局状态污染：** 巴菲特滚动评分器在每次策略评分前重置年度缓存，避免跨策略/跨窗口复用状态
 

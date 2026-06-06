@@ -42,13 +42,14 @@ ma_golden = Gt(MA("close", 5), MA("close", 20))
 
 ## 2. PIT 特征存储
 
-特征按月切片到 `data/store/features/YYYY-MM.parquet`。构建入口是 `scripts/build_features.py`，必须通过 CLI 或显式函数调用启动，不能在 import 时执行重任务。
+特征以 as-of 日期视图写入 `data/store/features/YYYY-MM-DD.parquet`。历史 `YYYY-MM.parquet` 仍可读取，但只代表月末兼容快照。构建入口是 `scripts/build_features.py`，必须通过 CLI 或显式函数调用启动，不能在 import 时执行重任务。
 
 关键约束：
 
 - 每个特征只使用 `as_of` 之前可获得的数据。
+- 日频价量、估值、资金流特征按交易日更新；财务、宏观、持有人等低频特征取 as-of 之前最新已披露值。
 - 前向标签使用固定交易日跨度，不能用自然日窗口漂移。
-- 构建区间、样本数、是否覆盖已有切片由 CLI 参数控制。
+- 构建区间、样本数、构建频率和是否覆盖已有切片由 CLI 参数控制。
 - 生产推理需要检查特征新鲜度，过期特征不能静默使用。
 
 ## 3. 模型训练
@@ -76,13 +77,15 @@ ma_golden = Gt(MA("close", 5), MA("close", 20))
 
 `signals/ml_signals.py` 负责生产信号：
 
-1. 加载模型和元数据。
+1. 通过 `models/lgbm_runtime.py` 加载模型和元数据，支持规范文件名和历史 regime 模型文件名。
 2. 选择最新且不过期的 PIT 特征文件。
-3. 按模型特征名构建输入矩阵。
+3. 按模型特征名构建输入矩阵，并在模型入口统一数值化特征 dtype。
 4. 生成标准信号行。
 5. 由 `data/strategy_plugins.py` 统一持久化。
 
 如果特征文件过期或覆盖不足，系统应显式告警或跳过，而不是用缺失值默默补 0。
+
+`backtest/strategies/ml_strategy.py` 负责回测 Alpha。正式回测使用 `MLFeatureStoreAlphaModel` 批量读取调仓日之前可见的最新 PIT as-of 视图并一次性预测横截面 score map，随后进入统一 Pipeline 的 portfolio/risk/execution 阶段。这个路径和生产信号共享模型加载、特征名和 dtype 清洗规则，但不消费当天最新信号文件，避免 paper 信号新鲜度与历史回测语义混在一起。
 
 ## 6. LLM 因子发现
 

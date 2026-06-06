@@ -359,15 +359,26 @@ class DataHub:
 
 
 _DEFAULT_HUB: DataHub | None = None
+_DEFAULT_HUB_SIGNATURE: tuple[str, str] | None = None
+
+
+def _default_hub_signature() -> tuple[str, str]:
+    return (
+        os.environ.get("ASTROLABE_STORE", ""),
+        os.environ.get("ASTROLABE_CACHE", ""),
+    )
 
 
 def get_datahub() -> DataHub:
-    global _DEFAULT_HUB
-    if _DEFAULT_HUB is None:
+    global _DEFAULT_HUB, _DEFAULT_HUB_SIGNATURE
+    signature = _default_hub_signature()
+    if _DEFAULT_HUB is None or _DEFAULT_HUB_SIGNATURE != signature:
         _DEFAULT_HUB = DataHub()
+        _DEFAULT_HUB_SIGNATURE = signature
     return _DEFAULT_HUB
 
 
 def reset_datahub() -> None:
-    global _DEFAULT_HUB
+    global _DEFAULT_HUB, _DEFAULT_HUB_SIGNATURE
     _DEFAULT_HUB = None
+    _DEFAULT_HUB_SIGNATURE = None

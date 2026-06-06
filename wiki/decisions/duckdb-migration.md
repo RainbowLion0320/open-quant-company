@@ -74,16 +74,16 @@ data/store/
 │   ├── cybernetic.parquet
 │   └── ml_lgbm.parquet
 ├── features/                   # Phase 3: PIT 特征 (NEW)
-│   ├── 2020-01.parquet         # 按月切片, 零前视
-│   ├── 2020-02.parquet
-│   └── ...                     # 100个月, 200股票 × 26因子
+│   ├── 2020-01-02.parquet      # as-of 日期视图, 零前视
+│   ├── 2020-01-03.parquet
+│   └── 2020-01.parquet         # 兼容月末快照
 ├── buffett_scan.parquet
 └── scan_meta.parquet
 ```
 
-**特征表 schema** (26列因子 + symbol + month):
+**特征表 schema** (因子列 + symbol + as_of_date + month):
 ```
-symbol, month,
+symbol, as_of_date, month,
 ret_1d, ret_5d, ret_20d, ret_60d,          # 收益率
 ma5_bias, ma20_bias, ma60_bias,             # 均线偏离
 vol_5d, vol_20d, vol_60d,                   # 波动率
@@ -110,11 +110,11 @@ db.execute("CREATE VIEW features_2024_01 AS SELECT * FROM read_parquet('data/sto
 **关键特性**:
 - 写: `pd.to_parquet()` — 无锁, 无并发冲突
 - 读: DuckDB视图 — 内存查询, 永不等
-- PIT严格: 每月文件只含该月已知的数据, FeatureStoreBuilder 强制 as_of 限制
+- PIT严格: 每个 as-of 文件只含该日期已知的数据, FeatureStore 强制 as_of 限制
 - 可扩展: 新增资产 → 同 schema 新文件, 无需改表
 
 ## Phase 2/3 读写模式
 
 - Web: `duckdb.connect(":memory:")` + `CREATE VIEW FROM read_parquet()` → 永不锁
 - Cron: `pd.DataFrame.to_parquet()` → 直接写文件, 不经过 DuckDB
-- Features: `FeatureStoreBuilder.build_month()` → `to_parquet()` → 按月份压缩存储
+- Features: `scripts/build_features.py --frequency daily` → `to_parquet()` → 按 as-of 日期存储，月末快照兼容

@@ -68,7 +68,7 @@ python scripts/execute_paper_trades.py --replay 2025-01-01
 python scripts/execute_paper_trades.py --dry-run
 ```
 
-信号读取：从 `data/store/signals/{strategy}.parquet` 取最新 `computed_at` 批次，过滤 `buy`/`strong_buy` → 每只买 100 股。
+信号读取：只遍历 `paper_trading.strategies` 配置内且策略注册表允许 paper 执行的策略，从 `data/store/signals/{strategy}.parquet` 取最新 `computed_at` 批次，并按 `paper_trading.max_signal_age_days` 跳过过期信号。最终过滤 `buy`/`strong_buy` → 每只买 100 股。
 
 ### Web API — /api/portfolio/*
 
@@ -119,6 +119,7 @@ paper_trading:
   risk_enabled: true
   store_dir: data/store/paper
   strategies: [buffett, multifactor, cybernetic, ml_lgbm]
+  max_signal_age_days: 2
   execution_price: close
   auto_execute: false          # cron 自动执行开关
 ```

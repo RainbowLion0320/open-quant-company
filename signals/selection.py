@@ -11,6 +11,7 @@ from math import ceil
 from typing import Iterable, List, Mapping
 
 from core.settings import get_settings
+from signals.tradability import is_tradable_signal
 
 DEFAULT_SELECTION = {
     "top_pct": 0.05,
@@ -69,7 +70,7 @@ def apply_ranked_buys(
     max_buys = int(strat_cfg.get("max_buys", cfg.get("max_buys", default_max_buys)))
 
     ranked = sorted(rows, key=_score, reverse=True)
-    eligible = [r for r in ranked if _score(r) >= min_score]
+    eligible = [r for r in ranked if _score(r) >= min_score and is_tradable_signal(r)]
     target_n = min(len(eligible), max_buys, max(min_buys, ceil(len(ranked) * top_pct)))
     buy_symbols = {r.get("symbol") for r in eligible[:target_n]}
 
@@ -77,10 +78,13 @@ def apply_ranked_buys(
         detail = row.get("detail") or {}
         if not isinstance(detail, dict):
             detail = {"raw_detail": str(detail)}
+        tradable = is_tradable_signal(row)
         detail["selection_rank"] = rank
         detail["selection_min_score"] = min_score
         detail["selection_target_n"] = target_n
+        if not tradable:
+            detail["tradability_blocked"] = True
         row["detail"] = detail
-        row["signal"] = "buy" if row.get("symbol") in buy_symbols else "hold"
+        row["signal"] = "buy" if tradable and row.get("symbol") in buy_symbols else "hold"
 
     return ranked

@@ -13,13 +13,15 @@
 
 用法:
   from backtest.analytics import RiskAnalytics
-  metrics = RiskAnalytics.compute(daily_returns, benchmark_returns)
+  metrics = RiskAnalytics.compute(daily_returns, benchmark_returns, risk_free_rates=rf_curve)
 """
 
 import numpy as np
 import pandas as pd
 from typing import Optional, Dict, List
 from dataclasses import dataclass, field
+
+from data.risk_free_rates import RiskFreeRateDataError
 
 
 @dataclass
@@ -59,6 +61,10 @@ class FullReport:
     # 其他
     n_trading_days: int = 0
     monthly_returns: Optional[pd.Series] = None
+    risk_free_mean: float = 0.0
+    risk_free_min: float = 0.0
+    risk_free_max: float = 0.0
+    risk_free_observations: int = 0
 
     def to_dict(self) -> dict:
         d = {}
@@ -108,16 +114,23 @@ class RiskAnalytics:
         cls,
         daily_returns: pd.Series,
         benchmark_returns: Optional[pd.Series] = None,
-        risk_free: float = 0.03,
+        risk_free_rates: Optional[pd.Series] = None,
         periods_per_year: int = 252,
     ) -> FullReport:
         """一次性计算所有指标"""
-        r = daily_returns.dropna().values
+        returns = daily_returns.dropna()
+        r = returns.values
         if len(r) < 10:
             return FullReport()
+        rf_annual = cls._risk_free_annual_values(returns, risk_free_rates)
+        rf_daily = rf_annual / periods_per_year
 
         report = FullReport()
         report.n_trading_days = len(r)
+        report.risk_free_mean = float(np.mean(rf_annual))
+        report.risk_free_min = float(np.min(rf_annual))
+        report.risk_free_max = float(np.max(rf_annual))
+        report.risk_free_observations = len(rf_annual)
 
         # 收益
         report.total_return = cls.total_return(r)
@@ -131,8 +144,8 @@ class RiskAnalytics:
         report.var_95 = cls.var_95(r)
 
         # 风险调整
-        report.sharpe = cls.sharpe_ratio(r, risk_free, periods_per_year)
-        report.sortino = cls.sortino_ratio(r, risk_free, periods_per_year)
+        report.sharpe = cls.sharpe_ratio(r, rf_daily, periods_per_year)
+        report.sortino = cls.sortino_ratio(r, rf_daily, periods_per_year)
         report.calmar = cls.calmar_ratio(r, periods_per_year)
 
         # 相对基准
@@ -141,7 +154,7 @@ class RiskAnalytics:
             if len(b) > 10:
                 common_len = min(len(r), len(b))
                 report.alpha, report.beta = cls.alpha_beta(
-                    r[-common_len:], b[-common_len:], risk_free, periods_per_year
+                    r[-common_len:], b[-common_len:], rf_annual[-common_len:], periods_per_year
                 )
                 report.information_ratio = cls.information_ratio(
                     r[-common_len:], b[-common_len:], periods_per_year
@@ -165,6 +178,31 @@ class RiskAnalytics:
             )
 
         return report
+
+    @staticmethod
+    def _risk_free_annual_values(daily_returns: pd.Series, risk_free_rates: Optional[pd.Series]) -> np.ndarray:
+        if risk_free_rates is None:
+            raise RiskFreeRateDataError("risk-free rate series is required for performance analytics")
+        if not isinstance(risk_free_rates, pd.Series):
+            risk_free_rates = pd.Series(risk_free_rates)
+        if len(risk_free_rates) == 0:
+            raise RiskFreeRateDataError("risk-free rate series is empty")
+
+        if not isinstance(daily_returns.index, pd.DatetimeIndex):
+            raise RiskFreeRateDataError("daily returns require a DatetimeIndex for risk-free curve alignment")
+        if not isinstance(risk_free_rates.index, pd.DatetimeIndex):
+            raise RiskFreeRateDataError("risk-free rate series requires a DatetimeIndex")
+        rf = risk_free_rates.reindex(daily_returns.index)
+
+        rf = pd.to_numeric(rf, errors="coerce")
+        missing = rf.isna() | ~np.isfinite(rf)
+        if missing.any():
+            sample = ", ".join(str(idx) for idx in rf.index[missing][:5])
+            raise RiskFreeRateDataError(f"risk-free rate series has missing values; sample={sample}")
+        values = rf.astype(float).to_numpy()
+        if np.nanmedian(np.abs(values)) > 1:
+            raise RiskFreeRateDataError("risk-free rates must be annual decimal values, not percentages")
+        return values
 
     # ── 收益指标 ──
 
@@ -230,16 +268,16 @@ class RiskAnalytics:
     # ── 风险调整收益 ──
 
     @staticmethod
-    def sharpe_ratio(r: np.ndarray, rf: float = 0.03, periods: int = 252) -> float:
-        excess = np.mean(r) - rf / periods
+    def sharpe_ratio(r: np.ndarray, rf_daily: np.ndarray, periods: int = 252) -> float:
+        excess = r - rf_daily
         std = np.std(r, ddof=1)
-        return excess / std * np.sqrt(periods) if std > 0 else 0
+        return np.mean(excess) / std * np.sqrt(periods) if std > 0 else 0
 
     @staticmethod
-    def sortino_ratio(r: np.ndarray, rf: float = 0.03, periods: int = 252) -> float:
-        excess = np.mean(r) - rf / periods
+    def sortino_ratio(r: np.ndarray, rf_daily: np.ndarray, periods: int = 252) -> float:
+        excess = r - rf_daily
         downside = RiskAnalytics.downside_risk(r, 1)  # daily downside
-        return excess / downside * np.sqrt(periods) if downside > 0 else 0
+        return np.mean(excess) / downside * np.sqrt(periods) if downside > 0 else 0
 
     @staticmethod
     def calmar_ratio(r: np.ndarray, periods: int = 252) -> float:
@@ -256,7 +294,7 @@ class RiskAnalytics:
     # ── 因子相关 ──
 
     @staticmethod
-    def alpha_beta(r: np.ndarray, benchmark_r: np.ndarray, rf: float = 0.03, periods: int = 252) -> tuple:
+    def alpha_beta(r: np.ndarray, benchmark_r: np.ndarray, rf_annual: np.ndarray, periods: int = 252) -> tuple:
         """返回 (alpha, beta)"""
         cov = np.cov(r, benchmark_r)
         if cov.shape != (2, 2):
@@ -264,6 +302,7 @@ class RiskAnalytics:
         beta = cov[0, 1] / cov[1, 1] if cov[1, 1] > 0 else 1.0
         ann_r = RiskAnalytics.annual_return(r, periods)
         ann_b = RiskAnalytics.annual_return(benchmark_r, periods)
+        rf = float(np.mean(rf_annual))
         alpha = ann_r - rf - beta * (ann_b - rf)
         return alpha, beta
 

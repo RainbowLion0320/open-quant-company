@@ -40,7 +40,12 @@ backtest:
   initial_cash: 1000000
   periods_per_year: 252
   pool_size: 0
-  risk_free_rate: 0.03
+  risk_free:
+    mode: curve
+    source: treasury_yields
+    market: CN
+    tenor: 2Y
+    max_staleness_days: 10
   start_date: '2020-01-01'
   end_date: '2026-05-10'
   min_bars: 200
@@ -465,6 +470,7 @@ signal_selection:
 ml:
   use_regime_models: true
   score_scale: 5.0
+  feature_frequency: daily
   max_feature_age_months: 3
   allow_stale_features: false
   allow_live_factor_fallback: false
@@ -774,6 +780,7 @@ paper_trading:
   order_value_pct: 0.05
   max_order_value: 50000
   max_orders_per_strategy: 5
+  max_signal_age_days: 2
   sell_all_on_sell_signal: true
   strategies:
   - buffett

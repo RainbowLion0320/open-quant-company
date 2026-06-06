@@ -1,17 +1,17 @@
 # 星盘 / Astrolabe Quant OS — 维护命令
-PYTHON = /Users/fushao/.hermes/hermes-agent/venv/bin/python3
+PYTHON ?= .venv/bin/python
 
 .PHONY: install test lint ci clean scan backtest regime web web-build web-dev web-stop
 
 # 安装依赖
 install:
-	pip install -r requirements.txt
+	$(PYTHON) -m pip install -r requirements.txt
 
 install-dev: install
-	pip install -r requirements-dev.txt
+	$(PYTHON) -m pip install -r requirements-dev.txt
 
 install-ml: install
-	pip install lightgbm scikit-learn optuna
+	$(PYTHON) -m pip install lightgbm scikit-learn optuna
 
 # 运行测试
 test:

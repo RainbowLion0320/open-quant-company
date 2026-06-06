@@ -89,14 +89,14 @@
 
 **模型：** LightGBM 二分类（未来 20 日收益 > 中位数 = 正样本）
 
-**PIT 特征：** 每月从 `data/store/features/YYYY-MM.parquet` 读取特征切片，训练/预测严格使用该月之前的数据
+**PIT 特征：** 优先从 `data/store/features/YYYY-MM-DD.parquet` 读取不晚于预测日的最新 as-of 特征视图；历史 `YYYY-MM.parquet` 月末快照继续兼容。训练/预测严格只使用 as-of 日期之前已可见的数据。
 
 **训练流程：**
 1. `scripts/build_features.py` — 批量构建月度 PIT 特征切片
 2. `scripts/tune_model.py` — Optuna 超参搜索，输出到 `data/models/`
 3. `scripts/weekly_retrain.py` — Cron 周六自动重训
 
-**模型注册表：** `models/__init__.py` → `list_models()` / `load_model(name)` / `model_metadata(name)`
+**模型加载：** `models/lgbm_runtime.py` 统一读取 global/regime 模型、元数据和加载错误；生产信号与 ML 回测复用同一加载规则。
 
 ### 2.4 控制论自适应 (cybernetics/orchestrator.py)
 
@@ -240,7 +240,8 @@ Vol20 = Std(Ret("close"), 20)
 - `min_score`、`top_pct`、`min_buys`、`max_buys` 从 `signal_selection` 全局配置和策略级配置合并
 - 最高 ranked 的 eligible rows 标为 `buy`，其他行保留为 `hold`，用于 Web/历史可观测性
 - 输出写入 `detail.selection_rank`、`selection_min_score`、`selection_target_n`
-- sell、停牌/ST 过滤和实际订单约束不在 `selection.py` 完成，由信号变更、执行层和交易约束承担
+- ST、退市风险名称在 `signals/tradability.py` 中统一阻断，selection 会把这些行保留为 `hold` 并标记 `detail.tradability_blocked`
+- sell、停牌和实际订单约束不在 `selection.py` 完成，由信号变更、执行层和交易约束承担
 
 ## 3. 数据流
 

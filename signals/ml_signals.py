@@ -3,7 +3,6 @@ ML 信号计算 — 用训练好的 LightGBM 模型生成每日买卖信号
 
 集成到 compute_signals.py: 跟巴菲特/多因子/控制论并列运行
 """
-import sys, pickle, json
 from pathlib import Path
 from typing import List, Dict
 
@@ -17,7 +16,8 @@ from data.price_types import PriceUseCase
 from signals.expression import alpha_factors
 from signals.selection import apply_ranked_buys
 from models import MODEL_DIR
-from data.feature_store import latest_feature_file
+from models.lgbm_runtime import global_model_candidates, load_lgbm_bundle, regime_model_candidates
+from data.feature_store import feature_date_key, feature_key_to_date, latest_feature_file
 from core.settings import get_settings
 
 
@@ -44,39 +44,19 @@ def _load_model_bundle(model_version: str = "best") -> tuple[object | None, list
     regime, _probs = _current_regime()
     use_regime = cfg.get("use_regime_models", True)
 
-    candidates: list[tuple[Path, Path, str]] = []
+    candidates = []
     if use_regime and model_version == "best" and regime in {"bull", "bear", "sideways"}:
-        candidates.extend([
-            (MODEL_DIR / f"lgbm_{regime}.pkl", MODEL_DIR / f"lgbm_{regime}_meta.json", f"regime:{regime}"),
-        ])
-    candidates.append((MODEL_DIR / f"lgbm_{model_version}.pkl", MODEL_DIR / "lgbm_best_meta.json", model_version))
+        candidates.extend(regime_model_candidates(MODEL_DIR, regime))
+    candidates.extend(global_model_candidates(MODEL_DIR, model_version))
 
-    for model_path, meta_path, label in candidates:
-        if not model_path.exists():
-            continue
-        try:
-            with open(model_path, "rb") as f:
-                model = pickle.load(f)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"Failed to load model {model_path}: {e}")
-            continue
-        meta = {}
-        feature_names: list[str] = []
-        if meta_path.exists():
-            try:
-                with open(meta_path) as f:
-                    meta = json.load(f)
-                    feature_names = meta.get("features", [])
-            except Exception:
-                meta = {}
-        if not feature_names:
-            feature_names = list(getattr(model, "_feature_names", []) or [])
-        meta["selected_regime"] = regime
-        meta["selected_model"] = label
-        return model, feature_names, meta, label
-
-    return None, [], {"selected_regime": regime, "selected_model": "missing"}, "missing"
+    bundle = load_lgbm_bundle(candidates)
+    meta = dict(bundle.meta)
+    meta["selected_regime"] = regime
+    meta["selected_model"] = bundle.selected_model
+    meta["load_errors"] = bundle.errors
+    if bundle.model is not None:
+        return bundle.model, bundle.feature_names, meta, bundle.selected_model
+    return None, [], meta, "missing"
 
 
 def _feature_age_months(month: str) -> int:
@@ -89,7 +69,7 @@ def _feature_age_months(month: str) -> int:
 
 
 def _latest_feature_file(cfg: dict) -> tuple[Path | None, str]:
-    latest = latest_feature_file()
+    latest = latest_feature_file(as_of=pd.Timestamp.today())
     if latest is None:
         return None, "missing"
 
@@ -136,8 +116,10 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
         print(f"[ML] ⚠️ PIT 特征不可用 ({feature_status}), 请先运行 build_features.py")
         return []
 
-    latest_month = latest_feature_path.stem
-    print(f"[ML] 使用特征: {latest_month}")
+    latest_key = latest_feature_path.stem
+    inferred_as_of = feature_key_to_date(latest_key)
+    feature_as_of = feature_date_key(inferred_as_of) if inferred_as_of is not None else latest_key
+    print(f"[ML] 使用特征: {latest_key}")
     try:
         feature_df = pd.read_parquet(latest_feature_path)
     except Exception as e:
@@ -167,8 +149,12 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
         try:
             features = {}
             used_fallback = False
+            feature_month_detail = feature_as_of[:7]
+            feature_asof_detail = feature_as_of
             if sym in feature_df.index:
                 row = feature_df.loc[sym]
+                feature_month_detail = row.get("month", feature_month_detail)
+                feature_asof_detail = row.get("as_of_date", feature_asof_detail)
                 for name in feature_names:
                     val = row.get(name, 0.0)
                     try:
@@ -216,7 +202,8 @@ def compute_ml_signals(limit: int = 0, model_version: str = "best") -> List[dict
                     "pred_raw": round(float(pred), 4),
                     "model": selected_model,
                     "regime": meta.get("selected_regime", ""),
-                    "feature_month": latest_month,
+                    "feature_month": feature_month_detail,
+                    "feature_as_of_date": feature_asof_detail,
                     "feature_source": "live_fallback" if used_fallback else "feature_store",
                 },
             })

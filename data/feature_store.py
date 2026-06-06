@@ -2,12 +2,14 @@
 Point-in-Time 特征存储
 
 设计:
-  data/store/features/YYYY-MM.parquet  — 每月一个 Parquet 文件
-  每行一只股票, 每列一个因子, 用当时已知的数据计算
+  data/store/features/YYYY-MM-DD.parquet  — 每个 as-of 交易日一个 Parquet 文件
+  data/store/features/YYYY-MM.parquet     — 兼容的月末快照
+  每行一只股票, 每列一个因子, 用 as-of 当时已知的数据计算
 
 关键约束:
-  - 计算 2020-01 的特征时, 绝不使用 2020-02 之后的价格数据
-  - 逐月滚动构建, 前视偏差零容忍
+  - 计算 2020-01-15 的特征时, 绝不使用 2020-01-16 之后的数据
+  - 日频价量特征按 as-of 日期更新, 低频数据取 as-of 前最新披露值
+  - 前视偏差零容忍
 
 用法:
   builder = FeatureStoreBuilder(alpha_factors())
@@ -16,7 +18,6 @@ Point-in-Time 特征存储
 """
 from pathlib import Path
 from typing import Dict, List, Optional
-from datetime import datetime
 
 import pandas as pd
 import numpy as np
@@ -32,17 +33,68 @@ FEATURES_DIR.mkdir(parents=True, exist_ok=True)
 FEATURE_METADATA_STEMS = frozenset({"scan_meta", "buffett_scan"})
 
 
+def feature_key_to_date(key: str) -> pd.Timestamp | None:
+    """Map a feature file stem to its PIT as-of date."""
+    text = str(key or "").strip()
+    if not text:
+        return None
+    try:
+        if len(text) == 7:
+            return pd.Timestamp(text + "-01") + pd.offsets.MonthEnd(0)
+        return pd.Timestamp(text)
+    except Exception:
+        return None
+
+
+def feature_date_key(as_of: str | pd.Timestamp) -> str:
+    return pd.Timestamp(as_of).strftime("%Y-%m-%d")
+
+
+def feature_month_key(as_of: str | pd.Timestamp) -> str:
+    return pd.Timestamp(as_of).to_period("M").strftime("%Y-%m")
+
+
 def iter_feature_files(directory: Path | None = None) -> list[Path]:
-    """List monthly PIT feature parquet files, excluding metadata sidecars."""
+    """List PIT feature parquet files, excluding metadata sidecars."""
     root = directory or FEATURES_DIR
     if not root.exists():
         return []
     return sorted(path for path in root.glob("*.parquet") if path.stem not in FEATURE_METADATA_STEMS)
 
 
-def latest_feature_file(directory: Path | None = None) -> Path | None:
+def latest_feature_file(directory: Path | None = None, as_of: str | pd.Timestamp | None = None) -> Path | None:
     files = iter_feature_files(directory)
+    if as_of is not None:
+        cutoff = pd.Timestamp(as_of).normalize()
+        files = [
+            path
+            for path in files
+            if (feature_key_to_date(path.stem) is not None and feature_key_to_date(path.stem).normalize() <= cutoff)
+        ]
     return files[-1] if files else None
+
+
+def write_feature_slice(
+    df: pd.DataFrame,
+    key: str,
+    *,
+    directory: Path | None = None,
+    hub=None,
+) -> Path:
+    """Write a PIT feature slice with normalized date metadata."""
+    as_of = feature_key_to_date(key) or pd.Timestamp(key)
+    out = df.copy()
+    out["as_of_date"] = feature_date_key(as_of)
+    if "month" not in out.columns:
+        out["month"] = feature_month_key(as_of)
+    root = directory or FEATURES_DIR
+    path = root / f"{key}.parquet"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if hub is not None:
+        hub.write_parquet(out, path)
+    else:
+        out.to_parquet(path, index=False)
+    return path
 
 
 def _read_feature_file(path: Path, hub=None) -> pd.DataFrame:
@@ -51,14 +103,38 @@ def _read_feature_file(path: Path, hub=None) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
     out = df.copy()
+    inferred_as_of = feature_key_to_date(path.stem)
+    if "as_of_date" not in out.columns:
+        if inferred_as_of is not None:
+            out["as_of_date"] = feature_date_key(inferred_as_of)
+    else:
+        parsed = pd.to_datetime(out["as_of_date"], errors="coerce")
+        if inferred_as_of is not None:
+            parsed = parsed.fillna(inferred_as_of)
+        out["as_of_date"] = parsed.dt.strftime("%Y-%m-%d")
     if "month" not in out.columns:
-        out["month"] = path.stem
+        if "as_of_date" in out.columns:
+            out["month"] = pd.to_datetime(out["as_of_date"], errors="coerce").dt.to_period("M").astype(str)
+        else:
+            out["month"] = path.stem
     return out
 
 
-def load_feature_panel(files: list[Path] | None = None, hub=None) -> pd.DataFrame:
-    """Load and concatenate all monthly PIT feature slices."""
-    selected = files if files is not None else iter_feature_files()
+def load_feature_panel(
+    files: list[Path] | None = None,
+    hub=None,
+    directory: Path | None = None,
+    as_of: str | pd.Timestamp | None = None,
+) -> pd.DataFrame:
+    """Load and concatenate PIT feature slices."""
+    selected = files if files is not None else iter_feature_files(directory)
+    if as_of is not None:
+        cutoff = pd.Timestamp(as_of).normalize()
+        selected = [
+            path
+            for path in selected
+            if (feature_key_to_date(path.stem) is not None and feature_key_to_date(path.stem).normalize() <= cutoff)
+        ]
     frames = [_read_feature_file(path, hub=hub) for path in selected]
     frames = [frame for frame in frames if not frame.empty]
     if not frames:
@@ -66,12 +142,26 @@ def load_feature_panel(files: list[Path] | None = None, hub=None) -> pd.DataFram
     return pd.concat(frames, ignore_index=True)
 
 
-def latest_feature_frame(hub=None) -> pd.DataFrame:
-    """Load the latest monthly PIT feature slice, or an empty frame when absent."""
-    latest = latest_feature_file()
+def latest_feature_frame(hub=None, as_of: str | pd.Timestamp | None = None) -> pd.DataFrame:
+    """Load the latest PIT feature slice, or an empty frame when absent."""
+    latest = latest_feature_file(as_of=as_of)
     if latest is None:
         return pd.DataFrame()
     return _read_feature_file(latest, hub=hub)
+
+
+def feature_time_key_column(df: pd.DataFrame) -> str:
+    """Return the preferred temporal key column for feature rows."""
+    return "as_of_date" if "as_of_date" in df.columns else "month"
+
+
+def feature_period_key(values) -> pd.Series:
+    """Normalize feature row timestamps into monthly CV buckets."""
+    series = pd.Series(values)
+    parsed = pd.to_datetime(series, errors="coerce")
+    if parsed.notna().any():
+        return parsed.dt.to_period("M").astype(str)
+    return series.astype(str).str.slice(0, 7)
 
 
 class FeatureStoreBuilder:
@@ -246,14 +336,13 @@ def enrich_from_registry(
     Enrich a feature DataFrame with additional data dimensions from the data registry.
 
     Reads cached Parquet files for moneyflow, holders, macro and
-    adds derived factors. PIT-safe: only uses data before `month`.
+    adds derived factors. PIT-safe: only uses data before the feature key.
 
     Returns enriched DataFrame with new factor columns.
     """
     from data.data_registry import get_registry
 
-    month_dt = pd.Timestamp(month)
-    month_end = month_dt + pd.offsets.MonthEnd(0)  # Last day of month
+    as_of_date = feature_key_to_date(month) or pd.Timestamp(month)
     reg = get_registry()
 
     # ── Moneyflow factors ──
@@ -268,7 +357,7 @@ def enrich_from_registry(
                     dt = pd.Timestamp(pq.stem)
                 except:
                     continue
-                if dt <= month_end:
+                if dt <= as_of_date:
                     mf_df = HUB.read_parquet(pq)
                     break
 
@@ -305,7 +394,7 @@ def enrich_from_registry(
                 if "end_date" not in hf_df.columns or len(hf_df) < 2:
                     continue
                 hf_df["end_date"] = pd.to_datetime(hf_df["end_date"], errors="coerce")
-                hf_df = hf_df[hf_df["end_date"] <= month_end]
+                hf_df = hf_df[hf_df["end_date"] <= as_of_date]
                 if len(hf_df) < 2:
                     continue
                 cur = int(hf_df.iloc[-1].get("holder_num", 0) or 0)
@@ -341,7 +430,7 @@ def enrich_from_registry(
 
                 md[date_col] = pd.to_datetime(md[date_col], errors="coerce")
                 md = md.dropna(subset=[date_col])  # Remove NaT rows BEFORE date filter
-                md = md[md[date_col] <= month_end]
+                md = md[md[date_col] <= as_of_date]
                 if len(md) == 0:
                     continue
 

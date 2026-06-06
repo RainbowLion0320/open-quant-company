@@ -216,7 +216,7 @@ def prepare_xy(
         raise KeyError(f"target column not found: {target_col}")
 
     if skip_cols is None:
-        skip_cols = ["symbol", "date", "month", "name", target_col]
+        skip_cols = ["symbol", "date", "as_of_date", "month", "name", "_cv_period", "_regime_month", "regime", target_col]
 
     df = features_df.copy()
     df[target_col] = pd.to_numeric(df[target_col], errors="coerce")

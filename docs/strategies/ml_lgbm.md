@@ -10,6 +10,8 @@
 
 当前定位为辅助 Alpha，不直接作为 production 主策略。进入 production 前必须通过策略晋级门槛：足够 OOS 月数、交易次数、Sharpe、最大回撤、换手、IC 和 ICIR。
 
+运行时模型加载由 `models/lgbm_runtime.py` 统一处理。生产信号和回测都会优先加载 regime-aware 模型；当前兼容历史遗留的 `lgbm_lgbm_{regime}.pkl` 文件名，但新产物应使用规范命名 `lgbm_{regime}.pkl`。
+
 ## 数据依赖
 
 | 维度 | 来源 | 频率 |
@@ -20,19 +22,28 @@
 | adj_factor | Tushare | daily |
 | valuation_daily | Tushare | daily |
 | moneyflow_daily | AKShare | daily |
-| features_all (PIT) | Computed | monthly |
+| features_all (PIT) | Computed | daily as-of preferred; monthly compatible |
 
 ## 参数空间
 
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | use_regime_models | true | 分市场状态模型 |
+| feature_frequency | daily | PIT 特征目标粒度 |
 | max_feature_age_months | 3 | 特征最大时效 |
 | score_scale | 5.0 | Sigmoid 压缩系数 |
 | allow_stale_features | false | 过期特征处理 |
 | allow_live_factor_fallback | false | 实时因子回退 |
 
 价格口径权威来源为 `data/price_service.py`。PIT 特征、信号和回测使用 `PriceUseCase.RESEARCH/SIGNAL/BACKTEST` 的 `qfq` 口径，实时执行和估值路径另走 `raw`。
+
+## 回测路径
+
+回测入口 `backtest/run_all_strategies.py --strategy ml_lgbm` 使用 `MLFeatureStoreAlphaModel`，按调仓日选择不晚于该日的最新 PIT as-of 特征视图一次性批量预测全股票池，再交给统一 Pipeline 执行组合构建、风控和成交模拟。不要退回通用逐股 `StrategyAlphaAdapter`，否则正式全池回测会退化为数千只股票逐个 `predict()`。
+
+日频价量、估值和资金流特征应使用 `scripts/build_features.py --frequency daily` 构建到 `data/store/features/YYYY-MM-DD.parquet`。历史 `YYYY-MM.parquet` 文件仍可读取，但只代表月末兼容快照，不是长期精度目标。
+
+特征矩阵进入模型前会统一 `to_numeric(errors="coerce")`，再处理 `inf`/`nan`，避免 Parquet 中对象类型列导致 LightGBM 拒绝预测。
 
 ## 结果来源
 

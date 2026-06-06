@@ -16,7 +16,7 @@ import numpy as np
 from scipy.stats import spearmanr
 
 from data.datahub import get_datahub
-from data.feature_store import TimeSeriesSplitter, load_feature_panel
+from data.feature_store import TimeSeriesSplitter, feature_period_key, feature_time_key_column, load_feature_panel
 from models import LightGBMRegressor, prepare_xy, MODEL_DIR
 
 HUB = get_datahub()
@@ -40,8 +40,10 @@ def optimize_hyperparams(n_trials: int = 50) -> dict:
     valid = df.dropna(subset=["ret_fwd_20d"])
 
     # ── 滚动窗口 CV (消除数据泄露) ──
-    from data.feature_store import TimeSeriesSplitter
-    months = sorted(valid["month"].unique())
+    time_key = feature_time_key_column(valid)
+    valid = valid.copy()
+    valid["_cv_period"] = feature_period_key(valid[time_key])
+    months = sorted(valid["_cv_period"].dropna().unique())
     splitter = TimeSeriesSplitter(train_months=48, test_months=6, step_months=12)
     splits = splitter.split(months)
 
@@ -53,8 +55,8 @@ def optimize_hyperparams(n_trials: int = 50) -> dict:
     # 预构建每轮的数据
     fold_data = []
     for train_ms, test_ms in splits:
-        train = valid[valid["month"].isin(train_ms)]
-        test = valid[valid["month"].isin(test_ms)]
+        train = valid[valid["_cv_period"].isin(train_ms)]
+        test = valid[valid["_cv_period"].isin(test_ms)]
         if len(train) < 100 or len(test) < 20:
             continue
         X_tr, y_tr = prepare_xy(train, "ret_fwd_20d")

@@ -96,14 +96,18 @@ def test_risk_analytics_boundary_handles_normal_and_degenerate_returns():
         index=pd.date_range("2024-01-01", periods=20, freq="B"),
     )
 
-    metrics = RiskAnalytics.compute(returns, benchmark)
+    risk_free = pd.Series([0.015] * len(returns), index=returns.index)
+    metrics = RiskAnalytics.compute(returns, benchmark, risk_free_rates=risk_free)
     assert metrics.sharpe > 0
     assert metrics.max_drawdown < 0
     assert 0 <= metrics.win_rate <= 1
     assert abs(metrics.beta) > 0
     assert abs(metrics.alpha) < 100
 
-    all_positive = RiskAnalytics.compute(pd.Series([0.01] * 20))
+    positive_index = pd.date_range("2024-02-01", periods=20, freq="B")
+    positive_returns = pd.Series([0.01] * 20, index=positive_index)
+    positive_rf = pd.Series([0.015] * len(positive_returns), index=positive_returns.index)
+    all_positive = RiskAnalytics.compute(positive_returns, risk_free_rates=positive_rf)
     assert all_positive.win_rate == 1.0
     assert all_positive.max_drawdown == 0.0
 
