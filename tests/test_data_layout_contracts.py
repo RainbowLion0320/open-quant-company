@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import importlib
-import subprocess
 import sys
 from pathlib import Path
 
@@ -12,14 +10,7 @@ import pytest
 def test_datahub_defaults_to_var_runtime_layout(monkeypatch):
     from data.storage.datahub import DataHub, reset_datahub
 
-    for name in (
-        "ASTROLABE_VAR",
-        "ASTROLABE_STORE",
-        "ASTROLABE_CACHE",
-        "ASTROLABE_ARTIFACTS",
-        "ASTROLABE_DB",
-    ):
-        monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv("ASTROLABE_VAR", raising=False)
     reset_datahub()
 
     hub = DataHub(create=False)
@@ -30,10 +21,9 @@ def test_datahub_defaults_to_var_runtime_layout(monkeypatch):
     assert hub.cache_root == root / "var" / "cache"
     assert hub.artifact_dir("backtests") == root / "var" / "artifacts" / "backtests"
     assert hub.db_path("quant_results.duckdb") == root / "var" / "db" / "quant_results.duckdb"
-    assert hub.migration_dir() == root / "var" / "migration"
 
 
-def test_datahub_runtime_env_overrides(tmp_path, monkeypatch):
+def test_datahub_runtime_env_is_single_canonical_override(tmp_path, monkeypatch):
     from data.storage.datahub import DataHub, reset_datahub
 
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
@@ -44,6 +34,28 @@ def test_datahub_runtime_env_overrides(tmp_path, monkeypatch):
     reset_datahub()
 
     hub = DataHub(project_root=tmp_path, create=False)
+
+    assert hub.runtime_dir() == tmp_path / "runtime"
+    assert hub.store_root == tmp_path / "runtime" / "store"
+    assert hub.cache_root == tmp_path / "runtime" / "cache"
+    assert hub.artifact_dir("models") == tmp_path / "runtime" / "artifacts" / "models"
+    assert hub.db_path("x.duckdb") == tmp_path / "runtime" / "db" / "x.duckdb"
+
+
+def test_datahub_explicit_roots_override_runtime_env(tmp_path, monkeypatch):
+    from data.storage.datahub import DataHub, reset_datahub
+
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    reset_datahub()
+
+    hub = DataHub(
+        project_root=tmp_path,
+        store_root=tmp_path / "custom-store",
+        cache_root=tmp_path / "custom-cache",
+        artifact_root=tmp_path / "custom-artifacts",
+        db_root=tmp_path / "custom-db",
+        create=False,
+    )
 
     assert hub.runtime_dir() == tmp_path / "runtime"
     assert hub.store_root == tmp_path / "custom-store"
@@ -63,104 +75,9 @@ def test_data_registry_cache_patterns_are_relative_to_store_root():
         assert ".." not in Path(cache).parts
 
 
-def test_data_layout_migration_dry_run_does_not_move_files(tmp_path):
-    _write_legacy_layout(tmp_path)
-
-    result = subprocess.run(
-        [
-            ".venv/bin/python",
-            "scripts/migrate_data_layout.py",
-            "--root",
-            str(tmp_path),
-            "--dry-run",
-            "--json",
-        ],
-        cwd=Path(__file__).resolve().parents[1],
-        text=True,
-        capture_output=True,
-        check=True,
-    )
-    payload = json.loads(result.stdout)
-    targets = {item["target"] for item in payload["items"]}
-
-    assert str(tmp_path / "var/store") in targets
-    assert str(tmp_path / "var/cache") in targets
-    assert str(tmp_path / "var/artifacts/backtests/backtest_ml_lgbm.pkl") in targets
-    assert (tmp_path / "data/store/scan_meta.parquet").exists()
-    assert (tmp_path / "data/backtest_ml_lgbm.pkl").exists()
-    assert not (tmp_path / "var/migration").exists()
-
-
-def test_data_layout_migration_apply_moves_files_and_records_manifest(tmp_path):
-    _write_legacy_layout(tmp_path)
-
-    result = subprocess.run(
-        [
-            ".venv/bin/python",
-            "scripts/migrate_data_layout.py",
-            "--root",
-            str(tmp_path),
-            "--apply",
-            "--json",
-        ],
-        cwd=Path(__file__).resolve().parents[1],
-        text=True,
-        capture_output=True,
-        check=True,
-    )
-    payload = json.loads(result.stdout)
-
-    assert (tmp_path / "var/store/scan_meta.parquet").exists()
-    assert (tmp_path / "var/cache/api/cache.parquet").exists()
-    assert (tmp_path / "var/artifacts/backtests/backtest_ml_lgbm.pkl").exists()
-    assert (tmp_path / "var/cache/backtest/price_matrix_qfq_demo.pkl").exists()
-    assert (tmp_path / "var/artifacts/tournaments/tournament.json").exists()
-    assert (tmp_path / "var/artifacts/models/lgbm_best.pkl").exists()
-    assert (tmp_path / "var/db/quant_results.duckdb").exists()
-    assert (tmp_path / "var/cache/runtime/financials_progress.json").exists()
-    assert not (tmp_path / "data/backtest_ml_lgbm.pkl").exists()
-
-    manifest_path = Path(payload["manifest_path"])
-    assert manifest_path.exists()
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert any(item["status"] == "moved" for item in manifest["items"])
-    assert any(item["source"].endswith("data/backtest_ml_lgbm.pkl") and item["sha256"] for item in manifest["items"])
-
-
-def test_data_layout_migration_apply_does_not_overwrite_existing_targets(tmp_path):
-    source = tmp_path / "data" / "backtest_ml_lgbm.pkl"
-    target = tmp_path / "var" / "artifacts" / "backtests" / "backtest_ml_lgbm.pkl"
-    source.parent.mkdir(parents=True)
-    target.parent.mkdir(parents=True)
-    source.write_text("source", encoding="utf-8")
-    target.write_text("target", encoding="utf-8")
-
-    result = subprocess.run(
-        [
-            ".venv/bin/python",
-            "scripts/migrate_data_layout.py",
-            "--root",
-            str(tmp_path),
-            "--apply",
-            "--json",
-        ],
-        cwd=Path(__file__).resolve().parents[1],
-        text=True,
-        capture_output=True,
-        check=True,
-    )
-    payload = json.loads(result.stdout)
-
-    assert source.exists()
-    assert target.read_text(encoding="utf-8") == "target"
-    item = next(item for item in payload["items"] if item["source"].endswith("data/backtest_ml_lgbm.pkl"))
-    assert item["status"] == "conflict"
-    assert item["sha256"]
-
-
 def test_data_root_contains_only_init_and_canonical_packages():
     root = Path(__file__).resolve().parents[1] / "data"
-    root_files = sorted(p.name for p in root.iterdir() if p.is_file())
+    root_files = sorted(p.name for p in root.iterdir() if p.is_file() and p.suffix == ".py")
     forbidden_legacy_packages = ["assets", "fetchers", "sector_pipeline"]
     forbidden_suffixes = {".pkl", ".db", ".duckdb"}
     forbidden_files = [
@@ -174,6 +91,12 @@ def test_data_root_contains_only_init_and_canonical_packages():
     assert [name for name in forbidden_legacy_packages if (root / name).exists()] == []
     assert forbidden_files == []
     assert forbidden_dirs == []
+
+
+def test_data_layout_migration_tool_is_removed():
+    root = Path(__file__).resolve().parents[1]
+    assert not (root / "scripts" / "migrate_data_layout.py").exists()
+    assert not (root / "docs" / "operations" / "data-layout-migration.md").exists()
 
 
 def test_canonical_data_imports_are_available():
@@ -211,20 +134,3 @@ def test_legacy_data_imports_are_removed():
         sys.modules.pop(name, None)
         with pytest.raises(ModuleNotFoundError):
             importlib.import_module(name)
-
-
-def _write_legacy_layout(root: Path) -> None:
-    files = {
-        "data/store/scan_meta.parquet": "store",
-        "data/cache/api/cache.parquet": "cache",
-        "data/backtest_ml_lgbm.pkl": "backtest",
-        "data/price_matrix_qfq_demo.pkl": "matrix",
-        "data/tournament/tournament.json": "{}",
-        "data/models/lgbm_best.pkl": "model",
-        "data/quant_results.duckdb": "db",
-        "data/.financials_progress.json": "{}",
-    }
-    for rel, text in files.items():
-        path = root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")

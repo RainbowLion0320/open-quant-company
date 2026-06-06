@@ -77,15 +77,14 @@ def test_datahub_facade_delegates_to_internal_components(tmp_path):
 
 
 def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatch):
-    from data.storage.datahub import DataHub, reset_datahub
+    from data.storage.datahub import get_datahub, reset_datahub
 
-    store = tmp_path / "store"
-    cache = tmp_path / "cache"
-    monkeypatch.setenv("ASTROLABE_STORE", str(store))
-    monkeypatch.setenv("ASTROLABE_CACHE", str(cache))
+    runtime = tmp_path / "runtime"
+    store = runtime / "store"
+    monkeypatch.setenv("ASTROLABE_VAR", str(runtime))
     reset_datahub()
 
-    hub = DataHub(store_root=store, cache_root=cache)
+    hub = get_datahub()
     hub.write_parquet(
         pd.DataFrame({"日期": ["2026-05-20"], "主力净流入-净额": [100.0]}),
         hub.dimension_path("moneyflow_daily", symbol="000001"),
@@ -114,40 +113,34 @@ def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatc
     reset_datahub()
 
 
-def test_datahub_uses_canonical_astrolabe_env(tmp_path, monkeypatch):
+def test_datahub_uses_canonical_runtime_env(tmp_path, monkeypatch):
     from data.storage.datahub import DataHub
 
-    astrolabe_store = tmp_path / "astrolabe-quant-store"
-    astrolabe_cache = tmp_path / "astrolabe-quant-cache"
-    monkeypatch.setenv("ASTROLABE_STORE", str(astrolabe_store))
-    monkeypatch.setenv("ASTROLABE_CACHE", str(astrolabe_cache))
+    runtime = tmp_path / "astrolabe-runtime"
+    monkeypatch.setenv("ASTROLABE_VAR", str(runtime))
 
     hub = DataHub(create=False)
 
-    assert hub.store_root == astrolabe_store.resolve()
-    assert hub.cache_root == astrolabe_cache.resolve()
+    assert hub.store_root == (runtime / "store").resolve()
+    assert hub.cache_root == (runtime / "cache").resolve()
 
 
-def test_default_datahub_rebuilds_when_astrolabe_env_changes(tmp_path, monkeypatch):
+def test_default_datahub_rebuilds_when_runtime_env_changes(tmp_path, monkeypatch):
     from data.storage.datahub import get_datahub, reset_datahub
 
-    first_store = tmp_path / "first-store"
-    first_cache = tmp_path / "first-cache"
-    second_store = tmp_path / "second-store"
-    second_cache = tmp_path / "second-cache"
+    first_runtime = tmp_path / "first-runtime"
+    second_runtime = tmp_path / "second-runtime"
 
-    monkeypatch.setenv("ASTROLABE_STORE", str(first_store))
-    monkeypatch.setenv("ASTROLABE_CACHE", str(first_cache))
+    monkeypatch.setenv("ASTROLABE_VAR", str(first_runtime))
     reset_datahub()
     first = get_datahub()
-    assert first.store_root == first_store.resolve()
+    assert first.store_root == (first_runtime / "store").resolve()
 
-    monkeypatch.setenv("ASTROLABE_STORE", str(second_store))
-    monkeypatch.setenv("ASTROLABE_CACHE", str(second_cache))
+    monkeypatch.setenv("ASTROLABE_VAR", str(second_runtime))
     second = get_datahub()
 
-    assert second.store_root == second_store.resolve()
-    assert second.cache_root == second_cache.resolve()
+    assert second.store_root == (second_runtime / "store").resolve()
+    assert second.cache_root == (second_runtime / "cache").resolve()
     reset_datahub()
 
 

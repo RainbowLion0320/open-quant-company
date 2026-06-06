@@ -24,7 +24,7 @@ def run_backtest(strategy: str, dry_run: bool) -> CliResult:
 
 
 def check() -> CliResult:
-    """Run backtest quality checks: reproducibility, PIT, pipeline contracts."""
+    """Run backtest quality checks: reproducibility, PIT, production pipeline contracts."""
     import subprocess as sp
 
     checks = {}
@@ -33,7 +33,7 @@ def check() -> CliResult:
     for name, test_path in [
         ("reproducibility", "tests/test_backtest_reproducibility.py"),
         ("pit", "tests/test_backtest_pit_contracts.py"),
-        ("pipeline_contract", "tests/test_backtest_pipeline_contracts.py"),
+        ("pipeline_contract", "tests/test_backtest_pipeline_runner_contracts.py"),
     ]:
         result = sp.run(
             [sys.executable, "-m", "pytest", test_path, "-q", "--tb=no"],

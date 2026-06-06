@@ -23,9 +23,9 @@
        ┌───────────────┼───────────────┬───────────────┐
        │               │               │               │
 ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
-│ base.py     │ │ml_strategy  │ │buffett_real │ │ pipeline.py │
-│ BaseStrategy│ │ LightGBM    │ │ _scorer.py  │ │ 可插拔流水线 │
-│ + Registry  │ │ 月度调仓     │ │ 滚动PIT评分  │ │ 自定义组合   │
+│ base.py     │ │ml_strategy  │ │buffett_real │ │pipeline_runner│
+│ BaseStrategy│ │ LightGBM    │ │ _scorer.py  │ │PipelineBacktest│
+│ + Registry  │ │ 月度调仓     │ │ 滚动PIT评分  │ │生产共享阶段   │
 └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
        │               │               │               │
        └───────────────┼───────────────┴───────────────┘
@@ -45,7 +45,7 @@
 1. 加载价格矩阵（N 只股票 × T 个交易日）
 2. 每月初运行策略评分 → 调仓
 3. 每日计算持仓市值 → NAV
-4. 通过 `pipeline.execution.ExecutionRouter` / `AShareExchange` 扣除交易成本（默认回测 commission_rate=0.00081、卖出 stamp_duty=0.0005，可注入交易所覆盖）
+4. 通过 `pipeline.execution.ExecutionRouter` / `AShareExchange` 扣除交易成本；费率从 `trading.exchange.stock` 或显式注入的 `Exchange` 读取
 
 **锦标赛模式：** 同一时间区间内运行所有已注册策略，输出对比排名表。
 
@@ -68,26 +68,22 @@
 - 特征矩阵进入 LightGBM 前统一数值化，避免 Parquet 对象 dtype 破坏正式回测
 - Pipeline 继续负责 Top-N 组合构建、风控和成交模拟
 
-### 2.4 可插拔流水线 (pipeline.py)
+### 2.4 生产共享流水线 (`pipeline_runner.py` + `pipeline/`)
 
 ```python
-from backtest.pipeline import (
-    Context,
-    Pipeline,
-    DataLoader,
-    FactorStage,
-    MultiFactorSignal,
-    EqualWeightPortfolio,
-    BacktestStage,
-)
+from backtest.pipeline_runner import PipelineBacktest
+from broker.exchange import AShareExchange
+from pipeline.execution import ExecutionConfig, ExecutionRouter
+from pipeline.portfolio import EqualWeightConstructor
+from pipeline.risk import RiskAdjuster
 
-ctx = Pipeline([
-    DataLoader(["000001", "600519"], "2020-01-01", "2026-05-31"),
-    FactorStage(factors, names),
-    MultiFactorSignal({"momentum": 0.6, "value": 0.4}, top_n=10),
-    EqualWeightPortfolio(),
-    BacktestStage(),
-]).run(Context())
+runner = PipelineBacktest(
+    alpha=my_alpha_model,
+    portfolio=EqualWeightConstructor(),
+    risk=RiskAdjuster(),
+    execution=ExecutionRouter(ExecutionConfig(exchange=AShareExchange())),
+)
+result = runner.run(prices, bench_close, universe=["000001", "600519"])
 ```
 
 ### 2.5 风险分析 (analytics.py)

@@ -20,17 +20,12 @@ def main():
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
     os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
-    api_key = (
-        os.environ.get("HINDSIGHT_API_LLM_API_KEY", "").strip()
-        or os.environ.get("DEEPSEEK_API_KEY", "").strip()
-    )
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
 
     if not api_key:
-        print("ERROR: HINDSIGHT_API_LLM_API_KEY or DEEPSEEK_API_KEY is not configured in the process environment")
+        print("ERROR: DEEPSEEK_API_KEY is not configured in the process environment")
         sys.exit(1)
 
-    # Set env vars that the daemon's MemoryEngine expects
-    os.environ["HINDSIGHT_API_LLM_API_KEY"] = api_key
     os.environ.setdefault("HINDSIGHT_API_LLM_PROVIDER", "openai")
     os.environ.setdefault("HINDSIGHT_API_LLM_MODEL", "deepseek-v4-flash")
     os.environ.setdefault("HINDSIGHT_API_LLM_BASE_URL", "https://api.deepseek.com/v1")

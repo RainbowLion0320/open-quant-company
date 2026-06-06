@@ -13,12 +13,11 @@ class TestDataQualityGate:
         from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("ASTROLABE_STORE", str(store))
-        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
+        cache = tmp_path / "cache"
         reset_datahub()
         reset_registry()
 
-        hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
+        hub = DataHub(store_root=store, cache_root=cache)
         hub.write_parquet(
             pd.DataFrame({
                 "date": ["2026-05-21", "2026-05-20", "2026-05-19"],
@@ -49,12 +48,11 @@ class TestDataQualityGate:
         from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("ASTROLABE_STORE", str(store))
-        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
+        cache = tmp_path / "cache"
         reset_datahub()
         reset_registry()
 
-        hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
+        hub = DataHub(store_root=store, cache_root=cache)
         hub.write_parquet(
             pd.DataFrame({
                 "date": ["2026-05-07", "2026-05-06"],
@@ -80,12 +78,11 @@ class TestDataQualityGate:
         from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("ASTROLABE_STORE", str(store))
-        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
+        cache = tmp_path / "cache"
         reset_datahub()
         reset_registry()
 
-        hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
+        hub = DataHub(store_root=store, cache_root=cache)
 
         from data.quality.quality import DataQualityGate
         gate = DataQualityGate(today=date(2026, 5, 21), hub=hub)
@@ -116,12 +113,11 @@ class TestDataQualityGate:
         from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("ASTROLABE_STORE", str(store))
-        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
+        cache = tmp_path / "cache"
         reset_datahub()
         reset_registry()
 
-        hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
+        hub = DataHub(store_root=store, cache_root=cache)
 
         df = pd.DataFrame({
             "date": ["2026-05-21", "2026-05-20"],
@@ -146,12 +142,11 @@ class TestDataQualityGate:
         from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("ASTROLABE_STORE", str(store))
-        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
+        cache = tmp_path / "cache"
         reset_datahub()
         reset_registry()
 
-        hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
+        hub = DataHub(store_root=store, cache_root=cache)
 
         write_daily(hub, "000001")
         write_financial(hub, "000001")
@@ -172,12 +167,11 @@ class TestDataQualityGate:
         from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("ASTROLABE_STORE", str(store))
-        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
+        cache = tmp_path / "cache"
         reset_datahub()
         reset_registry()
 
-        hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
+        hub = DataHub(store_root=store, cache_root=cache)
         hub.write_parquet(
             pd.DataFrame({
                 "date": ["2026-05-21"],
@@ -212,12 +206,11 @@ class TestDataQualityGate:
         from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("ASTROLABE_STORE", str(store))
-        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
+        cache = tmp_path / "cache"
         reset_datahub()
         reset_registry()
 
-        hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
+        hub = DataHub(store_root=store, cache_root=cache)
 
         hub.write_parquet(
             pd.DataFrame({
@@ -244,12 +237,11 @@ class TestDataQualityGate:
         from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("ASTROLABE_STORE", str(store))
-        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
+        cache = tmp_path / "cache"
         reset_datahub()
         reset_registry()
 
-        hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
+        hub = DataHub(store_root=store, cache_root=cache)
 
         hub.write_parquet(
             pd.DataFrame({
@@ -294,12 +286,11 @@ class TestDataQualityGate:
         from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
-        monkeypatch.setenv("ASTROLABE_STORE", str(store))
-        monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
+        cache = tmp_path / "cache"
         reset_datahub()
         reset_registry()
 
-        hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
+        hub = DataHub(store_root=store, cache_root=cache)
 
         days_ago = 10
         last_date = date(2026, 5, 21) - timedelta(days=days_ago)

@@ -65,6 +65,21 @@ DRIFT_TOKENS = (
     "回测: Backtrader",
     "横截面排名→交易信号",
     "四策略对比",
+    "from backtest.pipeline import",
+    "`backtest/pipeline.py`",
+    "test_backtest_pipeline_contracts.py",
+    "TUSHARE_PRO_TOKEN",
+    "HINDSIGHT_API_LLM_API_KEY",
+    "ASTROLABE_STORE",
+    "ASTROLABE_CACHE",
+    "ASTROLABE_ARTIFACTS",
+    "ASTROLABE_DB",
+    "migrate_data_layout",
+    "data-layout-migration",
+    "backtest_monthly_result",
+    "/api/portfolio/sector-exposure",
+    "Compatibility alias",
+    "legacy static tests",
 )
 DRIFT_PATTERNS = "|".join(re.escape(token) for token in DRIFT_TOKENS)
 

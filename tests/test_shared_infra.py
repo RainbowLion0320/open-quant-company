@@ -38,7 +38,6 @@ signals:
 
     monkeypatch.setenv("ASTROLABE_HOME", str(root))
     monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
-    monkeypatch.delenv("TUSHARE_PRO_TOKEN", raising=False)
 
     from core.settings import get_section, get_settings, get_tushare_token, resolve_settings_path
 

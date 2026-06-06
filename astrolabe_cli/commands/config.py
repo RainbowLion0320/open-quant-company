@@ -33,7 +33,7 @@ def env_status() -> CliResult:
     from data.llm.usage import llm_config
 
     secrets: dict[str, dict[str, object]] = {
-        "tushare": secret_status("TUSHARE_TOKEN", aliases=("TUSHARE_PRO_TOKEN",)),
+        "tushare": secret_status("TUSHARE_TOKEN"),
     }
 
     providers = llm_config().get("providers", {})
@@ -42,14 +42,8 @@ def env_status() -> CliResult:
             if not isinstance(cfg, dict) or not cfg.get("enabled", True):
                 continue
             raw = cfg.get("api_key_env")
-            if isinstance(raw, list):
-                env_names = [str(item) for item in raw if item]
-            elif isinstance(raw, str) and raw:
-                env_names = [raw]
-            else:
-                env_names = []
-            if env_names:
-                secrets[f"llm.{name}"] = secret_status(env_names[0], aliases=env_names[1:])
+            if isinstance(raw, str) and raw:
+                secrets[f"llm.{name}"] = secret_status(raw)
 
     missing = sorted(key for key, item in secrets.items() if item.get("status") != "ok")
     ok = not missing

@@ -102,4 +102,4 @@ def get_section(section: str, default: Any = None, *, path: str | os.PathLike | 
 
 def get_tushare_token() -> str:
     """Load Tushare token from process environment only."""
-    return read_env_secret("TUSHARE_TOKEN", aliases=("TUSHARE_PRO_TOKEN",))
+    return read_env_secret("TUSHARE_TOKEN")

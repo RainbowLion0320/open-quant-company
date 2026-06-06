@@ -66,7 +66,7 @@
 行业/板块相关维度同样通过注册表管理，包括行业指数行情、行业成员映射、行业动量快照、行业信号聚合和组合行业敞口。上层代码不应硬编码任何 `var/store/*` 深层路径，而应使用 `DataHub.dimension_root()` 或 `DataHub.dimension_path()`。
 
 Tushare 维度治理入口统一在 CLI：
-- `astroq config env --json` 检查当前进程是否已配置 `TUSHARE_TOKEN` / `TUSHARE_PRO_TOKEN` 和 LLM provider key，输出只包含脱敏状态。
+- `astroq config env --json` 检查当前进程是否已配置 `TUSHARE_TOKEN` 和 LLM provider key，输出只包含脱敏状态。
 - `astroq data tushare-audit --json` 探测当前账号可访问接口，并输出本地 `var/store` 覆盖率。
 - `astroq data tushare-backfill --scope missing --resume --json` 按缺口补齐非分钟维度；`stk_mins` 分钟接口只审计权限，不默认全市场全历史拉取。
 
@@ -88,10 +88,10 @@ Tushare 维度治理入口统一在 CLI：
 | 配置 | 默认值 | 环境变量覆盖 | 语义 |
 |------|--------|--------------|------|
 | `paths.runtime_root` | `var` | `ASTROLABE_VAR` | 本地运行产物根目录 |
-| `paths.store_root` | `var/store` | `ASTROLABE_STORE` | DataHub 主数据 |
-| `paths.cache_root` | `var/cache` | `ASTROLABE_CACHE` | API、回测矩阵和运行缓存 |
-| `paths.artifact_root` | `var/artifacts` | `ASTROLABE_ARTIFACTS` | 回测、模型、锦标赛、报告 |
-| `paths.db_root` | `var/db` | `ASTROLABE_DB` | DuckDB/SQLite 本地数据库 |
+| `paths.store_root` | `var/store` | - | DataHub 主数据 |
+| `paths.cache_root` | `var/cache` | - | API、回测矩阵和运行缓存 |
+| `paths.artifact_root` | `var/artifacts` | - | 回测、模型、锦标赛、报告 |
+| `paths.db_root` | `var/db` | - | DuckDB/SQLite 本地数据库 |
 
 新增公共路径 API：
 
@@ -100,14 +100,13 @@ hub.runtime_dir()
 hub.artifact_dir("backtests")
 hub.artifact_path("models", "lgbm_best.pkl")
 hub.db_path("quant_results.duckdb")
-hub.migration_dir()
 ```
 
 股票价格路径按口径显式分层：
 
 | 维度 | 路径 | 语义 |
 |------|------|------|
-| `ohlcv_daily` | `stock/daily/{symbol}.parquet` | 当前兼容维度，默认 `qfq` |
+| `ohlcv_daily` | `stock/daily/{symbol}.parquet` | 研究/回测默认前复权视图 |
 | `ohlcv_daily_raw` | `stock/daily_raw/{symbol}.parquet` | 未复权市场成交价 |
 | `ohlcv_daily_hfq` | `stock/daily_hfq/{symbol}.parquet` | 后复权视图 |
 | `adj_factor` | `stock/adj_factor/{symbol}.parquet` | Tushare 复权因子 |
@@ -135,7 +134,7 @@ hub.migration_dir()
 | `valuation` | `raw` | DCF 当前价、持仓市值 |
 | `display` | `raw` | Web 个股 K 线展示 |
 
-`qfq` / `hfq` 优先由 `raw + adj_factor` 派生；历史数据尚未补齐 raw 时，允许显式记录 fallback 到本地 `qfq` 兼容数据。DataHub manifest 会记录 `requested_price_mode`、`price_mode`、`price_adjustment_source` 和 fallback reason。
+`qfq` / `hfq` 优先由 `raw + adj_factor` 派生；若外部数据源临时不可用，读取层必须在 manifest 中记录 `requested_price_mode`、`price_mode`、`price_adjustment_source` 和 fallback reason。
 
 公司行动不直接混入 OHLCV。`data/market/corporate_actions.py` 把 `dividend` 原始事件归一为 `corporate_actions`，并提供 `apply_corporate_actions_to_position()` 给未来回测账本处理现金分红、送转和拆股。
 

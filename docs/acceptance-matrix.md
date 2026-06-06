@@ -54,7 +54,7 @@
 | 3.4 | Regime 回测用生产 policy 且滞后一月 | `backtest/run_all_strategies.py:build_production_regime_map()` | `test_architecture_contracts.py:test_backtest_regime_replay_uses_production_policy_not_monthly_ma_chain` | — | 历史回放 `CHAMPION_POLICY`，当月只使用上一期可得 regime，禁止旧 MA 链路 | OK | — |
 | 3.5 | 巴菲特滚动窗口逐年评分 | `backtest/buffett_real_scorer.py` | — | — | 验证滚动评分器每次策略评分前重置年度缓存，且只使用当期可得财报 | OK | — |
 | 3.6 | 回测结果可复现 | `backtest/run_all_strategies.py` / deterministic fixture | `test_backtest_reproducibility.py` | — | 同一数据+种子 → 同一结果 | OK | — |
-| 3.7 | 可插拔回测流水线 | `backtest/pipeline.py` | `test_backtest_pipeline_contracts.py` | — | 自定义 Pipeline 组合 DataLoader/FactorStage/MultiFactorSignal/Portfolio/Backtest/Evidence stages | OK | — |
+| 3.7 | 生产共享回测流水线 | `backtest/pipeline_runner.py` + `pipeline/*` | `test_backtest_pipeline_runner_contracts.py` | — | `PipelineBacktest` 按 Alpha→Portfolio→Risk→Execution 生产阶段运行，并过滤缺失价格列 | OK | — |
 | 3.8 | 基准使用上证综指 (非个股) | `config/settings.yaml` backtest.benchmark | — | — | 确认 benchmark=sh000001 (非 000001) | OK (已修复) | — |
 | 3.9 | 约束组合构建 | `pipeline/portfolio.py:ConstrainedPortfolioConstructor` | `test_strategy_research_governance.py:test_constrained_portfolio_constructor_caps_sector_and_single_name_weight` | — | Top-N 同时受单票/行业/总仓位上限约束 | OK | — |
 | 3.10 | 候选策略证据报告契约 | `research/strategy_evaluation.py`, `backtest/run_all_strategies.py` | `test_strategy_backtest_evidence.py`, `test_strategy_evaluation.py` | `var/store/research/strategy_evidence/*.json` | 报告含强基准、metrics、OOS、成本、regime breakdown 和 promotion decision | OK | 待接入更多真实 baseline 结果 |

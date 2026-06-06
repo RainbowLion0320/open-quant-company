@@ -23,26 +23,16 @@ from broker.exchange import AShareExchange, Exchange, OrderSide
 
 @dataclass
 class ExecutionConfig:
-    """Execution configuration.
-
-    Prefer passing an `exchange` for unified cost model (P1-7).
-    Raw commission_rate/stamp_duty are fallbacks for backward compatibility.
-    """
-    commission_rate: float = 0.00081
-    stamp_duty: float = 0.0005  # sell only
+    """Execution configuration for the shared order router."""
     lot_size: int = 100
     t_plus_1: bool = True
     today_buys: dict[str, int] | None = None
-    exchange: Exchange | None = None  # P1-7: unified cost model
+    exchange: Exchange | None = None
 
     def get_exchange(self) -> Exchange:
-        if self.exchange is not None:
-            return self.exchange
-        return AShareExchange(
-            commission=self.commission_rate,
-            stamp_tax=self.stamp_duty,
-            lot_size=self.lot_size,
-        )
+        if self.exchange is None:
+            self.exchange = AShareExchange(lot_size=self.lot_size)
+        return self.exchange
 
 
 class ExecutionRouter:
@@ -56,6 +46,10 @@ class ExecutionRouter:
         self.config = config or ExecutionConfig()
         self._exchange = self.config.get_exchange()
         self._today_buys: dict[str, int] = {}
+
+    @property
+    def exchange(self) -> Exchange:
+        return self._exchange
 
     def targets_to_intents(
         self,

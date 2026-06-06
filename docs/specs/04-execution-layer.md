@@ -59,7 +59,7 @@ class Broker(ABC):
 - 买入：以当日收盘价成交（日频无日内价格）
 - 卖出：同价成交
 - 约束：100 股整数倍（A 股规则）
-- 成本：由 `paper_trading.commission_rate` 和 `broker/exchange.py` 的资产费率模型配置驱动
+- 成本：由 `broker/exchange.py` 的资产费率模型和 `trading.exchange.*` 配置驱动
 
 **订单生命周期：** `PENDING` → `FILLED`（成交）/ `REJECTED`（风控拒绝）/ `CANCELLED`（撤单）
 

@@ -17,7 +17,7 @@ def api_health_payload() -> dict:
     except ImportError:
         results.append({"name": "AKShare", "status": "error", "detail": "未安装"})
 
-    token = read_env_secret("TUSHARE_TOKEN", aliases=("TUSHARE_PRO_TOKEN",))
+    token = read_env_secret("TUSHARE_TOKEN")
     if token:
         try:
             import requests as _r

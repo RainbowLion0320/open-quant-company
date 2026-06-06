@@ -2,7 +2,7 @@
 Sector pipeline & industry momentum tests.
 
 Covers: data/sectors.py builders, signals/multifactor.py industry factor,
-sector API endpoints, portfolio sector-exposure API.
+sector API endpoints, and canonical sectors exposure API.
 """
 
 import json
@@ -509,11 +509,11 @@ def test_sector_nonexistent_returns_empty(api_client):
 
 
 # ═══════════════════════════════════════════════════════════
-# Portfolio sector exposure API
+# Sector exposure API
 # ═══════════════════════════════════════════════════════════
 
-def test_portfolio_sector_exposure_returns_200(api_client):
-    resp = api_client.get("/api/portfolio/sector-exposure")
+def test_sector_exposure_canonical_route_returns_200(api_client):
+    resp = api_client.get("/api/sectors/exposure")
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert "exposure" in data
@@ -521,14 +521,19 @@ def test_portfolio_sector_exposure_returns_200(api_client):
     assert isinstance(data["exposure"], list)
 
 
-def test_portfolio_sector_exposure_fields(api_client):
-    resp = api_client.get("/api/portfolio/sector-exposure")
+def test_sector_exposure_canonical_route_fields(api_client):
+    resp = api_client.get("/api/sectors/exposure")
     data = resp.json()
     if data["exposure"]:
         e = data["exposure"][0]
         for key in ("sector", "weight", "market_value", "position_count"):
             assert key in e, f"missing field {key}"
         assert 0 <= e["weight"] <= 1
+
+
+def test_portfolio_sector_exposure_alias_is_removed(api_client):
+    resp = api_client.get("/api/portfolio/sector-exposure")
+    assert resp.status_code == 404
 
 
 # ═══════════════════════════════════════════════════════════

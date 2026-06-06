@@ -1,4 +1,5 @@
 import importlib
+import pickle
 from pathlib import Path
 
 import pandas as pd
@@ -28,6 +29,47 @@ def test_strategy_jobs_route_is_not_shadowed(monkeypatch):
     assert res.status_code == 200
     assert res.json()["job_id"] == "unit-job"
     assert res.json()["progress"] == 42
+
+
+def test_backtest_api_reads_current_artifact_dir(tmp_path, monkeypatch):
+    from data.storage.datahub import get_datahub, reset_datahub
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "var"))
+    reset_datahub()
+
+    artifact_dir = get_datahub().artifact_dir("backtests")
+    comparison = {
+        "strategies": {"multifactor": {"total_return": 0.12}},
+        "bench_return": 0.05,
+        "start": "2024-01-02",
+        "end": "2024-01-08",
+    }
+    detail = {
+        "total_return": 0.12,
+        "sharpe": 1.1,
+        "max_drawdown": -0.04,
+        "win_rate": 0.55,
+        "trade_count": 2,
+        "daily_returns": pd.Series([0.01, -0.02, 0.03], index=pd.date_range("2024-01-02", periods=3)),
+        "bench_returns": pd.Series([0.005, -0.01, 0.02], index=pd.date_range("2024-01-02", periods=3)),
+    }
+    with open(artifact_dir / "backtest_comparison.pkl", "wb") as f:
+        pickle.dump(comparison, f)
+    with open(artifact_dir / "backtest_multifactor.pkl", "wb") as f:
+        pickle.dump(detail, f)
+
+    client = TestClient(create_app())
+    overview = client.get("/api/backtest")
+    strategy = client.get("/api/backtest/multifactor")
+
+    assert overview.status_code == 200
+    assert overview.json()["strategies"]["multifactor"]["total_return"] == 0.12
+    assert strategy.status_code == 200
+    assert strategy.json()["trade_count"] == 2
+    assert strategy.json()["equity_curve"]
+    reset_datahub()
 
 
 def test_assets_overview_api_respects_config_enabled_flags(monkeypatch):
@@ -125,8 +167,7 @@ def test_db_health_scans_new_registry_dimensions(tmp_path, monkeypatch):
 
     store = tmp_path / "store"
     cache = tmp_path / "cache"
-    monkeypatch.setenv("ASTROLABE_STORE", str(store))
-    monkeypatch.setenv("ASTROLABE_CACHE", str(cache))
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     reset_datahub()
 
     hub = DataHub(store_root=store, cache_root=cache)
@@ -396,15 +437,16 @@ def test_settings_cancel_reverts_pending_toggle():
 def test_config_center_preserves_dotted_section_paths():
     config_center = Path("web/frontend/src/views/ConfigCenter.vue").read_text()
     config_center_logic = Path("web/frontend/src/view-models/useConfigCenter.ts").read_text()
-    api_client = Path("web/frontend/src/api/index.ts").read_text()
+    api_client = Path("web/frontend/src/api/client.ts").read_text()
+    settings_api = Path("web/frontend/src/api/modules/settings.ts").read_text()
 
     assert "function getNestedValue" in config_center_logic
     assert "function setNestedValue" in config_center_logic
     assert "setNestedValue(config, sectionKey" in config_center_logic
     assert "config[activeSection.value]" not in config_center_logic
     assert "function patch<T>" in api_client
-    assert "saveSettingsSection" in api_client
-    assert "patch<Record<string, any>>" in api_client
+    assert "saveSettingsSection" in settings_api
+    assert "patch<Record<string, any>>" in settings_api
 
 
 def test_config_center_uses_grouped_expandable_settings_model():
@@ -498,7 +540,7 @@ def test_market_view_surfaces_regime_stability_state():
 
 def test_strategy_lab_exposes_catalog_and_candidate_language():
     strategies = Path("web/frontend/src/views/Strategies.vue").read_text(encoding="utf-8")
-    api = Path("web/frontend/src/api/index.ts").read_text(encoding="utf-8")
+    api = Path("web/frontend/src/api/modules/strategy.ts").read_text(encoding="utf-8")
 
     assert "strategyCatalog" in api
     assert "strategyEvaluation" in api
@@ -526,7 +568,10 @@ def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():
     sectors = Path("web/frontend/src/views/Sectors.vue").read_text(encoding="utf-8")
     sector_logic = Path("web/frontend/src/view-models/useSectorsView.ts").read_text(encoding="utf-8")
     sector_css = Path("web/frontend/src/styles/views/sectors.css").read_text(encoding="utf-8")
-    api = Path("web/frontend/src/api/index.ts").read_text(encoding="utf-8")
+    api = "\n".join([
+        Path("web/frontend/src/api/modules/sectors.ts").read_text(encoding="utf-8"),
+        Path("web/frontend/src/api/types/sectors.ts").read_text(encoding="utf-8"),
+    ])
 
     assert "sectorBlockTiles" in sectors
     assert "sector-block-grid" in sectors
@@ -626,7 +671,7 @@ def test_sector_capital_blocks_prioritize_metric_then_centered_industry_name():
 def test_stock_search_view_defaults_to_stock_table():
     stocks = Path("web/frontend/src/views/Stocks.vue").read_text(encoding="utf-8")
     stocks_logic = Path("web/frontend/src/view-models/useStocksView.ts").read_text(encoding="utf-8")
-    api = Path("web/frontend/src/api/index.ts").read_text(encoding="utf-8")
+    api = Path("web/frontend/src/api/modules/stocks.ts").read_text(encoding="utf-8")
 
     assert "api.stockList" in stocks_logic
     assert "onMounted(loadStockList)" in stocks_logic

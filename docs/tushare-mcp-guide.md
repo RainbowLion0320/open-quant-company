@@ -7,7 +7,7 @@
 
 Tushare MCP Server 通过 Streamable HTTP 协议运行:
 - MCP URL: `https://api.tushare.pro/mcp/?token=<token>`（MCP 客户端侧配置）
-- Token: 项目运行代码只读系统环境变量 `TUSHARE_TOKEN`，兼容别名 `TUSHARE_PRO_TOKEN`
+- Token: 项目运行代码只读系统环境变量 `TUSHARE_TOKEN`
 - 共 258 个 MCP 工具，覆盖 15 个数据大类
 
 本项目不从 `config/settings.yaml` 或 `.env` 文件读取 Tushare token。用 `astroq config env --json` 检查当前进程环境，用 `astroq data tushare-audit --json` 检查账号权限和本地覆盖率。

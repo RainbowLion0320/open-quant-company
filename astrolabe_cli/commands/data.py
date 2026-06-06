@@ -104,7 +104,7 @@ def tushare_audit(probe_network: bool = True) -> CliResult:
             "coverage_count": len(coverage),
             "no_permission": no_permission,
         },
-        errors=["missing TUSHARE_TOKEN/TUSHARE_PRO_TOKEN"] if missing_secret else [],
+        errors=["missing TUSHARE_TOKEN"] if missing_secret else [],
     )
 
 

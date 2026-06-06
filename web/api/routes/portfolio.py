@@ -7,7 +7,6 @@ PaperBroker 实例从 Parquet 恢复，确保服务器重启不丢状态。
 from fastapi import APIRouter, HTTPException
 from web.api.schemas.portfolio import AccountInfo, OrderItem, OrderRequest, PositionItem
 from web.api.errors import InvalidParameterError
-from web.api.services.sectors import build_sector_exposure
 
 router = APIRouter(prefix="/api/portfolio", tags=["Portfolio"])
 
@@ -242,17 +241,6 @@ async def get_orders():
         ],
         "total": len(orders),
     }
-
-
-# ── 行业敞口 ──────────────────────────────────────────────
-
-@router.get("/sector-exposure")
-async def get_sector_exposure():
-    """按申万一级行业汇总的持仓敞口。
-
-    Compatibility alias for the canonical sector exposure service.
-    """
-    return build_sector_exposure()
 
 
 # ── 刷新状态 ──────────────────────────────────────────────

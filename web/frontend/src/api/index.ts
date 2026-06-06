@@ -20,8 +20,3 @@ export const api = {
   ...settingsApi,
   ...sectorsApi,
 };
-
-// Contract anchors for legacy static tests: function patch<T>, saveSettingsSection, patch<Record<string, any>>.
-// Stock contract: stockList: (limit = 300) => get<StockListResponse>(`/api/stocks?limit=${limit}`).
-// Sector contract fields: signal_dispersion, amount_5d_avg, amount_share.
-// Strategy contract: strategyCatalog, strategyEvaluation.

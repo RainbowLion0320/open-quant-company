@@ -207,6 +207,7 @@ def _execute_signals_via_pipeline(
     from pipeline.alpha import SignalParquetAlphaModel
     from pipeline.portfolio import EqualWeightConstructor
     from pipeline.risk import RiskAdjuster
+    from broker.exchange import AShareExchange
     from pipeline.execution import ExecutionRouter, ExecutionConfig
     from pipeline.scheduler import RebalanceScheduler, RebalanceConfig
 
@@ -229,9 +230,10 @@ def _execute_signals_via_pipeline(
     paper_cfg = cfg.get("paper_trading", {})
     max_signals = int(paper_cfg.get("max_orders_per_strategy", 5))
 
+    lot_size = int(paper_cfg.get("lot_size", 100))
     exec_cfg = ExecutionConfig(
-        commission_rate=0.00081,
-        lot_size=int(paper_cfg.get("lot_size", 100)),
+        lot_size=lot_size,
+        exchange=AShareExchange(lot_size=lot_size),
     )
     router = ExecutionRouter(exec_cfg)
     portfolio = EqualWeightConstructor(

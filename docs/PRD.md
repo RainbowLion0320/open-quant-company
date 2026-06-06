@@ -128,8 +128,9 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 ├── backtest/                     # 回测层
 │   ├── run_all_strategies.py     # N 策略锦标赛
 │   ├── analytics.py              # 15 项风险指标
-│   ├── pipeline.py               # 可插拔回测流水线
+│   ├── pipeline_runner.py        # 生产共享流水线回测入口
 │   └── strategies/               # ML + Base 策略
+├── pipeline/                     # Alpha/Portfolio/Risk/Execution 共享阶段
 ├── broker/                       # 执行层
 │   ├── __init__.py               # PaperBroker 模拟券商
 │   ├── risk.py                   # 5 规则风控

@@ -7,18 +7,6 @@ API keys from YAML, project files, or user-level ``.env`` files.
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
-
-
-def _names(primary: str, aliases: Iterable[str] = ()) -> list[str]:
-    seen: set[str] = set()
-    ordered: list[str] = []
-    for name in (primary, *tuple(aliases)):
-        clean = str(name or "").strip()
-        if clean and clean not in seen:
-            ordered.append(clean)
-            seen.add(clean)
-    return ordered
 
 
 def mask_secret(value: str) -> str:
@@ -31,31 +19,27 @@ def mask_secret(value: str) -> str:
     return f"{clean[:4]}****{clean[-4:]}"
 
 
-def read_env_secret(primary: str, aliases: Iterable[str] = ()) -> str:
+def read_env_secret(name: str) -> str:
     """Read a secret from process environment only."""
-    for name in _names(primary, aliases):
-        value = os.environ.get(name, "").strip()
-        if value:
-            return value
-    return ""
+    clean = str(name or "").strip()
+    if not clean:
+        return ""
+    return os.environ.get(clean, "").strip()
 
 
-def secret_status(primary: str, aliases: Iterable[str] = ()) -> dict[str, object]:
+def secret_status(name: str) -> dict[str, object]:
     """Return masked status for a secret without exposing its raw value."""
-    names = _names(primary, aliases)
-    for name in names:
-        value = os.environ.get(name, "").strip()
-        if value:
-            return {
-                "name": primary,
-                "aliases": [n for n in names if n != primary],
-                "status": "ok",
-                "source": name,
-                "masked": mask_secret(value),
-            }
+    clean = str(name or "").strip()
+    value = os.environ.get(clean, "").strip() if clean else ""
+    if value:
+        return {
+            "name": clean,
+            "status": "ok",
+            "source": clean,
+            "masked": mask_secret(value),
+        }
     return {
-        "name": primary,
-        "aliases": [n for n in names if n != primary],
+        "name": clean,
         "status": "missing",
         "source": "",
         "masked": "",

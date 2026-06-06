@@ -134,7 +134,7 @@ flowchart LR
 | 数据获取 | `data/ingestion/fetcher.py`, `data/ingestion/fetchers/`, `scripts/cron_fetch_*.py` | 行情、财务、估值、资金流、宏观、行业数据拉取 |
 | 因子与信号 | `signals/` | Buffett、多因子、ML、候选策略、DSL 和横截面选择 |
 | 研究治理 | `research/` | Strategy Catalog、候选晋级、OOS 证据、regime 训练 |
-| 回测 | `backtest/` | 日频回测、策略锦标赛、风险指标、可插拔回测流水线 |
+| 回测 | `backtest/` + `pipeline/` | 日频回测、策略锦标赛、风险指标、生产共享流水线 |
 | 控制论层 | `cybernetics/` | regime 检测、规则评分、HMM、稳定状态机、自适应参数 |
 | 执行层 | `broker/`, `pipeline/` | PaperBroker、风控、撮合、ledger、资产分配、执行流水线 |
 | Web API | `web/api/` | FastAPI 路由、WebSocket、任务队列、系统状态 |
@@ -190,14 +190,10 @@ python -m pip install -r requirements-dev.txt
 
 | 环境变量 | 用途 |
 |----------|------|
-| `TUSHARE_TOKEN` / `TUSHARE_PRO_TOKEN` | Tushare 数据，包括估值、资金流、部分财务扩展 |
+| `TUSHARE_TOKEN` | Tushare 数据，包括估值、资金流、部分财务扩展 |
 | `DEEPSEEK_API_KEY` | 默认 DeepSeek provider 的 LLM 因子发现、通用 LLM 用量监控 |
 | `ASTROLABE_API_KEY` | FastAPI Bearer Token 保护 |
 | `ASTROLABE_VAR` | 覆盖默认运行产物根目录 `var/` |
-| `ASTROLABE_STORE` | 覆盖默认 `var/store/` |
-| `ASTROLABE_CACHE` | 覆盖默认 `var/cache/` |
-| `ASTROLABE_ARTIFACTS` | 覆盖默认 `var/artifacts/` |
-| `ASTROLABE_DB` | 覆盖默认 `var/db/` |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | 通知推送，参考 [config/notify.example.yaml](config/notify.example.yaml) |
 | `WECHAT_WEBHOOK_URL`, `FEISHU_WEBHOOK_URL` | 企业微信 / 飞书通知 webhook |
 
@@ -275,15 +271,6 @@ astroq web serve --host 0.0.0.0 --port 8501
 
 长期 README 不固化“当前收益率”“当前选股数量”“某次样本内排名”这类动态结果。最新证据以 `var/artifacts/tournaments/`、`reports/`、Web `/strategy-lab` 和本地生成报告为准。
 
-从旧布局升级时先执行演练，再执行迁移：
-
-```bash
-python scripts/migrate_data_layout.py --dry-run
-python scripts/migrate_data_layout.py --apply
-```
-
-迁移 manifest 会写入 `var/migration/`。详细说明见 [docs/operations/data-layout-migration.md](docs/operations/data-layout-migration.md)。
-
 ## 项目结构
 
 ```text
@@ -318,8 +305,7 @@ astrolabe-quant/
 │   ├── store/              # DataHub 主存储
 │   ├── cache/              # API、回测矩阵和运行缓存
 │   ├── artifacts/          # backtests、models、tournaments、reports
-│   ├── db/                 # DuckDB/SQLite
-│   └── migration/          # 数据布局迁移 manifest
+│   └── db/                 # DuckDB/SQLite
 └── wiki/                   # 概念、参考、架构决策、对比分析
 ```
 

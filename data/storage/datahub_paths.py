@@ -77,7 +77,6 @@ class DataHubPaths:
             self.artifact_dir("models"),
             self.artifact_dir("tournaments"),
             self.artifact_dir("reports"),
-            self.migration_dir(),
             self.store_path("stock"),
             self.store_path("macro"),
             self.store_path("fund"),
@@ -118,11 +117,6 @@ class DataHubPaths:
     def db_path(self, name: str) -> Path:
         path = self.db_root / safe_leaf(name, "database name")
         path.parent.mkdir(parents=True, exist_ok=True)
-        return path
-
-    def migration_dir(self) -> Path:
-        path = self.runtime_root / "migration"
-        path.mkdir(parents=True, exist_ok=True)
         return path
 
     def stock_data_dir(self, name: str) -> Path:

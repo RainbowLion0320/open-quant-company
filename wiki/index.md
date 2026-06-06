@@ -39,7 +39,6 @@ tags: [index]
 - [[data-dimensions]] — ★ 数据维度索引：DataRegistry/DataHub 查询入口, 不复制动态维度数量
 - [[data-schema]] — ★ 数据合约索引：DataContract 来源、检查方式、常见 schema 家族
 - [[cli-control-plane]] — `astroq` CLI 控制平面：agent/cron/local 操作入口和常用命令
-- [Data Layout Migration](../docs/operations/data-layout-migration.md) — `data/` 源码包与 `var/` 运行产物迁移手册
 
 ## Comparisons
 - [[data-sources]] — AKShare(日线+财务+宏观+资金) vs Tushare(三张表+指标+moneyflow+holders)

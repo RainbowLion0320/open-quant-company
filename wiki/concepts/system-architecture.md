@@ -212,7 +212,7 @@ strategies:
 | 回测引擎 | `backtest/run_all_strategies.py` | 日频引擎 + 策略自主调仓 |
 | 回测评分 | `backtest/buffett_real_scorer.py` | PIT滚动评分器 |
 | 风险分析 | `backtest/analytics.py` | 15项风险指标 |
-| 回测流水线 | `backtest/pipeline.py` | 可插拔回测 |
+| 回测流水线 | `backtest/pipeline_runner.py` + `pipeline/` | 生产共享 Alpha/Portfolio/Risk/Execution 阶段 |
 | 配置 | `config/settings.yaml` + `web/api/config_schema/` | 全部可调参数；Web Config Center 通过 group/subgroup schema 编辑 dotted section 并写回嵌套 YAML |
 
 ## 因子体系

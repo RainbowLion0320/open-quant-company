@@ -128,7 +128,7 @@ class TestSchemaMigration:
         assert contract.migrations[0].from_version == 1
         assert contract.migrations[0].to_version == 2
 
-    def test_migrate_add_columns(self):
+    def test_migrate_same_version_returns_copy_without_shape_changes(self):
         contract = DataContract(
             dimension="test_dim",
             schema_version=2,
@@ -139,15 +139,15 @@ class TestSchemaMigration:
                     from_version=1,
                     to_version=2,
                     added_columns={"volume": "float64"},
-                    compat="coerce",
                 ),
             ],
         )
         df = pd.DataFrame({"date": ["2024-01-01"], "close": [10.5]})
-        result = contract.migrate(df, from_version=1)
-        assert "volume" in result.columns
+        result = contract.migrate(df, from_version=2)
+        assert result.equals(df)
+        assert result is not df
 
-    def test_migrate_remove_columns(self):
+    def test_migrate_old_version_requires_refetch(self):
         contract = DataContract(
             dimension="test_dim",
             schema_version=2,
@@ -158,54 +158,14 @@ class TestSchemaMigration:
                     from_version=1,
                     to_version=2,
                     removed_columns=["old_col"],
-                    compat="coerce",
                 ),
             ],
         )
         df = pd.DataFrame({"date": ["2024-01-01"], "close": [10.5], "old_col": [99]})
-        result = contract.migrate(df, from_version=1)
-        assert "old_col" not in result.columns
-        assert "date" in result.columns
-
-    def test_migrate_rename_columns(self):
-        contract = DataContract(
-            dimension="test_dim",
-            schema_version=2,
-            columns={"date": "object", "price": "float64"},
-            migrations=[
-                SchemaMigration(
-                    dimension="test_dim",
-                    from_version=1,
-                    to_version=2,
-                    renamed_columns={"close": "price"},
-                    compat="coerce",
-                ),
-            ],
-        )
-        df = pd.DataFrame({"date": ["2024-01-01"], "close": [10.5]})
-        result = contract.migrate(df, from_version=1)
-        assert "price" in result.columns
-        assert "close" not in result.columns
-
-    def test_migrate_strict_raises(self):
-        contract = DataContract(
-            dimension="test_dim",
-            schema_version=2,
-            columns={"date": "object", "new_col": "float64"},
-            migrations=[
-                SchemaMigration(
-                    dimension="test_dim",
-                    from_version=1,
-                    to_version=2,
-                    compat="strict",
-                ),
-            ],
-        )
-        df = pd.DataFrame({"date": ["2024-01-01"]})
-        with pytest.raises(ValueError, match="strict"):
+        with pytest.raises(ValueError, match="re-fetch required"):
             contract.migrate(df, from_version=1)
 
-    def test_migrate_chain_multiple(self):
+    def test_migration_metadata_does_not_auto_transform_columns(self):
         contract = DataContract(
             dimension="test_dim",
             schema_version=3,
@@ -224,10 +184,8 @@ class TestSchemaMigration:
             ],
         )
         df = pd.DataFrame({"date": ["2024-01-01"], "price": [10.5]})
-        result = contract.migrate(df, from_version=1)
-        assert "value" in result.columns
-        assert "price" not in result.columns
-        assert "temp" not in result.columns
+        with pytest.raises(ValueError, match="schema v1"):
+            contract.migrate(df, from_version=1)
 
 
 class TestDataContractPersistence:

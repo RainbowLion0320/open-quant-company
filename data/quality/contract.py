@@ -8,8 +8,8 @@ Every dimension in the DataRegistry can declare a DataContract that defines:
   - PIT (point-in-time) rules
   - Schema version
 
-On write, the contract validates incoming data. On read, it checks compatibility
-and can coerce/migrate stale schemas.
+On write and read, the contract validates data against the current schema.
+Stored data written with an older schema version must be re-fetched.
 
 Stored as JSON in var/store/_contracts/{dimension}.json.
 
@@ -58,12 +58,6 @@ class SchemaMigration:
     to_version: int
     description: str = ""
     applied_at: str = ""
-    # How to handle existing data written with the old schema:
-    #   "strict": reject reads (data must be re-fetched)
-    #   "coerce": add missing columns as null, cast dtypes
-    #   "drop": drop extra columns not in the new schema
-    compat: str = "coerce"
-    # Optional: columns added/removed/renamed
     added_columns: dict[str, str] = field(default_factory=dict)    # name → dtype
     removed_columns: list[str] = field(default_factory=list)
     renamed_columns: dict[str, str] = field(default_factory=dict)  # old → new
@@ -177,42 +171,15 @@ class DataContract:
     # ── Migration ──
 
     def migrate(self, df: pd.DataFrame, from_version: int) -> pd.DataFrame:
-        """Apply schema migrations to bring df from from_version to current."""
-        result = df.copy()
-        applicable = [m for m in self.migrations
-                      if m.from_version >= from_version and m.to_version <= self.schema_version]
-        applicable.sort(key=lambda m: m.from_version)
+        """Return data only when it already matches the current schema version."""
+        if from_version != self.schema_version:
+            raise ValueError(
+                f"Stored schema v{from_version} for {self.dimension} does not match "
+                f"current schema v{self.schema_version}; re-fetch required"
+            )
+        return df.copy()
 
-        for migration in applicable:
-            if migration.compat == "strict":
-                raise ValueError(
-                    f"Schema migration {migration.from_version}→{migration.to_version} "
-                    f"for {self.dimension} requires re-fetch (strict mode)"
-                )
-            result = self._apply_migration(result, migration)
-
-        return result
-
-    def _apply_migration(self, df: pd.DataFrame, migration: SchemaMigration) -> pd.DataFrame:
-        result = df.copy()
-
-        # Add missing columns
-        for col, dtype in migration.added_columns.items():
-            if col not in result.columns:
-                result[col] = pd.Series(dtype="float64" if "float" in dtype else "object")
-
-        # Remove columns
-        for col in migration.removed_columns:
-            if col in result.columns:
-                result.drop(columns=[col], inplace=True)
-
-        # Rename columns
-        result.rename(columns=migration.renamed_columns, inplace=True)
-
-        return result
-
-    def add_migration(self, to_version: int, description: str = "",
-                      compat: str = "coerce", **kwargs):
+    def add_migration(self, to_version: int, description: str = "", **kwargs):
         """Record a new schema migration."""
         m = SchemaMigration(
             dimension=self.dimension,
@@ -220,7 +187,6 @@ class DataContract:
             to_version=to_version,
             description=description,
             applied_at=datetime.now().isoformat(),
-            compat=compat,
             **kwargs,
         )
         self.migrations.append(m)
@@ -254,7 +220,6 @@ class DataContract:
                     "to_version": m.to_version,
                     "description": m.description,
                     "applied_at": m.applied_at,
-                    "compat": m.compat,
                     "added_columns": m.added_columns,
                     "removed_columns": m.removed_columns,
                     "renamed_columns": m.renamed_columns,
@@ -287,7 +252,6 @@ class DataContract:
                 to_version=m["to_version"],
                 description=m.get("description", ""),
                 applied_at=m.get("applied_at", ""),
-                compat=m.get("compat", "coerce"),
                 added_columns=m.get("added_columns", {}),
                 removed_columns=m.get("removed_columns", []),
                 renamed_columns=m.get("renamed_columns", {}),

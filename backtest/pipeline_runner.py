@@ -18,6 +18,7 @@ from pipeline.portfolio import PortfolioConstructor, EqualWeightConstructor
 from pipeline.risk import RiskAdjuster
 from pipeline.execution import ExecutionRouter, ExecutionConfig
 from pipeline.scheduler import RebalanceScheduler, RebalanceConfig
+from broker.exchange import AShareExchange, Exchange
 
 
 class PipelineBacktest:
@@ -31,12 +32,12 @@ class PipelineBacktest:
         execution: ExecutionRouter | None = None,
         scheduler: RebalanceScheduler | None = None,
         cash: float = 1_000_000,
-        commission_rate: float = 0.00081,
+        exchange: Exchange | None = None,
     ):
         self.alpha = alpha
         self.portfolio = portfolio or EqualWeightConstructor()
         self.risk = risk or RiskAdjuster()
-        self.execution = execution or ExecutionRouter(ExecutionConfig(commission_rate=commission_rate))
+        self.execution = execution or ExecutionRouter(ExecutionConfig(exchange=exchange or AShareExchange()))
         self.scheduler = scheduler or RebalanceScheduler()
         self.initial_cash = cash
 
@@ -187,7 +188,7 @@ class PipelineBacktest:
             "max_drawdown": report.max_drawdown,
             "win_rate": report.win_rate,
             "trade_count": len(trade_log),
-            "commission": self.execution.config.commission_rate,
+            "commission": float(getattr(getattr(self.execution, "exchange", None), "commission", 0.0) or 0.0),
             "slippage": 0.001,
         }
 

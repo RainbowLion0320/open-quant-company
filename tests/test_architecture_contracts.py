@@ -479,10 +479,12 @@ def test_data_freshness_gate_is_shared_outside_cli_layer():
     }
 
 
-def test_portfolio_sector_exposure_reuses_sector_service():
+def test_portfolio_sector_exposure_alias_is_removed():
     route_text = Path("web/api/routes/portfolio.py").read_text()
+    sectors_route_text = Path("web/api/routes/sectors.py").read_text()
 
-    assert "build_sector_exposure" in route_text
+    assert "build_sector_exposure" not in route_text
+    assert "build_sector_exposure" in sectors_route_text
     assert 'dimension_root("sector_exposure_snapshot")' not in route_text
     assert "root.glob(\"*.parquet\")" not in route_text
 
@@ -630,6 +632,21 @@ def test_current_project_docs_do_not_repeat_known_stale_facts():
         "回测: Backtrader",
         "横截面排名→交易信号",
         "四策略对比",
+        "from backtest.pipeline import",
+        "`backtest/pipeline.py`",
+        "test_backtest_pipeline_contracts.py",
+        "TUSHARE_PRO_TOKEN",
+        "HINDSIGHT_API_LLM_API_KEY",
+        "ASTROLABE_STORE",
+        "ASTROLABE_CACHE",
+        "ASTROLABE_ARTIFACTS",
+        "ASTROLABE_DB",
+        "migrate_data_layout",
+        "data-layout-migration",
+        "backtest_monthly_result",
+        "/api/portfolio/sector-exposure",
+        "Compatibility alias",
+        "legacy static tests",
     )
 
     offenders = []
@@ -640,6 +657,52 @@ def test_current_project_docs_do_not_repeat_known_stale_facts():
         for token in forbidden_tokens:
             if token in text:
                 offenders.append(f"{path}:{token}")
+
+    assert offenders == []
+
+
+def test_runtime_code_and_docs_do_not_keep_removed_compatibility_entrypoints():
+    tracked_files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+    forbidden_tokens = (
+        "from backtest.pipeline import",
+        "`backtest/pipeline.py`",
+        "test_backtest_pipeline_contracts.py",
+        "TUSHARE_PRO_TOKEN",
+        "HINDSIGHT_API_LLM_API_KEY",
+        "ASTROLABE_STORE",
+        "ASTROLABE_CACHE",
+        "ASTROLABE_ARTIFACTS",
+        "ASTROLABE_DB",
+        "migrate_data_layout",
+        "data-layout-migration",
+        "backtest_monthly_result",
+        "/api/portfolio/sector-exposure",
+        "Compatibility alias",
+        "legacy static tests",
+    )
+    checked_suffixes = {".py", ".md", ".ts", ".tsx", ".vue", ".yaml", ".yml", ".json"}
+    excluded_paths = {
+        Path("astrolabe_cli/commands/docs.py"),
+    }
+    excluded_roots = {
+        "tests",
+        "var",
+        "web/frontend/node_modules",
+        "web/frontend/dist",
+    }
+
+    offenders = []
+    for raw_path in tracked_files:
+        path = Path(raw_path)
+        if (
+            path in excluded_paths
+            or not path.exists()
+            or path.suffix not in checked_suffixes
+            or any(raw_path == root or raw_path.startswith(root + "/") for root in excluded_roots)
+        ):
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        offenders.extend(f"{path}:{token}" for token in forbidden_tokens if token in text)
 
     assert offenders == []
 

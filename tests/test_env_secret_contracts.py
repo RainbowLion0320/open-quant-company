@@ -5,17 +5,23 @@ def _json_from_cli(capsys):
     return json.loads(capsys.readouterr().out)
 
 
-def test_env_secret_reader_uses_aliases_and_masks_values(monkeypatch):
+def test_env_secret_reader_uses_single_name_and_masks_values(monkeypatch):
     from core.env_secrets import read_env_secret, secret_status
 
     monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
     monkeypatch.setenv("TUSHARE_PRO_TOKEN", "abcdefghijklmnop")
 
-    assert read_env_secret("TUSHARE_TOKEN", aliases=("TUSHARE_PRO_TOKEN",)) == "abcdefghijklmnop"
+    assert read_env_secret("TUSHARE_TOKEN") == ""
 
-    status = secret_status("TUSHARE_TOKEN", aliases=("TUSHARE_PRO_TOKEN",))
+    status = secret_status("TUSHARE_TOKEN")
+    assert status["status"] == "missing"
+
+    monkeypatch.setenv("TUSHARE_TOKEN", "abcdefghijklmnop")
+    assert read_env_secret("TUSHARE_TOKEN") == "abcdefghijklmnop"
+
+    status = secret_status("TUSHARE_TOKEN")
     assert status["status"] == "ok"
-    assert status["source"] == "TUSHARE_PRO_TOKEN"
+    assert status["source"] == "TUSHARE_TOKEN"
     assert status["masked"] == "abcd****mnop"
     assert "abcdefghijklmnop" not in json.dumps(status)
 

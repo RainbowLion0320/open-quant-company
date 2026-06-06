@@ -21,7 +21,7 @@
 | 当前实现状态 | 代码 + 测试 + `docs/acceptance-matrix.md` | 不在 wiki 重复维护状态表。 |
 | 项目发布版本 | `pyproject.toml` → `[project].version` | README badge 通过 `scripts/bump_version.py` 同步；配置文件不保存发布版本。 |
 | 数据维度和路径 | `config/settings.yaml` + `data/storage/dimensions.py` + `data/storage/datahub.py` | 文档说明如何查询，不复制动态数量。 |
-| 本地运行目录布局 | `config/settings.yaml` → `paths` + `docs/operations/data-layout-migration.md` | `data/` 是源码包，运行产物默认在 `var/`。 |
+| 本地运行目录布局 | `config/settings.yaml` → `paths` | `data/` 是源码包，运行产物默认在 `var/`。 |
 | 数据 schema | `data/quality/contract.py` + 必要时的显式 `_contracts/` 文件 | 文档说明契约归属和查询方法。 |
 | 策略参数 | `config/settings.yaml` + 策略代码 | 文档描述设计意图，不固化易过期指标。 |
 | 回测/锦标赛指标 | `var/artifacts/tournaments/` 和生成报告 | 除非明确标记为历史样本，否则不把 Sharpe/MaxDD 写进长期文档。 |

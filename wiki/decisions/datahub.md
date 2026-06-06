@@ -38,7 +38,7 @@ DataHub 对外负责统一入口。内部实现拆为小组件，避免单文件
 DataHub facade 负责:
 
 - 统一目录: `runtime_root`, `store_root`, `cache_root`, `artifact_root`, `db_root`, `signals`, `features`, `macro`, `paper`, `system_monitor`, token cache。
-- 运行产物 API: `runtime_dir()`, `artifact_dir(kind)`, `artifact_path(kind, name)`, `db_path(name)`, `migration_dir()`。
+- 运行产物 API: `runtime_dir()`, `artifact_dir(kind)`, `artifact_path(kind, name)`, `db_path(name)`。
 - 统一路径: `signal_path(strategy)`, `feature_path(as_of_key)`, `macro_path(name)`, `paper_path(name)`。
 - 注册表路径展开: `dimension_root(key)` / `dimension_path(key, **values)` 从 `data_registry.cache` 占位符模式生成真实路径。**设计理由**: 路径只定义一次（config.yaml），消费脚本不硬编码深层目录。占位符 `{symbol}`/`{YYYYMMDD}` 在调用点展开，`validate()` 拒绝 `..` 和绝对路径。
 - 路径 vs 创建分离: `store_path(asset)` 纯路径计算（dimension 展开用），`store_dir(asset)` 创建目录（init 用）。**设计理由**: dimension 路径展开不应产生空目录副作用。
@@ -61,10 +61,9 @@ var/
     reports/
   db/
   logs/
-  migration/
 ```
 
-环境变量覆盖优先级保留：`ASTROLABE_VAR`、`ASTROLABE_STORE`、`ASTROLABE_CACHE`、`ASTROLABE_ARTIFACTS`、`ASTROLABE_DB`。旧 `ASTROLABE_STORE` / `ASTROLABE_CACHE` 仍可继续使用。
+环境变量只保留 `ASTROLABE_VAR` 作为运行产物根目录覆盖。`store/cache/artifacts/db` 的细分目录通过 `config/settings.yaml` 的 `paths.*` 或显式构造 `DataHub(...)` 设置。
 
 设计约束: 很多模块依赖 DataHub 是合理的，因为 DataHub 是数据访问边界。反向依赖不合理: DataHub 及其内部组件不得依赖策略、Web、CLI、执行层业务逻辑。业务模块也不应绕过 DataHub/registry 自己拼深层存储路径。
 
@@ -74,7 +73,7 @@ var/
 
 - `data/storage/db.py`: DuckDB 视图注册统一使用 DataHub 的 store/cache/db 目录。
 - `data/storage/results_db.py`: 策略结果、巴菲特扫描、scan meta 改为 DataHub 原子写入。
-- `data/features/feature_store.py`: PIT as-of 日期视图、兼容月末快照和 registry enrichment 改为 DataHub 路径。
+- `data/features/feature_store.py`: PIT as-of 日期视图和 registry enrichment 统一走 DataHub 路径。
 - `broker/persistence.py`: paper trading 状态目录改为 DataHub，并修复相对配置路径解析。
 - `scripts/execute_paper_trades.py`: 使用 `latest_batch` 读取最新信号。
 - `web/api/routes/system.py`, `scripts/collect_system_metrics.py`: 系统监控库和 token cache 不再写死绝对路径。
@@ -93,4 +92,4 @@ var/
 
 ## 当前约束
 
-新增或重构模块不得再引入绕过 DataHub/registry 的读写路径。已迁入 DataHub 的维度不保留扁平文件 fallback；确需迁移旧数据时，应写一次性迁移脚本，而不是在运行时代码中长期保留兼容分支。
+新增或重构模块不得再引入绕过 DataHub/registry 的读写路径。已纳入 DataHub 的维度不保留扁平文件读取分支；历史数据整理属于人工运维动作，不进入生产运行路径。

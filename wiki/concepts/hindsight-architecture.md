@@ -64,8 +64,7 @@ memory:
 
 必须在启动进程的系统环境变量中设置：
 
-- `HINDSIGHT_API_LLM_API_KEY` — Hindsight 调用 LLM 的 key
-- 可选兼容别名：`DEEPSEEK_API_KEY`。`scripts/start_hindsight_daemon.py` 会把它映射给 Hindsight，但不会读取 `.env` 文件。
+- `DEEPSEEK_API_KEY` — Hindsight daemon 调用默认 LLM provider 的 key。`scripts/start_hindsight_daemon.py` 不读取 `.env` 文件。
 
 ## 端口陷阱 (⚠️ 已修复)
 

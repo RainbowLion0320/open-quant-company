@@ -22,7 +22,7 @@ from core.settings import get_section
 from data.storage.datahub_dimensions import DimensionStore
 from data.storage.datahub_manifest import ManifestStore
 from data.storage.datahub_parquet import ParquetStore
-from data.storage.datahub_paths import DataHubPaths, PROJECT_ROOT, env_first, resolve_path
+from data.storage.datahub_paths import DataHubPaths, PROJECT_ROOT, resolve_path
 
 
 @dataclass(frozen=True)
@@ -51,22 +51,19 @@ class DataHub:
     ):
         project = resolve_path(project_root or PROJECT_ROOT)
         path_cfg = get_section("paths", {}) or {}
-        env_var_root = env_first("ASTROLABE_VAR")
-        env_store_root = env_first("ASTROLABE_STORE")
-        env_cache_root = env_first("ASTROLABE_CACHE")
-        env_artifact_root = env_first("ASTROLABE_ARTIFACTS")
-        env_db_root = env_first("ASTROLABE_DB")
+        env_var_root = os.environ.get("ASTROLABE_VAR", "").strip()
 
         runtime_default = runtime_root or env_var_root or path_cfg.get("runtime_root") or project / "var"
-        store_default = store_root or env_store_root or path_cfg.get("store_root") or Path(runtime_default) / "store"
-        cache_default = cache_root or env_cache_root or path_cfg.get("cache_root") or Path(runtime_default) / "cache"
+        runtime_path = Path(runtime_default)
+        use_runtime_layout = bool(env_var_root and runtime_root is None)
+        store_default = store_root or (runtime_path / "store" if use_runtime_layout else path_cfg.get("store_root")) or runtime_path / "store"
+        cache_default = cache_root or (runtime_path / "cache" if use_runtime_layout else path_cfg.get("cache_root")) or runtime_path / "cache"
         artifact_default = (
             artifact_root
-            or env_artifact_root
-            or path_cfg.get("artifact_root")
-            or Path(runtime_default) / "artifacts"
+            or (runtime_path / "artifacts" if use_runtime_layout else path_cfg.get("artifact_root"))
+            or runtime_path / "artifacts"
         )
-        db_default = db_root or env_db_root or path_cfg.get("db_root") or Path(runtime_default) / "db"
+        db_default = db_root or (runtime_path / "db" if use_runtime_layout else path_cfg.get("db_root")) or runtime_path / "db"
 
         self.paths = DataHubPaths(project, runtime_default, store_default, cache_default, artifact_default, db_default)
         self.project_root = self.paths.project_root
@@ -129,9 +126,6 @@ class DataHub:
 
     def db_path(self, name: str) -> Path:
         return self.paths.db_path(name)
-
-    def migration_dir(self) -> Path:
-        return self.paths.migration_dir()
 
     def stock_data_dir(self, name: str) -> Path:
         return self.paths.stock_data_dir(name)
@@ -390,17 +384,11 @@ class DataHub:
 
 
 _DEFAULT_HUB: DataHub | None = None
-_DEFAULT_HUB_SIGNATURE: tuple[str, str, str, str, str] | None = None
+_DEFAULT_HUB_SIGNATURE: tuple[str] | None = None
 
 
-def _default_hub_signature() -> tuple[str, str, str, str, str]:
-    return (
-        os.environ.get("ASTROLABE_VAR", ""),
-        os.environ.get("ASTROLABE_STORE", ""),
-        os.environ.get("ASTROLABE_CACHE", ""),
-        os.environ.get("ASTROLABE_ARTIFACTS", ""),
-        os.environ.get("ASTROLABE_DB", ""),
-    )
+def _default_hub_signature() -> tuple[str]:
+    return (os.environ.get("ASTROLABE_VAR", ""),)
 
 
 def get_datahub() -> DataHub:

@@ -104,7 +104,7 @@ def resolve_llm_use_case(use_case: str, *, provider: str | None = None, model: s
         "label": str(pcfg.get("label") or resolved_provider),
         "model": resolved_model,
         "base_url": str(pcfg.get("base_url") or pcfg.get("chat_base_url") or ""),
-        "api_key_env": "/".join(_env_names(resolved_provider)),
+        "api_key_env": _env_name(resolved_provider),
         "usage_schema": str(pcfg.get("usage_schema") or DEFAULT_USAGE_SCHEMA),
     }
 
@@ -165,21 +165,19 @@ def fx_rate(provider: str = DEFAULT_PROVIDER) -> float:
         return 7.2
 
 
-def _env_names(provider: str) -> list[str]:
+def _env_name(provider: str) -> str:
     value = provider_config(provider).get("api_key_env")
-    if isinstance(value, list):
-        return [str(item) for item in value if item]
     if isinstance(value, str) and value:
-        return [value]
-    return []
+        return value
+    return ""
 
 
 def load_provider_api_key(provider: str = DEFAULT_PROVIDER) -> str:
     """Load provider API key from process environment only."""
-    names = _env_names(provider)
-    if not names:
+    name = _env_name(provider)
+    if not name:
         return ""
-    return read_env_secret(names[0], aliases=names[1:])
+    return read_env_secret(name)
 
 
 def provider_health_items() -> list[dict[str, str]]:
@@ -195,7 +193,7 @@ def provider_health_items() -> list[dict[str, str]]:
             masked = key[:4] + "****" + key[-4:] if len(key) > 8 else "****"
             items.append({"name": f"LLM:{label}", "status": "ok", "detail": f"已配置 ({masked})"})
         else:
-            env_hint = "/".join(_env_names(name)) or "provider API key"
+            env_hint = _env_name(name) or "provider API key"
             items.append({"name": f"LLM:{label}", "status": "missing", "detail": f"未配置 {env_hint}"})
     return items
 

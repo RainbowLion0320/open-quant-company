@@ -81,8 +81,7 @@ def test_paper_state_persistence_round_trip_uses_public_state_model(tmp_path, mo
     from data.storage.datahub import reset_datahub
     from broker.state import PaperBrokerState
 
-    monkeypatch.setenv("ASTROLABE_STORE", str(tmp_path / "store"))
-    monkeypatch.setenv("ASTROLABE_CACHE", str(tmp_path / "cache"))
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     reset_datahub()
 
     import broker.persistence as persistence

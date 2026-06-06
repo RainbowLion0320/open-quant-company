@@ -37,7 +37,7 @@ Current collection after cleanup: 590 pytest tests.
 | `test_audit.py` | 14 | 3 | 141 | Audit ledger contracts; kept. |
 | `test_auth.py` | 21 | 4 | 380 | Auth/settings security contracts; kept. |
 | `test_backfill.py` | 22 | 5 | 219 | Backfill ledger contracts; kept. |
-| `test_backtest_pipeline_contracts.py` | 4 | 1 | 146 | Backtest pipeline contracts; kept. |
+| `test_backtest_pipeline_runner_contracts.py` | 2 | 0 | 116 | Production PipelineBacktest stage contracts; kept. |
 | `test_backtest_pit_contracts.py` | 4 | 1 | 79 | PIT/no-lookahead contracts; kept. |
 | `test_backtest_reproducibility.py` | 3 | 1 | 104 | Deterministic backtest contract; kept. |
 | `test_boundary.py` | 5 | 0 | 245 | Converted from old script into collected cross-module boundary contracts. |

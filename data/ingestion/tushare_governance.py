@@ -237,7 +237,7 @@ class TushareGovernance:
 
     def api(self):
         if not self.token:
-            raise RuntimeError("TUSHARE_TOKEN or TUSHARE_PRO_TOKEN is not configured in process environment")
+            raise RuntimeError("TUSHARE_TOKEN is not configured in process environment")
         if self._api is None:
             import tushare as ts
 
@@ -351,7 +351,7 @@ class TushareGovernance:
             "schema_version": REPORT_SCHEMA_VERSION,
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "minute_policy": MINUTE_POLICY,
-            "token": secret_status("TUSHARE_TOKEN", aliases=("TUSHARE_PRO_TOKEN",)),
+            "token": secret_status("TUSHARE_TOKEN"),
             "capabilities": self.probe_capabilities(probe_network=probe_network),
             "coverage": self.coverage(days=days),
         }
@@ -628,7 +628,7 @@ class TushareGovernance:
         if dry_run:
             return result
         if not self.token:
-            raise RuntimeError("TUSHARE_TOKEN or TUSHARE_PRO_TOKEN is not configured in process environment")
+            raise RuntimeError("TUSHARE_TOKEN is not configured in process environment")
 
         from scripts.repair_table import REPAIR_MAP
 

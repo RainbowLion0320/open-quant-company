@@ -94,7 +94,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Signals | `routes/signals.py` | `GET /api/signals/changes` |
 | Strategies | `routes/strategies.py` | `GET /api/strategies`, `GET /api/strategies/statuses`, `GET /api/strategies/governance`, `GET /api/strategies/catalog`, `GET /api/strategies/evaluation`, `GET /api/strategies/evidence`, `GET /api/strategies/evidence/{strategy}`, `GET /api/strategies/jobs/{job_id}`, `GET /api/strategies/{name}`, `POST /api/strategies/run` |
 | Backtest | `routes/backtest.py` | `GET /api/backtest`, `GET /api/backtest/{strategy}` |
-| Portfolio | `routes/portfolio.py` | `GET /api/portfolio/positions`, `GET /api/portfolio/balance`, `GET /api/portfolio/nav`, `GET /api/portfolio/trades`, `GET /api/portfolio/summary`, `GET /api/portfolio/orders`, `GET /api/portfolio/sector-exposure`, `POST /api/portfolio/order`, `POST /api/portfolio/refresh` |
+| Portfolio | `routes/portfolio.py` | `GET /api/portfolio/positions`, `GET /api/portfolio/balance`, `GET /api/portfolio/nav`, `GET /api/portfolio/trades`, `GET /api/portfolio/summary`, `GET /api/portfolio/orders`, `POST /api/portfolio/order`, `POST /api/portfolio/refresh` |
 | Sectors | `routes/sectors.py` | `GET /api/sectors/overview`, `GET /api/sectors/exposure`, `GET /api/sectors/{industry}`, `GET /api/sectors/{industry}/stocks` (410 retired) |
 | Pipeline | `routes/pipeline.py` | `GET /api/pipeline`, `GET /api/pipeline/market-regime`, `GET /api/pipeline/{pipeline_key}` |
 | Assets | `routes/assets.py` | `GET /api/assets/overview` |
