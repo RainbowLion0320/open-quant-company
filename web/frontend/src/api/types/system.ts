@@ -69,8 +69,49 @@ export interface DbRepairResponse {
   message?: string;
 }
 
-export interface HindsightGraphResponse {
-  nodes: any[];
-  links: any[];
-  stats?: Record<string, any>;
+export interface CodeGraphStatusResponse {
+  initialized: boolean;
+  file_count: number;
+  node_count: number;
+  edge_count: number;
+  db_size_bytes?: number;
+  backend?: string;
+  languages: { language: string; files: number; nodes: number }[];
+  nodes_by_kind: Record<string, number>;
+  pending_changes: { added: number; modified: number; removed: number };
+  stale: boolean;
+  message?: string;
+  truncated?: boolean;
+}
+
+export interface CodeGraphNode {
+  id: string;
+  label: string;
+  kind: string;
+  path: string;
+  qualified_name: string;
+  language: string;
+  start_line: number | null;
+  end_line: number | null;
+  count: number;
+  degree: number;
+  group: string;
+  signature?: string | null;
+  docstring?: string | null;
+}
+
+export interface CodeGraphLink {
+  source: string;
+  target: string;
+  type: string;
+  label: string;
+  count: number;
+  direction: string;
+}
+
+export interface CodeGraphGraphResponse {
+  level: "module" | "file" | "symbol" | "neighborhood";
+  nodes: CodeGraphNode[];
+  links: CodeGraphLink[];
+  stats: CodeGraphStatusResponse;
 }

@@ -22,7 +22,7 @@ import { useI18n } from "../i18n";
 import ActivityMonitor from "./ActivityMonitor.vue";
 import Settings from "./Settings.vue";
 import ConfigCenter from "./ConfigCenter.vue";
-import HindsightGraph from "./HindsightGraph.vue";
+import CodeGraph from "./CodeGraph.vue";
 
 const { t } = useI18n();
 
@@ -30,7 +30,7 @@ const tabKeys = [
   { key: "monitor" },
   { key: "settings" },
   { key: "config" },
-  { key: "hindsight" },
+  { key: "codegraph" },
 ];
 
 const tabs = computed(() => tabKeys.map(item => ({
@@ -44,7 +44,7 @@ const { activeComponent } = useModuleTabs(tabKeys, "monitor", {
   monitor: ActivityMonitor,
   settings: Settings,
   config: ConfigCenter,
-  hindsight: HindsightGraph,
+  codegraph: CodeGraph,
 });
 </script>
 

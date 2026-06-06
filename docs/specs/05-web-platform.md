@@ -49,7 +49,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
 | `/pipeline` | 流程图 | 关键参数计算透明度入口；展示四条关键链路，Market Regime 为细粒度 DAG |
 | `/datahub` | 数据中台 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
-| `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、配置中心、记忆图谱 |
+| `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、配置中心、代码图谱 |
 
 旧一级页面 redirect 已移除。除 `/stocks/:code` 个股详情隐藏路由外，用户应通过七个一级模块、二级 tab 和 Pipeline 透明度页访问原子功能。
 
@@ -100,7 +100,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Assets | `routes/assets.py` | `GET /api/assets/overview` |
 | Settings | `routes/settings.py` | `GET /api/settings`, `GET /api/settings/schema`, `PUT /api/settings`, `PATCH /api/settings/section/{section}` |
 | System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/llm-usage`, `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/mode` |
-| Hindsight | `routes/hindsight.py` | `GET /api/hindsight/graph` |
+| CodeGraph | `routes/codegraph.py` | `GET /api/codegraph/status`, `GET /api/codegraph/graph`, `GET /api/codegraph/search`, `GET /api/codegraph/neighborhood`, `POST /api/codegraph/sync` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
 
 `GET /api/system/llm-usage` 只使用 provider 公开余额 API 与本地账本：启用 provider 的 `balance_url` 提供账号余额，本项目 LLM 调用从响应 `usage` 字段写入 `var/store/llm/project_usage_ledger.parquet` 后按 provider/model 聚合展示。不得重新引入 provider 专用别名、网页 CDP 或 CSV 导入作为历史用量来源。

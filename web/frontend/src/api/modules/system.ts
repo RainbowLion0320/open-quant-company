@@ -1,5 +1,5 @@
 import { get, post } from "../client";
-import type { DbHealthResponse, DbRepairResponse, HindsightGraphResponse, LlmUsageResponse, SystemHistoryResponse, SystemMonitor } from "../types";
+import type { CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LlmUsageResponse, SystemHistoryResponse, SystemMonitor } from "../types";
 
 export const systemApi = {
   systemMonitor: () => get<SystemMonitor>("/api/system/monitor"),
@@ -13,5 +13,18 @@ export const systemApi = {
   auditHistory: (section = "", limit = 50) =>
     get<{ entries: any[]; summary: any; total: number }>(`/api/system/audit?section=${encodeURIComponent(section)}&limit=${limit}`),
   systemMode: () => get<{ mode: string; has_api_key: boolean; allows_settings_write: boolean; allows_paper_trading: boolean; readonly_sections: string[] }>("/api/system/mode"),
-  hindsightGraph: () => get<HindsightGraphResponse>("/api/hindsight/graph"),
+  codeGraphStatus: () => get<CodeGraphStatusResponse>("/api/codegraph/status"),
+  codeGraphGraph: (params: { level?: string; root?: string; edge_kinds?: string; node_kinds?: string; limit?: number } = {}) => {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== "") search.set(key, String(value));
+    }
+    const query = search.toString();
+    return get<CodeGraphGraphResponse>(`/api/codegraph/graph${query ? `?${query}` : ""}`);
+  },
+  codeGraphSearch: (q: string, limit = 20) =>
+    get<{ items: CodeGraphNode[] }>(`/api/codegraph/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  codeGraphNeighborhood: (nodeId: string, depth = 1, limit = 180) =>
+    get<CodeGraphGraphResponse>(`/api/codegraph/neighborhood?node_id=${encodeURIComponent(nodeId)}&depth=${depth}&limit=${limit}`),
+  codeGraphSync: (mode: "sync" | "rebuild") => post<{ status: string; mode: string; results: any[] }>("/api/codegraph/sync", { mode }),
 };

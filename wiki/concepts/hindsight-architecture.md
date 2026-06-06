@@ -75,7 +75,7 @@ memory:
 | 8888 | (已关闭) | 历史遗留 (脚本已修复至 9177) | 仅14个自指节点 (空壳) |
 | **9177** | 活跃 | 由 `start_hindsight_daemon.py` 启动 | **~100+ 节点** (活跃增长中) |
 
-**根因**: `start_hindsight_daemon.py` 硬编码了 `port=8888`，但 Hermes 的 Hindsight 插件在 auto-start 时用了默认端口 9177。Web API 路由 (`web/api/routes/hindsight.py`) 原来 hardcode 了 `localhost:8888`，导致图谱只显示 14 个节点。
+**根因**: `start_hindsight_daemon.py` 硬编码了 `port=8888`，但 Hermes 的 Hindsight 插件在 auto-start 时用了默认端口 9177。旧 Web 图谱入口曾经 hardcode `localhost:8888`，导致页面只显示 14 个节点。
 
 **修复**: 2026-05-17 将 Web API 的 `HINDSIGHT` 常量改为 `http://localhost:9177`。
 
@@ -149,7 +149,7 @@ curl localhost:9177/v1/default/banks/astrolabe-quant/stats
 
 ## 当前状态
 
-实时节点数、链接数和最后合并时间以 Web UI 记忆图谱页面或 `/api/hindsight/graph` 为准；wiki 不保存会快速过期的运行快照。
+实时节点数、链接数和最后合并时间以 Hindsight daemon 的 `/v1/default/banks/astrolabe-quant/stats` 为准；wiki 不保存会快速过期的运行快照。Web UI 的系统图谱页面已经改为 CodeGraph 代码图谱，不再展示 Hindsight 数据。
 
 ## 与 Hermes 工具的对应
 
@@ -162,6 +162,6 @@ curl localhost:9177/v1/default/banks/astrolabe-quant/stats
 
 ## See Also
 
-- [[hindsight-graph]] — Web 端知识图谱可视化
+- [[codegraph-visualization]] — Web 端代码图谱可视化
 - [[system-architecture]] — 系统整体架构
 - [[web-architecture]] — Web 前端架构

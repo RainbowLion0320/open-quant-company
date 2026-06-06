@@ -95,11 +95,17 @@ export function highlightGraphEdges(allEdges: THREE.LineSegments | null, edgeMet
   const colors = allEdges.geometry.attributes.color.array as Float32Array;
   const material = allEdges.material as THREE.LineBasicMaterial;
   const dim = new THREE.Color(0x111122);
-  const bright = new THREE.Color(0xffffff);
+  const inbound = new THREE.Color(0x22d3ee);
+  const outbound = new THREE.Color(0xfacc15);
 
   for (let i = 0; i < edgeMeta.length; i++) {
     const meta = edgeMeta[i];
-    const color = !nodeId ? meta.baseColor : (meta.srcId === nodeId || meta.tgtId === nodeId ? bright : dim);
+    let color = meta.baseColor;
+    if (nodeId) {
+      if (meta.srcId === nodeId) color = outbound;
+      else if (meta.tgtId === nodeId) color = inbound;
+      else color = dim;
+    }
     const offset = i * 6;
     colors[offset] = color.r;
     colors[offset + 1] = color.g;
@@ -109,5 +115,34 @@ export function highlightGraphEdges(allEdges: THREE.LineSegments | null, edgeMet
     colors[offset + 5] = color.b;
   }
   material.opacity = 1.0;
+  allEdges.geometry.attributes.color.needsUpdate = true;
+}
+
+export function pulseSelectedEdges(
+  allEdges: THREE.LineSegments | null,
+  edgeMeta: EdgeMeta[],
+  nodeId: string | null,
+  timestamp: number,
+) {
+  if (!allEdges || !nodeId) return;
+  const colors = allEdges.geometry.attributes.color.array as Float32Array;
+  const inbound = new THREE.Color(0x22d3ee);
+  const outbound = new THREE.Color(0xfacc15);
+  const white = new THREE.Color(0xffffff);
+  const pulse = (Math.sin(timestamp / 180) + 1) / 2;
+
+  for (let i = 0; i < edgeMeta.length; i++) {
+    const meta = edgeMeta[i];
+    if (meta.srcId !== nodeId && meta.tgtId !== nodeId) continue;
+    const base = meta.srcId === nodeId ? outbound : inbound;
+    const color = base.clone().lerp(white, 0.22 + pulse * 0.45);
+    const offset = i * 6;
+    colors[offset] = color.r;
+    colors[offset + 1] = color.g;
+    colors[offset + 2] = color.b;
+    colors[offset + 3] = color.r;
+    colors[offset + 4] = color.g;
+    colors[offset + 5] = color.b;
+  }
   allEdges.geometry.attributes.color.needsUpdate = true;
 }

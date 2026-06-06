@@ -58,7 +58,7 @@ Current collection after cleanup: 590 pytest tests.
 | `test_factor_gate.py` | 15 | 5 | 208 | Candidate factor gate contracts; changed to isolated expression file. |
 | `test_fill_models.py` | 25 | 8 | 200 | Fill model contracts; kept. |
 | `test_frontend_i18n_contracts.py` | 4 | 0 | 82 | Frontend localization contracts; kept. |
-| `test_hindsight_contracts.py` | 1 | 0 | 20 | Hindsight contract; kept. |
+| `test_codegraph_contracts.py` | 4 | 0 | 187 | CodeGraph API/service graph contracts; kept. |
 | `test_hmm_engine.py` | 2 | 0 | 80 | HMM engine contract; kept. |
 | `test_ledger.py` | 19 | 6 | 350 | Event ledger contracts using temporary storage; kept. |
 | `test_market_data_view.py` | 3 | 0 | 48 | Market data view contracts; kept. |

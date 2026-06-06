@@ -18,7 +18,7 @@ import { database } from "./database";
 import { assetCoverage } from "./assetCoverage";
 import { activity } from "./activity";
 import { configCenter } from "./configCenter";
-import { hindsight } from "./hindsight";
+import { codegraph } from "./codegraph";
 
 export const enUS = {
   app,
@@ -41,5 +41,5 @@ export const enUS = {
   assetCoverage,
   activity,
   configCenter,
-  hindsight,
+  codegraph,
 } as const;

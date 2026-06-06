@@ -72,10 +72,10 @@ export const modules = {
             meta: "Config center",
             description: "查看和编辑所有系统参数：数据获取、信号、Regime、风控、回测、费率",
           },
-          hindsight: {
-            label: "记忆图谱",
-            meta: "AI memory",
-            description: "加载 Hindsight 记忆节点，检查经验、观察和实体关系",
+          codegraph: {
+            label: "代码图谱",
+            meta: "CodeGraph",
+            description: "浏览项目模块、文件、符号和调用关系，检查代码结构与影响面",
           },
         },
       },

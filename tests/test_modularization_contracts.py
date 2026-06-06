@@ -69,20 +69,20 @@ def test_frontend_heavy_views_are_componentized():
             "web/frontend/src/components/pipeline/PipelineCanvas.vue",
             "web/frontend/src/composables/useMarketOverview.ts",
             "web/frontend/src/composables/usePipelineData.ts",
-            "web/frontend/src/composables/useHindsightThreeGraph.ts",
-            "web/frontend/src/composables/hindsight/types.ts",
-            "web/frontend/src/composables/hindsight/scene.ts",
-            "web/frontend/src/composables/hindsight/graphBuilder.ts",
-            "web/frontend/src/composables/hindsight/simulation.ts",
-            "web/frontend/src/composables/hindsight/interaction.ts",
+            "web/frontend/src/composables/useCodeGraph.ts",
+            "web/frontend/src/composables/codegraph/types.ts",
+            "web/frontend/src/composables/codegraph/scene.ts",
+            "web/frontend/src/composables/codegraph/graphBuilder.ts",
+            "web/frontend/src/composables/codegraph/simulation.ts",
+            "web/frontend/src/composables/codegraph/interaction.ts",
             "web/frontend/src/i18n/messages/zh-CN.ts",
             "web/frontend/src/i18n/messages/en-US.ts",
         ]
     )
     assert _line_count("web/frontend/src/views/Market.vue") <= 760
     assert _line_count("web/frontend/src/views/Pipeline.vue") <= 520
-    assert _line_count("web/frontend/src/views/HindsightGraph.vue") <= 420
-    assert _line_count("web/frontend/src/composables/useHindsightThreeGraph.ts") <= 260
+    assert _line_count("web/frontend/src/views/CodeGraph.vue") <= 520
+    assert _line_count("web/frontend/src/composables/useCodeGraph.ts") <= 320
     assert _line_count("web/frontend/src/api/index.ts") <= 120
     assert _line_count("web/frontend/src/i18n/messages.ts") <= 80
 

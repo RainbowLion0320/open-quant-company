@@ -55,7 +55,7 @@ export const modules = {
       system: {
         title: "System",
         eyebrow: "System",
-        subtitle: "Runtime observation, config writes, and AI memory tools in one system entry",
+        subtitle: "Runtime observation, config writes, and code intelligence tools in one system entry",
         tabs: {
           monitor: {
             label: "Monitor",
@@ -72,10 +72,10 @@ export const modules = {
             meta: "Config center",
             description: "View and edit system parameters for data fetch, signals, regime, risk, backtest, and fees",
           },
-          hindsight: {
-            label: "Memory Graph",
-            meta: "AI memory",
-            description: "Load Hindsight memory nodes and inspect lessons, observations, and entity links",
+          codegraph: {
+            label: "CodeGraph",
+            meta: "Code graph",
+            description: "Inspect modules, files, symbols, call flow, and structural impact across the project",
           },
         },
       },

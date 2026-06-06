@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-export interface HindsightSceneObjects {
+export interface CodeGraphSceneObjects {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
@@ -10,7 +10,7 @@ export interface HindsightSceneObjects {
   starfield: THREE.Points;
 }
 
-export function createHindsightScene(container: HTMLElement): HindsightSceneObjects {
+export function createCodeGraphScene(container: HTMLElement): CodeGraphSceneObjects {
   const width = container.clientWidth;
   const height = container.clientHeight;
   const scene = new THREE.Scene();
@@ -45,7 +45,7 @@ export function createHindsightScene(container: HTMLElement): HindsightSceneObje
   return { scene, camera, renderer, controls, sphereGeo, starfield };
 }
 
-export function resizeHindsightScene(objects: HindsightSceneObjects, container: HTMLElement) {
+export function resizeCodeGraphScene(objects: CodeGraphSceneObjects, container: HTMLElement) {
   const width = container.clientWidth;
   const height = container.clientHeight;
   objects.renderer.setSize(width, height);
@@ -53,7 +53,7 @@ export function resizeHindsightScene(objects: HindsightSceneObjects, container: 
   objects.camera.updateProjectionMatrix();
 }
 
-export function disposeHindsightScene(objects: HindsightSceneObjects | null) {
+export function disposeCodeGraphScene(objects: CodeGraphSceneObjects | null) {
   if (!objects) return;
   objects.controls.dispose();
   objects.sphereGeo.dispose();

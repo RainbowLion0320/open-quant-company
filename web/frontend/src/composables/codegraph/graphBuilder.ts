@@ -1,15 +1,15 @@
 import * as THREE from "three";
 import {
+  CODEGRAPH_COLORS,
   EdgeMeta,
   GraphData,
   GraphLink,
   GraphNode,
-  HINDSIGHT_COLORS,
   SimLink,
   SimNode,
 } from "./types";
 
-export interface BuiltHindsightGraph {
+export interface BuiltCodeGraph {
   nodeMeshes: Map<string, THREE.Mesh>;
   allEdges: THREE.LineSegments | null;
   edgeMeta: EdgeMeta[];
@@ -17,13 +17,13 @@ export interface BuiltHindsightGraph {
   simLinks: SimLink[];
 }
 
-export function buildHindsightGraph(
+export function buildCodeGraph(
   data: GraphData,
   scene: THREE.Scene,
   sphereGeo: THREE.SphereGeometry,
   previousNodeMeshes: Map<string, THREE.Mesh>,
   previousEdges: THREE.LineSegments | null,
-): BuiltHindsightGraph {
+): BuiltCodeGraph {
   clearPreviousGraph(scene, previousNodeMeshes, previousEdges);
 
   const degree = calculateDegrees(data.nodes, data.links);
@@ -52,22 +52,23 @@ function clearPreviousGraph(
 
 function calculateDegrees(nodes: GraphNode[], links: GraphLink[]): Map<string, number> {
   const degree = new Map<string, number>();
-  for (const node of nodes) degree.set(node.id, 0);
+  for (const node of nodes) degree.set(node.id, node.degree || 0);
   for (const link of links) {
-    const srcId = nodeFromLink(link.source, nodes).id;
-    const tgtId = nodeFromLink(link.target, nodes).id;
-    degree.set(srcId, (degree.get(srcId) || 0) + 1);
-    degree.set(tgtId, (tgtId === srcId ? 0 : 1) + (degree.get(tgtId) || 0));
+    const srcId = nodeFromLink(link.source, nodes)?.id;
+    const tgtId = nodeFromLink(link.target, nodes)?.id;
+    if (!srcId || !tgtId) continue;
+    degree.set(srcId, (degree.get(srcId) || 0) + Math.max(1, link.count || 1));
+    degree.set(tgtId, (degree.get(tgtId) || 0) + Math.max(1, link.count || 1));
   }
   return degree;
 }
 
 function createSimNodes(nodes: GraphNode[], degree: Map<string, number>): SimNode[] {
-  const radius = Math.min(nodes.length * 3, 180);
-  return nodes.map((node) => {
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    const r = radius * Math.cbrt(Math.random()) * 0.6;
+  const radius = Math.min(Math.max(nodes.length * 4, 60), 220);
+  return nodes.map((node, index) => {
+    const theta = (index / Math.max(1, nodes.length)) * Math.PI * 2;
+    const phi = Math.acos(2 * ((index * 37) % Math.max(2, nodes.length)) / Math.max(2, nodes.length) - 1);
+    const r = radius * (0.35 + (index % 7) * 0.07);
     return {
       ...node,
       x: r * Math.sin(phi) * Math.cos(theta),
@@ -95,14 +96,14 @@ function createNodeMeshes(
     const material = new THREE.MeshStandardMaterial({
       color,
       emissive: color,
-      emissiveIntensity: 0.3 + degRatio * 0.4,
-      roughness: 0.5,
-      metalness: 0.1,
+      emissiveIntensity: 0.25 + degRatio * 0.45,
+      roughness: 0.52,
+      metalness: 0.12,
     });
     const mesh = new THREE.Mesh(sphereGeo, material);
     mesh.position.set(node.x, node.y, node.z);
     mesh.scale.setScalar(scale);
-    mesh.userData = { nodeId: node.id, type: node.type, scale, degRatio };
+    mesh.userData = { nodeId: node.id, kind: node.kind, scale, degRatio };
     scene.add(mesh);
     nodeMeshes.set(node.id, mesh);
   }
@@ -114,31 +115,25 @@ function createEdges(scene: THREE.Scene, data: GraphData, simNodes: SimNode[]) {
   const allColors: number[] = [];
   const edgeMeta: EdgeMeta[] = [];
   const simLinks: SimLink[] = [];
-  const typeBaseSpec: Record<string, { color: number; opacity: number }> = {
-    semantic: { color: HINDSIGHT_COLORS.semantic, opacity: 0.35 },
-    temporal: { color: HINDSIGHT_COLORS.temporal, opacity: 0.15 },
-    consolidation: { color: HINDSIGHT_COLORS.consolidation, opacity: 0.20 },
-    tag: { color: HINDSIGHT_COLORS.tag, opacity: 0.12 },
-  };
 
   for (const link of data.links) {
     const srcNode = nodeFromLink(link.source, data.nodes);
     const tgtNode = nodeFromLink(link.target, data.nodes);
+    if (!srcNode || !tgtNode) continue;
     const src = simNodes.find(item => item.id === srcNode.id);
     const tgt = simNodes.find(item => item.id === tgtNode.id);
     if (!src || !tgt) continue;
 
     simLinks.push({ source: src, target: tgt, type: link.type });
-    const edgeType = link.type || "temporal";
-    const spec = typeBaseSpec[edgeType] || typeBaseSpec.temporal;
-    const color = new THREE.Color(spec.color);
+    const edgeType = link.type || "references";
+    const color = new THREE.Color(edgeColor(edgeType));
     allPositions.push(src.x, src.y, src.z, tgt.x, tgt.y, tgt.z);
     allColors.push(color.r, color.g, color.b, color.r, color.g, color.b);
     edgeMeta.push({
       srcId: src.id,
       tgtId: tgt.id,
       type: edgeType,
-      baseOpacity: spec.opacity,
+      baseOpacity: edgeType === "contains" ? 0.22 : 0.42,
       baseColor: color.clone(),
     });
   }
@@ -149,7 +144,7 @@ function createEdges(scene: THREE.Scene, data: GraphData, simNodes: SimNode[]) {
   const edgeMat = new THREE.LineBasicMaterial({
     vertexColors: true,
     transparent: true,
-    opacity: 1.0,
+    opacity: 0.95,
     depthWrite: false,
   });
   const allEdges = new THREE.LineSegments(edgeGeo, edgeMat);
@@ -158,7 +153,8 @@ function createEdges(scene: THREE.Scene, data: GraphData, simNodes: SimNode[]) {
 }
 
 export function nodeScale(node: SimNode, maxDegree: number): number {
-  return 1.8 + (node.degree / Math.max(1, maxDegree)) * 4.5;
+  const base = node.kind === "module" ? 3.4 : node.kind === "file" ? 2.5 : 1.8;
+  return base + (node.degree / Math.max(1, maxDegree)) * 4.2;
 }
 
 export function maxNodeDegree(simNodes: SimNode[]): number {
@@ -166,13 +162,15 @@ export function maxNodeDegree(simNodes: SimNode[]): number {
 }
 
 function nodeColor(node: SimNode): number {
-  if (node.type === "experience") return HINDSIGHT_COLORS.exp;
-  if (node.type === "world") return HINDSIGHT_COLORS.world;
-  return HINDSIGHT_COLORS.obs;
+  return (CODEGRAPH_COLORS as Record<string, number>)[node.kind] || CODEGRAPH_COLORS.function;
 }
 
-function nodeFromLink(linkNode: number | GraphNode, nodes: GraphNode[]): GraphNode {
-  return typeof linkNode === "number" ? nodes[linkNode] : linkNode;
+function edgeColor(edgeType: string): number {
+  return (CODEGRAPH_COLORS as Record<string, number>)[edgeType] || CODEGRAPH_COLORS.references;
+}
+
+function nodeFromLink(linkNode: string | GraphNode, nodes: GraphNode[]): GraphNode | undefined {
+  return typeof linkNode === "string" ? nodes.find(node => node.id === linkNode) : linkNode;
 }
 
 function disposeMeshMaterial(mesh: THREE.Mesh) {

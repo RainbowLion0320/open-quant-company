@@ -31,18 +31,18 @@ export function pickGraphNode(
 export function graphNodePreview(node: SimNode): GraphNode {
   return {
     id: node.id,
-    index: node.index,
     label: node.label,
-    fullText: node.fullText || node.label,
-    type: node.type,
-    entities: node.entities,
-    tags: node.tags,
-    date: node.date,
-    documentId: node.documentId || null,
-    chunkId: node.chunkId || null,
-    consolidatedAt: node.consolidatedAt || null,
-    proofCount: node.proofCount,
+    kind: node.kind,
+    path: node.path,
+    qualified_name: node.qualified_name,
+    language: node.language,
+    start_line: node.start_line,
+    end_line: node.end_line,
+    count: node.count,
     degree: node.degree,
+    group: node.group,
+    signature: node.signature || null,
+    docstring: node.docstring || null,
   };
 }
 
