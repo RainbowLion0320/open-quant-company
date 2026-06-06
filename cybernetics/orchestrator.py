@@ -226,7 +226,7 @@ class QuantOrchestrator:
         import math
         from datetime import datetime
 
-        from data.fetcher import get_index_daily
+        from data.ingestion.fetcher import get_index_daily
 
         index_frames: Dict[str, Any] = {}
         for symbol, _label, _weight in _regime_indexes():

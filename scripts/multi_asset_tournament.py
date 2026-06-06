@@ -14,10 +14,10 @@ os.environ['no_proxy'] = '*'
 
 import pandas as pd
 
-from data.symbols import CIRCLE_STOCKS
-from data.fetcher import get_stock_daily, get_index_daily
-from data.assets.etf import ETFAsset
-from data.datahub import get_datahub
+from data.market.symbols import CIRCLE_STOCKS
+from data.ingestion.fetcher import get_stock_daily, get_index_daily
+from data.market.assets.etf import ETFAsset
+from data.storage.datahub import get_datahub
 from backtest.momentum import (
     buy_equal_weight_selection,
     liquidate_positions,

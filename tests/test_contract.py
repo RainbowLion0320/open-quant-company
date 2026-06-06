@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 from pathlib import Path
-from data.contract import (
+from data.quality.contract import (
     DataContract, SchemaMigration, ContractViolation,
     derive_contracts_from_registry, load_contract, list_contracts,
 )

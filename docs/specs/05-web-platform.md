@@ -103,7 +103,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Hindsight | `routes/hindsight.py` | `GET /api/hindsight/graph` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
 
-`GET /api/system/llm-usage` 只使用 provider 公开余额 API 与本地账本：启用 provider 的 `balance_url` 提供账号余额，本项目 LLM 调用从响应 `usage` 字段写入 `data/store/llm/project_usage_ledger.parquet` 后按 provider/model 聚合展示。`/api/system/deepseek-usage` 仅作为兼容别名；不得重新引入网页 CDP 或 CSV 导入作为历史用量来源。
+`GET /api/system/llm-usage` 只使用 provider 公开余额 API 与本地账本：启用 provider 的 `balance_url` 提供账号余额，本项目 LLM 调用从响应 `usage` 字段写入 `var/store/llm/project_usage_ledger.parquet` 后按 provider/model 聚合展示。`/api/system/deepseek-usage` 仅作为兼容别名；不得重新引入网页 CDP 或 CSV 导入作为历史用量来源。
 
 LLM 成本配置以 `llm.providers.{provider}` 为边界，`llm.use_cases.*` 只声明调用路由。定价支持 `input_cache_hit` / `input_cache_miss` / `input` / `output`，也支持 `total` token 和 `request` 固定调用成本；不同 provider 可用 `usage_schema` 标明自己的响应范式。
 
@@ -138,7 +138,7 @@ def get_db() -> Database:
 
 ### 2.4 Agent-facing Control Plane
 
-`astroq` 是 Web/API 之外的本地控制平面，用于 agent、cron 和人工维护。CLI 只做编排：策略扫描仍走 `data.strategy_plugins`，数据修复仍走 `scripts.repair_table`，Web 服务仍走 `uvicorn web.api.app:create_app`。所有 agent 依赖命令必须支持 `--json`。
+`astroq` 是 Web/API 之外的本地控制平面，用于 agent、cron 和人工维护。CLI 只做编排：策略扫描仍走 `data.strategy.plugins`，数据修复仍走 `scripts.repair_table`，Web 服务仍走 `uvicorn web.api.app:create_app`。所有 agent 依赖命令必须支持 `--json`。
 
 | 命令域 | 命令 | 契约 |
 |--------|------|------|
@@ -158,7 +158,7 @@ Browser (Vue 3)
     │  HTTP GET /api/strategies/buffett
     ▼
 FastAPI Route Handler
-    │  data.results_db.load_strategy_signals(name)
+    │  data.storage.results_db.load_strategy_signals(name)
     ▼
 DataHub → load_strategy_signals("buffett")
     │  DataFrame

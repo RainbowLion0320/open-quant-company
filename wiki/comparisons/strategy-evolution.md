@@ -20,7 +20,7 @@ confidence: high
 
 内置策略和候选策略走同一运行契约，但 production / paper / candidate 生命周期隔离。日频引擎按策略自主调仓节奏运行，候选策略必须通过 OOS、成本、regime 分解和 promotion gate 后才能晋级。
 
-最新回测结果见 `data/tournament/` JSON 文件。
+最新回测结果见 `var/artifacts/tournaments/` JSON 文件。
 
 ## 关键教训
 

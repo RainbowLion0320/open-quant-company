@@ -21,9 +21,9 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-from data.datahub import get_datahub
-from data.fetchers.macro import MacroFetcher
-from data.symbols import CIRCLE_STOCKS
+from data.storage.datahub import get_datahub
+from data.ingestion.fetchers.macro import MacroFetcher
+from data.market.symbols import CIRCLE_STOCKS
 
 HUB = get_datahub()
 
@@ -45,7 +45,7 @@ def _symbols(limit: int = 0) -> list[str]:
 
 def _tushare_api():
     import tushare as ts
-    from data.tushare_utils import get_tushare_token
+    from data.ingestion.tushare_utils import get_tushare_token
 
     token = get_tushare_token()
     if not token:
@@ -67,7 +67,7 @@ def repair_macro(name: str) -> None:
 def repair_bond_treasury_yields() -> None:
     """Re-fetch treasury yield curve through the bond adapter."""
     print("  Fetching bond/treasury_yields from AKShare...")
-    from data.assets.bond import BondAsset
+    from data.market.assets.bond import BondAsset
 
     adapter = BondAsset()
     cache = adapter.asset_dir / "treasury_yields.parquet"
@@ -78,7 +78,7 @@ def repair_bond_treasury_yields() -> None:
 
 
 def repair_holders(limit: int = 0) -> None:
-    from data.fetchers.holders import HolderFetcher
+    from data.ingestion.fetchers.holders import HolderFetcher
 
     symbols = _symbols(limit)
     print(f"  Fetching holders for {len(symbols)} symbols...")
@@ -88,7 +88,7 @@ def repair_holders(limit: int = 0) -> None:
 
 
 def repair_holdertrade(limit: int = 0) -> None:
-    from data.fetchers.holders import HolderTradeFetcher
+    from data.ingestion.fetchers.holders import HolderTradeFetcher
 
     symbols = _symbols(limit)
     print(f"  Fetching holder trades for {len(symbols)} symbols...")
@@ -98,7 +98,7 @@ def repair_holdertrade(limit: int = 0) -> None:
 
 
 def repair_stock_daily(limit: int = 0) -> None:
-    from data.fetchers import stock_daily
+    from data.ingestion.fetchers import stock_daily
 
     symbols = _symbols(limit)
     print(f"  Fetching OHLCV daily for {len(symbols)} symbols...")
@@ -109,7 +109,7 @@ def repair_stock_daily(limit: int = 0) -> None:
 
 
 def repair_financial_summary(limit: int = 0) -> None:
-    from data.fetchers.financial import fetch_all_financials
+    from data.ingestion.fetchers.financial import fetch_all_financials
 
     symbols = _symbols(limit)
     print(f"  Fetching financial summaries for {len(symbols)} symbols...")
@@ -120,7 +120,7 @@ def repair_financial_summary(limit: int = 0) -> None:
 
 
 def repair_fina_indicator(limit: int = 0) -> None:
-    from data.fetchers.financial import fetch_fina_indicator
+    from data.ingestion.fetchers.financial import fetch_fina_indicator
 
     symbols = _symbols(limit)
     print(f"  Fetching Tushare fina_indicator for {len(symbols)} symbols...")
@@ -134,7 +134,7 @@ def repair_fina_indicator(limit: int = 0) -> None:
 
 
 def repair_valuation(limit: int = 0) -> None:
-    from data.fetchers.financial import fetch_all_valuations
+    from data.ingestion.fetchers.financial import fetch_all_valuations
 
     symbols = _symbols(limit)
     print(f"  Fetching valuations for {len(symbols)} symbols...")
@@ -152,7 +152,7 @@ def repair_adj_factor(limit: int = 0) -> None:
 
 
 def repair_moneyflow_daily(limit: int = 0) -> None:
-    from data.fetchers.moneyflow import MoneyflowFetcher
+    from data.ingestion.fetchers.moneyflow import MoneyflowFetcher
 
     symbols = _symbols(limit)
     print(f"  Fetching daily moneyflow for {len(symbols)} symbols...")
@@ -329,7 +329,7 @@ def repair(table: str, limit: int = 0, days: int = 365) -> None:
     print(f"{'='*60}")
 
     # P1-8: Record backfill operation in ledger
-    from data.backfill import BackfillLedger
+    from data.ops.backfill import BackfillLedger
     ledger = BackfillLedger()
     run_id = ledger.start(table, date_start="", date_end="", triggered_by="manual")
 

@@ -4,7 +4,7 @@
 
 每天 15:30 compute_signals.py 后运行:
   1. 从 Parquet 恢复 PaperBroker 状态
-  2. 读取各策略最新信号 (data/store/signals/*.parquet)
+  2. 读取各策略最新信号 (var/store/signals/*.parquet)
   3. 用次日开盘价 (≈ 今日收盘) 模拟成交
   4. 记录 NAV 快照 + 交易记录
   5. 写回状态 Parquet
@@ -37,8 +37,8 @@ from broker.persistence import (
     load_state, save_state, append_nav, append_trade,
     load_nav, load_trades, PaperState, _resolve_store,
 )
-from data.datahub import get_datahub
-from data.symbols import CIRCLE_STOCKS
+from data.storage.datahub import get_datahub
+from data.market.symbols import CIRCLE_STOCKS
 
 HUB = get_datahub()
 DEFAULT_REGIME = "sideways"
@@ -55,13 +55,13 @@ def load_config() -> dict:
 def _get_close_prices(symbols: List[str], target_date: Optional[date] = None) -> Dict[str, float]:
     """
     获取股票最近收盘价。
-    通过 data.price_service 获取 raw 最新价；无 raw 时允许最新 qfq 兼容回退。
+    通过 data.market.price_service 获取 raw 最新价；无 raw 时允许最新 qfq 兼容回退。
     Paper trading 需要实时价格 — 启用 API fallback，允许从 AKShare 拉取未缓存的股票。
     """
     import os as _os
     _os.environ.setdefault("QUANT_ALLOW_API_FALLBACK", "1")
-    from data.price_service import get_stock_prices
-    from data.price_types import PriceUseCase
+    from data.market.price_service import get_stock_prices
+    from data.market.price_types import PriceUseCase
 
     prices: Dict[str, float] = {}
     for sym in symbols:
@@ -84,7 +84,7 @@ def _get_close_prices(symbols: List[str], target_date: Optional[date] = None) ->
 # ── 信号读取 ──
 
 def _iter_paper_strategy_configs(cfg: dict):
-    from data.registry import can_run_paper
+    from data.strategy.catalog import can_run_paper
 
     strategies = cfg.get("strategies", {}) or {}
     configured = cfg.get("paper_trading", {}).get("strategies") or list(strategies.keys())
@@ -268,8 +268,8 @@ def _execute_signals_via_pipeline(
                 ctx.universe.append(s.symbol)
                 if s.symbol not in ctx.prices:
                     try:
-                        from data.price_service import get_stock_prices
-                        from data.price_types import PriceUseCase
+                        from data.market.price_service import get_stock_prices
+                        from data.market.price_types import PriceUseCase
                         df = get_stock_prices(s.symbol, use_case=PriceUseCase.EXECUTION)
                         if df is not None and len(df):
                             ctx.prices[s.symbol] = float(df.iloc[-1]["close"])
@@ -433,7 +433,7 @@ def replay_history(start_date: date, end_date: Optional[date] = None,
         end_date = date.today()
 
     # 获取交易日历
-    from data.fetcher import get_trade_calendar
+    from data.ingestion.fetcher import get_trade_calendar
     try:
         trade_days = get_trade_calendar(start_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d"))
     except Exception:
@@ -502,7 +502,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # 普通日执行
-    from data.cron_logger import cron_run
+    from data.ops.cron_logger import cron_run
     with cron_run("execute_paper_trades"):
         run_date = date.fromisoformat(args.date) if args.date else None
         execute_daily(run_date=run_date, dry_run=args.dry_run,

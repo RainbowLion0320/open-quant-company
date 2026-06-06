@@ -66,8 +66,8 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     async def health():
-        from data.results_db import get_buffett_meta, list_strategies
-        from data.db import get_backend
+        from data.storage.results_db import get_buffett_meta, list_strategies
+        from data.storage.db import get_backend
         db_locked = False
         meta = {}
         strategies_count = 0

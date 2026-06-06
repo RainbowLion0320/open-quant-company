@@ -6,9 +6,9 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from data.datahub import get_datahub
-from data.data_registry import get_registry
-from data.llm_usage import append_llm_usage, load_provider_api_key, resolve_llm_use_case
+from data.storage.datahub import get_datahub
+from data.storage.dimensions import get_registry
+from data.llm.usage import append_llm_usage, load_provider_api_key, resolve_llm_use_case
 from research.factors.hypothesis.candidates import FactorCandidate
 
 _LLM_USAGE_FILE = get_datahub().llm_usage_path()

@@ -4,7 +4,7 @@
 
 **Goal:** Upgrade ML feature usage from month-only PIT slices to as-of-date PIT views so daily/fast-moving features can update at daily granularity while low-frequency features remain PIT-safe.
 
-**Architecture:** Keep existing monthly files readable for compatibility, but add date-keyed feature slices with explicit `as_of_date` and `feature_month`. `data.feature_store` becomes the single resolver: latest feature <= as_of date, load panel with normalized columns, and training split keys based on `as_of_date` when present. ML backtest and production signal paths use the resolver instead of directly assuming a month stem.
+**Architecture:** Keep existing monthly files readable for compatibility, but add date-keyed feature slices with explicit `as_of_date` and `feature_month`. `data.features.feature_store` becomes the single resolver: latest feature <= as_of date, load panel with normalized columns, and training split keys based on `as_of_date` when present. ML backtest and production signal paths use the resolver instead of directly assuming a month stem.
 
 **Tech Stack:** Python, pandas, Parquet via DataHub, LightGBM runtime wrappers, pytest.
 
@@ -13,14 +13,14 @@
 ### Task 1: Feature Store Date Resolver
 
 **Files:**
-- Modify: `data/feature_store.py`
+- Modify: `data/features/feature_store.py`
 - Test: `tests/test_asof_pit_feature_view.py`
 
 - [ ] **Step 1: Write failing tests**
 
 ```python
 def test_feature_store_selects_latest_slice_on_or_before_as_of(tmp_path):
-    from data.feature_store import latest_feature_file, write_feature_slice
+    from data.features.feature_store import latest_feature_file, write_feature_slice
     write_feature_slice(pd.DataFrame({"symbol": ["000001"], "as_of_date": ["2026-05-07"]}), "2026-05-07", directory=tmp_path)
     write_feature_slice(pd.DataFrame({"symbol": ["000001"], "as_of_date": ["2026-05-10"]}), "2026-05-10", directory=tmp_path)
     assert latest_feature_file(tmp_path, as_of="2026-05-08").name == "2026-05-07.parquet"
@@ -44,7 +44,7 @@ Expected: pass.
 
 **Files:**
 - Modify: `scripts/build_features.py`
-- Modify: `data/feature_store.py`
+- Modify: `data/features/feature_store.py`
 - Test: `tests/test_asof_pit_feature_view.py`
 
 - [ ] **Step 1: Write failing tests**
@@ -102,7 +102,7 @@ Expected: pass.
 ### Task 4: Training Split Compatibility
 
 **Files:**
-- Modify: `data/feature_store.py`
+- Modify: `data/features/feature_store.py`
 - Modify: `scripts/tune_model.py`
 - Modify: `scripts/train_regime_models.py`
 - Test: `tests/test_asof_pit_feature_view.py`

@@ -8,7 +8,7 @@ tags: [architecture, system-overview, extensibility, strategy-registry, ML, Fact
 
 # System Architecture
 
-A股量化研究与执行系统架构总览。巴菲特价值投资为决策约束层，钱学森控制论为运行机制层——两者正交不冲突。发布版本以 `pyproject.toml` 为唯一权威；策略数量、因子数量、回测指标等动态事实以 `config/settings.yaml`、`signals/expression.py`、`data/models/`、`data/tournament/` 和运行输出为准。
+A股量化研究与执行系统架构总览。巴菲特价值投资为决策约束层，钱学森控制论为运行机制层——两者正交不冲突。发布版本以 `pyproject.toml` 为唯一权威；策略数量、因子数量、回测指标等动态事实以 `config/settings.yaml`、`signals/expression.py`、`var/artifacts/models/`、`var/artifacts/tournaments/` 和运行输出为准。
 
 ## 设计哲学：三层正交架构
 
@@ -82,7 +82,7 @@ LLM Research → 自动化R&D      Circuit Breaker → -15%熔断  Self-healing 
 
 ## 策略注册表
 
-策略元数据和运行入口来自 `config/settings.yaml -> strategies`，执行调度由 `data/strategy_plugins.py` 统一处理。新增策略需要提供配置项、runner 函数和信号持久化契约：
+策略元数据和运行入口来自 `config/settings.yaml -> strategies`，执行调度由 `data/strategy/plugins.py` 统一处理。新增策略需要提供配置项、runner 函数和信号持久化契约：
 
 ```yaml
 strategies:
@@ -107,30 +107,30 @@ strategies:
    慢速: scripts/cron_fetch_extra.py --slow-only
    月频: Macro Monthly Refresh (1日) + Financial Monthly Refresh (3日)
    LLM providers: provider balance API + project API response usage ledger
-   Risk-free curve: data/store/bond/treasury_yields.parquet → data/risk_free_rates.py
+   Risk-free curve: var/store/bond/treasury_yields.parquet → data/rates/risk_free_rates.py
 
    路径统一由 DataHub.dimension_path() 从 data_registry 的 cache 模式展开:
-   data/store/stock/daily/{symbol}.parquet        ← "stock/daily/{symbol}.parquet"
-   data/store/stock/moneyflow/daily/{YYYYMMDD}.parquet  ← 占位符自动展开
+   var/store/stock/daily/{symbol}.parquet        ← "stock/daily/{symbol}.parquet"
+   var/store/stock/moneyflow/daily/{YYYYMMDD}.parquet  ← 占位符自动展开
    所有脚本不再自行拼接深层路径。
 
 2. 写入清单 (DataHub manifest, 自动)
-   每次 write_parquet() → 记录到 data/store/_manifest/datasets.parquet:
+   每次 write_parquet() → 记录到 var/store/_manifest/datasets.parquet:
    producer / row_count / date_range / schema_hash / file_sha256 / size_bytes
    manifest 写入失败不抛异常——可观测性不阻塞主数据流。
 
-3. 数据清洗 (data/cleaner.py)
+3. 数据清洗 (data/quality/cleaner.py)
    OHLCV 完整性 → 异常值检测(保留涨跌停) → 停牌过滤 → 缺失值填充
    → 清洗报告 (丢弃/填充/缩尾统计)
 
 4. 特征构建 (scripts/build_features.py)
-   因子 × 股票 × as_of_date → data/store/features/YYYY-MM-DD.parquet (PIT, 零前视)
+   因子 × 股票 × as_of_date → var/store/features/YYYY-MM-DD.parquet (PIT, 零前视)
 
 5. 模型训练 (scripts/tune_model.py)
    LightGBM + Optuna + 滚动窗口CV (48月训练/6月测试)
 
 6. 策略计算 (scripts/compute_signals.py, cron 触发)
-   for each strategy in Registry → signals → data/store/signals/{strategy}.parquet
+   for each strategy in Registry → signals → var/store/signals/{strategy}.parquet
 
 7. 数据库健康检查 (scripts/db_health_check.py, 每周六)
    从 data_registry.health_metadata() 获取 source/label/SLA/repair/partition
@@ -168,24 +168,24 @@ strategies:
 | 巴菲特过滤 | `signals/buffett.py` | 安全边际+DCF+三重过滤 |
 | 多因子打分 | `signals/multifactor.py` | 五维加权 (质量/估值/技术/市场/行业动量) |
 | ML 信号 | `signals/ml_signals.py` | 模型预测→评分和信号行 |
-| 特征存储 | `data/feature_store.py` | PIT特征 + enrich_from_registry |
+| 特征存储 | `data/features/feature_store.py` | PIT特征 + enrich_from_registry |
 | 模型层 | `models/__init__.py` | LightGBM + 注册表 |
-| 数据清洗 | `data/cleaner.py` | DataCleaner 规则化清洗 |
-| 数据注册 | `data/data_registry.py` | ★ 维度+健康元数据: source/label/SLA/repair/partition 单源管理 |
-| Tushare工具 | `data/tushare_utils.py` | Token统一(环境变量优先→config兜底) |
-| 多资产基类 | `data/assets/base.py` | AssetAdapter ABC + AssetRegistry |
-| 股票适配器 | `data/assets/stock.py` | StockAsset |
-| ETF适配器 | `data/assets/etf.py` | ETFAsset (宽基/行业/黄金/债券/货币) |
-| 债券适配器 | `data/assets/bond.py` | BondAsset (国债收益率+可转债) |
-| 期货适配器 | `data/assets/futures.py` | FuturesAsset (主力合约) |
-| 数据获取 | `data/fetcher.py` | AKShare 3源 fallback, API缓存→data/cache/api/ |
-| 财务数据 | `data/financials.py` | 同花顺 → ROE/毛利/D-E, 存储→data/store/stock/financials/ |
-| 数据中台 | `data/datahub.py` | ★ 路径合约 + 写入清单: dimension_path()/manifest_for()/write_parquet(producer=) |
-| 股票池 | `data/symbols.py` | A股 universe 与行业映射，当前数量以源码为准 |
-| 资金流获取 | `data/fetchers/moneyflow.py` | 资金流向 |
-| 筹码获取 | `data/fetchers/holders.py` | 股东户数+增减持 |
-| 宏观获取 | `data/fetchers/macro.py` | PMI/M2/Shibor等7指标, Tushare优先 |
-| 数据库 | `data/db.py` + `data/results_db.py` | Parquet存储 + DuckDB视图 |
+| 数据清洗 | `data/quality/cleaner.py` | DataCleaner 规则化清洗 |
+| 数据注册 | `data/storage/dimensions.py` | ★ 维度+健康元数据: source/label/SLA/repair/partition 单源管理 |
+| Tushare工具 | `data/ingestion/tushare_utils.py` | Token统一(环境变量优先→config兜底) |
+| 多资产基类 | `data/market/assets/base.py` | AssetAdapter ABC + AssetRegistry |
+| 股票适配器 | `data/market/assets/stock.py` | StockAsset |
+| ETF适配器 | `data/market/assets/etf.py` | ETFAsset (宽基/行业/黄金/债券/货币) |
+| 债券适配器 | `data/market/assets/bond.py` | BondAsset (国债收益率+可转债) |
+| 期货适配器 | `data/market/assets/futures.py` | FuturesAsset (主力合约) |
+| 数据获取 | `data/ingestion/fetcher.py` | AKShare 3源 fallback, API缓存→var/cache/api/ |
+| 财务数据 | `data/market/financials.py` | 同花顺 → ROE/毛利/D-E, 存储→var/store/stock/financials/ |
+| 数据中台 | `data/storage/datahub.py` | ★ 路径合约 + 写入清单: dimension_path()/manifest_for()/write_parquet(producer=) |
+| 股票池 | `data/market/symbols.py` | A股 universe 与行业映射，当前数量以源码为准 |
+| 资金流获取 | `data/ingestion/fetchers/moneyflow.py` | 资金流向 |
+| 筹码获取 | `data/ingestion/fetchers/holders.py` | 股东户数+增减持 |
+| 宏观获取 | `data/ingestion/fetchers/macro.py` | PMI/M2/Shibor等7指标, Tushare优先 |
+| 数据库 | `data/storage/db.py` + `data/storage/results_db.py` | Parquet存储 + DuckDB视图 |
 | 控制论 | `cybernetics/orchestrator.py` | profit-trained Regime 检测 + 状态机确认 + 自适应参数 |
 | 工作流 | `scripts/run_workflow.py` | qrun-style pipeline |
 | 锦标赛 | `scripts/strategy_tournament.py` | 多策略自动对比 |
@@ -216,7 +216,7 @@ strategies:
 
 ## 因子体系
 
-因子分三层来源。具体数量见源码 `signals/expression.py::alpha_factors()` 和 `data/feature_store.py::enrich_from_registry()`。
+因子分三层来源。具体数量见源码 `signals/expression.py::alpha_factors()` 和 `data/features/feature_store.py::enrich_from_registry()`。
 
 ### 价量因子 (Factor DSL)
 
@@ -249,7 +249,7 @@ strategies:
 
 ## 策略验证
 
-策略绩效通过锦标赛（`scripts/strategy_tournament.py`）持续验证，最新结果存储在 `data/tournament/` JSON 文件中。
+策略绩效通过锦标赛（`scripts/strategy_tournament.py`）持续验证，最新结果存储在 `var/artifacts/tournaments/` JSON 文件中。
 
 ## 架构演进
 
@@ -268,7 +268,7 @@ strategies:
 
 ## Manifest 子系统
 
-`data/store/_manifest/datasets.parquet` 是 DataHub 自动维护的写入清单。每次 `write_parquet()` 成功后追加一条记录（upsert by path），记录：
+`var/store/_manifest/datasets.parquet` 是 DataHub 自动维护的写入清单。每次 `write_parquet()` 成功后追加一条记录（upsert by path），记录：
 
 | 字段 | 来源 | 用途 |
 |------|------|------|

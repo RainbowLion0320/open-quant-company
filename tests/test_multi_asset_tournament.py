@@ -8,11 +8,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from data.assets.stock import StockAsset
-from data.assets.etf import ETFAsset
-from data.assets.bond import BondAsset
-from data.assets.futures import FuturesAsset
-from data.assets.crypto import CryptoAsset
+from data.market.assets.stock import StockAsset
+from data.market.assets.etf import ETFAsset
+from data.market.assets.bond import BondAsset
+from data.market.assets.futures import FuturesAsset
+from data.market.assets.crypto import CryptoAsset
 
 
 class TestAssetProvenance:

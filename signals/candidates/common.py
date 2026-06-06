@@ -5,9 +5,9 @@ from typing import Any, Mapping
 
 import pandas as pd
 
-from data.price_service import get_stock_prices
-from data.price_types import PriceUseCase
-from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_NAME
+from data.market.price_service import get_stock_prices
+from data.market.price_types import PriceUseCase
+from data.market.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_NAME
 from signals.selection import apply_ranked_buys
 
 

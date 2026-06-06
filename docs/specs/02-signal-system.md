@@ -4,7 +4,7 @@
 
 ## 1. 概述
 
-信号系统是量化策略的核心——从原始数据生成交易信号（买/卖/持有）。策略元数据以 Strategy Catalog 为 UI 和研究工作流的权威目录，生产策略和候选策略共享统一运行契约，但生命周期和运行模式严格隔离：Buffett 是质量过滤层，Multifactor 是主 Alpha，ML 是辅助 Alpha，Cybernetic 是 regime 风险覆盖层；新增候选策略只允许研究扫描、回测和证据沉淀。每日生产扫描输出信号到 `data/store/signals/{strategy}.parquet`，供回测引擎和执行层消费。
+信号系统是量化策略的核心——从原始数据生成交易信号（买/卖/持有）。策略元数据以 Strategy Catalog 为 UI 和研究工作流的权威目录，生产策略和候选策略共享统一运行契约，但生命周期和运行模式严格隔离：Buffett 是质量过滤层，Multifactor 是主 Alpha，ML 是辅助 Alpha，Cybernetic 是 regime 风险覆盖层；新增候选策略只允许研究扫描、回测和证据沉淀。每日生产扫描输出信号到 `var/store/signals/{strategy}.parquet`，供回测引擎和执行层消费。
 
 **设计原则：**
 - **策略独立性** — 每种策略可独立运行、独立回测、独立对比（锦标赛模式）
@@ -35,7 +35,7 @@
 ┌──────────────────────▼──────────────────────────────┐
 │                  selection.py                         │
 │         横截面排名 → 受限 buy list + hold rows          │
-│         输出: data/store/signals/{strategy}.parquet    │
+│         输出: var/store/signals/{strategy}.parquet    │
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
@@ -89,11 +89,11 @@
 
 **模型：** LightGBM 二分类（未来 20 日收益 > 中位数 = 正样本）
 
-**PIT 特征：** 优先从 `data/store/features/YYYY-MM-DD.parquet` 读取不晚于预测日的最新 as-of 特征视图；历史 `YYYY-MM.parquet` 月末快照继续兼容。训练/预测严格只使用 as-of 日期之前已可见的数据。
+**PIT 特征：** 优先从 `var/store/features/YYYY-MM-DD.parquet` 读取不晚于预测日的最新 as-of 特征视图；历史 `YYYY-MM.parquet` 月末快照继续兼容。训练/预测严格只使用 as-of 日期之前已可见的数据。
 
 **训练流程：**
 1. `scripts/build_features.py` — 批量构建月度 PIT 特征切片
-2. `scripts/tune_model.py` — Optuna 超参搜索，输出到 `data/models/`
+2. `scripts/tune_model.py` — Optuna 超参搜索，输出到 `var/artifacts/models/`
 3. `scripts/weekly_retrain.py` — Cron 周六自动重训
 
 **模型加载：** `models/lgbm_runtime.py` 统一读取 global/regime 模型、元数据和加载错误；生产信号与 ML 回测复用同一加载规则。
@@ -105,7 +105,7 @@
 **Hybrid Regime 检测：**
 - **默认引擎:** `config/settings.yaml` → `cybernetics.regime_engine: hybrid`。规则评分和 Student-t HMM 并行运行，不把 HMM 作为无条件替代。
 - **规则评分:** `trend 30% + breadth 30% + risk 30% + volume 10%`，所有分项归一到 0-100，并继续输出 `regime_score`、`score_components` 和 `breadth_detail` 供解释。
-- **HMM 概率:** `data/models/regime_hmm/` 中的 Student-t HMM 输出 bull/sideways/bear 概率、confidence 和 entropy。
+- **HMM 概率:** `data/reference/models/regime_hmm/` 中的 Student-t HMM 输出 bull/sideways/bear 概率、confidence 和 entropy。
 - **Hybrid 决策:** 规则/HMM 一致时使用 HMM 概率；不一致但 `hmm_confidence >= 0.80` 时采用 HMM；不一致且低置信时用 HMM 概率和规则投票 blended vote。
 - **Confirmed 状态:** raw regime 必须经过 `min_dwell=3` 个连续唯一市场观测确认后才切换生产 confirmed regime。
 
@@ -263,7 +263,7 @@ Market Data (DataHub)
 └──────┬───────────┘
        │ signals
        ▼
-  data/store/signals/{strategy}.parquet
+  var/store/signals/{strategy}.parquet
        │
        ├──→ backtest/run_all_strategies.py
        └──→ broker/PaperBroker (模拟执行)
@@ -284,8 +284,8 @@ Market Data (DataHub)
 ### 策略评分接口
 
 ```python
-# data.strategy_plugins 是 CLI/Web 统一运行入口
-from data.strategy_plugins import run_registered_strategies, get_strategy_plugin
+# data.strategy.plugins 是 CLI/Web 统一运行入口
+from data.strategy.plugins import run_registered_strategies, get_strategy_plugin
 
 rows = run_registered_strategies("all", limit=0, mode="production")
 plugin = get_strategy_plugin("multifactor")
@@ -331,7 +331,7 @@ compute_formula("close_t / close_t-20 - 1", df, idx=100)
 
 ## 7. 测试策略
 
-- **合约测试：** `data.strategy_plugins` runner 返回 `list[dict]`，持久化后的 StrategySignalRows schema 保持 `symbol/name/industry/score/signal/detail`
+- **合约测试：** `data.strategy.plugins` runner 返回 `list[dict]`，持久化后的 StrategySignalRows schema 保持 `symbol/name/industry/score/signal/detail`
 - **公式测试：** `Ret/MA/Std/Delta`、`close_t-N` 滞后引用、缺失列和 NaN 边界由 `tests/test_boundary.py` 覆盖
 - **边界测试：** 空股票池、全 NaN 数据、单只股票排名
 - **回归测试：** 固定日期+固定股票池，评分结果哈希不变

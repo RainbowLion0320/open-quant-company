@@ -39,7 +39,7 @@ buffett_real_scorer:
 
 ## 回测结果
 
-滚动评分结果通过 `backtest/run_all_strategies.py` 和 `research/strategy_evaluation.py` 进入 strategy evidence artifacts。动态收益和排名不写入 wiki，详见 `data/store/research/strategy_evidence/` 与 [[strategy-evolution]]。
+滚动评分结果通过 `backtest/run_all_strategies.py` 和 `research/strategy_evaluation.py` 进入 strategy evidence artifacts。动态收益和排名不写入 wiki，详见 `var/store/research/strategy_evidence/` 与 [[strategy-evolution]]。
 
 ## 相关
 

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from data.cleaner import (
+from data.quality.cleaner import (
     CleanReport,
     OHLCVIntegrityRule,
     OutlierDetectionRule,

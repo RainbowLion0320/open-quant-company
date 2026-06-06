@@ -32,9 +32,9 @@ PROJECT = Path(__file__).resolve().parent.parent
 
 def _load_candidates(n: int = 20) -> list[str]:
     """加载候选股票 (优先大盘/高流动性)。"""
-    from data.symbols import CIRCLE_STOCKS
+    from data.market.symbols import CIRCLE_STOCKS
     symbols = list(CIRCLE_STOCKS)[:n * 10]  # pool
-    from data.feature_store import latest_feature_frame
+    from data.features.feature_store import latest_feature_frame
 
     # 尝试按市值排序
     try:
@@ -49,7 +49,7 @@ def _load_candidates(n: int = 20) -> list[str]:
 
 def find_surge_events(symbol: str, min_gain_pct: float = 15.0, lookback_days: int = 252) -> list[dict]:
     """Find dates where a stock surged > min_gain_pct% in a short period (potential lookahead trap)."""
-    from data.fetcher import get_stock_daily
+    from data.ingestion.fetcher import get_stock_daily
     df = get_stock_daily(symbol)
     if df is None or len(df) < 120:
         return []
@@ -88,8 +88,8 @@ def check_single_stock_lookahead(symbol: str) -> dict:
     a diagnostic and is expected to differ.
     Returns lookahead indicators.
     """
-    from data.fetcher import get_stock_daily
-    from data.market_data_view import as_of_reader
+    from data.ingestion.fetcher import get_stock_daily
+    from data.market.market_data_view import as_of_reader
     from signals.multifactor import compute_momentum
 
     df = get_stock_daily(symbol)
@@ -198,8 +198,8 @@ def run_deep_check(symbol: str = "600519"):
     print(f"深度 PIT 检查: {symbol}")
     print(f"{'='*60}")
 
-    from data.fetcher import get_stock_daily
-    from data.market_data_view import MarketDataView
+    from data.ingestion.fetcher import get_stock_daily
+    from data.market.market_data_view import MarketDataView
 
     df = get_stock_daily(symbol)
     if df is None or len(df) < 252:

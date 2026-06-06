@@ -1,13 +1,9 @@
-"""Modular sector snapshot pipeline."""
-from data.sector_pipeline.membership import SW_INDUSTRIES, build_membership
-from data.sector_pipeline.performance import build_sector_performance
-from data.sector_pipeline.signals import build_signal_aggregation
-from data.sector_pipeline.exposure import build_exposure
+"""Compatibility shim for `data.market.sector_pipeline`.
 
-__all__ = [
-    "SW_INDUSTRIES",
-    "build_exposure",
-    "build_membership",
-    "build_sector_performance",
-    "build_signal_aggregation",
-]
+Use `data.market.sector_pipeline` for new code.
+"""
+from importlib import import_module as _import_module
+import sys as _sys
+
+_module = _import_module("data.market.sector_pipeline")
+_sys.modules[__name__] = _module

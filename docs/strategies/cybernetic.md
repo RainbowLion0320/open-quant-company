@@ -28,14 +28,14 @@
 | 最大连续亏损 | 3 次 | | |
 | 最低胜率 | 35% | | |
 
-价格口径权威来源为 `data/price_service.py`。研究、信号和回测使用 `PriceUseCase.SIGNAL/BACKTEST` 的 `qfq` 口径，执行和估值路径另走 `raw`。
+价格口径权威来源为 `data/market/price_service.py`。研究、信号和回测使用 `PriceUseCase.SIGNAL/BACKTEST` 的 `qfq` 口径，执行和估值路径另走 `raw`。
 
 ## 结果来源
 
 最新样本内/OOS/锦标赛结果不写死在策略文档中，避免与回测输出漂移。查看：
 
-- `data/store/signals/cybernetic.parquet`
-- `data/tournament/` 下的锦标赛 JSON
+- `var/store/signals/cybernetic.parquet`
+- `var/artifacts/tournaments/` 下的锦标赛 JSON
 - Web `/strategy-lab` 页面
 
 ## Regime 研究训练

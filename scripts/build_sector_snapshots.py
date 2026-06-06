@@ -29,7 +29,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Validate without writing")
     args = parser.parse_args()
 
-    from data.datahub import DataHub
+    from data.storage.datahub import DataHub
     from data import sectors
 
     hub = DataHub()

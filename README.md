@@ -130,8 +130,8 @@ flowchart LR
 
 | 模块 | 路径 | 职责 |
 |------|------|------|
-| 数据中台 | `data/datahub.py`, `data/data_registry.py` | 统一数据路径、维度声明、健康检查、修复入口 |
-| 数据获取 | `data/fetcher.py`, `data/fetchers/`, `scripts/cron_fetch_*.py` | 行情、财务、估值、资金流、宏观、行业数据拉取 |
+| 数据中台 | `data/storage/datahub.py`, `data/storage/dimensions.py` | 统一数据路径、维度声明、健康检查、修复入口 |
+| 数据获取 | `data/ingestion/fetcher.py`, `data/ingestion/fetchers/`, `scripts/cron_fetch_*.py` | 行情、财务、估值、资金流、宏观、行业数据拉取 |
 | 因子与信号 | `signals/` | Buffett、多因子、ML、候选策略、DSL 和横截面选择 |
 | 研究治理 | `research/` | Strategy Catalog、候选晋级、OOS 证据、regime 训练 |
 | 回测 | `backtest/` | 日频回测、策略锦标赛、风险指标、可插拔回测流水线 |
@@ -193,8 +193,11 @@ python -m pip install -r requirements-dev.txt
 | `TUSHARE_TOKEN` / `TUSHARE_PRO_TOKEN` | Tushare 数据，包括估值、资金流、部分财务扩展 |
 | `DEEPSEEK_API_KEY` | 默认 DeepSeek provider 的 LLM 因子发现、通用 LLM 用量监控 |
 | `ASTROLABE_API_KEY` | FastAPI Bearer Token 保护 |
-| `ASTROLABE_STORE` | 覆盖默认 `data/store/` |
-| `ASTROLABE_CACHE` | 覆盖默认 `data/cache/` |
+| `ASTROLABE_VAR` | 覆盖默认运行产物根目录 `var/` |
+| `ASTROLABE_STORE` | 覆盖默认 `var/store/` |
+| `ASTROLABE_CACHE` | 覆盖默认 `var/cache/` |
+| `ASTROLABE_ARTIFACTS` | 覆盖默认 `var/artifacts/` |
+| `ASTROLABE_DB` | 覆盖默认 `var/db/` |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | 通知推送，参考 [config/notify.example.yaml](config/notify.example.yaml) |
 | `WECHAT_WEBHOOK_URL`, `FEISHU_WEBHOOK_URL` | 企业微信 / 飞书通知 webhook |
 
@@ -254,14 +257,26 @@ astroq web serve --host 0.0.0.0 --port 8501
 | `config/settings.yaml` | 是 | 参数、权重、风控、资产和策略注册表 |
 | `config/notify.example.yaml` | 是 | 通知配置模板 |
 | `config/notify.yaml` | 否 | 本地真实通知密钥 |
-| `data/store/` | 否 | 行情、信号、特征、paper 状态等运行产物 |
-| `data/cache/` | 否 | API 缓存 |
-| `data/models/` | 部分 | 可提交结构性元数据，训练产物按 `.gitignore` 管理 |
+| `data/` | 是 | Python 数据层源码包和静态 reference 数据 |
+| `var/store/` | 否 | 行情、信号、特征、paper 状态等运行产物 |
+| `var/cache/` | 否 | API 缓存 |
+| `var/artifacts/` | 否 | 回测、模型训练、锦标赛和本地报告产物 |
+| `var/db/` | 否 | DuckDB/SQLite 运行数据库 |
+| `data/reference/` | 是 | 静态参考数据和 seed 模型，例如 HMM 初始参数 |
 | `reports/` | 否 | 训练、regime、回测和诊断报告 |
 | `docs/specs/` | 是 | 代码行为契约，行为变更需同步更新 |
 | `wiki/` | 是 | 长期概念、架构决策和操作参考 |
 
-长期 README 不固化“当前收益率”“当前选股数量”“某次样本内排名”这类动态结果。最新证据以 `data/tournament/`、`reports/`、Web `/strategy-lab` 和本地生成报告为准。
+长期 README 不固化“当前收益率”“当前选股数量”“某次样本内排名”这类动态结果。最新证据以 `var/artifacts/tournaments/`、`reports/`、Web `/strategy-lab` 和本地生成报告为准。
+
+从旧布局升级时先执行演练，再执行迁移：
+
+```bash
+python scripts/migrate_data_layout.py --dry-run
+python scripts/migrate_data_layout.py --apply
+```
+
+迁移 manifest 会写入 `var/migration/`。详细说明见 [docs/operations/data-layout-migration.md](docs/operations/data-layout-migration.md)。
 
 ## 项目结构
 
@@ -272,7 +287,17 @@ astrolabe-quant/
 ├── broker/                 # PaperBroker、风控、撮合、ledger、NAV
 ├── config/                 # settings.yaml、workflow、通知模板
 ├── cybernetics/            # market regime、HMM、稳定确认、风险预算
-├── data/                   # DataHub、DataRegistry、fetchers、Feature Store
+├── data/                   # 数据层源码包
+│   ├── storage/            # DataHub、manifest、DuckDB、DataRegistry
+│   ├── ingestion/          # provider、fetcher、fetchers、Tushare 工具
+│   ├── market/             # 价格服务、复权、行业、资产和市场视图
+│   ├── features/           # PIT Feature Store、factor scoreboard
+│   ├── quality/            # cleaner、contract、quality gate、freshness gate
+│   ├── ops/                # audit、backfill、cron logger
+│   ├── llm/                # provider usage ledger
+│   ├── rates/              # risk-free rate provider
+│   ├── strategy/           # Strategy Catalog 和插件注册
+│   └── reference/          # 可提交静态参考数据和 seed 模型
 ├── docs/                   # PRD、技术规格、验收矩阵、文档治理
 ├── models/                 # 模型注册与加载入口
 ├── pipeline/               # alpha/risk/portfolio/execution 流水线抽象
@@ -283,6 +308,12 @@ astrolabe-quant/
 ├── web/
 │   ├── api/                # FastAPI REST、WebSocket、jobs
 │   └── frontend/           # Vue 3 + Vite + ECharts 星盘终端
+├── var/                    # 本地运行产物，默认不进 git
+│   ├── store/              # DataHub 主存储
+│   ├── cache/              # API、回测矩阵和运行缓存
+│   ├── artifacts/          # backtests、models、tournaments、reports
+│   ├── db/                 # DuckDB/SQLite
+│   └── migration/          # 数据布局迁移 manifest
 └── wiki/                   # 概念、参考、架构决策、对比分析
 ```
 

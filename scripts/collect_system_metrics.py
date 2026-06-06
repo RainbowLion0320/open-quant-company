@@ -7,7 +7,7 @@ import psutil
 
 ROOT = Path(__file__).resolve().parent.parent
 
-from data.datahub import get_datahub
+from data.storage.datahub import get_datahub
 
 HUB = get_datahub()
 DB = HUB.system_monitor_path()

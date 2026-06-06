@@ -1,13 +1,14 @@
 # Spec: 数据管道 (Data Pipeline)
 
-> 版本: 1.3 | 更新: 2026-06-05 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md)
+> 版本: 1.4 | 更新: 2026-06-06 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
-数据管道负责从多源拉取、清洗、缓存、存储 A 股全量数据，并通过 DataHub 统一路径向上层（信号/回测/执行/Web）暴露。覆盖维度由 `config/settings.yaml` 的 `data_registry` 声明，按频率分为日频（行情/估值/资金流向/行业快照）、月频/季频（财务指标/三张表）、事件驱动（龙虎榜/研报/限售解禁/公司行动）。
+数据管道负责从多源拉取、清洗、缓存、存储 A 股全量数据，并通过 DataHub 统一路径向上层（信号/回测/执行/Web）暴露。`data/` 是 Python 数据层源码包，运行数据、缓存、数据库、模型训练产物和回测产物统一写入 `var/`。覆盖维度由 `config/settings.yaml` 的 `data_registry` 声明，按频率分为日频（行情/估值/资金流向/行业快照）、月频/季频（财务指标/三张表）、事件驱动（龙虎榜/研报/限售解禁/公司行动）。
 
 **核心理念：**
 - **离线优先** — 所有数据存储为本地 Parquet，不依赖云端数据库
+- **源码与运行产物分离** — `data/` 只放源码和静态 reference，`var/` 放本地运行产物且默认不进 git
 - **多源互补** — AKShare（免费不限流，行情）+ Tushare（深度财务数据）
 - **声明式注册** — 数据维度统一在 `settings.yaml` → `DataRegistry` 中声明，含 source/label/SLA/repair/partition
 - **价格口径显式** — OHLCV 通过 `PriceService` 声明 `raw` / `qfq` / `hfq`，消费者按 use case 取价，避免复权语义散落在业务代码里
@@ -62,7 +63,7 @@
 
 `DataRegistry.validate()` 在启动时运行合约检验，确保所有 enabled 维度 source/asset/status/freq/cache 字段合法。
 
-行业/板块相关维度同样通过注册表管理，包括行业指数行情、行业成员映射、行业动量快照、行业信号聚合和组合行业敞口。上层代码不应硬编码 `data/store/sector/*` 路径，而应使用 `DataHub.dimension_root()` 或 `DataHub.dimension_path()`。
+行业/板块相关维度同样通过注册表管理，包括行业指数行情、行业成员映射、行业动量快照、行业信号聚合和组合行业敞口。上层代码不应硬编码任何 `var/store/*` 深层路径，而应使用 `DataHub.dimension_root()` 或 `DataHub.dimension_path()`。
 
 ### 2.2 DataHub — 统一数据中台
 
@@ -70,12 +71,32 @@
 
 | 内部组件 | 文件 | 职责 |
 |----------|------|------|
-| `DataHubPaths` | `data/datahub_paths.py` | project/store/cache 路径、逻辑数据集路径、registry cache pattern 展开 |
-| `ParquetStore` | `data/datahub_parquet.py` | Parquet 读写、原子写入、追加锁、最新批次、目录扫描 |
-| `ManifestStore` | `data/datahub_manifest.py` | `_manifest/datasets.parquet` 读写、schema hash、文件 hash、日期范围 |
-| `DimensionStore` | `data/datahub_dimensions.py` | DataRegistry 维度 root/path/list/latest 解析 |
+| `DataHubPaths` | `data/storage/datahub_paths.py` | project/runtime/store/cache/artifact/db 路径、逻辑数据集路径、registry cache pattern 展开 |
+| `ParquetStore` | `data/storage/datahub_parquet.py` | Parquet 读写、原子写入、追加锁、最新批次、目录扫描 |
+| `ManifestStore` | `data/storage/datahub_manifest.py` | `_manifest/datasets.parquet` 读写、schema hash、文件 hash、日期范围 |
+| `DimensionStore` | `data/storage/datahub_dimensions.py` | DataRegistry 维度 root/path/list/latest 解析 |
 
-上层模块继续只依赖 `data.datahub.DataHub` / `get_datahub()`。内部组件是 DataHub 的实现细节，用来降低维护复杂度，不替代 DataHub facade。
+仓库内部新代码依赖 canonical import：`data.storage.datahub.DataHub` / `get_datahub()`。旧入口仅作为迁移期兼容 re-export，不承载真实实现。内部组件是 DataHub 的实现细节，用来降低维护复杂度，不替代 DataHub facade。
+
+默认路径配置：
+
+| 配置 | 默认值 | 环境变量覆盖 | 语义 |
+|------|--------|--------------|------|
+| `paths.runtime_root` | `var` | `ASTROLABE_VAR` | 本地运行产物根目录 |
+| `paths.store_root` | `var/store` | `ASTROLABE_STORE` | DataHub 主数据 |
+| `paths.cache_root` | `var/cache` | `ASTROLABE_CACHE` | API、回测矩阵和运行缓存 |
+| `paths.artifact_root` | `var/artifacts` | `ASTROLABE_ARTIFACTS` | 回测、模型、锦标赛、报告 |
+| `paths.db_root` | `var/db` | `ASTROLABE_DB` | DuckDB/SQLite 本地数据库 |
+
+新增公共路径 API：
+
+```python
+hub.runtime_dir()
+hub.artifact_dir("backtests")
+hub.artifact_path("models", "lgbm_best.pkl")
+hub.db_path("quant_results.duckdb")
+hub.migration_dir()
+```
 
 股票价格路径按口径显式分层：
 
@@ -98,7 +119,7 @@
 
 ### 2.3 PriceService — 价格口径契约
 
-`data/price_service.py` 是股票价格的统一入口。Fetcher 可以继续负责拉取和缓存，但策略、特征、回测、估值、执行和 Web 不应直接猜测某个 Parquet 的复权语义。
+`data/market/price_service.py` 是股票价格的统一入口。Fetcher 可以继续负责拉取和缓存，但策略、特征、回测、估值、执行和 Web 不应直接猜测某个 Parquet 的复权语义。
 
 | Use case | 默认口径 | 典型消费者 |
 |----------|----------|------------|
@@ -111,7 +132,7 @@
 
 `qfq` / `hfq` 优先由 `raw + adj_factor` 派生；历史数据尚未补齐 raw 时，允许显式记录 fallback 到本地 `qfq` 兼容数据。DataHub manifest 会记录 `requested_price_mode`、`price_mode`、`price_adjustment_source` 和 fallback reason。
 
-公司行动不直接混入 OHLCV。`data/corporate_actions.py` 把 `dividend` 原始事件归一为 `corporate_actions`，并提供 `apply_corporate_actions_to_position()` 给未来回测账本处理现金分红、送转和拆股。
+公司行动不直接混入 OHLCV。`data/market/corporate_actions.py` 把 `dividend` 原始事件归一为 `corporate_actions`，并提供 `apply_corporate_actions_to_position()` 给未来回测账本处理现金分红、送转和拆股。
 
 ### 2.4 Fetcher — 数据获取层
 
@@ -124,7 +145,7 @@
 
 **两层缓存：**
 1. 内存缓存（`_mem_cache` dict，max 64 entries）— 会话内避免重复磁盘读取
-2. 磁盘缓存（Parquet，`data/cache/api/`）— 跨会话，三级 TTL：
+2. 磁盘缓存（Parquet，`var/cache/api/`）— 跨会话，三级 TTL：
    - TTL_FOREVER (365d): 历史数据永不过期
    - TTL_DAILY (24h): 日线行情
    - TTL_REALTIME (1h): 实时快照
@@ -133,7 +154,7 @@
 
 ### 2.5 Cleaner — 6 规则数据清洗
 
-规则注册表位于 `data/cleaner.py` 的 `RULE_CLASSES`，启用和参数由 `config/settings.yaml` → `data_cleaning` 控制。
+规则注册表位于 `data/quality/cleaner.py` 的 `RULE_CLASSES`，启用和参数由 `config/settings.yaml` → `data_cleaning` 控制。
 
 1. **OHLCVIntegrityRule** — 验证必需 OHLCV 列、修正 high/low/close 区间、移除非正价格或负成交量
 2. **OutlierDetectionRule** — 对收益率极端值、异常单日涨跌幅和成交量尖峰做缩尾/回补
@@ -145,15 +166,15 @@
 ### 2.6 Feature Store — PIT 特征工程
 
 **Point-in-Time 严格性：** 每个 as-of 切片只使用该日期及之前已可见的数据构建特征，绝不使用未来信息。日频价量、估值、资金流可以按交易日更新；财务、宏观、持有人等低频特征自然取 as-of 之前最新已披露值。
-- 目标输出：`data/store/features/YYYY-MM-DD.parquet`
-- 兼容输出：`data/store/features/YYYY-MM.parquet`，表示该月月末 as-of 快照
+- 目标输出：`var/store/features/YYYY-MM-DD.parquet`
+- 兼容输出：`var/store/features/YYYY-MM.parquet`，表示该月月末 as-of 快照
 - 构建入口：`scripts/build_features.py --frequency daily` / `--frequency monthly`，以及 `FeatureStoreBuilder.build_month()` 兼容接口
 - 读取入口：`iter_feature_files()`、`load_feature_panel()`、`latest_feature_frame()`、`FeatureStoreBuilder.load_month(month)`
 - 注册表扩展：`enrich_from_registry(df, as_of_key, symbols)` 从 DataRegistry 维度补充资金流、持有人、宏观等 PIT 因子
 
 ### 2.6 Cron Logger — 可观测性
 
-- 格式：JSONL (`data/store/_cron_log/{script}.jsonl`)
+- 格式：JSONL (`var/store/_cron_log/{script}.jsonl`)
 - 自动轮转：每文件最多 500 行
 - 上下文管理器：`with cron_run("script_name") as log:`
 - 方法：`log_cron_success()`, `log_cron_error()`, `get_recent_errors()`
@@ -204,7 +225,9 @@ AKShare/Tushare API
 ```python
 # 路径解析 — 上层不应硬编码路径
 hub.dimension_path("ohlcv_daily", symbol="000001")
-# → data/store/stock/daily/000001.parquet
+# → var/store/stock/daily/000001.parquet
+hub.artifact_path("backtests", "backtest_ml_lgbm.pkl")
+hub.db_path("quant_results.duckdb")
 hub.stock_daily_raw_path("000001")
 hub.stock_adj_factor_path("000001")
 hub.stock_corporate_actions_path("000001")

@@ -60,7 +60,7 @@ DRIFT_TOKENS = (
     "GET /backtest",
     "`GET /portfolio`",
     "buy/sell/hold 信号",
-    "from data.cleaner import clean_ohlcv",
+    "from data.quality.cleaner import clean_ohlcv",
     "Data/Strategy/Selection/Risk/Execution",
     "回测: Backtrader",
     "横截面排名→交易信号",

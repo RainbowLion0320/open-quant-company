@@ -5,7 +5,7 @@ from astrolabe_cli.results import CliResult
 
 def validate_config() -> CliResult:
     from core.settings import get_settings
-    from data.registry import get_enabled_strategies, load_registry
+    from data.strategy.catalog import get_enabled_strategies, load_registry
 
     cfg = get_settings()
     registry = load_registry(force_reload=True)

@@ -5,7 +5,7 @@ import pytest
 
 
 def test_risk_free_provider_aligns_cn_treasury_curve(tmp_path):
-    from data.risk_free_rates import RiskFreeRateProvider
+    from data.rates.risk_free_rates import RiskFreeRateProvider
 
     source = tmp_path / "treasury_yields.parquet"
     pd.DataFrame(
@@ -25,7 +25,7 @@ def test_risk_free_provider_aligns_cn_treasury_curve(tmp_path):
 
 
 def test_risk_free_provider_fails_when_curve_missing_required_dates(tmp_path):
-    from data.risk_free_rates import RiskFreeRateDataError, RiskFreeRateProvider
+    from data.rates.risk_free_rates import RiskFreeRateDataError, RiskFreeRateProvider
 
     source = tmp_path / "treasury_yields.parquet"
     pd.DataFrame(
@@ -42,7 +42,7 @@ def test_risk_free_provider_fails_when_curve_missing_required_dates(tmp_path):
 
 
 def test_risk_free_provider_rejects_non_date_index(tmp_path):
-    from data.risk_free_rates import RiskFreeRateDataError, RiskFreeRateProvider
+    from data.rates.risk_free_rates import RiskFreeRateDataError, RiskFreeRateProvider
 
     source = tmp_path / "treasury_yields.parquet"
     pd.DataFrame(
@@ -60,7 +60,7 @@ def test_risk_free_provider_rejects_non_date_index(tmp_path):
 
 def test_risk_analytics_requires_daily_risk_free_series():
     from backtest.analytics import RiskAnalytics
-    from data.risk_free_rates import RiskFreeRateDataError
+    from data.rates.risk_free_rates import RiskFreeRateDataError
 
     returns = pd.Series([0.01] * 20, index=pd.date_range("2026-01-02", periods=20, freq="B"))
 
@@ -70,7 +70,7 @@ def test_risk_analytics_requires_daily_risk_free_series():
 
 def test_risk_analytics_rejects_positional_risk_free_series():
     from backtest.analytics import RiskAnalytics
-    from data.risk_free_rates import RiskFreeRateDataError
+    from data.rates.risk_free_rates import RiskFreeRateDataError
 
     returns = pd.Series([0.01] * 20, index=pd.date_range("2026-01-02", periods=20, freq="B"))
     positional_rates = pd.Series([0.015] * len(returns))
@@ -92,7 +92,7 @@ def test_config_does_not_allow_fixed_risk_free_fallback():
 
 
 def test_legacy_top_level_risk_free_rate_is_rejected():
-    from data.risk_free_rates import RiskFreeRateDataError, risk_free_spec_from_config
+    from data.rates.risk_free_rates import RiskFreeRateDataError, risk_free_spec_from_config
 
     with pytest.raises(RiskFreeRateDataError, match="risk_free_rate"):
         risk_free_spec_from_config({"backtest": {"risk_free_rate": 0.03}})

@@ -102,7 +102,7 @@ def build_portfolio_execution_pipeline() -> dict[str, object]:
             "persist",
             "Persistence & Audit",
             "Ledger + run record",
-            metrics=[metric("Store", "data/store/ledger/")],
+            metrics=[metric("Store", "var/store/ledger/")],
             inputs=["Updated ledger"],
             outputs=["Run ledger", "Audit trail"],
         ),

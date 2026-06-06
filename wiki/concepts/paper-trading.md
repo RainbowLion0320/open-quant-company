@@ -40,7 +40,7 @@ tags: [paper-trading, broker, persistence, portfolio, execution]
 
 ### broker/persistence.py — 状态持久化
 
-PaperBroker 所有状态序列化到 `data/store/paper/`：
+PaperBroker 所有状态序列化到 `var/store/paper/`：
 
 | 文件 | 内容 | 模式 |
 |------|------|------|
@@ -68,7 +68,7 @@ python scripts/execute_paper_trades.py --replay 2025-01-01
 python scripts/execute_paper_trades.py --dry-run
 ```
 
-信号读取：只遍历 `paper_trading.strategies` 配置内且策略注册表允许 paper 执行的策略，从 `data/store/signals/{strategy}.parquet` 取最新 `computed_at` 批次，并按 `paper_trading.max_signal_age_days` 跳过过期信号。最终过滤 `buy`/`strong_buy` → 每只买 100 股。
+信号读取：只遍历 `paper_trading.strategies` 配置内且策略注册表允许 paper 执行的策略，从 `var/store/signals/{strategy}.parquet` 取最新 `computed_at` 批次，并按 `paper_trading.max_signal_age_days` 跳过过期信号。最终过滤 `buy`/`strong_buy` → 每只买 100 股。
 
 ### Web API — /api/portfolio/*
 
@@ -117,7 +117,7 @@ paper_trading:
   commission_rate: 0.00081    # 完整 A 股买卖成本
   t_plus_1: true
   risk_enabled: true
-  store_dir: data/store/paper
+  store_dir: var/store/paper
   strategies: [buffett, multifactor, cybernetic, ml_lgbm]
   max_signal_age_days: 2
   execution_price: close

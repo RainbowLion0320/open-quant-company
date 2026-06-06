@@ -1,6 +1,6 @@
 # 星盘 / Astrolabe Quant OS — 产品需求文档 (PRD)
 
-> 版本: 1.1 | 更新: 2026-05-23 | 状态: 产品范围基线
+> 版本: 1.2 | 更新: 2026-06-06 | 状态: 产品范围基线
 
 ## 1. 产品定义
 
@@ -65,13 +65,14 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 | 回测可信 | 金融指标公式 | 行业标准（Sortino 用 RMS 法，Beta 用 cov 矩阵） |
 | 回测可信 | 无风险利率 | 本地曲线驱动，禁止固定值/fallback |
 | 代码质量 | 测试覆盖 | 合约测试 + 边界测试 20+ |
-| 操作可靠 | Cron 错误可观测 | 自动记录到 `data/store/_cron_log/` |
+| 操作可靠 | Cron 错误可观测 | 自动记录到 `var/store/_cron_log/` |
 
 ## 6. 非功能需求
 
 ### 6.1 数据安全
 - 所有行情和财务数据存储为本地 Parquet 文件，不依赖云端数据库
-- `data/store/` 目录在 `.gitignore` 中，不提交历史行情
+- `data/` 只放源码和静态 reference 数据
+- `var/` 目录在 `.gitignore` 中，不提交历史行情、缓存、数据库、训练产物和回测产物
 
 ### 6.2 API 治理
 - AKShare 请求节流：全局最小间隔 3 秒
@@ -80,7 +81,7 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 - 代理绕过：自动清除代理环境变量，直连境内数据源
 
 ### 6.3 可观测性
-- Cron 作业运行日志记录到 `data/store/_cron_log/{script}.jsonl`
+- Cron 作业运行日志记录到 `var/store/_cron_log/{script}.jsonl`
 - 自动轮转：每文件最多 500 行
 - Web 端 DB Health 页面展示 DataRegistry 中启用维度的健康状态
 - 错误通知：支持 Telegram/企业微信/飞书推送（需配置）
@@ -106,15 +107,17 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 ```
 ~/astrolabe-quant/
 ├── config/settings.yaml          # 全局配置 (策略/数据/风控/资产)
-├── data/                         # 数据层
-│   ├── fetcher.py                # AKShare 三源 fallback
-│   ├── datahub.py                # 统一路径+原子写入+清单审计
-│   ├── financials.py             # 财务数据提取 (三层缓存)
-│   ├── feature_store.py          # PIT 特征构建
-│   ├── data_registry.py          # 数据维度注册表+健康检查
-│   ├── cleaner.py                # 6 规则数据清洗
-│   ├── symbols.py                # A股股票池+申万行业映射
-│   └── cron_logger.py            # Cron 错误可观测性
+├── data/                         # 数据层源码包
+│   ├── storage/                  # DataHub、manifest、DuckDB、DataRegistry
+│   ├── ingestion/                # provider、fetcher、fetchers、Tushare 工具
+│   ├── market/                   # 价格服务、复权、行业、资产和市场视图
+│   ├── features/                 # PIT 特征构建、factor scoreboard
+│   ├── quality/                  # cleaner、contract、quality/freshness gate
+│   ├── ops/                      # audit、backfill、cron logger
+│   ├── llm/                      # provider usage ledger
+│   ├── rates/                    # risk-free rate provider
+│   ├── strategy/                 # Strategy Catalog 和插件注册
+│   └── reference/                # 静态参考数据和 seed 模型
 ├── signals/                      # 信号层
 │   ├── expression.py             # 因子 DSL 表达式引擎
 │   ├── dsl_parser.py             # LLM 公式→计算
@@ -146,6 +149,12 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 │   ├── PRD.md
 │   ├── DOCUMENTATION.md
 │   └── specs/
+├── var/                          # 本地运行产物 (git ignored)
+│   ├── store/                    # DataHub 主存储
+│   ├── cache/                    # API、回测矩阵和运行缓存
+│   ├── artifacts/                # 回测、模型、锦标赛、报告产物
+│   ├── db/                       # DuckDB/SQLite
+│   └── migration/                # 数据布局迁移 manifest
 ├── Makefile                      # 构建/扫描命令
 └── pyproject.toml                # Python 包配置
 ```

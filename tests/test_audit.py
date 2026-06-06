@@ -1,7 +1,7 @@
 """Contract tests for ConfigAuditLedger — record, query, summary."""
 
 import pytest
-from data.audit import ConfigAuditLedger, ConfigAuditEntry
+from data.ops.audit import ConfigAuditLedger, ConfigAuditEntry
 
 
 @pytest.fixture

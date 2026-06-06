@@ -1,7 +1,7 @@
 """Contract tests for BackfillLedger — lifecycle, queries, retry."""
 
 import pytest
-from data.backfill import BackfillLedger, BackfillEntry
+from data.ops.backfill import BackfillLedger, BackfillEntry
 
 
 @pytest.fixture

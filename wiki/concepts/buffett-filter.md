@@ -28,7 +28,7 @@ tags: [buffett, screening, value-investing, moat, margin-of-safety, backtest]
 | 利润率阈值 | 标准阈值 | 标准阈值 | `moat.sectors.*.min_gross_margin` / `.min_net_margin` |
 | D/E 上限 | 保守 | 放宽 (杠杆是银行核心) | `moat.sectors.*.max_debt_equity` |
 
-数据源: `data/financials.py` → 同花顺 `stock_financial_abstract_ths`，[[financial-cache|三层缓存]]。
+数据源: `data/market/financials.py` → 同花顺 `stock_financial_abstract_ths`，[[financial-cache|三层缓存]]。
 
 ## Filter 3: 安全边际
 

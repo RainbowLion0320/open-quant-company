@@ -1,5 +1,5 @@
 def test_strategy_catalog_has_required_fields_for_every_enabled_strategy():
-    from data.registry import get_enabled_strategies
+    from data.strategy.catalog import get_enabled_strategies
     from research.strategy_catalog import catalog_by_name
 
     catalog = catalog_by_name()

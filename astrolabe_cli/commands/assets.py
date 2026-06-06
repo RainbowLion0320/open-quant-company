@@ -6,7 +6,7 @@ from astrolabe_cli.results import CliResult
 
 def overview() -> CliResult:
     """Show asset type coverage, provenance, and readiness."""
-    from data.assets.overview import asset_overview_items
+    from data.market.assets.overview import asset_overview_items
 
     items = asset_overview_items()
     return CliResult(

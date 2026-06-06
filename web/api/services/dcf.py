@@ -7,8 +7,8 @@ from web.api.models import DCFParams, DCFResult
 
 
 def compute_dcf_result(code: str, params: DCFParams | None) -> DCFResult:
-    from data.price_service import get_stock_prices
-    from data.price_types import PriceUseCase
+    from data.market.price_service import get_stock_prices
+    from data.market.price_types import PriceUseCase
 
     if params is None:
         raise InvalidParameterError("params", "missing", "DCFParams body required")

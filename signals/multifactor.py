@@ -249,7 +249,7 @@ def _get_sector_momentum() -> dict:
         return _sector_ret_cache
 
     try:
-        from data.datahub import get_datahub
+        from data.storage.datahub import get_datahub
         hub = get_datahub()
         path = hub.latest_dimension_snapshot("sector_performance_snapshot")
         if not path:
@@ -284,7 +284,7 @@ def _lookup_sector(symbol: str, fallback_sector: str) -> str:
         return fallback_sector
 
     try:
-        from data.datahub import get_datahub
+        from data.storage.datahub import get_datahub
         hub = get_datahub()
         mem_path = hub.dimension_path("sector_membership")
         if not mem_path.exists():

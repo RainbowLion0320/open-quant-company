@@ -6,7 +6,7 @@ import pytest
 
 
 def test_data_registry_contract_is_valid():
-    from data.data_registry import get_registry
+    from data.storage.dimensions import get_registry
 
     reg = get_registry()
     assert reg.validate() == []
@@ -18,7 +18,7 @@ def test_data_registry_contract_is_valid():
 
 
 def test_datahub_expands_registry_dimension_paths(tmp_path):
-    from data.datahub import DataHub
+    from data.storage.datahub import DataHub
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
 
@@ -35,7 +35,7 @@ def test_datahub_expands_registry_dimension_paths(tmp_path):
 
 
 def test_datahub_writes_manifest_for_parquet(tmp_path):
-    from data.datahub import DataHub
+    from data.storage.datahub import DataHub
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     path = hub.dimension_path("ohlcv_daily", symbol="000001")
@@ -51,11 +51,11 @@ def test_datahub_writes_manifest_for_parquet(tmp_path):
 
 
 def test_datahub_facade_delegates_to_internal_components(tmp_path):
-    from data.datahub import DataHub
-    from data.datahub_dimensions import DimensionStore
-    from data.datahub_manifest import ManifestStore
-    from data.datahub_parquet import ParquetStore
-    from data.datahub_paths import DataHubPaths
+    from data.storage.datahub import DataHub
+    from data.storage.datahub_dimensions import DimensionStore
+    from data.storage.datahub_manifest import ManifestStore
+    from data.storage.datahub_parquet import ParquetStore
+    from data.storage.datahub_paths import DataHubPaths
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
 
@@ -77,7 +77,7 @@ def test_datahub_facade_delegates_to_internal_components(tmp_path):
 
 
 def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatch):
-    from data.datahub import DataHub, reset_datahub
+    from data.storage.datahub import DataHub, reset_datahub
 
     store = tmp_path / "store"
     cache = tmp_path / "cache"
@@ -115,7 +115,7 @@ def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatc
 
 
 def test_datahub_uses_canonical_astrolabe_env(tmp_path, monkeypatch):
-    from data.datahub import DataHub
+    from data.storage.datahub import DataHub
 
     astrolabe_store = tmp_path / "astrolabe-quant-store"
     astrolabe_cache = tmp_path / "astrolabe-quant-cache"
@@ -129,7 +129,7 @@ def test_datahub_uses_canonical_astrolabe_env(tmp_path, monkeypatch):
 
 
 def test_default_datahub_rebuilds_when_astrolabe_env_changes(tmp_path, monkeypatch):
-    from data.datahub import get_datahub, reset_datahub
+    from data.storage.datahub import get_datahub, reset_datahub
 
     first_store = tmp_path / "first-store"
     first_cache = tmp_path / "first-cache"
@@ -153,7 +153,7 @@ def test_default_datahub_rebuilds_when_astrolabe_env_changes(tmp_path, monkeypat
 
 def test_daily_cron_ohlcv_uses_stock_daily_module(monkeypatch):
     import scripts.cron_fetch_daily as daily
-    import data.fetchers.stock_daily as stock_daily
+    import data.ingestion.fetchers.stock_daily as stock_daily
 
     monkeypatch.setattr(daily, "_load_pool", lambda pool_size=0: ["000001", "000002"])
     monkeypatch.setattr(
@@ -166,7 +166,7 @@ def test_daily_cron_ohlcv_uses_stock_daily_module(monkeypatch):
 
 
 def test_financials_uses_canonical_symbol_path(tmp_path):
-    from data.datahub import DataHub
+    from data.storage.datahub import DataHub
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     expected = tmp_path / "store" / "stock" / "financials" / "000001.parquet"

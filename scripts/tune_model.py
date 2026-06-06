@@ -15,8 +15,8 @@ import pandas as pd
 import numpy as np
 from scipy.stats import spearmanr
 
-from data.datahub import get_datahub
-from data.feature_store import TimeSeriesSplitter, feature_period_key, feature_time_key_column, load_feature_panel
+from data.storage.datahub import get_datahub
+from data.features.feature_store import TimeSeriesSplitter, feature_period_key, feature_time_key_column, load_feature_panel
 from models import LightGBMRegressor, prepare_xy, MODEL_DIR
 
 HUB = get_datahub()

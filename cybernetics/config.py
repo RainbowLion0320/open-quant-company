@@ -36,7 +36,7 @@ def _regime_min_dwell() -> int:
 
 def _regime_transition_state_path() -> Optional[str]:
     try:
-        from data.datahub import get_datahub
+        from data.storage.datahub import get_datahub
 
         return str(get_datahub().cache_root / "runtime" / "market_regime_state.json")
     except Exception:

@@ -8,7 +8,7 @@ def dry_run() -> CliResult:
     """Run paper execution dry-run: load signals, propose orders, check risk, return JSON."""
     warnings = []
     try:
-        from data.results_db import load_latest_signals
+        from data.storage.results_db import load_latest_signals
         signals = load_latest_signals()
         signals_loaded = len(signals) if signals else 0
     except Exception as exc:

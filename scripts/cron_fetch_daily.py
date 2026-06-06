@@ -22,8 +22,8 @@ from datetime import datetime, timedelta
 
 
 import pandas as pd
-from data.datahub import get_datahub
-from data.tushare_utils import get_tushare_token
+from data.storage.datahub import get_datahub
+from data.ingestion.tushare_utils import get_tushare_token
 
 HUB = get_datahub()
 TOKEN = get_tushare_token()
@@ -49,7 +49,7 @@ def _today_str():
 
 def fetch_ohlcv(pool_size=0):
     """Fetch latest daily OHLCV for pool stocks."""
-    from data.fetchers import stock_daily
+    from data.ingestion.fetchers import stock_daily
 
     symbols = _load_pool(pool_size)
     print(f"  [ohlcv] pool={len(symbols)}")
@@ -63,7 +63,7 @@ def fetch_ohlcv(pool_size=0):
 # ═══════════════════════════════════════
 
 def fetch_shibor():
-    from data.fetchers.macro import MacroFetcher
+    from data.ingestion.fetchers.macro import MacroFetcher
     f = MacroFetcher()
     df = f.fetch_indicator("shibor", force=True)
     if df is not None:
@@ -204,7 +204,7 @@ def fetch_futures_daily():
 
 def _load_pool(pool_size=0):
     """Load stock pool symbols, sorted by market cap if available."""
-    from data.symbols import CIRCLE_STOCKS
+    from data.market.symbols import CIRCLE_STOCKS
     symbols = list(CIRCLE_STOCKS)
     # Try to sort by market cap for priority
     try:
@@ -269,5 +269,5 @@ if __name__ == "__main__":
 
     print(f"\nDone. Results: { {k: v for k, v in results.items() if v} }")
 
-    from data.cron_logger import log_cron_success
+    from data.ops.cron_logger import log_cron_success
     log_cron_success("cron_fetch_daily", **{k: v for k, v in results.items() if v})

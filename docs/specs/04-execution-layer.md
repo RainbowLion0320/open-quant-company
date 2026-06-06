@@ -105,9 +105,9 @@ class BondExchange:
 
 | 表 | 路径 | Schema |
 |----|------|--------|
-| `trades` | `data/store/paper/trades.parquet` | date, code, name, side, price, volume, amount, strategy |
-| `nav` | `data/store/paper/nav.parquet` | date, total_asset, cash, market_value |
-| `state` | `data/store/paper/state.parquet` | cash, frozen_cash, peak_equity, positions(JSON), order_counter, updated_at |
+| `trades` | `var/store/paper/trades.parquet` | date, code, name, side, price, volume, amount, strategy |
+| `nav` | `var/store/paper/nav.parquet` | date, total_asset, cash, market_value |
+| `state` | `var/store/paper/state.parquet` | cash, frozen_cash, peak_equity, positions(JSON), order_counter, updated_at |
 
 **保存时机：**
 - 每次 `submit_order()` 成交后 → 更新 trades + state
@@ -124,13 +124,13 @@ class BondExchange:
 | `scripts/cron_fetch_daily.py` | 交易日 16:00 | 日常数据拉取 |
 | `scripts/cron_fetch_slow.py` | 每日 02:00 | 限流数据分批填充 |
 
-所有 Cron 脚本集成 `cron_logger`，输出到 `data/store/_cron_log/{script}.jsonl`。
+所有 Cron 脚本集成 `cron_logger`，输出到 `var/store/_cron_log/{script}.jsonl`。
 
 ## 3. 数据流
 
 ```
 15:30 — compute_signals.py
-  data/store/signals/*.parquet (信号扫描)
+  var/store/signals/*.parquet (信号扫描)
           │
           ▼
 09:30 — execute_paper_trades.py

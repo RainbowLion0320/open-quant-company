@@ -51,7 +51,7 @@ def promotion_ready(evaluation: StrategyEvaluation, target_status: str = "paper"
 
 
 def strategy_evidence_dir() -> Path:
-    from data.datahub import get_datahub
+    from data.storage.datahub import get_datahub
 
     return get_datahub().store_path("research") / "strategy_evidence"
 

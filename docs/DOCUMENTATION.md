@@ -1,6 +1,6 @@
 # 星盘 / Astrolabe Quant OS 文档治理
 
-> 更新: 2026-05-29
+> 更新: 2026-06-06
 
 本仓库保留三类文档层。它们不是同一种东西，每一层只负责自己的边界。
 
@@ -20,10 +20,11 @@
 | 模块行为和契约 | `docs/specs/*.md` | 行为变化时同提交更新。 |
 | 当前实现状态 | 代码 + 测试 + `docs/acceptance-matrix.md` | 不在 wiki 重复维护状态表。 |
 | 项目发布版本 | `pyproject.toml` → `[project].version` | README badge 通过 `scripts/bump_version.py` 同步；配置文件不保存发布版本。 |
-| 数据维度和路径 | `config/settings.yaml` + `data/data_registry.py` + `data/datahub.py` | 文档说明如何查询，不复制动态数量。 |
-| 数据 schema | `data/contract.py` + 必要时的显式 `_contracts/` 文件 | 文档说明契约归属和查询方法。 |
+| 数据维度和路径 | `config/settings.yaml` + `data/storage/dimensions.py` + `data/storage/datahub.py` | 文档说明如何查询，不复制动态数量。 |
+| 本地运行目录布局 | `config/settings.yaml` → `paths` + `docs/operations/data-layout-migration.md` | `data/` 是源码包，运行产物默认在 `var/`。 |
+| 数据 schema | `data/quality/contract.py` + 必要时的显式 `_contracts/` 文件 | 文档说明契约归属和查询方法。 |
 | 策略参数 | `config/settings.yaml` + 策略代码 | 文档描述设计意图，不固化易过期指标。 |
-| 回测/锦标赛指标 | `data/tournament/` 和生成报告 | 除非明确标记为历史样本，否则不把 Sharpe/MaxDD 写进长期文档。 |
+| 回测/锦标赛指标 | `var/artifacts/tournaments/` 和生成报告 | 除非明确标记为历史样本，否则不把 Sharpe/MaxDD 写进长期文档。 |
 | Web 路由和 UI 模块 | `web/api/routes/` + `web/frontend/src/router` | spec 记录主要业务路由组，不追逐每个临时端点细节。 |
 | Agent/cron/local 操作入口 | `astroq` CLI (`astrolabe_cli/`) | 新自动化优先调用 CLI；旧脚本作为底层实现或兼容入口。 |
 | 操作历史 | git log | 仓库不再保留 append-only changelog 或历史计划归档。 |

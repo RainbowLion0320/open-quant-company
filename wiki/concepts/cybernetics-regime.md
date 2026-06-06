@@ -10,7 +10,7 @@ tags: [cybernetics, market-regime, profit-trained-policy, position-sizing, secto
 
 市场状态检测——作为组合级别 risk-on/risk-off 风险预算开关，用来决定何时提高或降低市场 beta 暴露。灵感来自钱学森控制论：系统持续感知市场状态，通过反馈回路自适应调参。
 
-**参数定义在 `config/settings.yaml` → `cybernetics`，规则评分常量定义在 `cybernetics/regime_policy.py`，HMM 模型文件保留在 `data/models/regime_hmm/`。**
+**参数定义在 `config/settings.yaml` → `cybernetics`，规则评分常量定义在 `cybernetics/regime_policy.py`，HMM 模型文件保留在 `data/reference/models/regime_hmm/`。**
 
 ## Regime Classification
 

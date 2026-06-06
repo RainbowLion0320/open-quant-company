@@ -34,10 +34,10 @@ AKShare（免费不限流）      Tushare MCP（2000积分）
 
 ## 财务数据缓存
 
-同花顺财务摘要（`data/financials.py`）默认只读本地 Parquet，API 补数由 cron/repair 触发：
+同花顺财务摘要（`data/market/financials.py`）默认只读本地 Parquet，API 补数由 cron/repair 触发：
 
 ```
-data/store/stock/financials/{symbol}.parquet ← scripts/cron_fetch_financials.py / repair_table.py
+var/store/stock/financials/{symbol}.parquet ← scripts/cron_fetch_financials.py / repair_table.py
 ```
 
 100只股票首次拉取约150秒，之后毫秒级。详见 [[financial-cache]]。

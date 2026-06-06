@@ -1,7 +1,7 @@
 # Tushare MCP 数据模块指南
 
 > 更新时间: 2026-05-23 | 积分: 2000 | MCP Server: tushare v0.0.1
-> 定位: 数据源能力参考；当前接入状态以 `config/settings.yaml` → `data_registry` 和 `data/provider.py` 为准。
+> 定位: 数据源能力参考；当前接入状态以 `config/settings.yaml` → `data_registry` 和 `data/ingestion/provider.py` 为准。
 
 ## 接入方式
 
@@ -22,7 +22,7 @@ Tushare MCP Server 通过 Streamable HTTP 协议运行:
 | `balancesheet` | 完整资产负债表（200+字段） | 杠杆、资产质量和风控因子 | P0 |
 | `cashflow` | 完整现金流量表（80+字段） | FCF/现金质量因子 | P0 |
 | `stock_basic` | 全A股列表+行业+上市日期+是否ST | 股票池和基础元数据补充 | P1 |
-| `index_classify` | 申万2014/2021版行业分类（三级） | `data/symbols.py`已内置 | - |
+| `index_classify` | 申万2014/2021版行业分类（三级） | `data/market/symbols.py`已内置 | - |
 | `sw_daily` | 申万行业指数日行情 | 行业雷达和多因子行业动量；已接入 provider/registry | P1 |
 
 ### 二级：策略增强（2000积分解锁，AKShare没有）

@@ -1,8 +1,9 @@
-"""Shared Tushare configuration helpers."""
+"""Compatibility shim for `data.ingestion.tushare_utils`.
 
-from core.settings import get_tushare_token as _get_tushare_token
+Use `data.ingestion.tushare_utils` for new code.
+"""
+from importlib import import_module as _import_module
+import sys as _sys
 
-
-def get_tushare_token() -> str:
-    """Load Tushare token from environment first, then local config fallback."""
-    return _get_tushare_token()
+_module = _import_module("data.ingestion.tushare_utils")
+_sys.modules[__name__] = _module

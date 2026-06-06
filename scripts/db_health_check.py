@@ -7,7 +7,7 @@ db_health_check.py — 全库数据健康扫描
 - 数据新鲜度 (最新日期距今天数)
 - 文件大小
 
-输出: data/store/db_health.parquet
+输出: var/store/db_health.parquet
 """
 
 from __future__ import annotations
@@ -23,9 +23,9 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-from data.datahub import get_datahub
-from data.data_registry import HealthTableMeta, get_registry
-from data.feature_store import iter_feature_files
+from data.storage.datahub import get_datahub
+from data.storage.dimensions import HealthTableMeta, get_registry
+from data.features.feature_store import iter_feature_files
 
 HUB = get_datahub()
 STORE = HUB.store_root
@@ -426,7 +426,7 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
     if llm.exists():
         records.append(_scan_single("system_llm_usage", llm))
 
-    # ── data/cache/api/ (AKShare API response cache) ──
+    # ── var/cache/api/ (AKShare API response cache) ──
     api_cache = STORE.parent / "cache" / "api"
     if api_cache.exists():
         paths = sorted(api_cache.glob("*.parquet"))

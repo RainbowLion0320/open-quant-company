@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from data.data_registry import get_registry
+from data.storage.dimensions import get_registry
 from web.api.services.pipelines.common import edge, metric, node, updated_timestamp
 from web.api.services.system_data_health import freshness_gate_from_health_check
 

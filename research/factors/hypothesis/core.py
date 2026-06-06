@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from typing import List
 
-from data.datahub import get_datahub
-from data.feature_store import iter_feature_files
-from data.llm_usage import resolve_llm_use_case
+from data.storage.datahub import get_datahub
+from data.features.feature_store import iter_feature_files
+from data.llm.usage import resolve_llm_use_case
 from research.factors.hypothesis.candidates import FactorCandidate
 from research.factors.hypothesis.evaluation import evaluate_factor_oos, get_feature_importance_hints
 from research.factors.hypothesis.llm import generate_via_llm
@@ -40,7 +40,7 @@ def run_research_loop(
         break
 
     # Load data symbols
-    from data.symbols import CIRCLE_STOCKS
+    from data.market.symbols import CIRCLE_STOCKS
     symbols = list(CIRCLE_STOCKS)[:500]  # 500 for stable OOS IC estimates
 
     all_accepted: List[FactorCandidate] = []
@@ -100,7 +100,7 @@ def run_research_loop(
             break
 
     # Save to scoreboard
-    from data.factor_scoreboard import record as scoreboard_record
+    from data.features.factor_scoreboard import record as scoreboard_record
     all_candidates_dicts = []
     for c in all_accepted:
         all_candidates_dicts.append({

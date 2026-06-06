@@ -52,7 +52,7 @@ signals:
 
 
 def test_symbol_helpers_normalize_a_share_codes_and_exchange_formats():
-    from data.symbols import normalize_symbol, to_sina_symbol, to_ts_code
+    from data.market.symbols import normalize_symbol, to_sina_symbol, to_ts_code
 
     assert normalize_symbol("SH600519") == "600519"
     assert normalize_symbol("000001.SZ") == "000001"
@@ -66,10 +66,10 @@ def test_symbol_helpers_normalize_a_share_codes_and_exchange_formats():
 def test_fetcher_base_rate_limiter_uses_configurable_jitter(monkeypatch):
     calls: list[float] = []
 
-    monkeypatch.setattr("data.fetchers.base.time.sleep", lambda seconds: calls.append(seconds))
-    monkeypatch.setattr("data.fetchers.base.random.uniform", lambda low, high: 0.25)
+    monkeypatch.setattr("data.ingestion.fetchers.base.time.sleep", lambda seconds: calls.append(seconds))
+    monkeypatch.setattr("data.ingestion.fetchers.base.random.uniform", lambda low, high: 0.25)
 
-    from data.fetchers.base import RateLimiter
+    from data.ingestion.fetchers.base import RateLimiter
 
     RateLimiter(base_seconds=1.0, jitter_seconds=0.5).sleep()
     assert calls == [1.25]
@@ -97,7 +97,7 @@ def test_api_serializer_converts_nan_and_time_series_consistently():
 
 
 def test_datahub_latest_dimension_snapshot_uses_registry_path_only(tmp_path):
-    from data.datahub import DataHub
+    from data.storage.datahub import DataHub
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     registry_root = hub.dimension_root("sector_performance_snapshot")
@@ -120,7 +120,7 @@ def test_datahub_latest_dimension_snapshot_uses_registry_path_only(tmp_path):
 
 
 def test_datahub_lists_dimension_snapshots_for_file_and_partitioned_dimensions(tmp_path):
-    from data.datahub import DataHub
+    from data.storage.datahub import DataHub
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     root = hub.dimension_root("sector_signal_snapshot")
@@ -141,7 +141,7 @@ def test_datahub_lists_dimension_snapshots_for_file_and_partitioned_dimensions(t
 
 def test_feature_store_loads_feature_files_panel_and_latest_frame(tmp_path, monkeypatch):
     from data import feature_store
-    from data.datahub import DataHub
+    from data.storage.datahub import DataHub
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     feature_dir = hub.features_dir()

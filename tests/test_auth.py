@@ -272,7 +272,7 @@ class TestAuditOnSettingsWrite:
     def test_patch_creates_audit_entry(self, research_app):
         client, _ = research_app
 
-        from data.audit import ConfigAuditLedger
+        from data.ops.audit import ConfigAuditLedger
         ledger = ConfigAuditLedger()
         ledger.clear()
 
@@ -306,7 +306,7 @@ class TestAuditOnSettingsWrite:
     def test_audit_endpoint(self, research_app):
         client, _ = research_app
 
-        from data.audit import ConfigAuditLedger
+        from data.ops.audit import ConfigAuditLedger
         ledger = ConfigAuditLedger()
         ledger.clear()
 

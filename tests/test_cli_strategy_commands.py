@@ -48,7 +48,7 @@ def test_strategy_evidence_without_name_lists_artifacts(monkeypatch, capsys):
         lambda: [
             {
                 "strategy": "trend_following",
-                "path": "data/store/research/strategy_evidence/trend_following.json",
+                "path": "var/store/research/strategy_evidence/trend_following.json",
                 "exists": False,
                 "promotion_decision": "missing",
                 "oos_status": "missing",
@@ -75,7 +75,7 @@ def test_strategy_evidence_with_name_returns_detail(monkeypatch, capsys):
         lambda name: {
             "strategy": name,
             "exists": False,
-            "path": f"data/store/research/strategy_evidence/{name}.json",
+            "path": f"var/store/research/strategy_evidence/{name}.json",
             "summary": {},
             "artifact": {},
             "parse_error": None,

@@ -31,18 +31,18 @@ def _make_ohlcv_df(dates=10):
 
 class TestETFAssetContracts:
     def test_data_source_is_real(self):
-        from data.assets.etf import ETFAsset
+        from data.market.assets.etf import ETFAsset
         assert ETFAsset.DATA_SOURCE == "real"
         assert ETFAsset.TRADING_CALENDAR == "SSE"
 
     def test_universe_is_nonempty(self):
-        from data.assets.etf import ETFAsset, ETF_UNIVERSE
+        from data.market.assets.etf import ETFAsset, ETF_UNIVERSE
         assert len(ETF_UNIVERSE) >= 50
         assert "518880" in ETF_UNIVERSE
 
     def test_fetch_daily_returns_ohlcv(self, tmp_path):
         """Mock AKShare to return a known DataFrame, verify columns."""
-        from data.assets.etf import ETFAsset
+        from data.market.assets.etf import ETFAsset
 
         df = _make_ohlcv_df()
         df.rename(columns={"date": "日期", "open": "开盘", "close": "收盘",
@@ -56,7 +56,7 @@ class TestETFAssetContracts:
             assert all(c in result.columns for c in ("date", "open", "high", "low", "close", "volume"))
 
     def test_get_metadata_returns_name_and_category(self, tmp_path):
-        from data.assets.etf import ETFAsset
+        from data.market.assets.etf import ETFAsset
 
         store = tmp_path / "store"
         adapter = ETFAsset(store_root=store)
@@ -65,7 +65,7 @@ class TestETFAssetContracts:
         assert "category" in meta or "industry" in meta
 
     def test_get_data_source_returns_dict(self, tmp_path):
-        from data.assets.etf import ETFAsset
+        from data.market.assets.etf import ETFAsset
 
         adapter = ETFAsset(store_root=tmp_path / "store")
         ds = adapter.get_data_source()
@@ -80,32 +80,32 @@ class TestETFAssetContracts:
 
 class TestBondAssetContracts:
     def test_data_source_is_proxy_by_default(self):
-        from data.assets.bond import BondAsset
+        from data.market.assets.bond import BondAsset
         assert BondAsset.DATA_SOURCE == "proxy"
 
     def test_get_data_source_proxy_for_treasury(self, tmp_path):
-        from data.assets.bond import BondAsset
+        from data.market.assets.bond import BondAsset
         adapter = BondAsset(store_root=tmp_path / "store")
         ds = adapter.get_data_source("CN10Y")
         assert ds["data_source"] == "proxy"
         assert "收益率" in ds["detail"]
 
     def test_get_data_source_real_for_convertible(self, tmp_path):
-        from data.assets.bond import BondAsset
+        from data.market.assets.bond import BondAsset
         adapter = BondAsset(store_root=tmp_path / "store")
         ds = adapter.get_data_source("110059")
         assert ds["data_source"] == "real"
         assert "可转债" in ds["detail"]
 
     def test_universe_has_treasury_and_convertibles(self):
-        from data.assets.bond import BondAsset, BOND_UNIVERSE
+        from data.market.assets.bond import BondAsset, BOND_UNIVERSE
         assert "CN10Y" in BOND_UNIVERSE
         assert "CN2Y" in BOND_UNIVERSE
         assert any(s.startswith("11") or s.startswith("12") or s.startswith("13") for s in BOND_UNIVERSE)
 
     def test_fetch_daily_returns_proxy_price_for_CN10Y(self, tmp_path):
         """Bond fetcher synthesizes price from yields."""
-        from data.assets.bond import BondAsset
+        from data.market.assets.bond import BondAsset
 
         idx = pd.date_range("2024-01-01", periods=30, freq="B")
         yield_df = pd.DataFrame({
@@ -129,11 +129,11 @@ class TestBondAssetContracts:
 
 class TestFuturesAssetContracts:
     def test_data_source_is_real(self):
-        from data.assets.futures import FuturesAsset
+        from data.market.assets.futures import FuturesAsset
         assert FuturesAsset.DATA_SOURCE == "real"
 
     def test_contract_multipliers(self):
-        from data.assets.futures import FuturesAsset
+        from data.market.assets.futures import FuturesAsset
         m = FuturesAsset._MULTIPLIERS
         assert m["IF"] == 300
         assert m["IC"] == 200
@@ -143,20 +143,20 @@ class TestFuturesAssetContracts:
         assert m["AU"] == 1000
 
     def test_universe_has_index_and_commodity(self):
-        from data.assets.futures import FuturesAsset, FUTURES_UNIVERSE
+        from data.market.assets.futures import FuturesAsset, FUTURES_UNIVERSE
         assert "IF" in FUTURES_UNIVERSE
         assert "IC" in FUTURES_UNIVERSE
         assert "RB" in FUTURES_UNIVERSE
 
     def test_get_data_source_reports_multiplier(self, tmp_path):
-        from data.assets.futures import FuturesAsset
+        from data.market.assets.futures import FuturesAsset
         adapter = FuturesAsset(store_root=tmp_path / "store")
         ds = adapter.get_data_source("IF")
         assert ds["data_source"] == "real"
         assert ds["multiplier"] == 300
 
     def test_fetch_daily_columns_include_open_interest(self, tmp_path):
-        from data.assets.futures import FuturesAsset
+        from data.market.assets.futures import FuturesAsset
 
         df = _make_ohlcv_df()
         df["open_interest"] = 50000.0
@@ -177,25 +177,25 @@ class TestFuturesAssetContracts:
 
 class TestCryptoAssetContracts:
     def test_data_source_is_placeholder(self):
-        from data.assets.crypto import CryptoAsset
+        from data.market.assets.crypto import CryptoAsset
         assert CryptoAsset.DATA_SOURCE == "placeholder"
         assert "pending" in CryptoAsset.DATA_SOURCE_DETAIL.lower()
 
     def test_fetch_daily_returns_none(self, tmp_path):
-        from data.assets.crypto import CryptoAsset
+        from data.market.assets.crypto import CryptoAsset
         adapter = CryptoAsset(store_root=tmp_path / "store")
         result = adapter.fetch_daily("BTC/USDT")
         assert result is None
 
     def test_universe_has_btc_eth(self, tmp_path):
-        from data.assets.crypto import CryptoAsset
+        from data.market.assets.crypto import CryptoAsset
         adapter = CryptoAsset(store_root=tmp_path / "store")
         u = adapter.get_universe()
         assert "BTC/USDT" in u
         assert "ETH/USDT" in u
 
     def test_currency_is_usdt(self):
-        from data.assets.crypto import CryptoAsset
+        from data.market.assets.crypto import CryptoAsset
         assert CryptoAsset.CURRENCY == "USDT"
         assert CryptoAsset.TRADING_CALENDAR == "24x7"
 
@@ -206,12 +206,12 @@ class TestCryptoAssetContracts:
 
 class TestAssetRegistryWithContracts:
     def test_register_all_adapters(self, tmp_path):
-        from data.assets.base import AssetRegistry
-        from data.assets.stock import StockAsset
-        from data.assets.etf import ETFAsset
-        from data.assets.bond import BondAsset
-        from data.assets.futures import FuturesAsset
-        from data.assets.crypto import CryptoAsset
+        from data.market.assets.base import AssetRegistry
+        from data.market.assets.stock import StockAsset
+        from data.market.assets.etf import ETFAsset
+        from data.market.assets.bond import BondAsset
+        from data.market.assets.futures import FuturesAsset
+        from data.market.assets.crypto import CryptoAsset
 
         s = tmp_path / "store"
         reg = AssetRegistry()
@@ -223,8 +223,8 @@ class TestAssetRegistryWithContracts:
         assert len(reg.asset_types) == 5
 
     def test_registry_get_by_type(self, tmp_path):
-        from data.assets.base import AssetRegistry
-        from data.assets.etf import ETFAsset
+        from data.market.assets.base import AssetRegistry
+        from data.market.assets.etf import ETFAsset
 
         reg = AssetRegistry()
         reg.register(ETFAsset(store_root=tmp_path / "store"))
@@ -233,12 +233,12 @@ class TestAssetRegistryWithContracts:
         assert adapter.asset_type == "etf"
 
     def test_all_adapters_report_data_source(self, tmp_path):
-        from data.assets.base import AssetRegistry
-        from data.assets.stock import StockAsset
-        from data.assets.etf import ETFAsset
-        from data.assets.bond import BondAsset
-        from data.assets.futures import FuturesAsset
-        from data.assets.crypto import CryptoAsset
+        from data.market.assets.base import AssetRegistry
+        from data.market.assets.stock import StockAsset
+        from data.market.assets.etf import ETFAsset
+        from data.market.assets.bond import BondAsset
+        from data.market.assets.futures import FuturesAsset
+        from data.market.assets.crypto import CryptoAsset
 
         s = tmp_path / "store"
         reg = AssetRegistry()
@@ -252,8 +252,8 @@ class TestAssetRegistryWithContracts:
             assert ds["data_source"] in ("real", "proxy", "placeholder", "unknown")
 
     def test_registry_duplicate_raises(self, tmp_path):
-        from data.assets.base import AssetRegistry
-        from data.assets.etf import ETFAsset
+        from data.market.assets.base import AssetRegistry
+        from data.market.assets.etf import ETFAsset
 
         reg = AssetRegistry()
         reg.register(ETFAsset(store_root=tmp_path / "store"))
@@ -267,7 +267,7 @@ class TestAssetRegistryWithContracts:
 
 class TestMultiAssetContractsDerivation:
     def test_derive_fund_daily_contract_columns(self):
-        from data.contract import derive_contracts_from_registry
+        from data.quality.contract import derive_contracts_from_registry
         contracts = derive_contracts_from_registry()
         c = contracts.get("fund_daily")
         assert c is not None
@@ -275,7 +275,7 @@ class TestMultiAssetContractsDerivation:
             assert col in c.columns, f"fund_daily contract missing column: {col}"
 
     def test_derive_bond_treasury_yields_contract_columns(self):
-        from data.contract import derive_contracts_from_registry
+        from data.quality.contract import derive_contracts_from_registry
         contracts = derive_contracts_from_registry()
         c = contracts.get("bond_treasury_yields")
         assert c is not None
@@ -283,7 +283,7 @@ class TestMultiAssetContractsDerivation:
         assert "中国国债收益率10年" in c.columns
 
     def test_derive_futures_daily_contract_columns(self):
-        from data.contract import derive_contracts_from_registry
+        from data.quality.contract import derive_contracts_from_registry
         contracts = derive_contracts_from_registry()
         c = contracts.get("futures_daily")
         assert c is not None
@@ -293,7 +293,7 @@ class TestMultiAssetContractsDerivation:
 
     def test_fund_daily_contract_validates_etf_data(self):
         """The derived fund_daily contract should validate a correct ETF DataFrame."""
-        from data.contract import derive_contracts_from_registry
+        from data.quality.contract import derive_contracts_from_registry
         contracts = derive_contracts_from_registry()
         c = contracts.get("fund_daily")
         assert c is not None

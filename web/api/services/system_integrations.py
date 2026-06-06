@@ -39,7 +39,7 @@ def api_health_payload() -> dict:
         results.append({"name": "Tushare", "status": "missing", "detail": "未配置 TUSHARE_TOKEN"})
 
     try:
-        from data.llm_usage import provider_health_items
+        from data.llm.usage import provider_health_items
         results.extend(provider_health_items())
     except Exception as exc:
         results.append({"name": "LLM", "status": "warn", "detail": f"无法读取 provider 配置: {str(exc)[:60]}"})

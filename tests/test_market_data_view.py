@@ -1,6 +1,6 @@
 import pandas as pd
 
-from data.market_data_view import MarketDataView, as_of_reader
+from data.market.market_data_view import MarketDataView, as_of_reader
 
 
 def test_market_data_view_filters_date_column():

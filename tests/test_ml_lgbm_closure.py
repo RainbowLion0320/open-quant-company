@@ -292,7 +292,7 @@ def test_apply_ranked_buys_never_marks_st_stock_as_buy():
 
 def test_paper_execution_uses_configured_fresh_paper_signals_only(tmp_path, monkeypatch):
     import scripts.execute_paper_trades as exec_trades
-    from data.datahub import DataHub
+    from data.storage.datahub import DataHub
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     monkeypatch.setattr(exec_trades, "HUB", hub)

@@ -67,8 +67,8 @@ async def run_strategy_async(strategy: str, limit: int = 0, params: dict = None,
     job_id = create_job(strategy, limit, params, mode)
 
     def _run():
-        from data.results_db import init
-        from data.strategy_plugins import run_registered_strategies
+        from data.storage.results_db import init
+        from data.strategy.plugins import run_registered_strategies
 
         init()
 

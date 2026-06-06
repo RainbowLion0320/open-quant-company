@@ -28,9 +28,9 @@ def _hmm_detect(
     # Check model path
     try:
         hmm_cfg = _load_config().get("hmm", {})
-        model_path = hmm_cfg.get("model_path", "data/models/regime_hmm")
+        model_path = hmm_cfg.get("model_path", "data/reference/models/regime_hmm")
     except Exception:
-        model_path = "data/models/regime_hmm"
+        model_path = "data/reference/models/regime_hmm"
 
     from pathlib import Path
     mp = Path(model_path)

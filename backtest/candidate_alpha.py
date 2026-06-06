@@ -6,19 +6,18 @@ import hashlib
 import pickle
 from datetime import datetime
 from functools import lru_cache
-from pathlib import Path
 from typing import Any, Mapping
 
 import pandas as pd
 
 from core.settings import get_dotted, get_settings
-from data.symbols import SYMBOL_INDUSTRY
+from data.storage.datahub import get_datahub
+from data.market.symbols import SYMBOL_INDUSTRY
 from pipeline.alpha import AlphaModel
 from pipeline.types import AlphaSignal
 from signals.candidates.common import bounded_score, percentile_score, safe_float
 from signals.candidates.params import CANDIDATE_STRATEGY_NAMES, candidate_strategy_params
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 _PRICE_PANELS: dict[int, dict[str, pd.DataFrame]] = {}
 _VALUATION_PANELS: dict[tuple[str, ...], dict[str, pd.DataFrame]] = {}
 _QUALITY_FINANCIAL_CACHE: dict[tuple[int, tuple[str, ...]], dict[str, dict]] = {}
@@ -213,8 +212,6 @@ def _valuation_panels(universe: list[str]) -> dict[str, pd.DataFrame]:
     if symbols in _VALUATION_PANELS:
         return _VALUATION_PANELS[symbols]
 
-    from data.datahub import get_datahub
-
     hub = get_datahub()
     existing_paths = []
     latest_mtime = 0
@@ -227,7 +224,9 @@ def _valuation_panels(universe: list[str]) -> dict[str, pd.DataFrame]:
 
     cache_seed = f"valuation|{len(symbols)}|{len(existing_paths)}|{latest_mtime}"
     cache_key = hashlib.md5(cache_seed.encode()).hexdigest()[:12]
-    cache_path = DATA_DIR / f"backtest_valuation_matrix_{cache_key}.pkl"
+    cache_dir = hub.cache_root / "backtest"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = cache_dir / f"backtest_valuation_matrix_{cache_key}.pkl"
     if cache_path.exists():
         with open(cache_path, "rb") as f:
             panels = pickle.load(f)
@@ -379,7 +378,7 @@ def _sector_rotation(universe: list[str], prices: pd.DataFrame, date_idx: int) -
 @lru_cache(maxsize=10000)
 def _quality_sources(symbol: str) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
     try:
-        from data.fetchers.financial import read_financial_summary, read_valuation
+        from data.ingestion.fetchers.financial import read_financial_summary, read_valuation
     except Exception:
         return None, None
     return read_financial_summary(symbol), read_valuation(symbol)
@@ -388,7 +387,7 @@ def _quality_sources(symbol: str) -> tuple[pd.DataFrame | None, pd.DataFrame | N
 @lru_cache(maxsize=200000)
 def _quality_inputs(symbol: str, recent_period_count: int, as_of_date: str) -> dict[str, float]:
     try:
-        from data.financials import extract_gross_margin_history, extract_roe_history
+        from data.market.financials import extract_gross_margin_history, extract_roe_history
     except Exception:
         return {"roe": 0.0, "gross_margin": 0.0, "pe_ttm": 0.0, "pb": 0.0}
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from data.storage.datahub import DataHub
 from research.regime.features import normalize_ohlcv
 
 def build_tradable_asset_panel(
@@ -65,7 +66,7 @@ def load_local_equity_ohlcv(symbol: str = "sh000001", *, data_root: str | Path =
     notes: list[str] = []
     if symbol.startswith(("sh", "sz")):
         try:
-            from data.fetcher import _read_cache
+            from data.ingestion.fetcher import _read_cache
 
             cached = _read_cache(f"index_daily_{symbol}_default", max_age_hours=0)
             if cached is not None and len(cached) > 0:
@@ -74,13 +75,17 @@ def load_local_equity_ohlcv(symbol: str = "sh000001", *, data_root: str | Path =
             notes.append(f"index_cache_unavailable:{type(exc).__name__}")
 
     root = Path(data_root)
+    hub = DataHub(project_root=root, create=False)
+    legacy_store = root / "data" / "store"
     fallbacks = [
-        (root / "data/store/fund/daily/510300.SH.parquet", "fund_daily:510300.SH"),
-        (root / "data/store/fund/daily/510500.SH.parquet", "fund_daily:510500.SH"),
-        (root / "data/store/fund/daily/510050.SH.parquet", "fund_daily:510050.SH"),
+        (hub.asset_daily_path("fund", "510300.SH"), legacy_store / "fund/daily/510300.SH.parquet", "fund_daily:510300.SH"),
+        (hub.asset_daily_path("fund", "510500.SH"), legacy_store / "fund/daily/510500.SH.parquet", "fund_daily:510500.SH"),
+        (hub.asset_daily_path("fund", "510050.SH"), legacy_store / "fund/daily/510050.SH.parquet", "fund_daily:510050.SH"),
     ]
-    for path, source in fallbacks:
-        frame = _read_local_parquet(path)
+    for primary, legacy, source in fallbacks:
+        frame = _read_local_parquet(primary)
+        if frame.empty:
+            frame = _read_local_parquet(legacy)
         if not frame.empty:
             notes.append(f"equity_symbol_{symbol}_not_found_used_{source}")
             return frame, source, notes
@@ -89,7 +94,11 @@ def load_local_equity_ohlcv(symbol: str = "sh000001", *, data_root: str | Path =
 
 
 def _load_treasury_defensive_proxy(*, data_root: str | Path = ".") -> tuple[pd.DataFrame, str, list[str]]:
-    path = Path(data_root) / "data/store/bond/treasury_yields.parquet"
+    root = Path(data_root)
+    hub = DataHub(project_root=root, create=False)
+    path = hub.store_dir("bond") / "treasury_yields.parquet"
+    if not path.exists():
+        path = root / "data" / "store" / "bond" / "treasury_yields.parquet"
     frame = _read_local_parquet(path)
     if frame.empty or "中国国债收益率10年" not in frame.columns:
         return pd.DataFrame(), "", ["bond_proxy_unavailable"]

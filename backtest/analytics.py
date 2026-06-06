@@ -21,7 +21,7 @@ import pandas as pd
 from typing import Optional, Dict, List
 from dataclasses import dataclass, field
 
-from data.risk_free_rates import RiskFreeRateDataError
+from data.rates.risk_free_rates import RiskFreeRateDataError
 
 
 @dataclass

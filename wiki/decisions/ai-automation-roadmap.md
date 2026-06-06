@@ -8,7 +8,7 @@ tags: [AI, ML, RL, architecture, roadmap, strategy, factor-DSL, PIT, LightGBM, R
 
 # AI 自动化交易框架路线图
 
-从手调规则策略演进到 AI/ML 驱动的自动化 R&D 循环。本文只记录方向、约束和晋级门槛；当前进度、指标、样本量和任务状态以 git 提交、运行日志、`data/models/`、`data/tournament/`、`data/factor_scoreboard.py` 为准。
+从手调规则策略演进到 AI/ML 驱动的自动化 R&D 循环。本文只记录方向、约束和晋级门槛；当前进度、指标、样本量和任务状态以 git 提交、运行日志、`var/artifacts/models/`、`var/artifacts/tournaments/`、`data/features/factor_scoreboard.py` 为准。
 
 ## 目标架构
 
@@ -45,7 +45,7 @@ DataHub/DataRegistry
 ### 策略晋级
 
 - 注册在 `config/settings.yaml -> strategies`。
-- 提供 runner 函数并由 `data/strategy_plugins.py` 调度。
+- 提供 runner 函数并由 `data/strategy/plugins.py` 调度。
 - 输出标准信号行：`symbol/name/industry/score/signal/detail`。
 - 回测、Web job、日频扫描、paper trading 使用同一策略运行入口。
 
@@ -54,7 +54,7 @@ DataHub/DataRegistry
 ### P1: 可信研究闭环
 
 - 强化 `scripts/tune_model.py` 的模型元数据和 promotion gate。
-- 让 `data/factor_scoreboard.py` 驱动自动淘汰候选因子。
+- 让 `data/features/factor_scoreboard.py` 驱动自动淘汰候选因子。
 - 对新旧模型输出做并行锦标赛，而不是覆盖式替换。
 
 ### P2: 数据广度和质量

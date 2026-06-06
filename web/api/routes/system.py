@@ -89,7 +89,7 @@ async def cron_jobs():
 @router.get("/quality-gate")
 async def quality_gate(dimension: str = Query(default="", description="Check a single dimension (empty = all critical)")):
     """数据质量门禁 — freshness SLA / completeness / consistency."""
-    from data.quality import DataQualityGate
+    from data.quality.quality import DataQualityGate
     gate = DataQualityGate()
     if dimension:
         report = gate.check_dimension(dimension)

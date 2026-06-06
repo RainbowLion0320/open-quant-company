@@ -8,7 +8,7 @@ tags: [cache, parquet, financials, architecture, akshare, PIT, feature-store, fu
 
 # Financial Cache & PIT Feature Store
 
-`data/financials.py` 的三层缓存架构为巴菲特过滤器和回测提供快速财务数据。Phase 3.0 后财务数据也被提取为基本面和估值因子，进入 ML PIT 特征存储。
+`data/market/financials.py` 的三层缓存架构为巴菲特过滤器和回测提供快速财务数据。Phase 3.0 后财务数据也被提取为基本面和估值因子，进入 ML PIT 特征存储。
 
 ## 三层缓存架构
 
@@ -16,12 +16,12 @@ tags: [cache, parquet, financials, architecture, akshare, PIT, feature-store, fu
 get_financial_summary(symbol)
   │
   ├─ 1. 本地 Parquet
-  │   path: data/store/stock/financials/{symbol}.parquet
+  │   path: var/store/stock/financials/{symbol}.parquet
   │   命中 → pd.read_parquet → 返回
   │
   └─ 2. 外部 API 补数
       scripts/cron_fetch_financials.py 或 repair_table.py
-      → data/fetchers/financial.py → AKShare
+      → data/ingestion/fetchers/financial.py → AKShare
 ```
 
 ## 数据内容
@@ -81,7 +81,7 @@ get_financial_summary(symbol)
 基本面+估值数据在 PIT as-of 特征构建中与价量因子合并。日频构建使用交易日 as-of，月末兼容构建使用月末 as-of：
 
 ```python
-# data/feature_store.py
+# data/features/feature_store.py
 def _get_fundamentals(symbol, as_of_date):
     """获取 as_of_date 时已知的最新财报"""
     summary = get_financial_summary(symbol)

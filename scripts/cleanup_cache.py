@@ -3,8 +3,8 @@
 Cache cleanup — remove stale parquet files beyond retention.
 
 安全策略:
-  - 只清理 data/cache/ 目录 (派生/缓存数据)
-  - 不碰 data/store/ 和 data/store/stock/ 等一级数据
+  - 只清理 var/cache/ 目录 (派生/缓存数据)
+  - 不碰 var/store/ 和 var/store/stock/ 等一级数据
   - 默认保留 90 天, 可通过 --days 调整
   - dry-run 模式 (默认): 只报告, 不删除
 
@@ -18,7 +18,7 @@ import sys, os, time, argparse
 from pathlib import Path
 
 
-from data.datahub import get_datahub
+from data.storage.datahub import get_datahub
 
 HUB = get_datahub()
 CLEAN_DIRS = [
@@ -31,7 +31,7 @@ def _safe_clean_dir(raw: str | None) -> Path:
         target = CLEAN_DIRS[0]
     else:
         raw_path = Path(raw)
-        if not raw_path.is_absolute() and not str(raw_path).startswith("data/cache"):
+        if not raw_path.is_absolute() and not str(raw_path).startswith("var/cache"):
             target = HUB.cache_root / raw_path
         else:
             target = HUB.resolve_path(raw)

@@ -28,9 +28,9 @@
 
 **Files:**
 - Read: `config/settings.yaml`
-- Read: `data/data_registry.py`
-- Read: `data/datahub.py`
-- Read: `data/sector_pipeline/*.py`
+- Read: `data/storage/dimensions.py`
+- Read: `data/storage/datahub.py`
+- Read: `data/market/sector_pipeline/*.py`
 - Read: `signals/*.py`
 - Read: `signals/candidates/*.py`
 - Read: `backtest/*.py`

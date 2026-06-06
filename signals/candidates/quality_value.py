@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from data.fetchers.financial import read_financial_summary, read_valuation
-from data.financials import extract_gross_margin_history, extract_roe_history
+from data.ingestion.fetchers.financial import read_financial_summary, read_valuation
+from data.market.financials import extract_gross_margin_history, extract_roe_history
 from signals.candidates.common import (
     build_signal_row,
     candidate_symbols,

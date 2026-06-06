@@ -133,7 +133,7 @@ ctx = Pipeline([
 证据报告写入：
 
 ```text
-data/store/research/strategy_evidence/<strategy>.json
+var/store/research/strategy_evidence/<strategy>.json
 ```
 
 报告字段由 `research/strategy_evaluation.py` 统一构建，runner 只负责把回测结果映射到该契约。
@@ -141,7 +141,7 @@ data/store/research/strategy_evidence/<strategy>.json
 ## 3. 数据流
 
 ```
-data/store/signals/*.parquet  (预计算信号)
+var/store/signals/*.parquet  (预计算信号)
           │
           ▼
     load_prices(pool, start, end)
@@ -164,10 +164,10 @@ data/store/signals/*.parquet  (预计算信号)
     FullReport: {metrics, trades, monthly_returns}
              │
              ▼
-    data/tournament/{date}.json
+    var/artifacts/tournaments/{date}.json
              │
              ▼
-    data/store/research/strategy_evidence/{strategy}.json
+    var/store/research/strategy_evidence/{strategy}.json
 ```
 
 ## 4. 关键设计决策
@@ -220,7 +220,7 @@ class BaseStrategy(ABC):
 
 ```python
 from backtest.analytics import RiskAnalytics, FullReport
-from data.risk_free_rates import risk_free_series_for_index
+from data.rates.risk_free_rates import risk_free_series_for_index
 
 rf_curve = risk_free_series_for_index(daily_returns.index)
 report: FullReport = RiskAnalytics.compute(

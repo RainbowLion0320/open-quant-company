@@ -9,8 +9,8 @@ import pytest
 
 class TestDataQualityGate:
     def test_fresh_dimension_with_recent_data(self, tmp_path, monkeypatch):
-        from data.datahub import DataHub, reset_datahub
-        from data.data_registry import reset_registry
+        from data.storage.datahub import DataHub, reset_datahub
+        from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
         monkeypatch.setenv("ASTROLABE_STORE", str(store))
@@ -32,7 +32,7 @@ class TestDataQualityGate:
             producer="test",
         )
 
-        from data.quality import DataQualityGate
+        from data.quality.quality import DataQualityGate
         gate = DataQualityGate(today=date(2026, 5, 21), hub=hub)
         report = gate.check_dimension("ohlcv_daily", symbol="000001")
 
@@ -45,8 +45,8 @@ class TestDataQualityGate:
         assert not report.issues
 
     def test_stale_dimension_past_sla(self, tmp_path, monkeypatch):
-        from data.datahub import DataHub, reset_datahub
-        from data.data_registry import reset_registry
+        from data.storage.datahub import DataHub, reset_datahub
+        from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
         monkeypatch.setenv("ASTROLABE_STORE", str(store))
@@ -65,7 +65,7 @@ class TestDataQualityGate:
             producer="test",
         )
 
-        from data.quality import DataQualityGate
+        from data.quality.quality import DataQualityGate
         gate = DataQualityGate(today=date(2026, 5, 21), hub=hub)
         report = gate.check_dimension("ohlcv_daily", symbol="000001")
 
@@ -76,8 +76,8 @@ class TestDataQualityGate:
         assert any("Stale" in i for i in report.issues)
 
     def test_missing_dimension_no_data(self, tmp_path, monkeypatch):
-        from data.datahub import DataHub, reset_datahub
-        from data.data_registry import reset_registry
+        from data.storage.datahub import DataHub, reset_datahub
+        from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
         monkeypatch.setenv("ASTROLABE_STORE", str(store))
@@ -87,7 +87,7 @@ class TestDataQualityGate:
 
         hub = DataHub(store_root=store, cache_root=tmp_path / "cache")
 
-        from data.quality import DataQualityGate
+        from data.quality.quality import DataQualityGate
         gate = DataQualityGate(today=date(2026, 5, 21), hub=hub)
         report = gate.check_dimension("dividend")
 
@@ -96,7 +96,7 @@ class TestDataQualityGate:
         assert "No data found" in report.issues
 
     def test_unknown_dimension(self):
-        from data.quality import DataQualityGate
+        from data.quality.quality import DataQualityGate
         gate = DataQualityGate()
         report = gate.check_dimension("nonexistent_dimension_xyz")
 
@@ -104,7 +104,7 @@ class TestDataQualityGate:
         assert "Unknown dimension" in report.issues[0]
 
     def test_skipped_planned_dimension(self):
-        from data.quality import DataQualityGate
+        from data.quality.quality import DataQualityGate
         gate = DataQualityGate()
         report = gate.check_dimension("crypto_daily")
 
@@ -112,8 +112,8 @@ class TestDataQualityGate:
         assert report.health_score == 100
 
     def test_high_null_ratio_detected(self, tmp_path, monkeypatch):
-        from data.datahub import DataHub, reset_datahub
-        from data.data_registry import reset_registry
+        from data.storage.datahub import DataHub, reset_datahub
+        from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
         monkeypatch.setenv("ASTROLABE_STORE", str(store))
@@ -133,7 +133,7 @@ class TestDataQualityGate:
         })
         hub.write_parquet(df, hub.dimension_path("ohlcv_daily", symbol="000001"), producer="test")
 
-        from data.quality import DataQualityGate
+        from data.quality.quality import DataQualityGate
         gate = DataQualityGate(today=date(2026, 5, 21), hub=hub)
         report = gate.check_dimension("ohlcv_daily", symbol="000001")
 
@@ -142,8 +142,8 @@ class TestDataQualityGate:
         assert any("High null" in i for i in report.issues)
 
     def test_pre_scan_gate_all_fresh(self, tmp_path, monkeypatch):
-        from data.datahub import DataHub, reset_datahub
-        from data.data_registry import reset_registry
+        from data.storage.datahub import DataHub, reset_datahub
+        from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
         monkeypatch.setenv("ASTROLABE_STORE", str(store))
@@ -156,7 +156,7 @@ class TestDataQualityGate:
         write_daily(hub, "000001")
         write_financial(hub, "000001")
 
-        from data.quality import pre_scan_gate
+        from data.quality.quality import pre_scan_gate
         ok, reports = pre_scan_gate(
             required_dims=["ohlcv_daily", "financial_summary"],
             symbol="000001",
@@ -168,8 +168,8 @@ class TestDataQualityGate:
         assert all(r.status == "fresh" for r in reports)
 
     def test_schema_mismatch_blocks_even_when_recent(self, tmp_path, monkeypatch):
-        from data.datahub import DataHub, reset_datahub
-        from data.data_registry import reset_registry
+        from data.storage.datahub import DataHub, reset_datahub
+        from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
         monkeypatch.setenv("ASTROLABE_STORE", str(store))
@@ -191,7 +191,7 @@ class TestDataQualityGate:
             producer="test",
         )
 
-        from data.quality import DataQualityGate, pre_scan_gate
+        from data.quality.quality import DataQualityGate, pre_scan_gate
         gate = DataQualityGate(today=date(2026, 5, 21), hub=hub)
         report = gate.check_dimension("ohlcv_daily", symbol="000001")
 
@@ -208,8 +208,8 @@ class TestDataQualityGate:
         assert reports[0].status == "schema_mismatch"
 
     def test_pre_scan_gate_stale_blocks(self, tmp_path, monkeypatch):
-        from data.datahub import DataHub, reset_datahub
-        from data.data_registry import reset_registry
+        from data.storage.datahub import DataHub, reset_datahub
+        from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
         monkeypatch.setenv("ASTROLABE_STORE", str(store))
@@ -229,7 +229,7 @@ class TestDataQualityGate:
             producer="test",
         )
 
-        from data.quality import pre_scan_gate
+        from data.quality.quality import pre_scan_gate
         ok, reports = pre_scan_gate(
             required_dims=["ohlcv_daily"],
             symbol="000001",
@@ -240,8 +240,8 @@ class TestDataQualityGate:
         assert reports[0].status == "stale"
 
     def test_pre_scan_gate_strict_raises(self, tmp_path, monkeypatch):
-        from data.datahub import DataHub, reset_datahub
-        from data.data_registry import reset_registry
+        from data.storage.datahub import DataHub, reset_datahub
+        from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
         monkeypatch.setenv("ASTROLABE_STORE", str(store))
@@ -261,12 +261,12 @@ class TestDataQualityGate:
             producer="test",
         )
 
-        from data.quality import pre_scan_gate
+        from data.quality.quality import pre_scan_gate
         with pytest.raises(RuntimeError, match="quality gate FAILED"):
             pre_scan_gate(required_dims=["ohlcv_daily"], symbol="000001", strict=True, hub=hub)
 
     def test_check_critical_returns_all_available(self):
-        from data.quality import DataQualityGate
+        from data.quality.quality import DataQualityGate
         gate = DataQualityGate()
         reports = gate.check_critical()
 
@@ -277,7 +277,7 @@ class TestDataQualityGate:
             assert 0 <= r.health_score <= 100
 
     def test_summary_report_structure(self):
-        from data.quality import DataQualityGate
+        from data.quality.quality import DataQualityGate
         gate = DataQualityGate()
         summary = gate.summary_report()
 
@@ -290,8 +290,8 @@ class TestDataQualityGate:
         assert isinstance(summary["details"], list)
 
     def test_freshness_score_decay(self, tmp_path, monkeypatch):
-        from data.datahub import DataHub, reset_datahub
-        from data.data_registry import reset_registry
+        from data.storage.datahub import DataHub, reset_datahub
+        from data.storage.dimensions import reset_registry
 
         store = tmp_path / "store"
         monkeypatch.setenv("ASTROLABE_STORE", str(store))
@@ -313,7 +313,7 @@ class TestDataQualityGate:
             producer="test",
         )
 
-        from data.quality import DataQualityGate
+        from data.quality.quality import DataQualityGate
         gate = DataQualityGate(today=date(2026, 5, 21), hub=hub)
         report = gate.check_dimension("ohlcv_daily", symbol="000001")
 

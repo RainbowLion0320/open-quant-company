@@ -36,14 +36,14 @@
 
 参数权威来源为 `config/settings.yaml` → `signals.multifactor`，上表只记录当前默认值。
 
-价格口径权威来源为 `data/price_service.py`。研究、信号和回测使用 `PriceUseCase.SIGNAL/BACKTEST` 的 `qfq` 口径，执行和估值路径另走 `raw`。
+价格口径权威来源为 `data/market/price_service.py`。研究、信号和回测使用 `PriceUseCase.SIGNAL/BACKTEST` 的 `qfq` 口径，执行和估值路径另走 `raw`。
 
 ## 结果来源
 
 最新样本内/OOS/锦标赛结果不写死在策略文档中，避免和回测输出漂移。查看：
 
-- `data/tournament/` 下的锦标赛 JSON
-- `data/store/signals/multifactor.parquet`
+- `var/artifacts/tournaments/` 下的锦标赛 JSON
+- `var/store/signals/multifactor.parquet`
 - Web `/strategy-lab` 页面
 
 ## 成本敏感性

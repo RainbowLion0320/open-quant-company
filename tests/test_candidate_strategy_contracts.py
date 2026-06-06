@@ -72,8 +72,8 @@ def test_quality_value_backtest_inputs_are_cut_to_rebalance_date(monkeypatch):
         }
     )
 
-    monkeypatch.setattr("data.fetchers.financial.read_financial_summary", lambda symbol: fin)
-    monkeypatch.setattr("data.fetchers.financial.read_valuation", lambda symbol: valuation)
+    monkeypatch.setattr("data.ingestion.fetchers.financial.read_financial_summary", lambda symbol: fin)
+    monkeypatch.setattr("data.ingestion.fetchers.financial.read_valuation", lambda symbol: valuation)
     candidate_alpha._quality_inputs.cache_clear()
 
     inputs = candidate_alpha._quality_inputs("000001", 1, "2020-06-01")

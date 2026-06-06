@@ -11,12 +11,12 @@ ROOT = Path(__file__).resolve().parent.parent
 
 import pandas as pd
 import numpy as np
-from data.symbols import CIRCLE_STOCKS
-from data.fetcher import get_stock_daily
-from data.datahub import get_datahub
-from data.financials import get_financial_summary
+from data.market.symbols import CIRCLE_STOCKS
+from data.ingestion.fetcher import get_stock_daily
+from data.storage.datahub import get_datahub
+from data.market.financials import get_financial_summary
 from signals.expression import alpha_factors
-from data.feature_store import FEATURES_DIR, enrich_from_registry
+from data.features.feature_store import FEATURES_DIR, enrich_from_registry
 
 HUB = get_datahub()
 
@@ -61,7 +61,7 @@ daily_cache = {}
 print("\n[3] PE/PB (Tushare)...")
 try:
     import tushare as _ts
-    from data.tushare_utils import get_tushare_token
+    from data.ingestion.tushare_utils import get_tushare_token
     token = get_tushare_token()
     ts_api = _ts.pro_api(token) if token else None
     if ts_api:
@@ -176,7 +176,7 @@ for month in MISSING:
 
     if rows:
         result_df = pd.DataFrame(rows)
-        from data.cleaner import DataCleaner
+        from data.quality.cleaner import DataCleaner
         cleaner = DataCleaner()
         result_df, _ = cleaner.clean_features(result_df)
         result_df = enrich_from_registry(result_df, month, list(price_cache.keys()))

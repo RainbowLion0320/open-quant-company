@@ -8,7 +8,7 @@ The ledger supports:
   - trace: follow the parent_event_id chain from any event back to its origin
   - reconstruct_state: replay all events to rebuild positions/cash holdings
 
-Storage: data/store/paper/ledger.parquet (append-only, via DataHub)
+Storage: var/store/paper/ledger.parquet (append-only, via DataHub)
 
 Event chain for a trade:
   ORDER_CREATED → ORDER_PARTIAL_FILLED → ORDER_FILLED
@@ -28,7 +28,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
-from data.datahub import get_datahub
+from data.storage.datahub import get_datahub
 
 
 class EventType(str, Enum):

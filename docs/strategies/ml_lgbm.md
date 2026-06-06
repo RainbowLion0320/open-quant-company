@@ -35,13 +35,13 @@
 | allow_stale_features | false | 过期特征处理 |
 | allow_live_factor_fallback | false | 实时因子回退 |
 
-价格口径权威来源为 `data/price_service.py`。PIT 特征、信号和回测使用 `PriceUseCase.RESEARCH/SIGNAL/BACKTEST` 的 `qfq` 口径，实时执行和估值路径另走 `raw`。
+价格口径权威来源为 `data/market/price_service.py`。PIT 特征、信号和回测使用 `PriceUseCase.RESEARCH/SIGNAL/BACKTEST` 的 `qfq` 口径，实时执行和估值路径另走 `raw`。
 
 ## 回测路径
 
 回测入口 `backtest/run_all_strategies.py --strategy ml_lgbm` 使用 `MLFeatureStoreAlphaModel`，按调仓日选择不晚于该日的最新 PIT as-of 特征视图一次性批量预测全股票池，再交给统一 Pipeline 执行组合构建、风控和成交模拟。不要退回通用逐股 `StrategyAlphaAdapter`，否则正式全池回测会退化为数千只股票逐个 `predict()`。
 
-日频价量、估值和资金流特征应使用 `scripts/build_features.py --frequency daily` 构建到 `data/store/features/YYYY-MM-DD.parquet`。历史 `YYYY-MM.parquet` 文件仍可读取，但只代表月末兼容快照，不是长期精度目标。
+日频价量、估值和资金流特征应使用 `scripts/build_features.py --frequency daily` 构建到 `var/store/features/YYYY-MM-DD.parquet`。历史 `YYYY-MM.parquet` 文件仍可读取，但只代表月末兼容快照，不是长期精度目标。
 
 特征矩阵进入模型前会统一 `to_numeric(errors="coerce")`，再处理 `inf`/`nan`，避免 Parquet 中对象类型列导致 LightGBM 拒绝预测。
 
@@ -49,9 +49,9 @@
 
 最新样本内/OOS/锦标赛结果不写死在策略文档中，避免与模型和回测输出漂移。查看：
 
-- `data/models/` 下的模型元数据
-- `data/store/signals/ml_lgbm.parquet`
-- `data/tournament/` 下的锦标赛 JSON
+- `var/artifacts/models/` 下的模型元数据
+- `var/store/signals/ml_lgbm.parquet`
+- `var/artifacts/tournaments/` 下的锦标赛 JSON
 - Web `/strategy-lab` 页面
 
 ## 成本敏感性

@@ -6,7 +6,7 @@ import pytest
 
 
 def test_price_mode_metadata_round_trips_on_dataframe():
-    from data.price_types import PriceFrameMetadata, PriceMode, attach_price_metadata, price_metadata
+    from data.market.price_types import PriceFrameMetadata, PriceMode, attach_price_metadata, price_metadata
 
     frame = pd.DataFrame({"date": ["2026-01-02"], "close": [10.0]})
     attach_price_metadata(
@@ -28,14 +28,14 @@ def test_price_mode_metadata_round_trips_on_dataframe():
 
 
 def test_invalid_price_mode_is_rejected():
-    from data.price_types import normalize_price_mode
+    from data.market.price_types import normalize_price_mode
 
     with pytest.raises(ValueError):
         normalize_price_mode("split_adjusted")
 
 
 def test_ohlcv_contract_declares_price_mode():
-    from data.contract import derive_contracts_from_registry
+    from data.quality.contract import derive_contracts_from_registry
 
     contract = derive_contracts_from_registry()["ohlcv_daily"]
 
@@ -44,8 +44,8 @@ def test_ohlcv_contract_declares_price_mode():
 
 
 def test_datahub_manifest_records_price_metadata(tmp_path):
-    from data.datahub import DataHub
-    from data.price_types import PriceFrameMetadata, PriceMode, attach_price_metadata
+    from data.storage.datahub import DataHub
+    from data.market.price_types import PriceFrameMetadata, PriceMode, attach_price_metadata
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     frame = pd.DataFrame({"date": ["2026-01-02"], "close": [10.0]})
@@ -69,8 +69,8 @@ def test_datahub_manifest_records_price_metadata(tmp_path):
 
 
 def test_stock_daily_cache_path_respects_adjust_mode(tmp_path, monkeypatch):
-    from data.datahub import DataHub
-    import data.fetchers.stock_daily as stock_daily
+    from data.storage.datahub import DataHub
+    import data.ingestion.fetchers.stock_daily as stock_daily
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     monkeypatch.setattr(stock_daily, "HUB", hub)
@@ -85,7 +85,7 @@ def test_stock_daily_cache_path_respects_adjust_mode(tmp_path, monkeypatch):
 
 
 def test_adjust_ohlcv_derives_qfq_and_hfq_from_raw_and_adj_factor():
-    from data.price_service import adjust_ohlcv
+    from data.market.price_service import adjust_ohlcv
 
     raw = pd.DataFrame(
         {
@@ -114,9 +114,9 @@ def test_adjust_ohlcv_derives_qfq_and_hfq_from_raw_and_adj_factor():
 
 
 def test_price_service_derives_qfq_from_raw_store(tmp_path):
-    from data.datahub import DataHub
-    from data.price_service import get_stock_prices
-    from data.price_types import PriceMode, price_metadata
+    from data.storage.datahub import DataHub
+    from data.market.price_service import get_stock_prices
+    from data.market.price_types import PriceMode, price_metadata
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     hub.write_parquet(
@@ -146,8 +146,8 @@ def test_price_service_derives_qfq_from_raw_store(tmp_path):
 
 
 def test_price_matrix_cache_key_includes_symbol_list(tmp_path):
-    from data.datahub import DataHub
-    from data.price_service import get_stock_price_matrix
+    from data.storage.datahub import DataHub
+    from data.market.price_service import get_stock_price_matrix
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     for symbol, close in (("000001", 10.0), ("000002", 20.0)):
@@ -179,7 +179,7 @@ def test_price_matrix_cache_key_includes_symbol_list(tmp_path):
 
 
 def test_price_service_use_case_modes_are_explicit():
-    from data.price_service import price_mode_for_use_case
+    from data.market.price_service import price_mode_for_use_case
 
     assert price_mode_for_use_case("backtest") == "qfq"
     assert price_mode_for_use_case("research") == "qfq"
@@ -207,7 +207,7 @@ def test_major_price_consumers_declare_price_use_cases():
 
 
 def test_price_registry_declares_adjustment_dimensions():
-    from data.data_registry import get_registry
+    from data.storage.dimensions import get_registry
 
     reg = get_registry()
 
@@ -241,7 +241,7 @@ def test_price_docs_describe_price_service_contract():
 
 
 def test_corporate_actions_adjust_position_for_cash_and_bonus_shares():
-    from data.corporate_actions import apply_corporate_actions_to_position
+    from data.market.corporate_actions import apply_corporate_actions_to_position
 
     actions = pd.DataFrame(
         [
@@ -269,7 +269,7 @@ def test_corporate_actions_adjust_position_for_cash_and_bonus_shares():
 
 
 def test_corporate_actions_normalizes_tushare_dividend_aliases():
-    from data.corporate_actions import normalize_dividend_events
+    from data.market.corporate_actions import normalize_dividend_events
 
     raw = pd.DataFrame(
         {
@@ -290,8 +290,8 @@ def test_corporate_actions_normalizes_tushare_dividend_aliases():
 
 
 def test_corporate_actions_load_from_datahub_path(tmp_path):
-    from data.corporate_actions import load_corporate_actions
-    from data.datahub import DataHub
+    from data.market.corporate_actions import load_corporate_actions
+    from data.storage.datahub import DataHub
 
     hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
     hub.write_parquet(

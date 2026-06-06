@@ -1,4 +1,4 @@
-from .fetcher import (
+from data.ingestion.fetcher import (
     get_index_daily,
     get_stock_daily,
     get_financial_indicator,
@@ -7,7 +7,7 @@ from .fetcher import (
     fetch_all_indices,
     retry_with_backoff,
 )
-from .symbols import (
+from data.market.symbols import (
     StockUniverse,
     CIRCLE_STOCKS,
     CIRCLE_OF_COMPETENCE_INDUSTRIES,
@@ -15,7 +15,7 @@ from .symbols import (
     SYMBOL_INDUSTRY,
     BENCHMARKS,
 )
-from .financials import (
+from data.market.financials import (
     get_financial_summary,
     get_buffett_inputs,
     extract_roe_history,

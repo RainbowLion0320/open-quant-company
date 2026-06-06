@@ -160,6 +160,6 @@ def test_strategy_governance_api_exposes_roles_before_detail_route(monkeypatch):
 
 
 def test_ml_strategy_is_paper_until_oos_gate_passes():
-    from data.registry import get_status
+    from data.strategy.catalog import get_status
 
     assert get_status("ml_lgbm") == "paper"

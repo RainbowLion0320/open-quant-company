@@ -13,9 +13,9 @@
 ### Task 1: P0 Price Mode Contract
 
 **Files:**
-- Create: `data/price_types.py`
-- Modify: `data/contract.py`
-- Modify: `data/datahub_manifest.py`
+- Create: `data/market/price_types.py`
+- Modify: `data/quality/contract.py`
+- Modify: `data/storage/datahub_manifest.py`
 - Test: `tests/test_price_service_contracts.py`
 
 - [x] Add `PriceMode`, `PriceUseCase`, `PriceFrameMetadata`, and helpers to normalize/attach/read metadata.
@@ -26,11 +26,11 @@
 ### Task 2: P1 Unified Price Service
 
 **Files:**
-- Create: `data/price_service.py`
-- Modify: `data/datahub_paths.py`
-- Modify: `data/datahub.py`
-- Modify: `data/fetchers/stock_daily.py`
-- Modify: `data/fetcher.py`
+- Create: `data/market/price_service.py`
+- Modify: `data/storage/datahub_paths.py`
+- Modify: `data/storage/datahub.py`
+- Modify: `data/ingestion/fetchers/stock_daily.py`
+- Modify: `data/ingestion/fetcher.py`
 - Test: `tests/test_price_service_contracts.py`
 
 - [x] Add stock paths for `daily_raw`, legacy `daily` qfq, and `daily_hfq`.
@@ -56,16 +56,16 @@
 
 - [x] Route research/technical/backtest price history through `PriceUseCase.RESEARCH` or `PriceUseCase.BACKTEST` (`qfq`).
 - [x] Route current execution and valuation prices through `PriceUseCase.EXECUTION` or `PriceUseCase.VALUATION` (`raw` with safe latest adjusted fallback).
-- [x] Keep old `get_stock_daily()` API compatible while making new code prefer `data.price_service`.
+- [x] Keep old `get_stock_daily()` API compatible while making new code prefer `data.market.price_service`.
 - [x] Add tests that assert major modules import/use `get_stock_prices` or `get_stock_price_matrix` with explicit use cases.
 
 ### Task 4: P3 Corporate Action Event Layer
 
 **Files:**
-- Create: `data/corporate_actions.py`
-- Modify: `data/datahub_paths.py`
-- Modify: `data/datahub.py`
-- Modify: `data/contract.py`
+- Create: `data/market/corporate_actions.py`
+- Modify: `data/storage/datahub_paths.py`
+- Modify: `data/storage/datahub.py`
+- Modify: `data/quality/contract.py`
 - Test: `tests/test_price_service_contracts.py`
 
 - [x] Add dividend/corporate-action paths and a normalized event schema.

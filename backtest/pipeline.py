@@ -114,7 +114,7 @@ class DataLoader(Stage):
 
         # 从缓存/API加载数据
         try:
-            from data.fetcher import get_stock_daily
+            from data.ingestion.fetcher import get_stock_daily
             dfs = {}
             for sym in self.symbols:
                 df = get_stock_daily(sym)
@@ -233,7 +233,7 @@ class BacktestStage(Stage):
 
         try:
             from backtest.analytics import RiskAnalytics
-            from data.risk_free_rates import risk_free_series_for_index
+            from data.rates.risk_free_rates import risk_free_series_for_index
             # 这里做实际回测计算...
             # 简化: 假设已计算出 daily_returns
             if ctx.daily_returns is not None:

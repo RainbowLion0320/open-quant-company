@@ -56,7 +56,7 @@ def _frame_close_volume(df):
     return data.dropna(subset=["close"]).reset_index(drop=True)
 
 def _stock_daily_files() -> list:
-    from data.datahub import get_datahub
+    from data.storage.datahub import get_datahub
 
     daily_dir = get_datahub().store_path("stock") / "daily"
     if not daily_dir.exists():
@@ -65,7 +65,7 @@ def _stock_daily_files() -> list:
 
 def _stock_daily_source_sql(files: Optional[Sequence[Any]] = None) -> Optional[str]:
     if files is None:
-        from data.datahub import get_datahub
+        from data.storage.datahub import get_datahub
 
         daily_dir = get_datahub().store_path("stock") / "daily"
         if not daily_dir.exists():

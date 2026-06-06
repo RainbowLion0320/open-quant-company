@@ -26,7 +26,7 @@ def evaluate_factor_oos(
 
     Returns: ic (mean in-sample), ic_std, icir, oos_ic, ic_rolling
     """
-    from data.fetcher import get_stock_daily
+    from data.ingestion.fetcher import get_stock_daily
     from scipy.stats import spearmanr
 
     if len(symbols) < 60:
@@ -84,7 +84,7 @@ def evaluate_factor_oos(
 
 def _compute_factor_values(formula: str, symbols: List[str]) -> Tuple[List[float], List[float]]:
     """Compute factor values and forward returns for a list of symbols."""
-    from data.fetcher import get_stock_daily
+    from data.ingestion.fetcher import get_stock_daily
 
     factor_vals = []
     targets = []
@@ -129,8 +129,11 @@ def get_feature_importance_hints() -> Optional[Dict[str, float]]:
     Load feature importance from the latest trained model.
     Used to give the LLM feedback about which areas need exploration.
     """
-    model_path = ROOT / "data" / "models" / "lgbm_best.pkl"
-    meta_path = ROOT / "data" / "models" / "lgbm_best_meta.json"
+    from data.storage.datahub import get_datahub
+
+    model_dir = get_datahub().artifact_dir("models")
+    model_path = model_dir / "lgbm_best.pkl"
+    meta_path = model_dir / "lgbm_best_meta.json"
 
     if not model_path.exists():
         return None

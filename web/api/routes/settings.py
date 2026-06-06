@@ -78,7 +78,7 @@ def _check_writable(section: str) -> None:
 def _audit_change(request: Request, section: str, method: str, old_data: dict, new_data: dict):
     """Record config change to audit ledger."""
     try:
-        from data.audit import ConfigAuditLedger
+        from data.ops.audit import ConfigAuditLedger
         from web.api.auth import get_run_mode
 
         ledger = ConfigAuditLedger()

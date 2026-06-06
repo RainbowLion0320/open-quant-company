@@ -16,10 +16,10 @@ confidence: high
 | 主题 | 来源 |
 |---------|--------|
 | 维度列表、source、asset、status、freq、cache pattern | `config/settings.yaml` → `data_registry` |
-| 注册表校验和元数据 | `data/data_registry.py` |
-| 路径展开和物理存储 | `data/datahub.py` |
+| 注册表校验和元数据 | `data/storage/dimensions.py` |
+| 路径展开和物理存储 | `data/storage/datahub.py` |
 | 健康检查表映射 | `DataRegistry.health_metadata()` |
-| 运行时目录和 manifest | `DataHub.catalog()` + `data/store/_manifest/datasets.parquet` |
+| 运行时目录和 manifest | `DataHub.catalog()` + `var/store/_manifest/datasets.parquet` |
 
 注册表是数据维度的单一事实来源。Wiki 页面应该链接到注册表，不重复维护完整表格。
 
@@ -28,32 +28,32 @@ confidence: high
 列出启用维度：
 
 ```bash
-python -c "from data.data_registry import get_registry; print('\\n'.join(d.key for d in get_registry().get_enabled()))"
+python -c "from data.storage.dimensions import get_registry; print('\\n'.join(d.key for d in get_registry().get_enabled()))"
 ```
 
 校验注册表契约：
 
 ```bash
-python -c "from data.data_registry import get_registry; print(get_registry().validate())"
+python -c "from data.storage.dimensions import get_registry; print(get_registry().validate())"
 ```
 
 查看健康检查元数据：
 
 ```bash
-python -c "from data.data_registry import get_registry; print(get_registry().health_metadata())"
+python -c "from data.storage.dimensions import get_registry; print(get_registry().health_metadata())"
 ```
 
 查看 DataHub catalog：
 
 ```bash
-python -c "from data.datahub import get_datahub; print(get_datahub().catalog())"
+python -c "from data.storage.datahub import get_datahub; print(get_datahub().catalog())"
 ```
 
 ## 路径规则
 
 - cache pattern 指向具体文件时，使用 `DataHub.dimension_path(key, **values)`。
 - cache pattern 指向快照目录或文件前缀时，使用 `DataHub.dimension_root(key)`。
-- 策略、Web、研究代码不要硬编码 `data/store/sector/...` 这类深层路径。
+- 策略、Web、研究代码不要硬编码 `var/store/sector/...` 这类深层路径。
 - 所有写入应经过 `write_parquet()` 或 `append_parquet()`，确保 manifest 元数据持续更新。
 
 ## 重要维度家族
@@ -72,7 +72,7 @@ python -c "from data.datahub import get_datahub; print(get_datahub().catalog())"
 
 1. 在 `config/settings.yaml` → `data_registry` 添加维度。
 2. 确保 `source`、`asset`、`status`、`freq`、`enabled`、`label`、`cache` 满足 `DataRegistry.validate()`。
-3. 下游 schema 重要时，在 `data/contract.py` 添加或派生契约。
+3. 下游 schema 重要时，在 `data/quality/contract.py` 添加或派生契约。
 4. 生产代码使用 `DataHub.dimension_path()` 或 `dimension_root()`。
 5. 补路径展开、契约形态和主要消费方测试。
 6. 只有行为或契约变化时才更新 `docs/specs/01-data-pipeline.md`。

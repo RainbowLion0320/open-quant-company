@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build point-in-time as-of features into ``data/store/features``.
+"""Build point-in-time as-of features into ``var/store/features``.
 
 The previous version executed the full feature build at import time.  This file
 is intentionally import-safe so cron jobs and agent tools can import
@@ -26,11 +26,11 @@ os.environ["no_proxy"] = "*"
 import numpy as np
 import pandas as pd
 
-from data.datahub import get_datahub
-from data.feature_store import FEATURES_DIR, enrich_from_registry, iter_feature_files, write_feature_slice
-from data.price_service import get_stock_prices
-from data.price_types import PriceUseCase
-from data.symbols import CIRCLE_STOCKS
+from data.storage.datahub import get_datahub
+from data.features.feature_store import FEATURES_DIR, enrich_from_registry, iter_feature_files, write_feature_slice
+from data.market.price_service import get_stock_prices
+from data.market.price_types import PriceUseCase
+from data.market.symbols import CIRCLE_STOCKS
 from signals.expression import alpha_factors
 
 
@@ -97,7 +97,7 @@ def _load_price_cache(symbols: list[str]) -> dict[str, pd.DataFrame]:
 
 def _load_financial_cache(symbols: list[str]) -> dict[str, pd.DataFrame]:
     print("\n[2/4] 加载财务数据 (PE/PB/ROE/毛利率/D-E)...")
-    from data.financials import get_financial_summary
+    from data.market.financials import get_financial_summary
 
     fin_cache: dict[str, pd.DataFrame] = {}
     total = len(symbols)
@@ -119,7 +119,7 @@ def _load_daily_basic_cache(symbols: list[str], start: str, end: str) -> dict[st
     daily_cache: dict[str, pd.DataFrame] = {}
     try:
         import tushare as ts
-        from data.tushare_utils import get_tushare_token
+        from data.ingestion.tushare_utils import get_tushare_token
 
         token = get_tushare_token()
         ts_api = ts.pro_api(token) if token else None
@@ -262,7 +262,7 @@ def _build_feature_slice(
 
     if rows:
         result_df = pd.DataFrame(rows)
-        from data.cleaner import DataCleaner
+        from data.quality.cleaner import DataCleaner
 
         cleaner = DataCleaner()
         result_df, _ = cleaner.clean_features(result_df)

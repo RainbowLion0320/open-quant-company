@@ -162,9 +162,9 @@ def load_bond_returns() -> pd.Series | None:
     Returns a pd.Series indexed by date, or None if data unavailable.
     Uses the same synthetic return formula as research/regime_training.py.
     """
-    from pathlib import Path
+    from data.storage.datahub import get_datahub
 
-    path = Path("data/store/bond/treasury_yields.parquet")
+    path = get_datahub().store_dir("bond") / "treasury_yields.parquet"
     if not path.exists():
         return None
     try:

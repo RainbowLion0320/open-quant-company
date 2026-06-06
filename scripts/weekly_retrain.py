@@ -6,7 +6,6 @@ Cron: 周度模型重训 (每周六执行)
 - 自动保存 lgbm_best.pkl + meta
 """
 import os, sys, time, json
-from pathlib import Path
 from datetime import datetime
 
 
@@ -32,7 +31,9 @@ def main():
     elapsed = time.time() - start
     log = {"timestamp": datetime.now().isoformat(), "elapsed": round(elapsed, 1),
            "model": str(path), "samples": len(valid)}
-    log_dir = Path(__file__).resolve().parent.parent / "data" / "models"
+    from data.storage.datahub import get_datahub
+
+    log_dir = get_datahub().artifact_dir("models")
     log_dir.mkdir(parents=True, exist_ok=True)
     with open(log_dir / "retrain_log.jsonl", "a") as f:
         f.write(json.dumps(log, ensure_ascii=False) + "\n")
@@ -42,6 +43,6 @@ def main():
 
 
 if __name__ == "__main__":
-    from data.cron_logger import cron_run
+    from data.ops.cron_logger import cron_run
     with cron_run("weekly_retrain"):
         sys.exit(main())

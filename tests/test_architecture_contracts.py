@@ -126,7 +126,7 @@ def test_paper_broker_private_state_is_not_used_outside_broker_package():
 
 
 def test_enabled_strategy_plugins_have_runners():
-    from data.strategy_plugins import iter_strategy_plugins
+    from data.strategy.plugins import iter_strategy_plugins
 
     plugins = list(iter_strategy_plugins("all"))
     assert plugins
@@ -135,7 +135,7 @@ def test_enabled_strategy_plugins_have_runners():
 
 
 def test_strategy_runners_do_not_point_at_cli_scripts():
-    from data.strategy_plugins import DEFAULT_RUNNERS
+    from data.strategy.plugins import DEFAULT_RUNNERS
 
     offenders = {name: runner for name, runner in DEFAULT_RUNNERS.items() if runner.startswith("scripts.")}
 
@@ -185,7 +185,7 @@ def test_backtest_strategy_scorers_reuse_shared_signal_scoring_helpers():
 
 
 def test_backtest_runner_covers_all_enabled_backtest_strategies():
-    from data.registry import get_enabled_strategies
+    from data.strategy.catalog import get_enabled_strategies
     from backtest.run_all_strategies import backtest_strategy_names
 
     enabled_backtest = {
@@ -227,7 +227,7 @@ def test_multifactor_backtest_uses_point_in_time_financial_snapshots(monkeypatch
         raise AssertionError("multifactor backtest must not call realtime Buffett inputs")
 
     monkeypatch.setattr(runner, "build_pit_financial_inputs", fake_build_pit_financial_inputs)
-    monkeypatch.setattr("data.financials.get_buffett_inputs", fail_realtime_financial_inputs)
+    monkeypatch.setattr("data.market.financials.get_buffett_inputs", fail_realtime_financial_inputs)
     runner._multifactor_fin_cache.clear()
     runner.multifactor_scorer._pool = ["AAA"]
 
@@ -240,7 +240,7 @@ def test_multifactor_backtest_uses_point_in_time_financial_snapshots(monkeypatch
 def test_backtest_runner_persists_each_strategy_result_file():
     text = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
 
-    assert 'DATA_DIR / f"backtest_{name}.pkl"' in text
+    assert 'BACKTEST_ARTIFACT_DIR / f"backtest_{name}.pkl"' in text
 
 
 def test_multi_asset_tournament_reuses_shared_momentum_helpers():
@@ -270,7 +270,7 @@ def test_feature_scripts_use_shared_feature_store_loaders():
 
     assert offenders == []
 
-    feature_store = Path("data/feature_store.py").read_text(encoding="utf-8")
+    feature_store = Path("data/features/feature_store.py").read_text(encoding="utf-8")
     assert "def iter_feature_files(" in feature_store
     assert "def load_feature_panel(" in feature_store
     assert "def latest_feature_frame(" in feature_store
@@ -287,7 +287,7 @@ def test_health_check_uses_datahub_dimension_snapshot_listing():
 
 
 def test_feature_store_registry_enrichment_uses_dimension_snapshot_listing():
-    text = Path("data/feature_store.py").read_text(encoding="utf-8")
+    text = Path("data/features/feature_store.py").read_text(encoding="utf-8")
 
     assert 'list_dimension_snapshots("moneyflow_monthly")' in text
     assert 'HUB.store_dir("stock") / "moneyflow" / "monthly"' not in text
@@ -323,7 +323,7 @@ def test_compute_signals_import_has_no_runtime_side_effects(monkeypatch):
 
 
 def test_datahub_catalog_includes_data_registry_dimensions():
-    from data.datahub import get_datahub
+    from data.storage.datahub import get_datahub
 
     catalog = get_datahub().catalog()
     assert "signals" in catalog
@@ -332,7 +332,7 @@ def test_datahub_catalog_includes_data_registry_dimensions():
 
 def test_stock_daily_read_path_does_not_implicitly_fetch_api(monkeypatch):
     from data import fetcher
-    import data.fetchers.stock_daily as stock_daily
+    import data.ingestion.fetchers.stock_daily as stock_daily
 
     monkeypatch.delenv("QUANT_ALLOW_API_FALLBACK", raising=False)
 
@@ -464,7 +464,7 @@ def test_pipeline_vue_uses_shared_layout_utility():
 
 
 def test_data_freshness_gate_is_shared_outside_cli_layer():
-    from data.freshness_gate import freshness_gate, health_result_to_gate_data
+    from data.quality.freshness_gate import freshness_gate, health_result_to_gate_data
 
     rows = health_result_to_gate_data([
         {"table": "stock_daily", "freshness_status": "stale", "missing_pct": 0},
@@ -625,7 +625,7 @@ def test_current_project_docs_do_not_repeat_known_stale_facts():
         "GET /backtest",
         "`GET /portfolio`",
         "buy/sell/hold 信号",
-        "from data.cleaner import clean_ohlcv",
+        "from data.quality.cleaner import clean_ohlcv",
         "Data/Strategy/Selection/Risk/Execution",
         "回测: Backtrader",
         "横截面排名→交易信号",
@@ -830,7 +830,7 @@ def test_deepseek_usage_no_longer_depends_on_platform_scraping_backfills():
     assert not Path("scripts", "ingest_deepseek_" + "usage.py").exists()
     monitor_logic = Path("web/frontend/src/view-models/useActivityMonitor.ts").read_text(encoding="utf-8")
     system_api = Path("web/frontend/src/api/modules/system.ts").read_text(encoding="utf-8")
-    datahub = Path("data/datahub.py").read_text(encoding="utf-8")
+    datahub = Path("data/storage/datahub.py").read_text(encoding="utf-8")
     factor_llm = Path("research/factors/hypothesis/llm.py").read_text(encoding="utf-8")
 
     assert "api.llmUsage()" in monitor_logic

@@ -9,10 +9,10 @@ from web.api.models import FinancialData, KLineItem, StockDetail, StockResponse,
 
 
 def build_stock_list(limit: int, q: str = "") -> tuple[list[dict], int]:
-    from data.datahub import get_datahub
-    from data.registry import get_enabled_strategies
-    from data.results_db import load_buffett_results, load_strategy_signals
-    from data.symbols import FALLBACK_SECTOR, SYMBOL_INDUSTRY, SYMBOL_NAME, SYMBOL_SECTOR
+    from data.storage.datahub import get_datahub
+    from data.strategy.catalog import get_enabled_strategies
+    from data.storage.results_db import load_buffett_results, load_strategy_signals
+    from data.market.symbols import FALLBACK_SECTOR, SYMBOL_INDUSTRY, SYMBOL_NAME, SYMBOL_SECTOR
 
     hub = get_datahub()
     query = str(q or "").strip().lower()
@@ -93,7 +93,7 @@ def build_stock_list(limit: int, q: str = "") -> tuple[list[dict], int]:
 
 
 def build_stock_detail(code: str) -> StockResponse:
-    from data.financials import (
+    from data.market.financials import (
         extract_debt_equity_ratio,
         extract_gross_margin_history,
         extract_latest_net_profit,
@@ -102,11 +102,11 @@ def build_stock_detail(code: str) -> StockResponse:
         extract_roe_history,
         get_financial_summary,
     )
-    from data.price_service import get_stock_prices
-    from data.price_types import PriceUseCase
-    from data.registry import get_enabled_strategies
-    from data.results_db import load_buffett_results, load_strategy_signals
-    from data.symbols import FALLBACK_SECTOR, SYMBOL_INDUSTRY, SYMBOL_NAME, SYMBOL_SECTOR
+    from data.market.price_service import get_stock_prices
+    from data.market.price_types import PriceUseCase
+    from data.strategy.catalog import get_enabled_strategies
+    from data.storage.results_db import load_buffett_results, load_strategy_signals
+    from data.market.symbols import FALLBACK_SECTOR, SYMBOL_INDUSTRY, SYMBOL_NAME, SYMBOL_SECTOR
 
     code = resolve_stock_symbol(code)
     name = SYMBOL_NAME.get(code)
@@ -314,7 +314,7 @@ def latest_valuation(hub, symbol: str) -> dict:
 
 
 def resolve_stock_symbol(identifier: str) -> str:
-    from data.symbols import SYMBOL_NAME
+    from data.market.symbols import SYMBOL_NAME
 
     raw = str(identifier or "").strip()
     if raw in SYMBOL_NAME:

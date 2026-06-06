@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from backtest.analytics import RiskAnalytics
-from data.risk_free_rates import risk_free_series_for_index
+from data.rates.risk_free_rates import risk_free_series_for_index
 
 
 def clean_daily_returns(daily_return: pd.Series) -> pd.Series:

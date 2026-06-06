@@ -1,35 +1,9 @@
+"""Compatibility shim for `data.market.industry`.
+
+Use `data.market.industry` for new code.
 """
-加载 Tushare 行业分类数据
-"""
-import json, os
-from typing import Dict
+from importlib import import_module as _import_module
+import sys as _sys
 
-_CACHE = None
-
-def _load() -> dict:
-    global _CACHE
-    if _CACHE is None:
-        path = os.path.join(os.path.dirname(__file__), "..", "data", "tushare_industry.json")
-        with open(path) as f:
-            _CACHE = json.load(f)
-    return _CACHE
-
-def get_sw1(symbol: str) -> str:
-    """获取申万一级行业"""
-    data = _load()
-    return data["sw1"].get(symbol, "待分类")
-
-def get_sw2(symbol: str) -> str:
-    """获取申万二级行业"""
-    data = _load()
-    return data["sw2"].get(symbol, "待分类")
-
-def get_name(symbol: str) -> str:
-    """获取公司名称"""
-    data = _load()
-    return data["name"].get(symbol, symbol)
-
-def get_all_sw2() -> Dict[str, str]:
-    """获取全部 符号→二级行业 映射"""
-    data = _load()
-    return data["sw2"].copy()
+_module = _import_module("data.market.industry")
+_sys.modules[__name__] = _module

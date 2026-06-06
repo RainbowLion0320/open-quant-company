@@ -1,3 +1,9 @@
+paths:
+  runtime_root: var
+  store_root: var/store
+  cache_root: var/cache
+  artifact_root: var/artifacts
+  db_root: var/db
 data_cleaning:
   ohlcv_integrity:
     enabled: true
@@ -233,7 +239,7 @@ cybernetics:
     max_df: 30.0
     feature_window: 252
     min_training_samples: 504
-    model_path: data/models/regime_hmm
+    model_path: data/reference/models/regime_hmm
     fallback_to_rules: true
     observation_columns:
     - return_1d
@@ -272,7 +278,7 @@ cybernetics:
       priority: 3
 data:
   cache_days: 1
-  cache_dir: data/cache
+  cache_dir: var/cache
   fetcher:
     min_interval: 3.0
     jitter_max: 0.5
@@ -775,7 +781,7 @@ paper_trading:
   commission_rate: 0.00081
   t_plus_1: true
   risk_enabled: true
-  store_dir: data/store/paper
+  store_dir: var/store/paper
   lot_size: 100
   order_value_pct: 0.05
   max_order_value: 50000

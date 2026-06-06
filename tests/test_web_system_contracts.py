@@ -85,7 +85,7 @@ def test_stock_list_route_is_not_shadowed(monkeypatch):
 
 
 def test_macro_gdp_tushare_normalizes_quarter_to_date():
-    from data.fetchers.macro import MacroFetcher, derive_macro_factors
+    from data.ingestion.fetchers.macro import MacroFetcher, derive_macro_factors
 
     raw = pd.DataFrame(
         [
@@ -102,7 +102,7 @@ def test_macro_gdp_tushare_normalizes_quarter_to_date():
 
 
 def test_macro_money_supply_normalizes_chinese_month_to_date():
-    from data.fetchers.macro import MacroFetcher
+    from data.ingestion.fetchers.macro import MacroFetcher
 
     raw = pd.DataFrame({
         "月份": ["2026年04月份", "2026年03月份"],
@@ -121,7 +121,7 @@ def test_macro_money_supply_normalizes_chinese_month_to_date():
 
 
 def test_db_health_scans_new_registry_dimensions(tmp_path, monkeypatch):
-    from data.datahub import DataHub, reset_datahub
+    from data.storage.datahub import DataHub, reset_datahub
 
     store = tmp_path / "store"
     cache = tmp_path / "cache"
@@ -153,7 +153,7 @@ def test_db_health_scans_new_registry_dimensions(tmp_path, monkeypatch):
 
 def test_limit_list_fetch_does_not_sleep_before_first_request(tmp_path, monkeypatch):
     import scripts.cron_fetch_extra as extra
-    from data.datahub import DataHub
+    from data.storage.datahub import DataHub
 
     class FakeApi:
         def __init__(self):
@@ -188,7 +188,7 @@ def test_limit_list_fetch_does_not_sleep_before_first_request(tmp_path, monkeypa
 
 
 def test_llm_usage_normalizes_provider_response_usage_with_configured_pricing():
-    from data.llm_usage import normalize_llm_usage
+    from data.llm.usage import normalize_llm_usage
 
     row = normalize_llm_usage(
         "deepseek",
@@ -217,7 +217,7 @@ def test_llm_usage_normalizes_provider_response_usage_with_configured_pricing():
 
 
 def test_llm_factor_hypothesis_runtime_resolves_from_use_case_config():
-    from data.llm_usage import resolve_llm_use_case
+    from data.llm.usage import resolve_llm_use_case
 
     runtime = resolve_llm_use_case("factor_hypothesis")
 
@@ -228,7 +228,7 @@ def test_llm_factor_hypothesis_runtime_resolves_from_use_case_config():
 
 
 def test_llm_usage_supports_total_token_and_request_pricing(monkeypatch):
-    import data.llm_usage as usage
+    import data.llm.usage as usage
 
     monkeypatch.setattr(
         usage,
@@ -263,7 +263,7 @@ def test_llm_usage_supports_total_token_and_request_pricing(monkeypatch):
 
 
 def test_llm_provider_balance_reports_unknown_provider_without_default_fallback(monkeypatch):
-    import data.llm_usage as usage
+    import data.llm.usage as usage
 
     monkeypatch.setattr(usage, "get_settings", lambda: {"llm": {"providers": {}}})
 

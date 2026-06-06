@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from data.registry import get_enabled_strategies
+from data.strategy.catalog import get_enabled_strategies
 
 
 @dataclass(frozen=True)

@@ -171,7 +171,7 @@ class PipelineBacktest:
 
         aligned = pd.concat([daily_returns, bench_returns], axis=1, join="inner").dropna()
         from backtest.analytics import RiskAnalytics
-        from data.risk_free_rates import risk_free_series_for_index
+        from data.rates.risk_free_rates import risk_free_series_for_index
 
         risk_free_rates = risk_free_series_for_index(aligned.index)
         report = RiskAnalytics.compute(aligned.iloc[:, 0], aligned.iloc[:, 1], risk_free_rates=risk_free_rates)

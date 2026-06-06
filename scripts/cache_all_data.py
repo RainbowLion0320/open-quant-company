@@ -13,10 +13,10 @@ import time
 from pathlib import Path
 
 
-from data.symbols import CIRCLE_STOCKS
-from data.fetchers.moneyflow import MoneyflowFetcher
-from data.fetchers.holders import HolderFetcher
-from data.fetchers.macro import MacroFetcher, MACRO_INDICATORS
+from data.market.symbols import CIRCLE_STOCKS
+from data.ingestion.fetchers.moneyflow import MoneyflowFetcher
+from data.ingestion.fetchers.holders import HolderFetcher
+from data.ingestion.fetchers.macro import MacroFetcher, MACRO_INDICATORS
 
 
 def cache_moneyflow(limit: int = 0):

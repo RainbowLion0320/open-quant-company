@@ -7,8 +7,8 @@ dist/
 build/
 *.egg
 
-# Data cache (managed by fetcher.py TTL)
-data/cache/
+# Runtime outputs (managed by DataHub under var/)
+var/
 
 # Node (frontend)
 node_modules/
@@ -40,10 +40,11 @@ config/notify.yaml
 .DS_Store
 Thumbs.db
 
-# ── Quant: 数据文件 (可重新生成) ──
+# ── Quant: 旧 data/ 运行产物布局 (迁移期防误提交) ──
 data/*.pkl
 data/*.duckdb
 data/*.db
+data/.financials_progress.json
 data/**/*.db
 data/**/*.db-shm
 data/**/*.db-wal

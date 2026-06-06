@@ -20,8 +20,8 @@ def catalog() -> CliResult:
 
 
 def run_strategy(strategy: str, mode: str, limit: int, dry_run: bool) -> CliResult:
-    from data.registry import get_strategy
-    from data.strategy_plugins import iter_strategy_plugins, run_registered_strategies
+    from data.strategy.catalog import get_strategy
+    from data.strategy.plugins import iter_strategy_plugins, run_registered_strategies
 
     try:
         mode = validate_runtime_mode(mode)

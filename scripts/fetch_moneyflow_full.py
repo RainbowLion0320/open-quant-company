@@ -6,8 +6,8 @@ Tushare moneyflow API: 每交易日一次调用, 返回全市场资金流向.
 频次限制: ~200次/分钟 → 按日拉取约需 20 分钟 (4000交易日).
 
 缓存策略:
-  日频: data/store/stock/moneyflow/daily/YYYY-MM-DD.parquet
-  月频: data/store/stock/moneyflow/monthly/YYYY-MM.parquet
+  日频: var/store/stock/moneyflow/daily/YYYY-MM-DD.parquet
+  月频: var/store/stock/moneyflow/monthly/YYYY-MM.parquet
 
 用法:
   python scripts/fetch_moneyflow_full.py --monthly   # 月频 (推荐, 72个月)
@@ -23,9 +23,9 @@ import pandas as pd
 import numpy as np
 
 
-from data.datahub import get_datahub
-from data.symbols import CIRCLE_STOCKS
-from data.tushare_utils import get_tushare_token
+from data.storage.datahub import get_datahub
+from data.market.symbols import CIRCLE_STOCKS
+from data.ingestion.tushare_utils import get_tushare_token
 
 HUB = get_datahub()
 

@@ -22,7 +22,7 @@ tags: [duckdb, parquet, database, migration, architecture, ADR, concurrency]
 
 **新架构**:
 ```
-存储层: data/store/signals/{strategy}.parquet  (pd.to_parquet, 无文件锁)
+存储层: var/store/signals/{strategy}.parquet  (pd.to_parquet, 无文件锁)
 查询层: DuckDB :memory: → read_parquet() → CREATE VIEW (内存, 永不锁)
 ```
 
@@ -46,11 +46,11 @@ Pandas → Parquet, 无需 SQL 写入, 无锁, 无 INSERT 陷阱。
 
 ## Migration Details
 
-- `data/store/signals/{strategy}.parquet` — 策略信号 (一文件一策略)
-- `data/store/signals/buffett_scan.parquet` — 巴菲特扫描 (含财务详情列)
-- `data/store/scan_meta.parquet` — 扫描元数据
+- `var/store/signals/{strategy}.parquet` — 策略信号 (一文件一策略)
+- `var/store/signals/buffett_scan.parquet` — 巴菲特扫描 (含财务详情列)
+- `var/store/scan_meta.parquet` — 扫描元数据
 - DuckDB `:memory:` 连接 → `_register_views()` 自动映射 Parquet 视图
-- `data/db.py` 保持统一接口, 读/写透明
+- `data/storage/db.py` 保持统一接口, 读/写透明
 
 ## See Also
 
@@ -67,7 +67,7 @@ Pandas → Parquet, 无需 SQL 写入, 无锁, 无 INSERT 陷阱。
 Parquet 模式成功 → 自然扩展到 ML 特征存储：
 
 ```
-data/store/
+var/store/
 ├── signals/                    # Phase 2: 策略信号
 │   ├── buffett.parquet
 │   ├── multifactor.parquet
@@ -103,7 +103,7 @@ ret_fwd_20d                                 # 目标变量
 ```python
 # DuckDB 视图自动注册
 db = duckdb.connect(":memory:")
-db.execute("CREATE VIEW features_2024_01 AS SELECT * FROM read_parquet('data/store/features/2024-01.parquet')")
+db.execute("CREATE VIEW features_2024_01 AS SELECT * FROM read_parquet('var/store/features/2024-01.parquet')")
 # 查询: symbols × month ∈ training window
 ```
 

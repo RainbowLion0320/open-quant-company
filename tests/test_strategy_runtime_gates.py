@@ -1,5 +1,5 @@
 def test_production_mode_excludes_candidate_strategies(monkeypatch):
-    from data.strategy_plugins import iter_strategy_plugins
+    from data.strategy.plugins import iter_strategy_plugins
 
     fake_registry = [
         {
@@ -32,7 +32,7 @@ def test_production_mode_excludes_candidate_strategies(monkeypatch):
 
 
 def test_research_mode_can_include_candidate_strategies(monkeypatch):
-    from data.strategy_plugins import iter_strategy_plugins
+    from data.strategy.plugins import iter_strategy_plugins
 
     fake_registry = [
         {
@@ -65,7 +65,7 @@ def test_research_mode_can_include_candidate_strategies(monkeypatch):
 
 
 def test_invalid_strategy_runtime_mode_is_rejected():
-    from data.strategy_plugins import iter_strategy_plugins
+    from data.strategy.plugins import iter_strategy_plugins
 
     try:
         list(iter_strategy_plugins("all", mode="paper"))

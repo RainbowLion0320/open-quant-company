@@ -2,7 +2,7 @@
 
 > 状态: research-only | 更新: 2026-06-04 | 权威注册: `config/settings.yaml` → `strategies`
 
-候选策略用于 Strategy Lab 研究扫描和回测，不直接参与默认生产信号。所有 runner 位于 `signals/candidates/`，输出统一 `StrategySignalRows`：`symbol`、`name`、`industry`、`score`、`signal`、`detail`。晋级前必须输出 `data/store/research/strategy_evidence/<strategy>.json` 并通过 OOS、强基准、成本和 regime 分解证据。
+候选策略用于 Strategy Lab 研究扫描和回测，不直接参与默认生产信号。所有 runner 位于 `signals/candidates/`，输出统一 `StrategySignalRows`：`symbol`、`name`、`industry`、`score`、`signal`、`detail`。晋级前必须输出 `var/store/research/strategy_evidence/<strategy>.json` 并通过 OOS、强基准、成本和 regime 分解证据。
 
 每个候选策略都有独立 `strategies.<name>.params` 配置段。窗口期、评分权重、过滤阈值、regime blend 权重等核心参数由 `signals/candidates/params.py` 定义默认值和 Config Center 字段元数据，运行时从 `config/settings.yaml` 合并读取。下面公式描述的是当前默认参数，不是写死在 runner 里的不可调规则。
 

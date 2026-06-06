@@ -12,8 +12,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-from data.fetchers.financial import fetch_financial_summary, fetch_valuation
-from data.symbols import CIRCLE_STOCKS
+from data.ingestion.fetchers.financial import fetch_financial_summary, fetch_valuation
+from data.market.symbols import CIRCLE_STOCKS
 
 
 def main():

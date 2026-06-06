@@ -27,7 +27,7 @@ DEFAULT_DETECTION = {
 
 
 def resolve_model_path(model_path: object) -> Path:
-    path = Path(str(model_path or "data/models/regime_hmm"))
+    path = Path(str(model_path or "data/reference/models/regime_hmm"))
     return path if path.is_absolute() else Path.cwd() / path
 
 

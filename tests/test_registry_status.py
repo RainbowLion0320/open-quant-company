@@ -1,7 +1,7 @@
 """Contract tests for P2-12 strategy registry — status lifecycle, promotion, capabilities."""
 
 import pytest
-from data.registry import (
+from data.strategy.catalog import (
     ALLOWED_STATUSES, VALID_PROMOTIONS, STATUS_CAPABILITIES,
     get_status, get_by_status, status_rank, status_label,
     can_run_paper, can_run_production, can_run_tournament,

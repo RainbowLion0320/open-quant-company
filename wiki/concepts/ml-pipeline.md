@@ -18,7 +18,7 @@ signals/expression.py
   → scripts/tune_model.py
   → scripts/strategy_tournament.py
   → signals/ml_signals.py
-  → data/store/signals/ml_lgbm.parquet
+  → var/store/signals/ml_lgbm.parquet
 ```
 
 ## 1. 因子 DSL
@@ -28,7 +28,7 @@ signals/expression.py
 - 可用已有 DSL 算子表达，或明确新增算子的语义。
 - 不依赖未来数据。
 - 对空值、停牌、缺列和极端值有明确处理。
-- 在进入模型前通过 `data/cleaner.py` 和 PIT 特征构建流程。
+- 在进入模型前通过 `data/quality/cleaner.py` 和 PIT 特征构建流程。
 
 示例：
 
@@ -42,7 +42,7 @@ ma_golden = Gt(MA("close", 5), MA("close", 20))
 
 ## 2. PIT 特征存储
 
-特征以 as-of 日期视图写入 `data/store/features/YYYY-MM-DD.parquet`。历史 `YYYY-MM.parquet` 仍可读取，但只代表月末兼容快照。构建入口是 `scripts/build_features.py`，必须通过 CLI 或显式函数调用启动，不能在 import 时执行重任务。
+特征以 as-of 日期视图写入 `var/store/features/YYYY-MM-DD.parquet`。历史 `YYYY-MM.parquet` 仍可读取，但只代表月末兼容快照。构建入口是 `scripts/build_features.py`，必须通过 CLI 或显式函数调用启动，不能在 import 时执行重任务。
 
 关键约束：
 
@@ -65,7 +65,7 @@ ma_golden = Gt(MA("close", 5), MA("close", 20))
 
 ## 4. 策略锦标赛
 
-`scripts/strategy_tournament.py` 用于比较策略表现，输出写入 `data/tournament/`。锦标赛结果是动态产物，不复制到 wiki。
+`scripts/strategy_tournament.py` 用于比较策略表现，输出写入 `var/artifacts/tournaments/`。锦标赛结果是动态产物，不复制到 wiki。
 
 锦标赛应验证：
 
@@ -81,7 +81,7 @@ ma_golden = Gt(MA("close", 5), MA("close", 20))
 2. 选择最新且不过期的 PIT 特征文件。
 3. 按模型特征名构建输入矩阵，并在模型入口统一数值化特征 dtype。
 4. 生成标准信号行。
-5. 由 `data/strategy_plugins.py` 统一持久化。
+5. 由 `data/strategy/plugins.py` 统一持久化。
 
 如果特征文件过期或覆盖不足，系统应显式告警或跳过，而不是用缺失值默默补 0。
 

@@ -78,7 +78,7 @@ def test_risk_manager_enforces_daily_order_count(tmp_path):
 
 
 def test_paper_state_persistence_round_trip_uses_public_state_model(tmp_path, monkeypatch):
-    from data.datahub import reset_datahub
+    from data.storage.datahub import reset_datahub
     from broker.state import PaperBrokerState
 
     monkeypatch.setenv("ASTROLABE_STORE", str(tmp_path / "store"))

@@ -47,7 +47,7 @@ def detect_trend_regime(
         try:
             fetcher = fetch_index_daily
             if fetcher is None:
-                from data.fetcher import get_index_daily
+                from data.ingestion.fetcher import get_index_daily
                 fetcher = lambda sym: get_index_daily(sym, force_refresh=False)
             df = fetcher(symbol)
         except Exception:

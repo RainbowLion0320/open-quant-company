@@ -30,14 +30,14 @@ def _make_ohlcv(symbol: str, n_days: int = 120, trend: float = 0.001) -> pd.Data
 
 def _patch_hub_store(tmp_path: Path, monkeypatch):
     """Redirect get_datahub() to a tmp_path-backed DataHub."""
-    from data import datahub
+    from data.storage import datahub
 
     datahub.reset_datahub()
     hub = datahub.get_datahub()
     monkeypatch.setattr(hub, "store_root", tmp_path)
     monkeypatch.setattr(datahub, "get_datahub", lambda: hub)
-    monkeypatch.setattr("data.datahub.get_datahub", lambda: hub)
-    monkeypatch.setattr("data.contract.get_datahub", lambda: hub)
+    monkeypatch.setattr("data.storage.datahub.get_datahub", lambda: hub)
+    monkeypatch.setattr("data.quality.contract.get_datahub", lambda: hub)
     return hub
 
 
@@ -61,7 +61,7 @@ def test_build_membership_columns(tmp_path, monkeypatch):
 
 def test_build_membership_uses_sw_industries(tmp_path, monkeypatch):
     from data import sectors
-    from data.symbols import SW_INDUSTRY_FIRST
+    from data.market.symbols import SW_INDUSTRY_FIRST
 
     hub = _patch_hub_store(tmp_path, monkeypatch)
     mem_path = tmp_path / "sector_membership.parquet"
@@ -564,7 +564,7 @@ def test_all_builders_run_without_exception(tmp_path, monkeypatch):
 # ═══════════════════════════════════════════════════════════
 
 def test_sector_membership_contract():
-    from data.contract import derive_contracts_from_registry
+    from data.quality.contract import derive_contracts_from_registry
     contracts = derive_contracts_from_registry()
     mc = contracts.get("sector_membership")
     assert mc is not None, "sector_membership contract missing"
@@ -574,7 +574,7 @@ def test_sector_membership_contract():
 
 
 def test_sector_sw_daily_contract():
-    from data.contract import derive_contracts_from_registry
+    from data.quality.contract import derive_contracts_from_registry
     contracts = derive_contracts_from_registry()
     sc = contracts.get("sector_sw_daily")
     assert sc is not None, "sector_sw_daily contract missing"
@@ -583,7 +583,7 @@ def test_sector_sw_daily_contract():
 
 
 def test_sector_performance_snapshot_contract():
-    from data.contract import derive_contracts_from_registry
+    from data.quality.contract import derive_contracts_from_registry
     contracts = derive_contracts_from_registry()
     pc = contracts.get("sector_performance_snapshot")
     assert pc is not None, "sector_performance_snapshot contract missing"

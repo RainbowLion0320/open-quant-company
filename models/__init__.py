@@ -22,9 +22,9 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
-from data.db import get_store_dir
+from data.storage.datahub import get_datahub
 
-MODEL_DIR = get_store_dir().parent / "models"
+MODEL_DIR = get_datahub().artifact_dir("models")
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 

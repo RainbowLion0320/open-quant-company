@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from data.datahub import get_datahub
+from data.storage.datahub import get_datahub
 from web.api.serializers import safe_float, safe_int
 
 HUB = get_datahub()

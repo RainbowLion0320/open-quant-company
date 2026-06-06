@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from data.registry import ALLOWED_STATUSES
+from data.strategy.catalog import ALLOWED_STATUSES
 from signals.candidates.params import CANDIDATE_PARAM_FIELDS
 from web.api.config_schema.fields import field
 

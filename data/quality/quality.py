@@ -5,7 +5,7 @@ Prevents strategy scans from silently producing signals on stale data.
 Integrates with DataRegistry (SLA definitions) and DataHub (path resolution).
 
 Usage:
-  from data.quality import DataQualityGate, pre_scan_gate
+  from data.quality.quality import DataQualityGate, pre_scan_gate
 
   gate = DataQualityGate()
   report = gate.check_dimension("ohlcv_daily", symbol="000001")
@@ -21,8 +21,8 @@ from typing import Optional
 import pandas as pd
 import numpy as np
 
-from data.datahub import get_datahub
-from data.data_registry import DataDimension, FRESHNESS_SLA_BY_FREQ, get_registry
+from data.storage.datahub import get_datahub
+from data.storage.dimensions import DataDimension, FRESHNESS_SLA_BY_FREQ, get_registry
 
 HUB = get_datahub()
 REGISTRY = get_registry()
@@ -344,7 +344,7 @@ class DataQualityGate:
     def _check_contract(self, key: str, df: pd.DataFrame) -> list[str]:
         """Validate df against the DataContract for this dimension. (P1-8)"""
         try:
-            from data.contract import load_contract
+            from data.quality.contract import load_contract
             contract = load_contract(key)
             if contract is None:
                 return []

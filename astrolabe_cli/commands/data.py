@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 
-from data.freshness_gate import freshness_gate, freshness_gate_from_health_result, health_result_to_gate_data
+from data.quality.freshness_gate import freshness_gate, freshness_gate_from_health_result, health_result_to_gate_data
 
 from astrolabe_cli.results import CliResult
 from astrolabe_cli.safety import dry_run_payload

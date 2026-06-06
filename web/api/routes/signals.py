@@ -15,7 +15,7 @@ async def get_signal_changes(days: int = Query(default=7, description="最近 N 
     此端点通过对比 buffett_scan + strategy_signals 交叉分析来模拟变化检测。
     实际效果：列出当前信号为 buy 且最近更新的股票，作为「近期信号」展示。
     """
-    from data.results_db import load_strategy_signals, list_strategies, load_buffett_results
+    from data.storage.results_db import load_strategy_signals, list_strategies, load_buffett_results
 
     strategies = list_strategies()
     all_signals = []

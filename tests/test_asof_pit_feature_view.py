@@ -9,7 +9,7 @@ class CloseReturnFactor:
 
 
 def test_feature_store_selects_latest_slice_on_or_before_as_of(tmp_path):
-    from data.feature_store import latest_feature_file, write_feature_slice
+    from data.features.feature_store import latest_feature_file, write_feature_slice
 
     write_feature_slice(
         pd.DataFrame({"symbol": ["000001"], "as_of_date": ["2026-05-07"], "daily_close": [10.0]}),
@@ -29,7 +29,7 @@ def test_feature_store_selects_latest_slice_on_or_before_as_of(tmp_path):
 
 
 def test_feature_store_loads_legacy_month_slice_with_asof_date(tmp_path):
-    from data.feature_store import load_feature_panel
+    from data.features.feature_store import load_feature_panel
 
     pd.DataFrame({"symbol": ["000001"], "month": ["2026-04"], "daily_close": [9.0]}).to_parquet(
         tmp_path / "2026-04.parquet",
@@ -48,7 +48,7 @@ def test_build_asof_uses_exact_daily_price_not_month_end(tmp_path, monkeypatch):
     monkeypatch.setattr(build_features, "FEATURES_DIR", tmp_path)
     monkeypatch.setattr(build_features.HUB, "features_dir", lambda: tmp_path)
     monkeypatch.setattr(build_features.HUB, "feature_path", lambda key: tmp_path / f"{key}.parquet")
-    monkeypatch.setattr("data.feature_store.HUB", build_features.HUB)
+    monkeypatch.setattr("data.features.feature_store.HUB", build_features.HUB)
 
     prices = pd.DataFrame(
         {
@@ -79,7 +79,7 @@ def test_build_asof_uses_exact_daily_price_not_month_end(tmp_path, monkeypatch):
 
 
 def test_time_series_splitter_accepts_asof_dates():
-    from data.feature_store import feature_time_key_column, feature_period_key
+    from data.features.feature_store import feature_time_key_column, feature_period_key
 
     df = pd.DataFrame(
         {

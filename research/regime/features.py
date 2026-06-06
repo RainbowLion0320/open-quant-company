@@ -172,7 +172,7 @@ def load_full_market_breadth_history(
         return pd.DataFrame()
 
     if daily_dir is None:
-        from data.datahub import get_datahub
+        from data.storage.datahub import get_datahub
 
         daily_dir = get_datahub().store_path("stock") / "daily"
     daily_path = Path(daily_dir)

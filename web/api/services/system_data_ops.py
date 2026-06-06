@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 def backfill_history_payload(dimension: str = "", status: str = "", limit: int = 20) -> dict:
-    from data.backfill import BackfillLedger
+    from data.ops.backfill import BackfillLedger
 
     ledger = BackfillLedger()
     entries = ledger.history(dimension=dimension, status=status, limit=limit)
@@ -33,7 +33,7 @@ def backfill_history_payload(dimension: str = "", status: str = "", limit: int =
 
 
 def last_backfill_payload(dimension: str) -> dict:
-    from data.backfill import BackfillLedger
+    from data.ops.backfill import BackfillLedger
 
     ledger = BackfillLedger()
     last = ledger.last_run(dimension)
@@ -58,13 +58,13 @@ def last_backfill_payload(dimension: str) -> dict:
 
 
 def provider_health_payload() -> dict:
-    from data.provider import provider_health_report
+    from data.ingestion.provider import provider_health_report
 
     return {"providers": provider_health_report(), "status": "ok"}
 
 
 def contracts_payload(dimension: str = "") -> dict:
-    from data.contract import list_contracts
+    from data.quality.contract import list_contracts
 
     contracts = list_contracts()
     if dimension:
@@ -91,7 +91,7 @@ def contracts_payload(dimension: str = "") -> dict:
 
 
 def audit_history_payload(section: str = "", limit: int = 50) -> dict:
-    from data.audit import ConfigAuditLedger
+    from data.ops.audit import ConfigAuditLedger
 
     ledger = ConfigAuditLedger()
     entries = ledger.history(section=section, limit=limit)

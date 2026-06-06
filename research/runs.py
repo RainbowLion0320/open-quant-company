@@ -8,7 +8,7 @@ Experiment Registry — 追踪研究/训练/回测的完整生命周期。
   - artifact paths
   - status: scheduled → running → finished / failed
 
-Persisted to data/store/runs.parquet via DataHub.
+Persisted to var/store/runs.parquet via DataHub.
 """
 
 import os
@@ -145,7 +145,7 @@ class RunTracker:
             "steps": json.dumps(self._steps, ensure_ascii=False),
             "error": self._error or "",
         }
-        from data.datahub import get_datahub
+        from data.storage.datahub import get_datahub
         hub = get_datahub()
         hub.append_parquet(str(_store() / "runs.parquet"), row, dedupe_subset=["run_id"])
 

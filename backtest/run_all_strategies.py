@@ -1,6 +1,6 @@
 """
 多策略对比回测 — 逐日引擎，策略自主调仓
-产量: data/backtest_<strategy>.pkl + data/backtest_comparison.pkl
+产量: var/artifacts/backtests/backtest_<strategy>.pkl + backtest_comparison.pkl
 """
 import os, pickle, sys
 from pathlib import Path
@@ -17,8 +17,9 @@ import pandas as pd
 from datetime import datetime
 
 from core.settings import get_settings
-from data.fetcher import get_index_daily
-from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
+from data.storage.datahub import get_datahub
+from data.ingestion.fetcher import get_index_daily
+from data.market.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
 from backtest.regime_replay import build_production_regime_map
 from signals.scoring import estimate_buffett_score, score_cybernetic_from_factors
 from signals.technical import technical_factors_from_series
@@ -32,7 +33,10 @@ from backtest.candidate_alpha import (
     register_price_panels,
 )
 
-DATA_DIR = ROOT / "data"
+HUB = get_datahub()
+BACKTEST_ARTIFACT_DIR = HUB.artifact_dir("backtests")
+BACKTEST_CACHE_DIR = HUB.cache_root / "backtest"
+BACKTEST_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _settings() -> dict:
@@ -42,8 +46,8 @@ def _settings() -> dict:
 def load_prices(pool, start, end):
     """加载价格矩阵"""
     from core.settings import get_section
-    from data.price_service import get_stock_price_matrix
-    from data.price_types import PriceUseCase
+    from data.market.price_service import get_stock_price_matrix
+    from data.market.price_types import PriceUseCase
 
     min_bars = int((get_section("backtest", {}) or {}).get("min_bars", 200))
     prices, panel_frames = get_stock_price_matrix(
@@ -52,7 +56,7 @@ def load_prices(pool, start, end):
         start=start,
         end=end,
         min_bars=min_bars,
-        cache_dir=DATA_DIR,
+        cache_dir=BACKTEST_CACHE_DIR,
     )
     if prices.empty:
         return None
@@ -157,7 +161,7 @@ def _get_multifactor_fin_inputs(sym, ind, year):
 def multifactor_scorer(sym, series, idx, regime):
     """多因子评分: 质量/估值/技术/市场/行业动量五维，权重来自 settings。"""
     from signals.multifactor import MultiFactorScorer
-    from data.symbols import SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
+    from data.market.symbols import SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
 
     ind = SYMBOL_INDUSTRY.get(sym, "待分类")
     sec = SYMBOL_SECTOR.get(sym, FALLBACK_SECTOR)
@@ -431,7 +435,7 @@ if __name__ == "__main__":
 
     print(f"基准: {bc.iloc[0]:.0f} → {bc.iloc[-1]:.0f} ({((bc.iloc[-1]/bc.iloc[0]-1)*100):+.2f}%)")
 
-    from data.registry import get_enabled_strategies
+    from data.strategy.catalog import get_enabled_strategies
 
     _scorer_map = {
         "buffett": buffett_scorer,
@@ -472,7 +476,7 @@ if __name__ == "__main__":
             cash=float(bt_cfg.get("initial_cash", 1_000_000)),
             label=s.get("label", name),
         )
-        with open(DATA_DIR / f"backtest_{name}.pkl", "wb") as f:
+        with open(BACKTEST_ARTIFACT_DIR / f"backtest_{name}.pkl", "wb") as f:
             pickle.dump(results[name], f)
         write_backtest_evidence(
             name,
@@ -493,7 +497,7 @@ if __name__ == "__main__":
         "start": start, "end": end,
         "runner": runner_label,
     }
-    with open(DATA_DIR / "backtest_comparison.pkl", "wb") as f:
+    with open(BACKTEST_ARTIFACT_DIR / "backtest_comparison.pkl", "wb") as f:
         pickle.dump(comparison, f)
 
     print(f"\n{'='*60}")

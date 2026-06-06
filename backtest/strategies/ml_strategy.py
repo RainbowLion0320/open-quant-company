@@ -17,8 +17,8 @@ from backtest.strategies.base import BaseStrategy
 from signals.expression import alpha_factors
 from models import MODEL_DIR
 from models.lgbm_runtime import global_model_candidates, load_lgbm_bundle, regime_model_candidates
-from data.feature_store import feature_date_key, feature_key_to_date, load_feature_panel
-from data.symbols import SYMBOL_NAME
+from data.features.feature_store import feature_date_key, feature_key_to_date, load_feature_panel
+from data.market.symbols import SYMBOL_NAME
 from pipeline.alpha import AlphaModel
 from pipeline.types import AlphaSignal
 from signals.tradability import is_tradable_stock

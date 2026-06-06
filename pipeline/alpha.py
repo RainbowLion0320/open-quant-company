@@ -129,7 +129,7 @@ class SignalParquetAlphaModel(AlphaModel):
         self.max_signals = max_signals
 
     def generate_alpha(self, universe, prices, date_idx, regime):
-        from data.datahub import get_datahub
+        from data.storage.datahub import get_datahub
 
         hub = get_datahub()
         path = hub.resolve_path(self._signal_path) if isinstance(self._signal_path, str) else self._signal_path

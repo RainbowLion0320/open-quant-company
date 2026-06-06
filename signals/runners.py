@@ -14,8 +14,8 @@ from signals.technical import technical_factors_from_frame
 def _get_latest_price(symbol: str) -> float:
     """Return latest cached/refreshed close price, or 0 when unavailable."""
     try:
-        from data.price_service import get_latest_price
-        from data.price_types import PriceUseCase
+        from data.market.price_service import get_latest_price
+        from data.market.price_types import PriceUseCase
 
         return get_latest_price(symbol, use_case=PriceUseCase.VALUATION)
     except Exception:
@@ -24,8 +24,8 @@ def _get_latest_price(symbol: str) -> float:
 
 def compute_buffett(limit: int = 0) -> list[dict]:
     """Run the Buffett full scan and return signal source rows."""
-    from data.financials import get_buffett_inputs
-    from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_NAME
+    from data.market.financials import get_buffett_inputs
+    from data.market.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_NAME
     from signals.buffett import buffett_filter as bf
 
     symbols = list(CIRCLE_STOCKS)
@@ -82,8 +82,8 @@ def compute_buffett(limit: int = 0) -> list[dict]:
 def compute_multifactor(limit: int = 0) -> list[dict]:
     """Run the production multifactor scorer."""
     from cybernetics.orchestrator import QuantOrchestrator
-    from data.financials import get_buffett_inputs
-    from data.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_NAME
+    from data.market.financials import get_buffett_inputs
+    from data.market.symbols import CIRCLE_STOCKS, SYMBOL_INDUSTRY, SYMBOL_NAME
     from signals.buffett import buffett_filter as bf
     from signals.multifactor import MultiFactorScorer
 
@@ -202,8 +202,8 @@ def _get_technical_factors(symbol: str) -> dict:
         "volatility": 0.30,
     }
     try:
-        from data.price_service import get_stock_prices
-        from data.price_types import PriceUseCase
+        from data.market.price_service import get_stock_prices
+        from data.market.price_types import PriceUseCase
 
         df = get_stock_prices(symbol, use_case=PriceUseCase.SIGNAL)
         if df is None or len(df) < 63:
@@ -217,7 +217,7 @@ def _get_technical_factors(symbol: str) -> dict:
 def compute_cybernetic(limit: int = 0) -> list[dict]:
     """Run cybernetic sector rotation signals from the current market regime."""
     from cybernetics.orchestrator import QuantOrchestrator
-    from data.symbols import CIRCLE_STOCKS, FALLBACK_SECTOR, SYMBOL_INDUSTRY, SYMBOL_NAME, SYMBOL_SECTOR
+    from data.market.symbols import CIRCLE_STOCKS, FALLBACK_SECTOR, SYMBOL_INDUSTRY, SYMBOL_NAME, SYMBOL_SECTOR
 
     orch = QuantOrchestrator()
     try:

@@ -55,7 +55,7 @@ def test_tradable_asset_panel_cash_fallback_has_sources_and_returns():
 def test_treasury_defensive_proxy_handles_date_index_and_column(tmp_path):
     from research.regime_training import _load_treasury_defensive_proxy
 
-    bond_dir = tmp_path / "data/store/bond"
+    bond_dir = tmp_path / "var/store/bond"
     bond_dir.mkdir(parents=True)
     dates = pd.date_range("2026-01-01", periods=4, freq="B")
     frame = pd.DataFrame({"日期": dates, "中国国债收益率10年": [2.0, 2.01, 2.0, 1.99]}, index=dates)

@@ -26,7 +26,7 @@ log = logging.getLogger("train_regime_hmm")
 def _load_index_daily(symbol: str = "sh000001") -> pd.DataFrame:
     """Load benchmark index daily data."""
     try:
-        from data.fetcher import _read_cache, get_index_daily
+        from data.ingestion.fetcher import _read_cache, get_index_daily
 
         cached = _read_cache(f"index_daily_{symbol}_default", max_age_hours=0)
         if cached is not None and len(cached) > 0:

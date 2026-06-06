@@ -4,7 +4,7 @@ from astrolabe_cli.results import CliResult
 
 
 def run_health() -> CliResult:
-    from data.datahub import get_datahub
+    from data.storage.datahub import get_datahub
     from web.api.version import get_project_version
 
     hub = get_datahub()

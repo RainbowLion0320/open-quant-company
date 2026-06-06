@@ -11,9 +11,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 import pandas as pd
 import numpy as np
-from data.datahub import get_datahub
-from data.feature_store import iter_feature_files
-from data.tushare_utils import get_tushare_token
+from data.storage.datahub import get_datahub
+from data.features.feature_store import iter_feature_files
+from data.ingestion.tushare_utils import get_tushare_token
 import tushare as ts
 
 HUB = get_datahub()

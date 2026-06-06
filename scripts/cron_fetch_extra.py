@@ -22,8 +22,8 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import tushare as ts
-from data.datahub import get_datahub
-from data.tushare_utils import get_tushare_token
+from data.storage.datahub import get_datahub
+from data.ingestion.tushare_utils import get_tushare_token
 
 HUB = get_datahub()
 TOKEN = get_tushare_token()

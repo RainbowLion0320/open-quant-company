@@ -7,7 +7,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 
-from data.datahub import get_datahub
+from data.storage.datahub import get_datahub
 
 DB = os.path.expanduser("~/.hermes/state.db")
 HUB = get_datahub()

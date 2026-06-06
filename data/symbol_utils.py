@@ -1,30 +1,9 @@
-"""Symbol normalization and exchange-code helpers."""
+"""Compatibility shim for `data.market.symbol_utils`.
 
-from __future__ import annotations
+Use `data.market.symbol_utils` for new code.
+"""
+from importlib import import_module as _import_module
+import sys as _sys
 
-
-def normalize_symbol(symbol: object) -> str:
-    """Normalize A-share symbols to six-digit plain codes when possible."""
-    text = str(symbol).strip()
-    text = text.replace(".SH", "").replace(".SZ", "").replace(".sh", "").replace(".sz", "")
-    if text.lower().startswith(("sh", "sz")):
-        text = text[2:]
-    return text.zfill(6) if text.isdigit() else text
-
-
-def infer_exchange(symbol: object) -> str:
-    """Infer SH/SZ exchange from a plain A-share code."""
-    code = normalize_symbol(symbol)
-    return "SH" if code.startswith(("5", "6", "9")) else "SZ"
-
-
-def to_sina_symbol(symbol: object) -> str:
-    """Convert to Sina/AKShare index style, e.g. ``600519`` -> ``sh600519``."""
-    code = normalize_symbol(symbol)
-    return f"{infer_exchange(code).lower()}{code}"
-
-
-def to_ts_code(symbol: object) -> str:
-    """Convert to Tushare style, e.g. ``600519`` -> ``600519.SH``."""
-    code = normalize_symbol(symbol)
-    return f"{code}.{infer_exchange(code)}"
+_module = _import_module("data.market.symbol_utils")
+_sys.modules[__name__] = _module

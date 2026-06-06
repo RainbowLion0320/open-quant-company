@@ -22,8 +22,8 @@ router = APIRouter(prefix="/api/strategies", tags=["Strategies"])
 @router.get("", response_model=StrategyListResponse)
 async def list_strategies():
     """列出所有已计算策略及统计 + 策略注册表元数据"""
-    from data.results_db import list_strategies as db_list
-    from data.registry import get_enabled_strategies, ALLOWED_STATUSES
+    from data.storage.results_db import list_strategies as db_list
+    from data.strategy.catalog import get_enabled_strategies, ALLOWED_STATUSES
 
     strategies = db_list()
     registry = get_enabled_strategies()
@@ -44,7 +44,7 @@ async def list_strategies():
 @router.get("/statuses")
 async def get_strategy_statuses():
     """所有策略的当前生命周期状态."""
-    from data.registry import get_enabled_strategies, status_label, ALLOWED_STATUSES
+    from data.strategy.catalog import get_enabled_strategies, status_label, ALLOWED_STATUSES
     registry = get_enabled_strategies()
     return {
         "strategies": [
@@ -66,7 +66,7 @@ async def get_strategy_statuses():
 @router.get("/governance")
 async def get_strategy_governance():
     """Return strategy role layering and promotion gate definitions."""
-    from data.registry import list_strategy_names
+    from data.strategy.catalog import list_strategy_names
     from research.strategy_governance import governance_summary
 
     summary = governance_summary(list_strategy_names())
@@ -103,7 +103,7 @@ async def get_strategy_evaluation_summary():
 async def run_strategy(req: StrategyRunRequest):
     """异步启动策略扫描, 返回 job_id"""
     from web.api.jobs import run_strategy_async
-    from data.registry import get_strategy, list_strategy_names
+    from data.strategy.catalog import get_strategy, list_strategy_names
 
     valid = set(list_strategy_names()) | {"all"}
     if req.strategy not in valid:
@@ -159,8 +159,8 @@ async def get_strategy_signals(
     order: str = Query(default="desc", description="desc / asc"),
 ):
     """加载某策略的全部信号"""
-    from data.registry import list_strategy_names
-    from data.results_db import load_strategy_signals
+    from data.strategy.catalog import list_strategy_names
+    from data.storage.results_db import load_strategy_signals
 
     valid = set(list_strategy_names())
     if name not in valid:

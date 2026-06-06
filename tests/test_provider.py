@@ -1,7 +1,7 @@
 """Contract tests for ProviderAdapter — dispatch, health, fallback."""
 
 import pytest
-from data.provider import (
+from data.ingestion.provider import (
     ProviderAdapter, AKShareAdapter, TushareAdapter,
     CompositeProvider, ProviderHealth,
     register_provider, get_provider, reset_providers,
@@ -48,7 +48,7 @@ class TestAKShareAdapter:
 
     def test_financial_summary_dispatch_uses_existing_function(self, monkeypatch):
         import pandas as pd
-        import data.financials as financials
+        import data.market.financials as financials
 
         monkeypatch.setattr(
             financials,
@@ -62,7 +62,7 @@ class TestAKShareAdapter:
 
     def test_macro_dispatch_uses_fetch_indicator(self, monkeypatch):
         import pandas as pd
-        from data.fetchers.macro import MacroFetcher
+        from data.ingestion.fetchers.macro import MacroFetcher
 
         calls = []
 

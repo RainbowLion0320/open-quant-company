@@ -12,7 +12,7 @@ class TestRetryWithBackoff:
 
     def test_failing_twice_then_succeeding_calls_three_times(self, monkeypatch):
         """Function failing twice then succeeding is called exactly 3 times."""
-        import data.fetcher as mod
+        import data.ingestion.fetcher as mod
 
         # Remove jitter for deterministic delays
         monkeypatch.setattr(mod.random, "uniform", lambda a, b: 0.0)
@@ -35,7 +35,7 @@ class TestRetryWithBackoff:
 
     def test_sleep_delays_are_exponential(self, monkeypatch):
         """Sleep delays follow base_delay * backoff_factor^attempt."""
-        import data.fetcher as mod
+        import data.ingestion.fetcher as mod
 
         monkeypatch.setattr(mod.random, "uniform", lambda a, b: 0.0)
 
@@ -60,7 +60,7 @@ class TestRetryWithBackoff:
 
     def test_failing_three_times_raises(self, monkeypatch):
         """Function failing max_retries+1 times raises the final error."""
-        import data.fetcher as mod
+        import data.ingestion.fetcher as mod
 
         monkeypatch.setattr(mod.random, "uniform", lambda a, b: 0.0)
         monkeypatch.setattr(mod.time, "sleep", lambda d: None)
@@ -78,7 +78,7 @@ class TestThrottle:
 
     def test_first_call_does_not_sleep_when_old(self, monkeypatch):
         """First call does not sleep when _last_request_time is old."""
-        import data.fetcher as mod
+        import data.ingestion.fetcher as mod
 
         mod._last_request_time = 0.0
         slept = []
@@ -91,7 +91,7 @@ class TestThrottle:
 
     def test_second_call_sleeps_for_remaining_interval(self, monkeypatch):
         """Second call sleeps for remaining interval when elapsed < MIN_INTERVAL."""
-        import data.fetcher as mod
+        import data.ingestion.fetcher as mod
 
         mod._last_request_time = 0.0
         slept = []

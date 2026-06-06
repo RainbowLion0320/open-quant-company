@@ -48,7 +48,7 @@ async def backtest_overview():
 @router.get("/{strategy}")
 async def strategy_detail(strategy: str):
     """单个策略详细数据（净值曲线）"""
-    from data.registry import list_strategy_names
+    from data.strategy.catalog import list_strategy_names
     valid = list_strategy_names()
     if strategy not in valid:
         raise InvalidParameterError("strategy", strategy, f"Choose from: {', '.join(sorted(valid))}")

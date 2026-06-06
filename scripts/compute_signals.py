@@ -23,8 +23,8 @@ import time
 from datetime import datetime
 
 from core.settings import get_section
-from data.datahub import get_datahub
-from data.results_db import load_strategy_signals, list_strategies
+from data.storage.datahub import get_datahub
+from data.storage.results_db import load_strategy_signals, list_strategies
 from signals.runners import compute_buffett, compute_cybernetic, compute_multifactor
 
 HUB = get_datahub()
@@ -40,8 +40,8 @@ def _configure_runtime_for_cli() -> None:
 
 
 def main():
-    from data.registry import list_strategy_names, get_status, can_run_production, status_label
-    from data.strategy_plugins import run_registered_strategies
+    from data.strategy.catalog import list_strategy_names, get_status, can_run_production, status_label
+    from data.strategy.plugins import run_registered_strategies
 
     _configure_runtime_for_cli()
 
@@ -70,7 +70,7 @@ def main():
 
     # Pre-scan data quality gate
     if not args.skip_quality_gate:
-        from data.quality import pre_scan_gate
+        from data.quality.quality import pre_scan_gate
         ok, reports = pre_scan_gate()
         stale_dims = [r for r in reports if r.status in ("stale", "missing", "error")]
         if stale_dims:
@@ -83,8 +83,8 @@ def main():
     else:
         print("  Data quality gate: skipped (--skip-quality-gate)\n")
 
-    from data.results_db import init
-    from data.db import reset_db
+    from data.storage.results_db import init
+    from data.storage.db import reset_db
     reset_db()
     init()
 
@@ -204,6 +204,6 @@ def _load_prev_signals(strategy: str) -> list[dict] | None:
 
 
 if __name__ == '__main__':
-    from data.cron_logger import cron_run
+    from data.ops.cron_logger import cron_run
     with cron_run("compute_signals"):
         main()

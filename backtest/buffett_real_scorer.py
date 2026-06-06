@@ -26,14 +26,14 @@ def build_pit_financial_inputs(year, stock_pool, *, log_label="财务PIT"):
             print(f"  {log_label} {year}年: {len(result)} 只具备PIT财务输入 (缓存)")
         return result
 
-    from data.financials import (
+    from data.market.financials import (
         get_financial_summary, extract_roe_history,
         extract_gross_margin_history, extract_net_margin_history,
         extract_debt_equity_ratio, extract_latest_net_profit,
         _estimate_growth,
     )
-    from data.fetcher import get_stock_daily
-    from data.symbols import SYMBOL_NAME, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
+    from data.ingestion.fetcher import get_stock_daily
+    from data.market.symbols import SYMBOL_NAME, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
 
     result = {}
     cutoff = pd.Timestamp(f"{year - 1}-12-31")
@@ -147,7 +147,7 @@ def create_buffett_real_scorer(pool):
 if __name__ == "__main__":
     """独立运行: 预热财务缓存 + 测试"""
     from core.settings import get_section
-    from data.symbols import CIRCLE_STOCKS
+    from data.market.symbols import CIRCLE_STOCKS
     pool_size = (get_section("backtest", {}) or {}).get("pool_size", 0)
     pool = list(CIRCLE_STOCKS)
     if pool_size > 0:
@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
     print(f"预热财务数据缓存 ({len(pool)} 只)...")
     succeeded = 0
-    from data.financials import get_financial_summary
+    from data.market.financials import get_financial_summary
     for sym in pool:
         try:
             df = get_financial_summary(sym)

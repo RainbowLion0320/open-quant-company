@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from data.datahub import get_datahub
+from data.storage.datahub import get_datahub
 from web.api.services.system_common import json_map, json_value, safe_float, safe_int
 
 
@@ -105,7 +105,7 @@ def repairable_tables() -> set[str]:
 
 def freshness_gate_from_health_check() -> tuple[dict[str, object], int]:
     """Run DB health check quietly and return the shared freshness gate payload."""
-    from data.freshness_gate import freshness_gate_from_health_result
+    from data.quality.freshness_gate import freshness_gate_from_health_result
     from scripts.db_health_check import run_health_check
 
     stdout = io.StringIO()

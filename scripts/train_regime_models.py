@@ -9,8 +9,8 @@ import os, json
 
 import pandas as pd
 
-from data.datahub import get_datahub
-from data.feature_store import feature_period_key, feature_time_key_column, load_feature_panel
+from data.storage.datahub import get_datahub
+from data.features.feature_store import feature_period_key, feature_time_key_column, load_feature_panel
 from models import LightGBMRegressor, prepare_xy, MODEL_DIR
 
 HUB = get_datahub()
@@ -21,7 +21,7 @@ def train_regime_models():
     print("Regime-Aware ML Training\n" + "=" * 50)
 
     # 1. Load all features with regime labels
-    from data.fetcher import get_index_daily
+    from data.ingestion.fetcher import get_index_daily
     df_idx = get_index_daily("sh000001")
     if df_idx is None:
         print("ERROR: cannot load index data")

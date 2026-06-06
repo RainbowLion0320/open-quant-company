@@ -71,7 +71,7 @@ def build_market_regime_context(
     risk_weights = configured_numbers(cfg.get("risk_strength_weights"), DEFAULT_RISK_WEIGHTS)
     detection = configured_numbers(detection_cfg, DEFAULT_DETECTION)
     engine = str(cfg.get("regime_engine", "rule_based"))
-    model_path = resolve_model_path(hmm_cfg.get("model_path", "data/models/regime_hmm"))
+    model_path = resolve_model_path(hmm_cfg.get("model_path", "data/reference/models/regime_hmm"))
     model_meta = read_model_meta(model_path)
 
     orchestrator = orchestrator_cls()

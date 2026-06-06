@@ -7,7 +7,6 @@
   python scripts/strategy_tournament.py --pool-size 50  # 小规模快速测试
 """
 import os, sys, json, time
-from pathlib import Path
 from datetime import datetime
 
 for k in list(os.environ.keys()):
@@ -18,10 +17,10 @@ os.environ['no_proxy'] = '*'
 import pandas as pd
 import numpy as np
 
-from data.symbols import CIRCLE_STOCKS
-from data.fetcher import get_stock_daily, get_index_daily
-from data.datahub import get_datahub
-from data.feature_store import latest_feature_frame
+from data.market.symbols import CIRCLE_STOCKS
+from data.ingestion.fetcher import get_stock_daily, get_index_daily
+from data.storage.datahub import get_datahub
+from data.features.feature_store import latest_feature_frame
 from backtest.strategies.base import BaseStrategy, StrategyRegistry
 from backtest.strategies.ml_strategy import MLStrategy
 from broker.exchange import AShareExchange, OrderSide
@@ -34,8 +33,7 @@ HUB = get_datahub()
 # 锦标赛配置
 # ══════════════════════════════════════════════════════════
 
-TOURNAMENT_DIR = Path(__file__).resolve().parent.parent / "data" / "tournament"
-TOURNAMENT_DIR.mkdir(parents=True, exist_ok=True)
+TOURNAMENT_DIR = HUB.artifact_dir("tournaments")
 
 
 def register_all_strategies() -> StrategyRegistry:
@@ -204,7 +202,7 @@ def run_tournament(pool_size: int = 50, start: str = "2020-01-01", end: str = "2
         aligned = pd.concat([returns, bench_ret], axis=1, join="inner").dropna()
 
         if len(aligned) > 0:
-            from data.risk_free_rates import risk_free_series_for_index
+            from data.rates.risk_free_rates import risk_free_series_for_index
 
             risk_free_rates = risk_free_series_for_index(aligned.index)
             report = RiskAnalytics.compute(aligned.iloc[:, 0], aligned.iloc[:, 1], risk_free_rates=risk_free_rates)

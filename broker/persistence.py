@@ -1,7 +1,7 @@
 """
 PaperBroker 状态持久化 — Parquet 存储
 
-将所有 PaperBroker 内部状态持久化到 data/store/paper/:
+将所有 PaperBroker 内部状态持久化到 var/store/paper/:
   - state.parquet     → 资金 + 持仓 (覆盖写入)
   - nav.parquet       → 每日净值快照 (追加)
   - trades.parquet    → 交易记录 (追加)
@@ -24,7 +24,7 @@ from typing import Optional
 
 from broker.state import PaperBrokerState
 from core.settings import get_section
-from data.datahub import get_datahub
+from data.storage.datahub import get_datahub
 
 # ── 默认路径 (可在 settings.yaml 覆盖) ──
 HUB = get_datahub()

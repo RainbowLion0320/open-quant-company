@@ -7,7 +7,7 @@ from typing import Callable
 
 import pandas as pd
 
-from data.datahub import get_datahub
+from data.storage.datahub import get_datahub
 from web.api.serializers import date_value_series, safe_float, series_card
 from web.api.version import get_project_meta
 
@@ -41,7 +41,7 @@ def position_capacity(current: object) -> dict[str, int]:
 
 def load_index(symbol: str) -> tuple[pd.DataFrame | None, str, str]:
     try:
-        from data.fetcher import get_index_daily
+        from data.ingestion.fetcher import get_index_daily
 
         df = get_index_daily(symbol)
         df["date"] = pd.to_datetime(df["date"], errors="coerce")
@@ -263,7 +263,7 @@ def kline_series(df: pd.DataFrame) -> list[dict]:
 
 def build_market_regime() -> dict:
     from cybernetics.orchestrator import QuantOrchestrator
-    from data.fetcher import get_index_daily
+    from data.ingestion.fetcher import get_index_daily
 
     orch = QuantOrchestrator()
     snapshot = orch.detect()
@@ -283,7 +283,7 @@ def build_market_regime() -> dict:
 
 def build_market_overview(range_key: str) -> dict:
     from cybernetics.orchestrator import QuantOrchestrator
-    from data.fetcher import get_index_daily
+    from data.ingestion.fetcher import get_index_daily
 
     orch = QuantOrchestrator()
     snapshot = orch.detect()

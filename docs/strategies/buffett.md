@@ -30,14 +30,14 @@
 | max_debt_equity | 1.5 | 最高负债权益比 |
 | 行业白名单 | 31 行业 | 排除金融/ST/亏损 |
 
-价格口径权威来源为 `data/price_service.py`。研究、信号和回测使用 `PriceUseCase.SIGNAL/BACKTEST` 的 `qfq` 口径；DCF 当前价和执行价使用 `raw`。
+价格口径权威来源为 `data/market/price_service.py`。研究、信号和回测使用 `PriceUseCase.SIGNAL/BACKTEST` 的 `qfq` 口径；DCF 当前价和执行价使用 `raw`。
 
 ## 结果来源
 
 最新扫描、回测、OOS 和锦标赛结果不写死在策略文档中。查看：
 
-- `data/store/signals/buffett*.parquet`
-- `data/tournament/` 下的锦标赛 JSON
+- `var/store/signals/buffett*.parquet`
+- `var/artifacts/tournaments/` 下的锦标赛 JSON
 - Web `/strategy-lab` 页面
 
 小样本股票池可能无法触发巴菲特筛选，正式扫描应使用当前配置中的全量股票池。

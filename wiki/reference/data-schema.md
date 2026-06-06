@@ -16,12 +16,12 @@ confidence: high
 | 主题 | 来源 |
 |---------|--------|
 | 声明式数据维度 | `config/settings.yaml` → `data_registry` |
-| 派生和显式数据契约 | `data/contract.py` |
-| 运行时 manifest schema hash | `data/store/_manifest/datasets.parquet` |
-| 物理 Parquet 文件 | `data/store/` |
+| 派生和显式数据契约 | `data/quality/contract.py` |
+| 运行时 manifest schema hash | `var/store/_manifest/datasets.parquet` |
+| 物理 Parquet 文件 | `var/store/` |
 | Web/API schema 预期 | `web/api/schemas/*` 分域 schema、`web/api/models.py` 兼容聚合入口和路由 response models |
 
-`data/contract.py` 可以从 DataRegistry 派生契约，也可以为重要数据集叠加显式 schema 要求。数据集 schema 变化时，契约和测试必须在同一次改动里更新。
+`data/quality/contract.py` 可以从 DataRegistry 派生契约，也可以为重要数据集叠加显式 schema 要求。数据集 schema 变化时，契约和测试必须在同一次改动里更新。
 
 ## 如何检查
 
