@@ -182,6 +182,12 @@ def test_p0_p2_modularization_hotspots_are_split():
             "broker/base.py",
             "broker/paper_orders.py",
             "broker/paper_state.py",
+            "backtest/candidate_alpha_features.py",
+            "backtest/candidate_alpha_scorers.py",
+            "backtest/strategy_scorers.py",
+            "data/ingestion/tushare_coverage.py",
+            "data/ingestion/tushare_tasks.py",
+            "web/frontend/src/composables/useRelativeStrengthChart.ts",
         ]
     )
 
@@ -204,3 +210,8 @@ def test_p0_p2_modularization_hotspots_are_split():
     assert _line_count("scripts/factor_hypothesis.py") <= 140
     assert _line_count("data/market/sectors.py") <= 140
     assert _line_count("broker/paper.py") <= 260
+    assert _line_count("backtest/candidate_alpha.py") <= 140
+    assert _line_count("backtest/run_all_strategies.py") <= 320
+    assert _line_count("data/ingestion/tushare_governance.py") <= 520
+    assert _line_count("web/frontend/src/views/Market.vue") <= 560
+    assert _line_count("web/frontend/src/composables/useRelativeStrengthChart.ts") <= 180

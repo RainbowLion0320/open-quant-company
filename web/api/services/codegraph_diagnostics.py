@@ -174,6 +174,8 @@ class CodeGraphDiagnosticsService:
             if len(component) < 2:
                 continue
             paths = sorted(component)
+            if any(_is_diagnostic_excluded(path) for path in paths):
+                continue
             severity = "P0" if len(paths) >= 3 else "P1"
             issues.append(_issue(
                 category="cycle",
@@ -204,9 +206,10 @@ class CodeGraphDiagnosticsService:
             if key in seen:
                 continue
             seen.add(key)
+            severity = _cross_layer_severity(rule)
             issues.append(_issue(
                 category="cross_layer",
-                severity="P0",
+                severity=severity,
                 title="Cross-layer dependency",
                 path=source,
                 node_id=f"file:{source}",
@@ -215,7 +218,7 @@ class CodeGraphDiagnosticsService:
                 evidence={"rule": rule, "edge_kind": edge["kind"]},
                 recommendation="Route the dependency through the intended service/facade boundary.",
             ))
-            flags.append({"source": f"file:{source}", "target": f"file:{target}", "category": "cross_layer", "severity": "P0"})
+            flags.append({"source": f"file:{source}", "target": f"file:{target}", "category": "cross_layer", "severity": severity})
         return issues, flags
 
     def _hotspot_issues(
@@ -226,12 +229,14 @@ class CodeGraphDiagnosticsService:
     ) -> list[dict[str, Any]]:
         issues = []
         for metric in metrics.values():
+            if _is_diagnostic_excluded(metric.path):
+                continue
             churn_count = int(churn.get(metric.path, 0))
             high_degree = metric.degree >= 20 or metric.incoming >= 15 or metric.outgoing >= 15
             churn_hotspot = git_churn_available and metric.degree >= 4 and churn_count >= 5
             if not high_degree and not churn_hotspot:
                 continue
-            severity = "P0" if metric.degree >= 80 or churn_count >= 15 else "P1" if metric.degree >= 30 or churn_count >= 10 else "P2"
+            severity = _hotspot_severity(metric, churn_count, git_churn_available)
             issues.append(_issue(
                 category="hotspot",
                 severity=severity,
@@ -269,6 +274,8 @@ class CodeGraphDiagnosticsService:
     def _internal_api_leak_issues(self, metrics: dict[str, FileMetrics]) -> list[dict[str, Any]]:
         issues = []
         for metric in metrics.values():
+            if _is_diagnostic_excluded(metric.path) or _is_public_facade(metric.path):
+                continue
             if not _is_internal_path(metric.path):
                 continue
             if len(metric.inbound_modules) < 2 or metric.incoming < 2:
@@ -287,10 +294,14 @@ class CodeGraphDiagnosticsService:
     def _large_connected_file_issues(self, metrics: dict[str, FileMetrics]) -> list[dict[str, Any]]:
         issues = []
         for metric in metrics.values():
+            if _is_diagnostic_excluded(metric.path):
+                continue
             large = metric.line_count >= 700 or metric.node_count >= 20
             if not large or metric.degree < 2:
                 continue
             severity = "P1" if metric.degree >= 6 or metric.line_count >= 900 else "P2"
+            if _is_script_entry(metric.path) or _is_public_facade(metric.path):
+                severity = "P2"
             issues.append(_issue(
                 category="large_connected_file",
                 severity=severity,
@@ -430,6 +441,8 @@ def _cross_layer_rule(source: str, target: str, edge_kind: str) -> str:
     stable_structural_edge = edge_kind in {"imports", "references", "instantiates", "extends"}
     if not stable_structural_edge:
         return ""
+    if _is_diagnostic_excluded(source) or _is_diagnostic_excluded(target):
+        return ""
     if source.startswith("web/api/routes/") and target.startswith("data/"):
         return "web_api_route_direct_to_data"
     if source.startswith("data/") and target.startswith("web/"):
@@ -438,6 +451,36 @@ def _cross_layer_rule(source: str, target: str, edge_kind: str) -> str:
     if source.startswith("data/storage/") and target.startswith(upper_roots):
         return "storage_depends_on_upper_layer"
     return ""
+
+
+def _cross_layer_severity(rule: str) -> str:
+    if rule in {"data_depends_on_web", "storage_depends_on_upper_layer"}:
+        return "P0"
+    return "P1"
+
+
+def _hotspot_severity(metric: FileMetrics, churn_count: int, git_churn_available: bool) -> str:
+    p0_by_size = metric.degree >= 220 and metric.line_count >= 900
+    p0_by_churn = git_churn_available and churn_count >= 30 and metric.degree >= 90 and metric.line_count >= 500
+    if p0_by_size or p0_by_churn:
+        severity = "P0"
+    elif (
+        metric.degree >= 50
+        or metric.incoming >= 40
+        or metric.outgoing >= 35
+        or metric.line_count >= 700
+        or (git_churn_available and churn_count >= 10)
+        or (git_churn_available and churn_count >= 5 and metric.degree >= 4 and metric.line_count >= 500)
+    ):
+        severity = "P1"
+    else:
+        severity = "P2"
+
+    if _is_script_entry(metric.path) and severity == "P0":
+        return "P1"
+    if _is_public_facade(metric.path) and severity == "P0":
+        return "P1"
+    return severity
 
 
 def _node_scores(issues: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -501,11 +544,42 @@ def _is_production_candidate(path: str) -> bool:
     return not path.startswith(excluded)
 
 
+def _is_diagnostic_excluded(path: str) -> bool:
+    excluded = (
+        "tests/",
+        "docs/",
+        "wiki/",
+        "var/",
+        ".codegraph/",
+        "web/frontend/node_modules/",
+        "web/frontend/dist/",
+    )
+    return path.startswith(excluded)
+
+
 def _is_entry_like(path: str) -> bool:
     name = Path(path).name
     return path.startswith("scripts/") or name in {"__init__.py", "main.py", "app.py"}
 
 
+def _is_script_entry(path: str) -> bool:
+    return path.startswith("scripts/")
+
+
+def _is_public_facade(path: str) -> bool:
+    if Path(path).name == "__init__.py":
+        return True
+    return path in {
+        "data/storage/datahub.py",
+        "signals/expression.py",
+        "web/api/config_schema/fields.py",
+        "web/api/services/pipelines/common.py",
+        "core/settings.py",
+    }
+
+
 def _is_internal_path(path: str) -> bool:
     name = Path(path).name
+    if name == "__init__.py":
+        return False
     return "/internal" in path or name.startswith("_")

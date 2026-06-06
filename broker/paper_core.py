@@ -15,11 +15,11 @@ from broker.ledger import EventLedger
 from broker.matcher import MatchingEngine
 from broker.models import Account, Order, Position
 from broker.order_sm import OrderStateMachine
-from broker.paper_orders import PaperOrderMixin
+from broker.paper_orders import PaperOrderService
 from broker.paper_state import PaperStateMixin
 
 
-class PaperBroker(PaperStateMixin, PaperOrderMixin, Broker):
+class PaperBroker(PaperStateMixin, Broker):
     """
     Local paper broker with event-sourced order lifecycle, pluggable matching,
     A-share cost modeling, optional risk pre-checks, and T+1 sell limits.
@@ -49,6 +49,7 @@ class PaperBroker(PaperStateMixin, PaperOrderMixin, Broker):
         self._order_sms: dict[str, OrderStateMachine] = {}
         self._ledger = ledger or EventLedger()
         self._exchange = AShareExchange(commission=commission_rate, stamp_tax=stamp_duty)
+        self._order_service = PaperOrderService()
 
         slippage = slippage_model or NoSlippage()
         self._fill_model = fill_model or CompositeFill([
@@ -99,6 +100,21 @@ class PaperBroker(PaperStateMixin, PaperOrderMixin, Broker):
             frozen_cash=self._frozen_cash,
             market_value=market_value,
         )
+
+    def submit_order(self, code: str, price: float, volume: int, side: str) -> str:
+        return self._order_service.submit_order(self, code, price, volume, side)
+
+    def cancel_order(self, order_id: str) -> bool:
+        return self._order_service.cancel_order(self, order_id)
+
+    def get_orders(self) -> list[Order]:
+        return self._order_service.get_orders(self)
+
+    def get_today_trades(self) -> list[Order]:
+        return self._order_service.get_today_trades(self)
+
+    def end_of_day(self) -> None:
+        self._order_service.end_of_day(self)
 
     def summary(self) -> str:
         balance = self.get_balance()

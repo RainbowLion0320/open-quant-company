@@ -7,6 +7,7 @@ PaperBroker 实例从 Parquet 恢复，确保服务器重启不丢状态。
 from fastapi import APIRouter, HTTPException
 from web.api.schemas.portfolio import AccountInfo, OrderItem, OrderRequest, PositionItem
 from web.api.errors import InvalidParameterError
+from web.api.services.portfolio import apply_latest_execution_price
 
 router = APIRouter(prefix="/api/portfolio", tags=["Portfolio"])
 
@@ -191,15 +192,7 @@ async def submit_order(req: OrderRequest):
 
     # 市价单: 尝试获取行情
     if req.price <= 0:
-        try:
-            from data.market.price_service import get_stock_prices
-            from data.market.price_types import PriceUseCase
-            df = get_stock_prices(req.code, use_case=PriceUseCase.EXECUTION)
-            if df is not None and len(df) > 0:
-                current = float(df.sort_values("date").iloc[-1]["close"])
-                broker.set_prices({req.code: current})
-        except Exception:
-            pass
+        apply_latest_execution_price(broker, req.code)
 
     result = broker.submit_order(
         code=req.code, price=req.price, volume=req.volume, side=req.side,

@@ -63,6 +63,29 @@ def provider_health_payload() -> dict:
     return {"providers": provider_health_report(), "status": "ok"}
 
 
+def quality_gate_payload(dimension: str = "") -> dict:
+    from data.quality.quality import DataQualityGate
+
+    gate = DataQualityGate()
+    if not dimension:
+        return gate.summary_report()
+
+    report = gate.check_dimension(dimension)
+    return {
+        "dimension": report.dimension,
+        "label": report.label,
+        "status": report.status,
+        "health_score": report.health_score,
+        "freshness_days": report.freshness_days,
+        "sla_days": report.sla_days,
+        "row_count": report.row_count,
+        "null_pct": report.null_pct,
+        "date_min": report.date_min,
+        "date_max": report.date_max,
+        "issues": report.issues,
+    }
+
+
 def contracts_payload(dimension: str = "") -> dict:
     from data.quality.contract import list_contracts
 

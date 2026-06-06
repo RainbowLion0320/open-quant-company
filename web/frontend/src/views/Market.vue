@@ -149,8 +149,9 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import RegimeHero from "../components/market/RegimeHero.vue";
 import { useAnimatedMetrics } from "../composables/useAnimatedMetrics";
 import { useMarketOverview } from "../composables/useMarketOverview";
+import { useRelativeStrengthChart } from "../composables/useRelativeStrengthChart";
 import { useMarketStore } from "../stores";
-import { api, type MacroCard, type MarketAssetCard, type MarketSeriesPoint, type SectorCard, type SectorOverviewResponse } from "../api";
+import { api, type MacroCard, type MarketSeriesPoint, type SectorCard, type SectorOverviewResponse } from "../api";
 import { useI18n } from "../i18n";
 import { colorBySignedRatio, fmtSignedRatioPct } from "../utils/format";
 import { signalPower } from "../utils/sector";
@@ -163,19 +164,12 @@ const selectedRange = ref("6M");
 const sectorOverview = ref<SectorOverviewResponse | null>(null);
 const sectorLoading = ref(false);
 
-const CHART_VIEW_W = 720;
-const CHART_VIEW_H = 310;
-const CHART_LEFT = 44;
-const CHART_RIGHT = 702;
-const CHART_TOP = 34;
-const CHART_BOTTOM = 282;
-const CHART_WIDTH = CHART_RIGHT - CHART_LEFT;
-const CHART_HEIGHT = CHART_BOTTOM - CHART_TOP;
 const SPARK_W = 120;
 const SPARK_H = 34;
 const SPARK_PAD_X = 2;
 
 const assets = computed(() => store.multiAsset || []);
+const marketFreshness = computed(() => `${t("market.fresh")} ${store.freshness?.market || "—"}`);
 const macro = computed(() => store.macro || []);
 const hotSectors = computed(() => {
   const sectors = sectorOverview.value?.sectors || [];
@@ -195,54 +189,20 @@ const sectorDate = computed(() => {
   return value.length === 8 ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}` : value;
 });
 
-interface RelativeLine {
-  key: string;
-  label: string;
-  color: string;
-  change: number;
-  data: Array<number | null>;
-  data_source?: string;
-  source_detail?: string;
-}
-
-const relativeChart = computed(() => {
-  const cards = (assets.value || []).filter((asset: MarketAssetCard) => (asset.series || []).length >= 2);
-  const dates = Array.from(new Set(cards.flatMap((asset: MarketAssetCard) => (asset.series || []).map(p => p.date)))).sort();
-  const lines: RelativeLine[] = cards.map((asset: MarketAssetCard) => {
-    const points = (asset.series || [])
-      .map(p => ({ date: p.date, value: Number(p.value) }))
-      .filter(p => p.date && Number.isFinite(p.value))
-      .sort((a, b) => a.date.localeCompare(b.date));
-    const base = points.find(p => p.value !== 0)?.value || 0;
-    const values = new Map(points.map(p => [p.date, p.value]));
-    const data = dates.map(date => {
-      const value = values.get(date);
-      if (!base || value == null || !Number.isFinite(value)) return null;
-      return Number((((value / base) - 1) * 100).toFixed(2));
-    });
-    const finite = data.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-    return {
-      key: asset.key,
-      label: asset.label,
-      color: indexColors[asset.key] || "#7dd3fc",
-      change: finite.length ? finite[finite.length - 1] : 0,
-      data,
-      data_source: asset.data_source,
-      source_detail: asset.source_detail,
-    };
-  }).filter(line => line.data.some(v => v != null));
-  return { dates, lines };
-});
-
-const strengthLeader = computed(() => {
-  const [leader] = [...relativeChart.value.lines].sort((a, b) => b.change - a.change);
-  return leader || { key: "", label: "—", color: "var(--text-disabled)", change: 0, data: [] };
-});
-const relativeSubtitle = computed(() => {
-  const dates = relativeChart.value.dates;
-  const rangeText = dates.length ? `${dates[0]} → ${dates[dates.length - 1]}` : t("market.waitingIndexSeries");
-  return `${rangeText} · ${t("market.fresh")} ${store.freshness?.market || "—"}`;
-});
+const {
+  CHART_VIEW_W,
+  CHART_VIEW_H,
+  CHART_LEFT,
+  CHART_RIGHT,
+  relativeChart,
+  relativeSubtitle,
+  strengthLeader,
+  chartTicks,
+  chartXLabels,
+  chartY,
+  chartLabelTop,
+  linePath,
+} = useRelativeStrengthChart(assets, indexColors, () => t("market.waitingIndexSeries"), marketFreshness);
 
 const regimeLabel = computed(() => {
   const r = store.regime?.value;
@@ -337,65 +297,6 @@ const regimeGaugeMetrics = computed(() => [
     color: "var(--warning)",
   },
 ]);
-
-const chartScale = computed(() => {
-  const values = relativeChart.value.lines
-    .flatMap(line => line.data)
-    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-  if (!values.length) return { min: -1, max: 1 };
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const spread = rawMax - rawMin || 1;
-  const pad = Math.max(spread * 0.12, 0.5);
-  return { min: rawMin - pad, max: rawMax + pad };
-});
-
-const chartTicks = computed(() => {
-  const { min, max } = chartScale.value;
-  const step = (max - min) / 4;
-  return Array.from({ length: 5 }, (_, i) => Number((max - step * i).toFixed(2)));
-});
-
-const chartXLabels = computed(() => {
-  const dates = relativeChart.value.dates;
-  if (!dates.length) return [];
-  const indices = Array.from(new Set([0, Math.floor((dates.length - 1) / 2), dates.length - 1]));
-  return indices.map(index => ({
-    date: dates[index],
-    label: shortDate(dates[index]),
-    left: `${(chartX(index, dates.length) / CHART_VIEW_W) * 100}%`,
-  }));
-});
-
-function chartX(index: number, total: number) {
-  if (total <= 1) return CHART_LEFT;
-  return CHART_LEFT + (index / (total - 1)) * CHART_WIDTH;
-}
-function chartY(value: number) {
-  const { min, max } = chartScale.value;
-  const spread = max - min || 1;
-  return CHART_TOP + ((max - value) / spread) * CHART_HEIGHT;
-}
-function chartLabelTop(value: number) {
-  return `${(chartY(value) / CHART_VIEW_H) * 100}%`;
-}
-function linePath(line: RelativeLine) {
-  const total = relativeChart.value.dates.length;
-  let started = false;
-  return line.data.map((value, index) => {
-    if (value == null || !Number.isFinite(value)) {
-      started = false;
-      return "";
-    }
-    const cmd = started ? "L" : "M";
-    started = true;
-    return `${cmd} ${chartX(index, total).toFixed(1)} ${chartY(value).toFixed(1)}`;
-  }).filter(Boolean).join(" ");
-}
-function shortDate(date: string) {
-  const m = date.match(/^\d{4}-(\d{2})-(\d{2})/);
-  return m ? `${m[1]}-${m[2]}` : date;
-}
 
 async function switchRange(range: string) {
   selectedRange.value = range;

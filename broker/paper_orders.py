@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from broker.ledger import EventType, LedgerEvent
 from broker.matcher import MatchContext
@@ -9,45 +10,47 @@ from broker.models import Order, Position
 from broker.order_sm import InvalidTransition, OrderState, OrderStateMachine
 
 
-class PaperOrderMixin:
-    def submit_order(self, code: str, price: float, volume: int, side: str) -> str:
+class PaperOrderService:
+    """Order lifecycle service composed by PaperBroker."""
+
+    def submit_order(self, broker: Any, code: str, price: float, volume: int, side: str) -> str:
         """Submit an order through risk checks, matching, state transition, and ledger append."""
         run_date = datetime.now().strftime("%Y-%m-%d")
-        fill_price = self._resolve_price(code, price)
+        fill_price = broker._resolve_price(code, price)
         if fill_price <= 0:
             return f"无行情: {code}"
 
-        balance = self.get_balance()
-        if self._risk_mgr and side == "buy":
+        balance = broker.get_balance()
+        if broker._risk_mgr and side == "buy":
             portfolio = {
                 "total_equity": balance.total_asset,
                 "total_exposure": balance.market_value,
-                "peak_equity": self._peak_equity,
+                "peak_equity": broker._peak_equity,
                 "positions": {
                     c: {"market_value": p.market_value}
-                    for c, p in self._positions.items()
+                    for c, p in broker._positions.items()
                     if p.volume > 0
                 },
             }
-            passed, results = self._risk_mgr.check_order(code, fill_price * volume, portfolio)
+            passed, results = broker._risk_mgr.check_order(code, fill_price * volume, portfolio)
             if not passed:
                 reasons = "; ".join(r.reason for r in results if not r.passed)
                 return f"风控拒绝: {reasons}"
 
         if side == "buy":
-            can, max_shares = self._matcher.can_afford(fill_price, volume, self._cash, side)
+            can, max_shares = broker._matcher.can_afford(fill_price, volume, broker._cash, side)
             if not can:
                 if max_shares <= 0:
                     return "资金不足"
                 volume = max_shares
 
         if side == "sell":
-            pos = self._positions.get(code)
+            pos = broker._positions.get(code)
             holdings = pos.volume if pos else 0
-            bought_today = self._today_buys.get(code, 0) if self.t_plus_1 else 0
+            bought_today = broker._today_buys.get(code, 0) if broker.t_plus_1 else 0
             available = max(0, holdings - bought_today)
             if available <= 0:
-                if self.t_plus_1 and bought_today > 0:
+                if broker.t_plus_1 and bought_today > 0:
                     return f"T+1限制: {code} 当日买入不可卖出"
                 return f"持仓不足: {code}"
             volume = min(volume, available)
@@ -55,23 +58,24 @@ class PaperOrderMixin:
         if volume <= 0:
             return "无可执行数量"
 
-        order, sm, ts = self._create_pending_order(code, side, fill_price, volume)
-        self._append_order_created(order, ts, run_date)
+        order, sm, ts = self._create_pending_order(broker, code, side, fill_price, volume)
+        self._append_order_created(broker, order, ts, run_date)
 
-        pos = self._positions.get(code)
-        result = self._matcher.match(MatchContext(
+        pos = broker._positions.get(code)
+        result = broker._matcher.match(MatchContext(
             symbol=code,
             side=side,
             requested_shares=volume,
             market_price=fill_price,
             prev_close=pos.avg_cost if pos and pos.avg_cost > 0 else fill_price,
-            available_cash=self._cash,
+            available_cash=broker._cash,
             current_holdings=pos.volume if pos else 0,
-            t_plus_1_bought_today=self._today_buys.get(code, 0) if self.t_plus_1 else 0,
+            t_plus_1_bought_today=broker._today_buys.get(code, 0) if broker.t_plus_1 else 0,
         ))
 
         if result.status == "rejected":
             self._transition_order(
+                broker,
                 sm,
                 order,
                 OrderState.REJECTED,
@@ -80,24 +84,25 @@ class PaperOrderMixin:
                 code=code,
                 metadata={"fill_price": fill_price, "requested": volume},
             )
-            self._orders.append(order)
+            broker._orders.append(order)
             return result.reason if result.reason else f"订单被拒绝: {code}"
 
-        self._apply_fill(order, sm, result, volume, side, code, run_date)
-        self._orders.append(order)
-        if self._risk_mgr:
-            self._risk_mgr.record_order()
-        self._peak_equity = max(self._peak_equity, self.get_balance().total_asset)
+        self._apply_fill(broker, order, sm, result, volume, side, code, run_date)
+        broker._orders.append(order)
+        if broker._risk_mgr:
+            broker._risk_mgr.record_order()
+        broker._peak_equity = max(broker._peak_equity, broker.get_balance().total_asset)
         return order.order_id
 
-    def cancel_order(self, order_id: str) -> bool:
-        sm = self._order_sms.get(order_id)
+    def cancel_order(self, broker: Any, order_id: str) -> bool:
+        sm = broker._order_sms.get(order_id)
         if not sm or not sm.can_be_cancelled:
             return False
 
-        for order in self._orders:
+        for order in broker._orders:
             if order.order_id == order_id:
                 self._transition_order(
+                    broker,
                     sm,
                     order,
                     OrderState.CANCELLED,
@@ -108,21 +113,22 @@ class PaperOrderMixin:
                 return True
         return False
 
-    def get_orders(self) -> list[Order]:
-        return self._orders
+    def get_orders(self, broker: Any) -> list[Order]:
+        return broker._orders
 
-    def get_today_trades(self) -> list[Order]:
-        return [order for order in self._orders if order.status == OrderState.FILLED.value]
+    def get_today_trades(self, broker: Any) -> list[Order]:
+        return [order for order in broker._orders if order.status == OrderState.FILLED.value]
 
-    def end_of_day(self):
+    def end_of_day(self, broker: Any) -> None:
         """Expire active orders and reset T+1 counters."""
         run_date = datetime.now().strftime("%Y-%m-%d")
-        for order_id, sm in list(self._order_sms.items()):
+        for order_id, sm in list(broker._order_sms.items()):
             if not sm.is_active:
                 continue
-            order = self._find_order(order_id)
+            order = self._find_order(broker, order_id)
             if order and order.remaining_volume > 0:
                 self._transition_order(
+                    broker,
                     sm,
                     order,
                     OrderState.EXPIRED,
@@ -132,17 +138,24 @@ class PaperOrderMixin:
                     metadata={"remaining": order.remaining_volume},
                 )
 
-        for code in list(self._positions):
-            if self._positions[code].volume <= 0:
-                del self._positions[code]
-            elif code in self._prices:
-                self._positions[code].current_price = self._prices[code]
+        for code in list(broker._positions):
+            if broker._positions[code].volume <= 0:
+                del broker._positions[code]
+            elif code in broker._prices:
+                broker._positions[code].current_price = broker._prices[code]
 
-        self._today_sells.clear()
-        self._today_buys.clear()
+        broker._today_sells.clear()
+        broker._today_buys.clear()
 
-    def _create_pending_order(self, code: str, side: str, fill_price: float, volume: int) -> tuple[Order, OrderStateMachine, str]:
-        order_id = self._next_order_id()
+    def _create_pending_order(
+        self,
+        broker: Any,
+        code: str,
+        side: str,
+        fill_price: float,
+        volume: int,
+    ) -> tuple[Order, OrderStateMachine, str]:
+        order_id = self._next_order_id(broker)
         ts = datetime.now().isoformat()
         order = Order(
             order_id=order_id,
@@ -155,11 +168,11 @@ class PaperOrderMixin:
             created_at=ts,
         )
         sm = OrderStateMachine(order_id=order_id, created_at=ts)
-        self._order_sms[order_id] = sm
+        broker._order_sms[order_id] = sm
         return order, sm, ts
 
-    def _append_order_created(self, order: Order, ts: str, run_date: str) -> None:
-        self._ledger.append(LedgerEvent(
+    def _append_order_created(self, broker: Any, order: Order, ts: str, run_date: str) -> None:
+        broker._ledger.append(LedgerEvent(
             event_id=self._new_event_id("order_created", order.order_id),
             event_type=EventType.ORDER_CREATED,
             timestamp=ts,
@@ -177,35 +190,36 @@ class PaperOrderMixin:
             },
         ))
 
-    def _apply_fill(self, order, sm, result, volume: int, side: str, code: str, run_date: str) -> None:
+    def _apply_fill(self, broker: Any, order, sm, result, volume: int, side: str, code: str, run_date: str) -> None:
         filled_shares = result.filled_shares
         actual_price = result.fill_price
         commission = result.commission
         trade_amount = actual_price * filled_shares
-        tax = trade_amount * self._exchange.stamp_tax if side == "sell" and hasattr(self._exchange, "stamp_tax") else 0
+        tax = trade_amount * broker._exchange.stamp_tax if side == "sell" and hasattr(broker._exchange, "stamp_tax") else 0
         total_cost = trade_amount + commission + tax
 
         if side == "buy":
-            self._cash -= total_cost
-            if code not in self._positions:
-                self._positions[code] = Position(code=code, volume=0, avg_cost=0.0)
-            pos = self._positions[code]
+            broker._cash -= total_cost
+            if code not in broker._positions:
+                broker._positions[code] = Position(code=code, volume=0, avg_cost=0.0)
+            pos = broker._positions[code]
             total_basis = pos.avg_cost * pos.volume + total_cost
             pos.volume += filled_shares
             pos.avg_cost = total_basis / pos.volume if pos.volume > 0 else 0.0
             pos.current_price = actual_price
-            self._today_buys[code] = self._today_buys.get(code, 0) + filled_shares
+            broker._today_buys[code] = broker._today_buys.get(code, 0) + filled_shares
         else:
-            self._cash += trade_amount - commission - tax
-            if code in self._positions:
-                self._positions[code].volume -= filled_shares
-                self._today_sells[code] = self._today_sells.get(code, 0) + filled_shares
+            broker._cash += trade_amount - commission - tax
+            if code in broker._positions:
+                broker._positions[code].volume -= filled_shares
+                broker._today_sells[code] = broker._today_sells.get(code, 0) + filled_shares
 
         order.filled_volume = filled_shares
         order.remaining_volume = volume - filled_shares
         order.price = actual_price
         is_full = filled_shares >= volume
         self._transition_order(
+            broker,
             sm,
             order,
             OrderState.FILLED if is_full else OrderState.PARTIAL_FILLED,
@@ -221,23 +235,24 @@ class PaperOrderMixin:
             },
         )
 
-    def _next_order_id(self) -> str:
-        self._order_counter += 1
-        return f"PAPER_{self._order_counter:06d}"
+    def _next_order_id(self, broker: Any) -> str:
+        broker._order_counter += 1
+        return f"PAPER_{broker._order_counter:06d}"
 
     def _new_event_id(self, prefix: str, order_id: str) -> str:
         import uuid
 
         return f"{prefix}:{order_id}:{uuid.uuid4().hex[:8]}"
 
-    def _find_order(self, order_id: str) -> Order | None:
-        for order in self._orders:
+    def _find_order(self, broker: Any, order_id: str) -> Order | None:
+        for order in broker._orders:
             if order.order_id == order_id:
                 return order
         return None
 
     def _transition_order(
         self,
+        broker: Any,
         sm: OrderStateMachine,
         order: Order,
         to_state: OrderState,
@@ -259,9 +274,9 @@ class PaperOrderMixin:
             "reason": transition.reason,
         })
 
-        prior_events = self._ledger.events_for_order(sm.order_id)
+        prior_events = broker._ledger.events_for_order(sm.order_id)
         parent_event_id = prior_events[-1].event_id if prior_events else ""
-        self._ledger.append(LedgerEvent(
+        broker._ledger.append(LedgerEvent(
             event_id=self._new_event_id(transition.event_type, sm.order_id),
             event_type=EventType(transition.event_type),
             timestamp=transition.timestamp,

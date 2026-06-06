@@ -125,6 +125,16 @@ def test_paper_broker_private_state_is_not_used_outside_broker_package():
     assert offenders == []
 
 
+def test_paper_broker_order_lifecycle_is_composed_not_mixin_inherited():
+    core_text = Path("broker/paper_core.py").read_text(encoding="utf-8")
+    orders_text = Path("broker/paper_orders.py").read_text(encoding="utf-8")
+
+    assert "PaperOrderMixin" not in core_text
+    assert "class PaperOrderService" in orders_text
+    assert "class PaperOrderMixin" not in orders_text
+    assert "from broker.paper_core" not in orders_text
+
+
 def test_enabled_strategy_plugins_have_runners():
     from data.strategy.plugins import iter_strategy_plugins
 
@@ -173,7 +183,7 @@ def test_datahub_snapshot_discovery_is_not_reimplemented_in_signal_or_web_layers
 
 
 def test_backtest_strategy_scorers_reuse_shared_signal_scoring_helpers():
-    text = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
+    text = Path("backtest/strategy_scorers.py").read_text(encoding="utf-8")
 
     assert "technical_factors_from_series" in text
     assert "score_cybernetic_from_factors" in text
@@ -198,7 +208,7 @@ def test_backtest_runner_covers_all_enabled_backtest_strategies():
 
 
 def test_multifactor_backtest_uses_point_in_time_financial_snapshots(monkeypatch):
-    import backtest.run_all_strategies as runner
+    import backtest.strategy_scorers as scorers
 
     series = pd.Series(
         [10.0 + i * 0.01 for i in range(160)],
@@ -226,12 +236,12 @@ def test_multifactor_backtest_uses_point_in_time_financial_snapshots(monkeypatch
     def fail_realtime_financial_inputs(*args, **kwargs):
         raise AssertionError("multifactor backtest must not call realtime Buffett inputs")
 
-    monkeypatch.setattr(runner, "build_pit_financial_inputs", fake_build_pit_financial_inputs)
+    monkeypatch.setattr(scorers, "build_pit_financial_inputs", fake_build_pit_financial_inputs)
     monkeypatch.setattr("data.market.financials.get_buffett_inputs", fail_realtime_financial_inputs)
-    runner._multifactor_fin_cache.clear()
-    runner.multifactor_scorer._pool = ["AAA"]
+    scorers._multifactor_fin_cache.clear()
+    scorers.multifactor_scorer._pool = ["AAA"]
 
-    score = runner.multifactor_scorer("AAA", series, len(series) - 1, "sideways")
+    score = scorers.multifactor_scorer("AAA", series, len(series) - 1, "sideways")
 
     assert score >= 0
     assert built_years == [(2020, ["AAA"], "多因子")]
@@ -354,6 +364,7 @@ def test_repairable_tables_are_sourced_from_repair_map():
 
 def test_system_route_delegates_large_status_domains_to_services():
     import web.api.services.system_data_health as data_health
+    import web.api.services.system_data_ops as data_ops
     import web.api.services.system_integrations as integrations
     import web.api.services.system_monitor as monitor
 
@@ -361,12 +372,25 @@ def test_system_route_delegates_large_status_domains_to_services():
 
     assert callable(monitor.system_monitor_payload)
     assert callable(data_health.db_health_payload)
+    assert callable(data_ops.quality_gate_payload)
     assert callable(integrations.api_health_payload)
     assert callable(integrations.cron_jobs_payload)
     assert "def _query(" not in route_text
     assert "def _read_token(" not in route_text
     assert "def _run_repair(" not in route_text
     assert "def _repairable_tables(" not in route_text
+    assert "from data.quality.quality import DataQualityGate" not in route_text
+
+
+def test_web_api_routes_do_not_import_data_layer_directly():
+    offenders = []
+    for path in Path("web/api/routes").glob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        for token in ("from data.", "import data."):
+            if token in text:
+                offenders.append(f"{path}:{token}")
+
+    assert offenders == []
 
 
 def test_web_api_does_not_depend_on_cli_commands():

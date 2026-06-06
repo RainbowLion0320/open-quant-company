@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
@@ -13,29 +12,12 @@ import pandas as pd
 import requests
 
 from core.env_secrets import secret_status
+from data.ingestion.tushare_coverage import build_tushare_coverage, missing_symbol_files
+from data.ingestion.tushare_tasks import BACKFILL_TASKS, MINUTE_POLICY, REPORT_SCHEMA_VERSION
 from data.ingestion.tushare_utils import get_tushare_token
-from data.market.assets.etf import ETF_UNIVERSE
-from data.market.assets.futures import FUTURES_UNIVERSE
 from data.market.symbol_utils import normalize_symbol, to_ts_code
 from data.market.symbols import CIRCLE_STOCKS, SW_INDUSTRY_FIRST
 from data.storage.datahub import DataHub, get_datahub
-
-
-MINUTE_POLICY = "audit_only"
-REPORT_SCHEMA_VERSION = 1
-FUTURES_TUSHARE_EXCHANGE = {
-    "IF": "CFX",
-    "IC": "CFX",
-    "IH": "CFX",
-    "IM": "CFX",
-    "T": "CFX",
-    "TF": "CFX",
-    "TS": "CFX",
-    "RB": "SHF",
-    "AU": "SHF",
-    "CU": "SHF",
-    "SC": "INE",
-}
 
 
 def _now_text() -> str:
@@ -66,105 +48,6 @@ def classify_probe_result(result: object) -> tuple[str, str]:
     return "ok", ""
 
 
-def _candidate_file_stems(symbol: str) -> set[str]:
-    normalized = normalize_symbol(symbol)
-    stems = {symbol, normalized}
-    try:
-        stems.add(to_ts_code(normalized))
-    except Exception:
-        pass
-    return {stem for stem in stems if stem}
-
-
-def symbol_file_coverage(root: str | Path, expected_symbols: list[str]) -> dict[str, object]:
-    """Count expected symbol parquet files, accepting 6-digit and Tushare-code filenames."""
-    path = Path(root)
-    existing_stems = {item.stem for item in path.glob("*.parquet")} if path.exists() else set()
-    missing = [
-        symbol
-        for symbol in expected_symbols
-        if not (_candidate_file_stems(symbol) & existing_stems)
-    ]
-    expected = len(expected_symbols)
-    existing = expected - len(missing)
-    ratio = round(existing / expected, 4) if expected else 1.0
-    return {
-        "expected": expected,
-        "existing": existing,
-        "missing": len(missing),
-        "ratio": ratio,
-        "missing_sample": missing[:20],
-    }
-
-
-def missing_symbol_files(root: str | Path, expected_symbols: list[str]) -> list[str]:
-    path = Path(root)
-    existing_stems = {item.stem for item in path.glob("*.parquet")} if path.exists() else set()
-    return [
-        symbol
-        for symbol in expected_symbols
-        if not (_candidate_file_stems(symbol) & existing_stems)
-    ]
-
-
-def partition_file_coverage(root: str | Path, expected_partitions: list[str]) -> dict[str, object]:
-    path = Path(root)
-    existing = {item.stem for item in path.glob("*.parquet")} if path.exists() else set()
-    missing = [partition for partition in expected_partitions if partition not in existing]
-    expected = len(expected_partitions)
-    present = expected - len(missing)
-    ratio = round(present / expected, 4) if expected else 1.0
-    return {
-        "expected": expected,
-        "existing": present,
-        "missing": len(missing),
-        "ratio": ratio,
-        "missing_sample": missing[:20],
-    }
-
-
-def file_coverage(path: str | Path) -> dict[str, object]:
-    target = Path(path)
-    exists = target.exists() and target.stat().st_size > 0
-    return {
-        "expected": 1,
-        "existing": 1 if exists else 0,
-        "missing": 0 if exists else 1,
-        "ratio": 1.0 if exists else 0.0,
-        "missing_sample": [] if exists else [target.name],
-    }
-
-
-def _etf_ts_codes() -> list[str]:
-    return [to_ts_code(code) for code in ETF_UNIVERSE]
-
-
-def _futures_ts_codes() -> list[str]:
-    codes = []
-    for code in FUTURES_UNIVERSE:
-        text = str(code).strip().upper()
-        if not text:
-            continue
-        if "." in text:
-            codes.append(text)
-            continue
-        exchange = FUTURES_TUSHARE_EXCHANGE.get(text)
-        if exchange:
-            codes.append(f"{text}.{exchange}")
-    return codes
-
-
-def _recent_quarter_periods(count: int = 4) -> list[str]:
-    today = datetime.now()
-    periods: list[str] = []
-    for year in range(today.year - 2, today.year + 1):
-        for month, day in ((3, 31), (6, 30), (9, 30), (12, 31)):
-            period = datetime(year, month, day)
-            if period.date() <= today.date():
-                periods.append(period.strftime("%Y%m%d"))
-    return sorted(periods, reverse=True)[:count]
-
-
 def _write_json_report(hub: DataHub, prefix: str, payload: dict[str, Any]) -> Path:
     report_dir = hub.store_root / "_audit"
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -179,52 +62,6 @@ def _append_backfill_event(hub: DataHub, event: dict[str, Any]) -> None:
     ledger = ledger_dir / "tushare_backfill.jsonl"
     with ledger.open("a", encoding="utf-8") as f:
         f.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
-
-
-@dataclass(frozen=True)
-class BackfillTask:
-    key: str
-    label: str
-    priority: str
-    repair_table: str | None = None
-    direct: str | None = None
-    minute_audit_only: bool = False
-
-
-BACKFILL_TASKS: list[BackfillTask] = [
-    BackfillTask("stock_basic", "Tushare 股票基础信息", "p0", direct="stock_basic"),
-    BackfillTask("trade_cal", "Tushare 交易日历", "p0", direct="trade_cal"),
-    BackfillTask("tushare_stock_daily", "Tushare 日线原始行情", "p0", direct="tushare_stock_daily"),
-    BackfillTask("adj_factor", "复权因子", "p0", direct="adj_factor"),
-    BackfillTask("valuation_daily", "每日估值", "p0", direct="valuation_daily"),
-    BackfillTask("fina_indicator", "财务指标", "p0", direct="fina_indicator"),
-    BackfillTask("moneyflow_tushare_daily", "Tushare 日频资金流", "p0", repair_table="stock_moneyflow_tushare_daily"),
-    BackfillTask("moneyflow_monthly", "月频资金流", "p0", repair_table="stock_moneyflow_monthly"),
-    BackfillTask("holder_number", "股东户数", "p0", direct="holder_number"),
-    BackfillTask("holder_trade", "股东增减持", "p0", direct="holder_trade"),
-    BackfillTask("sector_sw_daily", "申万行业日线", "p0", direct="sector_sw_daily"),
-    BackfillTask("macro_pmi", "PMI", "p0", repair_table="macro_pmi"),
-    BackfillTask("macro_cpi", "CPI", "p0", repair_table="macro_cpi"),
-    BackfillTask("macro_ppi", "PPI", "p0", repair_table="macro_ppi"),
-    BackfillTask("macro_gdp", "GDP", "p0", repair_table="macro_gdp"),
-    BackfillTask("macro_lpr", "LPR", "p0", repair_table="macro_lpr"),
-    BackfillTask("moneyflow_mkt_dc", "大盘资金流", "p0", direct="moneyflow_mkt_dc"),
-    BackfillTask("limit_list", "涨跌停", "p1", repair_table="stock_limit_list"),
-    BackfillTask("top_list", "龙虎榜", "p1", repair_table="stock_top_list"),
-    BackfillTask("broker_recommend", "券商金股", "p1", repair_table="stock_broker_recommend"),
-    BackfillTask("research_report", "券商研报", "p1", repair_table="stock_research_report"),
-    BackfillTask("share_float", "限售解禁", "p1", repair_table="share_float"),
-    BackfillTask("repurchase", "股票回购", "p1", repair_table="repurchase"),
-    BackfillTask("dividend", "分红送股", "p1", repair_table="stock_dividend"),
-    BackfillTask("fund_basic", "基金基础信息", "p2", direct="fund_basic"),
-    BackfillTask("fund_daily", "基金日线", "p2", repair_table="fund_daily"),
-    BackfillTask("fund_nav", "基金净值", "p2", repair_table="fund_nav"),
-    BackfillTask("fund_portfolio", "基金持仓", "p2", repair_table="fund_portfolio"),
-    BackfillTask("futures_daily", "期货日线", "p2", repair_table="futures_daily"),
-    BackfillTask("cyq_perf", "筹码分布胜率", "p2", direct="cyq_perf"),
-    BackfillTask("stk_factor_pro", "专业技术因子", "p2", direct="stk_factor_pro"),
-    BackfillTask("stk_mins", "分钟行情", "p2", minute_audit_only=True),
-]
 
 
 class TushareGovernance:
@@ -315,36 +152,7 @@ class TushareGovernance:
     def coverage(self, days: int = 365) -> dict[str, dict[str, object]]:
         symbols = self.stock_universe()
         days_list = self.trade_days(days) or []
-        coverage: dict[str, dict[str, object]] = {
-            "stock_basic": file_coverage(self.hub.dimension_root("stock_basic")),
-            "trade_cal": file_coverage(self.hub.dimension_root("trade_cal")),
-            "tushare_stock_daily": partition_file_coverage(self.hub.dimension_root("tushare_stock_daily"), days_list),
-            "adj_factor": symbol_file_coverage(self.hub.dimension_root("adj_factor"), symbols),
-            "valuation_daily": symbol_file_coverage(self.hub.dimension_root("valuation_daily"), symbols),
-            "fina_indicator": symbol_file_coverage(self.hub.dimension_root("fina_indicator"), symbols),
-            "moneyflow_tushare_daily": partition_file_coverage(self.hub.dimension_root("moneyflow_tushare_daily"), days_list),
-            "moneyflow_monthly": {"expected": 0, "existing": len(list(self.hub.dimension_root("moneyflow_monthly").glob("*.parquet"))) if self.hub.dimension_root("moneyflow_monthly").exists() else 0, "missing": 0, "ratio": 1.0, "missing_sample": []},
-            "holder_number": symbol_file_coverage(self.hub.dimension_root("holder_number"), symbols),
-            "holder_trade": symbol_file_coverage(self.hub.dimension_root("holder_trade"), symbols),
-            "sector_sw_daily": symbol_file_coverage(self.hub.dimension_root("sector_sw_daily"), [f"{code}.SI" for code in SW_INDUSTRY_FIRST]),
-            "moneyflow_mkt_dc": file_coverage(self.hub.dimension_root("moneyflow_mkt_dc")),
-            "limit_list": partition_file_coverage(self.hub.dimension_root("limit_list"), days_list[-60:]),
-            "top_list": partition_file_coverage(self.hub.dimension_root("top_list"), days_list[-60:]),
-            "broker_recommend": {"expected": 0, "existing": len(list(self.hub.dimension_root("broker_recommend").glob("*.parquet"))) if self.hub.dimension_root("broker_recommend").exists() else 0, "missing": 0, "ratio": 1.0, "missing_sample": []},
-            "research_report": {"expected": 0, "existing": len(list(self.hub.dimension_root("research_report").glob("*.parquet"))) if self.hub.dimension_root("research_report").exists() else 0, "missing": 0, "ratio": 1.0, "missing_sample": []},
-            "share_float": file_coverage(self.hub.dimension_root("share_float")),
-            "repurchase": file_coverage(self.hub.dimension_root("repurchase")),
-            "dividend": file_coverage(self.hub.dimension_root("dividend")),
-            "fund_basic": file_coverage(self.hub.dimension_root("fund_basic")),
-            "fund_daily": symbol_file_coverage(self.hub.dimension_root("fund_daily"), _etf_ts_codes()),
-            "fund_nav": symbol_file_coverage(self.hub.dimension_root("fund_nav"), _etf_ts_codes()),
-            "fund_portfolio": partition_file_coverage(self.hub.dimension_root("fund_portfolio"), _recent_quarter_periods()),
-            "futures_daily": partition_file_coverage(self.hub.dimension_root("futures_daily"), _futures_ts_codes()),
-            "cyq_perf": partition_file_coverage(self.hub.dimension_root("cyq_perf"), days_list[-60:]),
-            "stk_factor_pro": symbol_file_coverage(self.hub.dimension_root("stk_factor_pro"), symbols),
-            "stk_mins": {"expected": 0, "existing": 0, "missing": 0, "ratio": 1.0, "missing_sample": [], "policy": MINUTE_POLICY},
-        }
-        return coverage
+        return build_tushare_coverage(self.hub, symbols, days_list)
 
     def audit(self, probe_network: bool = True, days: int = 365) -> dict[str, Any]:
         payload: dict[str, Any] = {

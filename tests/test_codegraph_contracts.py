@@ -327,6 +327,70 @@ def test_codegraph_diagnostics_detects_architecture_risks(tmp_path, monkeypatch)
     assert any(flag["category"] == "cross_layer" for flag in payload["edge_flags"])
 
 
+def test_codegraph_diagnostics_keeps_entrypoints_tests_and_facades_below_p0(tmp_path, monkeypatch):
+    from web.api.services.codegraph_diagnostics import CodeGraphDiagnosticsService
+
+    _make_diagnostics_db(tmp_path)
+    service = CodeGraphDiagnosticsService(tmp_path)
+    monkeypatch.setattr(
+        service,
+        "_git_churn",
+        lambda: {
+            "scripts/entry.py": 30,
+            "tests/test_contract.py": 30,
+            "data/storage/datahub.py": 1,
+            "models/__init__.py": 12,
+        },
+    )
+    con = sqlite3.connect(tmp_path / ".codegraph" / "codegraph.db")
+    con.executemany(
+        "INSERT INTO files VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            ("tests/test_contract.py", "h8", "python", 9000, 1, 2, 4, "[]"),
+            ("data/storage/datahub.py", "h9", "python", 12000, 1, 2, 10, "[]"),
+            ("models/__init__.py", "h10", "python", 2000, 1, 2, 3, "[]"),
+        ],
+    )
+    con.executemany(
+        """
+        INSERT INTO nodes (
+            id, kind, name, qualified_name, file_path, language, start_line, end_line,
+            start_column, end_column, docstring, signature, visibility, is_exported,
+            is_async, is_static, is_abstract, decorators, type_parameters, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NULL, NULL, NULL, 0, 0, 0, 0, '[]', '[]', 3)
+        """,
+        [
+            ("file:tests/test_contract.py", "file", "test_contract.py", "tests/test_contract.py", "tests/test_contract.py", "python", 1, 620),
+            ("func:test_contract", "function", "test_contract", "test_contract", "tests/test_contract.py", "python", 20, 80),
+            ("file:data/storage/datahub.py", "file", "datahub.py", "data/storage/datahub.py", "data/storage/datahub.py", "python", 1, 520),
+            ("func:datahub", "function", "get_datahub", "get_datahub", "data/storage/datahub.py", "python", 20, 80),
+            ("file:models/__init__.py", "file", "__init__.py", "models/__init__.py", "models/__init__.py", "python", 1, 40),
+            ("func:model_api", "function", "model_api", "model_api", "models/__init__.py", "python", 5, 20),
+            ("func:test_user", "function", "test_user", "test_user", "tests/test_contract.py", "python", 90, 120),
+        ],
+    )
+    noisy_edges = []
+    noisy_edges.extend(("func:test_contract", "func:datahub", "calls", None, 10, 1, None) for _ in range(60))
+    noisy_edges.extend(("func:entry", "func:datahub", "calls", None, 11, 1, None) for _ in range(6))
+    noisy_edges.extend(("func:web_route", "func:datahub", "calls", None, 12, 1, None) for _ in range(90))
+    noisy_edges.extend(("func:test_user", "func:model_api", "calls", None, 13, 1, None) for _ in range(40))
+    con.executemany(
+        "INSERT INTO edges (source, target, kind, metadata, line, col, provenance) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        noisy_edges,
+    )
+    con.commit()
+    con.close()
+
+    payload = service.diagnostics(limit=80, include_git=True)
+    issues = {issue["path"]: issue for issue in payload["issues"] if issue["category"] == "hotspot"}
+
+    assert "tests/test_contract.py" not in issues
+    assert issues["scripts/entry.py"]["severity"] != "P0"
+    assert issues["data/storage/datahub.py"]["severity"] != "P0"
+    assert all(issue["category"] != "internal_api_leak" or issue["path"] != "models/__init__.py" for issue in payload["issues"])
+
+
 def test_codegraph_diagnostics_limit_and_api_contract(tmp_path, monkeypatch):
     from web.api.app import create_app
     from web.api.routes import codegraph as route

@@ -24,6 +24,7 @@ from web.api.services.system_data_ops import (
     contracts_payload,
     last_backfill_payload,
     provider_health_payload,
+    quality_gate_payload,
 )
 from web.api.services.system_orders import order_lifecycle_payload, order_trace_payload
 
@@ -82,24 +83,7 @@ async def cron_jobs():
 @router.get("/quality-gate")
 async def quality_gate(dimension: str = Query(default="", description="Check a single dimension (empty = all critical)")):
     """数据质量门禁 — freshness SLA / completeness / consistency."""
-    from data.quality.quality import DataQualityGate
-    gate = DataQualityGate()
-    if dimension:
-        report = gate.check_dimension(dimension)
-        return {
-            "dimension": report.dimension,
-            "label": report.label,
-            "status": report.status,
-            "health_score": report.health_score,
-            "freshness_days": report.freshness_days,
-            "sla_days": report.sla_days,
-            "row_count": report.row_count,
-            "null_pct": report.null_pct,
-            "date_min": report.date_min,
-            "date_max": report.date_max,
-            "issues": report.issues,
-        }
-    return gate.summary_report()
+    return quality_gate_payload(dimension)
 
 
 @router.get("/runs")

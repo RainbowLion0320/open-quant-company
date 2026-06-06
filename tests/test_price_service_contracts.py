@@ -196,7 +196,7 @@ def test_major_price_consumers_declare_price_use_cases():
         "signals/ml_signals.py": ("get_stock_prices", "PriceUseCase.SIGNAL"),
         "scripts/execute_paper_trades.py": ("get_stock_prices", "PriceUseCase.EXECUTION"),
         "web/api/services/dcf.py": ("get_stock_prices", "PriceUseCase.VALUATION"),
-        "web/api/routes/portfolio.py": ("get_stock_prices", "PriceUseCase.EXECUTION"),
+        "web/api/services/portfolio.py": ("get_stock_prices", "PriceUseCase.EXECUTION"),
         "web/api/services/stocks.py": ("get_stock_prices", "PriceUseCase.DISPLAY"),
     }
 

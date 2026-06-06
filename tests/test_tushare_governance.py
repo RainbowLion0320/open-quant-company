@@ -2,7 +2,7 @@ import pandas as pd
 
 
 def test_symbol_file_coverage_counts_missing_expected_symbols(tmp_path):
-    from data.ingestion.tushare_governance import missing_symbol_files, symbol_file_coverage
+    from data.ingestion.tushare_coverage import missing_symbol_files, symbol_file_coverage
 
     root = tmp_path / "stock" / "fina_indicator"
     root.mkdir(parents=True)
@@ -31,7 +31,8 @@ def test_probe_status_classifies_permission_rate_limit_and_empty(monkeypatch):
 
 def test_backfill_records_rate_limited_tasks_as_skipped(tmp_path, monkeypatch):
     import data.ingestion.tushare_governance as governance
-    from data.ingestion.tushare_governance import BackfillTask, TushareGovernance
+    from data.ingestion.tushare_governance import TushareGovernance
+    from data.ingestion.tushare_tasks import BackfillTask
     from data.storage.datahub import DataHub
 
     hub = DataHub(
@@ -76,7 +77,7 @@ def test_stock_universe_prefers_tushare_stock_basic(tmp_path, monkeypatch):
 
 
 def test_asset_universe_coverage_uses_project_etf_and_futures_universes(tmp_path, monkeypatch):
-    import data.ingestion.tushare_governance as governance
+    import data.ingestion.tushare_coverage as coverage_module
     from data.ingestion.tushare_governance import TushareGovernance
     from data.storage.datahub import DataHub
 
@@ -85,8 +86,8 @@ def test_asset_universe_coverage_uses_project_etf_and_futures_universes(tmp_path
         store_root=tmp_path / "var" / "store",
         cache_root=tmp_path / "var" / "cache",
     )
-    monkeypatch.setattr(governance, "ETF_UNIVERSE", ("510050", "159915"))
-    monkeypatch.setattr(governance, "FUTURES_UNIVERSE", ("IF", "RB"))
+    monkeypatch.setattr(coverage_module, "ETF_UNIVERSE", ("510050", "159915"))
+    monkeypatch.setattr(coverage_module, "FUTURES_UNIVERSE", ("IF", "RB"))
 
     hub.write_parquet(pd.DataFrame({"x": [1]}), hub.dimension_root("fund_daily") / "510050.SH.parquet")
     hub.write_parquet(pd.DataFrame({"x": [1]}), hub.dimension_root("fund_nav") / "159915.SZ.parquet")
@@ -107,7 +108,8 @@ def test_asset_universe_coverage_uses_project_etf_and_futures_universes(tmp_path
 
 def test_holder_event_backfill_writes_empty_success_as_coverage_marker(tmp_path, monkeypatch):
     import data.ingestion.tushare_governance as governance
-    from data.ingestion.tushare_governance import TushareGovernance, missing_symbol_files
+    from data.ingestion.tushare_coverage import missing_symbol_files
+    from data.ingestion.tushare_governance import TushareGovernance
     from data.storage.datahub import DataHub
 
     hub = DataHub(

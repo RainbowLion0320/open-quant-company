@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from core.settings import clear_settings_cache, get_dotted, resolve_settings_path, set_dotted
 from web.api.settings_schema import validate_settings_section
+from web.api.services.settings_audit import record_settings_change
 
 router = APIRouter(prefix="/api/settings", tags=["Settings"])
 
@@ -77,22 +78,7 @@ def _check_writable(section: str) -> None:
 
 def _audit_change(request: Request, section: str, method: str, old_data: dict, new_data: dict):
     """Record config change to audit ledger."""
-    try:
-        from data.ops.audit import ConfigAuditLedger
-        from web.api.auth import get_run_mode
-
-        ledger = ConfigAuditLedger()
-        ledger.record(
-            section=section,
-            method=method,
-            old_data=old_data,
-            new_data=new_data,
-            source_ip=request.client.host if request.client else "",
-            user_agent=request.headers.get("user-agent", ""),
-            run_mode=get_run_mode(),
-        )
-    except Exception:
-        pass  # audit failure must not block config writes
+    record_settings_change(request, section, method, old_data, new_data)
 
 
 # ── GET ────────────────────────────────────────────────────

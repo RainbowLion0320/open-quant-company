@@ -1,4 +1,4 @@
-"""Compatibility facade for broker interfaces and the paper broker."""
+"""Public facade for broker interfaces and the paper broker."""
 from __future__ import annotations
 
 from broker.base import Broker

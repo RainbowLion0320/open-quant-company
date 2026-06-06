@@ -12,7 +12,17 @@ from web.api.schemas.strategy import (
     StrategySignalsResponse,
     JobStatus,
 )
-from web.api.errors import DataNotFoundError, InvalidParameterError, StrategyRunError
+from web.api.services.strategies import (
+    start_strategy_run,
+    strategy_catalog_payload,
+    strategy_evaluation_payload,
+    strategy_evidence_detail_payload,
+    strategy_evidence_list_payload,
+    strategy_governance_payload,
+    strategy_list_payload,
+    strategy_signals_payload,
+    strategy_status_payload,
+)
 
 router = APIRouter(prefix="/api/strategies", tags=["Strategies"])
 
@@ -22,79 +32,31 @@ router = APIRouter(prefix="/api/strategies", tags=["Strategies"])
 @router.get("", response_model=StrategyListResponse)
 async def list_strategies():
     """列出所有已计算策略及统计 + 策略注册表元数据"""
-    from data.storage.results_db import list_strategies as db_list
-    from data.strategy.catalog import get_enabled_strategies, ALLOWED_STATUSES
-
-    strategies = db_list()
-    registry = get_enabled_strategies()
-
-    # Enrich with status metadata for frontend lifecycle display
-    for s in registry:
-        st = s.get("status", "candidate")
-        s["status_rank"] = list(ALLOWED_STATUSES).index(st) if st in ALLOWED_STATUSES else 0
-
-    return {
-        "strategies": strategies,
-        "registry": registry,
-        "total": len(strategies),
-        "statuses": list(ALLOWED_STATUSES),
-    }
+    return strategy_list_payload()
 
 
 @router.get("/statuses")
 async def get_strategy_statuses():
     """所有策略的当前生命周期状态."""
-    from data.strategy.catalog import get_enabled_strategies, status_label, ALLOWED_STATUSES
-    registry = get_enabled_strategies()
-    return {
-        "strategies": [
-            {
-                "name": s["name"],
-                "label": s["label"],
-                "status": s.get("status", "candidate"),
-                "status_label": status_label(s.get("status", "candidate")),
-                "color": s["color"],
-            }
-            for s in registry
-        ],
-        "statuses": list(ALLOWED_STATUSES),
-        "status_labels": {s: status_label(s) for s in ALLOWED_STATUSES},
-        "status": "ok",
-    }
+    return strategy_status_payload()
 
 
 @router.get("/governance")
 async def get_strategy_governance():
     """Return strategy role layering and promotion gate definitions."""
-    from data.strategy.catalog import list_strategy_names
-    from research.strategy_governance import governance_summary
-
-    summary = governance_summary(list_strategy_names())
-    return {
-        **summary,
-        "status": "ok",
-    }
+    return strategy_governance_payload()
 
 
 @router.get("/catalog", response_model=StrategyCatalogResponse)
 async def get_strategy_catalog():
     """Return the strategy catalog contract used by research and UI surfaces."""
-    from research.strategy_catalog import catalog_items
-
-    items = [item.__dict__ for item in catalog_items()]
-    return {"items": items, "total": len(items)}
+    return strategy_catalog_payload()
 
 
 @router.get("/evaluation", response_model=StrategyEvaluationSummaryResponse)
 async def get_strategy_evaluation_summary():
     """Return evaluation evidence requirements for candidate promotion."""
-    from research.strategy_evaluation import required_baselines
-
-    return {
-        "baselines": required_baselines(),
-        "status": "research_required",
-        "note": "Candidate strategies require OOS, walk-forward, cost and regime evidence before promotion.",
-    }
+    return strategy_evaluation_payload()
 
 
 # ── 启动策略运行 ──────────────────────────────────────────
@@ -102,19 +64,7 @@ async def get_strategy_evaluation_summary():
 @router.post("/run", response_model=StrategyRunResponse)
 async def run_strategy(req: StrategyRunRequest):
     """异步启动策略扫描, 返回 job_id"""
-    from web.api.jobs import run_strategy_async
-    from data.strategy.catalog import get_strategy, list_strategy_names
-
-    valid = set(list_strategy_names()) | {"all"}
-    if req.strategy not in valid:
-        raise StrategyRunError(
-            req.strategy,
-            f"Invalid strategy. Choose from: {', '.join(sorted(valid))}",
-        )
-    if req.mode not in {"production", "research"}:
-        raise StrategyRunError(req.strategy, f"Invalid runtime mode: {req.mode}")
-
-    job_id = await run_strategy_async(req.strategy, req.limit, req.params, mode=req.mode)
+    job_id = await start_strategy_run(req.strategy, req.limit, req.params, mode=req.mode)
     return StrategyRunResponse(job_id=job_id, status="started")
 
 
@@ -136,18 +86,13 @@ async def get_job_status(job_id: str):
 @router.get("/evidence", response_model=StrategyEvidenceListResponse)
 async def list_strategy_evidence():
     """List all strategy evidence artifacts."""
-    from research.strategy_evaluation import list_evidence_artifacts
-
-    items = list_evidence_artifacts()
-    return {"items": items, "total": len(items)}
+    return strategy_evidence_list_payload()
 
 
 @router.get("/evidence/{strategy}", response_model=StrategyEvidenceDetailResponse)
 async def get_strategy_evidence(strategy: str):
     """Load a single strategy's evidence artifact."""
-    from research.strategy_evaluation import load_evidence_artifact
-
-    return load_evidence_artifact(strategy)
+    return strategy_evidence_detail_payload(strategy)
 
 
 # ── 策略信号 ──────────────────────────────────────────────
@@ -159,22 +104,7 @@ async def get_strategy_signals(
     order: str = Query(default="desc", description="desc / asc"),
 ):
     """加载某策略的全部信号"""
-    from data.strategy.catalog import list_strategy_names
-    from data.storage.results_db import load_strategy_signals
-
-    valid = set(list_strategy_names())
-    if name not in valid:
-        raise InvalidParameterError("strategy", name, f"Choose from: {', '.join(sorted(valid))}")
-
-    signals = load_strategy_signals(name, sort=sort, order=order)
-    if not signals:
-        raise DataNotFoundError("strategy", name)
-    return {
-        "strategy": name,
-        "total": len(signals),
-        "buys": sum(1 for s in signals if s.get("signal") == "buy"),
-        "signals": signals,
-    }
+    return strategy_signals_payload(name, sort=sort, order=order)
 
 
 # ── WebSocket 进度 ────────────────────────────────────────
