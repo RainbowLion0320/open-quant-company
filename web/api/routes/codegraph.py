@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from web.api.services.codegraph import CodeGraphService, run_codegraph_sync
+from web.api.services.codegraph_diagnostics import CodeGraphDiagnosticsService
 
 router = APIRouter(prefix="/api/codegraph", tags=["CodeGraph"])
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -20,6 +21,10 @@ class CodeGraphSyncRequest(BaseModel):
 
 def _service() -> CodeGraphService:
     return CodeGraphService(PROJECT_ROOT)
+
+
+def _diagnostics_service() -> CodeGraphDiagnosticsService:
+    return CodeGraphDiagnosticsService(PROJECT_ROOT)
 
 
 def _csv(value: str | None) -> tuple[str, ...]:
@@ -61,6 +66,16 @@ async def codegraph_search(q: str = "", limit: int = 20):
 @router.get("/neighborhood")
 async def codegraph_neighborhood(node_id: str, depth: int = 1, limit: int = 180):
     return _service().neighborhood(node_id, depth=depth, limit=limit)
+
+
+@router.get("/diagnostics")
+async def codegraph_diagnostics(
+    scope: Literal["summary", "module", "file", "symbol"] = "summary",
+    root: str = "",
+    limit: int = 80,
+    include_git: bool = True,
+):
+    return _diagnostics_service().diagnostics(scope=scope, root=root, limit=limit, include_git=include_git)
 
 
 @router.post("/sync")

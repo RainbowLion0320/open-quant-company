@@ -32,12 +32,21 @@ export interface GraphNode {
   group: string;
   signature?: string | null;
   docstring?: string | null;
+  risk_score?: number;
+  risk_severity?: "P0" | "P1" | "P2";
+  risk_categories?: string[];
   x?: number;
   y?: number;
   z?: number;
   vx?: number;
   vy?: number;
   vz?: number;
+}
+
+export interface NodeRisk {
+  score: number;
+  severity: "P0" | "P1" | "P2";
+  categories: string[];
 }
 
 export interface GraphLink {

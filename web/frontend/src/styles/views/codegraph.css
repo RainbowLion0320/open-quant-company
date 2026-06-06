@@ -44,6 +44,7 @@
 .toolbar-stats,
 .toolbar-error,
 .status-pill,
+.risk-pill,
 .level-control button,
 .edge-filters button,
 .breadcrumb button,
@@ -86,6 +87,33 @@
   border-color: rgba(248, 113, 113, 0.32);
   color: #f87171;
   background: rgba(248, 113, 113, 0.08);
+}
+
+.risk-pill {
+  padding: 4px 8px;
+  border: 1px solid rgba(56, 189, 248, 0.24);
+  border-radius: 999px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  white-space: nowrap;
+}
+
+.risk-pill.p0 {
+  border-color: rgba(255, 77, 109, 0.34);
+  color: #fb7185;
+  background: rgba(255, 77, 109, 0.1);
+}
+
+.risk-pill.p1 {
+  border-color: rgba(250, 204, 21, 0.34);
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.08);
+}
+
+.risk-pill.clean {
+  border-color: rgba(52, 211, 153, 0.28);
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.08);
 }
 
 .search-box {
@@ -356,6 +384,155 @@
   overflow-y: auto;
 }
 
+.diagnostics-panel {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 45;
+  width: min(430px, calc(100% - 32px));
+  max-height: min(380px, calc(100% - 88px));
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.diagnostics-head,
+.diagnostics-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diagnostics-head {
+  justify-content: space-between;
+}
+
+.diagnostics-head span,
+.diagnostics-head strong,
+.panel-action,
+.diagnostics-filters button,
+.diagnostics-filters select {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.diagnostics-head span {
+  color: #94a3b8;
+}
+
+.diagnostics-head strong {
+  margin-left: 8px;
+  color: #00d4ff;
+}
+
+.panel-action,
+.diagnostics-filters button,
+.diagnostics-filters select {
+  min-height: 24px;
+  color: #94a3b8;
+  background: rgba(2, 6, 23, 0.42);
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: 5px;
+}
+
+.panel-action {
+  padding: 0 8px;
+  color: #00d4ff;
+  cursor: pointer;
+}
+
+.diagnostics-filters {
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.diagnostics-filters button {
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.diagnostics-filters button.active {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.09);
+}
+
+.diagnostics-filters select {
+  max-width: 180px;
+  padding: 0 8px;
+  outline: none;
+}
+
+.diagnostics-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  overflow-y: auto;
+}
+
+.diagnostic-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 3px 8px;
+  padding: 8px;
+  text-align: left;
+  background: rgba(2, 6, 23, 0.28);
+  border: 1px solid rgba(148, 163, 184, 0.09);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.diagnostic-item:hover {
+  border-color: rgba(0, 212, 255, 0.24);
+  background: rgba(0, 212, 255, 0.07);
+}
+
+.issue-severity {
+  grid-row: span 2;
+  align-self: center;
+  padding: 3px 0;
+  color: #38bdf8;
+  text-align: center;
+  background: rgba(56, 189, 248, 0.1);
+  border-radius: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+}
+
+.issue-severity.p0 {
+  color: #fb7185;
+  background: rgba(255, 77, 109, 0.12);
+}
+
+.issue-severity.p1 {
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.1);
+}
+
+.diagnostic-item strong {
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostic-item em,
+.diagnostics-empty {
+  color: #94a3b8;
+  font-size: 10px;
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostics-empty {
+  margin: 8px 0 0;
+}
+
 .panel-close {
   position: absolute;
   top: 12px;
@@ -493,6 +670,13 @@
   .detail-panel {
     inset: 12px;
     width: auto;
+  }
+  .diagnostics-panel {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: 260px;
   }
   .codegraph {
     min-height: calc(100vh - 132px);

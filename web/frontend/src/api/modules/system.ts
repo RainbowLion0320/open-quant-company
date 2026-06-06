@@ -1,5 +1,5 @@
 import { get, post } from "../client";
-import type { CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LlmUsageResponse, SystemHistoryResponse, SystemMonitor } from "../types";
+import type { CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LlmUsageResponse, SystemHistoryResponse, SystemMonitor } from "../types";
 
 export const systemApi = {
   systemMonitor: () => get<SystemMonitor>("/api/system/monitor"),
@@ -26,5 +26,13 @@ export const systemApi = {
     get<{ items: CodeGraphNode[] }>(`/api/codegraph/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   codeGraphNeighborhood: (nodeId: string, depth = 1, limit = 180) =>
     get<CodeGraphGraphResponse>(`/api/codegraph/neighborhood?node_id=${encodeURIComponent(nodeId)}&depth=${depth}&limit=${limit}`),
+  codeGraphDiagnostics: (params: { scope?: string; root?: string; limit?: number; include_git?: boolean } = {}) => {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== "") search.set(key, String(value));
+    }
+    const query = search.toString();
+    return get<CodeGraphDiagnosticsResponse>(`/api/codegraph/diagnostics${query ? `?${query}` : ""}`);
+  },
   codeGraphSync: (mode: "sync" | "rebuild") => post<{ status: string; mode: string; results: any[] }>("/api/codegraph/sync", { mode }),
 };

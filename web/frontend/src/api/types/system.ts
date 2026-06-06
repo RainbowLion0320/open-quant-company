@@ -100,6 +100,48 @@ export interface CodeGraphNode {
   docstring?: string | null;
 }
 
+export interface CodeGraphIssue {
+  id: string;
+  severity: "P0" | "P1" | "P2";
+  category: string;
+  title: string;
+  node_id: string;
+  source: string;
+  target: string;
+  path: string;
+  evidence: Record<string, any>;
+  recommendation: string;
+}
+
+export interface CodeGraphNodeRisk {
+  score: number;
+  severity: "P0" | "P1" | "P2";
+  categories: string[];
+}
+
+export interface CodeGraphEdgeFlag {
+  source: string;
+  target: string;
+  category: string;
+  severity: "P0" | "P1" | "P2";
+}
+
+export interface CodeGraphDiagnosticsResponse {
+  summary: {
+    initialized: boolean;
+    issue_count: number;
+    total_issue_count: number;
+    severity_counts: Record<string, number>;
+    risk_score: number;
+    git_churn_available: boolean;
+    stale: boolean;
+    truncated: boolean;
+  };
+  issues: CodeGraphIssue[];
+  node_scores: Record<string, CodeGraphNodeRisk>;
+  edge_flags: CodeGraphEdgeFlag[];
+}
+
 export interface CodeGraphLink {
   source: string;
   target: string;

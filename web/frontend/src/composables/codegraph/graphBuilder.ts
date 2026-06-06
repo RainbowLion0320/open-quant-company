@@ -5,6 +5,7 @@ import {
   GraphData,
   GraphLink,
   GraphNode,
+  NodeRisk,
   SimLink,
   SimNode,
 } from "./types";
@@ -161,8 +162,34 @@ export function maxNodeDegree(simNodes: SimNode[]): number {
   return Math.max(1, ...simNodes.map(node => node.degree));
 }
 
+export function applyNodeRiskStyles(
+  nodeMeshes: Map<string, THREE.Mesh>,
+  simNodes: SimNode[],
+  risks: Record<string, NodeRisk>,
+) {
+  for (const node of simNodes) {
+    const mesh = nodeMeshes.get(node.id);
+    if (!mesh) continue;
+    const risk = risks[node.id];
+    const material = mesh.material as THREE.MeshStandardMaterial;
+    const baseScale = mesh.userData.scale as number;
+    node.risk_score = risk?.score || 0;
+    node.risk_severity = risk?.severity;
+    node.risk_categories = risk?.categories || [];
+    material.emissive.setHex(risk ? riskColor(risk.severity) : nodeColor(node));
+    material.emissiveIntensity = risk ? 0.55 + Math.min(0.5, risk.score / 180) : 0.25 + (mesh.userData.degRatio || 0) * 0.45;
+    mesh.scale.setScalar(baseScale * (risk ? 1 + Math.min(0.34, risk.score / 260) : 1));
+  }
+}
+
 function nodeColor(node: SimNode): number {
   return (CODEGRAPH_COLORS as Record<string, number>)[node.kind] || CODEGRAPH_COLORS.function;
+}
+
+function riskColor(severity: "P0" | "P1" | "P2"): number {
+  if (severity === "P0") return 0xff4d6d;
+  if (severity === "P1") return 0xfacc15;
+  return 0x38bdf8;
 }
 
 function edgeColor(edgeType: string): number {

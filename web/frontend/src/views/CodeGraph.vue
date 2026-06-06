@@ -9,7 +9,11 @@
         <span class="status-pill" :class="{ stale: status?.stale, missing: !status?.initialized }">
           {{ status?.initialized ? (status.stale ? t("codegraph.stale") : t("codegraph.current")) : t("codegraph.missing") }}
         </span>
+        <span v-if="diagnosticsSummary" class="risk-pill" :class="riskTone">
+          {{ t("codegraph.riskScore", { score: diagnosticsSummary.risk_score, p0: diagnosticsSummary.severity_counts.P0 || 0, p1: diagnosticsSummary.severity_counts.P1 || 0 }) }}
+        </span>
         <span class="toolbar-error" v-if="loadError">{{ loadError }}</span>
+        <span class="toolbar-error" v-if="diagnosticsError">{{ diagnosticsError }}</span>
       </div>
       <div class="toolbar-right">
         <div class="search-box">
@@ -63,7 +67,7 @@
       </div>
     </div>
 
-    <div class="graph-stage" ref="stageRef">
+    <div class="graph-stage">
       <div ref="threeRef" class="three-container"></div>
       <div v-if="!graphLoaded && !isLoading" class="graph-placeholder glass-card">
         <span>{{ t("codegraph.standby") }}</span>
@@ -103,8 +107,47 @@
             <h4>{{ t("codegraph.docstring") }}</h4>
             <p>{{ selectedNode.docstring }}</p>
           </div>
+          <div class="panel-section" v-if="selectedNode.risk_score">
+            <h4>{{ t("codegraph.risk") }}</h4>
+            <p>{{ selectedNode.risk_severity }} · {{ selectedNode.risk_score }} · {{ selectedNode.risk_categories?.join(', ') }}</p>
+          </div>
         </div>
       </transition>
+
+      <div class="diagnostics-panel glass-card" data-testid="diagnosticsPanel">
+        <div class="diagnostics-head">
+          <div>
+            <span>{{ t("codegraph.diagnostics") }}</span>
+            <strong v-if="diagnosticsSummary">{{ diagnosticsSummary.issue_count }}/{{ diagnosticsSummary.total_issue_count }}</strong>
+          </div>
+          <button class="panel-action" @click="loadDiagnostics" :disabled="isDiagnosticsLoading">
+            {{ isDiagnosticsLoading ? t("codegraph.loadingDiagnostics") : t("codegraph.refreshDiagnostics") }}
+          </button>
+        </div>
+        <div class="diagnostics-filters">
+          <button
+            v-for="severity in ['all', 'P0', 'P1', 'P2']"
+            :key="severity"
+            :class="{ active: severityFilter === severity }"
+            @click="severityFilter = severity as any"
+          >
+            {{ severityLabel(severity) }}
+          </button>
+          <select v-model="categoryFilter">
+            <option v-for="category in diagnosticCategories" :key="category" :value="category">
+              {{ categoryLabel(category) }}
+            </option>
+          </select>
+        </div>
+        <div class="diagnostics-list">
+          <button v-for="issue in filteredIssues" :key="issue.id" class="diagnostic-item" @click="openDiagnosticIssue(issue)">
+            <span class="issue-severity" :class="issue.severity.toLowerCase()">{{ issue.severity }}</span>
+            <strong>{{ issue.title }}</strong>
+            <em>{{ categoryLabel(issue.category) }} · {{ issue.path }}</em>
+          </button>
+          <p v-if="diagnosticsSummary && !filteredIssues.length" class="diagnostics-empty">{{ t("codegraph.noDiagnostics") }}</p>
+        </div>
+      </div>
 
       <div class="legend glass-card">
         <div class="legend-item"><span class="legend-dot module"></span>{{ t("codegraph.module") }}</div>
@@ -119,15 +162,16 @@
 
 <script setup lang="ts">
 import { useCodeGraph } from "../composables/useCodeGraph";
+import { useCodeGraphDiagnostics, type CodeGraphIssue } from "../composables/useCodeGraphDiagnostics";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
 const {
   threeRef,
-  stageRef,
   isLoading,
   isSyncing,
   graphLoaded,
+  graphVersion,
   level,
   root,
   status,
@@ -146,9 +190,30 @@ const {
   openSearchResult,
   syncIndex,
   toggleEdgeKind,
+  applyDiagnosticsNodeRisks,
   deselectNode,
   lineRange,
 } = useCodeGraph(t);
+
+const {
+  diagnosticsSummary,
+  isDiagnosticsLoading,
+  diagnosticsError,
+  severityFilter,
+  categoryFilter,
+  diagnosticCategories,
+  filteredIssues,
+  riskTone,
+  loadDiagnostics,
+  categoryLabel,
+  severityLabel,
+} = useCodeGraphDiagnostics(t, level, root, graphVersion, applyDiagnosticsNodeRisks);
+
+async function openDiagnosticIssue(issue: CodeGraphIssue) {
+  const path = issue.path || issue.source || issue.target;
+  if (!path) return;
+  await loadGraph("symbol", path);
+}
 </script>
 
 <style scoped src="../styles/views/codegraph.css"></style>

@@ -58,13 +58,13 @@ Current collection after cleanup: 590 pytest tests.
 | `test_factor_gate.py` | 15 | 5 | 208 | Candidate factor gate contracts; changed to isolated expression file. |
 | `test_fill_models.py` | 25 | 8 | 200 | Fill model contracts; kept. |
 | `test_frontend_i18n_contracts.py` | 4 | 0 | 82 | Frontend localization contracts; kept. |
-| `test_codegraph_contracts.py` | 4 | 0 | 187 | CodeGraph API/service graph contracts; kept. |
+| `test_codegraph_contracts.py` | 6 | 0 | 348 | CodeGraph graph and deterministic diagnostics contracts; kept. |
 | `test_hmm_engine.py` | 2 | 0 | 80 | HMM engine contract; kept. |
 | `test_ledger.py` | 19 | 6 | 350 | Event ledger contracts using temporary storage; kept. |
 | `test_market_data_view.py` | 3 | 0 | 48 | Market data view contracts; kept. |
 | `test_market_regime_v2.py` | 10 | 0 | 358 | Regime scoring/state contracts with synthetic data; kept. |
 | `test_market_route_contracts.py` | 5 | 0 | 111 | Market API contracts; kept. |
-| `test_modularization_contracts.py` | 7 | 0 | 184 | Module size/split contracts; kept. |
+| `test_modularization_contracts.py` | 8 | 0 | 206 | Module size/split contracts; kept. |
 | `test_multi_asset_tournament.py` | 12 | 4 | 127 | Multi-asset contracts; kept. |
 | `test_order_sm.py` | 22 | 1 | 172 | Order state machine contracts; kept. |
 | `test_pipeline_contracts.py` | 23 | 9 | 259 | Pipeline domain contracts; kept. |

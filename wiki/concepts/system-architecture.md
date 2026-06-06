@@ -205,9 +205,9 @@ strategies:
 | 系统指标采集 | `scripts/collect_system_metrics.py` | 每分钟写 SQLite 时序数据 |
 | Hindsight采集 | `scripts/collect_hindsight_tokens.py` | 从 /metrics (port 9177) 拉取 LLM token |
 | 系统监视API | `web/api/routes/system.py` | /monitor + /history 端点 |
-| CodeGraph API | `web/api/routes/codegraph.py` + `web/api/services/codegraph.py` | ★ `/api/codegraph/*` — 本地代码图谱数据端点 |
+| CodeGraph API | `web/api/routes/codegraph.py` + `web/api/services/codegraph.py` + `web/api/services/codegraph_diagnostics.py` | ★ `/api/codegraph/*` — 本地代码图谱数据端点和确定性架构诊断 |
 | 活动监视器 | `web/frontend/src/views/ActivityMonitor.vue` | 🖥️ CPU/内存/Token 仪表盘 |
-| 代码图谱 | `web/frontend/src/views/CodeGraph.vue` + `web/frontend/src/composables/useCodeGraph.ts` | ★ Three.js WebGL 3D 图谱, CodeGraph 模块/文件/符号可视化 |
+| 代码图谱 | `web/frontend/src/views/CodeGraph.vue` + `web/frontend/src/composables/useCodeGraph.ts` + `useCodeGraphDiagnostics.ts` | ★ Three.js WebGL 3D 图谱, CodeGraph 模块/文件/符号可视化和架构风险叠加 |
 | 模拟交易 | `web/frontend/src/views/Portfolio.vue` | ★ PaperBroker 日频模拟, NAV曲线+持仓+交易记录 |
 | 回测引擎 | `backtest/run_all_strategies.py` | 日频引擎 + 策略自主调仓 |
 | 回测评分 | `backtest/buffett_real_scorer.py` | PIT滚动评分器 |

@@ -187,3 +187,162 @@ def test_codegraph_api_replaces_hindsight_graph_route(monkeypatch, tmp_path):
     assert graph.status_code == 200
     assert graph.json()["nodes"]
     assert old.status_code == 404
+
+
+def _make_diagnostics_db(project_root: Path) -> Path:
+    graph_dir = project_root / ".codegraph"
+    graph_dir.mkdir()
+    db_path = graph_dir / "codegraph.db"
+    con = sqlite3.connect(db_path)
+    con.executescript(
+        """
+        CREATE TABLE files (
+            path TEXT PRIMARY KEY,
+            content_hash TEXT NOT NULL,
+            language TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            modified_at INTEGER NOT NULL,
+            indexed_at INTEGER NOT NULL,
+            node_count INTEGER DEFAULT 0,
+            errors TEXT
+        );
+        CREATE TABLE nodes (
+            id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL,
+            name TEXT NOT NULL,
+            qualified_name TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            language TEXT NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            start_column INTEGER NOT NULL,
+            end_column INTEGER NOT NULL,
+            docstring TEXT,
+            signature TEXT,
+            visibility TEXT,
+            is_exported INTEGER DEFAULT 0,
+            is_async INTEGER DEFAULT 0,
+            is_static INTEGER DEFAULT 0,
+            is_abstract INTEGER DEFAULT 0,
+            decorators TEXT,
+            type_parameters TEXT,
+            updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE edges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            target TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            metadata TEXT,
+            line INTEGER,
+            col INTEGER,
+            provenance TEXT DEFAULT NULL
+        );
+        """
+    )
+    files = [
+        ("web/api/routes/bad.py", "h1", "python", 2500, 1, 2, 2, "[]"),
+        ("data/storage/internal.py", "h2", "python", 9000, 1, 2, 6, "[]"),
+        ("pipeline/a.py", "h3", "python", 1800, 1, 2, 2, "[]"),
+        ("pipeline/b.py", "h4", "python", 1800, 1, 2, 2, "[]"),
+        ("scripts/entry.py", "h5", "python", 1200, 1, 2, 1, "[]"),
+        ("models/unused.py", "h6", "python", 1200, 1, 2, 1, "[]"),
+        ("web/frontend/src/views/BigView.vue", "h7", "vue", 40000, 1, 2, 20, "[]"),
+    ]
+    con.executemany("INSERT INTO files VALUES (?, ?, ?, ?, ?, ?, ?, ?)", files)
+    nodes = [
+        ("file:web/api/routes/bad.py", "file", "bad.py", "web/api/routes/bad.py", "web/api/routes/bad.py", "python", 1, 120),
+        ("func:web_route", "function", "web_route", "web_route", "web/api/routes/bad.py", "python", 10, 50),
+        ("file:data/storage/internal.py", "file", "internal.py", "data/storage/internal.py", "data/storage/internal.py", "python", 1, 820),
+        ("func:internal_api", "function", "internal_api", "internal_api", "data/storage/internal.py", "python", 20, 80),
+        ("func:hot_a", "function", "hot_a", "hot_a", "data/storage/internal.py", "python", 120, 180),
+        ("func:hot_b", "function", "hot_b", "hot_b", "data/storage/internal.py", "python", 200, 260),
+        ("file:pipeline/a.py", "file", "a.py", "pipeline/a.py", "pipeline/a.py", "python", 1, 90),
+        ("func:a", "function", "a", "a", "pipeline/a.py", "python", 10, 30),
+        ("file:pipeline/b.py", "file", "b.py", "pipeline/b.py", "pipeline/b.py", "python", 1, 90),
+        ("func:b", "function", "b", "b", "pipeline/b.py", "python", 10, 30),
+        ("file:scripts/entry.py", "file", "entry.py", "scripts/entry.py", "scripts/entry.py", "python", 1, 70),
+        ("func:entry", "function", "entry", "entry", "scripts/entry.py", "python", 5, 40),
+        ("file:models/unused.py", "file", "unused.py", "models/unused.py", "models/unused.py", "python", 1, 60),
+        ("func:unused", "function", "unused", "unused", "models/unused.py", "python", 5, 20),
+        ("file:web/frontend/src/views/BigView.vue", "file", "BigView.vue", "web/frontend/src/views/BigView.vue", "web/frontend/src/views/BigView.vue", "vue", 1, 980),
+        ("component:big", "component", "BigView", "BigView", "web/frontend/src/views/BigView.vue", "vue", 1, 980),
+    ]
+    con.executemany(
+        """
+        INSERT INTO nodes (
+            id, kind, name, qualified_name, file_path, language, start_line, end_line,
+            start_column, end_column, docstring, signature, visibility, is_exported,
+            is_async, is_static, is_abstract, decorators, type_parameters, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NULL, NULL, NULL, 0, 0, 0, 0, '[]', '[]', 3)
+        """,
+        nodes,
+    )
+    edges = [
+        ("file:web/api/routes/bad.py", "func:web_route", "contains", None, None, None, None),
+        ("file:data/storage/internal.py", "func:internal_api", "contains", None, None, None, None),
+        ("file:data/storage/internal.py", "func:hot_a", "contains", None, None, None, None),
+        ("file:data/storage/internal.py", "func:hot_b", "contains", None, None, None, None),
+        ("file:pipeline/a.py", "func:a", "contains", None, None, None, None),
+        ("file:pipeline/b.py", "func:b", "contains", None, None, None, None),
+        ("file:scripts/entry.py", "func:entry", "contains", None, None, None, None),
+        ("file:models/unused.py", "func:unused", "contains", None, None, None, None),
+        ("file:web/frontend/src/views/BigView.vue", "component:big", "contains", None, None, None, None),
+        ("func:web_route", "func:internal_api", "imports", None, 12, 4, None),
+        ("func:entry", "func:internal_api", "references", None, 8, 1, None),
+        ("component:big", "func:internal_api", "references", None, 40, 2, None),
+        ("func:a", "func:b", "imports", None, 20, 1, None),
+        ("func:b", "func:a", "imports", None, 20, 1, None),
+        ("func:internal_api", "func:hot_a", "calls", None, 70, 1, None),
+        ("func:internal_api", "func:hot_b", "calls", None, 72, 1, None),
+        ("component:big", "func:hot_a", "calls", None, 100, 2, None),
+        ("func:web_route", "func:hot_b", "calls", None, 25, 4, None),
+    ]
+    con.executemany(
+        "INSERT INTO edges (source, target, kind, metadata, line, col, provenance) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        edges,
+    )
+    con.commit()
+    con.close()
+    return db_path
+
+
+def test_codegraph_diagnostics_detects_architecture_risks(tmp_path, monkeypatch):
+    from web.api.services.codegraph_diagnostics import CodeGraphDiagnosticsService
+
+    _make_diagnostics_db(tmp_path)
+    service = CodeGraphDiagnosticsService(tmp_path)
+    monkeypatch.setattr(service, "_git_churn", lambda: {"data/storage/internal.py": 7})
+
+    payload = service.diagnostics(limit=40, include_git=True)
+    categories = {issue["category"] for issue in payload["issues"]}
+
+    assert payload["summary"]["initialized"] is True
+    assert payload["summary"]["issue_count"] == len(payload["issues"])
+    assert payload["summary"]["git_churn_available"] is True
+    assert {"cycle", "cross_layer", "hotspot", "orphan", "internal_api_leak", "large_connected_file"} <= categories
+    assert any(issue["source"] == "web/api/routes/bad.py" and issue["target"] == "data/storage/internal.py" for issue in payload["issues"])
+    assert payload["node_scores"]["file:data/storage/internal.py"]["severity"] in {"P0", "P1"}
+    assert any(flag["category"] == "cross_layer" for flag in payload["edge_flags"])
+
+
+def test_codegraph_diagnostics_limit_and_api_contract(tmp_path, monkeypatch):
+    from web.api.app import create_app
+    from web.api.routes import codegraph as route
+
+    _make_diagnostics_db(tmp_path)
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    monkeypatch.setattr(route, "PROJECT_ROOT", tmp_path)
+
+    client = TestClient(create_app())
+    res = client.get("/api/codegraph/diagnostics?limit=2&include_git=false")
+
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["summary"]["initialized"] is True
+    assert payload["summary"]["truncated"] is True
+    assert payload["summary"]["git_churn_available"] is False
+    assert len(payload["issues"]) == 2
+    assert "node_scores" in payload
+    assert "edge_flags" in payload

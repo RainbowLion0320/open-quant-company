@@ -1,7 +1,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import * as THREE from "three";
 import { api } from "../api";
-import { buildCodeGraph } from "./codegraph/graphBuilder";
+import { applyNodeRiskStyles, buildCodeGraph } from "./codegraph/graphBuilder";
 import { graphNodePreview, pickGraphNode, resetNodeScales } from "./codegraph/interaction";
 import {
   CodeGraphSceneObjects,
@@ -23,6 +23,7 @@ import type {
   EdgeMeta,
   GraphData,
   GraphNode,
+  NodeRisk,
   SimLink,
   SimNode,
 } from "./codegraph/types";
@@ -34,10 +35,10 @@ const EDGE_KINDS: EdgeKind[] = ["imports", "calls", "instantiates", "references"
 
 export function useCodeGraph(t: CodeGraphTranslate) {
   const threeRef = ref<HTMLElement | null>(null);
-  const stageRef = ref<HTMLElement | null>(null);
   const isLoading = ref(false);
   const isSyncing = ref(false);
   const graphLoaded = ref(false);
+  const graphVersion = ref(0);
   const level = ref<CodeGraphLevel>("module");
   const root = ref("");
   const status = ref<CodeGraphStatus | null>(null);
@@ -45,7 +46,6 @@ export function useCodeGraph(t: CodeGraphTranslate) {
   const hoveredNode = ref<GraphNode | null>(null);
   const selectedNode = ref<GraphNode | null>(null);
   const tooltipStyle = ref({ left: "0px", top: "0px" });
-  const linkCount = ref(0);
   const loadError = ref("");
   const searchQuery = ref("");
   const searchResults = ref<GraphNode[]>([]);
@@ -146,10 +146,10 @@ export function useCodeGraph(t: CodeGraphTranslate) {
       level.value = data.level;
       root.value = nextRoot;
       stats.value = data.stats || null;
-      linkCount.value = data.links?.length || 0;
       deselectNode();
       buildGraph(data);
       graphLoaded.value = true;
+      graphVersion.value += 1;
       restartSimulation();
     } catch (error) {
       loadError.value = error instanceof Error ? error.message : t("codegraph.loadError");
@@ -167,9 +167,9 @@ export function useCodeGraph(t: CodeGraphTranslate) {
       level.value = "neighborhood";
       root.value = selectedNode.value?.label || nodeId;
       stats.value = data.stats || null;
-      linkCount.value = data.links?.length || 0;
       buildGraph(data);
       graphLoaded.value = true;
+      graphVersion.value += 1;
       restartSimulation();
     } catch (error) {
       loadError.value = error instanceof Error ? error.message : t("codegraph.loadError");
@@ -258,6 +258,11 @@ export function useCodeGraph(t: CodeGraphTranslate) {
     if (three && threeRef.value) resizeCodeGraphScene(three, threeRef.value);
   }
 
+  function applyDiagnosticsNodeRisks(risks: Record<string, NodeRisk>) {
+    applyNodeRiskStyles(nodeMeshes, simNodes, risks);
+    if (converged) drawGraphFrame();
+  }
+
   onMounted(() => {
     if (!threeRef.value) return;
     three = createCodeGraphScene(threeRef.value);
@@ -279,10 +284,10 @@ export function useCodeGraph(t: CodeGraphTranslate) {
 
   return {
     threeRef,
-    stageRef,
     isLoading,
     isSyncing,
     graphLoaded,
+    graphVersion,
     level,
     root,
     status,
@@ -290,7 +295,6 @@ export function useCodeGraph(t: CodeGraphTranslate) {
     hoveredNode,
     selectedNode,
     tooltipStyle,
-    linkCount,
     loadError,
     searchQuery,
     searchResults,
@@ -302,6 +306,7 @@ export function useCodeGraph(t: CodeGraphTranslate) {
     openSearchResult,
     syncIndex,
     toggleEdgeKind,
+    applyDiagnosticsNodeRisks,
     deselectNode,
     lineRange,
   };

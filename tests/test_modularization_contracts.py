@@ -87,6 +87,29 @@ def test_frontend_heavy_views_are_componentized():
     assert _line_count("web/frontend/src/i18n/messages.ts") <= 80
 
 
+def test_codegraph_diagnostics_frontend_is_modularized():
+    _assert_exists(
+        [
+            "web/frontend/src/composables/useCodeGraphDiagnostics.ts",
+            "web/frontend/src/composables/codegraph/types.ts",
+            "web/frontend/src/views/CodeGraph.vue",
+            "web/frontend/src/api/modules/system.ts",
+            "web/frontend/src/api/types/system.ts",
+        ]
+    )
+
+    view = Path("web/frontend/src/views/CodeGraph.vue").read_text(encoding="utf-8")
+    api = Path("web/frontend/src/api/modules/system.ts").read_text(encoding="utf-8")
+    types = Path("web/frontend/src/api/types/system.ts").read_text(encoding="utf-8")
+
+    assert "useCodeGraphDiagnostics" in view
+    assert "diagnosticsPanel" in view
+    assert "codeGraphDiagnostics" in api
+    assert "CodeGraphDiagnosticsResponse" in types
+    assert _line_count("web/frontend/src/composables/useCodeGraphDiagnostics.ts") <= 220
+    assert _line_count("web/frontend/src/composables/useCodeGraph.ts") <= 320
+
+
 def test_market_regime_hero_keeps_ring_gauge_styles_local_to_component():
     hero = Path("web/frontend/src/components/market/RegimeHero.vue").read_text(encoding="utf-8")
 
