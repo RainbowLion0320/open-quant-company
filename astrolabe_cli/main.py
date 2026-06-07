@@ -23,6 +23,7 @@ from astrolabe_cli.commands.strategy import catalog as strategy_catalog
 from astrolabe_cli.commands.strategy import evidence as strategy_evidence
 from astrolabe_cli.commands.strategy import run_strategy
 from astrolabe_cli.commands.test_system import check as test_check
+from astrolabe_cli.commands.test_system import design as test_design
 from astrolabe_cli.commands.web import build as web_build
 from astrolabe_cli.commands.web import serve as web_serve
 from astrolabe_cli.results import CliResult, ExitCode
@@ -168,6 +169,10 @@ def build_parser() -> argparse.ArgumentParser:
     test_check_cmd.add_argument("--suite", choices=["quick", "full"], default="quick")
     add_common_flags(test_check_cmd)
     test_check_cmd.set_defaults(handler=lambda args: test_check(args.suite))
+
+    test_design_cmd = test_sub.add_parser("design", help="Generate deterministic test design intelligence artifact")
+    add_common_flags(test_design_cmd)
+    test_design_cmd.set_defaults(handler=lambda args: test_design())
 
     web = sub.add_parser("web", help="Build or serve the Web UI")
     web_sub = web.add_subparsers(dest="web_command", required=True)

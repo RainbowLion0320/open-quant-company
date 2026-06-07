@@ -394,77 +394,90 @@ def test_legacy_service_status_route_is_removed(monkeypatch):
     assert res.status_code == 404
 
 
-def test_system_tests_summary_returns_no_run_without_artifact(monkeypatch, tmp_path):
+def test_system_tests_design_returns_no_artifact_without_design_artifact(monkeypatch, tmp_path):
     from data.storage.datahub import reset_datahub
     from web.api.app import create_app
 
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("API must not run pytest")))
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "var"))
     reset_datahub()
 
-    res = TestClient(create_app()).get("/api/system/tests/summary")
+    res = TestClient(create_app()).get("/api/system/tests/design")
 
     assert res.status_code == 200
     payload = res.json()
-    assert payload["status"] == "no_run"
+    assert payload["status"] == "no_artifact"
     assert payload["latest"] is None
-    assert payload["recommended_command"] == "astroq test check --suite quick --json"
-    assert payload["domains"]
+    assert payload["recommended_command"] == "astroq test design --json"
+    assert payload["summary"]["test_count"] == 0
+    assert payload["cases"] == []
     reset_datahub()
 
 
-def test_system_tests_summary_reads_latest_artifact_and_domain_rollup(monkeypatch, tmp_path):
+def test_system_tests_design_reads_latest_artifact(monkeypatch, tmp_path):
     import json
     from data.storage.datahub import get_datahub, reset_datahub
     from web.api.app import create_app
 
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("API must not run pytest")))
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "var"))
     reset_datahub()
 
-    artifact_dir = get_datahub().artifact_dir("tests")
+    artifact_dir = get_datahub().artifact_dir("tests") / "design"
     latest = {
-        "run_id": "unit-run",
-        "suite": "quick",
-        "status": "failed",
-        "ok": False,
-        "started_at": "2026-06-07T10:00:00Z",
-        "finished_at": "2026-06-07T10:00:02Z",
-        "duration_seconds": 2.0,
-        "command": [".venv/bin/python", "-m", "pytest", "tests/test_datahub_contracts.py", "tests/test_unknown.py", "-q"],
-        "totals": {"passed": 2, "failed": 1, "skipped": 0, "warnings": 1, "errors": 0, "total": 3},
-        "failures": ["FAILED tests/test_unknown.py::test_gap - AssertionError"],
-        "warnings": ["UserWarning: unit"],
-        "stdout_excerpt": "1 failed, 2 passed, 1 warning in 2.00s",
-        "stderr_excerpt": "",
+        "status": "ok",
+        "generated_at": "2026-06-07T10:00:00Z",
+        "recommended_command": "astroq test design --json",
+        "summary": {
+            "test_count": 1,
+            "file_count": 1,
+            "target_count": 1,
+            "spec_count": 1,
+            "risk_count": 1,
+            "risk_covered": 1,
+            "risk_coverage_rate": 1.0,
+            "target_link_rate": 1.0,
+            "spec_link_rate": 1.0,
+            "smell_count": 1,
+            "severity_counts": {"P2": 1},
+            "design_score": 97,
+            "truncated": False,
+        },
+        "matrix": {"kinds": ["unit", "contract"], "risks": [{"key": "api_contract", "counts": {"unit": 0, "contract": 1}, "total": 1}]},
+        "graph": {"nodes": [{"id": "risk:api_contract", "label": "api_contract", "kind": "risk"}], "links": []},
+        "cases": [{"nodeid": "tests/test_api.py::test_contract", "kind": "contract", "risks": ["api_contract"], "target_modules": ["web.api"], "specs": ["docs/specs/05-web-platform.md"], "fixtures": [], "assert_count": 1, "mock_count": 0, "smells": []}],
+        "smells": [{"id": "no_spec:unit", "severity": "P2", "kind": "no_spec", "title": "unit", "subject": "unit", "path": "tests/test_api.py", "evidence": {}, "recommendation": "unit"}],
     }
-    (artifact_dir / "runs").mkdir(parents=True, exist_ok=True)
+    artifact_dir.mkdir(parents=True, exist_ok=True)
     (artifact_dir / "latest.json").write_text(json.dumps(latest), encoding="utf-8")
-    (artifact_dir / "runs" / "unit-run.json").write_text(json.dumps(latest), encoding="utf-8")
 
     client = TestClient(create_app())
-    summary = client.get("/api/system/tests/summary")
-    domains = client.get("/api/system/tests/domains")
-    runs = client.get("/api/system/tests/runs?limit=5")
+    res = client.get("/api/system/tests/design")
 
-    assert summary.status_code == 200
-    payload = summary.json()
-    assert payload["status"] == "failed"
-    assert payload["latest"]["run_id"] == "unit-run"
-    assert payload["latest"]["totals"]["failed"] == 1
-    assert payload["summary"]["pass_rate"] == 2 / 3
-    assert any(domain["key"] == "data" and domain["last_status"] in {"passed", "failed"} for domain in payload["domains"])
-    assert any(domain["key"] == "unclassified" for domain in payload["domains"])
-
-    assert domains.status_code == 200
-    domain_payload = domains.json()
-    assert domain_payload["domains"]
-    assert any(item["test_files"] for item in domain_payload["domains"])
-    assert any(item["key"] == "unclassified" for item in domain_payload["domains"])
-
-    assert runs.status_code == 200
-    assert runs.json()["runs"][0]["run_id"] == "unit-run"
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["status"] == "ok"
+    assert payload["latest"]["generated_at"] == "2026-06-07T10:00:00Z"
+    assert payload["summary"]["design_score"] == 97
+    assert payload["summary"]["artifact_age_seconds"] is not None
+    assert payload["matrix"]["risks"][0]["key"] == "api_contract"
+    assert payload["cases"][0]["target_modules"] == ["web.api"]
+    assert payload["smells"][0]["severity"] == "P2"
     reset_datahub()
+
+
+def test_legacy_system_tests_endpoints_are_removed(monkeypatch):
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    client = TestClient(create_app())
+
+    prefix = "/api/system/tests/"
+    assert client.get(prefix + "summary").status_code == 404
+    assert client.get(prefix + "domains").status_code == 404
+    assert client.get(prefix + "runs").status_code == 404
 
 
 def test_cron_jobs_payload_coerces_nullable_status_fields(monkeypatch, tmp_path):

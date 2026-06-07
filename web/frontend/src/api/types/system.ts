@@ -158,61 +158,85 @@ export interface CodeGraphGraphResponse {
   stats: CodeGraphStatusResponse;
 }
 
-export interface TestTotals {
-  passed: number;
-  failed: number;
-  skipped: number;
-  warnings: number;
-  errors: number;
-  total: number;
-}
-
-export interface TestRunSummary {
-  run_id: string;
-  suite: string;
-  status: string;
-  ok: boolean;
-  started_at: string;
-  finished_at: string;
-  duration_seconds: number;
-  command?: string[];
-  totals: TestTotals;
-  failures?: string[];
-  warnings?: string[];
-  stdout_excerpt?: string;
-  stderr_excerpt?: string;
-}
-
-export interface TestDomain {
-  key: string;
-  label_zh: string;
-  label_en: string;
-  description_zh: string;
-  description_en: string;
-  test_files: string[];
+export interface TestDesignSummary {
   test_count: number;
-  run_count: number;
-  failed_count: number;
-  last_status: string;
-  modules: string[];
-  specs: string[];
+  file_count: number;
+  target_count: number;
+  spec_count: number;
+  risk_count: number;
+  risk_covered: number;
+  risk_coverage_rate: number;
+  target_link_rate: number;
+  spec_link_rate: number;
+  smell_count: number;
+  severity_counts: Record<string, number>;
+  design_score: number;
+  truncated: boolean;
+  artifact_age_seconds?: number | null;
 }
 
-export interface TestSystemSummaryResponse {
-  status: "no_run" | "passed" | "failed" | "error" | string;
-  latest: TestRunSummary | null;
-  summary: TestTotals & { pass_rate: number; duration_seconds: number; stale: boolean };
-  domains: TestDomain[];
-  recommended_command: string;
-}
-
-export interface TestSystemDomainsResponse {
-  domains: TestDomain[];
-  recommended_command: string;
-}
-
-export interface TestSystemRunsResponse {
-  runs: TestRunSummary[];
+export interface TestDesignRiskRow {
+  key: string;
+  label_zh?: string;
+  label_en?: string;
+  counts: Record<string, number>;
   total: number;
+}
+
+export interface TestDesignGraphNode {
+  id: string;
+  label: string;
+  kind: string;
+  group: string;
+  path?: string;
+  count?: number;
+}
+
+export interface TestDesignGraphLink {
+  source: string;
+  target: string;
+  type: string;
+  label: string;
+  count: number;
+}
+
+export interface TestDesignCase {
+  nodeid: string;
+  file: string;
+  name: string;
+  line: number;
+  kind: string;
+  domain: string;
+  risks: string[];
+  target_modules: string[];
+  specs: string[];
+  fixtures: string[];
+  markers: string[];
+  assert_count: number;
+  raises_count: number;
+  mock_count: number;
+  smells: string[];
+}
+
+export interface TestDesignSmell {
+  id: string;
+  severity: "P0" | "P1" | "P2" | string;
+  kind: string;
+  title: string;
+  subject: string;
+  path: string;
+  evidence: Record<string, any>;
+  recommendation: string;
+}
+
+export interface TestDesignResponse {
+  status: "no_artifact" | "ok" | "empty" | string;
+  generated_at?: string;
+  latest: { generated_at?: string; artifact_path?: string } | null;
+  summary: TestDesignSummary;
+  matrix: { kinds: string[]; risks: TestDesignRiskRow[] };
+  graph: { nodes: TestDesignGraphNode[]; links: TestDesignGraphLink[] };
+  cases: TestDesignCase[];
+  smells: TestDesignSmell[];
   recommended_command: string;
 }

@@ -10,6 +10,7 @@ from typing import Any
 
 import yaml
 
+from astrolabe_cli.design_intelligence import collect_test_design, write_test_design_artifact
 from astrolabe_cli.results import CliResult
 from data.storage.datahub import get_datahub
 
@@ -53,6 +54,30 @@ def check(suite: str = "quick") -> CliResult:
         message="Test suite passed" if payload["ok"] else "Test suite failed",
         data=payload,
         errors=[] if payload["ok"] else payload["failures"][:5] or [payload["status"]],
+    )
+
+
+def design() -> CliResult:
+    config = _load_config()
+    payload = collect_test_design(get_datahub().project_root, config)
+    path = write_test_design_artifact(payload)
+    graph = payload.get("graph", {}) if isinstance(payload.get("graph"), dict) else {}
+    return CliResult(
+        ok=True,
+        command="test design",
+        message="Test design artifact generated",
+        data={
+            "artifact_path": path.as_posix(),
+            "status": payload.get("status"),
+            "generated_at": payload.get("generated_at"),
+            "recommended_command": payload.get("recommended_command"),
+            "summary": payload.get("summary", {}),
+            "matrix": payload.get("matrix", {}),
+            "graph": {
+                "node_count": len(graph.get("nodes", []) or []),
+                "link_count": len(graph.get("links", []) or []),
+            },
+        },
     )
 
 

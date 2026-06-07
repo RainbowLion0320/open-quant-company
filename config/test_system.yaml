@@ -14,6 +14,122 @@ suites:
     targets:
       - tests
 
+design:
+  scan_globs:
+    - tests/test*.py
+
+risks:
+  - key: pit_leakage
+    label_zh: PIT / 未来函数
+    label_en: PIT Leakage
+    patterns:
+      - "*pit*"
+      - "*asof*"
+      - "*reproducibility*"
+    specs:
+      - docs/specs/03-backtest-engine.md
+
+  - key: architecture_drift
+    label_zh: 架构漂移
+    label_en: Architecture Drift
+    patterns:
+      - "*architecture*"
+      - "*layout*"
+      - "*modularization*"
+      - "*compat*"
+      - "*legacy*"
+    specs:
+      - docs/acceptance-matrix.md
+
+  - key: api_contract
+    label_zh: API 合约
+    label_en: API Contract
+    patterns:
+      - "*api*"
+      - "*route*"
+      - "*auth*"
+      - "*websocket*"
+    specs:
+      - docs/specs/05-web-platform.md
+
+  - key: data_contract
+    label_zh: 数据契约
+    label_en: Data Contract
+    patterns:
+      - "*data*"
+      - "*tushare*"
+      - "*provider*"
+      - "*quality*"
+      - "*price*"
+      - "*risk_free*"
+    specs:
+      - docs/specs/01-data-pipeline.md
+
+  - key: strategy_governance
+    label_zh: 策略治理
+    label_en: Strategy Governance
+    patterns:
+      - "*strategy*"
+      - "*candidate*"
+      - "*factor*"
+      - "*registry*"
+      - "*buffett*"
+      - "*ml_lgbm*"
+    specs:
+      - docs/specs/02-signal-system.md
+
+  - key: backtest_validity
+    label_zh: 回测有效性
+    label_en: Backtest Validity
+    patterns:
+      - "*backtest*"
+      - "*pipeline*"
+      - "*regime*"
+      - "*hmm*"
+    specs:
+      - docs/specs/03-backtest-engine.md
+
+  - key: execution_safety
+    label_zh: 执行安全
+    label_en: Execution Safety
+    patterns:
+      - "*execution*"
+      - "*broker*"
+      - "*order*"
+      - "*ledger*"
+      - "*fill*"
+    specs:
+      - docs/specs/04-execution.md
+
+  - key: config_secret
+    label_zh: 配置 / 密钥
+    label_en: Config / Secrets
+    patterns:
+      - "*env_secret*"
+      - "*settings*"
+      - "*config*"
+    specs:
+      - docs/specs/05-web-platform.md
+
+  - key: docs_drift
+    label_zh: 文档漂移
+    label_en: Docs Drift
+    patterns:
+      - "*docs*"
+      - "*documentation*"
+      - "*wiki*"
+      - "*acceptance*"
+    specs:
+      - docs/acceptance-matrix.md
+
+  - key: codegraph_design
+    label_zh: 代码图谱设计
+    label_en: CodeGraph Design
+    patterns:
+      - "*codegraph*"
+    specs:
+      - wiki/concepts/codegraph-visualization.md
+
 domains:
   - key: data
     label_zh: 数据

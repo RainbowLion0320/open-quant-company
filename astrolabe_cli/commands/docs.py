@@ -41,6 +41,11 @@ REMOVED_COMPATIBILITY_TOKENS = (
     _drift_token("scripts/factor", "_hypothesis.py"),
     _drift_token("monthly point", "-in-time feature store"),
     _drift_token("月末", "兼容"),
+    _drift_token("/api/system/tests/", "summary"),
+    _drift_token("/api/system/tests/", "domains"),
+    _drift_token("/api/system/tests/", "runs"),
+    _drift_token("Test", "System.vue"),
+    _drift_token("test", "System"),
 )
 
 

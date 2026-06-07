@@ -28,9 +28,7 @@ from web.api.services.system_data_ops import (
 )
 from web.api.services.system_orders import order_lifecycle_payload, order_trace_payload
 from web.api.services.system_tests import (
-    test_runs_payload,
-    tests_domains_payload,
-    tests_summary_payload,
+    tests_design_payload,
 )
 
 router = APIRouter(prefix="/api/system", tags=["System"])
@@ -210,19 +208,7 @@ async def get_system_mode():
     }
 
 
-@router.get("/tests/summary")
-async def get_tests_summary():
-    """Latest local test-system artifact summary."""
-    return tests_summary_payload()
-
-
-@router.get("/tests/domains")
-async def get_tests_domains():
-    """Business-domain test architecture map."""
-    return tests_domains_payload()
-
-
-@router.get("/tests/runs")
-async def get_test_runs(limit: int = Query(default=20, ge=1, le=100)):
-    """Recent local test-system artifact history."""
-    return test_runs_payload(limit=limit)
+@router.get("/tests/design")
+async def get_tests_design():
+    """Latest deterministic Test Design Intelligence artifact."""
+    return tests_design_payload()

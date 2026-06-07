@@ -67,17 +67,29 @@ def test_module_shells_get_titles_and_tabs_from_i18n():
         assert 'title="系统' not in text
 
 
-def test_system_module_exposes_test_intelligence_tab():
+def test_system_module_exposes_test_design_intelligence_tab():
     system_hub = read_frontend("views/SystemHub.vue")
     zh_modules = read_frontend("i18n/messages/zh-CN/modules.ts")
     en_modules = read_frontend("i18n/messages/en-US/modules.ts")
+    api_system = read_frontend("api/modules/system.ts")
+    zh_index = read_frontend("i18n/messages/zh-CN/index.ts")
+    en_index = read_frontend("i18n/messages/en-US/index.ts")
 
-    assert "TestSystem" in system_hub
+    assert "TestDesign" in system_hub
+    assert ("Test" + "System") not in system_hub
     assert '{ key: "tests" }' in system_hub
     assert "tests: {" in zh_modules
-    assert "测试系统" in zh_modules
+    assert "测试设计" in zh_modules
     assert "tests: {" in en_modules
-    assert "Test System" in en_modules
+    assert "Test Design" in en_modules
+    assert "testDesign" in zh_index
+    assert "testDesign" in en_index
+    assert ("test" + "System") not in zh_index
+    assert ("test" + "System") not in en_index
+    assert "testDesign:" in api_system
+    assert ("test" + "SystemSummary") not in api_system
+    assert ("test" + "SystemDomains") not in api_system
+    assert ("test" + "SystemRuns") not in api_system
 
 
 def test_high_traffic_views_use_i18n_for_static_copy():

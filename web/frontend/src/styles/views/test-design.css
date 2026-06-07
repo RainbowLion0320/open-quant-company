@@ -1,0 +1,351 @@
+.test-design {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.design-toolbar,
+.design-command,
+.panel-head,
+.case-stats,
+.graph-node {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.design-toolbar,
+.design-command,
+.design-panel,
+.design-metric {
+  padding: 14px;
+}
+
+.design-toolbar h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 17px;
+}
+
+.design-toolbar p {
+  margin: 4px 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.design-command {
+  justify-content: flex-start;
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.design-command span,
+.design-metric small,
+.panel-head span {
+  color: var(--text-disabled);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.design-command code,
+.graph-chip,
+.inspector code {
+  display: block;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.design-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.design-metric {
+  min-height: 104px;
+  display: grid;
+  align-content: space-between;
+}
+
+.design-metric strong {
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 25px;
+  line-height: 1.1;
+}
+
+.design-metric em,
+.panel-head small,
+.graph-node em {
+  color: var(--text-tertiary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.design-metric.score strong { color: var(--positive); }
+.design-metric.smell strong { color: var(--warning); }
+
+.design-grid,
+.design-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.panel-head {
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.matrix-shell {
+  overflow: auto;
+}
+
+.design-matrix {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.design-matrix th,
+.design-matrix td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-align: center;
+}
+
+.design-matrix th:first-child,
+.design-matrix td:first-child {
+  width: 210px;
+  text-align: left;
+}
+
+.design-matrix tbody tr {
+  cursor: pointer;
+}
+
+.design-matrix tbody tr.active,
+.design-matrix tbody tr:hover {
+  background: rgba(6, 182, 212, 0.07);
+}
+
+.design-matrix strong,
+.case-title strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.design-matrix code {
+  display: block;
+  color: var(--text-disabled);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+}
+
+.heat-cell {
+  display: inline-flex;
+  width: 34px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+
+.graph-lanes,
+.inspector-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.graph-lane {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.graph-lane h3,
+.inspector h3 {
+  margin: 0 0 4px;
+  color: var(--text-disabled);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.graph-lane.cases {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.graph-node {
+  width: 100%;
+  min-height: 48px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.24);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.graph-node:hover,
+.graph-node.active {
+  border-color: rgba(6, 182, 212, 0.55);
+  background: rgba(6, 182, 212, 0.1);
+}
+
+.graph-node strong {
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.graph-chip {
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.graph-chip.spec {
+  color: var(--text-tertiary);
+}
+
+.case-title {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.case-title span {
+  color: var(--text-tertiary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.case-stats {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.case-stats span,
+.case-smells span {
+  display: inline-flex;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+}
+
+.inspector-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.case-smells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.case-smells span {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warning);
+}
+
+.smell-list {
+  display: grid;
+  gap: 8px;
+  max-height: 450px;
+  overflow: auto;
+}
+
+.smell-item {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.smell-item.p0 { border-color: rgba(239, 68, 68, 0.5); }
+.smell-item.p1 { border-color: rgba(245, 158, 11, 0.5); }
+.smell-item.p2 { border-color: rgba(148, 163, 184, 0.35); }
+
+.smell-item strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.smell-item span {
+  color: var(--text-tertiary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.smell-item em {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.empty-text {
+  margin: 0;
+  color: var(--text-disabled);
+  font-size: 12px;
+}
+
+@media (max-width: 1240px) {
+  .design-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .design-grid,
+  .design-detail-grid,
+  .graph-lanes {
+    grid-template-columns: 1fr;
+  }
+
+  .graph-lane {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .design-metrics,
+  .inspector-columns {
+    grid-template-columns: 1fr;
+  }
+}

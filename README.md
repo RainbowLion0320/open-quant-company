@@ -316,6 +316,7 @@ astrolabe-quant/
 ```bash
 git diff --check
 astroq docs check --json
+astroq test design --json
 astroq test check --suite quick --json
 ```
 

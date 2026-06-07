@@ -66,9 +66,10 @@ astroq backtest check --json
 ```bash
 astroq test check --suite quick --json
 astroq test check --suite full --json
+astroq test design --json
 ```
 
-`test check` 运行 `config/test_system.yaml` 声明的固定测试 suite，并把结果写入 `var/artifacts/tests/`。Web 的 `/system?tab=tests` 只读取这些产物，不直接触发 pytest。
+`test check` 运行 `config/test_system.yaml` 声明的固定测试 suite。`test design` 使用确定性 AST 规则生成 `var/artifacts/tests/design/latest.json`。Web 的 `/system?tab=tests` 只读取测试设计产物，展示风险矩阵、测试图谱、用例审查器和异味诊断，不直接触发 pytest。
 
 ## Pipeline
 

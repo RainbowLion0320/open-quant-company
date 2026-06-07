@@ -150,3 +150,29 @@ def test_test_check_cli_records_failure_summary(monkeypatch, tmp_path, capsys):
     assert data["data"]["failures"]
     assert "test_breaks" in data["data"]["failures"][0]
     reset_datahub()
+
+
+def test_test_design_cli_writes_design_artifact_without_pytest(monkeypatch, tmp_path, capsys):
+    from data.storage.datahub import reset_datahub
+    from astrolabe_cli.main import run_cli
+
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "var"))
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("pytest should not run")))
+    reset_datahub()
+
+    code = run_cli(["test", "design", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["ok"] is True
+    assert data["data"]["status"] in {"ok", "empty"}
+    assert data["data"]["summary"]["test_count"] >= 1
+    assert data["data"]["matrix"]["risks"]
+    assert data["data"]["graph"]["node_count"] >= 1
+
+    artifact = tmp_path / "var" / "artifacts" / "tests" / "design" / "latest.json"
+    latest = json.loads(artifact.read_text(encoding="utf-8"))
+    assert latest["recommended_command"] == "astroq test design --json"
+    assert latest["graph"]["nodes"]
+    assert latest["cases"]
+    reset_datahub()
