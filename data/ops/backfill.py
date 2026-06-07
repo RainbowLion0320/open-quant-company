@@ -23,14 +23,14 @@ Usage:
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
 from data.storage.datahub import get_datahub
+from data.ops.ledger_store import ParquetLedgerStore
 
 
 # ── Backfill Entry ──
@@ -99,8 +99,8 @@ class BackfillLedger:
     def __init__(self, store_dir: Path | None = None):
         self._hub = get_datahub()
         self._store = store_dir or (self._hub.store_root / "_backfill")
-        self._store.mkdir(parents=True, exist_ok=True)
-        self._file = self._store / "ledger.parquet"
+        self._ledger = ParquetLedgerStore(self._store, "ledger.parquet")
+        self._file = self._ledger.file
 
     # ── Lifecycle ──
 
@@ -160,22 +160,13 @@ class BackfillLedger:
         self._write_all(df)
 
     def _append(self, entry: BackfillEntry):
-        df = self._all()
-        row = pd.DataFrame([entry.to_row()])
-        if df is not None and not df.empty:
-            df = pd.concat([df, row], ignore_index=True)
-        else:
-            df = row
-        self._write_all(df)
+        self._ledger.append_row(entry.to_row())
 
     def _all(self) -> pd.DataFrame:
-        return self._hub.read_parquet(
-            self._file,
-            default=pd.DataFrame(),
-        )
+        return self._ledger.read_all()
 
     def _write_all(self, df: pd.DataFrame):
-        self._hub.write_parquet(df, self._file)
+        self._ledger.write_all(df)
 
     # ── Queries ──
 
@@ -285,5 +276,4 @@ class BackfillLedger:
 
     def clear(self):
         """Remove all backfill records (for testing)."""
-        if self._file.exists():
-            self._file.unlink()
+        self._ledger.clear()

@@ -15,15 +15,8 @@ from enum import Enum
 from core.settings import get_section
 
 
-# ----- 配置加载 -----
-_config = None
-
-
-def _load_config():
-    global _config
-    if _config is None:
-        _config = get_section("buffett", {})
-    return _config
+def _buffett_config():
+    return get_section("buffett", {})
 
 
 # ----- 过滤结果 -----
@@ -74,13 +67,13 @@ def calc_margin_of_safety(
     简化DCF估值模型
     返回: (内在价值/股, 当前股价, 安全边际%, 是否通过)
     """
-    cfg = _load_config()["margin_of_safety"]
+    cfg = _buffett_config()["margin_of_safety"]
     discount = cfg["dcf_discount_rate"]
     terminal_g = cfg["growth_rate_terminal"]
     required_margin = cfg["safety_margin_pct"]
 
     # 两阶段DCF: 高增长期 + 永续期
-    val_cfg = _load_config().get("valuation", {})
+    val_cfg = _buffett_config().get("valuation", {})
     _growth_period = int(val_cfg.get("growth_period", 5))
     _terminal_pe = float(val_cfg.get("terminal_pe", 20))
     cashflows = [fcf * (1 + growth_rate) ** i for i in range(1, _growth_period + 1)]
@@ -118,7 +111,7 @@ def assess_moat(
     金融板块: ROE + 销售净利率 + 负债权益比（放宽）
     返回: (avg_roe, avg_margin_or_gm, debt_equity, passed, 详细说明)
     """
-    cfg = _load_config()["moat"]
+    cfg = _buffett_config()["moat"]
     min_years = cfg["min_roe_years"]
 
     # 加载板块特定参数
@@ -179,7 +172,7 @@ def check_circle(industry: str) -> Tuple[bool, str]:
     """
     检查是否在能力圈内
     """
-    cfg = _load_config()["circle_of_competence"]
+    cfg = _buffett_config()["circle_of_competence"]
     industries = cfg["industries"]
     in_circle = industry in industries
     return in_circle, industry
@@ -237,7 +230,7 @@ def buffett_filter(
 
     # 从配置读取默认增长率（如果未指定）
     if growth_rate is None:
-        growth_rate = _load_config().get("valuation", {}).get("growth_default", 0.05)
+        growth_rate = _buffett_config().get("valuation", {}).get("growth_default", 0.05)
 
     # 3. 安全边际
     iv_per_share, price, margin, margin_pass = calc_margin_of_safety(
@@ -260,7 +253,7 @@ def buffett_filter(
     # 金融板块用净利率替代毛利率参与评分
     margin_indicator = avg_nm if avg_nm > 0 else avg_gm
     # 从配置读取评分权重（保留硬编码值作为兜底）
-    scoring_cfg = _load_config().get("scoring", {})
+    scoring_cfg = _buffett_config().get("scoring", {})
     weight_roe = scoring_cfg.get("weight_roe", 30)
     weight_margin = scoring_cfg.get("weight_margin", 20)
     weight_safety = scoring_cfg.get("weight_safety", 50)

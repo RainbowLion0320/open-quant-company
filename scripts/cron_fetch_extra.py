@@ -22,9 +22,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import tushare as ts
-from data.market.assets.etf import ETF_UNIVERSE
-from data.market.assets.futures import FUTURES_UNIVERSE
-from data.market.symbol_utils import to_ts_code
+from data.ingestion.tushare_coverage import tushare_etf_ts_codes, tushare_futures_ts_codes
 from data.storage.datahub import get_datahub
 from data.ingestion.tushare_utils import get_tushare_token
 
@@ -68,24 +66,6 @@ FUTURES_TUSHARE_EXCHANGE = {
     "SC": "INE",
 }
 
-
-def etf_ts_codes() -> list[str]:
-    return [to_ts_code(code) for code in ETF_UNIVERSE]
-
-
-def futures_ts_codes() -> list[str]:
-    codes = []
-    for code in FUTURES_UNIVERSE:
-        text = str(code).strip().upper()
-        if not text:
-            continue
-        if "." in text:
-            codes.append(text)
-            continue
-        exchange = FUTURES_TUSHARE_EXCHANGE.get(text)
-        if exchange:
-            codes.append(f"{text}.{exchange}")
-    return codes
 
 # ═══════════════════════════════════════
 # 1. limit_list — 涨跌停 (1次/小时, 增量每次最多请求1天)
@@ -228,7 +208,7 @@ def fetch_fund_daily(full_history=False):
     """拉取项目 ETF universe 日线。"""
     api_ = api()
     fetched = 0
-    for code in etf_ts_codes():
+    for code in tushare_etf_ts_codes():
         pq = FUND_D_STORE / f"{code}.parquet"
         if pq.exists() and not full_history:
             continue
@@ -290,7 +270,7 @@ def fetch_fund_portfolio(full_history=False):
 def fetch_fund_nav(full_history=False):
     api_ = api()
     fetched = 0
-    for code in etf_ts_codes():
+    for code in tushare_etf_ts_codes():
         pq = FUND_N_STORE / f"{code}.parquet"
         if pq.exists() and not full_history:
             continue
@@ -313,7 +293,7 @@ def fetch_fund_nav(full_history=False):
 def fetch_futures_daily(full_history=False):
     api_ = api()
     fetched = 0
-    for ct in futures_ts_codes():
+    for ct in tushare_futures_ts_codes():
         pq = FUT_STORE / f"{ct}.parquet"
         if pq.exists() and not full_history:
             continue

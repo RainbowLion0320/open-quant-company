@@ -9,7 +9,7 @@ from functools import lru_cache
 import pandas as pd
 
 from data.storage.datahub import get_datahub
-from signals.candidates.common import bounded_score, percentile_score, safe_float
+from signals.candidates.common import avg_recent_positive, bounded_score, latest_positive_value, percentile_score, safe_float
 
 _PRICE_PANELS: dict[int, dict[str, pd.DataFrame]] = {}
 _VALUATION_PANELS: dict[tuple[str, ...], dict[str, pd.DataFrame]] = {}
@@ -90,11 +90,6 @@ def score_rows(scores: pd.Series, detail: dict[str, pd.Series] | None = None) ->
             },
         }
     return rows
-
-
-def avg_recent_positive(values: list[float], period_count: int) -> float:
-    recent = [safe_float(value) for value in values[-period_count:] if safe_float(value) > 0]
-    return sum(recent) / len(recent) if recent else 0.0
 
 
 def asof_row(frame: pd.DataFrame, as_of: pd.Timestamp) -> pd.Series:
@@ -207,17 +202,6 @@ def quality_inputs(symbol: str, recent_period_count: int, as_of_date: str) -> di
         frame["报告期"] = pd.to_datetime(frame["报告期"], errors="coerce")
         return frame[frame["报告期"] <= as_of].sort_values("报告期")
 
-    def latest_positive(df: pd.DataFrame | None, column: str) -> float:
-        if df is None or df.empty or column not in df.columns:
-            return 0.0
-        frame = df.copy()
-        if "trade_date" in frame.columns:
-            frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce")
-            frame = frame.sort_values("trade_date")
-        values = pd.to_numeric(frame[column], errors="coerce").dropna()
-        values = values[values > 0]
-        return safe_float(values.iloc[-1]) if len(values) else 0.0
-
     as_of = pd.Timestamp(as_of_date)
     fin, valuation = quality_sources(symbol)
     fin = financial_as_of(fin, as_of)
@@ -229,6 +213,6 @@ def quality_inputs(symbol: str, recent_period_count: int, as_of_date: str) -> di
     return {
         "roe": avg_recent(extract_roe_history(fin)) if fin is not None else 0.0,
         "gross_margin": avg_recent(extract_gross_margin_history(fin)) if fin is not None else 0.0,
-        "pe_ttm": latest_positive(valuation, "pe_ttm"),
-        "pb": latest_positive(valuation, "pb"),
+        "pe_ttm": latest_positive_value(valuation, "pe_ttm"),
+        "pb": latest_positive_value(valuation, "pb"),
     }

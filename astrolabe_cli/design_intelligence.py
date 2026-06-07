@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from astrolabe_cli.graph_payload import GraphPayloadBuilder
 from data.storage.datahub import get_datahub
 
 RECOMMENDED_DESIGN_COMMAND = "astroq test design --json"
@@ -447,48 +448,33 @@ def _matrix_payload(cases: list[dict[str, Any]], config: dict[str, Any]) -> dict
 
 
 def _graph_payload(cases: list[dict[str, Any]], smells: list[dict[str, Any]]) -> dict[str, Any]:
-    nodes: dict[str, dict[str, Any]] = {}
-    links: Counter[tuple[str, str, str]] = Counter()
-
-    def add_node(node_id: str, label: str, kind: str, group: str, path: str = "") -> None:
-        nodes.setdefault(node_id, {"id": node_id, "label": label, "kind": kind, "group": group, "path": path, "count": 0})
-        nodes[node_id]["count"] += 1
-
-    def add_link(source: str, target: str, kind: str) -> None:
-        links[(source, target, kind)] += 1
-
+    graph = GraphPayloadBuilder()
     for case in cases:
         case_id = f"test:{case['nodeid']}"
         file_id = f"file:{case['file']}"
-        add_node(file_id, case["file"], "test_file", case["domain"], case["file"])
-        add_node(case_id, case["name"], "test_case", case["domain"], case["file"])
-        add_link(file_id, case_id, "contains")
+        graph.add_node(file_id, case["file"], "test_file", case["domain"], case["file"])
+        graph.add_node(case_id, case["name"], "test_case", case["domain"], case["file"])
+        graph.add_link(file_id, case_id, "contains")
         for risk in case["risks"]:
             risk_id = f"risk:{risk}"
-            add_node(risk_id, risk, "risk", "risk")
-            add_link(risk_id, case_id, "tests")
+            graph.add_node(risk_id, risk, "risk", "risk")
+            graph.add_link(risk_id, case_id, "tests")
         for target in case["target_modules"]:
             target_id = f"target:{target}"
-            add_node(target_id, target, "target_module", "target")
-            add_link(case_id, target_id, "covers")
+            graph.add_node(target_id, target, "target_module", "target")
+            graph.add_link(case_id, target_id, "covers")
         for spec in case["specs"]:
             spec_id = f"spec:{spec}"
-            add_node(spec_id, spec.rsplit("/", 1)[-1], "spec", "spec", spec)
-            add_link(case_id, spec_id, "documents")
+            graph.add_node(spec_id, spec.rsplit("/", 1)[-1], "spec", "spec", spec)
+            graph.add_link(case_id, spec_id, "documents")
         for fixture in case["fixtures"]:
             fixture_id = f"fixture:{fixture}"
-            add_node(fixture_id, fixture, "fixture", "fixture")
-            add_link(case_id, fixture_id, "uses")
+            graph.add_node(fixture_id, fixture, "fixture", "fixture")
+            graph.add_link(case_id, fixture_id, "uses")
     for smell in smells:
         smell_id = f"smell:{smell['id']}"
-        add_node(smell_id, smell["kind"], "smell", smell["severity"], smell["path"])
-    return {
-        "nodes": sorted(nodes.values(), key=lambda item: (item["kind"], item["id"])),
-        "links": [
-            {"source": source, "target": target, "type": kind, "label": kind, "count": count}
-            for (source, target, kind), count in sorted(links.items())
-        ],
-    }
+        graph.add_node(smell_id, smell["kind"], "smell", smell["severity"], smell["path"])
+    return graph.payload()
 
 
 def _summary_payload(cases: list[dict[str, Any]], smells: list[dict[str, Any]], matrix: dict[str, Any], files: list[Path]) -> dict[str, Any]:

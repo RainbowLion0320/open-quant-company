@@ -9,6 +9,22 @@ import pandas as pd
 from data.storage.datahub import DataHub
 from research.regime.features import normalize_ohlcv
 
+
+def load_benchmark_index_daily(symbol: str = "sh000001", *, allow_fetch: bool = True) -> pd.DataFrame:
+    """Load benchmark index daily data through the canonical regime research asset path."""
+    try:
+        from data.ingestion.fetcher import _read_cache, get_index_daily
+
+        cached = _read_cache(f"index_daily_{symbol}_default", max_age_hours=0)
+        if cached is not None and len(cached) > 0:
+            return cached
+        if allow_fetch:
+            return get_index_daily(symbol, force_refresh=False)
+    except Exception:
+        return pd.DataFrame()
+    return pd.DataFrame()
+
+
 def build_tradable_asset_panel(
     equity_df: pd.DataFrame,
     defensive_df: pd.DataFrame | None = None,
@@ -65,14 +81,10 @@ def load_local_equity_ohlcv(symbol: str = "sh000001", *, data_root: str | Path =
     """Load a broad equity proxy from local cache/parquet without network fetches."""
     notes: list[str] = []
     if symbol.startswith(("sh", "sz")):
-        try:
-            from data.ingestion.fetcher import _read_cache
-
-            cached = _read_cache(f"index_daily_{symbol}_default", max_age_hours=0)
-            if cached is not None and len(cached) > 0:
-                return cached, f"local_cache:{symbol}", notes
-        except Exception as exc:
-            notes.append(f"index_cache_unavailable:{type(exc).__name__}")
+        cached = load_benchmark_index_daily(symbol, allow_fetch=False)
+        if not cached.empty:
+            return cached, f"local_cache:{symbol}", notes
+        notes.append(f"index_cache_unavailable:{symbol}")
 
     root = Path(data_root)
     hub = DataHub(project_root=root, create=False)

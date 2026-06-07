@@ -13,13 +13,23 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import pandas as pd
-import numpy as np
 
 from data.storage.datahub import get_datahub
 from data.ingestion.fetchers.base import get_tushare_token
 from data.market.symbol_utils import to_ts_code
 
 HUB = get_datahub()
+
+
+def _batch_fetch_symbols(fetcher, label: str, symbols: List[str], force: bool = False) -> Dict[str, pd.DataFrame]:
+    results = {}
+    for i, sym in enumerate(symbols):
+        df = fetcher.fetch_symbol(sym, force=force)
+        if df is not None and len(df) > 0:
+            results[sym] = df
+        if (i + 1) % 100 == 0:
+            print(f"  [{label}] {i+1}/{len(symbols)} — {len(results)} with data")
+    return results
 
 
 class HolderFetcher:
@@ -61,14 +71,7 @@ class HolderFetcher:
             return None
 
     def batch_fetch(self, symbols: List[str], force: bool = False) -> Dict[str, pd.DataFrame]:
-        results = {}
-        for i, sym in enumerate(symbols):
-            df = self.fetch_symbol(sym, force=force)
-            if df is not None and len(df) > 0:
-                results[sym] = df
-            if (i + 1) % 100 == 0:
-                print(f"  [holders] {i+1}/{len(symbols)} — {len(results)} with data")
-        return results
+        return _batch_fetch_symbols(self, "holders", symbols, force)
 
     def get_latest(self, symbol: str) -> Optional[Dict]:
         df = self.fetch_symbol(symbol)
@@ -120,14 +123,7 @@ class HolderTradeFetcher:
             return None
 
     def batch_fetch(self, symbols: List[str], force: bool = False) -> Dict[str, pd.DataFrame]:
-        results = {}
-        for i, sym in enumerate(symbols):
-            df = self.fetch_symbol(sym, force=force)
-            if df is not None and len(df) > 0:
-                results[sym] = df
-            if (i + 1) % 100 == 0:
-                print(f"  [holdertrade] {i+1}/{len(symbols)} — {len(results)} with data")
-        return results
+        return _batch_fetch_symbols(self, "holdertrade", symbols, force)
 
 
 def derive_holder_factors(current: Optional[int], previous: Optional[int]) -> Dict:

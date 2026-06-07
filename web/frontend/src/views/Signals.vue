@@ -76,6 +76,7 @@ import { ref, onMounted } from "vue";
 import { api } from "../api";
 import type { SignalChange } from "../api";
 import { useI18n } from "../i18n";
+import { signalLabel as formatSignalLabel } from "../utils/signals";
 
 const { t } = useI18n();
 const changes = ref<SignalChange[]>([]);
@@ -90,9 +91,7 @@ function signalColor(s: string) {
   return "var(--text-disabled)";
 }
 function signalLabel(s: string) {
-  if (s === "buy") return t("common.buy");
-  if (s === "sell") return t("common.sell");
-  return t("common.hold");
+  return formatSignalLabel(s, t);
 }
 
 async function loadChanges() {

@@ -2,7 +2,7 @@ import { ref, computed, onMounted } from "vue";
 import { api } from "../api";
 import type { StockDetail, StockListItem } from "../api";
 import { useI18n } from "../i18n";
-import { colorBySignedRatio, fmtPercentValue, fmtRatioPct, fmtShortCount, fmtSignedRatioPct } from "../utils/format";
+import { colorBySignedRatio, fmtFixedNumber, fmtPercentValue, fmtRatioPct, fmtShortCount, fmtSignedRatioPct } from "../utils/format";
 
 export function useStocksView() {
 
@@ -19,7 +19,7 @@ export function useStocksView() {
 
   function fmtPct(v: number | undefined) { return fmtRatioPct(v, 1); }
   function fmtPrice(v: number | null | undefined) { return v == null ? "—" : v.toFixed(v >= 100 ? 2 : 3); }
-  function fmtNumber(v: number | null | undefined, digits = 1) { return v == null ? "—" : Number(v).toFixed(digits); }
+  function fmtNumber(v: number | null | undefined, digits = 1) { return fmtFixedNumber(v, digits); }
   function colorPct(v: number | null | undefined) { return colorBySignedRatio(v ?? 0); }
   function scoreColor(v: number | null | undefined) {
     if (v == null) return "var(--text-disabled)";

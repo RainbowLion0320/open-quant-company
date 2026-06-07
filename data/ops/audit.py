@@ -26,11 +26,11 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
 from data.storage.datahub import get_datahub
+from data.ops.ledger_store import ParquetLedgerStore
 
 
 @dataclass
@@ -88,8 +88,8 @@ class ConfigAuditLedger:
     def __init__(self, store_dir: Path | None = None):
         self._hub = get_datahub()
         self._store = store_dir or (self._hub.store_root / "_audit")
-        self._store.mkdir(parents=True, exist_ok=True)
-        self._file = self._store / "config_changes.parquet"
+        self._ledger = ParquetLedgerStore(self._store, "config_changes.parquet")
+        self._file = self._ledger.file
 
     def record(
         self,
@@ -133,19 +133,13 @@ class ConfigAuditLedger:
         return change_id
 
     def _append(self, entry: ConfigAuditEntry):
-        df = self._all()
-        row = pd.DataFrame([entry.to_row()])
-        if df is not None and not df.empty:
-            df = pd.concat([df, row], ignore_index=True)
-        else:
-            df = row
-        self._write_all(df)
+        self._ledger.append_row(entry.to_row())
 
     def _all(self) -> pd.DataFrame:
-        return self._hub.read_parquet(self._file, default=pd.DataFrame())
+        return self._ledger.read_all()
 
     def _write_all(self, df: pd.DataFrame):
-        self._hub.write_parquet(df, self._file)
+        self._ledger.write_all(df)
 
     # ── Queries ──
 
@@ -196,5 +190,4 @@ class ConfigAuditLedger:
 
     def clear(self):
         """Remove all audit records (for testing)."""
-        if self._file.exists():
-            self._file.unlink()
+        self._ledger.clear()

@@ -3,10 +3,6 @@ import pandas as pd
 import pytest
 
 
-def _compute_series(factor, df: pd.DataFrame) -> pd.Series:
-    return pd.Series([factor.compute(df, i) for i in range(len(df))], index=df.index)
-
-
 def test_factor_expression_boundary_handles_formula_and_missing_inputs():
     from signals.dsl_parser import compute_formula
     from signals.expression import Delta, MA, Ret, Std
@@ -21,9 +17,9 @@ def test_factor_expression_boundary_handles_formula_and_missing_inputs():
     )
 
     close = Ret("close")
-    momentum = _compute_series(Delta(close, 3) / close, df)
-    ma5 = _compute_series(MA(close, 5), df)
-    volatility = _compute_series(Std(Delta(close, 1), 5), df)
+    momentum = (Delta(close, 3) / close).compute_series(df)
+    ma5 = MA(close, 5).compute_series(df)
+    volatility = Std(Delta(close, 1), 5).compute_series(df)
     parsed = compute_formula("Delta(close,3)/close_t", df, len(df) - 1)
     lagged_ref = compute_formula("close_t / close_t-3 - 1", df, 5)
 
@@ -33,12 +29,12 @@ def test_factor_expression_boundary_handles_formula_and_missing_inputs():
     assert not pd.isna(parsed)
     assert lagged_ref == pytest.approx(12 / 11 - 1)
 
-    empty = _compute_series(Ret("close"), pd.DataFrame({"close": []}))
+    empty = Ret("close").compute_series(pd.DataFrame({"close": []}))
     assert empty.empty
     assert pd.isna(Ret("nonexistent").compute(df, 0))
 
     df_nan = pd.DataFrame({"close": [10, np.nan, 12]})
-    result_nan = _compute_series(Delta(Ret("close"), 1), df_nan)
+    result_nan = Delta(Ret("close"), 1).compute_series(df_nan)
     assert len(result_nan) == 3
 
 

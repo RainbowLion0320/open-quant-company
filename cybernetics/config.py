@@ -10,21 +10,17 @@ from cybernetics.types import MarketBreadth, MarketVolume
 from core.settings import get_section
 
 
-_config = None
 _REGIME_TRACKER: Optional[RegimeTransitionTracker] = None
 _REGIME_TRACKER_PATH: Optional[str] = None
 
 
-def _load_config():
-    global _config
-    if _config is None:
-        _config = get_section("cybernetics", {})
-    return _config
+def _load_config() -> Dict[str, Any]:
+    return get_section("cybernetics", {})
 
 
 def _detection_config() -> Dict[str, Any]:
     try:
-        return _load_config().get("adaptive", {}).get("detection", {})
+        return get_section("cybernetics.adaptive.detection", {})
     except Exception:
         return {}
 

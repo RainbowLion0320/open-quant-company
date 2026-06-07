@@ -18,6 +18,10 @@ export function fmtPercentValue(v: number | null | undefined, digits = 1): strin
   return `${Number(v).toFixed(digits)}%`;
 }
 
+export function fmtFixedNumber(v: number | null | undefined, digits = 2): string {
+  return isBlankNumber(v) ? "—" : Number(v).toFixed(digits);
+}
+
 export function fmtSignedPercentValue(v: number | null | undefined, digits = 2): string {
   if (isBlankNumber(v)) return "—";
   const n = Number(v);

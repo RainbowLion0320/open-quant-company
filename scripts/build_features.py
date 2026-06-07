@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from data.storage.datahub import get_datahub
+from data.features.factor_inputs import compute_fundamental_factors, compute_valuation_factors
 from data.features.feature_store import FEATURES_DIR, enrich_from_registry, iter_feature_files, write_feature_slice
 from data.market.price_service import get_stock_prices
 from data.market.price_types import PriceUseCase
@@ -43,21 +44,6 @@ DEFAULT_END = os.environ.get(
 )
 DEFAULT_FREQUENCY = "daily"
 SKIP_PREFIXES = ("92", "83", "87", "43")
-
-
-def _to_float(val) -> float:
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return 0.0
-    if isinstance(val, (int, float, np.number)):
-        return float(val)
-    if isinstance(val, str):
-        text = val.replace("%", "").replace(",", "")
-        text = text.replace("万亿", "e12").replace("亿", "e8").replace("万", "e4")
-        try:
-            return float(text)
-        except ValueError:
-            return 0.0
-    return 0.0
 
 
 def _select_symbols(n_stocks: int) -> list[str]:
@@ -146,69 +132,6 @@ def _load_daily_basic_cache(symbols: list[str], start: str, end: str) -> dict[st
     return daily_cache
 
 
-def _compute_fundamental_factors(fin_df: pd.DataFrame, as_of: pd.Timestamp) -> dict:
-    result = {}
-    try:
-        fin = fin_df.copy()
-        rc = "报告期" if "报告期" in fin.columns else "end_date"
-        if rc not in fin.columns:
-            return result
-        fin[rc] = pd.to_datetime(fin[rc], errors="coerce")
-        past = fin[fin[rc] <= as_of].sort_values(rc)
-        if len(past) == 0:
-            return result
-        latest = past.iloc[-1]
-        result["fund_roe"] = _to_float(latest.get("净资产收益率") or latest.get("roe"))
-        result["fund_gross_margin"] = _to_float(latest.get("销售毛利率") or latest.get("gross_margin"))
-        result["fund_net_margin"] = _to_float(latest.get("销售净利率") or latest.get("net_margin"))
-        de = latest.get("debt_equity_ratio")
-        if de is None and len(past) >= 2:
-            prev = past.iloc[-2]
-            de = float(prev.get("total_liab", 0) or 0) / max(1, float(prev.get("total_equity", 0) or 1))
-        result["fund_de_ratio"] = _to_float(de)
-        result["fund_net_profit"] = _to_float(latest.get("净利润") or latest.get("net_profit"))
-        roes = [
-            _to_float(row.get("净资产收益率") or row.get("roe"))
-            for _, row in past.tail(5).iterrows()
-            if row.get("净资产收益率") or row.get("roe")
-        ]
-        result["fund_roe_5y_avg"] = sum(roes) / len(roes) if roes else 0
-        if len(past) >= 5:
-            result["fund_gm_trend"] = result["fund_gross_margin"] - _to_float(
-                past.iloc[-5].get("销售毛利率") or past.iloc[-5].get("gross_margin") or 0
-            )
-    except Exception:
-        pass
-    return result
-
-
-def _compute_valuation_factors(daily_df: pd.DataFrame, as_of: pd.Timestamp) -> dict:
-    result = {}
-    try:
-        past = daily_df[daily_df.index <= as_of]
-        if len(past) == 0:
-            return result
-        latest = past.iloc[-1]
-        for key, col in [
-            ("val_pe", "pe"),
-            ("val_pe_ttm", "pe_ttm"),
-            ("val_pb", "pb"),
-            ("val_ps", "ps"),
-            ("val_dv_ratio", "dv_ratio"),
-        ]:
-            result[key] = _to_float(latest.get(col))
-        if len(past) > 250 and "pe_ttm" in past.columns:
-            pe_hist = past["pe_ttm"].dropna().tail(500)
-            if len(pe_hist) > 100:
-                cur = _to_float(latest.get("pe_ttm"))
-                if cur > 0:
-                    result["val_pe_percentile"] = float((pe_hist < cur).mean())
-        result["val_total_mv"] = _to_float(latest.get("total_mv"))
-    except Exception:
-        pass
-    return result
-
-
 def _build_feature_slice(
     storage_key: str,
     as_of_date: str | pd.Timestamp,
@@ -240,11 +163,11 @@ def _build_feature_slice(
 
         fin_df = fin_cache.get(sym)
         if fin_df is not None:
-            row.update(_compute_fundamental_factors(fin_df, as_of))
+            row.update(compute_fundamental_factors(fin_df, as_of))
 
         daily_df = daily_cache.get(sym)
         if daily_df is not None:
-            row.update(_compute_valuation_factors(daily_df, as_of))
+            row.update(compute_valuation_factors(daily_df, as_of))
 
         full_idx = df.index.get_indexer([df_pit.index[-1]])[0]
         fwd_idx = full_idx + 20

@@ -68,13 +68,17 @@
   white-space: nowrap;
 }
 
-.status-pill {
+.status-pill,
+.risk-pill {
   padding: 4px 8px;
-  border: 1px solid rgba(52, 211, 153, 0.26);
   border-radius: 999px;
+  white-space: nowrap;
+}
+
+.status-pill {
+  border: 1px solid rgba(52, 211, 153, 0.26);
   color: #34d399;
   background: rgba(52, 211, 153, 0.08);
-  white-space: nowrap;
 }
 
 .status-pill.stale {
@@ -90,12 +94,9 @@
 }
 
 .risk-pill {
-  padding: 4px 8px;
   border: 1px solid rgba(56, 189, 248, 0.24);
-  border-radius: 999px;
   color: #38bdf8;
   background: rgba(56, 189, 248, 0.08);
-  white-space: nowrap;
 }
 
 .risk-pill.p0 {

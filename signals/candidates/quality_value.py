@@ -6,32 +6,16 @@ import pandas as pd
 from data.ingestion.fetchers.financial import read_financial_summary, read_valuation
 from data.market.financials import extract_gross_margin_history, extract_roe_history
 from signals.candidates.common import (
+    avg_recent_positive,
     build_signal_row,
     candidate_symbols,
+    latest_positive_value,
     percentile_score,
-    safe_float,
     selected_candidate_rows,
     stock_industry,
     stock_name,
 )
 from signals.candidates.params import candidate_strategy_params
-
-
-def _latest_positive(df: pd.DataFrame | None, column: str) -> float:
-    if df is None or df.empty or column not in df.columns:
-        return 0.0
-    frame = df.copy()
-    if "trade_date" in frame.columns:
-        frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce")
-        frame = frame.sort_values("trade_date")
-    values = pd.to_numeric(frame[column], errors="coerce").dropna()
-    values = values[values > 0]
-    return safe_float(values.iloc[-1]) if len(values) else 0.0
-
-
-def _avg_recent(values: list[float], period_count: int) -> float:
-    recent = [safe_float(v) for v in values[-period_count:] if safe_float(v) > 0]
-    return sum(recent) / len(recent) if recent else 0.0
 
 
 def compute(limit: int = 0) -> list[dict]:
@@ -42,10 +26,10 @@ def compute(limit: int = 0) -> list[dict]:
     for symbol in candidate_symbols(limit):
         fin = read_financial_summary(symbol)
         valuation = read_valuation(symbol)
-        roe = _avg_recent(extract_roe_history(fin), recent_period_count) if fin is not None else 0.0
-        gross_margin = _avg_recent(extract_gross_margin_history(fin), recent_period_count) if fin is not None else 0.0
-        pe_ttm = _latest_positive(valuation, "pe_ttm")
-        pb = _latest_positive(valuation, "pb")
+        roe = avg_recent_positive(extract_roe_history(fin), recent_period_count) if fin is not None else 0.0
+        gross_margin = avg_recent_positive(extract_gross_margin_history(fin), recent_period_count) if fin is not None else 0.0
+        pe_ttm = latest_positive_value(valuation, "pe_ttm")
+        pb = latest_positive_value(valuation, "pb")
         metrics.append(
             {
                 "symbol": symbol,

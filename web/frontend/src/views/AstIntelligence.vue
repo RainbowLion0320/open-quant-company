@@ -180,6 +180,7 @@ import { computed, onMounted, ref } from "vue";
 import { api } from "../api";
 import type { AstCloneGroup, AstIntelligenceResponse, AstIssue } from "../api";
 import { useI18n } from "../i18n";
+import { formatArtifactDate, heatCellStyle, topModule } from "../utils/intelligenceViews";
 
 const { currentLocale, t } = useI18n();
 const payload = ref<AstIntelligenceResponse | null>(null);
@@ -196,7 +197,7 @@ const modules = computed(() => Array.from(new Set((payload.value?.clone_groups |
 const filteredIssues = computed(() => (payload.value?.issues || []).filter(matchesIssue).slice(0, 120));
 const filteredGroups = computed(() => (payload.value?.clone_groups || []).filter(matchesGroup).slice(0, 120));
 const selectedGroup = computed(() => filteredGroups.value.find(item => item.id === selectedGroupId.value) || filteredGroups.value[0] || null);
-const generatedAt = computed(() => fmtDate(payload.value?.generated_at || payload.value?.latest?.generated_at || ""));
+const generatedAt = computed(() => formatArtifactDate(payload.value?.generated_at || payload.value?.latest?.generated_at || "", currentLocale.value));
 const severityText = computed(() => {
   const counts = payload.value?.summary.severity_counts || {};
   return ["P0", "P1", "P2"].map(key => `${key}:${counts[key] || 0}`).join(" · ");
@@ -257,22 +258,12 @@ function selectIssue(issueId: string) {
 }
 
 function heatStyle(value: number) {
-  const intensity = value / maxHeat.value;
-  return {
-    backgroundColor: `rgba(34, 197, 94, ${0.08 + intensity * 0.34})`,
-    borderColor: `rgba(34, 197, 94, ${0.18 + intensity * 0.54})`,
-  };
-}
-
-function topModule(path: string) {
-  return path.split("/", 1)[0] || path;
-}
-
-function fmtDate(value: string) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString(currentLocale.value);
+  return heatCellStyle(value, maxHeat.value, "34, 197, 94", {
+    backgroundBase: 0.08,
+    backgroundScale: 0.34,
+    borderBase: 0.18,
+    borderScale: 0.54,
+  });
 }
 
 onMounted(load);

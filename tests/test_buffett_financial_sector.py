@@ -3,8 +3,8 @@ def test_financial_sector_moat_uses_net_margin_and_relaxed_leverage(monkeypatch)
 
     monkeypatch.setattr(
         buffett,
-        "_config",
-        {
+        "_buffett_config",
+        lambda: {
             "moat": {
                 "min_roe_years": 3,
                 "min_roe": 0.15,

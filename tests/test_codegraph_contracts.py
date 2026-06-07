@@ -129,6 +129,14 @@ def test_codegraph_service_builds_module_file_and_symbol_graphs(tmp_path):
     assert any(link["type"] == "contains" for link in symbol_graph["links"])
 
 
+def test_codegraph_services_share_common_path_helpers():
+    from web.api.services import codegraph, codegraph_diagnostics
+
+    for module in (codegraph, codegraph_diagnostics):
+        assert "_bounded_limit" not in module.__dict__
+        assert "_top_module" not in module.__dict__
+
+
 def test_codegraph_search_and_neighborhood_are_limited(tmp_path):
     from web.api.services.codegraph import CodeGraphService
 

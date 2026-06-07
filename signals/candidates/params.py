@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import copy
-from typing import Any, Mapping, MutableMapping
+from typing import Any, Mapping
 
-from core.settings import get_dotted, get_settings
+from core.settings import get_dotted, get_settings, set_dotted
 
 
 def _param(
@@ -116,23 +116,11 @@ CANDIDATE_PARAM_FIELDS: dict[str, list[dict[str, Any]]] = {
 CANDIDATE_STRATEGY_NAMES = tuple(CANDIDATE_PARAM_FIELDS.keys())
 
 
-def _set_dotted(data: MutableMapping[str, Any], dotted_key: str, value: Any) -> None:
-    current = data
-    parts = dotted_key.split(".")
-    for part in parts[:-1]:
-        child = current.get(part)
-        if not isinstance(child, MutableMapping):
-            child = {}
-            current[part] = child
-        current = child
-    current[parts[-1]] = value
-
-
 def _defaults_from_fields(fields: list[dict[str, Any]]) -> dict[str, Any]:
     defaults: dict[str, Any] = {}
     for item in fields:
         if "default" in item:
-            _set_dotted(defaults, str(item["key"]), copy.deepcopy(item["default"]))
+            set_dotted(defaults, str(item["key"]), copy.deepcopy(item["default"]))
     return defaults
 
 

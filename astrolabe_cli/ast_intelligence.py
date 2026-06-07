@@ -11,6 +11,7 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any
 
+from astrolabe_cli.graph_payload import GraphPayloadBuilder
 from data.storage.datahub import get_datahub
 
 RECOMMENDED_AST_COMMAND = "astroq architecture ast --json"
@@ -200,19 +201,51 @@ def _python_tokens(node: ast.AST) -> list[str]:
     for child in ast.walk(node):
         if isinstance(child, (ast.Load, ast.Store, ast.Del, ast.Param)):
             continue
-        if isinstance(child, ast.Name):
+        if isinstance(child, ast.Call):
+            call_name = _python_full_name(child.func)
+            tokens.append(f"Call:{call_name}" if call_name else "Call")
+        elif isinstance(child, ast.Name):
             tokens.append("Name")
         elif isinstance(child, ast.arg):
             tokens.append("Arg")
         elif isinstance(child, ast.Attribute):
-            tokens.append("Attribute")
+            tokens.append(f"Attribute:{child.attr}")
         elif isinstance(child, ast.Constant):
-            tokens.append(f"Constant:{type(child.value).__name__}")
-        elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            tokens.append(_python_constant_token(child.value))
+        elif isinstance(child, ast.AnnAssign):
+            tokens.append("AnnAssign")
+            tokens.extend(f"Target:{name}" for name in _python_target_names(child.target))
+        elif isinstance(child, ast.Assign):
+            tokens.append("Assign")
+            for target in child.targets:
+                tokens.extend(f"Target:{name}" for name in _python_target_names(target))
+        elif isinstance(child, ast.ClassDef):
+            tokens.append("ClassDef")
+            tokens.extend(f"Base:{_python_full_name(base)}" for base in child.bases if _python_full_name(base))
+        elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
             tokens.append(type(child).__name__)
         else:
             tokens.append(type(child).__name__)
     return tokens
+
+
+def _python_constant_token(value: Any) -> str:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return f"Constant:{type(value).__name__}:{value!r}"
+    return f"Constant:{type(value).__name__}"
+
+
+def _python_target_names(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Name):
+        return [node.id]
+    if isinstance(node, ast.Attribute):
+        return [node.attr]
+    if isinstance(node, (ast.Tuple, ast.List)):
+        names: list[str] = []
+        for item in node.elts:
+            names.extend(_python_target_names(item))
+        return names
+    return []
 
 
 def _python_calls(node: ast.AST) -> set[str]:
@@ -317,6 +350,8 @@ def _clone_groups(units: list[UnitRef]) -> list[dict[str, Any]]:
             pair = tuple(sorted((left.id, right.id)))
             if pair in seen_unit_pairs:
                 continue
+            if _nested_pair(left, right):
+                continue
             if not _same_size_band(left, right):
                 continue
             score = _jaccard(_shingles(left.tokens), _shingles(right.tokens))
@@ -330,8 +365,19 @@ def _clone_groups(units: list[UnitRef]) -> list[dict[str, Any]]:
 
 
 def _clone_candidate(unit: UnitRef) -> bool:
+    if unit.kind == "template":
+        return False
+    if unit.name.startswith("__") and unit.name.endswith("__"):
+        return False
+    if unit.name == "<anonymous>" and unit.node_count < 60:
+        return False
+    if unit.kind == "class" and unit.node_count < 20:
+        return False
+    if unit.kind in {"function", "async-function", "ts-function", "method"}:
+        if unit.node_count < 20 and (unit.end_line - unit.start_line) <= 2:
+            return False
     if unit.kind == "style-rule":
-        return unit.node_count >= 3
+        return unit.node_count >= 6
     if unit.node_count < MIN_CLONE_NODES:
         return False
     if unit.kind in {"file", "import"}:
@@ -358,23 +404,57 @@ def _duplicate_helper_groups(units: list[UnitRef], seen_pairs: set[tuple[str, st
             buckets[key].append(unit)
     index = 0
     for key, items in sorted(buckets.items()):
-        distinct_paths = {unit.path for unit in items}
-        if len(items) < 2 or len(distinct_paths) < 2:
+        candidates = _similar_helper_units(items, seen_pairs)
+        distinct_paths = {unit.path for unit in candidates}
+        if len(candidates) < 2 or len(distinct_paths) < 2:
             continue
-        fresh_pairs = [pair for pair in _unit_pairs(items) if pair not in seen_pairs]
+        fresh_pairs = [pair for pair in _unit_pairs(candidates) if pair not in seen_pairs]
         if not fresh_pairs:
             continue
         index += 1
-        groups.append(_group_payload("duplicate_helper", 0.76, items[:8], f"helper-{key}-{index}"))
+        groups.append(_group_payload("duplicate_helper", 0.76, candidates[:8], f"helper-{key}-{index}"))
     return groups
 
 
+def _similar_helper_units(items: list[UnitRef], seen_pairs: set[tuple[str, str]]) -> list[UnitRef]:
+    similar_ids: set[str] = set()
+    for left, right in combinations(sorted(items, key=lambda item: item.id), 2):
+        pair = tuple(sorted((left.id, right.id)))
+        if pair in seen_pairs:
+            continue
+        if _nested_pair(left, right):
+            continue
+        if not _same_size_band(left, right):
+            continue
+        token_similarity = _jaccard(_shingles(left.tokens), _shingles(right.tokens))
+        call_similarity = _jaccard(set(left.calls), set(right.calls)) if left.calls or right.calls else 0.0
+        if token_similarity >= 0.62 or call_similarity >= 0.60:
+            similar_ids.update((left.id, right.id))
+    return [item for item in items if item.id in similar_ids]
+
+
 def _helper_key(name: str) -> str:
+    if name == "<anonymous>":
+        return ""
     lowered = "".join(ch for ch in name.lower() if ch.isalpha() or ch == "_")
     for prefix in ("get_", "build_", "make_", "create_", "format_", "normalize_", "parse_", "safe_"):
         if lowered.startswith(prefix):
             lowered = lowered[len(prefix):]
     lowered = lowered.strip("_")
+    interface_names = {
+        "batch_fetch",
+        "catalog",
+        "collect",
+        "compute",
+        "data_source",
+        "generate_alpha",
+        "heatstyle",
+        "history",
+        "is_ready",
+        "summary",
+    }
+    if lowered in interface_names:
+        return ""
     return lowered if len(lowered) >= 6 else ""
 
 
@@ -405,7 +485,16 @@ def _unit_payload(unit: UnitRef) -> dict[str, Any]:
 
 
 def _unit_pairs(units: list[UnitRef]) -> set[tuple[str, str]]:
-    return {tuple(sorted((left.id, right.id))) for left, right in combinations(units, 2)}
+    return {tuple(sorted((left.id, right.id))) for left, right in combinations(units, 2) if not _nested_pair(left, right)}
+
+
+def _nested_pair(left: UnitRef, right: UnitRef) -> bool:
+    if left.path != right.path:
+        return False
+    return (
+        left.start_line < right.start_line <= right.end_line <= left.end_line
+        or right.start_line < left.start_line <= left.end_line <= right.end_line
+    )
 
 
 def _module_pairs(units: list[UnitRef]) -> list[str]:
@@ -536,37 +625,25 @@ def _canonical_bypass_issues(project_root: Path, files: list[Path], units: list[
 
 
 def _graph_payload(units: list[UnitRef], groups: list[dict[str, Any]]) -> dict[str, Any]:
-    nodes: dict[str, dict[str, Any]] = {}
-    links: Counter[tuple[str, str, str]] = Counter()
-
-    def add_node(node_id: str, label: str, kind: str, group: str, path: str = "", count: int = 1) -> None:
-        if node_id not in nodes:
-            nodes[node_id] = {"id": node_id, "label": label, "kind": kind, "group": group, "path": path, "count": 0}
-        nodes[node_id]["count"] += count
-
-    def add_link(source: str, target: str, kind: str) -> None:
-        links[(source, target, kind)] += 1
-
+    graph = GraphPayloadBuilder()
     for unit in units:
         module_id = f"module:{unit.module}"
         file_id = f"file:{unit.path}"
-        add_node(module_id, unit.module, "module", unit.module, unit.module)
-        add_node(file_id, unit.path.rsplit("/", 1)[-1], "file", unit.module, unit.path)
-        add_node(unit.id, unit.name, unit.kind, unit.module, unit.path)
-        add_link(module_id, file_id, "contains")
-        add_link(file_id, unit.id, "contains")
+        graph.add_node(module_id, unit.module, "module", unit.module, unit.module)
+        graph.add_node(file_id, unit.path.rsplit("/", 1)[-1], "file", unit.module, unit.path)
+        graph.add_node(unit.id, unit.name, unit.kind, unit.module, unit.path)
+        graph.add_link(module_id, file_id, "contains")
+        graph.add_link(file_id, unit.id, "contains")
     for group in groups:
         group_id = f"clone:{group['id']}"
-        add_node(group_id, group["category"], "clone_group", group["category"], "", len(group["units"]))
+        graph.add_node(group_id, group["category"], "clone_group", group["category"], "", count=len(group["units"]))
         for unit in group["units"]:
-            add_link(group_id, unit["id"], "duplicates" if group["category"] in {"exact_clone", "style_clone"} else "similar_to")
-    return {
-        "nodes": sorted(nodes.values(), key=lambda item: (item["kind"], item["id"])),
-        "links": [
-            {"source": source, "target": target, "type": kind, "label": kind, "count": count}
-            for (source, target, kind), count in sorted(links.items())
-        ],
-    }
+            graph.add_link(
+                group_id,
+                unit["id"],
+                "duplicates" if group["category"] in {"exact_clone", "style_clone"} else "similar_to",
+            )
+    return graph.payload()
 
 
 def _summary_payload(

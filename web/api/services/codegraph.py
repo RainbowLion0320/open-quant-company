@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from web.api.services.codegraph_common import bounded_limit, connect_readonly, normalize_root, top_module
+
 VISUAL_EDGE_KINDS = ("imports", "calls", "instantiates", "references", "extends")
 SYMBOL_NODE_KINDS = ("class", "function", "method", "component", "route", "interface", "type_alias")
 _SYNC_LOCK = threading.Lock()
@@ -92,20 +94,20 @@ class CodeGraphService:
     ) -> dict[str, Any]:
         edge_filter = _clean_filter(edge_kinds, VISUAL_EDGE_KINDS)
         node_filter = _clean_filter(node_kinds, SYMBOL_NODE_KINDS)
-        bounded_limit = _bounded_limit(limit)
+        limit_value = bounded_limit(limit, default=300, maximum=800)
         if level == "module":
-            return self._module_graph(edge_filter, bounded_limit)
+            return self._module_graph(edge_filter, limit_value)
         if level == "file":
-            return self._file_graph(root, edge_filter, bounded_limit)
+            return self._file_graph(root, edge_filter, limit_value)
         if level == "symbol":
-            return self._symbol_graph(root, edge_filter, node_filter, bounded_limit)
+            return self._symbol_graph(root, edge_filter, node_filter, limit_value)
         raise ValueError(f"Unsupported CodeGraph level: {level}")
 
     def search(self, q: str, limit: int = 20) -> list[dict[str, Any]]:
         query = q.strip()
         if not query or not self.db_path.exists():
             return []
-        bounded_limit = _bounded_limit(limit, default=20, maximum=50)
+        limit_value = bounded_limit(limit, default=20, maximum=50)
         pattern = f"%{query.lower()}%"
         with self._connect() as con:
             rows = con.execute(
@@ -127,14 +129,14 @@ class CodeGraphService:
                     length(qualified_name)
                 LIMIT ?
                 """,
-                (pattern, pattern, pattern, query, bounded_limit),
+                (pattern, pattern, pattern, query, limit_value),
             ).fetchall()
         return [self._node_payload(row) for row in rows]
 
     def neighborhood(self, node_id: str, depth: int = 1, limit: int = 180) -> dict[str, Any]:
         if not node_id or not self.db_path.exists():
             return self._empty_graph(level="neighborhood")
-        bounded_limit = _bounded_limit(limit, default=180, maximum=500)
+        limit_value = bounded_limit(limit, default=180, maximum=500)
         max_depth = max(1, min(int(depth or 1), 3))
         nodes: dict[str, dict[str, Any]] = {}
         links: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -147,7 +149,7 @@ class CodeGraphService:
                 return self._empty_graph(level="neighborhood")
             nodes[node_id] = self._node_payload(seed)
             for _ in range(max_depth):
-                if len(nodes) >= bounded_limit or not frontier:
+                if len(nodes) >= limit_value or not frontier:
                     break
                 placeholders = ",".join("?" for _ in frontier)
                 rows = con.execute(
@@ -173,14 +175,14 @@ class CodeGraphService:
                       AND (e.source IN ({placeholders}) OR e.target IN ({placeholders}))
                     LIMIT ?
                     """,
-                    (*VISUAL_EDGE_KINDS, *frontier, *frontier, bounded_limit * 4),
+                    (*VISUAL_EDGE_KINDS, *frontier, *frontier, limit_value * 4),
                 ).fetchall()
                 next_frontier: set[str] = set()
                 for row in rows:
                     source = _node_from_prefixed_row(row, "source")
                     target = _node_from_prefixed_row(row, "target")
                     for item in (source, target):
-                        if len(nodes) < bounded_limit:
+                        if len(nodes) < limit_value:
                             nodes.setdefault(item["id"], item)
                     key = (row["source"], row["target"], row["edge_kind"])
                     links[key] = _link_payload(row["source"], row["target"], row["edge_kind"], row["edge_kind"], 1)
@@ -190,7 +192,7 @@ class CodeGraphService:
                             visited.add(item_id)
                 frontier = next_frontier
 
-        return self._graph_payload("neighborhood", list(nodes.values()), list(links.values()), len(nodes) >= bounded_limit)
+        return self._graph_payload("neighborhood", list(nodes.values()), list(links.values()), len(nodes) >= limit_value)
 
     def _module_graph(self, edge_filter: tuple[str, ...], limit: int) -> dict[str, Any]:
         if not self.db_path.exists():
@@ -199,7 +201,7 @@ class CodeGraphService:
         links: dict[tuple[str, str, str], dict[str, Any]] = {}
         with self._connect() as con:
             for row in con.execute("SELECT path, language, node_count FROM files").fetchall():
-                top = _top_module(row["path"])
+                top = top_module(row["path"])
                 node_id = f"module:{top}"
                 node = nodes.setdefault(
                     node_id,
@@ -219,8 +221,8 @@ class CodeGraphService:
                 )
                 node["count"] += int(row["node_count"] or 0)
             for row in self._edge_file_rows(con, edge_filter):
-                source = f"module:{_top_module(row['source_file_path'])}"
-                target = f"module:{_top_module(row['target_file_path'])}"
+                source = f"module:{top_module(row['source_file_path'])}"
+                target = f"module:{top_module(row['target_file_path'])}"
                 if source == target or source not in nodes or target not in nodes:
                     continue
                 _add_counted_link(links, source, target, row["edge_kind"])
@@ -232,7 +234,7 @@ class CodeGraphService:
     def _file_graph(self, root: str, edge_filter: tuple[str, ...], limit: int) -> dict[str, Any]:
         if not self.db_path.exists():
             return self._empty_graph(level="file")
-        root_prefix = _normalize_root(root)
+        root_prefix = normalize_root(root)
         nodes: dict[str, dict[str, Any]] = {}
         links: dict[tuple[str, str, str], dict[str, Any]] = {}
         file_degree: dict[str, int] = {}
@@ -253,14 +255,14 @@ class CodeGraphService:
                 tgt_internal = tgt_path in internal_paths
                 if not src_internal and not tgt_internal:
                     continue
-                source_id = f"file:{src_path}" if src_internal else f"external:{_top_module(src_path)}"
-                target_id = f"file:{tgt_path}" if tgt_internal else f"external:{_top_module(tgt_path)}"
+                source_id = f"file:{src_path}" if src_internal else f"external:{top_module(src_path)}"
+                target_id = f"file:{tgt_path}" if tgt_internal else f"external:{top_module(tgt_path)}"
                 if source_id == target_id:
                     continue
                 if not src_internal:
-                    nodes.setdefault(source_id, _external_node(_top_module(src_path)))
+                    nodes.setdefault(source_id, _external_node(top_module(src_path)))
                 if not tgt_internal:
-                    nodes.setdefault(target_id, _external_node(_top_module(tgt_path)))
+                    nodes.setdefault(target_id, _external_node(top_module(tgt_path)))
                 _add_counted_link(links, source_id, target_id, row["edge_kind"])
                 file_degree[source_id] = file_degree.get(source_id, 0) + 1
                 file_degree[target_id] = file_degree.get(target_id, 0) + 1
@@ -287,7 +289,7 @@ class CodeGraphService:
             if not file_row:
                 return self._empty_graph(level="symbol")
             file_id = f"file:{root_path}"
-            nodes[file_id] = _file_node(root_path, file_row["language"], int(file_row["node_count"] or 0), _top_module(root_path))
+            nodes[file_id] = _file_node(root_path, file_row["language"], int(file_row["node_count"] or 0), top_module(root_path))
             placeholders = ",".join("?" for _ in node_filter)
             symbol_rows = con.execute(
                 f"SELECT * FROM nodes WHERE file_path = ? AND kind IN ({placeholders}) ORDER BY start_line",
@@ -347,9 +349,7 @@ class CodeGraphService:
         ).fetchall()
 
     def _connect(self) -> sqlite3.Connection:
-        con = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
-        con.row_factory = sqlite3.Row
-        return con
+        return connect_readonly(self.db_path)
 
     def _cli_status(self) -> dict[str, Any] | None:
         try:
@@ -383,7 +383,7 @@ class CodeGraphService:
             "end_line": row["end_line"],
             "count": 1,
             "degree": degree,
-            "group": _top_module(row["file_path"]),
+            "group": top_module(row["file_path"]),
             "signature": row["signature"],
             "docstring": row["docstring"],
         }
@@ -470,25 +470,8 @@ def _clean_filter(values: Iterable[str] | None, default: tuple[str, ...]) -> tup
     return cleaned or default
 
 
-def _bounded_limit(limit: int, default: int = 300, maximum: int = 800) -> int:
-    try:
-        value = int(limit)
-    except (TypeError, ValueError):
-        return default
-    return max(1, min(value, maximum))
-
-
-def _top_module(path: str) -> str:
-    return (path or "root").split("/", 1)[0] or "root"
-
-
-def _normalize_root(root: str) -> str:
-    value = (root or "").strip().strip("/")
-    return value or ""
-
-
 def _normalize_file_root(root: str) -> str:
-    return _normalize_root(root).removeprefix("file:")
+    return normalize_root(root)
 
 
 def _path_in_root(path: str, root: str) -> bool:
@@ -539,7 +522,7 @@ def _node_from_prefixed_row(row: sqlite3.Row, prefix: str) -> dict[str, Any]:
         "end_line": row[f"{prefix}_end_line"],
         "count": 1,
         "degree": 0,
-        "group": _top_module(row[f"{prefix}_file_path"]),
+        "group": top_module(row[f"{prefix}_file_path"]),
         "signature": row[f"{prefix}_signature"],
         "docstring": row[f"{prefix}_docstring"],
     }

@@ -7,20 +7,7 @@ from typing import Iterable, Mapping
 from signals.candidates.common import build_signal_row, selected_candidate_rows
 from signals.candidates import low_vol_defensive, quality_value, rps_relative_strength, trend_following
 from signals.candidates.params import candidate_strategy_params
-
-
-def _current_regime() -> tuple[str, dict[str, float]]:
-    """Return (regime_string, regime_probs)."""
-    try:
-        from cybernetics.orchestrator import QuantOrchestrator
-
-        snapshot = QuantOrchestrator().detect()
-        regime = snapshot.regime.value if hasattr(snapshot.regime, "value") else str(snapshot.regime)
-        regime = regime if regime in {"bull", "bear", "sideways"} else "sideways"
-        probs = getattr(snapshot, "regime_probs", {})
-        return regime, probs if probs else {regime: 1.0}
-    except Exception:
-        return "sideways", {"sideways": 1.0}
+from signals.regime_context import current_regime
 
 
 def _merge_rows(weighted_sources: Iterable[tuple[str, float, list[dict]]], regime: str) -> list[dict]:
@@ -71,7 +58,7 @@ def _merge_rows(weighted_sources: Iterable[tuple[str, float, list[dict]]], regim
 def compute(limit: int = 0) -> list[dict]:
     params = candidate_strategy_params("regime_gated")
     regime_weights = params["regime_weights"]
-    regime, probs = _current_regime()
+    regime, probs = current_regime()
 
     strategy_weights: dict[str, float] = {}
     for regime_name, regime_strategy_weights in regime_weights.items():

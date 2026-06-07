@@ -1,6 +1,7 @@
 import { computed, ref, onMounted } from "vue";
 import { useStrategyStore } from "../stores";
 import { useI18n } from "../i18n";
+import { signalLabel as formatSignalLabel } from "../utils/signals";
 import {
   api,
   type StrategyCatalogItem,
@@ -80,7 +81,7 @@ export function useStrategiesView() {
     return catalog.value.find(s => s.name === name)?.label || name;
   }
   function signalLabel(signal: string) {
-    return signal === "buy" ? t("common.buy") : signal === "sell" ? t("common.sell") : t("common.hold");
+    return formatSignalLabel(signal, t);
   }
   function scanMeta(name: string) {
     const meta = scanByName.value[name];

@@ -255,7 +255,7 @@ def test_ml_model_bundle_reports_load_errors(tmp_path, monkeypatch):
 
     (tmp_path / "lgbm_best.pkl").write_bytes(b"broken")
     monkeypatch.setattr(ml_signals, "MODEL_DIR", tmp_path)
-    monkeypatch.setattr(ml_signals, "_current_regime", lambda: ("sideways", {"sideways": 1.0}))
+    monkeypatch.setattr(ml_signals, "current_regime", lambda: ("sideways", {"sideways": 1.0}))
 
     def broken_load(_file):
         raise ModuleNotFoundError("No module named 'lightgbm'")

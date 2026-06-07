@@ -126,6 +126,15 @@ def test_stock_list_route_is_not_shadowed(monkeypatch):
             assert key in row
 
 
+def test_system_artifact_services_use_shared_artifact_reader():
+    from web.api.services import system_ast, system_tests
+
+    assert "_read_json" not in system_ast.__dict__
+    assert "_read_json" not in system_tests.__dict__
+    assert "_artifact_age_seconds" not in system_ast.__dict__
+    assert "_artifact_age_seconds" not in system_tests.__dict__
+
+
 def test_macro_gdp_tushare_normalizes_quarter_to_date():
     from data.ingestion.fetchers.macro import MacroFetcher, derive_macro_factors
 

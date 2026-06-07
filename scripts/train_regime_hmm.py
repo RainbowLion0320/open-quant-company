@@ -19,21 +19,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from research.regime.assets import load_benchmark_index_daily
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 log = logging.getLogger("train_regime_hmm")
-
-
-def _load_index_daily(symbol: str = "sh000001") -> pd.DataFrame:
-    """Load benchmark index daily data."""
-    try:
-        from data.ingestion.fetcher import _read_cache, get_index_daily
-
-        cached = _read_cache(f"index_daily_{symbol}_default", max_age_hours=0)
-        if cached is not None and len(cached) > 0:
-            return cached
-        return get_index_daily(symbol, force_refresh=False)
-    except Exception:
-        return pd.DataFrame()
 
 
 def _load_breadth_history(start: str, end: str) -> pd.DataFrame:
@@ -330,7 +319,7 @@ def main() -> int:
 
     # Load data
     log.info("Loading index data...")
-    index_df = _load_index_daily(args.symbol)
+    index_df = load_benchmark_index_daily(args.symbol)
     if index_df.empty:
         log.error(f"Failed to load index data for {args.symbol}")
         return 1

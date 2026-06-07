@@ -139,9 +139,16 @@ function scriptKind(node) {
 function scriptTokens(node) {
   const tokens = [];
   function walk(child) {
-    if (ts.isIdentifier(child)) {
+    if (ts.isCallExpression(child)) {
+      const name = exprName(child.expression);
+      tokens.push(name ? `Call:${name}` : "CallExpression");
+    } else if (ts.isPropertyAccessExpression(child)) {
+      tokens.push(`Property:${child.name.text}`);
+    } else if (ts.isIdentifier(child)) {
       tokens.push("Identifier");
-    } else if (ts.isStringLiteral(child) || ts.isNumericLiteral(child) || child.kind === ts.SyntaxKind.TrueKeyword || child.kind === ts.SyntaxKind.FalseKeyword) {
+    } else if (ts.isStringLiteral(child) || ts.isNumericLiteral(child)) {
+      tokens.push(`Literal:${ts.SyntaxKind[child.kind]}:${child.text}`);
+    } else if (child.kind === ts.SyntaxKind.TrueKeyword || child.kind === ts.SyntaxKind.FalseKeyword) {
       tokens.push(`Literal:${ts.SyntaxKind[child.kind]}`);
     } else {
       tokens.push(ts.SyntaxKind[child.kind] || String(child.kind));

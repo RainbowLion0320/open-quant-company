@@ -1,6 +1,15 @@
 import { get, post } from "../client";
 import type { AstIntelligenceResponse, CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LlmUsageResponse, SystemHistoryResponse, SystemMonitor, TestDesignResponse } from "../types";
 
+function queryString(params: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  }
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
 export const systemApi = {
   systemMonitor: () => get<SystemMonitor>("/api/system/monitor"),
   systemHistory: (hours = 24) => get<SystemHistoryResponse>(`/api/system/history?hours=${hours}`),
@@ -16,25 +25,13 @@ export const systemApi = {
   testDesign: () => get<TestDesignResponse>("/api/system/tests/design"),
   astIntelligence: () => get<AstIntelligenceResponse>("/api/system/ast-intelligence"),
   codeGraphStatus: () => get<CodeGraphStatusResponse>("/api/codegraph/status"),
-  codeGraphGraph: (params: { level?: string; root?: string; edge_kinds?: string; node_kinds?: string; limit?: number } = {}) => {
-    const search = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== "") search.set(key, String(value));
-    }
-    const query = search.toString();
-    return get<CodeGraphGraphResponse>(`/api/codegraph/graph${query ? `?${query}` : ""}`);
-  },
+  codeGraphGraph: (params: { level?: string; root?: string; edge_kinds?: string; node_kinds?: string; limit?: number } = {}) =>
+    get<CodeGraphGraphResponse>(`/api/codegraph/graph${queryString(params)}`),
   codeGraphSearch: (q: string, limit = 20) =>
     get<{ items: CodeGraphNode[] }>(`/api/codegraph/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   codeGraphNeighborhood: (nodeId: string, depth = 1, limit = 180) =>
     get<CodeGraphGraphResponse>(`/api/codegraph/neighborhood?node_id=${encodeURIComponent(nodeId)}&depth=${depth}&limit=${limit}`),
-  codeGraphDiagnostics: (params: { scope?: string; root?: string; limit?: number; include_git?: boolean } = {}) => {
-    const search = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== "") search.set(key, String(value));
-    }
-    const query = search.toString();
-    return get<CodeGraphDiagnosticsResponse>(`/api/codegraph/diagnostics${query ? `?${query}` : ""}`);
-  },
+  codeGraphDiagnostics: (params: { scope?: string; root?: string; limit?: number; include_git?: boolean } = {}) =>
+    get<CodeGraphDiagnosticsResponse>(`/api/codegraph/diagnostics${queryString(params)}`),
   codeGraphSync: (mode: "sync" | "rebuild") => post<{ status: string; mode: string; results: any[] }>("/api/codegraph/sync", { mode }),
 };

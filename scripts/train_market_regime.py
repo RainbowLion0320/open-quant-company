@@ -8,21 +8,9 @@ from pathlib import Path
 
 import pandas as pd
 
+from research.regime.assets import load_benchmark_index_daily
 from research.regime.features import load_full_market_breadth_history
 from research.regime.reports import run_and_write_report, write_regime_training_report
-
-
-def _load_index_daily(symbol: str = "sh000001") -> pd.DataFrame:
-    """Load benchmark index daily data, preferring local API cache."""
-    try:
-        from data.ingestion.fetcher import _read_cache, get_index_daily
-
-        cached = _read_cache(f"index_daily_{symbol}_default", max_age_hours=0)
-        if cached is not None and len(cached) > 0:
-            return cached
-        return get_index_daily(symbol, force_refresh=False)
-    except Exception:
-        return pd.DataFrame()
 
 
 def _parse_args() -> argparse.Namespace:
@@ -47,7 +35,7 @@ def main() -> int:
     if not args.no_apply:
         print("[regime-trainer] auto-apply is intentionally disabled in this version; writing advisory config only")
 
-    index_df = _load_index_daily(args.symbol)
+    index_df = load_benchmark_index_daily(args.symbol)
     if index_df.empty:
         summary = write_regime_training_report(
             output,

@@ -94,10 +94,10 @@ def build_tushare_coverage(hub: DataHub, symbols: list[str], trade_days: list[st
         "repurchase": file_coverage(hub.dimension_root("repurchase")),
         "dividend": file_coverage(hub.dimension_root("dividend")),
         "fund_basic": file_coverage(hub.dimension_root("fund_basic")),
-        "fund_daily": symbol_file_coverage(hub.dimension_root("fund_daily"), _etf_ts_codes()),
-        "fund_nav": symbol_file_coverage(hub.dimension_root("fund_nav"), _etf_ts_codes()),
+        "fund_daily": symbol_file_coverage(hub.dimension_root("fund_daily"), tushare_etf_ts_codes()),
+        "fund_nav": symbol_file_coverage(hub.dimension_root("fund_nav"), tushare_etf_ts_codes()),
         "fund_portfolio": partition_file_coverage(hub.dimension_root("fund_portfolio"), _recent_quarter_periods()),
-        "futures_daily": partition_file_coverage(hub.dimension_root("futures_daily"), _futures_ts_codes()),
+        "futures_daily": partition_file_coverage(hub.dimension_root("futures_daily"), tushare_futures_ts_codes()),
         "cyq_perf": partition_file_coverage(hub.dimension_root("cyq_perf"), trade_days[-60:]),
         "stk_factor_pro": symbol_file_coverage(hub.dimension_root("stk_factor_pro"), symbols),
         "stk_mins": {"expected": 0, "existing": 0, "missing": 0, "ratio": 1.0, "missing_sample": [], "policy": MINUTE_POLICY},
@@ -119,11 +119,11 @@ def _count_only_coverage(root: Path) -> dict[str, object]:
     return {"expected": 0, "existing": existing, "missing": 0, "ratio": 1.0, "missing_sample": []}
 
 
-def _etf_ts_codes() -> list[str]:
+def tushare_etf_ts_codes() -> list[str]:
     return [to_ts_code(code) for code in ETF_UNIVERSE]
 
 
-def _futures_ts_codes() -> list[str]:
+def tushare_futures_ts_codes() -> list[str]:
     codes = []
     for code in FUTURES_UNIVERSE:
         text = str(code).strip().upper()

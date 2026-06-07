@@ -185,7 +185,7 @@
 <script setup lang="ts">
 import { useDatabaseHealth } from "../view-models/useDatabaseHealth";
 
-const { rows, currentLocale, t, summary, status, statusMessage, expanded, apiFallback, repairing, sortedRows, statusClass, statusText, missingColor, outlierColor, fmtSize, fmtPercent, fmtCountOk, fmtCount, fmtTime, fmtMiss10y, fmtMiss10yPlus, freshnessLabel, missingClass, okClass, missingClassAny, outlierClass, outlierClassAny, freshnessClass, bdMissingClass, hasDetail, toggleDetail, startRepair, fetchData } = useDatabaseHealth();
+const { rows, currentLocale, t, summary, status, statusMessage, expanded, apiFallback, repairing, sortedRows, statusClass, statusText, missingColor, outlierColor, fmtSize, fmtPercent, fmtCountOk, fmtCount, fmtTime, fmtMiss10y, fmtMiss10yPlus, freshnessLabel, missingClass, okClass, outlierClass, freshnessClass, bdMissingClass, hasDetail, toggleDetail, startRepair, fetchData } = useDatabaseHealth();
 </script>
 
 <style scoped src="../styles/views/database-health.css"></style>

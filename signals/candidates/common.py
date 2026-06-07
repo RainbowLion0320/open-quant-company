@@ -36,6 +36,23 @@ def bounded_score(value: Any, default: float = 0.0) -> float:
     return round(max(0.0, min(100.0, safe_float(value, default))), 2)
 
 
+def avg_recent_positive(values: list[float], period_count: int) -> float:
+    recent = [safe_float(value) for value in values[-period_count:] if safe_float(value) > 0]
+    return sum(recent) / len(recent) if recent else 0.0
+
+
+def latest_positive_value(df: pd.DataFrame | None, column: str) -> float:
+    if df is None or df.empty or column not in df.columns:
+        return 0.0
+    frame = df.copy()
+    if "trade_date" in frame.columns:
+        frame["trade_date"] = pd.to_datetime(frame["trade_date"], errors="coerce")
+        frame = frame.sort_values("trade_date")
+    values = pd.to_numeric(frame[column], errors="coerce").dropna()
+    values = values[values > 0]
+    return safe_float(values.iloc[-1]) if len(values) else 0.0
+
+
 def is_st_name(name: str) -> bool:
     return "ST" in str(name or "").upper()
 

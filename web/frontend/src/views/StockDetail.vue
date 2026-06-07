@@ -94,7 +94,7 @@ import { useRoute } from "vue-router";
 import { api } from "../api";
 import { useECharts, QUANTUM_THEME } from "../charts/useECharts";
 import { useI18n } from "../i18n";
-import { fmtRatioPct, isBlankNumber } from "../utils/format";
+import { fmtFixedNumber, fmtRatioPct } from "../utils/format";
 import type { StockDetail } from "../api";
 
 const route = useRoute();
@@ -167,7 +167,7 @@ function fmtPctValue(v: number | undefined | null) {
 }
 
 function fmtNumber(v: number | undefined | null, digits = 2) {
-  return isBlankNumber(v) ? "—" : Number(v).toFixed(digits);
+  return fmtFixedNumber(v, digits);
 }
 
 onMounted(load);

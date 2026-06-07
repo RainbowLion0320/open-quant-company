@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 import pandas as pd
 import numpy as np
 from data.storage.datahub import get_datahub
+from data.features.factor_inputs import compute_valuation_factors
 from data.features.feature_store import iter_feature_files
 from data.ingestion.tushare_utils import get_tushare_token
 import tushare as ts
@@ -56,41 +57,6 @@ for i, sym in enumerate(symbols_list):
     time.sleep(0.3)
 print(f"  估值有效: {len(daily_cache)}")
 
-# Step 2: 辅助函数
-def _to_float(val):
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return np.nan
-    if isinstance(val, (int, float)):
-        return float(val)
-    if isinstance(val, str):
-        val = val.replace("%", "").replace(",", "").replace("万亿", "e12").replace("亿", "e8").replace("万", "e4")
-        try: return float(val)
-        except ValueError: return np.nan
-    return np.nan
-
-def compute_valuation_factors(daily_df, as_of):
-    factors = {}
-    try:
-        past = daily_df[daily_df.index <= as_of]
-        if len(past) == 0: return factors
-        latest = past.iloc[-1]
-        factors["val_pe"] = _to_float(latest.get("pe"))
-        factors["val_pe_ttm"] = _to_float(latest.get("pe_ttm"))
-        factors["val_pb"] = _to_float(latest.get("pb"))
-        factors["val_ps"] = _to_float(latest.get("ps"))
-        factors["val_dv_ratio"] = _to_float(latest.get("dv_ratio"))
-        if len(past) > 250:
-            pe_hist = past["pe_ttm"].dropna().tail(500)
-            if len(pe_hist) > 100:
-                cur = _to_float(latest.get("pe_ttm"))
-                if not np.isnan(cur) and cur > 0:
-                    factors["val_pe_percentile"] = (pe_hist < cur).mean()
-        factors["val_total_mv"] = _to_float(latest.get("total_mv"))
-        factors["val_circ_mv"] = _to_float(latest.get("circ_mv"))
-    except Exception:
-        pass
-    return factors
-
 # Step 3: 逐月补增 PE/PB
 print("\n[2] 补增 PE/PB 到特征文件...")
 for pq in iter_feature_files():
@@ -110,7 +76,7 @@ for pq in iter_feature_files():
         for sym in df['symbol'].unique():
             daily_df = daily_cache.get(sym)
             if daily_df is not None:
-                factors = compute_valuation_factors(daily_df, month_end)
+                factors = compute_valuation_factors(daily_df, month_end, default=np.nan, include_circ_mv=True)
                 if factors:
                     val_data[sym] = factors
         

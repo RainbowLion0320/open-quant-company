@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from web.api.services.codegraph_common import bounded_limit, connect_readonly, normalize_root, top_module
+
 VISUAL_EDGE_KINDS = ("imports", "calls", "instantiates", "references", "extends")
 SEVERITY_ORDER = {"P0": 0, "P1": 1, "P2": 2}
 _CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
@@ -46,10 +48,10 @@ class CodeGraphDiagnosticsService:
         limit: int = 80,
         include_git: bool = True,
     ) -> dict[str, Any]:
-        bounded_limit = _bounded_limit(limit)
-        normalized_root = _normalize_root(root)
+        limit_value = bounded_limit(limit, default=80, maximum=200)
+        normalized_root = normalize_root(root)
         if not self.db_path.exists():
-            return _empty_payload(initialized=False, limit=bounded_limit)
+            return _empty_payload(initialized=False, limit=limit_value)
 
         git_head = self._git_head() if include_git else ""
         cache_key = (
@@ -58,7 +60,7 @@ class CodeGraphDiagnosticsService:
             git_head,
             scope,
             normalized_root,
-            bounded_limit,
+            limit_value,
             include_git,
         )
         if cache_key in _CACHE:
@@ -86,8 +88,8 @@ class CodeGraphDiagnosticsService:
 
         filtered = [issue for issue in issues if _issue_in_scope(issue, scope, normalized_root)]
         ordered = sorted(filtered, key=_issue_sort_key)
-        truncated = len(ordered) > bounded_limit
-        limited = ordered[:bounded_limit]
+        truncated = len(ordered) > limit_value
+        limited = ordered[:limit_value]
         node_scores = _node_scores(limited)
         payload = {
             "summary": {
@@ -102,7 +104,7 @@ class CodeGraphDiagnosticsService:
             },
             "issues": limited,
             "node_scores": node_scores,
-            "edge_flags": [flag for flag in edge_flags if _edge_flag_in_scope(flag, scope, normalized_root)][:bounded_limit],
+            "edge_flags": [flag for flag in edge_flags if _edge_flag_in_scope(flag, scope, normalized_root)][:limit_value],
         }
         _CACHE[cache_key] = payload
         if len(_CACHE) > 16:
@@ -157,8 +159,8 @@ class CodeGraphDiagnosticsService:
             target_metric.incoming += 1
             source_metric.outbound_files.add(target)
             target_metric.inbound_files.add(source)
-            source_metric.outbound_modules.add(_top_module(target))
-            target_metric.inbound_modules.add(_top_module(source))
+            source_metric.outbound_modules.add(top_module(target))
+            target_metric.inbound_modules.add(top_module(source))
 
     def _cycle_issues(self, metrics: dict[str, FileMetrics], edges: list[dict[str, Any]]) -> list[dict[str, Any]]:
         graph: dict[str, set[str]] = defaultdict(set)
@@ -349,9 +351,7 @@ class CodeGraphDiagnosticsService:
         return dict(counts)
 
     def _connect(self) -> sqlite3.Connection:
-        con = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
-        con.row_factory = sqlite3.Row
-        return con
+        return connect_readonly(self.db_path)
 
 
 def _empty_payload(*, initialized: bool, limit: int) -> dict[str, Any]:
@@ -521,22 +521,6 @@ def _edge_flag_in_scope(flag: dict[str, Any], scope: str, root: str) -> bool:
     source = flag.get("source", "").removeprefix("file:")
     target = flag.get("target", "").removeprefix("file:")
     return source.startswith(root) or target.startswith(root)
-
-
-def _bounded_limit(limit: int, default: int = 80, maximum: int = 200) -> int:
-    try:
-        value = int(limit)
-    except (TypeError, ValueError):
-        return default
-    return max(1, min(value, maximum))
-
-
-def _normalize_root(root: str) -> str:
-    return (root or "").strip().strip("/").removeprefix("file:")
-
-
-def _top_module(path: str) -> str:
-    return (path or "root").split("/", 1)[0] or "root"
 
 
 def _is_production_candidate(path: str) -> bool:

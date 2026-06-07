@@ -145,23 +145,7 @@ export function useDatabaseHealth() {
     return "";
   }
 
-  function missingClassAny(pct: number | null | undefined): string {
-
-    if (pct == null) return "";
-    if (pct === 0) return "val-ok";
-    if (pct < 5) return "val-warn";
-    return "val-bad";
-  }
-
   function outlierClass(cnt: number | null | undefined): string {
-    if (cnt == null) return "";
-    if (cnt === 0) return "val-ok";
-    if (cnt < 100) return "val-warn";
-    return "val-bad";
-  }
-
-  function outlierClassAny(cnt: number | null | undefined): string {
-
     if (cnt == null) return "";
     if (cnt === 0) return "val-ok";
     if (cnt < 100) return "val-warn";
@@ -288,9 +272,7 @@ export function useDatabaseHealth() {
     freshnessLabel,
     missingClass,
     okClass,
-    missingClassAny,
     outlierClass,
-    outlierClassAny,
     freshnessClass,
     bdMissingClass,
     hasDetail,

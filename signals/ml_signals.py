@@ -19,29 +19,17 @@ from models import MODEL_DIR
 from models.lgbm_runtime import global_model_candidates, load_lgbm_bundle, regime_model_candidates
 from data.features.feature_store import feature_date_key, feature_key_to_date, latest_feature_file
 from core.settings import get_settings
+from signals.regime_context import current_regime
 
 
 def _load_settings() -> dict:
     return get_settings()
 
 
-def _current_regime() -> tuple[str, dict[str, float]]:
-    """Return (regime_string, regime_probs)."""
-    try:
-        from cybernetics.orchestrator import QuantOrchestrator
-        snapshot = QuantOrchestrator().detect()
-        regime = snapshot.regime.value if hasattr(snapshot.regime, "value") else str(snapshot.regime)
-        regime = regime if regime in {"bull", "bear", "sideways"} else "sideways"
-        probs = getattr(snapshot, "regime_probs", {})
-        return regime, probs if probs else {regime: 1.0}
-    except Exception:
-        return "sideways", {"sideways": 1.0}
-
-
 def _load_model_bundle(model_version: str = "best") -> tuple[object | None, list[str], dict, str]:
     """Load regime-aware model when available, falling back to lgbm_best."""
     cfg = _load_settings().get("ml", {})
-    regime, _probs = _current_regime()
+    regime, _probs = current_regime()
     use_regime = cfg.get("use_regime_models", True)
 
     candidates = []

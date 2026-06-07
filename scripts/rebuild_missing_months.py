@@ -16,6 +16,7 @@ from data.ingestion.fetcher import get_stock_daily
 from data.storage.datahub import get_datahub
 from data.market.financials import get_financial_summary
 from signals.expression import alpha_factors
+from data.features.factor_inputs import compute_fundamental_factors, compute_valuation_factors
 from data.features.feature_store import FEATURES_DIR, enrich_from_registry
 
 HUB = get_datahub()
@@ -86,59 +87,6 @@ try:
 except Exception as e:
     print(f"  Tushare不可用: {e}")
 
-# Helper functions
-def _to_float(val):
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return 0.0
-    if isinstance(val, (int, float)):
-        return float(val)
-    if isinstance(val, str):
-        val = val.replace("%", "").replace(",", "").replace("万亿", "e12").replace("亿", "e8").replace("万", "e4")
-        try: return float(val)
-        except ValueError: return 0.0
-    return 0.0
-
-def _compute_fundamental_factors(fin_df, as_of):
-    factors = {}
-    try:
-        rc = "报告期" if "报告期" in fin_df.columns else "end_date"
-        fin_df[rc] = pd.to_datetime(fin_df[rc])
-        past = fin_df[fin_df[rc] <= as_of].sort_values(rc)
-        if len(past) == 0: return factors
-        latest = past.iloc[-1]
-        factors["fund_roe"] = _to_float(latest.get("净资产收益率") or latest.get("roe"))
-        factors["fund_gross_margin"] = _to_float(latest.get("销售毛利率") or latest.get("gross_margin"))
-        factors["fund_net_margin"] = _to_float(latest.get("销售净利率") or latest.get("net_margin"))
-        de = latest.get("debt_equity_ratio")
-        if de is None and len(past) >= 2:
-            prev = past.iloc[-2]
-            de = float(prev.get("total_liab",0) or 0) / max(1, float(prev.get("total_equity",0) or 1))
-        factors["fund_de_ratio"] = _to_float(de)
-        factors["fund_net_profit"] = _to_float(latest.get("净利润") or latest.get("net_profit"))
-        roes = [_to_float(r.get("净资产收益率") or r.get("roe")) for _,r in past.tail(5).iterrows() if r.get("净资产收益率") or r.get("roe")]
-        factors["fund_roe_5y_avg"] = sum(roes)/len(roes) if roes else 0
-        if len(past) >= 5:
-            factors["fund_gm_trend"] = factors["fund_gross_margin"] - _to_float(past.iloc[-5].get("销售毛利率") or past.iloc[-5].get("gross_margin") or 0)
-    except Exception: pass
-    return factors
-
-def _compute_valuation_factors(daily_df, as_of, price_df, idx):
-    factors = {}
-    try:
-        past = daily_df[daily_df.index <= as_of]
-        if len(past) == 0: return factors
-        latest = past.iloc[-1]
-        for k, c in [("val_pe","pe"),("val_pe_ttm","pe_ttm"),("val_pb","pb"),("val_ps","ps"),("val_dv_ratio","dv_ratio")]:
-            factors[k] = _to_float(latest.get(c))
-        if len(past) > 250:
-            pe_hist = past["pe_ttm"].dropna().tail(500)
-            if len(pe_hist) > 100:
-                cur = _to_float(latest.get("pe_ttm"))
-                if cur > 0: factors["val_pe_percentile"] = (pe_hist < cur).mean()
-        factors["val_total_mv"] = _to_float(latest.get("total_mv"))
-    except Exception: pass
-    return factors
-
 # Phase 4: 构建缺失月份
 print(f"\n[4] 构建 {len(MISSING)} 个缺失月...")
 factors = alpha_factors()
@@ -160,11 +108,11 @@ for month in MISSING:
         # 基本面
         fin_df = fin_cache.get(sym)
         if fin_df is not None:
-            row.update(_compute_fundamental_factors(fin_df, month_end))
+            row.update(compute_fundamental_factors(fin_df, month_end))
         # PE/PB
         daily_df = daily_cache.get(sym)
         if daily_df is not None:
-            row.update(_compute_valuation_factors(daily_df, month_end, df_pit, idx))
+            row.update(compute_valuation_factors(daily_df, month_end))
         # 前向标签
         full_idx = df.index.get_indexer([df_pit.index[-1]])[0]
         fwd_idx = full_idx + 20

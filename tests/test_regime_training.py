@@ -19,6 +19,13 @@ def test_forward_labels_use_future_rows_only():
     assert pd.isna(labels.loc[dates[-1], "future_2d_return"])
 
 
+def test_evaluation_reuses_canonical_regime_feature_builders():
+    from research.regime import evaluation, features
+
+    assert evaluation.build_regime_feature_history is features.build_regime_feature_history
+    assert evaluation.load_full_market_breadth_history is features.load_full_market_breadth_history
+
+
 def test_candidate_policy_classifies_with_hysteresis_and_min_dwell():
     from research.regime_types import RegimePolicy
     from research.regime.policies import apply_policy

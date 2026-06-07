@@ -195,6 +195,7 @@ import { computed, onMounted, ref } from "vue";
 import { api } from "../api";
 import type { TestDesignResponse, TestDesignRiskRow } from "../api";
 import { useI18n } from "../i18n";
+import { formatArtifactDate, heatCellStyle } from "../utils/intelligenceViews";
 
 const { currentLocale, t } = useI18n();
 const design = ref<TestDesignResponse | null>(null);
@@ -222,7 +223,7 @@ const filteredSmells = computed(() => {
   const nodeids = new Set(visibleCases.value.map(item => item.nodeid));
   return smells.filter(item => nodeids.has(item.subject) || item.subject === selectedRisk.value).slice(0, 60);
 });
-const generatedAt = computed(() => fmtDate(design.value?.generated_at || design.value?.latest?.generated_at || ""));
+const generatedAt = computed(() => formatArtifactDate(design.value?.generated_at || design.value?.latest?.generated_at || "", currentLocale.value));
 const graphMeta = computed(() => t("testDesign.graphMeta", { nodes: design.value?.graph.nodes.length ?? 0, links: design.value?.graph.links.length ?? 0 }));
 const severityText = computed(() => {
   const counts = design.value?.summary.severity_counts || {};
@@ -257,22 +258,16 @@ function riskLabel(risk: TestDesignRiskRow) {
 }
 
 function heatStyle(value: number) {
-  const intensity = value / maxMatrixCount.value;
-  return {
-    backgroundColor: `rgba(6, 182, 212, ${0.08 + intensity * 0.42})`,
-    borderColor: `rgba(6, 182, 212, ${0.18 + intensity * 0.58})`,
-  };
+  return heatCellStyle(value, maxMatrixCount.value, "6, 182, 212", {
+    backgroundBase: 0.08,
+    backgroundScale: 0.42,
+    borderBase: 0.18,
+    borderScale: 0.58,
+  });
 }
 
 function fmtPct(value: number) {
   return `${Math.round(value * 100)}%`;
-}
-
-function fmtDate(value: string) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString(currentLocale.value);
 }
 
 onMounted(load);

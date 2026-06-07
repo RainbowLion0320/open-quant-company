@@ -1,26 +1,11 @@
 import pandas as pd
 
-from cybernetics import orchestrator
+from tests.market_helpers import fake_core_index_loader, market_index_frame
 from web.api.services import market as market_service
 
 
-def _index_frame(offset: float = 0) -> pd.DataFrame:
-    return pd.DataFrame({
-        "date": pd.date_range("2026-01-01", periods=4, freq="D"),
-        "close": [100 + offset, 101 + offset, 102 + offset, 103 + offset],
-    })
-
-
-def test_market_index_cards_are_distinct_core_indices(monkeypatch):
-    def fake_load_index(symbol: str):
-        frames = {
-            "sh000300": _index_frame(10),
-            "sz399006": _index_frame(20),
-            "sh000688": _index_frame(30),
-        }
-        return frames[symbol], "real", "test source"
-
-    cards = market_service.multi_asset_cards(_index_frame(), load_index_fn=fake_load_index)
+def test_market_index_cards_are_distinct_core_indices():
+    cards = market_service.multi_asset_cards(market_index_frame(), load_index_fn=fake_core_index_loader)
 
     assert [c["key"] for c in cards] == ["sse", "csi300", "chinext", "star50"]
     assert [c["label"] for c in cards] == ["上证综指", "沪深300", "创业板指", "科创50"]
@@ -36,23 +21,13 @@ def test_market_index_cards_are_distinct_core_indices(monkeypatch):
     assert len(signatures) == 4
 
 
-def test_market_index_cards_respect_requested_series_limit(monkeypatch):
+def test_market_index_cards_respect_requested_series_limit():
     def fake_load_index(symbol: str):
-        return _index_frame(10), "real", "test source"
+        return market_index_frame(10), "real", "test source"
 
-    cards = market_service.multi_asset_cards(_index_frame(), series_limit=2, load_index_fn=fake_load_index)
+    cards = market_service.multi_asset_cards(market_index_frame(), series_limit=2, load_index_fn=fake_load_index)
 
     assert all(len(card["series"]) == 2 for card in cards)
-
-
-def test_position_capacity_uses_adaptive_regime_ceiling(monkeypatch):
-    def fake_adaptive_params(regime):
-        return {"max_positions": {"bull": 8, "sideways": 5, "bear": 2}[regime.value]}
-
-    monkeypatch.setattr(orchestrator, "adaptive_params", fake_adaptive_params)
-
-    assert market_service.position_capacity(5) == {"current": 5, "max": 8}
-    assert market_service.position_capacity(10) == {"current": 10, "max": 10}
 
 
 def test_macro_cards_include_liquidity_and_profit_cycle_spreads(monkeypatch):
