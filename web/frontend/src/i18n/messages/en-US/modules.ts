@@ -75,7 +75,7 @@ export const modules = {
           tests: {
             label: "Test Design",
             meta: "Design intelligence",
-            description: "Inspect test cases, risks, code targets, specs, and design smells",
+            description: "Inspect test cases, risks, code targets, specs, and design risks",
           },
           codegraph: {
             label: "CodeGraph",

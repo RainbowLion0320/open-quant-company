@@ -75,7 +75,7 @@ export const modules = {
           tests: {
             label: "测试设计",
             meta: "Design intelligence",
-            description: "审查测试用例、风险、代码目标、规格文档和测试异味",
+            description: "审查测试用例、风险、代码目标、规格文档和设计风险",
           },
           codegraph: {
             label: "代码图谱",

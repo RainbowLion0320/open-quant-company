@@ -1,6 +1,6 @@
 export const testDesign = {
   title: "Test Design Intelligence",
-  subtitle: "Inspect links between test cases, risks, code targets, specs, and test design smells",
+  subtitle: "Inspect links between test cases, risks, code targets, specs, and design risks",
   refresh: "Refresh test design",
   loadError: "Test design data failed to load",
   noArtifact: "No test design artifact has been generated",
@@ -8,7 +8,7 @@ export const testDesign = {
   riskCoverage: "Risk Coverage",
   targetLinks: "Code Targets",
   specLinks: "Spec Links",
-  smells: "Design Smells",
+  smells: "Design Risks",
   coveredText: "{covered}/{total} risks",
   targets: "{count} targets",
   specs: "{count} specs",
@@ -31,5 +31,5 @@ export const testDesign = {
   fixtures: "Fixtures",
   noSelectedCase: "Select a test case",
   diagnostics: "Design Diagnostics",
-  noSmells: "No design smells in the current filter",
+  noSmells: "No design risks in the current filter",
 } as const;

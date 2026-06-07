@@ -1,6 +1,6 @@
 export const testDesign = {
   title: "测试设计智能",
-  subtitle: "审查测试用例、风险、代码目标、规格文档和测试异味之间的关系",
+  subtitle: "审查测试用例、风险、代码目标、规格文档和设计风险之间的关系",
   refresh: "刷新测试设计",
   loadError: "测试设计数据加载失败",
   noArtifact: "尚未生成测试设计产物",
@@ -8,7 +8,7 @@ export const testDesign = {
   riskCoverage: "风险覆盖",
   targetLinks: "代码目标",
   specLinks: "规格链接",
-  smells: "设计异味",
+  smells: "设计风险",
   coveredText: "{covered}/{total} risks",
   targets: "{count} targets",
   specs: "{count} specs",
@@ -31,5 +31,5 @@ export const testDesign = {
   fixtures: "Fixtures",
   noSelectedCase: "请选择一个测试用例",
   diagnostics: "设计诊断",
-  noSmells: "当前过滤范围没有设计异味",
+  noSmells: "当前过滤范围没有设计风险",
 } as const;
