@@ -394,6 +394,79 @@ def test_legacy_service_status_route_is_removed(monkeypatch):
     assert res.status_code == 404
 
 
+def test_system_tests_summary_returns_no_run_without_artifact(monkeypatch, tmp_path):
+    from data.storage.datahub import reset_datahub
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "var"))
+    reset_datahub()
+
+    res = TestClient(create_app()).get("/api/system/tests/summary")
+
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["status"] == "no_run"
+    assert payload["latest"] is None
+    assert payload["recommended_command"] == "astroq test check --suite quick --json"
+    assert payload["domains"]
+    reset_datahub()
+
+
+def test_system_tests_summary_reads_latest_artifact_and_domain_rollup(monkeypatch, tmp_path):
+    import json
+    from data.storage.datahub import get_datahub, reset_datahub
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "var"))
+    reset_datahub()
+
+    artifact_dir = get_datahub().artifact_dir("tests")
+    latest = {
+        "run_id": "unit-run",
+        "suite": "quick",
+        "status": "failed",
+        "ok": False,
+        "started_at": "2026-06-07T10:00:00Z",
+        "finished_at": "2026-06-07T10:00:02Z",
+        "duration_seconds": 2.0,
+        "command": [".venv/bin/python", "-m", "pytest", "tests/test_datahub_contracts.py", "tests/test_unknown.py", "-q"],
+        "totals": {"passed": 2, "failed": 1, "skipped": 0, "warnings": 1, "errors": 0, "total": 3},
+        "failures": ["FAILED tests/test_unknown.py::test_gap - AssertionError"],
+        "warnings": ["UserWarning: unit"],
+        "stdout_excerpt": "1 failed, 2 passed, 1 warning in 2.00s",
+        "stderr_excerpt": "",
+    }
+    (artifact_dir / "runs").mkdir(parents=True, exist_ok=True)
+    (artifact_dir / "latest.json").write_text(json.dumps(latest), encoding="utf-8")
+    (artifact_dir / "runs" / "unit-run.json").write_text(json.dumps(latest), encoding="utf-8")
+
+    client = TestClient(create_app())
+    summary = client.get("/api/system/tests/summary")
+    domains = client.get("/api/system/tests/domains")
+    runs = client.get("/api/system/tests/runs?limit=5")
+
+    assert summary.status_code == 200
+    payload = summary.json()
+    assert payload["status"] == "failed"
+    assert payload["latest"]["run_id"] == "unit-run"
+    assert payload["latest"]["totals"]["failed"] == 1
+    assert payload["summary"]["pass_rate"] == 2 / 3
+    assert any(domain["key"] == "data" and domain["last_status"] in {"passed", "failed"} for domain in payload["domains"])
+    assert any(domain["key"] == "unclassified" for domain in payload["domains"])
+
+    assert domains.status_code == 200
+    domain_payload = domains.json()
+    assert domain_payload["domains"]
+    assert any(item["test_files"] for item in domain_payload["domains"])
+    assert any(item["key"] == "unclassified" for item in domain_payload["domains"])
+
+    assert runs.status_code == 200
+    assert runs.json()["runs"][0]["run_id"] == "unit-run"
+    reset_datahub()
+
+
 def test_cron_jobs_payload_coerces_nullable_status_fields(monkeypatch, tmp_path):
     import json
     import web.api.services.system_integrations as integrations

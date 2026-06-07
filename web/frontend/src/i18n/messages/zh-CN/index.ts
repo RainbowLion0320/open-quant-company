@@ -19,6 +19,7 @@ import { assetCoverage } from "./assetCoverage";
 import { activity } from "./activity";
 import { configCenter } from "./configCenter";
 import { codegraph } from "./codegraph";
+import { testSystem } from "./testSystem";
 
 export const zhCN = {
   app,
@@ -42,4 +43,5 @@ export const zhCN = {
   activity,
   configCenter,
   codegraph,
+  testSystem,
 } as const;

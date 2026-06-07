@@ -72,6 +72,11 @@ export const modules = {
             meta: "Config center",
             description: "查看和编辑所有系统参数：数据获取、信号、Regime、风控、回测、费率",
           },
+          tests: {
+            label: "测试系统",
+            meta: "Test intelligence",
+            description: "查看测试健康状态、业务域覆盖和最近运行历史",
+          },
           codegraph: {
             label: "代码图谱",
             meta: "CodeGraph",

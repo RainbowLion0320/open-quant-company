@@ -22,6 +22,7 @@ from astrolabe_cli.commands.regime import train_profit as regime_train_profit
 from astrolabe_cli.commands.strategy import catalog as strategy_catalog
 from astrolabe_cli.commands.strategy import evidence as strategy_evidence
 from astrolabe_cli.commands.strategy import run_strategy
+from astrolabe_cli.commands.test_system import check as test_check
 from astrolabe_cli.commands.web import build as web_build
 from astrolabe_cli.commands.web import serve as web_serve
 from astrolabe_cli.results import CliResult, ExitCode
@@ -160,6 +161,13 @@ def build_parser() -> argparse.ArgumentParser:
     docs_check_cmd = docs_sub.add_parser("check", help="Scan docs for known stale phrases")
     add_common_flags(docs_check_cmd)
     docs_check_cmd.set_defaults(handler=lambda args: check_docs())
+
+    test = sub.add_parser("test", help="Run and record project test gates")
+    test_sub = test.add_subparsers(dest="test_command", required=True)
+    test_check_cmd = test_sub.add_parser("check", help="Run a configured test suite and write System Test artifacts")
+    test_check_cmd.add_argument("--suite", choices=["quick", "full"], default="quick")
+    add_common_flags(test_check_cmd)
+    test_check_cmd.set_defaults(handler=lambda args: test_check(args.suite))
 
     web = sub.add_parser("web", help="Build or serve the Web UI")
     web_sub = web.add_subparsers(dest="web_command", required=True)

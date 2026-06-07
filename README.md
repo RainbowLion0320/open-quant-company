@@ -316,6 +316,7 @@ astrolabe-quant/
 ```bash
 git diff --check
 astroq docs check --json
+astroq test check --suite quick --json
 ```
 
 代码改动按风险选择测试范围：

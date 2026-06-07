@@ -25,6 +25,7 @@ astroq config validate --json
 astroq data status --json
 astroq strategy catalog --json
 astroq regime status --json
+astroq test check --suite quick --json
 astroq docs check --json
 ```
 
@@ -59,6 +60,15 @@ astroq backtest check --json
 ```
 
 `regime status` 读取当前生产检测链路。`train-profit` 和 `backtest run` 可能耗时，agent 默认先 dry-run。`backtest check` 运行可复现性、PIT 和管道合约测试。
+
+## 测试系统
+
+```bash
+astroq test check --suite quick --json
+astroq test check --suite full --json
+```
+
+`test check` 运行 `config/test_system.yaml` 声明的固定测试 suite，并把结果写入 `var/artifacts/tests/`。Web 的 `/system?tab=tests` 只读取这些产物，不直接触发 pytest。
 
 ## Pipeline
 

@@ -1,0 +1,154 @@
+suites:
+  quick:
+    description: Core contracts that should stay fast enough for frequent local checks.
+    targets:
+      - tests/test_architecture_contracts.py
+      - tests/test_data_layout_contracts.py
+      - tests/test_env_secret_contracts.py
+      - tests/test_settings_schema_contracts.py
+      - tests/test_codegraph_contracts.py
+      - tests/test_web_system_contracts.py
+      - tests/test_test_suite_health.py
+  full:
+    description: Full Python test suite.
+    targets:
+      - tests
+
+domains:
+  - key: data
+    label_zh: 数据
+    label_en: Data
+    description_zh: DataHub、数据源、PIT、质量门禁和价格语义
+    description_en: DataHub, providers, PIT, quality gates, and price semantics
+    patterns:
+      - tests/test_data*.py
+      - tests/test_tushare*.py
+      - tests/test_quality_gate.py
+      - tests/test_asset_contracts.py
+      - tests/test_backfill.py
+      - tests/test_cron_logger_contracts.py
+      - tests/test_env_secret_contracts.py
+      - tests/test_market_data_view.py
+      - tests/test_price_service_contracts.py
+      - tests/test_provider.py
+      - tests/test_asof_pit_feature_view.py
+      - tests/test_risk_free_rates.py
+    modules:
+      - data/
+      - core/
+    specs:
+      - docs/specs/01-data-pipeline.md
+
+  - key: strategy
+    label_zh: 策略
+    label_en: Strategy
+    description_zh: 策略目录、信号、因子研究和晋级治理
+    description_en: Strategy catalog, signals, factor research, and promotion governance
+    patterns:
+      - tests/test_strategy*.py
+      - tests/test_candidate_strategy_contracts.py
+      - tests/test_factor_gate.py
+      - tests/test_buffett_financial_sector.py
+      - tests/test_ml_lgbm_closure.py
+      - tests/test_registry_status.py
+      - tests/test_sector_pipeline.py
+      - tests/test_boundary.py
+    modules:
+      - signals/
+      - research/
+      - models/
+    specs:
+      - docs/specs/02-signal-system.md
+
+  - key: backtest
+    label_zh: 回测
+    label_en: Backtest
+    description_zh: 回测可复现性、PIT 合约、流水线和策略证据
+    description_en: Backtest reproducibility, PIT contracts, pipeline, and evidence
+    patterns:
+      - tests/test_backtest*.py
+      - tests/test_multi_asset_tournament.py
+      - tests/test_strategy_backtest_evidence.py
+      - tests/test_regime*.py
+      - tests/test_hmm_engine.py
+      - tests/test_market_regime_v2.py
+    modules:
+      - backtest/
+      - pipeline/
+      - cybernetics/
+    specs:
+      - docs/specs/03-backtest-engine.md
+
+  - key: execution
+    label_zh: 执行
+    label_en: Execution
+    description_zh: Paper trading、订单生命周期、撮合、风控和 broker 状态
+    description_en: Paper trading, order lifecycle, fills, risk, and broker state
+    patterns:
+      - tests/test_broker*.py
+      - tests/test_execution_observability.py
+      - tests/test_fill_models.py
+      - tests/test_ledger.py
+      - tests/test_order_sm.py
+    modules:
+      - broker/
+      - scripts/execute_paper_trades.py
+    specs:
+      - docs/specs/04-execution.md
+
+  - key: web_system
+    label_zh: Web / System
+    label_en: Web / System
+    description_zh: FastAPI、Vue、系统控制、配置中心和前端 i18n
+    description_en: FastAPI, Vue, System Hub, Config Center, and frontend i18n
+    patterns:
+      - tests/test_api_services.py
+      - tests/test_auth.py
+      - tests/test_frontend_i18n_contracts.py
+      - tests/test_market_route_contracts.py
+      - tests/test_pipeline_route_contracts.py
+      - tests/test_project_version.py
+      - tests/test_settings_schema_contracts.py
+      - tests/test_audit.py
+      - tests/test_web*.py
+      - tests/test_websocket_contracts.py
+    modules:
+      - web/api/
+      - web/frontend/
+    specs:
+      - docs/specs/05-web-platform.md
+
+  - key: docs_architecture
+    label_zh: 文档 / 架构
+    label_en: Docs / Architecture
+    description_zh: 文档漂移、模块化、架构边界和测试系统健康
+    description_en: Docs drift, modularity, architecture boundaries, and test suite health
+    patterns:
+      - tests/test_documentation_contracts.py
+      - tests/test_architecture_contracts.py
+      - tests/test_cli*.py
+      - tests/test_modularization_contracts.py
+      - tests/test_pipeline_contracts.py
+      - tests/test_test_suite_health.py
+      - tests/test_contract.py
+      - tests/test_shared_infra.py
+    modules:
+      - docs/
+      - wiki/
+      - astrolabe_cli/
+    specs:
+      - docs/acceptance-matrix.md
+
+  - key: codegraph
+    label_zh: 代码图谱
+    label_en: CodeGraph
+    description_zh: CodeGraph 索引、图谱接口和确定性架构诊断
+    description_en: CodeGraph indexing, graph API, and deterministic architecture diagnostics
+    patterns:
+      - tests/test_codegraph_contracts.py
+    modules:
+      - web/api/services/codegraph.py
+      - web/api/services/codegraph_diagnostics.py
+      - web/frontend/src/views/CodeGraph.vue
+    specs:
+      - wiki/concepts/codegraph-visualization.md

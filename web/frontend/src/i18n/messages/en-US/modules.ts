@@ -72,6 +72,11 @@ export const modules = {
             meta: "Config center",
             description: "View and edit system parameters for data fetch, signals, regime, risk, backtest, and fees",
           },
+          tests: {
+            label: "Test System",
+            meta: "Test intelligence",
+            description: "Inspect test health, business-domain coverage, and recent run history",
+          },
           codegraph: {
             label: "CodeGraph",
             meta: "Code graph",
