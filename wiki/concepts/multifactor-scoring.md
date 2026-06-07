@@ -20,7 +20,7 @@ confidence: medium
 | Industry Momentum | 行业动量 | 申万行业20d/60d动量 → 个股映射 |
 
 权重: quality=0.35, valuation=0.25, technical=0.15, market=0.10, industry_momentum=0.15。
-行业动量从 DataHub 维度 `sector_performance_snapshot` 读取最新快照，并通过 `sector_membership` 映射个股→行业。缺少快照或映射时回到中性行业分，不再读取旧扁平文件。
+行业动量从 DataHub 维度 `sector_performance_snapshot` 读取最新快照，并通过 `sector_membership` 映射个股→行业。缺少快照或映射时回到中性行业分。
 
 各维度的具体因子和权重在 config 中配置，可按市场状态自适应调整。
 

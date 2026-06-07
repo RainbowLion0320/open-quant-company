@@ -23,7 +23,7 @@ def _hmm_detect(
     import numpy as np
 
     from cybernetics.features import OBSERVATION_COLUMNS, build_observation_matrix, build_regime_features
-    from cybernetics.hmm_engine import StudentTHMM, apply_hmm_preprocessor, load_hmm_model
+    from cybernetics.hmm import StudentTHMM, apply_hmm_preprocessor, load_hmm_model
 
     # Check model path
     try:

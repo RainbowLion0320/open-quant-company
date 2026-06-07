@@ -14,7 +14,6 @@ def test_regime_training_is_split_by_research_responsibility():
     _assert_exists(
         [
             "research/regime/__init__.py",
-            "research/regime/core.py",
             "research/regime/features.py",
             "research/regime/policies.py",
             "research/regime/evaluation.py",
@@ -22,11 +21,10 @@ def test_regime_training_is_split_by_research_responsibility():
             "research/regime/assets.py",
             "research/regime/profit_evaluation.py",
             "research/regime/profit_training.py",
-            "research/regime_training.py",
         ]
     )
-    assert _line_count("research/regime_training.py") <= 120
-    assert _line_count("research/regime/core.py") <= 700
+    assert not (Path("research") / "regime_training.py").exists()
+    assert not (Path("research") / "regime" / "core.py").exists()
     assert _line_count("research/regime/profit_evaluation.py") <= 700
 
 
@@ -34,12 +32,20 @@ def test_cybernetics_orchestrator_is_a_thin_facade():
     _assert_exists(
         [
             "cybernetics/config.py",
-            "cybernetics/market_observations.py",
+            "cybernetics/observations/sources.py",
+            "cybernetics/observations/breadth.py",
+            "cybernetics/observations/trend_risk.py",
+            "cybernetics/observations/volume.py",
+            "cybernetics/observations/scoring.py",
+            "cybernetics/observations/hmm_detection.py",
             "cybernetics/hybrid_decision.py",
             "cybernetics/adaptive_params.py",
+            "cybernetics/hmm/__init__.py",
             "cybernetics/orchestrator.py",
         ]
     )
+    assert not (Path("cybernetics") / "market_observations.py").exists()
+    assert not (Path("cybernetics") / "hmm_engine.py").exists()
     assert _line_count("cybernetics/orchestrator.py") <= 360
 
 
@@ -205,10 +211,12 @@ def test_p0_p2_modularization_hotspots_are_split():
     assert _line_count("web/frontend/src/i18n/messages/zh-CN.ts") <= 80
     assert _line_count("web/frontend/src/i18n/messages/en-US.ts") <= 80
 
-    assert _line_count("cybernetics/market_observations.py") <= 120
-    assert _line_count("cybernetics/hmm_engine.py") <= 120
-    assert _line_count("scripts/factor_hypothesis.py") <= 140
-    assert _line_count("data/market/sectors.py") <= 140
+    removed_factor_script = Path("scripts") / "factor_hypothesis.py"
+    assert not removed_factor_script.exists()
+    assert _line_count("research/factors/hypothesis/cli.py") <= 90
+    removed_sector_module = Path("data/market") / "sectors.py"
+    assert not removed_sector_module.exists()
+    assert _line_count("data/market/sector_pipeline/__init__.py") <= 90
     assert _line_count("broker/paper.py") <= 260
     assert _line_count("backtest/candidate_alpha.py") <= 140
     assert _line_count("backtest/run_all_strategies.py") <= 320

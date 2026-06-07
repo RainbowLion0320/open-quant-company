@@ -3,7 +3,7 @@ import yaml
 
 def test_settings_schema_fields_exist_in_canonical_settings():
     from core.settings import get_dotted
-    from web.api.settings_schema import SETTINGS_SECTIONS
+    from web.api.config_schema import SETTINGS_SECTIONS
 
     cfg = yaml.safe_load(open("config/settings.yaml", encoding="utf-8")) or {}
     missing: list[str] = []
@@ -22,7 +22,7 @@ def test_settings_schema_fields_exist_in_canonical_settings():
 
 
 def test_settings_schema_exposes_grouped_strategy_management_model():
-    from web.api.settings_schema import get_settings_schema
+    from web.api.config_schema import get_settings_schema
 
     schema = get_settings_schema()
     groups = {group["key"]: group for group in schema["groups"]}
@@ -52,7 +52,7 @@ def test_settings_schema_exposes_grouped_strategy_management_model():
 
 def test_settings_schema_exposes_candidate_strategy_core_params():
     from signals.candidates.params import CANDIDATE_PARAM_FIELDS
-    from web.api.settings_schema import get_settings_schema
+    from web.api.config_schema import get_settings_schema
 
     schema = get_settings_schema()
     sections = {section["key"]: section for section in schema["sections"]}
@@ -135,7 +135,7 @@ def test_settings_schema_exposes_candidate_strategy_core_params():
 
 
 def test_settings_schema_validation_covers_bool_and_select_fields():
-    from web.api.settings_schema import validate_settings_section
+    from web.api.config_schema import validate_settings_section
 
     assert validate_settings_section("strategies.buffett", {"enabled": True, "status": "production"}) == []
 
@@ -151,7 +151,7 @@ def test_settings_yaml_does_not_contain_top_level_dotted_sections():
 
 
 def test_settings_schema_validation_is_reusable_outside_routes():
-    from web.api.settings_schema import validate_settings_section
+    from web.api.config_schema import validate_settings_section
 
     valid = {"min_interval": "4.5", "max_retries": "4"}
     invalid = {"min_interval": 0.1, "max_retries": "many"}
@@ -164,7 +164,7 @@ def test_settings_schema_validation_is_reusable_outside_routes():
 
 
 def test_settings_schema_validation_supports_nested_fields_and_unknown_sections():
-    from web.api.settings_schema import validate_settings_section
+    from web.api.config_schema import validate_settings_section
 
     assert validate_settings_section("unknown.section", {"x": "bad"}) == []
 

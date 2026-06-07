@@ -12,7 +12,7 @@ description: LLM 因子发现 — 多轮迭代 + OOS 验证 + 候选池治理
 steps:
   - name: llm_factor_hypothesis
     description: LLM 生成因子 + OOS 验证 + 保存候选池
-    script: scripts/factor_hypothesis.py
+    module: research.factors.hypothesis.cli
     args: ["--n-candidates", "8", "--rounds", "3", "--save-candidates"]
     timeout_minutes: 45
     retry: 0

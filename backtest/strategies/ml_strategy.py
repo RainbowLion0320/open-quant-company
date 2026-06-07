@@ -271,7 +271,7 @@ class MLStrategy(BaseStrategy):
 
 
 class MLFeatureStoreAlphaModel(AlphaModel):
-    """Batch ML alpha generation from the monthly point-in-time feature store."""
+    """Batch ML alpha generation from the daily as-of feature store."""
 
     name = MLStrategy.name
     label = MLStrategy.label

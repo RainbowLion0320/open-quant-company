@@ -89,7 +89,7 @@
 
 **模型：** LightGBM 二分类（未来 20 日收益 > 中位数 = 正样本）
 
-**PIT 特征：** 从 `var/store/features/YYYY-MM-DD.parquet` 读取不晚于预测日的最新 as-of 特征视图。训练/预测严格只使用 as-of 日期之前已可见的数据；`YYYY-MM.parquet` 月末特征切片不是正式输入。
+**PIT 特征：** 从 `var/store/features/YYYY-MM-DD.parquet` 读取不晚于预测日的最新 as-of 特征视图。训练/预测严格只使用 as-of 日期之前已可见的数据。
 
 **训练流程：**
 1. `scripts/build_features.py --frequency daily` — 批量构建日频 as-of PIT 特征切片
@@ -126,7 +126,7 @@ Market Regime 规则评分层保持确定性和可解释性，但不再只能靠
 - **策略 A/B**：比较固定仓位、当前公式、trend-only、trend+breadth、best challenger 的风险收益表现。
 - **晋级门槛**：只有 challenger 在预测区分、bear 风险识别、策略贡献、稳定性和复杂度惩罚后仍优于 champion，才生成 `recommended_config.yaml` 供人工审查。
 
-训练器只写 `reports/regime_training/` 研究报告，不自动改 `cybernetics/regime_scoring.py`、`cybernetics/hmm_engine.py` 或 `config/settings.yaml`。
+训练器只写 `reports/regime_training/` 研究报告，不自动改 `cybernetics/regime_scoring.py`、`cybernetics/hmm.py` 或 `config/settings.yaml`。
 
 ### 2.5.1 Market Regime 挣钱导向训练
 
@@ -220,7 +220,7 @@ Vol20 = Std(Ret("close"), 20)
 
 **内置因子：** `Ref(col, offset)`, `Ret(col)`, `MA(expr, window)`, `Std(expr, window)`, `Min(expr, window)`, `Max(expr, window)`, `Delta(expr, window)`, `Gt(expr, value)`, `Lt(expr, value)`, `CrossSectionalRank(expr)`；`alpha_factors()` 提供常用收益率、均线偏离、波动率、量价和自动注册因子。
 
-**LLM 因子发现：** `dsl_parser.py` 解析 LLM 生成的公式文本 → 计算因子值 → IC 检验 → 报告结果。`scripts/factor_hypothesis.py` 批量运行因子假设检验。
+**LLM 因子发现：** `dsl_parser.py` 解析 LLM 生成的公式文本 → 计算因子值 → IC 检验 → 报告结果。`python -m research.factors.hypothesis.cli` 批量运行因子假设检验。
 
 ### 2.8 因子研究诊断 (signals/factor_research.py)
 

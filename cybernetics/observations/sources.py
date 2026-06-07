@@ -18,8 +18,8 @@ def _get_regime_indexes() -> list[tuple]:
     return [(k, _INDEX_NAMES.get(k, k), v) for k, v in merged.items()]
 
 
-# Kept for compatibility with older tests/imports; current config is read on
-# each detection so Config Center changes apply without restarting the API.
+# Current config is read on each detection so Config Center changes apply
+# without restarting the API.
 _REGIME_INDEXES: list[tuple] | None = None
 
 def _regime_indexes() -> list[tuple]:

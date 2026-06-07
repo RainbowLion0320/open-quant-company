@@ -149,13 +149,18 @@ def get_stock_prices(
 ) -> pd.DataFrame:
     """Return stock OHLCV with explicit raw/qfq/hfq semantics."""
     store = hub or get_datahub()
-    requested = mode_for_use_case(use_case) if use_case is not None else normalize_price_mode(mode)
+    normalized_use_case = normalize_price_use_case(use_case) if use_case is not None else None
+    requested = mode_for_use_case(normalized_use_case) if normalized_use_case is not None else normalize_price_mode(mode)
 
     if requested == PriceMode.RAW:
         raw = _read_raw_frame(symbol, store)
         if not raw.empty:
             return _slice_dates(raw, start, end)
-        if allow_adjusted_fallback:
+        fallback_allowed = allow_adjusted_fallback and normalized_use_case not in {
+            PriceUseCase.EXECUTION,
+            PriceUseCase.VALUATION,
+        }
+        if fallback_allowed:
             fallback = _read_adjusted_provider_frame(symbol, PriceMode.QFQ, store)
             if not fallback.empty:
                 attach_price_metadata(

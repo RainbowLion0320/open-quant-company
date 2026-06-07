@@ -160,7 +160,7 @@ def load_bond_returns() -> pd.Series | None:
     """Load 10Y treasury bond daily returns from local parquet.
 
     Returns a pd.Series indexed by date, or None if data unavailable.
-    Uses the same synthetic return formula as research/regime_training.py.
+    Uses the same synthetic return formula as the regime feature module.
     """
     from data.storage.datahub import get_datahub
 

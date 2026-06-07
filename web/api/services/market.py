@@ -80,7 +80,7 @@ def _restore_money_supply_dates(
     df: pd.DataFrame,
     reference_date: pd.Timestamp | None = None,
 ) -> pd.DataFrame:
-    """Repair legacy money_supply cache rows whose AKShare month column became NaT."""
+    """Repair money_supply rows whose AKShare month column became NaT."""
     if "date" not in df.columns or len(df) == 0:
         return df
 

@@ -37,7 +37,7 @@ def _features(index: pd.DatetimeIndex) -> pd.DataFrame:
 
 
 def test_tradable_asset_panel_cash_fallback_has_sources_and_returns():
-    from research.regime_training import build_tradable_asset_panel
+    from research.regime.assets import build_tradable_asset_panel
 
     dates = pd.date_range("2026-01-01", periods=4, freq="B")
     equity = pd.DataFrame({"date": dates, "close": [100.0, 101.0, 99.0, 102.0]})
@@ -53,7 +53,7 @@ def test_tradable_asset_panel_cash_fallback_has_sources_and_returns():
 
 
 def test_treasury_defensive_proxy_handles_date_index_and_column(tmp_path):
-    from research.regime_training import _load_treasury_defensive_proxy
+    from research.regime.assets import _load_treasury_defensive_proxy
 
     bond_dir = tmp_path / "var/store/bond"
     bond_dir.mkdir(parents=True)
@@ -71,7 +71,7 @@ def test_treasury_defensive_proxy_handles_date_index_and_column(tmp_path):
 
 
 def test_profit_labels_use_future_rows_without_lookahead():
-    from research.regime_training import build_profit_labels
+    from research.regime.features import build_profit_labels
 
     panel = _asset_panel(periods=8)
     panel.loc[panel.index[1], "equity_close"] = 90.0
@@ -90,7 +90,7 @@ def test_profit_labels_use_future_rows_without_lookahead():
 
 
 def test_tradable_exposure_uses_prior_day_regime_for_returns():
-    from research.regime_training import DEFAULT_EXPOSURE_MAP, simulate_tradable_exposure
+    from research.regime.profit_evaluation import DEFAULT_EXPOSURE_MAP, simulate_tradable_exposure
 
     dates = pd.date_range("2026-01-01", periods=4, freq="B")
     panel = pd.DataFrame(
@@ -115,7 +115,7 @@ def test_tradable_exposure_uses_prior_day_regime_for_returns():
 
 
 def test_profit_score_penalizes_permanent_defense_and_gates_reject_it():
-    from research.regime_training import decide_profit_promotion, profit_score_candidate
+    from research.regime.profit_evaluation import decide_profit_promotion, profit_score_candidate
 
     good_metrics = {
         "cagr": 0.12,
@@ -143,7 +143,7 @@ def test_profit_score_penalizes_permanent_defense_and_gates_reject_it():
 
 
 def test_v3_gate_diagnostics_apply_to_champion_and_candidates():
-    from research.regime_training import build_profit_gate_diagnostics
+    from research.regime.profit_evaluation import build_profit_gate_diagnostics
 
     candidate_rows = [
         {
@@ -221,7 +221,7 @@ def test_v3_gate_diagnostics_apply_to_champion_and_candidates():
 
 
 def test_v3_selects_best_validated_candidate_after_skipping_invalid_top_candidate():
-    from research.regime_training import select_best_validated_formula
+    from research.regime.profit_evaluation import select_best_validated_formula
 
     candidate_rows = [
         {"candidate_id": "invalid_top", "profit_score": 90.0, "calmar": 2.0},
@@ -240,7 +240,7 @@ def test_v3_selects_best_validated_candidate_after_skipping_invalid_top_candidat
 
 
 def test_v3_best_validated_selection_prefers_oos_strength_over_full_sample_score():
-    from research.regime_training import select_best_validated_formula
+    from research.regime.profit_evaluation import select_best_validated_formula
 
     candidate_rows = [
         {"candidate_id": "full_sample_leader", "profit_score": 80.0, "calmar": 1.2},
@@ -266,7 +266,7 @@ def test_v3_best_validated_selection_prefers_oos_strength_over_full_sample_score
 def test_champion_policy_matches_validated_w0611_production_formula():
     from core.settings import get_section
     from cybernetics.regime_policy import PRODUCTION_REGIME_POLICY
-    from research.regime_training import CHAMPION_POLICY
+    from research.regime.policies import CHAMPION_POLICY
 
     detection = get_section("cybernetics.adaptive.detection")
 
@@ -284,7 +284,8 @@ def test_champion_policy_matches_validated_w0611_production_formula():
 
 
 def test_profit_training_outputs_required_baselines_and_oos_decision():
-    from research.regime_training import RegimePolicy, run_regime_profit_training
+    from research.regime_types import RegimePolicy
+    from research.regime.profit_training import run_regime_profit_training
 
     panel = _asset_panel(periods=1800)
     features = _features(panel.index)
@@ -321,7 +322,8 @@ def test_profit_training_outputs_required_baselines_and_oos_decision():
 
 
 def test_profit_report_writes_stable_schema_and_advisory_config(tmp_path):
-    from research.regime_training import RegimePolicy, run_regime_profit_training, write_regime_profit_report
+    from research.regime_types import RegimePolicy
+    from research.regime.profit_training import run_regime_profit_training, write_regime_profit_report
 
     panel = _asset_panel(periods=1300)
     features = _features(panel.index)

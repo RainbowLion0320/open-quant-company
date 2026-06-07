@@ -23,7 +23,7 @@ SW_INDUSTRIES: dict[str, str] = {
     "801980": "美容护理",
 }
 
-_LEGACY_SW_ALIASES: dict[str, str] = {
+_SW_NAME_ALIASES: dict[str, str] = {
     "采掘": "煤炭",
     "化工": "基础化工",
     "纺织服装": "纺织服饰",
@@ -32,7 +32,7 @@ _LEGACY_SW_ALIASES: dict[str, str] = {
 
 
 def _store(hub: DataHub | None = None) -> Path:
-    """Compatibility helper: sector store under the active DataHub."""
+    """Return the sector store under the active DataHub."""
     hub = hub or DataHub()
     store = hub.store_path("sector")
     store.mkdir(parents=True, exist_ok=True)
@@ -44,7 +44,7 @@ def _snapshot_path(hub: DataHub, dimension: str, run_date: date) -> Path:
 
 
 def _canonical_sector_name(name: str) -> str:
-    return _LEGACY_SW_ALIASES.get(str(name).strip(), str(name).strip())
+    return _SW_NAME_ALIASES.get(str(name).strip(), str(name).strip())
 
 
 def build_membership(hub: DataHub | None = None) -> pd.DataFrame:

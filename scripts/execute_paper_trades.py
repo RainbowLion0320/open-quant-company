@@ -55,7 +55,7 @@ def load_config() -> dict:
 def _get_close_prices(symbols: List[str], target_date: Optional[date] = None) -> Dict[str, float]:
     """
     获取股票最近收盘价。
-    通过 data.market.price_service 获取 raw 最新价；无 raw 时允许最新 qfq 兼容回退。
+    通过 data.market.price_service 获取 raw 最新价；无 raw 时该标的跳过执行。
     Paper trading 需要实时价格 — 启用 API fallback，允许从 AKShare 拉取未缓存的股票。
     """
     import os as _os
@@ -134,7 +134,7 @@ def _read_latest_signals() -> Dict[str, List[Tuple[str, str, float]]]:
             if df.empty or "signal" not in df.columns:
                 continue
 
-            # 信号过滤 (大小写兼容)
+            # 信号过滤 (大小写标准化)
             signal_col = df["signal"].astype(str).str.lower()
             buys = df[signal_col.isin(["buy", "strong_buy"])]
             sells = df[signal_col.isin(["sell", "strong_sell"])]

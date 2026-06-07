@@ -15,7 +15,7 @@ tags: [cli, automation, operations]
 - 机器调用优先加 `--json`，读取 `ok`、`command`、`data`、`message`、`errors`。
 - 会写数据、跑长任务或触发研究流程的命令，先用 `--dry-run` 确认。
 - 策略运行默认是 `production`；candidate / research 策略必须显式 `--mode research`。
-- 旧脚本仍可作为底层实现存在，但 agent-facing 示例统一写 `astroq`。
+- agent-facing 示例统一写 `astroq` 或明确的 `python -m ...` 模块入口；脚本只作为当前受维护的批处理命令使用。
 
 ## 常用命令
 

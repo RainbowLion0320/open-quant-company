@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import pandas as pd
 
+from research.regime.features import build_regime_feature_history
+from research.regime.policies import CHAMPION_POLICY, apply_policy
+
 
 def _benchmark_close_frame(bench_close_series: pd.Series) -> pd.DataFrame:
     series = pd.Series(bench_close_series).dropna()
@@ -17,8 +20,6 @@ def _benchmark_close_frame(bench_close_series: pd.Series) -> pd.DataFrame:
 
 def build_production_regime_map(bench_close_series: pd.Series) -> dict[str, str]:
     """Replay the production Market Regime policy historically without look-ahead."""
-    from research.regime_training import CHAMPION_POLICY, apply_policy, build_regime_feature_history
-
     index_frame = _benchmark_close_frame(bench_close_series)
     if index_frame.empty:
         return {}

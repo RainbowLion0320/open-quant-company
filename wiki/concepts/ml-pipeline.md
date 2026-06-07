@@ -89,7 +89,7 @@ ma_golden = Gt(MA("close", 5), MA("close", 20))
 
 ## 6. LLM 因子发现
 
-`scripts/factor_hypothesis.py` 负责 LLM 因子假说：
+`python -m research.factors.hypothesis.cli` 负责 LLM 因子假说：
 
 ```
 LLM hypothesis

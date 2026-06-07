@@ -8,11 +8,10 @@
 - 注意: 这两个原则已写入 ~/.hermes/SOUL.md，是 Hermes 本身的架构而非仅项目的。本项目是它们在量化领域的具体落地。
 
 ## 环境
-- Python: `~/.hermes/hermes-agent/venv/bin/python3`
-- 数据: AKShare 1.18.60, 优先用新浪源, 东方财富/腾讯作备选
-- 回测: 自研日频回测与 PipelineBacktest（非 Backtrader）
-- 缓存: parquet (需 pyarrow)
-- 代理: fetcher.py 会自动绕过 v2ray
+- Python: `.venv/bin/python`
+- 数据: AKShare 与 Tushare 按 `data.ingestion.*` 和 `data.market.*` 分层接入；Tushare token 只读系统环境变量 `TUSHARE_TOKEN`
+- 回测: 自研日频回测与 `PipelineBacktest`，生产流水线由 `backtest/pipeline_runner.py` + `pipeline/` 共享模块组成
+- 本地运行产物: `var/`，包括 store/cache/artifacts/db/logs；不提交真实数据、模型、缓存、数据库和报告
 
 ## 数据源约定
 - **AKShare** (日线行情，免费不限流): `stock_zh_a_daily` (新浪), 备选 `stock_zh_a_hist`/`stock_zh_a_hist_tx`
@@ -22,8 +21,8 @@
 - AKShare↔Tushare 分工: AKShare管日线，Tushare管三张表+daily_basic+融资融券+北向+申万+宏观
 
 ## 记忆系统
-- 已配置 Hindsight Local 模式 (deepseek-v4-flash, 星盘记忆库; bank_id=astrolabe-quant)
-- 首次启动需 /reset, daemon 会自动拉起 (首次初始化约1分钟)
+- Hindsight 保留为后台记忆服务和健康检查项。
+- System Web 图谱入口是 CodeGraph 可视化，索引来自本地 `.codegraph/`，只在用户显式同步时更新。
 
 ## 当前状态
 - 当前能力链路以 `docs/acceptance-matrix.md`、测试和代码为准。
@@ -34,21 +33,23 @@
 ```
 ~/astrolabe-quant/  # 项目目录
 ├── config/settings.yaml          # 全局配置 (策略/数据/资产注册表)
-├── data/
-│   ├── fetcher.py                # AKShare 3源 fallback
-│   ├── financials.py             # 财务数据提取 (三层缓存)
-│   ├── symbols.py                # 全量A股 universe + 申万行业映射
-│   ├── feature_store.py          # PIT 特征存储 + enrich
-│   ├── data_registry.py          # ★ 维度+健康注册表: source/label/SLA/repair/partition 单源
-│   ├── cleaner.py                # 6规则数据清洗
-│   ├── tushare_utils.py          # Token 统一管理
-│   ├── datahub.py                 # ★ 数据中台: dimension_path()/manifest/原子写入/追加去重/审计
-│   ├── strategy_plugins.py        # 策略运行时注册: 配置驱动dispatch, 动态import
-│   ├── db.py + results_db.py     # Parquet存储 + DuckDB视图
-│   ├── sectors.py                 # 行业流水线: membership/performance/signals/exposure
-│   ├── assets/{base,stock}.py    # 多资产架构 + StockAsset
-│   ├── fetchers/{moneyflow,holders,macro}.py  # 数据获取器
-│   └── store/                    # Parquet: stock/macro/signals/features/_manifest/
+├── data/                          # Python 数据层源码包，不存放运行产物
+│   ├── storage/                   # DataHub、Parquet、Manifest、DuckDB 视图、结果库
+│   ├── ingestion/                 # provider、fetcher、Tushare 工具和补数治理
+│   ├── market/                    # 价格服务、复权类型、symbols、行业流水线、市场视图
+│   ├── features/                  # 日频 as-of PIT feature store 与因子记分板
+│   ├── quality/                   # schema contract、quality gate、freshness gate
+│   ├── ops/                       # audit、backfill、cron logger
+│   ├── llm/                       # 通用 LLM provider usage ledger
+│   ├── rates/                     # 无风险利率曲线 provider
+│   ├── strategy/                  # strategy catalog 与插件注册
+│   └── reference/                 # 可提交的静态 reference 数据和 seed 模型
+├── var/                           # 本地运行产物根目录，git ignore
+│   ├── store/                     # API 获取后的 parquet 原始/衍生数据
+│   ├── cache/                     # 临时缓存与运行状态
+│   ├── artifacts/                 # backtests/models/tournaments/reports
+│   ├── db/                        # SQLite/DuckDB 本地数据库
+│   └── logs/                      # 运行日志
 ├── signals/
 │   ├── expression.py             # 因子 DSL 表达式引擎
 │   ├── dsl_parser.py             # LLM公式→计算
@@ -63,8 +64,9 @@
 │   ├── run_all_strategies.py     # N策略对比回测 (日频)
 │   ├── buffett_real_scorer.py    # 滚动PIT评分器
 │   ├── analytics.py              # 15项风险指标
-│   ├── pipeline.py               # 可插拔回测流水线
+│   ├── pipeline_runner.py        # 生产 PipelineBacktest 入口
 │   └── strategies/{base,ml_strategy}.py
+├── pipeline/                      # alpha/portfolio/risk/execution 共享流水线模块
 ├── broker/{__init__,exchange,risk,persistence,allocator}.py  # PaperBroker + 持久化 + 风控
 ├── scripts/
 │   ├── compute_signals.py        # Cron 15:30 日频扫描 (五维评分含行业动量)
@@ -74,10 +76,10 @@
 │   ├── tune_model.py             # Optuna训练
 │   ├── weekly_retrain.py         # Cron 周六 模型重训
 │   ├── strategy_tournament.py    # 锦标赛对比
-│   ├── factor_hypothesis.py      # LLM因子发现
 │   ├── run_workflow.py           # qrun YAML工作流
 │   └── cron_fetch_slow.py        # 限流数据日常填充
-├── web/api/routes/{market,strategies,stocks,portfolio,signals,sectors,settings,backtest,system,hindsight,pipeline,assets}.py
+├── research/factors/hypothesis/   # LLM 因子假说、DSL、IC/OOS 评估和 CLI
+├── web/api/routes/{market,strategies,stocks,portfolio,signals,sectors,settings,backtest,system,codegraph,pipeline,assets}.py
 ├── web/frontend/                 # Vue 3 SPA 星盘终端
 ├── wiki/                         # 长期概念、架构决策和参考知识
 ├── tests/                        # 合约测试 + 边界测试

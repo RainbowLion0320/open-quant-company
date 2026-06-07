@@ -76,7 +76,7 @@ var/store/
 ├── features/                   # Phase 3: PIT 特征 (NEW)
 │   ├── 2020-01-02.parquet      # as-of 日期视图, 零前视
 │   ├── 2020-01-03.parquet
-│   └── 2020-01.parquet         # 兼容月末快照
+│   └── 2020-01-06.parquet
 ├── buffett_scan.parquet
 └── scan_meta.parquet
 ```
@@ -103,8 +103,8 @@ ret_fwd_20d                                 # 目标变量
 ```python
 # DuckDB 视图自动注册
 db = duckdb.connect(":memory:")
-db.execute("CREATE VIEW features_2024_01 AS SELECT * FROM read_parquet('var/store/features/2024-01.parquet')")
-# 查询: symbols × month ∈ training window
+db.execute("CREATE VIEW features AS SELECT * FROM read_parquet('var/store/features/*.parquet')")
+# 查询: symbols × as_of_date ∈ training window
 ```
 
 **关键特性**:

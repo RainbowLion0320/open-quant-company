@@ -78,7 +78,7 @@ get_financial_summary(symbol)
 
 ### PIT 构建集成
 
-基本面+估值数据在 PIT as-of 特征构建中与价量因子合并。日频构建使用交易日 as-of，月末兼容构建使用月末 as-of：
+基本面+估值数据在 PIT as-of 特征构建中与价量因子合并。正式特征输入使用日频交易日 as-of 切片：
 
 ```python
 # data/features/feature_store.py

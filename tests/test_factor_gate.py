@@ -39,7 +39,7 @@ def temp_pool_path():
 @pytest.fixture
 def clean_pool(temp_pool_path):
     """Patch CANDIDATE_POOL_PATH to use a temp file, and clean it."""
-    with patch("scripts.factor_hypothesis.CANDIDATE_POOL_PATH", temp_pool_path):
+    with patch("research.factors.hypothesis.persistence.CANDIDATE_POOL_PATH", temp_pool_path):
         if temp_pool_path.exists():
             temp_pool_path.unlink()
         yield temp_pool_path
@@ -52,7 +52,7 @@ def temp_expression_path(tmp_path):
     """Patch factor promotion to write to an isolated expression.py copy."""
     path = tmp_path / "expression.py"
     path.write_text(_EXPR_PATH.read_text(encoding="utf-8"), encoding="utf-8")
-    with patch("scripts.factor_hypothesis.EXPRESSION_PATH", path):
+    with patch("research.factors.hypothesis.persistence.EXPRESSION_PATH", path):
         yield path
 
 
@@ -60,7 +60,7 @@ def temp_expression_path(tmp_path):
 
 class TestSaveToCandidatePool:
     def test_saves_new_factors(self, clean_pool):
-        from scripts.factor_hypothesis import save_to_candidate_pool
+        from research.factors.hypothesis.persistence import save_to_candidate_pool
 
         factors = [
             FakeFactorCandidate("alpha_momentum_20d", "ts_mean(returns, 20) / ts_std(returns, 20)"),
@@ -70,7 +70,7 @@ class TestSaveToCandidatePool:
         assert clean_pool.exists()
 
     def test_pool_contains_saved_factor(self, clean_pool):
-        from scripts.factor_hypothesis import save_to_candidate_pool, list_candidate_factors
+        from research.factors.hypothesis.persistence import save_to_candidate_pool, list_candidate_factors
 
         factors = [FakeFactorCandidate("test_factor_1", "rank(close)")]
         save_to_candidate_pool(factors)
@@ -81,7 +81,7 @@ class TestSaveToCandidatePool:
         assert pool["test_factor_1"]["status"] == "candidate"
 
     def test_duplicate_factor_not_overwritten(self, clean_pool):
-        from scripts.factor_hypothesis import save_to_candidate_pool, list_candidate_factors
+        from research.factors.hypothesis.persistence import save_to_candidate_pool, list_candidate_factors
 
         f1 = [FakeFactorCandidate("dup_factor", "ts_mean(close, 10)", ic=0.05)]
         f2 = [FakeFactorCandidate("dup_factor", "ts_mean(close, 20)", ic=0.03)]
@@ -93,7 +93,7 @@ class TestSaveToCandidatePool:
         assert pool["dup_factor"]["formula"] == "ts_mean(close, 10)"
 
     def test_saves_multiple_factors(self, clean_pool):
-        from scripts.factor_hypothesis import save_to_candidate_pool, list_candidate_factors
+        from research.factors.hypothesis.persistence import save_to_candidate_pool, list_candidate_factors
 
         factors = [
             FakeFactorCandidate(f"factor_{i}", f"formula_{i}", ic=0.02 + i * 0.01)
@@ -106,11 +106,11 @@ class TestSaveToCandidatePool:
 
 class TestListCandidateFactors:
     def test_empty_pool_returns_empty_dict(self, clean_pool):
-        from scripts.factor_hypothesis import list_candidate_factors
+        from research.factors.hypothesis.persistence import list_candidate_factors
         assert list_candidate_factors() == {}
 
     def test_filter_by_status(self, clean_pool):
-        from scripts.factor_hypothesis import save_to_candidate_pool, list_candidate_factors
+        from research.factors.hypothesis.persistence import save_to_candidate_pool, list_candidate_factors
 
         save_to_candidate_pool([FakeFactorCandidate("f_cand", "close")])
         candidates = list_candidate_factors(status="candidate")
@@ -118,7 +118,7 @@ class TestListCandidateFactors:
         assert candidates["f_cand"]["status"] == "candidate"
 
     def test_filter_by_promoted_returns_empty_when_none(self, clean_pool):
-        from scripts.factor_hypothesis import save_to_candidate_pool, list_candidate_factors
+        from research.factors.hypothesis.persistence import save_to_candidate_pool, list_candidate_factors
 
         save_to_candidate_pool([FakeFactorCandidate("f_only", "close")])
         promoted = list_candidate_factors(status="promoted")
@@ -127,11 +127,11 @@ class TestListCandidateFactors:
 
 class TestPromoteCandidateFactor:
     def test_promote_nonexistent_factor_returns_false(self, clean_pool, temp_expression_path):
-        from scripts.factor_hypothesis import promote_candidate_factor
+        from research.factors.hypothesis.persistence import promote_candidate_factor
         assert promote_candidate_factor("nonexistent_factor") is False
 
     def test_promote_updates_status(self, clean_pool, temp_expression_path):
-        from scripts.factor_hypothesis import save_to_candidate_pool, promote_candidate_factor, list_candidate_factors
+        from research.factors.hypothesis.persistence import save_to_candidate_pool, promote_candidate_factor, list_candidate_factors
 
         save_to_candidate_pool([FakeFactorCandidate("promo_test", "ts_rank(volume, 5)")])
 
@@ -142,7 +142,7 @@ class TestPromoteCandidateFactor:
         assert pool["promo_test"]["status"] == "promoted"
 
     def test_promote_already_promoted_returns_false(self, clean_pool, temp_expression_path):
-        from scripts.factor_hypothesis import (
+        from research.factors.hypothesis.persistence import (
             save_to_candidate_pool, promote_candidate_factor,
             list_candidate_factors,
         )
@@ -153,7 +153,7 @@ class TestPromoteCandidateFactor:
 
     def test_promote_writes_to_expression_file(self, clean_pool, temp_expression_path):
         """Promote should inject factor DSL into expression.py."""
-        from scripts.factor_hypothesis import save_to_candidate_pool, promote_candidate_factor
+        from research.factors.hypothesis.persistence import save_to_candidate_pool, promote_candidate_factor
 
         save_to_candidate_pool([FakeFactorCandidate("expr_test", "rank(close)")])
 
@@ -166,19 +166,19 @@ class TestPromoteCandidateFactor:
 
 class TestFormulaToDSL:
     def test_converts_close_t(self):
-        from scripts.factor_hypothesis import _formula_to_dsl
+        from research.factors.hypothesis.candidates import _formula_to_dsl
         result = _formula_to_dsl("close_t", "test_factor")
         assert "Ref('close')" in result
 
     def test_converts_open_t(self):
-        from scripts.factor_hypothesis import _formula_to_dsl
+        from research.factors.hypothesis.candidates import _formula_to_dsl
         result = _formula_to_dsl("open_t", "test_factor")
         assert "Ref('open')" in result
 
 
 class TestLLMFactorParsing:
     def test_parses_unfenced_json_array(self):
-        from scripts.factor_hypothesis import _parse_llm_candidates
+        from research.factors.hypothesis.llm import _parse_llm_candidates
 
         text = """
         [
@@ -193,7 +193,7 @@ class TestLLMFactorParsing:
         assert candidates[0].formula == "MF_MAIN_NET / volume_t"
 
     def test_parses_fenced_json_object(self):
-        from scripts.factor_hypothesis import _parse_llm_candidates
+        from research.factors.hypothesis.llm import _parse_llm_candidates
 
         text = """
         ```json

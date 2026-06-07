@@ -13,7 +13,7 @@ from .features import (
     build_observation_matrix,
     build_regime_features,
 )
-from .hmm_engine import (
+from .hmm import (
     HMMConfig,
     HMMResult,
     StudentTHMM,

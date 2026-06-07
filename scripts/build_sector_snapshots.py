@@ -30,7 +30,7 @@ def main():
     args = parser.parse_args()
 
     from data.storage.datahub import DataHub
-    from data.market import sectors
+    import data.market.sector_pipeline as sectors
 
     hub = DataHub()
 

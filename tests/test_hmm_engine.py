@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from cybernetics.hmm_engine import HMMConfig, HMMResult, align_states
+from cybernetics.hmm import HMMConfig, HMMResult, align_states
 
 
 def test_align_states_remaps_viterbi_states_with_inverse_mapping():
@@ -43,7 +43,7 @@ def test_align_states_remaps_viterbi_states_with_inverse_mapping():
 def test_save_load_hmm_model_preserves_pca_preprocessor(tmp_path):
     from sklearn.decomposition import PCA
 
-    from cybernetics.hmm_engine import apply_hmm_preprocessor, load_hmm_model, save_hmm_model
+    from cybernetics.hmm import apply_hmm_preprocessor, load_hmm_model, save_hmm_model
 
     raw = np.array([
         [1.0, 2.0, 3.0],

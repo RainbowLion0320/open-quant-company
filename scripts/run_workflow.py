@@ -3,7 +3,7 @@
 统一工作流执行器 — 对标 Qlib `qrun`
 
 读取 config/workflows/{name}.yaml，按顺序执行 steps。
-每个 step 是一个独立脚本，带超时和重试。
+每个 step 是一个独立脚本或 Python module，带超时和重试。
 
 用法:
   python scripts/run_workflow.py research_pipeline
@@ -39,15 +39,23 @@ def load_workflow(name: str) -> Optional[Dict]:
 def run_step(step: Dict, step_index: int, total_steps: int) -> bool:
     """Execute one workflow step. Returns True on success."""
     name = step["name"]
-    script = step["script"]
+    script = step.get("script")
+    module = step.get("module")
     args = step.get("args", [])
     timeout = step.get("timeout_minutes", 30) * 60
     max_retries = step.get("retry", 0)
     on_fail = step.get("on_fail", "abort")
 
-    script_path = PROJECT / script
-    if not script_path.exists():
-        print(f"  ✗ Script not found: {script}")
+    if script:
+        script_path = PROJECT / script
+        if not script_path.exists():
+            print(f"  ✗ Script not found: {script}")
+            return on_fail != "abort"
+        command_target = str(script_path)
+    elif module:
+        command_target = module
+    else:
+        print("  ✗ Workflow step requires either script or module")
         return on_fail != "abort"
 
     for attempt in range(max_retries + 1):
@@ -59,7 +67,7 @@ def run_step(step: Dict, step_index: int, total_steps: int) -> bool:
         print(f"  {label}")
         print(f"  {'─'*60}")
 
-        cmd = [str(VENV_PYTHON), str(script_path)] + args
+        cmd = [str(VENV_PYTHON), "-m", module] + args if module else [str(VENV_PYTHON), command_target] + args
         print(f"  → {' '.join(cmd)}")
 
         t0 = time.time()

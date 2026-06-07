@@ -119,8 +119,8 @@ def test_canonical_data_imports_are_available():
     assert RiskFreeRateProvider
 
 
-def test_legacy_data_imports_are_removed():
-    legacy_modules = [
+def test_removed_data_imports_are_absent():
+    removed_modules = [
         ".".join(("data", "datahub")),
         ".".join(("data", "fetcher")),
         ".".join(("data", "feature_store")),
@@ -129,8 +129,10 @@ def test_legacy_data_imports_are_removed():
         ".".join(("data", "assets", "stock")),
         ".".join(("data", "fetchers", "base")),
         ".".join(("data", "sector_pipeline", "membership")),
+        ".".join(("data", "market", "sectors")),
+        ".".join(("data", "llm", "deepseek_usage")),
     ]
-    for name in legacy_modules:
+    for name in removed_modules:
         sys.modules.pop(name, None)
         with pytest.raises(ModuleNotFoundError):
             importlib.import_module(name)

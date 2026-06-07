@@ -7,7 +7,7 @@ Tushare moneyflow API: 每交易日一次调用, 返回全市场资金流向.
 
 缓存策略:
   日频: var/store/stock/moneyflow/daily/YYYY-MM-DD.parquet
-  月频: var/store/stock/moneyflow/monthly/YYYY-MM.parquet
+  月频: var/store/stock/moneyflow/monthly/{year-month}.parquet
 
 用法:
   python scripts/fetch_moneyflow_full.py --monthly   # 月频 (推荐, 72个月)

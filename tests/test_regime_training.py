@@ -6,7 +6,7 @@ import pytest
 
 
 def test_forward_labels_use_future_rows_only():
-    from research.regime_training import build_forward_labels
+    from research.regime.features import build_forward_labels
 
     dates = pd.date_range("2026-01-01", periods=8, freq="D")
     close = pd.Series([100, 101, 102, 99, 98, 103, 106, 104], index=dates, name="close")
@@ -20,7 +20,8 @@ def test_forward_labels_use_future_rows_only():
 
 
 def test_candidate_policy_classifies_with_hysteresis_and_min_dwell():
-    from research.regime_training import RegimePolicy, apply_policy
+    from research.regime_types import RegimePolicy
+    from research.regime.policies import apply_policy
 
     features = pd.DataFrame(
         {
@@ -51,7 +52,7 @@ def test_candidate_policy_classifies_with_hysteresis_and_min_dwell():
 
 
 def test_walk_forward_splits_are_time_ordered():
-    from research.regime_training import walk_forward_splits
+    from research.regime.policies import walk_forward_splits
 
     dates = pd.date_range("2018-01-31", "2023-12-31", freq="ME")
     splits = list(walk_forward_splits(dates, train_years=3, validate_years=1))
@@ -63,7 +64,8 @@ def test_walk_forward_splits_are_time_ordered():
 
 
 def test_challenger_must_clear_promotion_gates():
-    from research.regime_training import PromotionGateResult, decide_promotion
+    from research.regime_types import PromotionGateResult
+    from research.regime.evaluation import decide_promotion
 
     result = decide_promotion(
         champion_score=70.0,
@@ -78,7 +80,8 @@ def test_challenger_must_clear_promotion_gates():
 
 
 def test_collapsed_regime_policy_cannot_clear_promotion_gates():
-    from research.regime_training import PromotionGateResult, decide_promotion
+    from research.regime_types import PromotionGateResult
+    from research.regime.evaluation import decide_promotion
 
     result = decide_promotion(
         champion_score=20.0,
@@ -94,7 +97,7 @@ def test_collapsed_regime_policy_cannot_clear_promotion_gates():
 
 
 def test_candidate_ranking_penalizes_excessive_flipping():
-    from research.regime_training import rank_candidate_rows
+    from research.regime.evaluation import rank_candidate_rows
 
     rows = [
         {"candidate_id": "stable", "predictive_score": 70, "strategy_score": 65, "turnovers": 8, "complexity": 2},
@@ -107,7 +110,7 @@ def test_candidate_ranking_penalizes_excessive_flipping():
 
 
 def test_report_summary_schema_is_stable(tmp_path):
-    from research.regime_training import write_regime_training_report
+    from research.regime.reports import write_regime_training_report
 
     result = {
         "decision": "keep_champion",
@@ -130,7 +133,8 @@ def test_report_summary_schema_is_stable(tmp_path):
 
 
 def test_strategy_ab_rows_include_required_baselines():
-    from research.regime_training import RegimePolicy, run_regime_research
+    from research.regime_types import RegimePolicy
+    from research.regime.evaluation import run_regime_research
 
     dates = pd.date_range("2018-01-01", periods=1400, freq="B")
     close = pd.Series(100 + pd.RangeIndex(len(dates)).to_series().to_numpy() * 0.02, index=dates)

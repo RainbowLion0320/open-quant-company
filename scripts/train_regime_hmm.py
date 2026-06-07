@@ -39,7 +39,7 @@ def _load_index_daily(symbol: str = "sh000001") -> pd.DataFrame:
 def _load_breadth_history(start: str, end: str) -> pd.DataFrame:
     """Load full-market breadth history from local stock parquet."""
     try:
-        from research.regime_training import load_full_market_breadth_history
+        from research.regime.features import load_full_market_breadth_history
 
         return load_full_market_breadth_history(start=start, end=end)
     except Exception as e:
@@ -117,7 +117,7 @@ def _train_single_hmm(
     forward_returns: np.ndarray | None = None,
 ) -> dict:
     """Train a single HMM and return metrics."""
-    from cybernetics.hmm_engine import HMMConfig, StudentTHMM
+    from cybernetics.hmm import HMMConfig, StudentTHMM
 
     config = HMMConfig(
         n_states=n_states,
@@ -270,7 +270,7 @@ def _compare_with_champion(
     hmm_states: np.ndarray,
 ) -> dict:
     """Compare HMM regimes with the current rule-based champion."""
-    from research.regime_training import apply_policy, CHAMPION_POLICY
+    from research.regime.policies import CHAMPION_POLICY, apply_policy
 
     # Apply champion policy
     champion_applied = apply_policy(features, CHAMPION_POLICY)
@@ -366,7 +366,7 @@ def main() -> int:
 
     # Build observation matrix
     from cybernetics.features import build_observation_frame, build_observation_matrix
-    from cybernetics.hmm_engine import save_hmm_model
+    from cybernetics.hmm import save_hmm_model
 
     observation_frame = build_observation_frame(features)
     X, pca = build_observation_matrix(features, n_components=args.pca_components)

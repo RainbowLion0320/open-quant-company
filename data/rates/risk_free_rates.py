@@ -49,12 +49,12 @@ def risk_free_spec_from_config(config: dict | None = None) -> RiskFreeRateSpec:
     if config is None:
         backtest_cfg = get_section("backtest", {}) or {}
         if isinstance(backtest_cfg, Mapping) and "risk_free_rate" in backtest_cfg:
-            raise RiskFreeRateDataError("legacy fixed backtest.risk_free_rate is not allowed")
+            raise RiskFreeRateDataError("fixed backtest.risk_free_rate is not allowed")
         cfg = backtest_cfg.get("risk_free", {}) if isinstance(backtest_cfg, Mapping) else {}
     elif isinstance(config, Mapping) and "backtest" in config:
         backtest_cfg = config.get("backtest", {}) or {}
         if isinstance(backtest_cfg, Mapping) and "risk_free_rate" in backtest_cfg:
-            raise RiskFreeRateDataError("legacy fixed backtest.risk_free_rate is not allowed")
+            raise RiskFreeRateDataError("fixed backtest.risk_free_rate is not allowed")
         cfg = backtest_cfg.get("risk_free", {}) if isinstance(backtest_cfg, Mapping) else {}
     else:
         cfg = config

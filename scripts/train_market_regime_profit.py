@@ -8,14 +8,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from research.regime_training import (
-    PromotionGateResult,
-    load_full_market_breadth_history,
-    load_local_equity_ohlcv,
-    load_tradable_asset_panel,
-    run_and_write_profit_report,
-    write_regime_profit_report,
-)
+from research.regime.assets import load_local_equity_ohlcv, load_tradable_asset_panel
+from research.regime.features import load_full_market_breadth_history
+from research.regime.profit_training import run_and_write_profit_report, write_regime_profit_report
+from research.regime_types import PromotionGateResult
 
 
 def _parse_args() -> argparse.Namespace:

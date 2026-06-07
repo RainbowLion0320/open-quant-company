@@ -6,6 +6,44 @@ import subprocess
 from astrolabe_cli.results import CliResult
 
 
+def _drift_token(*parts: str) -> str:
+    return "".join(parts)
+
+
+REMOVED_COMPATIBILITY_TOKENS = (
+    _drift_token("from backtest", ".pipeline import"),
+    _drift_token("`backtest/", "pipeline.py`"),
+    _drift_token("test_backtest", "_pipeline_contracts.py"),
+    _drift_token("TUSHARE", "_PRO_TOKEN"),
+    _drift_token("HINDSIGHT_API", "_LLM_API_KEY"),
+    _drift_token("ASTROLABE", "_STORE"),
+    _drift_token("ASTROLABE", "_CACHE"),
+    _drift_token("ASTROLABE", "_ARTIFACTS"),
+    _drift_token("ASTROLABE", "_DB"),
+    _drift_token("migrate", "_data_layout"),
+    _drift_token("data-layout", "-migration"),
+    _drift_token("backtest", "_monthly_result"),
+    _drift_token("/api/portfolio", "/sector-exposure"),
+    _drift_token("Compatibility", " alias"),
+    _drift_token("legacy", " static tests"),
+    _drift_token("Compatibility", " facade"),
+    _drift_token("Compatibility", " CLI"),
+    _drift_token("legacy", " import"),
+    _drift_token("旧", "入口"),
+    _drift_token("迁移期", "兼容"),
+    _drift_token("web.api", ".settings_schema"),
+    _drift_token("data.llm", ".deepseek_usage"),
+    _drift_token("cybernetics", ".hmm_engine"),
+    _drift_token("cybernetics", ".market_observations"),
+    _drift_token("research", ".regime_training"),
+    _drift_token("research.regime", ".core"),
+    _drift_token("data.market", ".sectors"),
+    _drift_token("scripts/factor", "_hypothesis.py"),
+    _drift_token("monthly point", "-in-time feature store"),
+    _drift_token("月末", "兼容"),
+)
+
+
 DRIFT_TOKENS = (
     "34 维度",
     "34维度",
@@ -65,21 +103,7 @@ DRIFT_TOKENS = (
     "回测: Backtrader",
     "横截面排名→交易信号",
     "四策略对比",
-    "from backtest.pipeline import",
-    "`backtest/pipeline.py`",
-    "test_backtest_pipeline_contracts.py",
-    "TUSHARE_PRO_TOKEN",
-    "HINDSIGHT_API_LLM_API_KEY",
-    "ASTROLABE_STORE",
-    "ASTROLABE_CACHE",
-    "ASTROLABE_ARTIFACTS",
-    "ASTROLABE_DB",
-    "migrate_data_layout",
-    "data-layout-migration",
-    "backtest_monthly_result",
-    "/api/portfolio/sector-exposure",
-    "Compatibility alias",
-    "legacy static tests",
+    *REMOVED_COMPATIBILITY_TOKENS,
 )
 DRIFT_PATTERNS = "|".join(re.escape(token) for token in DRIFT_TOKENS)
 

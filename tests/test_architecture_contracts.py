@@ -5,8 +5,30 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 import subprocess
 import sys
+
+from astrolabe_cli.commands.docs import DRIFT_TOKENS, REMOVED_COMPATIBILITY_TOKENS
+
+
+def _joined(*parts: str) -> str:
+    return "".join(parts)
+
+
+def _path(*parts: str) -> Path:
+    return Path(*parts)
+
+
+REMOVED_COMPATIBILITY_MODULES = (
+    (_joined("web.api.", "settings_schema"), _path("web", "api", "settings_schema.py")),
+    (_joined("data.llm.", "deepseek_usage"), _path("data", "llm", "deepseek_usage.py")),
+    (_joined("cybernetics.", "hmm_engine"), _path("cybernetics", "hmm_engine.py")),
+    (_joined("cybernetics.", "market_observations"), _path("cybernetics", "market_observations.py")),
+    (_joined("research.", "regime_training"), _path("research", "regime_training.py")),
+    (_joined("research.regime.", "core"), _path("research", "regime", "core.py")),
+    (_joined("data.market.", "sectors"), _path("data", "market", "sectors.py")),
+)
 
 
 def test_build_features_import_is_safe():
@@ -266,7 +288,7 @@ def test_feature_scripts_use_shared_feature_store_loaders():
         Path("signals/ml_signals.py"),
         Path("scripts/build_features.py"),
         Path("scripts/enrich_pe_pb.py"),
-        Path("scripts/factor_hypothesis.py"),
+        Path("research/factors/hypothesis/cli.py"),
         Path("scripts/lookahead_check.py"),
         Path("scripts/strategy_tournament.py"),
         Path("scripts/tune_model.py"),
@@ -455,12 +477,14 @@ def test_backtest_regime_replay_lives_in_dedicated_module():
 
 
 def test_regime_training_policy_types_live_in_dedicated_module():
-    training_text = Path("research/regime_training.py").read_text(encoding="utf-8")
+    policies_text = Path("research/regime/policies.py").read_text(encoding="utf-8")
+    evaluation_text = Path("research/regime/evaluation.py").read_text(encoding="utf-8")
     types_text = Path("research/regime_types.py").read_text(encoding="utf-8")
 
-    assert "from research.regime_types import" in training_text
-    assert "class RegimePolicy" not in training_text
-    assert "class PromotionGateResult" not in training_text
+    assert "from research.regime_types import" in policies_text
+    assert "from research.regime_types import" in evaluation_text
+    assert "class RegimePolicy" not in policies_text
+    assert "class PromotionGateResult" not in evaluation_text
     assert "class RegimePolicy" in types_text
     assert "class PromotionGateResult" in types_text
 
@@ -514,12 +538,13 @@ def test_portfolio_sector_exposure_alias_is_removed():
 
 
 def test_regime_training_reuses_shared_metric_helpers():
-    text = Path("research/regime_training.py").read_text()
+    feature_text = Path("research/regime/features.py").read_text()
+    evaluation_text = Path("research/regime/evaluation.py").read_text()
 
-    assert "from research.performance import portfolio_metrics" in text
-    assert "from research.forward_labels import" in text
-    assert "def _portfolio_metrics(" not in text
-    assert "def _future_compound_return(" not in text
+    assert "from research.performance import portfolio_metrics" in evaluation_text
+    assert "from research.forward_labels import" in feature_text
+    assert "def _portfolio_metrics(" not in evaluation_text
+    assert "def _future_compound_return(" not in feature_text
 
 
 def test_frontend_sector_metrics_are_shared():
@@ -597,81 +622,7 @@ def test_current_project_docs_do_not_repeat_known_stale_facts():
         *Path("wiki").rglob("*.md"),
     ]
     excluded = {Path("docs/DOCUMENTATION.md")}
-    forbidden_tokens = (
-        "34维度",
-        "34 维度",
-        "四维加权",
-        "多因子四维",
-        "9 页",
-        "9页",
-        "FastAPI（9",
-        "3页",
-        "3 页",
-        "5517",
-        "全局 ticker",
-        "底部 ticker",
-        "点位与日涨跌",
-        "Regime Score",
-        "7 节点",
-        "七个固定节点",
-        "v1 展示 Market Regime",
-        "CSS grid + inline SVG",
-        "GET /signals/buffett",
-        "POST /backtest/run",
-        "GET /system/health",
-        "GET /stocks/{code}/kline",
-        "POST /signals/scan",
-        "GET /system/cron-log",
-        "Canvas力导向图",
-        "Canvas 力导向图",
-        "11个业务路由模块",
-        "routes/ (11 domain modules)",
-        "from signals.buffett import BuffettFilter",
-        "generate_ml_signals",
-        "def generate_signals(",
-        "compute_all()",
-        "DataStep(\"load_prices\")",
-        "StrategyStep(\"compute_signals\")",
-        "SelectionStep(\"top_n\"",
-        "RiskStep(\"max_position_20pct\")",
-        "ExecutionStep(\"equal_weight\")",
-        "update_positions(prices)",
-        "broker.get_nav_history()",
-        "is_circuit_breaker_triggered",
-        "rm.reset_circuit_breaker",
-        "broadcast_progress",
-        "`/ws/{job_id}`",
-        "JobQueue.add",
-        "def universe(self)",
-        "def metadata(self",
-        "allocator.detect_regime",
-        "detect_regime(index_data)",
-        "detect_regime(close)",
-        "backtest/multi_asset_tournament.py",
-        "GET /backtest",
-        "`GET /portfolio`",
-        "buy/sell/hold 信号",
-        "from data.quality.cleaner import clean_ohlcv",
-        "Data/Strategy/Selection/Risk/Execution",
-        "回测: Backtrader",
-        "横截面排名→交易信号",
-        "四策略对比",
-        "from backtest.pipeline import",
-        "`backtest/pipeline.py`",
-        "test_backtest_pipeline_contracts.py",
-        "TUSHARE_PRO_TOKEN",
-        "HINDSIGHT_API_LLM_API_KEY",
-        "ASTROLABE_STORE",
-        "ASTROLABE_CACHE",
-        "ASTROLABE_ARTIFACTS",
-        "ASTROLABE_DB",
-        "migrate_data_layout",
-        "data-layout-migration",
-        "backtest_monthly_result",
-        "/api/portfolio/sector-exposure",
-        "Compatibility alias",
-        "legacy static tests",
-    )
+    forbidden_tokens = DRIFT_TOKENS
 
     offenders = []
     for path in checked_paths:
@@ -687,27 +638,9 @@ def test_current_project_docs_do_not_repeat_known_stale_facts():
 
 def test_runtime_code_and_docs_do_not_keep_removed_compatibility_entrypoints():
     tracked_files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
-    forbidden_tokens = (
-        "from backtest.pipeline import",
-        "`backtest/pipeline.py`",
-        "test_backtest_pipeline_contracts.py",
-        "TUSHARE_PRO_TOKEN",
-        "HINDSIGHT_API_LLM_API_KEY",
-        "ASTROLABE_STORE",
-        "ASTROLABE_CACHE",
-        "ASTROLABE_ARTIFACTS",
-        "ASTROLABE_DB",
-        "migrate_data_layout",
-        "data-layout-migration",
-        "backtest_monthly_result",
-        "/api/portfolio/sector-exposure",
-        "Compatibility alias",
-        "legacy static tests",
-    )
+    forbidden_tokens = REMOVED_COMPATIBILITY_TOKENS
     checked_suffixes = {".py", ".md", ".ts", ".tsx", ".vue", ".yaml", ".yml", ".json"}
-    excluded_paths = {
-        Path("astrolabe_cli/commands/docs.py"),
-    }
+    excluded_paths: set[Path] = set()
     excluded_roots = {
         "tests",
         "var",
@@ -729,6 +662,25 @@ def test_runtime_code_and_docs_do_not_keep_removed_compatibility_entrypoints():
         offenders.extend(f"{path}:{token}" for token in forbidden_tokens if token in text)
 
     assert offenders == []
+
+
+def test_removed_compatibility_modules_are_absent_and_imports_fail():
+    for module_name, path in REMOVED_COMPATIBILITY_MODULES:
+        sys.modules.pop(module_name, None)
+        assert not path.exists(), f"{path} should be removed"
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(module_name)
+
+
+def test_workflow_runner_supports_canonical_module_steps():
+    text = Path("scripts/run_workflow.py").read_text(encoding="utf-8")
+    workflow = Path("config/workflows/factor_discovery.yaml").read_text(encoding="utf-8")
+
+    assert 'module = step.get("module")' in text
+    assert '"-m", module' in text
+    assert "module: research.factors.hypothesis.cli" in workflow
+    removed_script_step = "script: " + "/".join(["scripts", "factor_hypothesis.py"])
+    assert removed_script_step not in workflow
 
 
 def test_web_docs_match_current_market_regime_layout_contract():
@@ -843,7 +795,7 @@ def test_backtest_regime_replay_uses_production_policy_not_monthly_ma_chain():
 
 
 def test_production_regime_map_uses_previous_month_policy_result(monkeypatch):
-    import research.regime_training as regime_training
+    import backtest.regime_replay as regime_replay
     from backtest.run_all_strategies import build_production_regime_map
 
     dates = pd.date_range("2024-01-01", periods=180, freq="D")
@@ -859,8 +811,8 @@ def test_production_regime_map_uses_previous_month_policy_result(monkeypatch):
         regimes.loc[regimes.index >= pd.Timestamp("2024-03-31")] = "bear"
         return pd.DataFrame({"regime": regimes}, index=features.index)
 
-    monkeypatch.setattr(regime_training, "build_regime_feature_history", fake_feature_history)
-    monkeypatch.setattr(regime_training, "apply_policy", fake_apply_policy)
+    monkeypatch.setattr(regime_replay, "build_regime_feature_history", fake_feature_history)
+    monkeypatch.setattr(regime_replay, "apply_policy", fake_apply_policy)
 
     result = build_production_regime_map(close)
 

@@ -141,7 +141,7 @@ strategies:
 
 8. 信号推送 → Telegram @buffett0320_bot
 
-9. 因子研究 (factor_hypothesis.py)
+9. 因子研究 (`python -m research.factors.hypothesis.cli`)
    LLM → 因子假说 → DSL解析器计算 → IC评估 → OOS验证
 
 10. 信号选择 (signals/selection.py)
@@ -193,7 +193,7 @@ strategies:
 | 模拟执行 | `scripts/execute_paper_trades.py` | ★ 日频: 信号→下单→NAV→持久化 |
 | 状态持久化 | `broker/persistence.py` | ★ PaperBroker Parquet 序列化 |
 | 多资产锦标赛 | `scripts/multi_asset_tournament.py` | 二资产分配验证 |
-| 因子发现 | `scripts/factor_hypothesis.py` | LLM因子假说→DSL→IC/OOS |
+| 因子发现 | `python -m research.factors.hypothesis.cli` | LLM因子假说→DSL→IC/OOS |
 | 日频扫描 | `scripts/compute_signals.py` | workflow/cron 调度策略运行 |
 | 慢数据填充 | `scripts/cron_fetch_slow.py` | 限流数据日常积累 |
 | 特征构建 | `scripts/build_features.py` | 批量PIT特征构建，CLI 控制样本和区间 |
@@ -260,7 +260,7 @@ strategies:
 
 - **策略可插拔**: 新增策略 = config注册 + runner契约 + 信号输出契约
 - **数据层零锁**: Parquet存储 + DuckDB `:memory:` → cron写不影响Web读
-- **PIT零前视**: 所有特征按 as-of 日期视图读取，`as_of` 参数严格限制数据可用范围；月度切片仅作为月末兼容快照
+- **PIT零前视**: 所有特征按日频 as-of 日期视图读取，`as_of` 参数严格限制数据可用范围
 - **因子可组合**: DSL表达式声明式, 可缓存, 可序列化
 - **ML可重现**: 模型版本化 (registry.json), 训练参数全记录
 - **注册表驱动**: 维度路径通过 `DataHub.dimension_path(key, **placeholders)` 从 `data_registry.cache` 展开, 路径只定义一次; DB Health 的 source/label/SLA/repair/partition 全从 DataDimension 字段派生, 不硬编码

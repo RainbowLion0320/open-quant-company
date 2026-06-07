@@ -187,6 +187,31 @@ def test_price_service_use_case_modes_are_explicit():
     assert price_mode_for_use_case("valuation") == "raw"
 
 
+def test_execution_use_case_does_not_fallback_to_adjusted_prices(tmp_path):
+    from data.storage.datahub import DataHub
+    from data.market.price_service import get_stock_prices
+    from data.market.price_types import PriceUseCase
+
+    hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
+    hub.write_parquet(
+        pd.DataFrame(
+            {
+                "date": ["2026-01-01"],
+                "open": [10.0],
+                "high": [11.0],
+                "low": [9.0],
+                "close": [10.0],
+                "volume": [100.0],
+            }
+        ),
+        hub.stock_daily_path("000001"),
+    )
+
+    prices = get_stock_prices("000001", use_case=PriceUseCase.EXECUTION, hub=hub)
+
+    assert prices.empty
+
+
 def test_major_price_consumers_declare_price_use_cases():
     expectations = {
         "backtest/run_all_strategies.py": ("get_stock_price_matrix", "PriceUseCase.BACKTEST"),

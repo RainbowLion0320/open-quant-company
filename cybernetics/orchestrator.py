@@ -1,9 +1,4 @@
-"""
-控制论运行机制层 — 钱学森工程控制论在量化系统中的应用.
-
-This facade keeps the historical ``cybernetics.orchestrator`` API stable while
-runtime policy, observations, and decision helpers live in focused modules.
-"""
+"""控制论运行机制层 — 钱学森工程控制论在量化系统中的应用."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -11,7 +6,13 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from cybernetics import adaptive_params as adaptive_policy
 from cybernetics import config as runtime_config
-from cybernetics import hybrid_decision, market_observations
+from cybernetics import hybrid_decision
+from cybernetics.observations import breadth as breadth_obs
+from cybernetics.observations import hmm_detection as hmm_obs
+from cybernetics.observations import scoring as scoring_obs
+from cybernetics.observations import sources as source_obs
+from cybernetics.observations import trend_risk as risk_obs
+from cybernetics.observations import volume as volume_obs
 from cybernetics.regime import MarketRegime, detect_trend_regime
 from cybernetics.types import (
     FeedbackReport,
@@ -59,48 +60,48 @@ _REGIME_INDEXES: list[tuple] | None = None
 
 
 def _get_regime_indexes() -> list[tuple]:
-    return market_observations._get_regime_indexes()
+    return source_obs._get_regime_indexes()
 
 
 def _regime_indexes() -> list[tuple]:
-    return market_observations._regime_indexes()
+    return source_obs._regime_indexes()
 
 
 def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
-    return market_observations._clamp(value, lower, upper)
+    return source_obs._clamp(value, lower, upper)
 
 
 def _frame_close_volume(df):
-    return market_observations._frame_close_volume(df)
+    return source_obs._frame_close_volume(df)
 
 
-_stock_daily_files = market_observations._stock_daily_files
-_stock_daily_source_sql = market_observations._stock_daily_source_sql
-_compute_full_market_breadth_duckdb = market_observations._compute_full_market_breadth_duckdb
-_read_breadth_observation = market_observations._read_breadth_observation
+_stock_daily_files = source_obs._stock_daily_files
+_stock_daily_source_sql = source_obs._stock_daily_source_sql
+_compute_full_market_breadth_duckdb = breadth_obs._compute_full_market_breadth_duckdb
+_read_breadth_observation = breadth_obs._read_breadth_observation
 
 
 def _compute_full_market_breadth(files: Optional[Sequence[Any]] = None, *, use_cache: bool = True) -> MarketBreadth:
-    return market_observations._compute_full_market_breadth(files, use_cache=use_cache)
+    return breadth_obs._compute_full_market_breadth(files, use_cache=use_cache)
 
 
-_compute_full_market_volume_duckdb = market_observations._compute_full_market_volume_duckdb
+_compute_full_market_volume_duckdb = volume_obs._compute_full_market_volume_duckdb
 
 
 def _compute_full_market_volume(files: Optional[Sequence[Any]] = None, *, use_cache: bool = True) -> MarketVolume:
-    return market_observations._compute_full_market_volume(files, use_cache=use_cache)
+    return volume_obs._compute_full_market_volume(files, use_cache=use_cache)
 
 
 def _index_trend_strength(df) -> Optional[float]:
-    return market_observations._index_trend_strength(df)
+    return risk_obs._index_trend_strength(df)
 
 
 def _compute_multi_index_trend(index_frames: Dict[str, Any]) -> tuple[float, Dict[str, float]]:
-    return market_observations._compute_multi_index_trend(index_frames)
+    return risk_obs._compute_multi_index_trend(index_frames)
 
 
 def _index_risk_metrics(df) -> Optional[Dict[str, float]]:
-    return market_observations._index_risk_metrics(df)
+    return risk_obs._index_risk_metrics(df)
 
 
 def _compute_risk_strength(index_frames: Dict[str, Any], breadth: MarketBreadth) -> tuple[float, Dict[str, float]]:
@@ -109,22 +110,22 @@ def _compute_risk_strength(index_frames: Dict[str, Any], breadth: MarketBreadth)
         "_regime_indexes": _regime_indexes,
         "_index_risk_metrics": _index_risk_metrics,
     }
-    previous = {name: getattr(market_observations, name) for name in overrides}
+    previous = {name: getattr(risk_obs, name) for name in overrides}
     try:
         for name, value in overrides.items():
-            setattr(market_observations, name, value)
-        return market_observations._compute_risk_strength(index_frames, breadth)
+            setattr(risk_obs, name, value)
+        return risk_obs._compute_risk_strength(index_frames, breadth)
     finally:
         for name, value in previous.items():
-            setattr(market_observations, name, value)
+            setattr(risk_obs, name, value)
 
 
 def _index_volume_confirmation(df) -> Optional[Dict[str, float]]:
-    return market_observations._index_volume_confirmation(df)
+    return volume_obs._index_volume_confirmation(df)
 
 
 def _compute_multi_index_volume(index_frames: Dict[str, Any]) -> tuple[float, Dict[str, float]]:
-    return market_observations._compute_multi_index_volume(index_frames)
+    return volume_obs._compute_multi_index_volume(index_frames)
 
 
 def _compute_volume_strength(
@@ -132,11 +133,11 @@ def _compute_volume_strength(
     breadth: MarketBreadth,
     market_volume: MarketVolume,
 ) -> tuple[float, str, Dict[str, float]]:
-    return market_observations._compute_volume_strength(index_frames, breadth, market_volume)
+    return volume_obs._compute_volume_strength(index_frames, breadth, market_volume)
 
 
 def _breadth_strength(breadth: MarketBreadth) -> float:
-    return market_observations._breadth_strength(breadth)
+    return breadth_obs._breadth_strength(breadth)
 
 
 def _compute_regime_score_v2(
@@ -145,15 +146,15 @@ def _compute_regime_score_v2(
     breadth: MarketBreadth,
     market_volume: Optional[MarketVolume] = None,
 ) -> tuple[float, Dict[str, float]]:
-    return market_observations._compute_regime_score_v2(bench_df, index_frames, breadth, market_volume)
+    return scoring_obs._compute_regime_score_v2(bench_df, index_frames, breadth, market_volume)
 
 
 def _classify_regime(score: float, components: Dict[str, float], breadth: MarketBreadth) -> MarketRegime:
-    return market_observations._classify_regime(score, components, breadth)
+    return scoring_obs._classify_regime(score, components, breadth)
 
 
 def _hmm_detect(index_frames: Dict[str, Any], breadth: MarketBreadth, volume: MarketVolume):
-    return market_observations._hmm_detect(index_frames, breadth, volume)
+    return hmm_obs._hmm_detect(index_frames, breadth, volume)
 
 
 def _normalise_regime_probs(regime_probs: Dict[str, float] | None) -> Dict[str, float]:

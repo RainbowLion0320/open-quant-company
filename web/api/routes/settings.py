@@ -6,7 +6,7 @@ import yaml
 from fastapi import APIRouter, HTTPException, Request
 
 from core.settings import clear_settings_cache, get_dotted, resolve_settings_path, set_dotted
-from web.api.settings_schema import validate_settings_section
+from web.api.config_schema import validate_settings_section
 from web.api.services.settings_audit import record_settings_change
 
 router = APIRouter(prefix="/api/settings", tags=["Settings"])
@@ -96,7 +96,7 @@ async def get_settings():
 @router.get("/schema")
 async def get_settings_schema():
     """返回配置中心 schema — 每个可编辑 section 的参数元数据"""
-    from web.api.settings_schema import get_settings_schema
+    from web.api.config_schema import get_settings_schema
     return get_settings_schema()
 
 

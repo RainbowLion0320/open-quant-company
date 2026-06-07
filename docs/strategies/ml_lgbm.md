@@ -41,7 +41,7 @@
 
 回测入口 `backtest/run_all_strategies.py --strategy ml_lgbm` 使用 `MLFeatureStoreAlphaModel`，按调仓日选择不晚于该日的最新 PIT as-of 特征视图一次性批量预测全股票池，再交给统一 Pipeline 执行组合构建、风控和成交模拟。不要退回通用逐股 `StrategyAlphaAdapter`，否则正式全池回测会退化为数千只股票逐个 `predict()`。
 
-日频价量、估值和资金流特征使用 `scripts/build_features.py --frequency daily` 构建到 `var/store/features/YYYY-MM-DD.parquet`。`YYYY-MM.parquet` 月末切片不是正式输入。
+日频价量、估值和资金流特征使用 `scripts/build_features.py --frequency daily` 构建到 `var/store/features/YYYY-MM-DD.parquet`。策略训练、预测和回测只读取日频 as-of 特征视图。
 
 特征矩阵进入模型前会统一 `to_numeric(errors="coerce")`，再处理 `inf`/`nan`，避免 Parquet 中对象类型列导致 LightGBM 拒绝预测。
 
