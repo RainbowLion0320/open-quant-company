@@ -14,6 +14,7 @@ from astrolabe_cli.commands.data import tushare_backfill as data_tushare_backfil
 from astrolabe_cli.commands.execution import dry_run as execution_dry_run
 from astrolabe_cli.commands.pipeline import list_pipelines, show_pipeline
 from astrolabe_cli.commands.assets import overview as assets_overview
+from astrolabe_cli.commands.architecture import ast_check as architecture_ast_check
 from astrolabe_cli.commands.data import status as data_status
 from astrolabe_cli.commands.docs import check_docs
 from astrolabe_cli.commands.health import run_health
@@ -162,6 +163,12 @@ def build_parser() -> argparse.ArgumentParser:
     docs_check_cmd = docs_sub.add_parser("check", help="Scan docs for known stale phrases")
     add_common_flags(docs_check_cmd)
     docs_check_cmd.set_defaults(handler=lambda args: check_docs())
+
+    architecture = sub.add_parser("architecture", help="Inspect architecture intelligence artifacts")
+    architecture_sub = architecture.add_subparsers(dest="architecture_command", required=True)
+    architecture_ast_cmd = architecture_sub.add_parser("ast", help="Generate deterministic AST duplicate intelligence artifact")
+    add_common_flags(architecture_ast_cmd)
+    architecture_ast_cmd.set_defaults(handler=lambda args: architecture_ast_check())
 
     test = sub.add_parser("test", help="Run and record project test gates")
     test_sub = test.add_subparsers(dest="test_command", required=True)

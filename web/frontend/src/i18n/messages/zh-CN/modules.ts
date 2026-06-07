@@ -77,6 +77,11 @@ export const modules = {
             meta: "Design intelligence",
             description: "审查测试用例、风险、代码目标、规格文档和设计风险",
           },
+          ast: {
+            label: "AST 检测",
+            meta: "AST Intelligence",
+            description: "检查全项目重复实现、近似 clone、重复 helper 和 canonical helper 绕行风险",
+          },
           codegraph: {
             label: "代码图谱",
             meta: "CodeGraph",

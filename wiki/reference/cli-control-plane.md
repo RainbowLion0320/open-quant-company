@@ -67,9 +67,12 @@ astroq backtest check --json
 astroq test check --suite quick --json
 astroq test check --suite full --json
 astroq test design --json
+astroq architecture ast --json
 ```
 
 `test check` 运行 `config/test_system.yaml` 声明的固定测试 suite。`test design` 使用确定性 AST 规则生成 `var/artifacts/tests/design/latest.json`。Web 的 `/system?tab=tests` 只读取测试设计产物，展示风险矩阵、测试图谱、用例审查器和异味诊断，不直接触发 pytest。
+
+`architecture ast` 使用确定性 Python/TS/Vue/CSS AST 规则生成 `var/artifacts/architecture/ast/latest.json`。Web 的 `/system?tab=ast` 只读取该产物，展示重复风险分、clone groups、模块热力和重复实现诊断，不在 API 请求时扫描仓库。
 
 ## Pipeline
 

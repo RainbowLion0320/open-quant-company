@@ -49,7 +49,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
 | `/pipeline` | 流程图 | 关键参数计算透明度入口；展示四条关键链路，Market Regime 为细粒度 DAG |
 | `/datahub` | 数据中台 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
-| `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、配置中心、测试系统、代码图谱与架构诊断 |
+| `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、配置中心、测试设计、AST 检测、代码图谱与架构诊断 |
 
 旧一级页面 redirect 已移除。除 `/stocks/:code` 个股详情隐藏路由外，用户应通过七个一级模块、二级 tab 和 Pipeline 透明度页访问原子功能。
 
@@ -99,7 +99,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Pipeline | `routes/pipeline.py` | `GET /api/pipeline`, `GET /api/pipeline/market-regime`, `GET /api/pipeline/{pipeline_key}` |
 | Assets | `routes/assets.py` | `GET /api/assets/overview` |
 | Settings | `routes/settings.py` | `GET /api/settings`, `GET /api/settings/schema`, `PUT /api/settings`, `PATCH /api/settings/section/{section}` |
-| System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/llm-usage`, `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/mode`, `GET /api/system/tests/design` |
+| System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/llm-usage`, `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/mode`, `GET /api/system/tests/design`, `GET /api/system/ast-intelligence` |
 | CodeGraph | `routes/codegraph.py` | `GET /api/codegraph/status`, `GET /api/codegraph/graph`, `GET /api/codegraph/search`, `GET /api/codegraph/neighborhood`, `GET /api/codegraph/diagnostics`, `POST /api/codegraph/sync` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
 
@@ -150,6 +150,7 @@ def get_db() -> Database:
 | Backtest | `astroq backtest run [--strategy NAME] --dry-run --json` | 委托回测 runner，不在 CLI 重写回测逻辑 |
 | Docs | `astroq docs check --json` | 扫描已知陈旧文档短语 |
 | Tests | `astroq test check --suite quick --json` / `astroq test design --json` | `test check` 运行固定测试 suite；`test design` 生成 `var/artifacts/tests/design/latest.json`，Web 只读展示测试设计图谱、风险矩阵和异味诊断 |
+| Architecture | `astroq architecture ast --json` | 生成 `var/artifacts/architecture/ast/latest.json`，Web 只读展示 Python/TS/Vue/CSS 的重复实现、近似 clone、重复 helper 和 canonical helper 绕行风险 |
 | Web | `astroq web build --json` / `astroq web serve --host HOST --port PORT` | 委托 Vite build 和 FastAPI/uvicorn |
 
 ## 3. 数据流

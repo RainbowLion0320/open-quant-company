@@ -23,6 +23,7 @@ import ActivityMonitor from "./ActivityMonitor.vue";
 import Settings from "./Settings.vue";
 import ConfigCenter from "./ConfigCenter.vue";
 import TestDesign from "./TestDesign.vue";
+import AstIntelligence from "./AstIntelligence.vue";
 import CodeGraph from "./CodeGraph.vue";
 
 const { t } = useI18n();
@@ -32,6 +33,7 @@ const tabKeys = [
   { key: "settings" },
   { key: "config" },
   { key: "tests" },
+  { key: "ast" },
   { key: "codegraph" },
 ];
 
@@ -47,6 +49,7 @@ const { activeComponent } = useModuleTabs(tabKeys, "monitor", {
   settings: Settings,
   config: ConfigCenter,
   tests: TestDesign,
+  ast: AstIntelligence,
   codegraph: CodeGraph,
 });
 </script>

@@ -606,6 +606,22 @@ def test_system_graph_tab_is_codegraph_not_hindsight():
     assert "CodeGraph" in en_modules
 
 
+def test_system_ast_intelligence_tab_and_api_contract():
+    hub = Path("web/frontend/src/views/SystemHub.vue").read_text(encoding="utf-8")
+    system_api = Path("web/frontend/src/api/modules/system.ts").read_text(encoding="utf-8")
+    system_types = Path("web/frontend/src/api/types/system.ts").read_text(encoding="utf-8")
+    zh_modules = Path("web/frontend/src/i18n/messages/zh-CN/modules.ts").read_text(encoding="utf-8")
+    en_modules = Path("web/frontend/src/i18n/messages/en-US/modules.ts").read_text(encoding="utf-8")
+
+    assert "AstIntelligence" in hub
+    assert '{ key: "ast" }' in hub
+    assert "astIntelligence" in system_api
+    assert "/api/system/ast-intelligence" in system_api
+    assert "AstIntelligenceResponse" in system_types
+    assert "AST 检测" in zh_modules
+    assert "AST Intelligence" in en_modules
+
+
 def test_hindsight_visualization_legacy_references_are_removed_from_product_surface():
     forbidden = (
         "HindsightGraph",

@@ -20,6 +20,7 @@ import { activity } from "./activity";
 import { configCenter } from "./configCenter";
 import { codegraph } from "./codegraph";
 import { testDesign } from "./testDesign";
+import { astIntelligence } from "./astIntelligence";
 
 export const zhCN = {
   app,
@@ -44,4 +45,5 @@ export const zhCN = {
   configCenter,
   codegraph,
   testDesign,
+  astIntelligence,
 } as const;

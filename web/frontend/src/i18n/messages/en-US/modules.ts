@@ -77,6 +77,11 @@ export const modules = {
             meta: "Design intelligence",
             description: "Inspect test cases, risks, code targets, specs, and design risks",
           },
+          ast: {
+            label: "AST Intelligence",
+            meta: "AST analysis",
+            description: "Inspect duplicate implementations, near clones, repeated helpers, and canonical helper bypass risks",
+          },
           codegraph: {
             label: "CodeGraph",
             meta: "Code graph",

@@ -20,6 +20,7 @@ import { activity } from "./activity";
 import { configCenter } from "./configCenter";
 import { codegraph } from "./codegraph";
 import { testDesign } from "./testDesign";
+import { astIntelligence } from "./astIntelligence";
 
 export const enUS = {
   app,
@@ -44,4 +45,5 @@ export const enUS = {
   configCenter,
   codegraph,
   testDesign,
+  astIntelligence,
 } as const;

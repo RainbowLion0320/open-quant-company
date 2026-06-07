@@ -240,3 +240,76 @@ export interface TestDesignResponse {
   smells: TestDesignSmell[];
   recommended_command: string;
 }
+
+export interface AstIntelligenceSummary {
+  file_count: number;
+  unit_count: number;
+  issue_count: number;
+  clone_group_count: number;
+  languages: Record<string, number>;
+  severity_counts: Record<string, number>;
+  duplicate_score: number;
+  truncated?: boolean;
+  artifact_age_seconds?: number | null;
+}
+
+export interface AstUnitRef {
+  id: string;
+  path: string;
+  language: string;
+  kind: string;
+  name: string;
+  start_line: number;
+  end_line: number;
+  node_count: number;
+}
+
+export interface AstIssue {
+  id: string;
+  severity: "P0" | "P1" | "P2" | string;
+  category: string;
+  title: string;
+  paths: string[];
+  units: AstUnitRef[];
+  language: string;
+  evidence: Record<string, any>;
+  recommendation: string;
+}
+
+export interface AstCloneGroup {
+  id: string;
+  category: string;
+  similarity: number;
+  units: AstUnitRef[];
+  shared_shape: string;
+  module_pairs: string[];
+}
+
+export interface AstGraphNode {
+  id: string;
+  label: string;
+  kind: string;
+  group: string;
+  path?: string;
+  count?: number;
+}
+
+export interface AstGraphLink {
+  source: string;
+  target: string;
+  type: string;
+  label: string;
+  count: number;
+}
+
+export interface AstIntelligenceResponse {
+  status: "no_artifact" | "ok" | "empty" | "error" | string;
+  generated_at?: string;
+  latest: { generated_at?: string; artifact_path?: string } | null;
+  summary: AstIntelligenceSummary;
+  issues: AstIssue[];
+  clone_groups: AstCloneGroup[];
+  graph: { nodes: AstGraphNode[]; links: AstGraphLink[] };
+  errors: { path?: string; language?: string; message?: string; line?: number }[];
+  recommended_command: string;
+}

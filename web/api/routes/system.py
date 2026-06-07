@@ -30,6 +30,7 @@ from web.api.services.system_orders import order_lifecycle_payload, order_trace_
 from web.api.services.system_tests import (
     tests_design_payload,
 )
+from web.api.services.system_ast import ast_intelligence_payload
 
 router = APIRouter(prefix="/api/system", tags=["System"])
 
@@ -212,3 +213,9 @@ async def get_system_mode():
 async def get_tests_design():
     """Latest deterministic Test Design Intelligence artifact."""
     return tests_design_payload()
+
+
+@router.get("/ast-intelligence")
+async def get_ast_intelligence():
+    """Latest deterministic AST Intelligence duplicate implementation artifact."""
+    return ast_intelligence_payload()

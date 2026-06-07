@@ -1,5 +1,5 @@
 import { get, post } from "../client";
-import type { CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LlmUsageResponse, SystemHistoryResponse, SystemMonitor, TestDesignResponse } from "../types";
+import type { AstIntelligenceResponse, CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LlmUsageResponse, SystemHistoryResponse, SystemMonitor, TestDesignResponse } from "../types";
 
 export const systemApi = {
   systemMonitor: () => get<SystemMonitor>("/api/system/monitor"),
@@ -14,6 +14,7 @@ export const systemApi = {
     get<{ entries: any[]; summary: any; total: number }>(`/api/system/audit?section=${encodeURIComponent(section)}&limit=${limit}`),
   systemMode: () => get<{ mode: string; has_api_key: boolean; allows_settings_write: boolean; allows_paper_trading: boolean; readonly_sections: string[] }>("/api/system/mode"),
   testDesign: () => get<TestDesignResponse>("/api/system/tests/design"),
+  astIntelligence: () => get<AstIntelligenceResponse>("/api/system/ast-intelligence"),
   codeGraphStatus: () => get<CodeGraphStatusResponse>("/api/codegraph/status"),
   codeGraphGraph: (params: { level?: string; root?: string; edge_kinds?: string; node_kinds?: string; limit?: number } = {}) => {
     const search = new URLSearchParams();
