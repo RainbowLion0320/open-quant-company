@@ -30,6 +30,7 @@ tmp/
 # IDE
 .vscode/
 .idea/
+wiki/.obsidian/
 
 # Environment
 .env
