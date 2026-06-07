@@ -82,6 +82,32 @@ def test_collect_test_design_returns_stable_empty_payload(tmp_path):
     assert payload["matrix"]["risks"] == []
 
 
+def test_collect_test_design_counts_pandas_testing_assertions(tmp_path):
+    from astrolabe_cli.design_intelligence import collect_test_design
+
+    project = tmp_path
+    tests_dir = project / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_pandas_assert.py").write_text(
+        textwrap.dedent(
+            """
+            import pandas as pd
+
+            def test_frame_contract():
+                left = pd.DataFrame({"x": [1]})
+                right = pd.DataFrame({"x": [1]})
+                pd.testing.assert_frame_equal(left, right)
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    payload = collect_test_design(project, {"design": {"scan_globs": ["tests/test*.py"]}})
+
+    assert payload["cases"][0]["assert_count"] == 1
+    assert "no_assertions" not in payload["cases"][0]["smells"]
+
+
 def test_write_test_design_artifact_uses_design_latest(monkeypatch, tmp_path):
     from data.storage.datahub import reset_datahub
     from astrolabe_cli.design_intelligence import write_test_design_artifact

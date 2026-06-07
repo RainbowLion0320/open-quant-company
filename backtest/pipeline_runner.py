@@ -103,12 +103,15 @@ class PipelineBacktest:
                       f"holdings={len(holdings)} cash={cash:,.0f}", flush=True)
 
             if should_rebal:
+                visible_price_history = price_history.iloc[: day_idx + 1].copy()
+                visible_price_history.attrs = dict(getattr(price_history, "attrs", {}) or {})
+                visible_day_idx = len(visible_price_history) - 1
                 # Build PipelineContext
                 ctx = PipelineContext(
                     date=dt.date() if hasattr(dt, "date") else dt,
                     universe=universe,
                     prices=current_prices,
-                    price_history=price_history,
+                    price_history=visible_price_history,
                     regime=regime,
                     cash=cash,
                     holdings=dict(holdings),
@@ -116,7 +119,7 @@ class PipelineBacktest:
                 )
 
                 # Stage 1: Alpha
-                ctx.signals = self.alpha.generate_alpha(universe, price_history, day_idx, regime)
+                ctx.signals = self.alpha.generate_alpha(universe, visible_price_history, visible_day_idx, regime)
 
                 # Stage 2: Portfolio
                 ctx.targets = self.portfolio.construct(ctx.signals, ctx)

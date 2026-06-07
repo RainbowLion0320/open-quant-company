@@ -76,9 +76,9 @@ class TestAuthMiddleware:
         data = resp.json()
         assert "config" in data
 
-    def test_api_without_bearer_prefix(self, client):
+    def test_api_without_bearer_prefix_is_rejected(self, client):
         resp = client.get("/api/settings", headers={"Authorization": "test-secret-key"})
-        assert resp.status_code == 200  # raw token also accepted
+        assert resp.status_code == 401
 
     def test_protected_route_with_auth(self, client):
         """Test that a PATCH to settings with auth works."""

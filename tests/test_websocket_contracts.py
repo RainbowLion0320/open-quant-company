@@ -5,6 +5,7 @@ Tests use FastAPI TestClient to verify WebSocket behavior
 without requiring a running server.
 """
 import asyncio
+import time
 import pytest
 
 try:
@@ -61,10 +62,12 @@ class TestWebSocketContract:
         job_id = create_job("test_strategy")
 
         with client.websocket_connect(f"/api/strategies/ws/{job_id}") as ws:
-            # Try to receive with a short timeout
-            try:
-                ws.receive_json()
-            except Exception:
-                # Timeout or close is expected
-                pass
-        # If we get here, the test passed (connection didn't hang)
+            started = time.monotonic()
+            data = ws.receive_json()
+            elapsed = time.monotonic() - started
+
+        assert elapsed < 2.0
+        assert data["job_id"] == job_id
+        assert data["status"] == "pending"
+        assert "progress" in data
+        assert "message" in data

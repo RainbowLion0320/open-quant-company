@@ -2,6 +2,8 @@ import pandas as pd
 
 from backtest.pipeline_runner import PipelineBacktest
 from pipeline.alpha import AlphaModel
+from pipeline.portfolio import EqualWeightConstructor
+from pipeline.scheduler import RebalanceConfig, RebalanceScheduler
 from pipeline.types import AlphaSignal, FillResult, OrderIntent, PortfolioTarget
 
 
@@ -96,6 +98,25 @@ class RecordingExecution:
         self.events.append("execution:eod")
 
 
+class FuturePeekingAlpha(AlphaModel):
+    name = "future_peeking_alpha"
+    label = "Future Peeking Alpha"
+
+    def __init__(self):
+        self.seen_lengths: list[int] = []
+
+    def generate_alpha(self, universe, prices, date_idx, regime):
+        self.seen_lengths.append(len(prices))
+        signals = []
+        for symbol in universe:
+            current = float(prices[symbol].iloc[date_idx])
+            future = prices[symbol].iloc[date_idx + 1:]
+            future_max = float(future.max()) if not future.empty else current
+            if future_max > current * 5:
+                signals.append(AlphaSignal(symbol=symbol, strategy=self.name, direction="buy", score=99, confidence=0.99))
+        return signals
+
+
 def test_pipeline_backtest_uses_production_shared_stage_sequence():
     events: list[str] = []
     dates = pd.date_range("2024-01-02", periods=5, freq="B")
@@ -112,6 +133,22 @@ def test_pipeline_backtest_uses_production_shared_stage_sequence():
     assert events[:5] == ["alpha", "portfolio", "risk", "execution:intents", "execution:fills"]
     assert events[-1] == "execution:eod"
     assert result["trade_count"] == 1
+
+
+def test_pipeline_backtest_only_passes_point_in_time_prices_to_alpha():
+    dates = pd.date_range("2024-01-02", periods=5, freq="B")
+    prices = pd.DataFrame({"AAA": [10.0, 10.0, 1000.0, 10.0, 10.0]}, index=dates)
+    bench = pd.Series([100, 100, 100, 100, 100], index=dates)
+    alpha = FuturePeekingAlpha()
+
+    result = PipelineBacktest(
+        alpha=alpha,
+        portfolio=EqualWeightConstructor(max_positions=1, position_pct=1.0),
+        scheduler=RebalanceScheduler(RebalanceConfig(schedule="daily")),
+    ).run(prices, bench, universe=["AAA"])
+
+    assert alpha.seen_lengths == [1, 2, 3, 4, 5]
+    assert result["trade_count"] == 0
 
 
 def test_pipeline_backtest_filters_universe_to_available_price_columns():

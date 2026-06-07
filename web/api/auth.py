@@ -100,7 +100,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if auth.startswith("Bearer "):
             provided = auth[7:]
         elif auth:
-            provided = auth
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid Authorization header. Use: Bearer <api_key>"},
+            )
         else:
             return JSONResponse(
                 status_code=401,

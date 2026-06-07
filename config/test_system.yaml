@@ -36,6 +36,7 @@ risks:
       - "*architecture*"
       - "*layout*"
       - "*modularization*"
+      - "*test_design*"
       - "*compat*"
       - "*legacy*"
     specs:
@@ -245,6 +246,7 @@ domains:
       - tests/test_cli*.py
       - tests/test_modularization_contracts.py
       - tests/test_pipeline_contracts.py
+      - tests/test_test_design_intelligence.py
       - tests/test_test_suite_health.py
       - tests/test_contract.py
       - tests/test_shared_infra.py

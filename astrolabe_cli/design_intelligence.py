@@ -123,7 +123,7 @@ def _case_payload(item: dict[str, Any], rel: str, module_imports: list[str], con
     domain = _domain(rel, node.name, config, design_marker)
     kind = _kind(rel, node.name, node, design_marker)
     smells: list[str] = []
-    assert_count = sum(isinstance(child, ast.Assert) for child in ast.walk(node))
+    assert_count = sum(isinstance(child, ast.Assert) for child in ast.walk(node)) + _assertion_helper_count(node)
     raises_count = _call_count(node, {"pytest.raises", "raises"})
     mock_count = _mock_count(node)
     fixtures = [arg.arg for arg in node.args.args if arg.arg not in {"self", "cls"}]
@@ -308,6 +308,20 @@ def _call_count(node: ast.AST, names: set[str]) -> int:
             short = full.rsplit(".", 1)[-1]
             if full in names or short in names:
                 count += 1
+    return count
+
+
+def _assertion_helper_count(node: ast.AST) -> int:
+    count = 0
+    prefixes = (
+        "pd.testing.assert_",
+        "pandas.testing.assert_",
+        "np.testing.assert_",
+        "numpy.testing.assert_",
+    )
+    for child in ast.walk(node):
+        if isinstance(child, ast.Call) and _full_name(child.func).startswith(prefixes):
+            count += 1
     return count
 
 
