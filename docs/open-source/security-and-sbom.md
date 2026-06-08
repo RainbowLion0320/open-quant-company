@@ -4,9 +4,10 @@ Astrolabe uses GitHub-native security automation plus release-time artifact disc
 
 ## Automated Security Checks
 
-The `Security` workflow runs:
+GitHub CodeQL default setup runs code scanning for the repository.
 
-- CodeQL analysis for Python and TypeScript/JavaScript.
+The custom `Security` workflow runs:
+
 - Dependency Review on pull requests.
 - CycloneDX SBOM generation as a GitHub Actions artifact.
 

@@ -6,7 +6,7 @@ Security fixes are considered for the current `main` branch and the latest publi
 
 ## Automated Security Controls
 
-The repository uses GitHub Actions for CodeQL analysis, dependency review, and SBOM generation. Dependabot monitors Python, frontend npm, and GitHub Actions dependencies.
+The repository uses GitHub CodeQL default setup for code scanning, plus GitHub Actions for dependency review and SBOM generation. Dependabot monitors Python, frontend npm, and GitHub Actions dependencies.
 
 These checks reduce risk, but they do not replace responsible disclosure for vulnerabilities involving secrets, local data, authentication, command execution, or provider integrations.
 
