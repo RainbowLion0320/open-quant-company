@@ -1,0 +1,49 @@
+name: Feature request
+description: Propose a product, architecture, data, CLI, or Web UI improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web UI
+        - CLI
+        - Data architecture
+        - Strategy architecture
+        - Backtest / research
+        - Paper execution
+        - Diagnostics / observability
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What real workflow, limitation, or design issue should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the desired behavior or architecture.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Mention simpler approaches, rejected options, or tradeoffs.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How should maintainers know this is complete?
+      placeholder: |
+        - ...
+        - ...
+

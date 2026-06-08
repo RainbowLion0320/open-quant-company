@@ -1,0 +1,38 @@
+name: Question
+description: Ask a setup, usage, or architecture question.
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions about investment advice, trade recommendations, or return guarantees are out of scope.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Setup
+        - Web UI
+        - CLI
+        - Data
+        - Strategy
+        - Backtest
+        - Paper execution
+        - Architecture
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Include what you already tried and links to relevant docs if applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Add commands, environment details, screenshots, or logs if they help. Redact secrets.
+

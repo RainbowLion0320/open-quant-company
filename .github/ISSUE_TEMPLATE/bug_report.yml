@@ -1,0 +1,73 @@
+name: Bug report
+description: Report a reproducible defect in Astrolabe.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Remove secrets, tokens, private trading records, and local data before submitting.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web UI
+        - CLI
+        - Data ingestion
+        - DataHub / storage
+        - Strategy runtime
+        - Backtest
+        - Paper execution
+        - System diagnostics
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: Describe the expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include exact commands, Web route, config section, or data workflow when possible.
+      placeholder: |
+        1. Run ...
+        2. Open ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant logs or attach screenshots. Redact secrets.
+      render: text
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or version
+      description: "`git rev-parse --short HEAD` or release version."
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, Node version, browser, and relevant provider setup.
+      placeholder: |
+        OS:
+        Python:
+        Node:
+        Browser:
+        Provider credentials configured:

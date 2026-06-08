@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/RainbowLion0320/astrolabe-quant/security
+    about: Please do not disclose vulnerabilities in public issues. Use GitHub security reporting when available.
+  - name: Documentation
+    url: https://github.com/RainbowLion0320/astrolabe-quant/tree/main/docs
+    about: Check project documentation before opening a support request.
+
