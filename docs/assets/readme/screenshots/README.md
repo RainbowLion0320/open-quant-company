@@ -14,3 +14,5 @@ Expected files:
 | `06-portfolio.png` | Portfolio execution |
 
 Recommended capture size: around 1600x1000 desktop, with the left navigation and main page content visible.
+
+To update README screenshots, replace the existing files with the same names and keep the README image links unchanged.

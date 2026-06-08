@@ -1,6 +1,4 @@
 <div align="center">
-  <img src="docs/assets/readme-quant-iceberg.png" alt="蜉蝣望青天，星盘只是量化世界的一瞬微光" width="100%">
-
   <h1>星盘</h1>
   <h3>Astrolabe Quant OS — 个人量化研究与执行操作系统</h3>
   <p>
@@ -21,22 +19,22 @@
 - 人可以打开 Web UI，看市场、策略、数据、流程图、组合和系统诊断。
 - Agent 和自动化可以调用 `astroq` CLI，用稳定的 JSON 接口做检查、补数、回测、诊断和维护。
 
-换句话说，Web 是给人理解系统的窗口，CLI 是给 agent 操作系统的把手。这两个入口指向同一套代码、配置和运行产物，避免“界面看到一套，脚本跑的是另一套”。
+更具体地说：Web 负责把系统状态讲清楚，CLI 负责把维护动作做稳定。这两个入口指向同一套代码、配置和运行产物，避免“界面看到一套，脚本跑的是另一套”。
 
-星盘不是机构级真实量化平台，也不承诺收益。它更像个人量化工程的一块严肃地基：数据要有来源，参数要能追踪，信号要能解释，回测要尽量避免未来函数，执行先在 paper 环境里留下账本。
+星盘不是机构级真实量化平台，也不承诺收益。它的定位更接近个人量化工程底座：数据要有来源，参数要能追踪，信号要能解释，回测要尽量避免未来函数，执行先在 paper 环境里留下账本。
 
-## 先看这两条线
+## 两个入口
 
 | 线索 | 入口 | 适合做什么 |
 |------|------|------------|
-| 给人看的工作台 | Vue 3 Web UI | 看市场状态、策略证据、流程图、数据健康、组合执行和系统诊断 |
-| 给 agent 用的控制面 | `astroq` CLI | 以 JSON 方式执行 health、config、data、strategy、regime、backtest、execution、architecture、test 等维护动作 |
+| 面向使用者 | Vue 3 Web UI | 看市场状态、策略证据、流程图、数据健康、组合执行和系统诊断 |
+| 面向 Agent / 自动化 | `astroq` CLI | 以 JSON 方式执行 health、config、data、strategy、regime、backtest、execution、architecture、test 等维护动作 |
 
-这不是把 Web UI 和 CLI 分成两个产品。它们共享 DataHub、Strategy Catalog、Pipeline、PaperBroker、配置中心和本地运行目录。你可以先在 Web 里看懂问题，再让 agent 用 CLI 生成诊断 artifact 或执行修复演练。
+Web UI 和 CLI 不是两套系统。它们共享 DataHub、Strategy Catalog、Pipeline、PaperBroker、配置中心和本地运行目录。你可以先在 Web 里看懂问题，再让 Agent 用 CLI 生成诊断 artifact 或执行修复演练。
 
 ## Web UI 一眼看懂
 
-这些页面不是静态报告，而是系统的日常观察台。截图路径固定在 `docs/assets/readme/screenshots/`，以后替换同名文件即可更新 README。
+这些页面不是静态报告，而是系统的主要工作面。
 
 **市场总览：**先看今天系统眼里的市场状态，包括 market regime、核心指数、行业脉冲和宏观快照。
 
@@ -64,20 +62,20 @@
 
 ## 项目特点
 
-**1. 双控制面：人能看，agent 能做**
+**1. 双控制面：Web 面向人，CLI 面向 Agent**
 
-很多量化项目只有 notebook 或脚本，适合作者本人临时跑；也有些系统只有后台服务，外部协作只能猜状态。星盘刻意保留两条入口：
+星盘保留两条正式入口，不把所有操作压到脚本或页面里：
 
 - Web UI 用来观察和解释：Market、Research、Strategy Lab、Portfolio、Pipeline、DataHub、System。
-- CLI 用来自动化和审计：`astroq ... --json` 输出机器可读结果，适合 cron、本地脚本和 AI agent。
+- CLI 用来自动化和审计：`astroq ... --json` 输出机器可读结果，适合 cron、本地脚本和 AI Agent。
 
-这个设计让一次维护动作可以被人理解，也可以被 agent 重复执行。
+同一件维护工作既能在 Web 里被理解，也能通过 CLI 被重复执行。
 
-**2. 本地优先，不把关键状态交给黑盒服务**
+**2. 本地优先，关键状态可复查**
 
-数据以 Parquet 为主，DuckDB 做轻量查询，DataHub 管路径、manifest、原子写入和运行产物目录。默认运行产物在 `var/`，不进 git；源码、配置、spec、wiki 留在仓库里。这样做没有云端 SaaS 省事，但可复查、可迁移，也更适合个人研究长期维护。
+数据以 Parquet 为主，DuckDB 做轻量查询，DataHub 管路径、manifest、原子写入和运行产物目录。默认运行产物在 `var/`，不进 git；源码、配置、spec、wiki 留在仓库里。这个取舍牺牲了一些开箱即用的便利，换来可复查、可迁移，也更适合个人研究长期维护。
 
-**3. 策略不是一坨函数**
+**3. 策略有身份，也有边界**
 
 生产策略、paper 策略和 candidate 策略有边界。Strategy Catalog 负责策略身份和状态，runtime registry 负责运行入口，Web 和 CLI 都通过同一层去看策略。候选策略可以研究和回测，但不能默认混进生产扫描。
 
@@ -104,13 +102,13 @@
 | `risk_control` | 单票仓位、总敞口、下单次数、回撤熔断、单笔金额 |
 | `asset_allocation` | bull / sideways / bear 下的资产权重 |
 
-**5. 解释链路放到台面上**
+**5. 解释链路可见**
 
-Pipeline 页面不是装饰图。它把 `market_regime`、`data_quality`、`strategy_evidence`、`portfolio_execution` 等关键链路拆成节点和边，展示输入、参数、阈值、权重、分支和输出。线太多时，可以选中节点看流入和流出关系。
+Pipeline 页面不是展示用流程图。它把 `market_regime`、`data_quality`、`strategy_evidence`、`portfolio_execution` 等关键链路拆成节点和边，展示输入、参数、阈值、权重、分支和输出。线太多时，可以选中节点看流入和流出关系。
 
-**6. 系统自己也被观察**
+**6. 诊断结果也可视化**
 
-System 页面不仅看机器状态，还能看测试设计、AST 重复实现诊断、CodeGraph 代码图谱和架构风险。这些诊断由 CLI 显式生成 artifact，Web 只读展示，避免在页面请求里偷偷跑长任务。
+System 页面不仅看机器状态，还能看测试设计、AST 重复实现诊断、CodeGraph 代码图谱和架构风险。这些诊断由 CLI 显式生成 artifact，Web 只读展示，避免页面请求触发不可控的长任务。
 
 ## 系统地图
 
