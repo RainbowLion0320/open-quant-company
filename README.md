@@ -34,26 +34,33 @@
 
 这不是把 Web UI 和 CLI 分成两个产品。它们共享 DataHub、Strategy Catalog、Pipeline、PaperBroker、配置中心和本地运行目录。你可以先在 Web 里看懂问题，再让 agent 用 CLI 生成诊断 artifact 或执行修复演练。
 
-## Web UI 截图预留
+## Web UI 一眼看懂
 
-当前 README 先留出截图位置，避免提交空图或坏链。后续把截图放到建议路径后，再把对应占位块替换成 Markdown 图片即可。
+这些页面不是静态报告，而是系统的日常观察台。截图路径固定在 `docs/assets/readme/screenshots/`，以后替换同名文件即可更新 README。
 
-| 页面 | 建议截图路径 | 截图要表达什么 |
-|------|--------------|----------------|
-| 市场总览 | `docs/assets/readme/screenshots/01-market-overview.png` | market regime、核心指数、行业脉冲、宏观状态 |
-| 策略实验室 | `docs/assets/readme/screenshots/02-strategy-lab.png` | 生产 / paper / candidate 策略隔离、信号和证据 |
-| Pipeline 流程图 | `docs/assets/readme/screenshots/03-pipeline.png` | 参数、阈值、权重如何流向最终判断 |
-| 数据中台 | `docs/assets/readme/screenshots/04-datahub.png` | 本地数据维度、健康扫描、修复入口 |
-| 系统控制 | `docs/assets/readme/screenshots/05-system-control.png` | 配置中心、测试设计、AST 检测、CodeGraph 架构诊断 |
-| 组合执行 | `docs/assets/readme/screenshots/06-portfolio.png` | PaperBroker 持仓、NAV、订单和交易账本 |
-
-<!--
-未来插图示例：
+**市场总览：**先看今天系统眼里的市场状态，包括 market regime、核心指数、行业脉冲和宏观快照。
 
 ![市场总览](docs/assets/readme/screenshots/01-market-overview.png)
 
-建议截图尺寸：桌面宽屏 1600x1000 左右；尽量保留左侧导航和页面主体，让第一次进来的人能判断这是可操作的系统，不是静态报告。
--->
+**策略实验室：**把 production / paper / candidate 策略分开看，避免研究策略误入生产扫描。
+
+![策略实验室](docs/assets/readme/screenshots/02-strategy-lab.png)
+
+**Pipeline 流程图：**把关键参数、阈值、权重和分支判断摆出来，看一个结论是怎么形成的。
+
+![Pipeline 流程图](docs/assets/readme/screenshots/03-pipeline.png)
+
+**数据中台：**检查本地数据维度、数据健康、大小统计和单表修复入口。
+
+![数据中台](docs/assets/readme/screenshots/04-datahub.png)
+
+**系统控制：**配置中心、测试设计、AST 检测、CodeGraph 和架构诊断都在这里。
+
+![系统控制](docs/assets/readme/screenshots/05-system-control.png)
+
+**组合执行：**PaperBroker 的持仓、NAV、订单和交易账本，用来验证执行链路。
+
+![组合执行](docs/assets/readme/screenshots/06-portfolio.png)
 
 ## 项目特点
 
