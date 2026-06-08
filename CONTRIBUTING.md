@@ -28,6 +28,7 @@ Requirements:
 - Python 3.11+
 - Node.js 18+
 - Git
+- ripgrep (`rg`) for documentation drift checks
 
 Basic setup:
 
