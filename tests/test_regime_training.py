@@ -139,7 +139,7 @@ def test_report_summary_schema_is_stable(tmp_path):
     assert json.loads((tmp_path / "summary.json").read_text())["status"] == "ok"
 
 
-def test_strategy_ab_rows_include_required_baselines():
+def test_strategy_ab_rows_include_required_baselines(risk_free_curve):
     from research.regime_types import RegimePolicy
     from research.regime.evaluation import run_regime_research
 

@@ -283,7 +283,7 @@ def test_champion_policy_matches_validated_w0611_production_formula():
     assert detection["regime_min_dwell"] == PRODUCTION_REGIME_POLICY.min_dwell
 
 
-def test_profit_training_outputs_required_baselines_and_oos_decision():
+def test_profit_training_outputs_required_baselines_and_oos_decision(risk_free_curve):
     from research.regime_types import RegimePolicy
     from research.regime.profit_training import run_regime_profit_training
 
@@ -321,7 +321,7 @@ def test_profit_training_outputs_required_baselines_and_oos_decision():
     assert result["candidate_validation_summary_rows"]
 
 
-def test_profit_report_writes_stable_schema_and_advisory_config(tmp_path):
+def test_profit_report_writes_stable_schema_and_advisory_config(tmp_path, risk_free_curve):
     from research.regime_types import RegimePolicy
     from research.regime.profit_training import run_regime_profit_training, write_regime_profit_report
 

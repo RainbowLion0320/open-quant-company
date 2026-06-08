@@ -11,6 +11,10 @@ python -m pip install -U pip
 python -m pip install -r requirements-dev.txt
 python -m pip install -e .
 
+cd web/frontend
+npm ci
+cd ../..
+
 .venv/bin/astroq health --json
 .venv/bin/astroq config validate --json
 .venv/bin/astroq docs check --json
@@ -23,7 +27,6 @@ Frontend:
 
 ```bash
 cd web/frontend
-npm ci
 npm run typecheck
 npm run build
 ```

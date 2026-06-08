@@ -72,6 +72,17 @@ jobs:
           python -m pip install -r requirements-dev.txt
           python -m pip install -e .
 
+      - name: Set up Node for AST parser tests
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/frontend/package-lock.json
+
+      - name: Install frontend parser dependencies
+        working-directory: web/frontend
+        run: npm ci
+
       - name: Ruff critical checks
         run: ruff check astrolabe_cli backtest broker core cybernetics data models notify pipeline research scripts signals tests web/api --select E9,F63,F7,F82
 

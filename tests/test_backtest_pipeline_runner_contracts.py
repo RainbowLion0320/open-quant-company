@@ -1,10 +1,14 @@
 import pandas as pd
+import pytest
 
 from backtest.pipeline_runner import PipelineBacktest
 from pipeline.alpha import AlphaModel
 from pipeline.portfolio import EqualWeightConstructor
 from pipeline.scheduler import RebalanceConfig, RebalanceScheduler
 from pipeline.types import AlphaSignal, FillResult, OrderIntent, PortfolioTarget
+
+
+pytestmark = pytest.mark.usefixtures("risk_free_curve")
 
 
 class RecordingAlpha(AlphaModel):

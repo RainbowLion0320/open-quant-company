@@ -79,6 +79,7 @@ Local runtime outputs belong under `var/` and are ignored by git. This includes 
 Run the smallest relevant checks for your change. For broad changes, run the full set:
 
 ```bash
+cd web/frontend && npm ci && cd ../..
 .venv/bin/python -m pytest -q
 .venv/bin/python -m compileall -q astrolabe_cli backtest broker cybernetics data models pipeline research scripts signals tests web/api
 .venv/bin/astroq docs check --json
