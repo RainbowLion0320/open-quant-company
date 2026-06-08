@@ -11,6 +11,16 @@ Thank you for considering a contribution. Astrolabe is treated as a real open so
 - Make dynamic values configurable instead of hard-coding thresholds, weights, credentials, or local paths.
 - Documentation, specs, tests, and code should describe the same current design.
 
+Project governance and long-lived contributor expectations are also documented in:
+
+- `GOVERNANCE.md`
+- `MAINTAINERS.md`
+- `ROADMAP.md`
+- `docs/RELEASE.md`
+- `docs/open-source/data-compliance.md`
+- `docs/open-source/privacy.md`
+- `docs/open-source/onboarding-without-secrets.md`
+
 ## Development Setup
 
 Requirements:
@@ -41,6 +51,15 @@ Optional development dependencies:
 python -m pip install -r requirements-dev.txt
 python -m pip install -e ".[ml]"
 ```
+
+Install local git hooks if you want the same lightweight checks before every commit:
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+The current ruff gate is intentionally conservative. It checks syntax, invalid constructs, control-flow errors, and undefined names without forcing a full historical style rewrite.
 
 ## Secrets and Local Data
 
@@ -95,4 +114,3 @@ Use the issue templates when possible. Include enough context for maintainers to
 ## Financial Disclaimer
 
 Astrolabe is research and infrastructure software. It is not investment advice, does not promise returns, and should not be used as the only basis for trading decisions.
-

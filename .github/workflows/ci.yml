@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  governance:
+    name: Governance checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate community files and issue templates
+        run: |
+          python - <<'PY'
+          import pathlib
+          import yaml
+
+          required = [
+              "README.md",
+              "README.en.md",
+              "LICENSE",
+              "CODE_OF_CONDUCT.md",
+              "CONTRIBUTING.md",
+              "SECURITY.md",
+              "SUPPORT.md",
+              "GOVERNANCE.md",
+              "MAINTAINERS.md",
+              "ROADMAP.md",
+              "CHANGELOG.md",
+              "CITATION.cff",
+              "NOTICE",
+              ".github/CODEOWNERS",
+              ".github/pull_request_template.md",
+          ]
+          missing = [path for path in required if not pathlib.Path(path).exists()]
+          if missing:
+              raise SystemExit(f"missing community files: {missing}")
+
+          for template in pathlib.Path(".github/ISSUE_TEMPLATE").glob("*.yml"):
+              yaml.safe_load(template.read_text(encoding="utf-8"))
+          PY
+
+      - name: Check diff whitespace
+        run: git diff --check HEAD
+
+  python:
+    name: Python quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -e .
+
+      - name: Ruff critical checks
+        run: ruff check astrolabe_cli backtest broker core cybernetics data models notify pipeline research scripts signals tests web/api --select E9,F63,F7,F82
+
+      - name: Compile Python modules
+        run: python -m compileall -q astrolabe_cli backtest broker cybernetics data models pipeline research scripts signals tests web/api
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Check documentation drift
+        run: astroq docs check --json
+
+  frontend:
+    name: Frontend quality gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build

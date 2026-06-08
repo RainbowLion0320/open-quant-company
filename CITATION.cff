@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+title: "Astrolabe Quant OS"
+message: "If you use Astrolabe in research, tooling, or derivative work, please cite the repository."
+type: software
+authors:
+  - name: "RainbowLion0320"
+repository-code: "https://github.com/RainbowLion0320/astrolabe-quant"
+url: "https://github.com/RainbowLion0320/astrolabe-quant"
+license: "MIT"
+version: "2.0.0"
+date-released: "2026-06-08"
+abstract: "A local-first daily-frequency quant research and execution operating system with a Web UI and agent-friendly CLI."
+keywords:
+  - quant
+  - backtesting
+  - trading
+  - local-first
+  - datahub
+  - cli

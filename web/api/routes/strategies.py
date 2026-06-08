@@ -1,6 +1,7 @@
 """策略中心路由 — 策略列表 / 信号 / 异步运行 / 进度"""
 
 from fastapi import APIRouter, Query, WebSocket
+from web.api.errors import DataNotFoundError
 from web.api.schemas.strategy import (
     StrategyCatalogResponse,
     StrategyEvaluationSummaryResponse,

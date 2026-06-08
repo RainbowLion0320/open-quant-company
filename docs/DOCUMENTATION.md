@@ -10,7 +10,8 @@
 2. `docs/specs/` — 子系统实现契约，是代码行为的权威设计文档。
 3. `docs/acceptance-matrix.md` — PRD/spec 到代码、测试、API/Web、手工验收的追踪矩阵。
 4. `wiki/` — 长期知识：概念、架构决策、对比分析、操作方法。
-5. `docs/development-plan.md` — 仅在有活跃开发计划时存在。完成或被取代的计划从工作树删除，历史从 git 恢复。
+5. `CONTRIBUTING.md` / `GOVERNANCE.md` / `docs/open-source/` — 开源协作、发布、安全、隐私和数据合规边界。
+6. `docs/development-plan.md` — 仅在有活跃开发计划时存在。完成或被取代的计划从工作树删除，历史从 git 恢复。
 
 ## 权威来源
 
@@ -19,7 +20,7 @@
 | 产品范围和边界 | `docs/PRD.md` | 保持稳定，不写 sprint 级状态。 |
 | 模块行为和契约 | `docs/specs/*.md` | 行为变化时同提交更新。 |
 | 当前实现状态 | 代码 + 测试 + `docs/acceptance-matrix.md` | 不在 wiki 重复维护状态表。 |
-| 项目发布版本 | `pyproject.toml` → `[project].version` | README badge 通过 `scripts/bump_version.py` 同步；配置文件不保存发布版本。 |
+| 项目发布版本 | `pyproject.toml` → `[project].version` + `CHANGELOG.md` + `docs/RELEASE.md` | README badge 通过 `scripts/bump_version.py` 同步；配置文件不保存发布版本。 |
 | 数据维度和路径 | `config/settings.yaml` + `data/storage/dimensions.py` + `data/storage/datahub.py` | 文档说明如何查询，不复制动态数量。 |
 | 本地运行目录布局 | `config/settings.yaml` → `paths` | `data/` 是源码包，运行产物默认在 `var/`。 |
 | 数据 schema | `data/quality/contract.py` + 必要时的显式 `_contracts/` 文件 | 文档说明契约归属和查询方法。 |
@@ -27,7 +28,7 @@
 | 回测/锦标赛指标 | `var/artifacts/tournaments/` 和生成报告 | 除非明确标记为历史样本，否则不把 Sharpe/MaxDD 写进长期文档。 |
 | Web 路由和 UI 模块 | `web/api/routes/` + `web/frontend/src/router` | spec 记录主要业务路由组，不追逐每个临时端点细节。 |
 | Agent/cron/local 操作入口 | `astroq` CLI (`astrolabe_cli/`) | 新自动化优先调用 CLI；CLI 编排当前维护的底层模块。 |
-| 操作历史 | git log | 仓库不再保留 append-only changelog 或历史计划归档。 |
+| 操作历史 | git log | 仓库不保留历史计划归档；发布变更记录只写入 `CHANGELOG.md`。 |
 
 ## CLI 操作入口
 

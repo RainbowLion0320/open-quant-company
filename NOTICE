@@ -1,0 +1,8 @@
+Astrolabe Quant OS
+Copyright (c) 2026 RainbowLion0320
+
+Astrolabe is distributed under the MIT License. See LICENSE for the full license text.
+
+This repository may integrate with third-party data providers and libraries, including AKShare, Tushare, FastAPI, Vue, ECharts, Three.js, pandas, DuckDB, and related open source packages. Third-party packages remain governed by their own licenses and terms.
+
+The repository does not grant rights to redistribute paid, private, or provider-restricted market data. Users are responsible for complying with the terms of each data provider and broker or notification service they configure.

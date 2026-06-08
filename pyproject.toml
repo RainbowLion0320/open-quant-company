@@ -2,7 +2,32 @@
 name = "astrolabe-quant"
 version = "2.0.0"
 description = "星盘 / Astrolabe Quant OS：个人量化研究与执行操作系统"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+    { name = "RainbowLion0320" },
+]
+keywords = [
+    "quant",
+    "trading",
+    "backtesting",
+    "a-share",
+    "fastapi",
+    "vue",
+    "cli",
+    "local-first",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
 
 dependencies = [
     "pandas>=2.0",
@@ -24,6 +49,12 @@ dependencies = [
 
 [project.scripts]
 astroq = "astrolabe_cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/RainbowLion0320/astrolabe-quant"
+Documentation = "https://github.com/RainbowLion0320/astrolabe-quant/tree/main/docs"
+Repository = "https://github.com/RainbowLion0320/astrolabe-quant"
+Issues = "https://github.com/RainbowLion0320/astrolabe-quant/issues"
 
 [project.optional-dependencies]
 ml = ["lightgbm>=4.0", "scikit-learn>=1.3", "optuna>=3.0"]
@@ -52,3 +83,19 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = [
+    "var",
+    "web/frontend/node_modules",
+    "web/frontend/dist",
+    ".codegraph",
+]
+
+[tool.ruff.lint]
+# Keep the default CI gate conservative for now: syntax, invalid constructs,
+# control-flow errors, and undefined names. Broader style enforcement can be
+# enabled once the historical codebase has been cleaned intentionally.
+select = ["E9", "F63", "F7", "F82"]

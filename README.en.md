@@ -185,6 +185,23 @@ After installation, run `astroq` directly, or use `python -m astrolabe_cli.main 
 | `astroq web build --json` | Build frontend assets |
 | `astroq web serve --host 0.0.0.0 --port 8501` | Serve the local Web API and static frontend |
 
+## Open Source Governance
+
+Astrolabe is maintained as a real open source project, not a demo repository. Contribution, release, security, and data-boundary documents are here:
+
+| Document | Purpose |
+|----------|---------|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup, contribution rules, verification expectations |
+| [GOVERNANCE.md](GOVERNANCE.md) | Maintainer responsibilities, decision principles, breaking change rules |
+| [MAINTAINERS.md](MAINTAINERS.md) | Current maintainers and maintainer responsibilities |
+| [ROADMAP.md](ROADMAP.md) | Near-, mid-, and long-term direction |
+| [CHANGELOG.md](CHANGELOG.md) | Release history |
+| [docs/RELEASE.md](docs/RELEASE.md) | Versioning, tags, and GitHub Release process |
+| [SECURITY.md](SECURITY.md) | Vulnerability reporting and security boundaries |
+| [docs/open-source/data-compliance.md](docs/open-source/data-compliance.md) | Data provider, redistribution, and runtime artifact boundaries |
+| [docs/open-source/privacy.md](docs/open-source/privacy.md) | Local-first privacy statement |
+| [docs/open-source/onboarding-without-secrets.md](docs/open-source/onboarding-without-secrets.md) | Onboarding and checks without provider secrets |
+
 ## Quick Start
 
 ### 1. Prepare the Environment

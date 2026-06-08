@@ -179,6 +179,23 @@ flowchart LR
 | `astroq web build --json` | 构建前端资源 |
 | `astroq web serve --host 0.0.0.0 --port 8501` | 启动本地 Web API 和静态资源服务 |
 
+## 开源治理
+
+星盘按正式开源项目维护，而不是 demo 仓库。贡献、发布、安全和数据边界说明如下：
+
+| 文档 | 用途 |
+|------|------|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 开发环境、贡献规则、验证要求 |
+| [GOVERNANCE.md](GOVERNANCE.md) | 维护者职责、决策原则、breaking change 规则 |
+| [MAINTAINERS.md](MAINTAINERS.md) | 当前维护者和维护责任 |
+| [ROADMAP.md](ROADMAP.md) | 近期、中期、长期方向 |
+| [CHANGELOG.md](CHANGELOG.md) | 发布变更记录 |
+| [docs/RELEASE.md](docs/RELEASE.md) | 版本、tag 和 GitHub Release 流程 |
+| [SECURITY.md](SECURITY.md) | 漏洞报告和安全边界 |
+| [docs/open-source/data-compliance.md](docs/open-source/data-compliance.md) | 数据来源、再分发和本地运行产物边界 |
+| [docs/open-source/privacy.md](docs/open-source/privacy.md) | local-first 隐私说明 |
+| [docs/open-source/onboarding-without-secrets.md](docs/open-source/onboarding-without-secrets.md) | 无密钥上手和可运行检查 |
+
 ## 快速开始
 
 ### 1. 环境准备

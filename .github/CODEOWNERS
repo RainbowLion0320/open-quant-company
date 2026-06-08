@@ -1,0 +1,18 @@
+# Default ownership for the repository.
+* @RainbowLion0320
+
+# Public project governance and automation.
+/.github/ @RainbowLion0320
+/CODE_OF_CONDUCT.md @RainbowLion0320
+/CONTRIBUTING.md @RainbowLion0320
+/GOVERNANCE.md @RainbowLion0320
+/MAINTAINERS.md @RainbowLion0320
+/SECURITY.md @RainbowLion0320
+
+# Core runtime boundaries.
+/data/ @RainbowLion0320
+/pipeline/ @RainbowLion0320
+/backtest/ @RainbowLion0320
+/broker/ @RainbowLion0320
+/web/ @RainbowLion0320
+/astrolabe_cli/ @RainbowLion0320
