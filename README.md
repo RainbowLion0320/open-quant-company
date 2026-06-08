@@ -8,90 +8,80 @@
     <img src="https://img.shields.io/badge/A%20Share-universe-cyan" alt="A Share">
     <img src="https://img.shields.io/badge/local--first-Parquet%20%2B%20DuckDB-0f766e" alt="Local first">
   </p>
+  <p>
+    简体中文 | <a href="README.en.md">English</a>
+  </p>
 </div>
 
 ---
 
-星盘是一个自托管的日频量化研究系统。它把数据、策略、回测、模拟执行、配置、诊断和文档治理放在同一个本地工程里。
+星盘是一个本地运行的日频量化研究系统，把数据、策略、回测、模拟执行、配置和诊断放在同一个工程里统一管理。
 
-这个项目最想解决的不是“再写一个选股脚本”，而是一个更实际的问题：个人量化系统很容易散成一堆脚本、缓存、报告和口头记忆。星盘把这些东西收进一个可复查的闭环里，并且同时照顾两类使用者：
+个人量化项目容易变成一堆散落的脚本、缓存和临时报告，难以复现和维护。星盘的设计目标是把这些收进一个结构化的闭环里，同时提供两种使用方式：
 
-- 人可以打开 Web UI，看市场、策略、数据、流程图、组合和系统诊断。
-- Agent 和自动化可以调用 `astroq` CLI，用稳定的 JSON 接口做检查、补数、回测、诊断和维护。
+- **人**通过 Web UI 查看市场、策略、数据、流程图、组合和系统状态。
+- **Agent 和自动化脚本**通过 `astroq` CLI 以 JSON 接口执行检查、补数、回测、诊断等操作。
 
-更具体地说：Web 负责把系统状态讲清楚，CLI 负责把维护动作做稳定。这两个入口指向同一套代码、配置和运行产物，避免“界面看到一套，脚本跑的是另一套”。
+Web 用于观察和理解系统状态，CLI 用于执行可重复的维护动作。两者共享同一套代码、配置和运行产物，不存在"界面看的和脚本跑的"不一致的问题。
 
-星盘不是机构级真实量化平台，也不承诺收益。它的定位更接近个人量化工程底座：数据要有来源，参数要能追踪，信号要能解释，回测要尽量避免未来函数，执行先在 paper 环境里留下账本。
+星盘是个人研究和学习的工具，不构成投资建议，也不承诺收益。
 
 ## 两个入口
 
-| 线索 | 入口 | 适合做什么 |
-|------|------|------------|
-| 面向使用者 | Vue 3 Web UI | 看市场状态、策略证据、流程图、数据健康、组合执行和系统诊断 |
-| 面向 Agent / 自动化 | `astroq` CLI | 以 JSON 方式执行 health、config、data、strategy、regime、backtest、execution、architecture、test 等维护动作 |
+| 入口 | 形式 | 用途 |
+|------|------|------|
+| 用户界面 | Vue 3 Web UI | 查看市场状态、策略证据、流程图、数据健康、组合执行和系统诊断 |
+| 自动化入口 | `astroq` CLI | 通过 `--json` 输出机器可读结果，执行 health、config、data、strategy、regime、backtest、execution 等操作 |
 
-Web UI 和 CLI 不是两套系统。它们共享 DataHub、Strategy Catalog、Pipeline、PaperBroker、配置中心和本地运行目录。你可以先在 Web 里看懂问题，再让 Agent 用 CLI 生成诊断 artifact 或执行修复演练。
+Web UI 和 CLI 共享 DataHub、Strategy Catalog、Pipeline、PaperBroker、配置中心和本地运行目录。
 
-## Web UI 一眼看懂
+## Web UI
 
-这些页面不是静态报告，而是系统的主要工作面。
-
-**市场总览：**先看今天系统眼里的市场状态，包括 market regime、核心指数、行业脉冲和宏观快照。
+### 市场总览
+显示当前市场状态，包括 market regime、核心指数、行业脉冲和宏观快照。
 
 ![市场总览](docs/assets/readme/screenshots/01-market-overview.png)
 
-**策略实验室：**把 production / paper / candidate 策略分开看，避免研究策略误入生产扫描。
+### 策略实验室
+按 production / paper / candidate 分层展示策略，避免研究中的策略误入生产扫描。
 
 ![策略实验室](docs/assets/readme/screenshots/02-strategy-lab.png)
 
-**Pipeline 流程图：**把关键参数、阈值、权重和分支判断摆出来，看一个结论是怎么形成的。
+### Pipeline 流程图
+展示关键参数、阈值、权重和分支判断，说明每个结论的形成过程。
 
 ![Pipeline 流程图](docs/assets/readme/screenshots/03-pipeline.png)
 
-**数据中台：**检查本地数据维度、数据健康、大小统计和单表修复入口。
+### 数据中台
+查看本地数据维度、健康状态、存储大小，支持单表修复。
 
 ![数据中台](docs/assets/readme/screenshots/04-datahub.png)
 
-**系统控制：**配置中心、测试设计、AST 检测、CodeGraph 和架构诊断都在这里。
+### 系统控制
+配置中心、测试设计、AST 检测、CodeGraph 和架构诊断。
 
 ![系统控制](docs/assets/readme/screenshots/05-system-control.png)
 
-**组合执行：**PaperBroker 的持仓、NAV、订单和交易账本，用来验证执行链路。
+### 组合执行
+PaperBroker 的持仓、NAV、订单和交易账本，用于验证执行链路。
 
 ![组合执行](docs/assets/readme/screenshots/06-portfolio.png)
 
-## 项目特点
+## 策略分层
 
-**1. 双控制面：Web 面向人，CLI 面向 Agent**
+生产策略、paper 策略和 candidate 策略边界明确。Strategy Catalog 管理策略身份和状态，runtime registry 管理运行入口，Web 和 CLI 通过同一层访问策略。候选策略可以研究和回测，但不能混入生产扫描。
 
-星盘保留两条正式入口，不把所有操作压到脚本或页面里：
-
-- Web UI 用来观察和解释：Market、Research、Strategy Lab、Portfolio、Pipeline、DataHub、System。
-- CLI 用来自动化和审计：`astroq ... --json` 输出机器可读结果，适合 cron、本地脚本和 AI Agent。
-
-同一件维护工作既能在 Web 里被理解，也能通过 CLI 被重复执行。
-
-**2. 本地优先，关键状态可复查**
-
-数据以 Parquet 为主，DuckDB 做轻量查询，DataHub 管路径、manifest、原子写入和运行产物目录。默认运行产物在 `var/`，不进 git；源码、配置、spec、wiki 留在仓库里。这个取舍牺牲了一些开箱即用的便利，换来可复查、可迁移，也更适合个人研究长期维护。
-
-**3. 策略有身份，也有边界**
-
-生产策略、paper 策略和 candidate 策略有边界。Strategy Catalog 负责策略身份和状态，runtime registry 负责运行入口，Web 和 CLI 都通过同一层去看策略。候选策略可以研究和回测，但不能默认混进生产扫描。
-
-| 层级 | 策略 | 角色 |
+| 层级 | 策略 | 说明 |
 |------|------|------|
-| 质量过滤 | Buffett | 能力圈、护城河、安全边际，过滤财务质量和估值陷阱 |
+| 质量过滤 | Buffett | 能力圈、护城河、安全边际，过滤财务质量和估值风险 |
 | 主 Alpha | Multifactor | 质量、估值、技术、市场、行业动量五维打分 |
 | 辅助 Alpha | LightGBM | 使用 PIT 特征捕捉非线性关系，默认处于 paper 状态 |
-| 风险覆盖 | Cybernetic | market regime、仓位、止损、风险预算和资产配置覆盖层 |
-| 研究候选 | Candidate strategies | 趋势、Donchian、RPS、行业轮动、质量价值、低波防御等候选策略 |
+| 风险覆盖 | Cybernetic | market regime、仓位、止损、风险预算和资产配置 |
+| 研究候选 | Candidate | 趋势、Donchian、RPS、行业轮动、质量价值、低波防御等 |
 
-**4. 参数归配置，不靠记忆**
+## 配置管理
 
-阈值、权重、风控上限、策略开关和资产配置主要归属在 [config/settings.yaml](config/settings.yaml)。Web 的配置中心负责可视化管理，CLI 负责校验。README 不写死容易漂移的动态数值，只说明参数在哪里、由谁消费。
-
-典型配置域：
+阈值、权重、风控参数、策略开关和资产配置集中在 [config/settings.yaml](config/settings.yaml)。Web 配置中心提供可视化编辑，CLI 提供校验命令。README 不写死容易变化的动态数值。
 
 | 配置域 | 内容 |
 |--------|------|
@@ -102,15 +92,7 @@ Web UI 和 CLI 不是两套系统。它们共享 DataHub、Strategy Catalog、Pi
 | `risk_control` | 单票仓位、总敞口、下单次数、回撤熔断、单笔金额 |
 | `asset_allocation` | bull / sideways / bear 下的资产权重 |
 
-**5. 解释链路可见**
-
-Pipeline 页面不是展示用流程图。它把 `market_regime`、`data_quality`、`strategy_evidence`、`portfolio_execution` 等关键链路拆成节点和边，展示输入、参数、阈值、权重、分支和输出。线太多时，可以选中节点看流入和流出关系。
-
-**6. 诊断结果也可视化**
-
-System 页面不仅看机器状态，还能看测试设计、AST 重复实现诊断、CodeGraph 代码图谱和架构风险。这些诊断由 CLI 显式生成 artifact，Web 只读展示，避免页面请求触发不可控的长任务。
-
-## 系统地图
+## 系统架构
 
 ```mermaid
 flowchart LR
@@ -154,35 +136,33 @@ flowchart LR
   UI --> API
 ```
 
-## Web 工作台
+## Web 路由
 
-Web UI 是项目的主要观察入口。它不是 landing page，也不是静态报告；每个页面都对应一类日常操作或排查场景。
-
-| 路由 | 页面 | 主要能力 |
-|------|------|----------|
+| 路由 | 页面 | 功能 |
+|------|------|------|
 | `/` | 市场总览 | market regime、核心指标、行业脉冲、宏观快照 |
 | `/research` | 市场研究 | 行业雷达、个股搜索、个股详情 |
 | `/strategy-lab` | 策略实验室 | 策略目录、生产隔离、研究扫描、回测证据 |
 | `/portfolio` | 组合执行 | PaperBroker 持仓、NAV、交易记录、手动下单 |
 | `/pipeline` | 流程图 | 关键链路拆解、参数解释、节点详情、流向高亮 |
-| `/datahub` | 数据中台 | 启用维度、数据健康、大小统计、单表修复 |
-| `/system` | 系统控制 | 系统信息、配置中心、设置、测试设计、AST 检测、CodeGraph 和架构诊断 |
+| `/datahub` | 数据中台 | 维度状态、数据健康、存储统计、单表修复 |
+| `/system` | 系统控制 | 系统信息、配置中心、测试设计、AST 检测、CodeGraph、架构诊断 |
 
-前端支持中文 / English，本地化切换在左侧导航栏底部。
+前端支持中文 / English 切换，入口在左侧导航栏底部。
 
-## CLI 控制面
+## CLI 命令
 
-安装为 editable 包后可以直接使用 `astroq`。如果没有安装，也可以用 `python -m astrolabe_cli.main ...`。
+项目安装后可执行 `astroq`，或通过 `python -m astrolabe_cli.main ...` 运行。
 
 | 命令 | 用途 |
 |------|------|
 | `astroq health --json` | 检查项目版本、DataHub 路径和本地健康状态 |
-| `astroq config env --json` | 检查当前进程环境变量密钥状态，只输出脱敏信息 |
+| `astroq config env --json` | 检查当前进程环境变量密钥状态（脱敏输出） |
 | `astroq config validate --json` | 校验 settings 和策略注册表 |
 | `astroq data status --json` | 扫描本地数据健康 |
 | `astroq data repair stock_valuation --dry-run --json` | 演练单表修复 |
 | `astroq data tushare-audit --json` | 审计 Tushare 权限和本地覆盖率 |
-| `astroq data tushare-backfill --scope missing --resume --json` | 按缺口补齐可获取的 Tushare 数据 |
+| `astroq data tushare-backfill --scope missing --resume --json` | 按缺口补齐 Tushare 数据 |
 | `astroq strategy catalog --json` | 查看 production / paper / candidate 策略目录 |
 | `astroq strategy run all --mode production --json` | 运行生产策略扫描 |
 | `astroq strategy run trend_following --mode research --dry-run --json` | 候选策略研究扫描演练 |
@@ -191,19 +171,19 @@ Web UI 是项目的主要观察入口。它不是 landing page，也不是静态
 | `astroq backtest run --strategy multifactor --dry-run --json` | 回测入口演练 |
 | `astroq backtest check --json` | 运行回测质量检查 |
 | `astroq execution dry-run --json` | 模拟执行链路演练 |
-| `astroq pipeline list --json` | 查看可解释流程图列表 |
-| `astroq architecture ast --json` | 生成 AST 重复实现诊断 artifact |
-| `astroq test design --json` | 生成测试设计诊断 artifact |
+| `astroq pipeline list --json` | 查看流程图列表 |
+| `astroq architecture ast --json` | 生成 AST 重复实现诊断 |
+| `astroq test design --json` | 生成测试设计诊断 |
 | `astroq test check --suite quick --json` | 运行快速测试 gate 并记录产物 |
 | `astroq docs check --json` | 扫描已知陈旧文档短语 |
 | `astroq web build --json` | 构建前端资源 |
-| `astroq web serve --host 0.0.0.0 --port 8501` | 启动本地 Web API / 静态资源服务 |
+| `astroq web serve --host 0.0.0.0 --port 8501` | 启动本地 Web API 和静态资源服务 |
 
 ## 快速开始
 
-### 1. 准备环境
+### 1. 环境准备
 
-需要 Python 3.11+、Node.js 18+、Git。推荐使用虚拟环境。
+需要 Python 3.11+、Node.js 18+、Git。
 
 ```bash
 git clone https://github.com/RainbowLion0320/astrolabe-quant.git
@@ -228,20 +208,20 @@ python -m pip install -r requirements-dev.txt
 
 ### 2. 配置密钥
 
-基础 Web 和部分本地功能可以无密钥启动，但完整数据和 AI 因子研究需要额外配置。API token/key 只从进程系统环境变量读取；不要写入 `config/settings.yaml`、`.env` 或其他项目文件。
+基础 Web 和部分本地功能无需密钥即可启动。完整数据和 AI 因子研究需要配置以下环境变量。API token/key 只能从系统环境变量读取，不要写入 `config/settings.yaml` 或 `.env` 文件。
 
 | 环境变量 | 用途 |
 |----------|------|
-| `TUSHARE_TOKEN` | Tushare 数据，包括估值、资金流、部分财务扩展 |
-| `DEEPSEEK_API_KEY` | 默认 DeepSeek provider 的 LLM 因子发现、通用 LLM 用量监控 |
-| `ASTROLABE_API_KEY` | FastAPI Bearer Token 保护 |
-| `ASTROLABE_VAR` | 覆盖默认运行产物根目录 `var/` |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | 通知推送，参考 [config/notify.example.yaml](config/notify.example.yaml) |
+| `TUSHARE_TOKEN` | Tushare 数据（估值、资金流、财务扩展等） |
+| `DEEPSEEK_API_KEY` | DeepSeek LLM 因子发现和用量监控 |
+| `ASTROLABE_API_KEY` | FastAPI Bearer Token 认证 |
+| `ASTROLABE_VAR` | 覆盖默认运行产物目录 `var/` |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Telegram 通知推送，参考 [config/notify.example.yaml](config/notify.example.yaml) |
 | `WECHAT_WEBHOOK_URL`, `FEISHU_WEBHOOK_URL` | 企业微信 / 飞书通知 webhook |
 
-真实通知配置文件应放在 `config/notify.yaml`，该文件已被 `.gitignore` 忽略。
+真实通知配置放在 `config/notify.yaml`（该文件已被 `.gitignore` 忽略）。
 
-检查当前进程环境变量状态：
+检查环境变量状态：
 
 ```bash
 astroq config env --json
@@ -251,14 +231,14 @@ astroq config env --json
 
 开发模式建议开两个终端。
 
-终端 A：FastAPI 后端。
+终端 A — FastAPI 后端：
 
 ```bash
 source .venv/bin/activate
 uvicorn web.api.app:create_app --factory --host 0.0.0.0 --port 8501 --reload
 ```
 
-终端 B：Vite 前端。
+终端 B — Vite 前端：
 
 ```bash
 cd web/frontend
@@ -268,7 +248,7 @@ npm run dev
 
 打开 `http://localhost:5173`。
 
-生产式本地预览可先构建前端，再由后端挂载静态资源：
+生产模式先构建前端，再由后端挂载静态资源：
 
 ```bash
 cd web/frontend
@@ -277,85 +257,85 @@ cd ../..
 astroq web serve --host 0.0.0.0 --port 8501
 ```
 
-## 数据与运行产物
+## 文件与数据说明
 
-| 路径 | 是否应提交 | 说明 |
+| 路径 | 提交到 Git | 说明 |
 |------|------------|------|
 | `config/settings.yaml` | 是 | 参数、权重、风控、资产和策略注册表 |
 | `config/notify.example.yaml` | 是 | 通知配置模板 |
 | `config/notify.yaml` | 否 | 本地真实通知密钥 |
-| `data/` | 是 | Python 数据层源码包和静态 reference 数据 |
-| `data/reference/` | 是 | 静态参考数据和 seed 模型，例如 HMM 初始参数 |
+| `data/` | 是 | Python 数据层源码包 |
+| `data/reference/` | 是 | 静态参考数据和 seed 模型（如 HMM 初始参数） |
 | `var/store/` | 否 | 行情、信号、特征、paper 状态等运行产物 |
 | `var/cache/` | 否 | API 缓存 |
-| `var/artifacts/` | 否 | 回测、模型训练、锦标赛、测试和诊断 artifact |
+| `var/artifacts/` | 否 | 回测、模型训练、锦标赛、测试和诊断结果 |
 | `var/db/` | 否 | DuckDB/SQLite 运行数据库 |
 | `reports/` | 否 | 训练、regime、回测和诊断报告 |
-| `docs/specs/` | 是 | 代码行为契约，行为变更需同步更新 |
-| `wiki/` | 是 | 长期概念、架构决策和操作参考 |
+| `docs/specs/` | 是 | 模块行为契约，行为变更需同步更新 |
+| `wiki/` | 是 | 概念说明、架构决策和操作参考 |
 
-README 不固化“当前收益率”“当前选股数量”“某次样本内排名”这类动态结果。最新证据以 `var/artifacts/`、`reports/`、Web `/strategy-lab` 和本地生成报告为准。
+README 不记录动态结果（收益率、选股数量、样本内排名等）。最新证据以 `var/artifacts/`、`reports/`、Web `/strategy-lab` 和本地生成报告为准。
 
 ## 项目结构
 
 ```text
 astrolabe-quant/
-├── astrolabe_cli/          # agent / cron / 人工维护的 CLI 控制面
+├── astrolabe_cli/          # CLI 控制面
 ├── backtest/               # 日频回测、风险指标、策略锦标赛
 ├── broker/                 # PaperBroker、风控、撮合、ledger、NAV
 ├── config/                 # settings.yaml、workflow、通知模板
 ├── cybernetics/            # market regime、HMM、稳定确认、风险预算
 ├── data/                   # 数据层源码包
 │   ├── storage/            # DataHub、manifest、DuckDB、DataRegistry
-│   ├── ingestion/          # provider、fetcher、fetchers、Tushare 工具
+│   ├── ingestion/          # provider、fetcher、Tushare 工具
 │   ├── market/             # 价格服务、复权、行业、资产和市场视图
 │   ├── features/           # PIT Feature Store、factor scoreboard
 │   ├── quality/            # cleaner、contract、quality gate、freshness gate
 │   ├── ops/                # audit、backfill、cron logger
-│   ├── llm/                # provider usage ledger
-│   ├── rates/              # risk-free rate provider
+│   ├── llm/                # LLM provider usage ledger
+│   ├── rates/              # 无风险利率 provider
 │   ├── strategy/           # Strategy Catalog 和插件注册
-│   └── reference/          # 可提交静态参考数据和 seed 模型
+│   └── reference/          # 静态参考数据和 seed 模型
 ├── docs/                   # PRD、技术规格、验收矩阵、文档治理
-├── models/                 # 模型注册与加载入口
-├── pipeline/               # alpha/risk/portfolio/execution 流水线抽象
+├── models/                 # 模型注册与加载
+├── pipeline/               # alpha/risk/portfolio/execution 流水线
 ├── research/               # 策略治理、OOS 证据、regime 训练
 ├── scripts/                # cron、数据拉取、训练、修复、报告脚本
 ├── signals/                # 生产策略、候选策略、DSL、信号选择
 ├── tests/                  # 合约测试、边界测试、Web/API/CLI 测试
 ├── web/
 │   ├── api/                # FastAPI REST、WebSocket、jobs
-│   └── frontend/           # Vue 3 + Vite + ECharts 星盘终端
-├── var/                    # 本地运行产物，默认不进 git
+│   └── frontend/           # Vue 3 + Vite + ECharts
+├── var/                    # 本地运行产物（不提交）
 │   ├── store/              # DataHub 主存储
-│   ├── cache/              # API、回测矩阵和运行缓存
-│   ├── artifacts/          # backtests、models、tournaments、reports、diagnostics
+│   ├── cache/              # API、回测缓存
+│   ├── artifacts/          # 回测、模型、锦标赛、诊断产物
 │   └── db/                 # DuckDB/SQLite
-└── wiki/                   # 概念、参考、架构决策、对比分析
+└── wiki/                   # 概念、参考、架构决策
 ```
 
-## 文档入口
+## 文档导航
 
-| 入口 | 适合谁 | 看什么 |
-|------|--------|--------|
-| [产品范围](docs/PRD.md) | 第一次了解项目的人 | 项目做什么、不做什么、成功标准 |
-| [技术规格](docs/specs/) | 开发者 / agent | 数据、信号、回测、执行、Web、多资产契约 |
+| 文档 | 面向 | 内容 |
+|------|------|------|
+| [产品范围](docs/PRD.md) | 新用户 | 项目做什么、不做什么 |
+| [技术规格](docs/specs/) | 开发者 | 数据、信号、回测、执行、Web、多资产契约 |
 | [验收矩阵](docs/acceptance-matrix.md) | 维护者 | 需求、代码、测试、文档之间的追踪 |
 | [文档治理](docs/DOCUMENTATION.md) | 维护者 | README、spec、wiki、代码之间的权威边界 |
 | [策略文档](docs/strategies/) | 策略研究者 | 生产策略、候选策略、研究晋级规则 |
 | [Wiki](wiki/index.md) | 深入阅读 | 概念、架构决策、数据维度、CLI 控制面 |
 
-文档权威边界：
+各文档分工：
 
-- README 负责项目入口、心智模型和上手路径。
-- `docs/PRD.md` 负责产品范围和边界。
-- `docs/specs/*.md` 负责模块行为契约。
-- `docs/acceptance-matrix.md` 负责需求、代码、测试和验收追踪。
-- `wiki/` 负责长期知识和架构推理。
+- README：项目入口和上手路径。
+- `docs/PRD.md`：产品范围和边界。
+- `docs/specs/*.md`：模块行为契约。
+- `docs/acceptance-matrix.md`：需求、代码、测试和验收追踪。
+- `wiki/`：长期知识和架构推理。
 
-## 开发与校验
+## 开发检查
 
-常规文档或代码改动至少运行：
+文档或代码改动后至少运行：
 
 ```bash
 git diff --check
@@ -365,7 +345,7 @@ astroq architecture ast --json
 astroq test check --suite quick --json
 ```
 
-代码改动按风险选择测试范围：
+按风险选择测试范围：
 
 ```bash
 python -m pytest tests/ -q
@@ -373,15 +353,15 @@ python -m pytest tests/test_frontend_i18n_contracts.py -q
 cd web/frontend && npm run typecheck && npm run build
 ```
 
-## 边界与风险声明
+## 声明
 
-星盘用于个人研究、工程学习和模拟执行，不构成投资建议，也不保证收益。
+星盘用于个人研究、工程学习和模拟执行，不构成投资建议，不保证收益。
 
-- 默认交易频率是日线级，不覆盖高频、分钟级实盘或期权复杂交易。
-- PaperBroker 是模拟交易，不等同于券商实盘接入。
-- 数据质量依赖外部数据源和本地缓存状态，必须通过 DataHub 健康检查和回测证据确认。
-- 策略参数可配置，但任何参数变更都需要样本外验证、风险指标和交易成本检查。
-- 生产策略、paper 策略和 candidate 策略有严格边界；候选策略不能默认进入生产扫描。
+- 交易频率为日线级别，不覆盖高频、分钟级实盘或期权复杂策略。
+- PaperBroker 是模拟交易，不连接真实券商。
+- 数据质量依赖外部数据源和本地缓存状态，需通过 DataHub 健康检查和回测证据确认。
+- 策略参数可配置，但参数变更需要样本外验证、风险指标和交易成本检查。
+- 生产策略、paper 策略和候选策略边界严格，候选策略不能进入生产扫描。
 
 ## 许可证
 
