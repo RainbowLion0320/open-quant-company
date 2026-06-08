@@ -202,9 +202,6 @@ class DataHub:
     def llm_usage_path(self) -> Path:
         return self.paths.llm_usage_path()
 
-    def hindsight_tokens_path(self) -> Path:
-        return self.paths.hindsight_tokens_path()
-
     def llm_project_usage_path(self) -> Path:
         return self.paths.llm_project_usage_path()
 

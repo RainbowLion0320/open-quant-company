@@ -176,7 +176,7 @@ def test_codegraph_sync_uses_fixed_commands_and_lock(tmp_path, monkeypatch):
     assert all(call[1] == tmp_path for call in calls)
 
 
-def test_codegraph_api_replaces_hindsight_graph_route(monkeypatch, tmp_path):
+def test_codegraph_api_serves_status_and_graph(monkeypatch, tmp_path):
     from web.api.app import create_app
     from web.api.routes import codegraph as route
 
@@ -188,13 +188,11 @@ def test_codegraph_api_replaces_hindsight_graph_route(monkeypatch, tmp_path):
 
     status = client.get("/api/codegraph/status")
     graph = client.get("/api/codegraph/graph?level=module")
-    old = client.get("/api/hindsight/graph")
 
     assert status.status_code == 200
     assert status.json()["file_count"] == 3
     assert graph.status_code == 200
     assert graph.json()["nodes"]
-    assert old.status_code == 404
 
 
 def _make_diagnostics_db(project_root: Path) -> Path:

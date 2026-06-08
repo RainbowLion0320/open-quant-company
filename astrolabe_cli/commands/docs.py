@@ -15,7 +15,6 @@ REMOVED_COMPATIBILITY_TOKENS = (
     _drift_token("`backtest/", "pipeline.py`"),
     _drift_token("test_backtest", "_pipeline_contracts.py"),
     _drift_token("TUSHARE", "_PRO_TOKEN"),
-    _drift_token("HINDSIGHT_API", "_LLM_API_KEY"),
     _drift_token("ASTROLABE", "_STORE"),
     _drift_token("ASTROLABE", "_CACHE"),
     _drift_token("ASTROLABE", "_ARTIFACTS"),

@@ -46,17 +46,6 @@ def api_health_payload() -> dict:
         results.append({"name": "LLM", "status": "warn", "detail": f"无法读取 provider 配置: {str(exc)[:60]}"})
 
     try:
-        import httpx
-        with httpx.Client(timeout=3) as client:
-            r = client.get("http://localhost:9177/health")
-            if r.status_code == 200:
-                results.append({"name": "Hindsight", "status": "ok", "detail": "端口 9177 正常"})
-            else:
-                results.append({"name": "Hindsight", "status": "error", "detail": f"HTTP {r.status_code}"})
-    except Exception:
-        results.append({"name": "Hindsight", "status": "warn", "detail": "端口 9177 无响应"})
-
-    try:
         from core.settings import load_yaml_config
         cfg_path = Path(__file__).resolve().parent.parent.parent.parent / "config" / "notify.yaml"
         cfg = load_yaml_config(cfg_path, default={})

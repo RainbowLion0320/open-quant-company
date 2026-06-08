@@ -586,14 +586,14 @@ def test_frontend_router_does_not_keep_legacy_redirect_routes():
     router = Path("web/frontend/src/router/index.ts").read_text()
 
     assert "redirectWithTab" not in router
-    for path in ("/strategies", "/signals", "/backtest", "/sectors", "/monitor", "/settings", "/db-health", "/hindsight"):
+    for path in ("/strategies", "/signals", "/backtest", "/sectors", "/monitor", "/settings", "/db-health"):
         assert f'path: "{path}"' not in router
     assert 'path: "/pipeline"' in router
     assert 'path: "/stocks/:code"' in router
     assert 'path: "/stocks"' not in router
 
 
-def test_system_graph_tab_is_codegraph_not_hindsight():
+def test_system_graph_tab_uses_codegraph_surface():
     hub = Path("web/frontend/src/views/SystemHub.vue").read_text(encoding="utf-8")
     system_api = Path("web/frontend/src/api/modules/system.ts").read_text(encoding="utf-8")
     system_types = Path("web/frontend/src/api/types/system.ts").read_text(encoding="utf-8")
@@ -602,13 +602,9 @@ def test_system_graph_tab_is_codegraph_not_hindsight():
 
     assert "CodeGraph" in hub
     assert '{ key: "codegraph" }' in hub
-    assert "HindsightGraph" not in hub
-    assert "hindsightGraph" not in system_api
-    assert "/api/hindsight/graph" not in system_api
     assert "codeGraphStatus" in system_api
     assert "codeGraphGraph" in system_api
     assert "CodeGraphStatusResponse" in system_types
-    assert "HindsightGraphResponse" not in system_types
     assert "codegraph" in zh_modules
     assert "代码图谱" in zh_modules
     assert "codegraph" in en_modules
@@ -629,31 +625,6 @@ def test_system_ast_intelligence_tab_and_api_contract():
     assert "AstIntelligenceResponse" in system_types
     assert "AST 检测" in zh_modules
     assert "AST Intelligence" in en_modules
-
-
-def test_hindsight_visualization_legacy_references_are_removed_from_product_surface():
-    forbidden = (
-        "HindsightGraph",
-        "useHindsightThreeGraph",
-        "hindsightGraph",
-        "HindsightGraphResponse",
-        "/api/hindsight/graph",
-        "routes/hindsight.py",
-        "hindsight-graph",
-        "Memory Graph",
-    )
-    checked_roots = [Path("README.md"), Path("docs"), Path("wiki"), Path("web/frontend/src"), Path("web/api")]
-    offenders = []
-
-    for root in checked_roots:
-        paths = [root] if root.is_file() else [path for path in root.rglob("*") if path.is_file()]
-        for path in paths:
-            if path.suffix not in {".md", ".py", ".ts", ".vue", ".css"} and path.name != "README.md":
-                continue
-            text = path.read_text(encoding="utf-8")
-            offenders.extend(f"{path}:{token}" for token in forbidden if token in text)
-
-    assert offenders == []
 
 
 def test_market_view_surfaces_regime_stability_state():

@@ -20,9 +20,9 @@
 - Tushare MCP 模块文档: `docs/tushare-mcp-guide.md`
 - AKShare↔Tushare 分工: AKShare管日线，Tushare管三张表+daily_basic+融资融券+北向+申万+宏观
 
-## 记忆系统
-- Hindsight 保留为后台记忆服务和健康检查项。
+## 代码图谱
 - System Web 图谱入口是 CodeGraph 可视化，索引来自本地 `.codegraph/`，只在用户显式同步时更新。
+- 自动化上下文以 `docs/`、`wiki/`、`docs/specs/`、CodeGraph 索引和当前代码为准。
 
 ## 当前状态
 - 当前能力链路以 `docs/acceptance-matrix.md`、测试和代码为准。

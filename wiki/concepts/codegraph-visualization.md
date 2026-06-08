@@ -76,10 +76,8 @@ CodeGraph 诊断层是确定性 architecture smell detector，不调用大模型
 - 普通图谱请求只读 SQLite，不调用 CLI。
 - 诊断层只读 SQLite + git log，失败时降级为无 git churn，不影响图谱加载。
 - `POST /api/codegraph/sync` 使用固定命令数组，不接收路径参数。
-- Hindsight 仍是后台记忆服务，但不再提供 Web 图谱页面。
 
 ## See Also
 
 - [[system-architecture]] — 系统分层 + 关键模块表
 - [[web-architecture]] — Web 整体架构
-- [[hindsight-architecture]] — 后台记忆服务

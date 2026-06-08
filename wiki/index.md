@@ -22,7 +22,6 @@ tags: [index]
 - [[multifactor-scoring]] — 五维打分引擎（含行业动量），Strategy Catalog 体系
 - [[financial-cache]] — 三层财务缓存 + PIT基本面/估值/资金/筹码/宏观因子提取
 
-- [[hindsight-architecture]] — Hindsight 后台记忆服务：配置详解, 端口陷阱, 生命周期, 检索策略
 - [[codegraph-visualization]] — ★ CodeGraph 代码图谱可视化：模块/文件/符号下钻, 调用流向高亮, 确定性架构诊断
 - [[paper-trading]] — ★ 日频模拟交易: 信号→PaperBroker→Parquet持久化→Web展示
 

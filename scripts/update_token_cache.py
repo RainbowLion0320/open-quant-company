@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
-"""更新 Token 缓存 → 合并 Hermes state.db + factor_hypothesis log + Hindsight"""
+"""更新 Token 缓存 → 合并 Hermes state.db + project LLM usage ledger"""
 import sqlite3, json, os
 from datetime import datetime
-from pathlib import Path
-import sys
-
-ROOT = Path(__file__).resolve().parent.parent
 
 from data.storage.datahub import get_datahub
 
@@ -36,7 +32,7 @@ def read_hermes_usage():
 
 
 def read_external_usage():
-    """读取 factor_hypothesis / Hindsight 等外部 LLM 调用日志"""
+    """读取项目 LLM usage ledger 中的外部调用统计"""
     try:
         if LLM_LOG.exists():
             with open(LLM_LOG) as f:
@@ -51,28 +47,7 @@ def read_external_usage():
 def update():
     h = read_hermes_usage()
     ext = read_external_usage()
-
-    # 合并 Hindsight token
-    hindsight_file = HUB.hindsight_tokens_path()
-    hs = {"total_input": 0, "total_output": 0, "total_cost": 0.0, "calls": 0}
-    try:
-        if hindsight_file.exists():
-            with open(hindsight_file) as f:
-                d = json.load(f)
-            hs["total_input"] = d["input_tokens"]
-            hs["total_output"] = d["output_tokens"]
-            hs["total_cost"] = d["cost_usd"]
-            hs["calls"] = d["calls"]
-    except Exception:
-        pass
-
-    ext["total_input"] += hs["total_input"]
-    ext["total_output"] += hs["total_output"]
-    ext["total_cost"] += hs["total_cost"]
-    ext["calls"] += hs["calls"]
     ext_sources = list(set(item["source"] for item in ext.get("items", [])))
-    if hs["calls"] > 0:
-        ext_sources.append("hindsight")
 
     data = {
         "hermes": {

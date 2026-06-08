@@ -48,7 +48,7 @@ export function useActivityMonitor() {
 
 
   // Fixed API health display order: data → AI → infra → messaging
-  const API_HEALTH_ORDER = ["AKShare", "Tushare", "LLM:DeepSeek", "Hindsight", "Telegram"];
+  const API_HEALTH_ORDER = ["AKShare", "Tushare", "LLM:DeepSeek", "Telegram"];
   const apiHealthOrdered = computed(() => {
     if (!apiHealth.value) return [];
     const byName = new Map(apiHealth.value.items.map(i => [i.name, i]));

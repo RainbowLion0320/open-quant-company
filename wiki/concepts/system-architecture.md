@@ -201,9 +201,8 @@ strategies:
 | PE/PB补增 | `scripts/enrich_pe_pb.py` | 给特征文件批量补估值列 |
 | 财务预缓存 | `scripts/precache_financials.py` | 磁盘缓存全量财务数据 |
 | 缺月补建 | `scripts/rebuild_missing_months.py` | 精准补建受损特征文件 |
-| Token缓存 | `scripts/update_token_cache.py` | Hermes state.db + Hindsight → JSON |
+| Token缓存 | `scripts/update_token_cache.py` | Hermes state.db + project LLM usage ledger → JSON |
 | 系统指标采集 | `scripts/collect_system_metrics.py` | 每分钟写 SQLite 时序数据 |
-| Hindsight采集 | `scripts/collect_hindsight_tokens.py` | 从 /metrics (port 9177) 拉取 LLM token |
 | 系统监视API | `web/api/routes/system.py` | /monitor + /history 端点 |
 | CodeGraph API | `web/api/routes/codegraph.py` + `web/api/services/codegraph.py` + `web/api/services/codegraph_diagnostics.py` | ★ `/api/codegraph/*` — 本地代码图谱数据端点和确定性架构诊断 |
 | AST检测CLI | `astrolabe_cli/ast_intelligence.py` + `scripts/ast_frontend_collector.mjs` | Python/TS/Vue/CSS AST 重复实现和 clone 风险扫描 |
