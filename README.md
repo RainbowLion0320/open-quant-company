@@ -132,34 +132,18 @@ flowchart LR
 
 前端支持中文 / English 切换，入口在左侧导航栏底部。
 
-## CLI 命令
+## CLI
 
-项目安装后可执行 `astroq`，或通过 `python -m astrolabe_cli.main ...` 运行。
+项目安装后可执行 `astroq`，或通过 `python -m astrolabe_cli.main ...` 运行。常用命令示例：
 
-| 命令 | 用途 |
-|------|------|
-| `astroq health --json` | 检查项目版本、DataHub 路径和本地健康状态 |
-| `astroq config env --json` | 检查当前进程环境变量密钥状态（脱敏输出） |
-| `astroq config validate --json` | 校验 settings 和策略注册表 |
-| `astroq data status --json` | 扫描本地数据健康 |
-| `astroq data repair stock_valuation --dry-run --json` | 演练单表修复 |
-| `astroq data tushare-audit --json` | 审计 Tushare 权限和本地覆盖率 |
-| `astroq data tushare-backfill --scope missing --resume --json` | 按缺口补齐 Tushare 数据 |
-| `astroq strategy catalog --json` | 查看 production / paper / candidate 策略目录 |
-| `astroq strategy run all --mode production --json` | 运行生产策略扫描 |
-| `astroq strategy run trend_following --mode research --dry-run --json` | 候选策略研究扫描演练 |
-| `astroq regime status --json` | 查看当前 market regime |
-| `astroq regime train-profit --dry-run --json` | 演练利润导向 regime 训练入口 |
-| `astroq backtest run --strategy multifactor --dry-run --json` | 回测入口演练 |
-| `astroq backtest check --json` | 运行回测质量检查 |
-| `astroq execution dry-run --json` | 模拟执行链路演练 |
-| `astroq pipeline list --json` | 查看流程图列表 |
-| `astroq architecture ast --json` | 生成 AST 重复实现诊断 |
-| `astroq test design --json` | 生成测试设计诊断 |
-| `astroq test check --suite quick --json` | 运行快速测试 gate 并记录产物 |
-| `astroq docs check --json` | 扫描已知陈旧文档短语 |
-| `astroq web build --json` | 构建前端资源 |
-| `astroq web serve --host 0.0.0.0 --port 8501` | 启动本地 Web API 和静态资源服务 |
+```bash
+astroq health --json          # 项目健康检查
+astroq data status --json     # 数据健康扫描
+astroq strategy catalog --json  # 策略目录
+astroq backtest check --json  # 回测质量检查
+```
+
+完整命令清单见 [AGENTS.md](AGENTS.md)。
 
 ## 快速开始
 
