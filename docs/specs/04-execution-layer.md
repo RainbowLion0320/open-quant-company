@@ -1,6 +1,6 @@
 # Spec: 执行层 (Execution Layer)
 
-> 版本: 1.1 | 日期: 2026-06-03 | 关联: [PRD](../PRD.md) [Backtest Engine](03-backtest-engine.md) [Multi-Asset](06-multi-asset.md)
+> 版本: 1.1 | 日期: 2026-06-03 | 关联: [PRD](../product/prd.md) [Backtest Engine](03-backtest-engine.md) [Multi-Asset](06-multi-asset.md)
 
 ## 1. 概述
 

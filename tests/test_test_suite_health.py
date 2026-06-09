@@ -61,7 +61,7 @@ def test_non_collected_test_support_files_do_not_hide_tests():
 
 
 def test_acceptance_matrix_references_existing_test_files():
-    matrix = PROJECT_ROOT / "docs" / "acceptance-matrix.md"
+    matrix = PROJECT_ROOT / "docs" / "product" / "acceptance-matrix.md"
     names = set(re.findall(r"\btest_[A-Za-z0-9_]+\.py\b", matrix.read_text(encoding="utf-8")))
     missing = sorted(name for name in names if not (TESTS_ROOT / name).exists())
 

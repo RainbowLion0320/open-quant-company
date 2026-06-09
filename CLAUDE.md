@@ -8,7 +8,7 @@ Before making changes, read:
 
 1. [AGENTS.md](AGENTS.md)
 2. [README.md](README.md) or [README.en.md](README.en.md)
-3. [docs/PRD.md](docs/PRD.md)
+3. [docs/product/prd.md](docs/product/prd.md)
 4. Relevant files under [docs/specs/](docs/specs/)
 5. Relevant concepts or decisions under [wiki/](wiki/index.md)
 

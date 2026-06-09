@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 def _acceptance_rows():
-    for line in Path("docs/acceptance-matrix.md").read_text(encoding="utf-8").splitlines():
+    for line in Path("docs/product/acceptance-matrix.md").read_text(encoding="utf-8").splitlines():
         if not line.startswith("|") or line.startswith("|---"):
             continue
         cols = [col.strip() for col in line.strip("|").split("|")]
@@ -12,7 +12,7 @@ def _acceptance_rows():
 
 
 def test_acceptance_matrix_quality_debt_summary_matches_gap_rows():
-    text = Path("docs/acceptance-matrix.md").read_text(encoding="utf-8")
+    text = Path("docs/product/acceptance-matrix.md").read_text(encoding="utf-8")
     gap_count = sum(1 for cols in _acceptance_rows() if cols[-1] not in {"—", "-", ""})
 
     summary_line = next(
@@ -24,7 +24,7 @@ def test_acceptance_matrix_quality_debt_summary_matches_gap_rows():
 
 
 def test_acceptance_matrix_summary_counts_match_domain_rows():
-    text = Path("docs/acceptance-matrix.md").read_text(encoding="utf-8")
+    text = Path("docs/product/acceptance-matrix.md").read_text(encoding="utf-8")
     domain_labels = {
         "## 1.": "数据管道",
         "## 2.": "信号系统",

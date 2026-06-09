@@ -7,7 +7,7 @@
 
 | Finding | Action |
 |---|---|
-| `tests/test_boundary.py` was a print-based script, not a pytest module, while `docs/acceptance-matrix.md` treated it as an acceptance contract. | Rewrote it into collected pytest tests with explicit assertions. |
+| `tests/test_boundary.py` was a print-based script, not a pytest module, while `docs/product/acceptance-matrix.md` treated it as an acceptance contract. | Rewrote it into collected pytest tests with explicit assertions. |
 | The old boundary script wrote and restored real `data/store` Buffett result files. | Replaced real store access with isolated `DataHub`/DuckDB monkeypatching under `tmp_path`. |
 | `tests/test_new_modules.py` was an uncollected smoke script duplicating collected syntax/import/DSL/broker tests. | Removed it. |
 | `tests/run_all.py` hid live-data `test_*` functions in a non-collected script and could trigger real market/financial fetches. | Removed it. |

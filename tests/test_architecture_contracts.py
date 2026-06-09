@@ -621,7 +621,7 @@ def test_current_project_docs_do_not_repeat_known_stale_facts():
         *Path("docs").rglob("*.md"),
         *Path("wiki").rglob("*.md"),
     ]
-    excluded = {Path("docs/DOCUMENTATION.md")}
+    excluded = {Path("docs/project/documentation.md")}
     forbidden_tokens = DRIFT_TOKENS
 
     offenders = []
@@ -686,7 +686,7 @@ def test_workflow_runner_supports_canonical_module_steps():
 def test_web_docs_match_current_market_regime_layout_contract():
     spec = Path("docs/specs/05-web-platform.md").read_text(encoding="utf-8")
     decision = Path("wiki/decisions/web-architecture.md").read_text(encoding="utf-8")
-    acceptance = Path("docs/acceptance-matrix.md").read_text(encoding="utf-8")
+    acceptance = Path("docs/product/acceptance-matrix.md").read_text(encoding="utf-8")
     combined = "\n".join([spec, decision, acceptance])
 
     required_tokens = (
@@ -708,7 +708,7 @@ def test_web_docs_match_current_market_regime_layout_contract():
 def test_web_docs_match_current_api_pipeline_and_schema_contracts():
     spec = Path("docs/specs/05-web-platform.md").read_text(encoding="utf-8")
     decision = Path("wiki/decisions/web-architecture.md").read_text(encoding="utf-8")
-    acceptance = Path("docs/acceptance-matrix.md").read_text(encoding="utf-8")
+    acceptance = Path("docs/product/acceptance-matrix.md").read_text(encoding="utf-8")
     schema_reference = Path("wiki/reference/data-schema.md").read_text(encoding="utf-8")
     api_init = Path("web/api/__init__.py").read_text(encoding="utf-8")
 

@@ -146,10 +146,12 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 ├── scripts/                      # Cron/工作流脚本
 ├── tests/                        # 合约测试+边界测试
 ├── wiki/                         # LLM Wiki 知识库 (概念/决策/参考)
-├── docs/                         # PRD/spec/验收矩阵/开发计划
-│   ├── PRD.md
-│   ├── DOCUMENTATION.md
-│   └── specs/
+├── docs/                         # 产品、spec、项目治理、运维和质量文档
+│   ├── product/                  # PRD + 验收矩阵
+│   ├── specs/                    # 子系统行为契约
+│   ├── project/                  # 治理、维护、路线图、发布与合规
+│   ├── operations/               # 本地运维和外部服务接入
+│   └── quality/                  # 测试与质量审计
 ├── var/                          # 本地运行产物 (git ignored)
 │   ├── store/                    # DataHub 主存储
 │   ├── cache/                    # API、回测矩阵和运行缓存
@@ -162,7 +164,7 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 
 ## 9. 演进脉络
 
-本项目的演进由 git 历史和 `docs/acceptance-matrix.md` 追踪。PRD 只保留稳定能力边界：
+本项目的演进由 git 历史和 `docs/product/acceptance-matrix.md` 追踪。PRD 只保留稳定能力边界：
 
 - 数据基础：AKShare/Tushare、Parquet、DataHub、DataRegistry。
 - 信号生成：巴菲特约束、多因子、ML、控制论、因子 DSL。

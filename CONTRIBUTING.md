@@ -13,13 +13,13 @@ Thank you for considering a contribution. Astrolabe is treated as a real open so
 
 Project governance and long-lived contributor expectations are also documented in:
 
-- `GOVERNANCE.md`
-- `MAINTAINERS.md`
-- `ROADMAP.md`
-- `docs/RELEASE.md`
-- `docs/open-source/data-compliance.md`
-- `docs/open-source/privacy.md`
-- `docs/open-source/onboarding-without-secrets.md`
+- `docs/project/governance.md`
+- `docs/project/maintainers.md`
+- `docs/project/roadmap.md`
+- `docs/project/release.md`
+- `docs/project/compliance/data-compliance.md`
+- `docs/project/compliance/privacy.md`
+- `docs/project/compliance/onboarding-without-secrets.md`
 
 ## Development Setup
 

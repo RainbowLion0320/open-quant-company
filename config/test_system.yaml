@@ -40,7 +40,7 @@ risks:
       - "*compat*"
       - "*legacy*"
     specs:
-      - docs/acceptance-matrix.md
+      - docs/product/acceptance-matrix.md
 
   - key: api_contract
     label_zh: API 合约
@@ -100,7 +100,7 @@ risks:
       - "*ledger*"
       - "*fill*"
     specs:
-      - docs/specs/04-execution.md
+      - docs/specs/04-execution-layer.md
 
   - key: config_secret
     label_zh: 配置 / 密钥
@@ -121,7 +121,7 @@ risks:
       - "*wiki*"
       - "*acceptance*"
     specs:
-      - docs/acceptance-matrix.md
+      - docs/product/acceptance-matrix.md
 
   - key: codegraph_design
     label_zh: 代码图谱设计
@@ -211,7 +211,7 @@ domains:
       - broker/
       - scripts/execute_paper_trades.py
     specs:
-      - docs/specs/04-execution.md
+      - docs/specs/04-execution-layer.md
 
   - key: web_system
     label_zh: Web / System
@@ -255,7 +255,7 @@ domains:
       - wiki/
       - astrolabe_cli/
     specs:
-      - docs/acceptance-matrix.md
+      - docs/product/acceptance-matrix.md
 
   - key: codegraph
     label_zh: 代码图谱

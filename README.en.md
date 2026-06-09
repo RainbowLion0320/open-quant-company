@@ -204,14 +204,14 @@ astroq web serve --host 0.0.0.0 --port 8501
 
 | Document | Content |
 |----------|---------|
-| [docs/PRD.md](docs/PRD.md) | Product scope, users, and boundaries |
+| [docs/product/prd.md](docs/product/prd.md) | Product scope, users, and boundaries |
 | [docs/specs/](docs/specs/) | Behavioral contracts for data, signals, backtests, execution, Web, and multi-asset work |
 | [docs/strategies/](docs/strategies/) | Production strategies, candidate strategies, and promotion rules |
 | [wiki/index.md](wiki/index.md) | Concepts, architecture decisions, data dimensions, and operations references |
 | [AGENTS.md](AGENTS.md) | Operating rules for agents, cron jobs, automation scripts, and maintainers |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow |
 | [SECURITY.md](SECURITY.md) | Security reporting |
-| [GOVERNANCE.md](GOVERNANCE.md) | Maintainer responsibilities and decision principles |
+| [docs/project/governance.md](docs/project/governance.md) | Maintainer responsibilities and decision principles |
 
 ## Disclaimer
 

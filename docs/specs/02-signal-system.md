@@ -1,6 +1,6 @@
 # Spec: 信号系统 (Signal System)
 
-> 版本: 1.4 | 更新: 2026-06-03 | 关联: [PRD](../PRD.md) [Data Pipeline](01-data-pipeline.md) [Backtest Engine](03-backtest-engine.md)
+> 版本: 1.4 | 更新: 2026-06-03 | 关联: [PRD](../product/prd.md) [Data Pipeline](01-data-pipeline.md) [Backtest Engine](03-backtest-engine.md)
 
 ## 1. 概述
 

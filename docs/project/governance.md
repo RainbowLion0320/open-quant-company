@@ -13,7 +13,7 @@ Maintainers are responsible for:
 - Deciding release timing and versioning.
 - Protecting secrets, local data boundaries, and provider compliance.
 
-The current maintainer list is in `MAINTAINERS.md`.
+The current maintainer list is in `maintainers.md`.
 
 ## Decision Principles
 

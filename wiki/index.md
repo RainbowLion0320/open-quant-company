@@ -10,7 +10,7 @@ tags: [index]
 
 > 星盘 / Astrolabe Quant OS — 个人量化研究与执行操作系统知识库。每行 = wikilink + 一句话概括。
 > This index lists stable knowledge pages. Current counts, metrics, and phase status live in code/config/data outputs, not in wiki prose.
-> Documentation ownership: see `../docs/DOCUMENTATION.md`.
+> Documentation ownership: see `../docs/project/documentation.md`.
 
 ## Concepts
 - [[system-architecture]] — **系统架构总览**：多层正交设计，策略运行入口，多资产架构，数据注册表

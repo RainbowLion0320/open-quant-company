@@ -5,9 +5,9 @@
 /.github/ @RainbowLion0320
 /CODE_OF_CONDUCT.md @RainbowLion0320
 /CONTRIBUTING.md @RainbowLion0320
-/GOVERNANCE.md @RainbowLion0320
-/MAINTAINERS.md @RainbowLion0320
 /SECURITY.md @RainbowLion0320
+/docs/project/governance.md @RainbowLion0320
+/docs/project/maintainers.md @RainbowLion0320
 
 # Core runtime boundaries.
 /data/ @RainbowLion0320

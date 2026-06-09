@@ -6,9 +6,9 @@ This file is the working entry point for Codex, Claude, cron jobs, and other aut
 
 1. `AGENTS.md` for operational rules.
 2. `README.md` or `README.en.md` for the human-facing project overview.
-3. `docs/PRD.md` for product scope and boundaries.
+3. `docs/product/prd.md` for product scope and boundaries.
 4. `docs/specs/` for current module behavior.
-5. `docs/acceptance-matrix.md` for requirement-code-test traceability.
+5. `docs/product/acceptance-matrix.md` for requirement-code-test traceability.
 6. `wiki/index.md` for deeper concepts and architecture decisions.
 
 Use current code, specs, tests, and generated artifacts as the source of truth. Do not rely on historical plans or old progress notes unless the user explicitly asks for archaeology.
@@ -78,7 +78,7 @@ cd web/frontend && npm run dev
 - Keep `README.md` focused on first-time human readers. Do not add long maintenance rules, full command catalogs, directory inventories, CI policy, or agent-specific instructions there.
 - Put agent and automation rules in `AGENTS.md`.
 - Put contribution process in `CONTRIBUTING.md`.
-- Put maintainer decision rules in `GOVERNANCE.md`.
+- Put maintainer decision rules in `docs/project/governance.md`.
 - Put security reporting in `SECURITY.md`.
 - Update specs, wiki, acceptance matrix, and tests when behavior changes.
 - Do not preserve deprecated compatibility paths unless the current design explicitly requires them.

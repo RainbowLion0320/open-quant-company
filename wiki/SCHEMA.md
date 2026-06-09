@@ -44,11 +44,11 @@ wiki/
 - 新页面加入 `index.md` 对应分区，按字母序
 - 不在 wiki 保留 append-only changelog。实现历史以 git log 为准。
 
-完整文档职责边界见 `../docs/DOCUMENTATION.md`。简化规则：
+完整文档职责边界见 `../docs/project/documentation.md`。简化规则：
 
 - PRD 存产品边界。
 - `docs/specs/` 存代码契约。
-- `docs/acceptance-matrix.md` 存当前验收链路。
+- `docs/product/acceptance-matrix.md` 存当前验收链路。
 - Wiki 存长期知识、概念和设计理由。
 - 已完成或废弃的执行计划不留在工作树；需要追溯时使用 git。
 

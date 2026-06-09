@@ -1,6 +1,6 @@
 # Spec: 数据管道 (Data Pipeline)
 
-> 版本: 1.4 | 更新: 2026-06-06 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md)
+> 版本: 1.4 | 更新: 2026-06-06 | 关联: [PRD](../product/prd.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 

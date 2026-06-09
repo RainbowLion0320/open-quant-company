@@ -1,6 +1,6 @@
 # Spec: 回测引擎 (Backtest Engine)
 
-> 版本: 1.2 | 日期: 2026-06-03 | 关联: [PRD](../PRD.md) [Signal System](02-signal-system.md) [Execution Layer](04-execution-layer.md)
+> 版本: 1.2 | 日期: 2026-06-03 | 关联: [PRD](../product/prd.md) [Signal System](02-signal-system.md) [Execution Layer](04-execution-layer.md)
 
 ## 1. 概述
 

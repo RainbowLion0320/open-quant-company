@@ -204,14 +204,14 @@ astroq web serve --host 0.0.0.0 --port 8501
 
 | 文档 | 内容 |
 |------|------|
-| [docs/PRD.md](docs/PRD.md) | 产品范围、目标用户和边界 |
+| [docs/product/prd.md](docs/product/prd.md) | 产品范围、目标用户和边界 |
 | [docs/specs/](docs/specs/) | 数据、信号、回测、执行、Web、多资产的行为契约 |
 | [docs/strategies/](docs/strategies/) | 生产策略、候选策略和研究晋级规则 |
 | [wiki/index.md](wiki/index.md) | 概念、架构决策、数据维度和操作参考 |
 | [AGENTS.md](AGENTS.md) | agent、cron、自动化脚本和维护者操作约束 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献流程 |
 | [SECURITY.md](SECURITY.md) | 安全报告方式 |
-| [GOVERNANCE.md](GOVERNANCE.md) | 维护者职责和决策原则 |
+| [docs/project/governance.md](docs/project/governance.md) | 维护者职责和决策原则 |
 
 ## 声明
 

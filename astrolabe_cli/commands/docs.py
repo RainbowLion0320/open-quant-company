@@ -122,7 +122,7 @@ def check_docs() -> CliResult:
         "docs",
         "wiki",
         "-g",
-        "!docs/DOCUMENTATION.md",
+        "!docs/project/documentation.md",
         "-g",
         "!docs/development-plan.md",
     ]

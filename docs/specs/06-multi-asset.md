@@ -1,6 +1,6 @@
 # Spec: 多资产架构 (Multi-Asset Architecture)
 
-> 版本: 1.1 | 日期: 2026-06-03 | 关联: [PRD](../PRD.md) [Execution Layer](04-execution-layer.md)
+> 版本: 1.1 | 日期: 2026-06-03 | 关联: [PRD](../product/prd.md) [Execution Layer](04-execution-layer.md)
 
 ## 1. 概述
 
