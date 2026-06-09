@@ -1,5 +1,6 @@
 import { computed, reactive, ref, onMounted } from "vue";
 import { api } from "../api";
+import { hasAuthToken, setAuthToken } from "../api/client";
 import { useI18n } from "../i18n";
 import { fmtConfigRatio } from "../utils/format";
 
@@ -27,9 +28,10 @@ export function useSettingsView() {
     return "badge-green";
   });
   const apiKeyStatus = computed(() => {
+    if (hasAuthToken()) return t("settings.apiKeySessionSet");
     const has = modeStatus.value?.has_api_key;
     if (has === undefined) return t("settings.checking");
-    return has ? t("settings.apiKeySet") : t("settings.apiKeyOpen");
+    return has ? t("settings.apiKeyRequired") : t("settings.apiKeyOpen");
   });
 
   const risk = computed(() => settings.risk_control || {});
@@ -141,9 +143,15 @@ export function useSettingsView() {
   }
 
   async function saveApiKey() {
-    if (!apiKeyInput.value.trim()) return;
-    localStorage.setItem("quant_api_key", apiKeyInput.value.trim());
+    const token = apiKeyInput.value.trim();
+    if (!token) return;
+    setAuthToken(token);
     apiKeyInput.value = "";
+    await loadMode();
+    try {
+      const data = await api.settings();
+      Object.assign(settings, data);
+    } catch {}
   }
 
   async function loadMode() {
@@ -162,9 +170,6 @@ export function useSettingsView() {
     await loadMode();
     fetchStrategyStatuses();
     fetchAudit();
-    // Restore saved API key
-    const saved = localStorage.getItem("quant_api_key");
-    if (saved) apiKeyInput.value = "";
   });
 
   return {

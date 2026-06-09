@@ -104,7 +104,7 @@ def resolve_llm_use_case(use_case: str, *, provider: str | None = None, model: s
         "label": str(pcfg.get("label") or resolved_provider),
         "model": resolved_model,
         "base_url": str(pcfg.get("base_url") or pcfg.get("chat_base_url") or ""),
-        "api_key_env": _env_name(resolved_provider),
+        "credential_env": _env_name(resolved_provider),
         "usage_schema": str(pcfg.get("usage_schema") or DEFAULT_USAGE_SCHEMA),
     }
 

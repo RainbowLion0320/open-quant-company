@@ -187,6 +187,7 @@ export function useConfigCenter() {
   function getNestedValue(source: any, dottedKey: string): any {
     let current = source;
     for (const part of dottedKey.split(".")) {
+      if (!isSafePathPart(part)) return undefined;
       if (!current || typeof current !== "object") {
         return undefined;
       }
@@ -195,8 +196,13 @@ export function useConfigCenter() {
     return current;
   }
 
+  function isSafePathPart(part: string): boolean {
+    return Boolean(part) && part !== "__proto__" && part !== "prototype" && part !== "constructor";
+  }
+
   function setNestedValue(target: any, dottedKey: string, value: any) {
     const parts = dottedKey.split(".");
+    if (!parts.every(isSafePathPart)) return;
     let current = target;
     for (let i = 0; i < parts.length - 1; i++) {
       const part = parts[i];

@@ -1,9 +1,8 @@
 """
 API Authentication — lightweight Bearer token middleware for local single-user.
 
-Reads the API key from ``ASTROLABE_API_KEY`` or ``project.api_key`` in
-``config/settings.yaml``. If none is configured, auth is disabled so the local
-dashboard keeps working in the default single-user setup.
+Reads the API key from ``ASTROLABE_API_KEY``. If none is configured, auth is
+disabled so the local dashboard keeps working in the default single-user setup.
 
 Whitelist: /api/health, static /assets, and SPA fallback paths are public.
 All other /api/* routes require Authorization: Bearer <key> when a key exists.
@@ -36,14 +35,8 @@ def _read_settings() -> dict:
 # ── API Key management ──
 
 def get_api_key() -> str:
-    """Read API key from env/config without mutating tracked settings."""
-    env_key = os.environ.get("ASTROLABE_API_KEY", "").strip()
-    if env_key:
-        return env_key
-
-    cfg = _read_settings()
-    project = cfg.get("project") or {}
-    return str(project.get("api_key", "") or "").strip()
+    """Read API key from the process environment only."""
+    return os.environ.get("ASTROLABE_API_KEY", "").strip()
 
 
 def get_run_mode() -> str:
@@ -102,12 +95,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
         elif auth:
             return JSONResponse(
                 status_code=401,
-                content={"detail": "Invalid Authorization header. Use: Bearer <api_key>"},
+                content={"detail": "Invalid Authorization header. Use: Bearer <token>"},
             )
         else:
             return JSONResponse(
                 status_code=401,
-                content={"detail": "Missing Authorization header. Use: Bearer <api_key>"},
+                content={"detail": "Missing Authorization header. Use: Bearer <token>"},
             )
 
         if not secrets.compare_digest(provided, token):

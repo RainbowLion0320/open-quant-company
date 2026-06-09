@@ -42,7 +42,7 @@
       </div>
     </div>
 
-    <!-- API Key -->
+    <!-- Session token -->
     <div class="glass-card card-pad-lg">
       <div class="section-heading mb-4">{{ t('settings.apiKey') }}</div>
       <div class="setting-row">

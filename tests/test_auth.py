@@ -11,11 +11,12 @@ from starlette.testclient import TestClient
 # ── Test app factory ──
 
 @pytest.fixture
-def app():
+def app(monkeypatch):
     """Create a fresh FastAPI app with auth middleware for testing."""
     import yaml
     import tempfile
 
+    monkeypatch.setenv("ASTROLABE_API_KEY", "test-secret-key")
     # Write a temp settings.yaml with a known API key
     tmpdir = tempfile.mkdtemp()
     config_dir = Path(tmpdir) / "config"
@@ -27,7 +28,6 @@ def app():
             "name": "test",
             "version": "1.0.0",
             "run_mode": "research",
-            "api_key": "test-secret-key",
         },
         "strategies": {},
         "risk_control": {},
@@ -107,7 +107,7 @@ class TestAuthMiddleware:
         config_file = tmp_path / "settings.yaml"
         config_file.write_text(
             yaml.safe_dump({
-                "project": {"name": "test", "run_mode": "research", "api_key": "test-secret-key"},
+                "project": {"name": "test", "run_mode": "research"},
                 "strategies": {},
                 "risk_control": {},
                 "data": {"fetcher": {"min_interval": 3.0, "max_retries": 3}},
@@ -115,7 +115,8 @@ class TestAuthMiddleware:
             encoding="utf-8",
         )
 
-        with patch("web.api.auth._settings_path", return_value=config_file), \
+        with patch.dict(os.environ, {"ASTROLABE_API_KEY": "test-secret-key"}), \
+             patch("web.api.auth._settings_path", return_value=config_file), \
              patch("web.api.routes.settings._config_path", return_value=str(config_file)):
             from web.api.app import create_app
             client = TestClient(create_app())
@@ -135,11 +136,12 @@ class TestAuthMiddleware:
 
 class TestRunModeEnforcement:
     @pytest.fixture
-    def config_with_mode(self):
+    def config_with_mode(self, monkeypatch):
         """Return a fresh app with a specific run mode."""
         import yaml
         import tempfile
 
+        monkeypatch.setenv("ASTROLABE_API_KEY", "test-key")
         tmpdir = tempfile.mkdtemp()
         config_dir = Path(tmpdir) / "config"
         config_dir.mkdir(parents=True, exist_ok=True)
@@ -151,7 +153,6 @@ class TestRunModeEnforcement:
                     "name": "test",
                     "version": "1.0.0",
                     "run_mode": run_mode,
-                    "api_key": "test-key",
                 },
                 "strategies": {},
                 "risk_control": {},
@@ -237,10 +238,11 @@ class TestRunModeEnforcement:
 
 class TestAuditOnSettingsWrite:
     @pytest.fixture
-    def research_app(self):
+    def research_app(self, monkeypatch):
         import yaml
         import tempfile
 
+        monkeypatch.setenv("ASTROLABE_API_KEY", "test-key")
         tmpdir = tempfile.mkdtemp()
         config_dir = Path(tmpdir) / "config"
         config_dir.mkdir(parents=True, exist_ok=True)
@@ -251,7 +253,6 @@ class TestAuditOnSettingsWrite:
                 "name": "test",
                 "version": "1.0.0",
                 "run_mode": "research",
-                "api_key": "test-key",
             },
             "strategies": {"test_strategy": {"enabled": True}},
             "risk_control": {"max_pct": 0.25},
@@ -352,6 +353,13 @@ class TestAuthHelpers:
 
         assert get_api_key() == "env-secret"
 
+    def test_yaml_project_api_key_is_ignored(self, monkeypatch):
+        monkeypatch.delenv("ASTROLABE_API_KEY", raising=False)
+        from web.api.auth import get_api_key
+
+        with patch("web.api.auth._read_settings", return_value={"project": {"api_key": "yaml-secret"}}):
+            assert get_api_key() == ""
+
     def test_renamed_project_env_aliases_are_not_read(self, monkeypatch):
         old_quant_env = "QUANT" + "_AGENT_API_KEY"
         old_chinese_name_env = "XING" + "PAN_API_KEY"
@@ -360,8 +368,7 @@ class TestAuthHelpers:
         monkeypatch.delenv("ASTROLABE_API_KEY", raising=False)
         from web.api.auth import get_api_key
 
-        with patch("web.api.auth._read_settings", return_value={"project": {}}):
-            assert get_api_key() == ""
+        assert get_api_key() == ""
 
     def test_get_run_mode_default(self):
         """get_run_mode returns 'research' when no config."""

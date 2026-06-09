@@ -274,7 +274,8 @@ def test_llm_factor_hypothesis_runtime_resolves_from_use_case_config():
     assert runtime["provider"] == "deepseek"
     assert runtime["model"] == "deepseek-v4-pro"
     assert runtime["base_url"].startswith("https://")
-    assert runtime["api_key_env"] == "DEEPSEEK_API_KEY"
+    assert runtime["credential_env"] == "DEEPSEEK_API_KEY"
+    assert "api_key_env" not in runtime
 
 
 def test_llm_usage_supports_total_token_and_request_pricing(monkeypatch):
@@ -537,11 +538,28 @@ def test_config_center_preserves_dotted_section_paths():
 
     assert "function getNestedValue" in config_center_logic
     assert "function setNestedValue" in config_center_logic
+    assert "function isSafePathPart" in config_center_logic
+    assert '"__proto__"' in config_center_logic
+    assert '"prototype"' in config_center_logic
+    assert '"constructor"' in config_center_logic
     assert "setNestedValue(config, sectionKey" in config_center_logic
     assert "config[activeSection.value]" not in config_center_logic
     assert "function patch<T>" in api_client
     assert "saveSettingsSection" in settings_api
     assert "patch<Record<string, any>>" in settings_api
+
+
+def test_frontend_auth_token_is_not_persisted_in_browser_storage():
+    api_client = Path("web/frontend/src/api/client.ts").read_text()
+    settings_logic = Path("web/frontend/src/view-models/useSettingsView.ts").read_text()
+
+    assert "setAuthToken" in api_client
+    assert "let bearerToken" in api_client
+    assert "quant_api_key" not in api_client
+    assert "quant_api_key" not in settings_logic
+    assert 'localStorage.setItem("quant_api_key"' not in settings_logic
+    assert 'localStorage.getItem("quant_api_key"' not in settings_logic
+    assert 'localStorage.removeItem("quant_api_key"' not in api_client
 
 
 def test_config_center_uses_grouped_expandable_settings_model():

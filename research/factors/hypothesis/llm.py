@@ -136,8 +136,8 @@ def generate_via_llm(n: int, existing: List[str],
     model = runtime["model"]
     api_key = load_provider_api_key(provider)
     if not api_key:
-        hint = runtime.get("api_key_env") or "provider API key"
-        print(f"No API key configured for LLM provider {provider} ({hint})")
+        hint = runtime.get("credential_env") or "configured provider credential env"
+        print(f"Missing LLM provider credential for {provider}; set {hint}")
         return []
 
     client_kwargs = {"api_key": api_key}
