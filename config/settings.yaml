@@ -881,6 +881,33 @@ data_registry:
     label: Tushare 财务指标
     cache: stock/fina_indicator/{symbol}.parquet
     description: 50+指标 EPS/ROA/ROIC/FCFF/FCFE等
+  income_statement:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: quarterly
+    enabled: true
+    label: Tushare 完整利润表
+    cache: stock/income_statement/{symbol}.parquet
+    description: 完整利润表 60+字段 营收/成本/利润/EBITDA
+  balance_sheet:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: quarterly
+    enabled: true
+    label: Tushare 完整资产负债表
+    cache: stock/balance_sheet/{symbol}.parquet
+    description: 完整资产负债表 200+字段 资产/负债/权益明细
+  cashflow_statement:
+    source: tushare_free
+    asset: stock
+    status: available
+    freq: quarterly
+    enabled: true
+    label: Tushare 完整现金流量表
+    cache: stock/cashflow_statement/{symbol}.parquet
+    description: 完整现金流量表 80+字段 经营/投资/筹资现金流
   valuation_daily:
     source: tushare_free
     asset: stock

@@ -181,6 +181,15 @@ class DataHubPaths:
     def stock_fina_indicator_path(self, symbol: str) -> Path:
         return self.store_path("stock") / "fina_indicator" / f"{safe_leaf(symbol, 'symbol')}.parquet"
 
+    def stock_income_statement_path(self, symbol: str) -> Path:
+        return self.store_path("stock") / "income_statement" / f"{safe_leaf(symbol, 'symbol')}.parquet"
+
+    def stock_balance_sheet_path(self, symbol: str) -> Path:
+        return self.store_path("stock") / "balance_sheet" / f"{safe_leaf(symbol, 'symbol')}.parquet"
+
+    def stock_cashflow_statement_path(self, symbol: str) -> Path:
+        return self.store_path("stock") / "cashflow_statement" / f"{safe_leaf(symbol, 'symbol')}.parquet"
+
     def stock_valuation_path(self, symbol: str) -> Path:
         return self.store_path("stock") / "valuation" / f"{safe_leaf(symbol, 'symbol')}.parquet"
 

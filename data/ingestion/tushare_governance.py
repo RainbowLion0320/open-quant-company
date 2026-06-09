@@ -263,6 +263,51 @@ class TushareGovernance:
             rows += self._write_frame(df, root / f"{normalize_symbol(symbol)}.parquet")
         return rows
 
+    def _fetch_income_statement_missing(self, limit: int = 0) -> int:
+        root = self.hub.dimension_root("income_statement")
+        root.mkdir(parents=True, exist_ok=True)
+        rows = 0
+        for symbol in self._missing_symbols("income_statement", limit):
+            time.sleep(0.3)
+            try:
+                df = self._pro_query("income", {"ts_code": to_ts_code(symbol)})
+            except Exception as exc:
+                if classify_probe_result(exc)[0] in {"rate_limited", "no_permission"}:
+                    raise
+                continue
+            rows += self._write_frame(df, root / f"{normalize_symbol(symbol)}.parquet")
+        return rows
+
+    def _fetch_balance_sheet_missing(self, limit: int = 0) -> int:
+        root = self.hub.dimension_root("balance_sheet")
+        root.mkdir(parents=True, exist_ok=True)
+        rows = 0
+        for symbol in self._missing_symbols("balance_sheet", limit):
+            time.sleep(0.3)
+            try:
+                df = self._pro_query("balancesheet", {"ts_code": to_ts_code(symbol)})
+            except Exception as exc:
+                if classify_probe_result(exc)[0] in {"rate_limited", "no_permission"}:
+                    raise
+                continue
+            rows += self._write_frame(df, root / f"{normalize_symbol(symbol)}.parquet")
+        return rows
+
+    def _fetch_cashflow_statement_missing(self, limit: int = 0) -> int:
+        root = self.hub.dimension_root("cashflow_statement")
+        root.mkdir(parents=True, exist_ok=True)
+        rows = 0
+        for symbol in self._missing_symbols("cashflow_statement", limit):
+            time.sleep(0.3)
+            try:
+                df = self._pro_query("cashflow", {"ts_code": to_ts_code(symbol)})
+            except Exception as exc:
+                if classify_probe_result(exc)[0] in {"rate_limited", "no_permission"}:
+                    raise
+                continue
+            rows += self._write_frame(df, root / f"{normalize_symbol(symbol)}.parquet")
+        return rows
+
     def _fetch_holder_number_missing(self, limit: int = 0) -> int:
         root = self.hub.dimension_root("holder_number")
         root.mkdir(parents=True, exist_ok=True)
@@ -387,6 +432,9 @@ class TushareGovernance:
             "adj_factor": lambda: self._fetch_adj_factor_missing(limit),
             "valuation_daily": lambda: self._fetch_valuation_missing(limit),
             "fina_indicator": lambda: self._fetch_fina_indicator_missing(limit),
+            "income_statement": lambda: self._fetch_income_statement_missing(limit),
+            "balance_sheet": lambda: self._fetch_balance_sheet_missing(limit),
+            "cashflow_statement": lambda: self._fetch_cashflow_statement_missing(limit),
             "holder_number": lambda: self._fetch_holder_number_missing(limit),
             "holder_trade": lambda: self._fetch_holder_trade_missing(limit),
             "tushare_stock_daily": lambda: self._fetch_tushare_stock_daily(limit, days),

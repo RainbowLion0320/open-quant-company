@@ -125,6 +125,99 @@ def read_fina_indicator(symbol: str) -> Optional[pd.DataFrame]:
     return HUB.read_parquet(HUB.stock_fina_indicator_path(symbol))
 
 
+def fetch_income_statement(symbol: str) -> Optional[pd.DataFrame]:
+    """从 Tushare income 拉取完整利润表，写入 store/stock/income_statement/{symbol}.parquet"""
+    symbol = normalize_symbol(symbol)
+    import requests as _r
+    throttle()
+    try:
+        token = get_tushare_token()
+        if not token:
+            return None
+        ts_code = to_ts_code(symbol)
+        resp = _r.post("http://api.tushare.pro", json={
+            "api_name": "income", "token": token,
+            "params": {"ts_code": ts_code},
+        }, timeout=30)
+        data = resp.json()
+        items = data.get("data", {}).get("items", [])
+        if not items:
+            return None
+        df = pd.DataFrame(items, columns=data["data"]["fields"])
+        HUB.write_parquet(df, HUB.stock_income_statement_path(symbol))
+        return df
+    except Exception as e:
+        print(f"  [FAIL] income_statement({symbol}): {e}")
+        return None
+
+
+def read_income_statement(symbol: str) -> Optional[pd.DataFrame]:
+    symbol = normalize_symbol(symbol)
+    return HUB.read_parquet(HUB.stock_income_statement_path(symbol))
+
+
+def fetch_balance_sheet(symbol: str) -> Optional[pd.DataFrame]:
+    """从 Tushare balancesheet 拉取完整资产负债表，写入 store/stock/balance_sheet/{symbol}.parquet"""
+    symbol = normalize_symbol(symbol)
+    import requests as _r
+    throttle()
+    try:
+        token = get_tushare_token()
+        if not token:
+            return None
+        ts_code = to_ts_code(symbol)
+        resp = _r.post("http://api.tushare.pro", json={
+            "api_name": "balancesheet", "token": token,
+            "params": {"ts_code": ts_code},
+        }, timeout=30)
+        data = resp.json()
+        items = data.get("data", {}).get("items", [])
+        if not items:
+            return None
+        df = pd.DataFrame(items, columns=data["data"]["fields"])
+        HUB.write_parquet(df, HUB.stock_balance_sheet_path(symbol))
+        return df
+    except Exception as e:
+        print(f"  [FAIL] balance_sheet({symbol}): {e}")
+        return None
+
+
+def read_balance_sheet(symbol: str) -> Optional[pd.DataFrame]:
+    symbol = normalize_symbol(symbol)
+    return HUB.read_parquet(HUB.stock_balance_sheet_path(symbol))
+
+
+def fetch_cashflow_statement(symbol: str) -> Optional[pd.DataFrame]:
+    """从 Tushare cashflow 拉取完整现金流量表，写入 store/stock/cashflow_statement/{symbol}.parquet"""
+    symbol = normalize_symbol(symbol)
+    import requests as _r
+    throttle()
+    try:
+        token = get_tushare_token()
+        if not token:
+            return None
+        ts_code = to_ts_code(symbol)
+        resp = _r.post("http://api.tushare.pro", json={
+            "api_name": "cashflow", "token": token,
+            "params": {"ts_code": ts_code},
+        }, timeout=30)
+        data = resp.json()
+        items = data.get("data", {}).get("items", [])
+        if not items:
+            return None
+        df = pd.DataFrame(items, columns=data["data"]["fields"])
+        HUB.write_parquet(df, HUB.stock_cashflow_statement_path(symbol))
+        return df
+    except Exception as e:
+        print(f"  [FAIL] cashflow_statement({symbol}): {e}")
+        return None
+
+
+def read_cashflow_statement(symbol: str) -> Optional[pd.DataFrame]:
+    symbol = normalize_symbol(symbol)
+    return HUB.read_parquet(HUB.stock_cashflow_statement_path(symbol))
+
+
 # ═══════════════════════════════════════
 # 批量
 # ═══════════════════════════════════════

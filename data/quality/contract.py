@@ -320,6 +320,28 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
             "bps": "float64", "grossprofit_margin": "float64",
             "netprofit_margin": "float64", "debt_to_assets": "float64",
         },
+        "income_statement": {
+            "ts_code": "object", "ann_date": "object", "end_date": "object",
+            "revenue": "float64", "total_revenue": "float64", "oper_cost": "float64",
+            "total_cogs": "float64", "operate_profit": "float64", "total_profit": "float64",
+            "n_income": "float64", "n_income_attr_p": "float64",
+            "basic_eps": "float64", "ebit": "float64", "ebitda": "float64",
+        },
+        "balance_sheet": {
+            "ts_code": "object", "ann_date": "object", "end_date": "object",
+            "total_assets": "float64", "total_liab": "float64",
+            "total_hldr_eqy_exc_min_int": "float64", "total_cur_assets": "float64",
+            "total_nca": "float64", "total_cur_liab": "float64", "total_ncl": "float64",
+            "money_cap": "float64", "inventories": "float64",
+            "accounts_receiv": "float64", "fix_assets": "float64",
+        },
+        "cashflow_statement": {
+            "ts_code": "object", "ann_date": "object", "end_date": "object",
+            "n_cashflow_act": "float64", "n_cashflow_inv_act": "float64",
+            "n_cash_flows_fnc_act": "float64", "c_fr_sale_sg": "float64",
+            "stot_cash_outflows_operate": "float64", "stot_outflows_inv_act": "float64",
+            "net_profit": "float64",
+        },
         "valuation_daily": {
             "ts_code": "object", "trade_date": "datetime64[ns]", "close": "float64",
             "pe": "float64", "pe_ttm": "float64", "pb": "float64",
