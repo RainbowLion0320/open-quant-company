@@ -55,18 +55,21 @@ def load_config() -> dict:
 def _get_close_prices(symbols: List[str], target_date: Optional[date] = None) -> Dict[str, float]:
     """
     获取股票最近收盘价。
-    通过 data.market.price_service 获取 raw 最新价；无 raw 时该标的跳过执行。
+    优先 raw (EXECUTION 用例)，raw 不可用时回退到 QFQ 调整价。
     Paper trading 需要实时价格 — 启用 API fallback，允许从 AKShare 拉取未缓存的股票。
     """
     import os as _os
     _os.environ.setdefault("QUANT_ALLOW_API_FALLBACK", "1")
     from data.market.price_service import get_stock_prices
-    from data.market.price_types import PriceUseCase
+    from data.market.price_types import PriceUseCase, PriceMode
 
     prices: Dict[str, float] = {}
     for sym in symbols:
         try:
+            # 优先 raw (实际执行价格)，raw 目录空时回退 QFQ
             df = get_stock_prices(sym, use_case=PriceUseCase.EXECUTION)
+            if df is None or df.empty:
+                df = get_stock_prices(sym, mode=PriceMode.QFQ)
             if df is None or df.empty:
                 continue
             if target_date:

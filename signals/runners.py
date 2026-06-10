@@ -5,6 +5,8 @@ timeouts and notification side effects belong in scripts/compute_signals.py.
 """
 from __future__ import annotations
 
+import sys
+
 from core.settings import get_section
 from signals.scoring import estimate_buffett_score, favored_sectors_for_regime, score_cybernetic_from_factors
 from signals.selection import apply_ranked_buys
@@ -73,9 +75,9 @@ def compute_buffett(limit: int = 0) -> list[dict]:
             pass
 
         if (i + 1) % 100 == 0:
-            print(f"  Buffett [{i+1}/{total}] {passed} passed ...")
+            print(f"  Buffett [{i+1}/{total}] {passed} passed ...", flush=True, file=sys.stderr)
 
-    print(f"  Buffett done: {len(results)} scanned, {passed} passed")
+    print(f"  Buffett done: {len(results)} scanned, {passed} passed", flush=True, file=sys.stderr)
     return results
 
 
@@ -165,11 +167,11 @@ def compute_multifactor(limit: int = 0) -> list[dict]:
 
         if (i + 1) % 100 == 0:
             buys = sum(1 for r in results if r["signal"] == "buy")
-            print(f"  Multifactor [{i+1}/{total}] {buys} buys ...")
+            print(f"  Multifactor [{i+1}/{total}] {buys} buys ...", flush=True, file=sys.stderr)
 
     results = apply_ranked_buys(results, "multifactor", default_min_score=MFC_BUY_THRESHOLD())
     buys = sum(1 for r in results if r["signal"] == "buy")
-    print(f"  Multifactor done: {len(results)} scored, {buys} buys (regime={regime})")
+    print(f"  Multifactor done: {len(results)} scored, {buys} buys (regime={regime})", flush=True, file=sys.stderr)
     return results
 
 
@@ -274,5 +276,5 @@ def compute_cybernetic(limit: int = 0) -> list[dict]:
         default_max_buys=max_buys,
     )
     buys = sum(1 for r in results if r["signal"] == "buy")
-    print(f"  Cybernetic done: {len(results)} signals, {buys} buys (regime={regime})")
+    print(f"  Cybernetic done: {len(results)} signals, {buys} buys (regime={regime})", flush=True, file=sys.stderr)
     return results
