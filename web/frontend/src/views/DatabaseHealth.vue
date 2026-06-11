@@ -107,7 +107,7 @@
                 <span :class="okClass(row.outlier_count_10y_plus)">{{ fmtCountOk(row.outlier_count_10y_plus) }}</span>
               </td>
               <td class="num">
-                <span :class="freshnessClass(row.freshness_days)">
+                <span :class="freshnessClass(row)">
                   {{ freshnessLabel(row.freshness_days) }}
                 </span>
               </td>

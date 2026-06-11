@@ -112,6 +112,18 @@ def test_data_sources_capabilities_api_returns_no_artifact(monkeypatch, tmp_path
     reset_datahub()
 
 
+def test_db_health_freshness_color_uses_backend_sla_status():
+    health = Path("web/frontend/src/views/DatabaseHealth.vue").read_text(encoding="utf-8")
+    logic = Path("web/frontend/src/view-models/useDatabaseHealth.ts").read_text(encoding="utf-8")
+
+    assert "freshness_sla_days" in logic
+    assert "freshness_status" in logic
+    assert "status === \"fresh\"" in logic
+    assert "status === \"stale\"" in logic
+    assert "freshnessClass(row)" in health
+    assert "freshnessClass(row.freshness_days)" not in health
+
+
 def test_data_sources_capabilities_api_reads_latest_artifact(monkeypatch, tmp_path):
     import json
     from data.storage.datahub import get_datahub, reset_datahub

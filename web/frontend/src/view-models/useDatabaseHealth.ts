@@ -24,6 +24,8 @@ export function useDatabaseHealth() {
     outlier_cols: Record<string, number>;
     time_breakdown: Record<string, { rows: number; missing_pct: number; missing_cols: Record<string, number>; outliers: Record<string, number> }>;
     freshness_days: number | null;
+    freshness_sla_days: number | null;
+    freshness_status: "fresh" | "stale" | "missing" | "error" | "unknown" | "untracked" | string;
     error: string | null;
     checked_at: string;
   }
@@ -152,7 +154,12 @@ export function useDatabaseHealth() {
     return "val-bad";
   }
 
-  function freshnessClass(days: number | null): string {
+  function freshnessClass(row: HealthRow): string {
+    const status = row.freshness_status;
+    if (status === "fresh") return "val-ok";
+    if (status === "stale" || status === "missing" || status === "error") return "val-bad";
+    if (status === "unknown" || status === "untracked") return "";
+    const days = row.freshness_days;
     if (days == null) return "";
     if (days < 0) return "val-ok";
     if (days <= 1) return "val-ok";
