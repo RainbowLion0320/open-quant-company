@@ -202,12 +202,17 @@ class TushareGovernance:
         return pd.DataFrame(items, columns=columns)
 
     def _fetch_stock_basic(self) -> int:
-        df = self._pro_query(
-            "stock_basic",
-            {"exchange": "", "list_status": "L"},
-            "ts_code,symbol,name,area,industry,list_date,market,exchange",
-        )
-        return self._write_frame(df, self.hub.dimension_root("stock_basic"))
+        frames = []
+        for status in ("L", "D", "P"):
+            df = self._pro_query(
+                "stock_basic",
+                {"exchange": "", "list_status": status},
+                "ts_code,symbol,name,area,industry,list_date,market,exchange,list_status,delist_date",
+            )
+            if df is not None and len(df):
+                frames.append(df)
+        merged = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        return self._write_frame(merged, self.hub.dimension_root("stock_basic"))
 
     def _fetch_trade_cal(self) -> int:
         end = (datetime.now() + timedelta(days=370)).strftime("%Y%m%d")
