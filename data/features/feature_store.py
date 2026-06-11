@@ -65,6 +65,64 @@ def iter_feature_files(directory: Path | None = None) -> list[Path]:
     )
 
 
+def ignored_feature_files(directory: Path | None = None) -> list[Path]:
+    """List feature-like parquet files ignored by the canonical daily PIT loader."""
+    root = directory or FEATURES_DIR
+    if not root.exists():
+        return []
+    return sorted(
+        path
+        for path in root.glob("*.parquet")
+        if path.stem not in FEATURE_METADATA_STEMS and feature_key_to_date(path.stem) is None
+    )
+
+
+def feature_store_coverage(
+    directory: Path | None = None,
+    *,
+    start: str | pd.Timestamp | None = None,
+    end: str | pd.Timestamp | None = None,
+    max_files: int = 256,
+) -> dict:
+    """Return lightweight coverage diagnostics for canonical daily PIT features."""
+    files = iter_feature_files(directory)
+    if start is not None:
+        start_ts = pd.Timestamp(start).normalize()
+        files = [path for path in files if (feature_key_to_date(path.stem) or start_ts) >= start_ts]
+    if end is not None:
+        end_ts = pd.Timestamp(end).normalize()
+        files = [path for path in files if (feature_key_to_date(path.stem) or end_ts) <= end_ts]
+
+    ignored = ignored_feature_files(directory)
+    selected = files[-max_files:] if max_files and len(files) > max_files else files
+    symbols: set[str] = set()
+    row_count = 0
+    read_errors: list[str] = []
+    for path in selected:
+        try:
+            frame = pd.read_parquet(path, columns=["symbol"])
+        except Exception as exc:
+            read_errors.append(f"{path.name}: {exc}")
+            continue
+        row_count += len(frame)
+        if "symbol" in frame.columns:
+            symbols.update(str(symbol) for symbol in frame["symbol"].dropna().unique())
+
+    date_keys = [feature_date_key(feature_key_to_date(path.stem)) for path in files if feature_key_to_date(path.stem) is not None]
+    return {
+        "directory": str(directory or FEATURES_DIR),
+        "daily_file_count": len(files),
+        "ignored_file_count": len(ignored),
+        "sampled_file_count": len(selected),
+        "row_count": int(row_count),
+        "symbol_count": len(symbols),
+        "start": date_keys[0] if date_keys else "",
+        "end": date_keys[-1] if date_keys else "",
+        "truncated": bool(max_files and len(files) > max_files),
+        "read_errors": read_errors[:10],
+    }
+
+
 def latest_feature_file(directory: Path | None = None, as_of: str | pd.Timestamp | None = None) -> Path | None:
     files = iter_feature_files(directory)
     if as_of is not None:

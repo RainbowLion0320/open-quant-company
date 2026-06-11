@@ -19,6 +19,8 @@ from research.strategy_governance import default_strategy_roles
 
 
 DEFAULT_OOS_MONTHS = 36
+MIN_ML_FEATURE_DATES = 24
+MIN_ML_FEATURE_SYMBOLS = 100
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -163,6 +165,32 @@ def _rank_score(oos: dict[str, Any], layer: str) -> float:
     )
 
 
+def _data_quality(
+    strategy: str,
+    oos: dict[str, Any],
+) -> tuple[list[str], dict[str, Any], list[str]]:
+    blockers: list[str] = []
+    warnings: list[str] = []
+    diagnostics: dict[str, Any] = {}
+
+    if int(oos.get("trade_count", 0) or 0) <= 0:
+        blockers.append("no_oos_trades")
+
+    if strategy == "ml_lgbm":
+        from data.features.feature_store import feature_store_coverage
+
+        coverage = feature_store_coverage(start=oos.get("start") or None, end=oos.get("end") or None)
+        diagnostics["feature_store"] = coverage
+        if coverage.get("daily_file_count", 0) < MIN_ML_FEATURE_DATES:
+            blockers.append("feature_store_date_coverage")
+        if coverage.get("symbol_count", 0) < MIN_ML_FEATURE_SYMBOLS:
+            blockers.append("feature_store_symbol_coverage")
+        if coverage.get("ignored_file_count", 0) > 0:
+            warnings.append("ignored_noncanonical_feature_files")
+
+    return blockers, diagnostics, warnings
+
+
 def _production_blockers(oos: dict[str, Any], *, layer: str, alpha_ic: float | None, alpha_icir: float | None) -> list[str]:
     blockers: list[str] = []
     if int(oos.get("months", 0) or 0) < 36:
@@ -214,9 +242,14 @@ def _decision(strategy: str, item: dict[str, Any], metrics: dict[str, Any]) -> d
     oos = dict(metrics.get("oos") or {})
     alpha_ic = None
     alpha_icir = None
+    data_blockers, data_diagnostics, data_warnings = _data_quality(strategy, oos)
     production_blockers = _production_blockers(oos, layer=layer, alpha_ic=alpha_ic, alpha_icir=alpha_icir)
     paper_blockers = _paper_blockers(oos, layer=layer)
-    if not production_blockers:
+    production_blockers = data_blockers + production_blockers
+    paper_blockers = data_blockers + paper_blockers
+    if data_blockers:
+        recommended = "candidate"
+    elif not production_blockers:
         recommended = "production"
     elif not paper_blockers:
         recommended = "paper"
@@ -230,6 +263,8 @@ def _decision(strategy: str, item: dict[str, Any], metrics: dict[str, Any]) -> d
         warnings.append("missing_icir")
     if _safe_float(oos.get("turnover")) > 6.0:
         warnings.append("high_turnover")
+    warnings.extend(data_warnings)
+    rank_score = -999999.0 if data_blockers else round(_rank_score(oos, layer), 6)
 
     return {
         "strategy": strategy,
@@ -237,7 +272,12 @@ def _decision(strategy: str, item: dict[str, Any], metrics: dict[str, Any]) -> d
         "previous_status": item.get("status", "candidate"),
         "recommended_status": recommended,
         "layer": layer,
-        "rank_score": round(_rank_score(oos, layer), 6),
+        "rank_score": rank_score,
+        "competition_valid": not data_blockers,
+        "data_quality": {
+            "blockers": data_blockers,
+            "diagnostics": data_diagnostics,
+        },
         "production_blockers": production_blockers,
         "paper_blockers": paper_blockers,
         "warnings": warnings,
@@ -272,6 +312,11 @@ def build_strategy_competition_report(
                 "recommended_status": "candidate",
                 "layer": _strategy_layer(name, item),
                 "rank_score": -999999.0,
+                "competition_valid": False,
+                "data_quality": {
+                    "blockers": ["missing_backtest_artifact"],
+                    "diagnostics": {},
+                },
                 "production_blockers": ["missing_backtest_artifact"],
                 "paper_blockers": ["missing_backtest_artifact"],
                 "warnings": [],
@@ -295,6 +340,11 @@ def build_strategy_competition_report(
                 "recommended_status": "candidate",
                 "layer": _strategy_layer(name, item),
                 "rank_score": -999999.0,
+                "competition_valid": False,
+                "data_quality": {
+                    "blockers": ["metric_error"],
+                    "diagnostics": {},
+                },
                 "production_blockers": ["metric_error"],
                 "paper_blockers": ["metric_error"],
                 "warnings": [],
@@ -308,9 +358,12 @@ def build_strategy_competition_report(
         row["rank"] = idx
     counts: dict[str, int] = {}
     previous_counts: dict[str, int] = {}
+    invalid_count = 0
     for row in decisions:
         counts[row["recommended_status"]] = counts.get(row["recommended_status"], 0) + 1
         previous_counts[row["previous_status"]] = previous_counts.get(row["previous_status"], 0) + 1
+        if not row.get("competition_valid", False):
+            invalid_count += 1
     return {
         "schema_version": 1,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -345,6 +398,7 @@ def build_strategy_competition_report(
             "previous_counts": previous_counts,
             "production_count": counts.get("production", 0),
             "paper_count": counts.get("paper", 0),
+            "invalid_count": invalid_count,
         },
         "rankings": decisions,
         "errors": errors,

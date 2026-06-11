@@ -9,8 +9,9 @@ import pandas as pd
 def _result(daily_return: float, bench_return: float, *, days: int = 820, trades: int = 120) -> dict:
     idx = pd.bdate_range("2023-01-02", periods=days)
     trade_log = []
-    for dt in idx[:: max(days // trades, 1)][:trades]:
-        trade_log.append((dt, "BUY", "000001", 100, 10.0))
+    if trades > 0:
+        for dt in idx[:: max(days // trades, 1)][:trades]:
+            trade_log.append((dt, "BUY", "000001", 100, 10.0))
     return {
         "daily_returns": pd.Series(daily_return, index=idx),
         "bench_returns": pd.Series(bench_return, index=idx),
@@ -69,3 +70,44 @@ def test_strategy_competition_report_writes_latest(monkeypatch, tmp_path):
     assert (tmp_path / "out" / "strategy_competition_latest.json").exists()
     assert report["summary"]["strategy_count"] == 1
     assert report["summary"]["recommended_counts"]["paper"] == 1
+    assert report["summary"]["invalid_count"] == 0
+
+
+def test_ml_strategy_with_insufficient_feature_store_is_invalid(monkeypatch, tmp_path):
+    from research.strategy_competition import build_strategy_competition_report
+
+    monkeypatch.setattr(
+        "research.strategy_competition.get_enabled_strategies",
+        lambda: [{"name": "ml_lgbm", "label": "ML", "status": "paper", "layer": "auxiliary_alpha"}],
+    )
+    monkeypatch.setattr(
+        "research.strategy_competition.risk_free_series_for_index",
+        lambda index: pd.Series(0.02, index=index),
+    )
+    monkeypatch.setattr(
+        "data.features.feature_store.feature_store_coverage",
+        lambda **_: {
+            "daily_file_count": 1,
+            "ignored_file_count": 90,
+            "sampled_file_count": 1,
+            "row_count": 1,
+            "symbol_count": 1,
+            "start": "2026-05-08",
+            "end": "2026-05-08",
+            "truncated": False,
+            "read_errors": [],
+        },
+    )
+    with (tmp_path / "backtest_ml_lgbm.pkl").open("wb") as f:
+        pickle.dump(_result(0.0, 0.0001, trades=0), f)
+
+    report = build_strategy_competition_report(backtest_dir=tmp_path)
+    row = report["rankings"][0]
+
+    assert row["competition_valid"] is False
+    assert row["rank_score"] == -999999.0
+    assert row["recommended_status"] == "candidate"
+    assert "feature_store_date_coverage" in row["data_quality"]["blockers"]
+    assert "feature_store_symbol_coverage" in row["data_quality"]["blockers"]
+    assert "ignored_noncanonical_feature_files" in row["warnings"]
+    assert report["summary"]["invalid_count"] == 1

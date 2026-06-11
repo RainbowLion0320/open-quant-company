@@ -88,6 +88,11 @@ def build_evidence_report(
     metric_src = metrics or {}
     oos_src = oos or {}
     baseline_src = baselines or {name: {} for name in required_baselines()}
+    missing_evidence = [
+        key
+        for key in ("ic", "icir")
+        if key not in metric_src or metric_src.get(key) is None
+    ]
     normalized_metrics = {
         "cagr": _metric_value(metric_src, "cagr", _metric_value(metric_src, "total_return", 0.0)),
         "sharpe": _metric_value(metric_src, "sharpe"),
@@ -95,11 +100,13 @@ def build_evidence_report(
         "turnover": _metric_value(metric_src, "turnover"),
         "trades": int(_metric_value(metric_src, "trades", _metric_value(metric_src, "trade_count", 0.0))),
         "win_rate": _metric_value(metric_src, "win_rate"),
-        "ic": _metric_value(metric_src, "ic"),
-        "icir": _metric_value(metric_src, "icir"),
         "benchmark_total_return": _metric_value(metric_src, "benchmark_total_return"),
         "excess_return": _metric_value(metric_src, "excess_return"),
     }
+    if "ic" in metric_src and metric_src.get("ic") is not None:
+        normalized_metrics["ic"] = _metric_value(metric_src, "ic")
+    if "icir" in metric_src and metric_src.get("icir") is not None:
+        normalized_metrics["icir"] = _metric_value(metric_src, "icir")
     evaluation = StrategyEvaluation(
         name=strategy,
         cagr=normalized_metrics["cagr"],
@@ -109,8 +116,8 @@ def build_evidence_report(
         oos_months=int(oos_src.get("months", 0) or 0),
         trades=normalized_metrics["trades"],
         baseline_win_rate=_metric_value(metric_src, "baseline_win_rate"),
-        ic=normalized_metrics["ic"],
-        icir=normalized_metrics["icir"],
+        ic=_metric_value(normalized_metrics, "ic"),
+        icir=_metric_value(normalized_metrics, "icir"),
         regime_coverage={k: 1.0 for k, v in _normalized_regime_breakdown(regime_breakdown).items() if v},
     )
     decision = promotion_ready(evaluation, target_status=target_status)
@@ -129,6 +136,7 @@ def build_evidence_report(
             "slippage": _metric_value(cost_model or {}, "slippage", 0.001),
         },
         "regime_breakdown": _normalized_regime_breakdown(regime_breakdown),
+        "missing_evidence": missing_evidence,
         "promotion_decision": {
             "target_status": decision.target_status,
             "passed": decision.passed,
@@ -276,8 +284,6 @@ def write_backtest_evidence(
         "win_rate": _metric_value(oos_metrics, "win_rate"),
         "benchmark_total_return": _metric_value(oos_metrics, "benchmark_total_return"),
         "excess_return": _metric_value(oos_metrics, "excess_return"),
-        "ic": 0.0,
-        "icir": 0.0,
     }
     report = build_evidence_report(
         strategy=strategy,

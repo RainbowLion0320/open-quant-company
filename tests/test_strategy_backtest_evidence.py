@@ -27,5 +27,38 @@ def test_strategy_evidence_report_contains_baselines_and_gates(tmp_path):
     assert saved["status"] == "candidate"
     assert saved["cost_model"]["commission"] > 0
     assert set(saved["regime_breakdown"]) == {"bull", "sideways", "bear"}
+    assert saved["missing_evidence"] == ["ic", "icir"]
     assert saved["promotion_decision"]["target_status"] == "paper"
     assert not saved["promotion_decision"]["passed"]
+
+
+def test_strategy_evidence_distinguishes_missing_ic_from_zero_ic():
+    from research.strategy_evaluation import build_evidence_report
+
+    missing = build_evidence_report(
+        strategy="alpha",
+        status="candidate",
+        metrics={"cagr": 0.1, "sharpe": 0.8, "max_drawdown": -0.1, "turnover": 1.0, "trades": 100},
+        oos={"months": 36},
+    )
+    measured_zero = build_evidence_report(
+        strategy="alpha",
+        status="candidate",
+        metrics={
+            "cagr": 0.1,
+            "sharpe": 0.8,
+            "max_drawdown": -0.1,
+            "turnover": 1.0,
+            "trades": 100,
+            "ic": 0.0,
+            "icir": 0.0,
+        },
+        oos={"months": 36},
+    )
+
+    assert missing["missing_evidence"] == ["ic", "icir"]
+    assert "ic" not in missing["metrics"]
+    assert "icir" not in missing["metrics"]
+    assert measured_zero["missing_evidence"] == []
+    assert measured_zero["metrics"]["ic"] == 0.0
+    assert measured_zero["metrics"]["icir"] == 0.0
