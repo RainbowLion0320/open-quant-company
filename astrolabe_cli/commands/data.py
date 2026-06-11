@@ -7,6 +7,11 @@ from data.quality.freshness_gate import freshness_gate, freshness_gate_from_heal
 
 from astrolabe_cli.results import CliResult
 from astrolabe_cli.safety import dry_run_payload
+from data.ingestion.source_capabilities import (
+    audit_sources,
+    sources_diff_payload,
+    sources_summary_payload,
+)
 
 
 def run_health_check_quiet():
@@ -135,4 +140,44 @@ def tushare_backfill(scope: str, resume: bool, dry_run: bool, limit: int, days: 
         message="Dry run: Tushare backfill plan" if dry_run else "Tushare backfill complete",
         data=result,
         errors=[str(item) for item in failed],
+    )
+
+
+def sources() -> CliResult:
+    payload = sources_summary_payload()
+    return CliResult(
+        ok=True,
+        command="data sources",
+        message="Data source capability summary",
+        data=payload,
+    )
+
+
+def sources_audit(source: str, probe_network: bool) -> CliResult:
+    try:
+        payload = audit_sources(source=source, probe_network=probe_network, write=True)
+    except Exception as exc:
+        return CliResult(
+            ok=False,
+            command="data sources audit",
+            message="Data source capability audit failed",
+            errors=[str(exc)],
+            data={"source": source, "probe_network": probe_network},
+        )
+    return CliResult(
+        ok=payload.get("status") in {"ok", "degraded"},
+        command="data sources audit",
+        message="Data source capability audit complete",
+        data=payload,
+        errors=[str(item) for item in payload.get("errors", [])],
+    )
+
+
+def sources_diff_registry() -> CliResult:
+    payload = sources_diff_payload()
+    return CliResult(
+        ok=True,
+        command="data sources diff-registry",
+        message="Data source capability registry diff complete",
+        data=payload,
     )

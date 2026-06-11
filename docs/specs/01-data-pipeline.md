@@ -1,15 +1,16 @@
 # Spec: 数据管道 (Data Pipeline)
 
-> 版本: 1.4 | 更新: 2026-06-06 | 关联: [PRD](../product/prd.md) [Signal System](02-signal-system.md)
+> 版本: 1.5 | 更新: 2026-06-11 | 关联: [PRD](../product/prd.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
-数据管道负责从多源拉取、清洗、缓存、存储 A 股全量数据，并通过 DataHub 统一路径向上层（信号/回测/执行/Web）暴露。`data/` 是 Python 数据层源码包，运行数据、缓存、数据库、模型训练产物和回测产物统一写入 `var/`。覆盖维度由 `config/settings.yaml` 的 `data_registry` 声明，按频率分为日频（行情/估值/资金流向/行业快照）、月频/季频（财务指标/三张表）、事件驱动（龙虎榜/研报/限售解禁/公司行动）。
+数据管道负责从多源拉取、清洗、缓存、存储 A 股全量数据，并通过 DataHub 统一路径向上层（信号/回测/执行/Web）暴露。`data/` 是 Python 数据层源码包，运行数据、缓存、数据库、模型训练产物和回测产物统一写入 `var/`。覆盖维度由 `config/settings.yaml` 的 `data_registry` 声明，按频率分为日频（行情/估值/资金流向/行业快照）、月频/季频（财务指标/三张表）、事件驱动（龙虎榜/研报/限售解禁/公司行动）。外部 provider 本身能提供什么不等于项目已接入什么，必须通过 Data Source Capability Registry 单独治理。
 
 **核心理念：**
 - **离线优先** — 所有数据存储为本地 Parquet，不依赖云端数据库
 - **源码与运行产物分离** — `data/` 只放源码和静态 reference，`var/` 放本地运行产物且默认不进 git
 - **多源互补** — AKShare（免费不限流，行情）+ Tushare（深度财务数据）
+- **能力与接入分离** — Source Capability Registry 描述外部源理论/当前环境能力，DataRegistry 描述项目正式使用维度，本地覆盖率描述实际落盘完整性
 - **声明式注册** — 数据维度统一在 `settings.yaml` → `DataRegistry` 中声明，含 source/label/SLA/repair/partition
 - **价格口径显式** — OHLCV 通过 `PriceService` 声明 `raw` / `qfq` / `hfq`，消费者按 use case 取价，避免复权语义散落在业务代码里
 
@@ -51,7 +52,31 @@
 └─────────────────────────────────────────────────────┘
 ```
 
-### 2.1 DataRegistry — 声明式维度注册表
+### 2.1 Source Capability Registry — 外部数据源能力目录
+
+Source Capability Registry 位于 `data/ingestion/source_capabilities.py`，不替代 `data_registry`。它回答的问题是“外部数据源在理论上或当前环境下能提供什么”，而不是“本项目已经把哪些维度纳入生产数据层”。
+
+三层治理模型：
+
+| 层级 | 权威入口 | 回答的问题 | 产物/展示 |
+|------|----------|------------|-----------|
+| Source Capability Registry | `data.ingestion.source_capabilities` | AKShare/Tushare/候选源能提供哪些接口、频率、资产和权限状态 | `var/artifacts/data-sources/latest.json`，DataHub → Sources 页签 |
+| Project Data Registry | `config/settings.yaml` → `data_registry` | 项目正式接入、健康检查和修复的数据维度有哪些 | DataRegistry、DB Health、DataHub dimension path |
+| Local Coverage | DataHub store/cache/manifest | 本地文件是否完整、新鲜、字段是否健康 | `astroq data status --json`、DB Health |
+
+初始 source 集合固定为 `akshare`、`tushare`、`tencent_finance`、`eastmoney`、`sina_finance`、`tonghuashun`、`exchange_official`、`cninfo`、`computed`。腾讯财经、东方财富、新浪财经、同花顺在 v1 中作为 AKShare backend 或 direct candidate source 治理；只有代码中实际接入的接口才标记为 `project_integrated` 或 `backend_source`，不承诺全量接口稳定可用。
+
+CLI：
+
+- `astroq data sources --json` 读取最近一次能力审计摘要；没有产物时返回 `no_artifact`。
+- `astroq data sources audit --source akshare --json` 通过本地安装包 introspection 枚举 AKShare callable，不访问网络。
+- `astroq data sources audit --source tushare --offline --json` 输出 Tushare 能力目录形状，不做账号 probe。
+- `astroq data sources audit --source tushare --json` 使用当前进程 `TUSHARE_TOKEN` 做账号权限 probe。
+- `astroq data sources diff-registry --json` 对比 source capabilities 与 `data_registry`，输出“可用但未接入”“已接入但来源能力缺失”“频率/口径不一致”。
+
+Web DataHub 的 `Sources` 页签只读消费 `var/artifacts/data-sources/latest.json`，页面加载不扫描包、不访问外网、不调用 provider。新增外部 fetcher 或 provider adapter 时，必须同步 capability registry 和 data_registry diff 测试。
+
+### 2.2 DataRegistry — 声明式维度注册表
 
 `config/settings.yaml` → `data_registry` 段，每个维度声明：
 - `source`: akshare / tushare_free / tushare_paid / computed
@@ -70,7 +95,7 @@ Tushare 维度治理入口统一在 CLI：
 - `astroq data tushare-audit --json` 探测当前账号可访问接口，并输出本地 `var/store` 覆盖率。
 - `astroq data tushare-backfill --scope missing --resume --json` 按缺口补齐非分钟维度；`stk_mins` 分钟接口只审计权限，不默认全市场全历史拉取。
 
-### 2.2 DataHub — 统一数据中台
+### 2.3 DataHub — 统一数据中台
 
 `DataHub` 是外部稳定 facade，目标是把数据访问中心化，而不是让业务模块绕开它各自读写路径。内部实现按职责拆分：
 
@@ -121,7 +146,7 @@ hub.db_path("quant_results.duckdb")
 | 清单 | `manifest` → `datasets.parquet` | 每次 write 记录 schema_hash/size/date_range |
 | 审计 | `audit()` / `catalog()` | 遍历所有 dataset，统计文件数/大小 |
 
-### 2.3 PriceService — 价格口径契约
+### 2.4 PriceService — 价格口径契约
 
 `data/market/price_service.py` 是股票价格的统一入口。Fetcher 可以继续负责拉取和缓存，但策略、特征、回测、估值、执行和 Web 不应直接猜测某个 Parquet 的复权语义。
 
@@ -138,7 +163,7 @@ hub.db_path("quant_results.duckdb")
 
 公司行动不直接混入 OHLCV。`data/market/corporate_actions.py` 把 `dividend` 原始事件归一为 `corporate_actions`，并提供 `apply_corporate_actions_to_position()` 给未来回测账本处理现金分红、送转和拆股。
 
-### 2.4 Fetcher — 数据获取层
+### 2.5 Fetcher — 数据获取层
 
 **多源 fallback 链：** 新浪 → 东方财富 → 腾讯
 **稳定性机制：**
@@ -156,7 +181,7 @@ hub.db_path("quant_results.duckdb")
 
 **API 调用安全阀：** 默认 `get_stock_daily()` 只读本地 Parquet，不触网。设置 `QUANT_ALLOW_API_FALLBACK=1` 或 `force_refresh=True` 才发起 API 请求。
 
-### 2.5 Cleaner — 6 规则数据清洗
+### 2.6 Cleaner — 6 规则数据清洗
 
 规则注册表位于 `data/quality/cleaner.py` 的 `RULE_CLASSES`，启用和参数由 `config/settings.yaml` → `data_cleaning` 控制。
 
@@ -167,7 +192,7 @@ hub.db_path("quant_results.duckdb")
 5. **FinancialValidationRule** — 财务因子边界裁剪（ROE、利润率、D/E、PE、PB）
 6. **WinsorizeRule** — 特征列按 1%/99% 默认分位缩尾
 
-### 2.6 Feature Store — PIT 特征工程
+### 2.7 Feature Store — PIT 特征工程
 
 **Point-in-Time 严格性：** 每个 as-of 切片只使用该日期及之前已可见的数据构建特征，绝不使用未来信息。日频价量、估值、资金流可以按交易日更新；财务、宏观、持有人等低频特征自然取 as-of 之前最新已披露值。
 - 目标输出：`var/store/features/YYYY-MM-DD.parquet`
@@ -175,7 +200,7 @@ hub.db_path("quant_results.duckdb")
 - 读取入口：`iter_feature_files()`、`load_feature_panel()`、`latest_feature_frame()`
 - 注册表扩展：`enrich_from_registry(df, as_of_key, symbols)` 从 DataRegistry 维度补充资金流、持有人、宏观等 PIT 因子
 
-### 2.6 Cron Logger — 可观测性
+### 2.8 Cron Logger — 可观测性
 
 - 格式：JSONL (`var/store/_cron_log/{script}.jsonl`)
 - 自动轮转：每文件最多 500 行

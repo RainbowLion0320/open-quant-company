@@ -23,6 +23,11 @@ export const modules = {
             meta: "Asset coverage",
             description: "查看多资产数据来源、研究就绪度和交易能力",
           },
+          sources: {
+            label: "数据源能力",
+            meta: "Capability registry",
+            description: "对比外部数据源能力、项目数据维度和本地来源缺口",
+          },
         },
       },
       strategyLab: {

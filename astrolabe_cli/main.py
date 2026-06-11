@@ -9,6 +9,9 @@ from astrolabe_cli.commands.config import validate_config
 from astrolabe_cli.commands.backtest import check as backtest_check
 from astrolabe_cli.commands.backtest import run_backtest
 from astrolabe_cli.commands.data import repair as data_repair
+from astrolabe_cli.commands.data import sources as data_sources
+from astrolabe_cli.commands.data import sources_audit as data_sources_audit
+from astrolabe_cli.commands.data import sources_diff_registry as data_sources_diff_registry
 from astrolabe_cli.commands.data import tushare_audit as data_tushare_audit
 from astrolabe_cli.commands.data import tushare_backfill as data_tushare_backfill
 from astrolabe_cli.commands.execution import dry_run as execution_dry_run
@@ -84,6 +87,41 @@ def build_parser() -> argparse.ArgumentParser:
     data_status_cmd = data_sub.add_parser("status", help="Run DB health check")
     add_common_flags(data_status_cmd)
     data_status_cmd.set_defaults(handler=lambda args: data_status())
+
+    data_sources_cmd = data_sub.add_parser("sources", help="Inspect external data source capability registry")
+    add_common_flags(data_sources_cmd)
+    data_sources_cmd.set_defaults(handler=lambda args: data_sources())
+    data_sources_sub = data_sources_cmd.add_subparsers(dest="sources_command")
+
+    data_sources_audit_cmd = data_sources_sub.add_parser("audit", help="Audit external source capabilities")
+    data_sources_audit_cmd.add_argument(
+        "--source",
+        choices=[
+            "all",
+            "akshare",
+            "tushare",
+            "tencent_finance",
+            "eastmoney",
+            "sina_finance",
+            "tonghuashun",
+            "exchange_official",
+            "cninfo",
+            "computed",
+        ],
+        default="all",
+    )
+    data_sources_audit_cmd.add_argument("--offline", action="store_true", help="Skip token-gated network probes")
+    add_common_flags(data_sources_audit_cmd)
+    data_sources_audit_cmd.set_defaults(
+        handler=lambda args: data_sources_audit(args.source, args.source in {"all", "tushare"} and not args.offline)
+    )
+
+    data_sources_diff_cmd = data_sources_sub.add_parser(
+        "diff-registry",
+        help="Diff external source capabilities against project data_registry",
+    )
+    add_common_flags(data_sources_diff_cmd)
+    data_sources_diff_cmd.set_defaults(handler=lambda args: data_sources_diff_registry())
 
     data_repair_cmd = data_sub.add_parser("repair", help="Repair one logical table")
     data_repair_cmd.add_argument("table")

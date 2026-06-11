@@ -1,4 +1,5 @@
 import { assetsApi } from "./modules/assets";
+import { dataSourcesApi } from "./modules/dataSources";
 import { marketApi } from "./modules/market";
 import { portfolioApi } from "./modules/portfolio";
 import { sectorsApi } from "./modules/sectors";
@@ -14,6 +15,7 @@ export const api = {
   ...marketApi,
   ...strategyApi,
   ...assetsApi,
+  ...dataSourcesApi,
   ...portfolioApi,
   ...stocksApi,
   ...systemApi,

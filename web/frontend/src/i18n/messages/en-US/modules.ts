@@ -23,6 +23,11 @@ export const modules = {
             meta: "Asset coverage",
             description: "Inspect multi-asset data sources, research readiness, and trading capability",
           },
+          sources: {
+            label: "Source Capabilities",
+            meta: "Capability registry",
+            description: "Compare external provider capabilities with project data dimensions and local source gaps",
+          },
         },
       },
       strategyLab: {

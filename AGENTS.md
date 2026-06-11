@@ -49,6 +49,9 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq config validate --json` | 校验 settings 和策略注册表 |
 | `astroq data status --json` | 扫描本地数据健康 |
 | `astroq data repair stock_valuation --dry-run --json` | 演练单表修复 |
+| `astroq data sources --json` | 查看外部数据源能力目录最近一次审计摘要 |
+| `astroq data sources audit --source all --json` | 生成 AKShare/Tushare/候选源能力治理产物 |
+| `astroq data sources diff-registry --json` | 对比 source capability registry 与项目 data_registry |
 | `astroq data tushare-audit --json` | 审计 Tushare 权限和本地覆盖率 |
 | `astroq data tushare-backfill --scope missing --resume --json` | 按缺口补齐 Tushare 数据 |
 | `astroq strategy catalog --json` | 查看 production / paper / candidate 策略目录 |
@@ -88,6 +91,7 @@ cd web/frontend && npm run dev
 - Put maintainer decision rules in `docs/project/governance.md`.
 - Put security reporting in `SECURITY.md`.
 - Update specs, wiki, acceptance matrix, and tests when behavior changes.
+- When adding an external data source, fetcher, provider adapter, or new data dimension, update the Source Capability Registry and verify `astroq data sources diff-registry --json`.
 - Do not preserve deprecated compatibility paths unless the current design explicitly requires them.
 - Do not revert user changes. If the worktree is dirty, inspect changes and stage only files that belong to the task.
 
@@ -127,6 +131,7 @@ astroq test design --json
 ## Current Architecture Notes
 
 - Data access is organized under `data.storage`, `data.ingestion`, `data.market`, `data.features`, `data.quality`, `data.ops`, `data.llm`, `data.rates`, `data.strategy`, and `data.reference`.
+- External provider capabilities are governed separately from project dimensions: Source Capability Registry describes what sources can provide, `data_registry` describes what the project uses, and DataHub coverage describes what exists locally.
 - Production backtests use `backtest/pipeline_runner.py` plus shared modules under `pipeline/`.
 - Strategy state is owned by Strategy Catalog and separated into production, paper, and candidate layers.
 - Web System visualizations include CodeGraph, AST diagnostics, architecture diagnostics, and test design intelligence.

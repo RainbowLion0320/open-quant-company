@@ -16,6 +16,7 @@ import { backtest } from "./backtest";
 import { evidence } from "./evidence";
 import { database } from "./database";
 import { assetCoverage } from "./assetCoverage";
+import { dataSources } from "./dataSources";
 import { activity } from "./activity";
 import { configCenter } from "./configCenter";
 import { codegraph } from "./codegraph";
@@ -41,6 +42,7 @@ export const zhCN = {
   evidence,
   database,
   assetCoverage,
+  dataSources,
   activity,
   configCenter,
   codegraph,

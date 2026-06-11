@@ -92,6 +92,63 @@ def test_assets_overview_api_respects_config_enabled_flags(monkeypatch):
     assert by_type["crypto"]["error"] == ""
 
 
+def test_data_sources_capabilities_api_returns_no_artifact(monkeypatch, tmp_path):
+    from data.storage.datahub import reset_datahub
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "var"))
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("API must not audit sources")))
+    reset_datahub()
+
+    res = TestClient(create_app()).get("/api/data-sources/capabilities")
+
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["status"] == "no_artifact"
+    assert payload["summary"]["source_count"] >= 9
+    assert payload["capabilities"] == []
+    assert payload["recommended_command"] == "astroq data sources audit --source all --json"
+    reset_datahub()
+
+
+def test_data_sources_capabilities_api_reads_latest_artifact(monkeypatch, tmp_path):
+    import json
+    from data.storage.datahub import get_datahub, reset_datahub
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "var"))
+    reset_datahub()
+
+    artifact = get_datahub().artifact_path("data-sources", "latest.json")
+    artifact.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "generated_at": "2026-06-11T08:00:00+00:00",
+                "recommended_command": "astroq data sources audit --source all --json",
+                "summary": {"source_count": 9, "capability_count": 2},
+                "sources": [{"source": "akshare", "capability_count": 2}],
+                "capabilities": [{"source": "akshare", "interface": "stock_zh_a_daily"}],
+                "diff": {"summary": {"capability_unmapped_count": 1}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    res = TestClient(create_app()).get("/api/data-sources/capabilities")
+
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["status"] == "ok"
+    assert payload["latest"]["artifact_path"].endswith("var/artifacts/data-sources/latest.json")
+    assert payload["summary"]["artifact_age_seconds"] is not None
+    assert payload["sources"][0]["source"] == "akshare"
+    assert payload["diff"]["summary"]["capability_unmapped_count"] == 1
+    reset_datahub()
+
+
 def test_strategy_evidence_api_lists_catalog_gaps(monkeypatch):
     from web.api.app import create_app
 
@@ -643,6 +700,33 @@ def test_system_ast_intelligence_tab_and_api_contract():
     assert "AstIntelligenceResponse" in system_types
     assert "AST 检测" in zh_modules
     assert "AST Intelligence" in en_modules
+
+
+def test_datahub_sources_tab_and_api_contract():
+    hub = Path("web/frontend/src/views/DataHub.vue").read_text(encoding="utf-8")
+    data_sources_view = Path("web/frontend/src/views/DataSources.vue").read_text(encoding="utf-8")
+    api_index = Path("web/frontend/src/api/index.ts").read_text(encoding="utf-8")
+    data_sources_api = Path("web/frontend/src/api/modules/dataSources.ts").read_text(encoding="utf-8")
+    types = Path("web/frontend/src/api/types.ts").read_text(encoding="utf-8")
+    data_source_types = Path("web/frontend/src/api/types/dataSources.ts").read_text(encoding="utf-8")
+    zh_modules = Path("web/frontend/src/i18n/messages/zh-CN/modules.ts").read_text(encoding="utf-8")
+    en_modules = Path("web/frontend/src/i18n/messages/en-US/modules.ts").read_text(encoding="utf-8")
+    zh_index = Path("web/frontend/src/i18n/messages/zh-CN/index.ts").read_text(encoding="utf-8")
+    en_index = Path("web/frontend/src/i18n/messages/en-US/index.ts").read_text(encoding="utf-8")
+
+    assert "DataSources" in hub
+    assert '{ key: "sources" }' in hub
+    assert "dataSourcesApi" in api_index
+    assert "dataSourceCapabilities" in data_sources_api
+    assert "/api/data-sources/capabilities" in data_sources_api
+    assert "types/dataSources" in types
+    assert "DataSourceCapabilityResponse" in data_source_types
+    assert "dataSources" in zh_index
+    assert "dataSources" in en_index
+    assert "数据源能力" in zh_modules
+    assert "Source Capabilities" in en_modules
+    assert "auditSources" not in data_sources_view
+    assert "Web scan" not in data_sources_view
 
 
 def test_market_view_surfaces_regime_stability_state():

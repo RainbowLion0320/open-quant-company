@@ -21,12 +21,14 @@ import { useModuleTabs } from "../composables/useModuleTabs";
 import { useI18n } from "../i18n";
 import DatabaseHealth from "./DatabaseHealth.vue";
 import AssetCoverage from "./AssetCoverage.vue";
+import DataSources from "./DataSources.vue";
 
 const { t } = useI18n();
 
 const tabKeys = [
   { key: "health" },
   { key: "assets" },
+  { key: "sources" },
 ];
 
 const tabs = computed(() => tabKeys.map(item => ({
@@ -39,6 +41,7 @@ const tabs = computed(() => tabKeys.map(item => ({
 const { activeComponent } = useModuleTabs(tabKeys, "health", {
   health: DatabaseHealth,
   assets: AssetCoverage,
+  sources: DataSources,
 });
 </script>
 
