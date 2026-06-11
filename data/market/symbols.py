@@ -189,6 +189,29 @@ else:  # top500: 全量按市值取前500
     sorted_all = sorted(ALL_STOCKS_RAW, key=lambda x: -x.get("mktcap", 0))
     CIRCLE_STOCKS = sorted(set(s["code"] for s in sorted_all[:500]))
 
+
+def _load_delisted_symbols() -> set:
+    """从 basic.parquet 加载退市股 symbol 集合"""
+    try:
+        import pandas as pd
+        from data.storage.datahub import get_datahub
+        hub = get_datahub()
+        basic_path = hub.store_path("stock") / "basic.parquet"
+        if basic_path.exists():
+            df = pd.read_parquet(basic_path, columns=["symbol", "list_status"])
+            return set(df.loc[df["list_status"] == "D", "symbol"])
+    except Exception:
+        pass
+    return set()
+
+
+_DELISTED = _load_delisted_symbols()
+if _DELISTED:
+    _before = len(CIRCLE_STOCKS)
+    CIRCLE_STOCKS = [c for c in CIRCLE_STOCKS if c not in _DELISTED]
+    print(f"  symbols: filtered {_before - len(CIRCLE_STOCKS)} delisted stocks", file=__import__("sys").stderr)
+
+
 # ============================================================
 # 填充映射表（动态推断，不手工维护）
 # ============================================================
