@@ -32,6 +32,8 @@ class StrategyEvaluation:
     oos_months: int
     trades: int
     baseline_win_rate: float = 0.0
+    ic: float = 0.0
+    icir: float = 0.0
     regime_coverage: dict[str, float] = field(default_factory=dict)
     cost_model: str = "commission_slippage"
 
@@ -44,8 +46,8 @@ def promotion_ready(evaluation: StrategyEvaluation, target_status: str = "paper"
         turnover=evaluation.turnover,
         oos_months=evaluation.oos_months,
         trades=evaluation.trades,
-        ic=0.03 if evaluation.baseline_win_rate >= 0.6 else 0.0,
-        icir=0.4 if evaluation.baseline_win_rate >= 0.6 else 0.0,
+        ic=evaluation.ic,
+        icir=evaluation.icir,
     )
     return evaluate_promotion(metrics, target_status=target_status)
 
@@ -92,6 +94,11 @@ def build_evidence_report(
         "max_drawdown": _metric_value(metric_src, "max_drawdown"),
         "turnover": _metric_value(metric_src, "turnover"),
         "trades": int(_metric_value(metric_src, "trades", _metric_value(metric_src, "trade_count", 0.0))),
+        "win_rate": _metric_value(metric_src, "win_rate"),
+        "ic": _metric_value(metric_src, "ic"),
+        "icir": _metric_value(metric_src, "icir"),
+        "benchmark_total_return": _metric_value(metric_src, "benchmark_total_return"),
+        "excess_return": _metric_value(metric_src, "excess_return"),
     }
     evaluation = StrategyEvaluation(
         name=strategy,
@@ -102,6 +109,8 @@ def build_evidence_report(
         oos_months=int(oos_src.get("months", 0) or 0),
         trades=normalized_metrics["trades"],
         baseline_win_rate=_metric_value(metric_src, "baseline_win_rate"),
+        ic=normalized_metrics["ic"],
+        icir=normalized_metrics["icir"],
         regime_coverage={k: 1.0 for k, v in _normalized_regime_breakdown(regime_breakdown).items() if v},
     )
     decision = promotion_ready(evaluation, target_status=target_status)
@@ -253,11 +262,32 @@ def write_backtest_evidence(
     end: str,
     output_dir: str | Path | None = None,
 ) -> Path:
+    from research.strategy_competition import summarize_backtest_result
+
+    summary = summarize_backtest_result(result)
+    oos_metrics = dict(summary.get("oos") or {})
+    report_metrics = {
+        "cagr": _metric_value(oos_metrics, "annual_return"),
+        "total_return": _metric_value(oos_metrics, "total_return"),
+        "sharpe": _metric_value(oos_metrics, "sharpe"),
+        "max_drawdown": _metric_value(oos_metrics, "max_drawdown"),
+        "turnover": _metric_value(oos_metrics, "turnover"),
+        "trades": int(_metric_value(oos_metrics, "trade_count")),
+        "win_rate": _metric_value(oos_metrics, "win_rate"),
+        "benchmark_total_return": _metric_value(oos_metrics, "benchmark_total_return"),
+        "excess_return": _metric_value(oos_metrics, "excess_return"),
+        "ic": 0.0,
+        "icir": 0.0,
+    }
     report = build_evidence_report(
         strategy=strategy,
         status=status,
-        metrics=result,
-        oos={"months": 0, "start": start, "end": end},
+        metrics=report_metrics,
+        oos={
+            "months": int(oos_metrics.get("months", 0) or 0),
+            "start": str(oos_metrics.get("start", start)),
+            "end": str(oos_metrics.get("end", end)),
+        },
         cost_model={
             "commission": _metric_value(result, "commission", 0.00025),
             "slippage": _metric_value(result, "slippage", 0.001),

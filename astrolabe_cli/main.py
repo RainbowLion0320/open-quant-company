@@ -24,6 +24,7 @@ from astrolabe_cli.commands.health import run_health
 from astrolabe_cli.commands.regime import status as regime_status
 from astrolabe_cli.commands.regime import train_profit as regime_train_profit
 from astrolabe_cli.commands.strategy import catalog as strategy_catalog
+from astrolabe_cli.commands.strategy import compete as strategy_compete
 from astrolabe_cli.commands.strategy import evidence as strategy_evidence
 from astrolabe_cli.commands.strategy import run_strategy
 from astrolabe_cli.commands.test_system import check as test_check
@@ -80,6 +81,14 @@ def build_parser() -> argparse.ArgumentParser:
     strategy_evidence_cmd.add_argument("name", nargs="?")
     add_common_flags(strategy_evidence_cmd)
     strategy_evidence_cmd.set_defaults(handler=lambda args: strategy_evidence(args.name))
+
+    strategy_compete_cmd = strategy_sub.add_parser("compete", help="Generate a fair strategy competition report")
+    strategy_compete_cmd.add_argument("--run-backtest", action="store_true", help="Run all strategy backtests first")
+    strategy_compete_cmd.add_argument("--oos-months", type=int, default=36)
+    add_common_flags(strategy_compete_cmd)
+    strategy_compete_cmd.set_defaults(
+        handler=lambda args: strategy_compete(args.run_backtest, args.oos_months)
+    )
 
     data = sub.add_parser("data", help="Inspect and repair local DataHub datasets")
     data_sub = data.add_subparsers(dest="data_command", required=True)

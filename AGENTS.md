@@ -57,6 +57,7 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq strategy catalog --json` | 查看 production / paper / candidate 策略目录 |
 | `astroq strategy run all --mode production --json` | 运行生产策略扫描 |
 | `astroq strategy run trend_following --mode research --dry-run --json` | 候选策略研究扫描演练 |
+| `astroq strategy compete --json` | 生成 12 策略统一 OOS 公平竞赛报告 |
 | `astroq regime status --json` | 查看当前 market regime |
 | `astroq regime train-profit --dry-run --json` | 演练利润导向 regime 训练入口 |
 | `astroq backtest run --strategy multifactor --dry-run --json` | 回测入口演练 |

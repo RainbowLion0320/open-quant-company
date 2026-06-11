@@ -89,3 +89,24 @@ def test_strategy_evidence_with_name_returns_detail(monkeypatch, capsys):
     assert data["ok"] is True
     assert data["data"]["strategy"] == "trend_following"
     assert data["data"]["exists"] is False
+
+
+def test_strategy_compete_command_writes_report(monkeypatch, capsys):
+    from pathlib import Path
+
+    from astrolabe_cli.main import run_cli
+
+    monkeypatch.setattr(
+        "research.strategy_competition.write_strategy_competition_report",
+        lambda oos_months=36: (
+            {"summary": {"strategy_count": 1}, "rankings": []},
+            Path("var/artifacts/tournaments/strategy_competition_latest.json"),
+        ),
+    )
+
+    code = run_cli(["strategy", "compete", "--json"])
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert data["ok"] is True
+    assert data["data"]["report"]["summary"]["strategy_count"] == 1

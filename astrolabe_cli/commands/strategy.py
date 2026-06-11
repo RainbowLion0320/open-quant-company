@@ -89,3 +89,36 @@ def evidence(strategy: str | None = None) -> CliResult:
         message=f"Evidence detail for {strategy}",
         data=detail,
     )
+
+
+def compete(run_backtest: bool = False, oos_months: int = 36) -> CliResult:
+    if run_backtest:
+        try:
+            from backtest.run_all_strategies import run_strategy_comparison
+
+            run_strategy_comparison()
+        except Exception as exc:
+            return CliResult(
+                ok=False,
+                command="strategy compete",
+                message="Strategy backtest run failed before competition report",
+                errors=[str(exc)],
+            )
+
+    try:
+        from research.strategy_competition import write_strategy_competition_report
+
+        report, path = write_strategy_competition_report(oos_months=oos_months)
+    except Exception as exc:
+        return CliResult(
+            ok=False,
+            command="strategy compete",
+            message="Strategy competition report failed",
+            errors=[str(exc)],
+        )
+    return CliResult(
+        ok=True,
+        command="strategy compete",
+        message=f"Strategy competition report written: {path}",
+        data={"report": report, "path": str(path)},
+    )
