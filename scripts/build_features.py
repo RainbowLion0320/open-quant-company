@@ -32,10 +32,10 @@ from data.features.feature_store import FEATURES_DIR, enrich_from_registry, iter
 from data.market.price_service import get_stock_prices
 from data.market.price_types import PriceUseCase
 from data.market.symbols import CIRCLE_STOCKS
-from signals.expression import alpha_factors
 
 
 HUB = get_datahub()
+DAILY_BASIC_CACHE_DIR = HUB.cache_root / "features" / "daily_basic"
 DEFAULT_N_STOCKS = int(os.environ.get("QUANT_FEATURE_N_STOCKS", str(len(CIRCLE_STOCKS))))
 DEFAULT_START = os.environ.get("QUANT_FEATURE_START", "2018-01")
 DEFAULT_END = os.environ.get(
@@ -56,7 +56,7 @@ def _select_symbols(n_stocks: int) -> list[str]:
 
 
 def _load_price_cache(symbols: list[str]) -> dict[str, pd.DataFrame]:
-    print("\n[1/4] 加载价格数据...")
+    print("\n[1/5] 加载价格数据...")
     price_cache: dict[str, pd.DataFrame] = {}
     total = len(symbols)
     for i, sym in enumerate(symbols, 1):
@@ -76,7 +76,7 @@ def _load_price_cache(symbols: list[str]) -> dict[str, pd.DataFrame]:
 
 
 def _load_financial_cache(symbols: list[str]) -> dict[str, pd.DataFrame]:
-    print("\n[2/4] 加载财务数据 (PE/PB/ROE/毛利率/D-E)...")
+    print("\n[2/5] 加载财务数据 (PE/PB/ROE/毛利率/D-E)...")
     from data.market.financials import get_financial_summary
 
     fin_cache: dict[str, pd.DataFrame] = {}
@@ -95,8 +95,9 @@ def _load_financial_cache(symbols: list[str]) -> dict[str, pd.DataFrame]:
 
 
 def _load_daily_basic_cache(symbols: list[str], start: str, end: str) -> dict[str, pd.DataFrame]:
-    print("\n[3/4] 加载日频指标 PE/PB (Tushare daily_basic)...")
+    print("\n[3/5] 加载日频指标 PE/PB (Tushare daily_basic)...")
     daily_cache: dict[str, pd.DataFrame] = {}
+    DAILY_BASIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     try:
         import tushare as ts
         from data.ingestion.tushare_utils import get_tushare_token
@@ -106,39 +107,131 @@ def _load_daily_basic_cache(symbols: list[str], start: str, end: str) -> dict[st
         if ts_api is None:
             raise RuntimeError("No Tushare token")
 
-        start_date = pd.Timestamp(start + "-01").strftime("%Y%m%d")
-        end_date = (pd.Timestamp(end + "-01") + pd.offsets.MonthEnd(1)).strftime("%Y%m%d")
+        start_ts, end_ts = _date_range_bounds(start, end)
+        start_date = start_ts.strftime("%Y%m%d")
+        end_date = end_ts.strftime("%Y%m%d")
+        errors: list[str] = []
         total = len(symbols)
         for i, sym in enumerate(symbols, 1):
+            cache_path = DAILY_BASIC_CACHE_DIR / f"{sym}_{start_date}_{end_date}.parquet"
             try:
-                suffix = ".SH" if sym.startswith("6") else ".SZ"
-                df = ts_api.daily_basic(
-                    ts_code=f"{sym}{suffix}",
-                    start_date=start_date,
-                    end_date=end_date,
-                    fields="trade_date,pe,pe_ttm,pb,ps,ps_ttm,dv_ratio,dv_ttm,total_mv,circ_mv",
-                )
+                df = HUB.read_parquet(cache_path, default=pd.DataFrame()) if cache_path.exists() else pd.DataFrame()
+                if df is None or df.empty:
+                    suffix = ".SH" if sym.startswith("6") else ".SZ"
+                    df = ts_api.daily_basic(
+                        ts_code=f"{sym}{suffix}",
+                        start_date=start_date,
+                        end_date=end_date,
+                        fields="trade_date,pe,pe_ttm,pb,ps,ps_ttm,dv_ratio,dv_ttm,total_mv,circ_mv",
+                    )
+                    if df is not None and len(df) > 0:
+                        HUB.write_parquet(df, cache_path)
+                    time.sleep(0.3)
                 if df is not None and len(df) > 0:
                     df["trade_date"] = pd.to_datetime(df["trade_date"])
                     daily_cache[sym] = df.set_index("trade_date").sort_index()
-                time.sleep(0.3)
-            except Exception:
-                pass
+            except KeyboardInterrupt:
+                raise
+            except Exception as exc:
+                if len(errors) < 10:
+                    errors.append(f"{sym}: {type(exc).__name__}: {exc}")
             if i % 20 == 0:
-                print(f"  PE/PB {i}/{total} ({len(daily_cache)} valid)")
+                print(f"  PE/PB {i}/{total} ({len(daily_cache)} valid, {len(errors)} sample errors)", flush=True)
+        if errors:
+            print("  PE/PB errors (sample):")
+            for err in errors:
+                print(f"    {err}")
     except Exception as exc:
         print(f"  Tushare不可用 ({type(exc).__name__}), 跳过PE/PB")
     print(f"  日频估值有效: {len(daily_cache)}")
     return daily_cache
 
 
+def _masked_rolling_std(series: pd.Series, window: int) -> pd.Series:
+    result = series.rolling(window, min_periods=1).std(ddof=1)
+    result.iloc[: max(0, window - 1)] = np.nan
+    return result
+
+
+def _masked_rolling_mean(series: pd.Series, window: int) -> pd.Series:
+    result = series.rolling(window, min_periods=1).mean()
+    result.iloc[: max(0, window - 1)] = np.nan
+    return result
+
+
+def _compute_technical_factor_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Vectorized equivalent of ``signals.expression.alpha_factors`` for one stock."""
+    close = pd.to_numeric(df["close"], errors="coerce")
+    open_ = pd.to_numeric(df["open"], errors="coerce")
+    high = pd.to_numeric(df["high"], errors="coerce")
+    low = pd.to_numeric(df["low"], errors="coerce")
+    volume = pd.to_numeric(df["volume"], errors="coerce")
+
+    close_ma5 = close.rolling(5, min_periods=5).mean()
+    close_ma10 = close.rolling(10, min_periods=10).mean()
+    close_ma20 = close.rolling(20, min_periods=20).mean()
+    close_ma60 = close.rolling(60, min_periods=60).mean()
+    close_std20 = close.rolling(20, min_periods=20).std(ddof=1)
+    ret_1d = close.pct_change()
+    delta_1d = close - close.shift(1)
+    delta_5d = close - close.shift(5)
+    rsi_mean = _masked_rolling_mean(delta_1d, 14)
+    rsi_std = _masked_rolling_std(delta_1d, 14)
+
+    frame = pd.DataFrame(index=df.index)
+    frame["ret_1d"] = ret_1d
+    frame["ret_5d"] = close / close.shift(5) - 1
+    frame["ret_10d"] = close / close.shift(10) - 1
+    frame["ret_20d"] = close / close.shift(20) - 1
+    frame["ret_60d"] = close / close.shift(60) - 1
+    frame["ma5_bias"] = close / close_ma5 - 1
+    frame["ma10_bias"] = close / close_ma10 - 1
+    frame["ma20_bias"] = close / close_ma20 - 1
+    frame["ma60_bias"] = close / close_ma60 - 1
+    frame["vol_5d"] = _masked_rolling_std(ret_1d, 5)
+    frame["vol_20d"] = _masked_rolling_std(ret_1d, 20)
+    frame["vol_60d"] = _masked_rolling_std(ret_1d, 60)
+    frame["volume_ratio_5"] = volume / volume.rolling(5, min_periods=5).mean()
+    frame["volume_ratio_20"] = volume / volume.rolling(20, min_periods=20).mean()
+    frame["amplitude"] = (high - low) / close.shift(1)
+    frame["high_low_ratio"] = high / low - 1
+    frame["ma5_20_cross"] = (close_ma5 > close_ma20).astype(float)
+    frame.loc[close_ma5.isna() | close_ma20.isna(), "ma5_20_cross"] = np.nan
+    frame["ma20_60_cross"] = (close_ma20 > close_ma60).astype(float)
+    frame.loc[close_ma20.isna() | close_ma60.isna(), "ma20_60_cross"] = np.nan
+    frame["rsi_14"] = rsi_mean / (rsi_std + 1e-9)
+    frame["vol_adj_mom_5d"] = delta_5d / (close_std20 + 1e-6)
+    frame["volume_conviction"] = (volume * delta_5d) / (close_std20 + 1e-6)
+    frame["intraday_close_strength"] = (close - low) / (high - low + 0.0001)
+    frame["upside_intraday_range"] = (high - open_) / (close_std20 + 1e-6)
+    frame["midpoint_bias"] = (close - (high + low) / 2) / (close_std20 + 1e-6)
+    frame["volume_vol_ratio"] = volume / (close_std20 * close_ma20 + 1e-6)
+    frame["open_gap_ma20"] = (open_ - close_ma20) / (close_std20 + 1e-6)
+    return frame.replace([np.inf, -np.inf], np.nan)
+
+
+def _build_technical_cache(price_cache: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    print("\n[4/5] 预计算技术因子...")
+    technical_cache: dict[str, pd.DataFrame] = {}
+    total = len(price_cache)
+    for i, (sym, df) in enumerate(price_cache.items(), 1):
+        try:
+            technical_cache[sym] = _compute_technical_factor_frame(df)
+        except Exception:
+            pass
+        if i % 100 == 0:
+            print(f"  技术因子: {i}/{total} ({len(technical_cache)} valid)", flush=True)
+    print(f"  技术因子有效: {len(technical_cache)}")
+    return technical_cache
+
+
 def _build_feature_slice(
     storage_key: str,
     as_of_date: str | pd.Timestamp,
     price_cache: dict[str, pd.DataFrame],
+    technical_cache: dict[str, pd.DataFrame],
     fin_cache: dict[str, pd.DataFrame],
     daily_cache: dict[str, pd.DataFrame],
-    factors: dict,
     force: bool = False,
     min_bars: int = 60,
 ) -> int:
@@ -151,15 +244,16 @@ def _build_feature_slice(
     month = as_of.to_period("M").strftime("%Y-%m")
     rows = []
     for sym, df in price_cache.items():
-        df_pit = df[df.index <= as_of]
-        if len(df_pit) < min_bars:
+        idx = df.index.searchsorted(as_of, side="right") - 1
+        if idx < max(0, min_bars - 1):
             continue
-        idx = len(df_pit) - 1
         row = {"symbol": sym, "as_of_date": as_of_key, "month": month}
 
-        for fname, factor in factors.items():
-            val = factor.compute(df_pit, idx)
-            row[fname] = val if not (isinstance(val, float) and np.isnan(val)) else None
+        feature_frame = technical_cache.get(sym)
+        if feature_frame is not None and idx < len(feature_frame):
+            feature_row = feature_frame.iloc[idx]
+            for fname, val in feature_row.items():
+                row[fname] = val if not pd.isna(val) else None
 
         fin_df = fin_cache.get(sym)
         if fin_df is not None:
@@ -169,10 +263,9 @@ def _build_feature_slice(
         if daily_df is not None:
             row.update(compute_valuation_factors(daily_df, as_of))
 
-        full_idx = df.index.get_indexer([df_pit.index[-1]])[0]
-        fwd_idx = full_idx + 20
-        if full_idx >= 0 and fwd_idx < len(df):
-            cur = df.iloc[full_idx]["close"]
+        fwd_idx = idx + 20
+        if idx >= 0 and fwd_idx < len(df):
+            cur = df.iloc[idx]["close"]
             fwd = df.iloc[fwd_idx]["close"]
             row["ret_fwd_20d"] = (fwd / cur - 1) if cur > 0 else None
         rows.append(row)
@@ -191,9 +284,9 @@ def _build_feature_slice(
 def _build_asof(
     as_of_date: str,
     price_cache: dict[str, pd.DataFrame],
+    technical_cache: dict[str, pd.DataFrame],
     fin_cache: dict[str, pd.DataFrame],
     daily_cache: dict[str, pd.DataFrame],
-    factors: dict,
     force: bool = False,
     min_bars: int = 60,
 ) -> int:
@@ -202,9 +295,9 @@ def _build_asof(
         key,
         key,
         price_cache,
+        technical_cache,
         fin_cache,
         daily_cache,
-        factors,
         force=force,
         min_bars=min_bars,
     )
@@ -250,13 +343,13 @@ def build_features(
     price_cache = _load_price_cache(symbols)
     fin_cache = _load_financial_cache(list(price_cache.keys()))
     daily_cache = _load_daily_basic_cache(list(price_cache.keys()), start, end) if include_tushare else {}
-    factors = alpha_factors()
+    technical_cache = _build_technical_cache(price_cache)
 
     dates = _daily_asof_dates(start, end, price_cache)
-    print(f"\n[4/4] 构建特征 ({len(dates)}个交易日)...")
+    print(f"\n[5/5] 构建特征 ({len(dates)}个交易日)...")
     for as_of in dates:
         key = as_of.strftime("%Y-%m-%d")
-        rows = _build_asof(key, price_cache, fin_cache, daily_cache, factors, force=force)
+        rows = _build_asof(key, price_cache, technical_cache, fin_cache, daily_cache, force=force)
         print(f"  {key}: {rows} stocks" if rows else f"  {key}: skipped")
 
     pq_files = iter_feature_files()

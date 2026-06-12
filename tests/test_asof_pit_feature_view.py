@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
-
-
-class CloseReturnFactor:
-    def compute(self, df: pd.DataFrame, idx: int) -> float:
-        return float(df["close"].iloc[idx])
+import numpy as np
 
 
 def test_feature_store_selects_latest_slice_on_or_before_as_of(tmp_path):
@@ -66,9 +62,9 @@ def test_build_asof_uses_exact_daily_price_not_month_end(tmp_path, monkeypatch):
     rows = build_features._build_asof(
         "2026-05-08",
         {"000001": prices},
+        {"000001": pd.DataFrame({"daily_close": prices["close"]}, index=prices.index)},
         {},
         {},
-        {"daily_close": CloseReturnFactor()},
         force=True,
         min_bars=1,
     )
@@ -78,6 +74,35 @@ def test_build_asof_uses_exact_daily_price_not_month_end(tmp_path, monkeypatch):
     assert saved.loc[0, "as_of_date"] == "2026-05-08"
     assert saved.loc[0, "month"] == "2026-05"
     assert saved.loc[0, "daily_close"] == 10.0
+
+
+def test_vectorized_alpha_features_match_expression_dsl():
+    import scripts.build_features as build_features
+    from signals.expression import alpha_factors
+
+    dates = pd.date_range("2026-01-01", periods=90, freq="B")
+    base = np.linspace(10.0, 18.0, len(dates))
+    prices = pd.DataFrame(
+        {
+            "open": base + np.sin(np.arange(len(dates))) * 0.1,
+            "high": base + 0.6,
+            "low": base - 0.5,
+            "close": base + np.cos(np.arange(len(dates))) * 0.1,
+            "volume": np.linspace(1000.0, 3000.0, len(dates)),
+        },
+        index=dates,
+    )
+
+    vectorized = build_features._compute_technical_factor_frame(prices)
+    factors = alpha_factors()
+    idx = 75
+    for name, factor in factors.items():
+        expected = factor.compute(prices, idx)
+        actual = vectorized.iloc[idx][name]
+        if pd.isna(expected):
+            assert pd.isna(actual), name
+        else:
+            assert np.isclose(actual, expected, rtol=1e-10, atol=1e-10), name
 
 
 def test_time_series_splitter_accepts_asof_dates():
