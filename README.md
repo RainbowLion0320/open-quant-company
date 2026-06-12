@@ -42,7 +42,7 @@
 ![数据中台](docs/assets/readme/screenshots/04-datahub.png)
 
 ### 系统控制
-配置中心、测试设计、AST 检测、CodeGraph 和架构诊断。
+配置中心、生命周期门禁、测试设计、AST 检测、CodeGraph 和架构诊断。
 
 ![系统控制](docs/assets/readme/screenshots/05-system-control.png)
 
@@ -128,7 +128,7 @@ flowchart LR
 | `/portfolio` | 组合执行 | PaperBroker 持仓、NAV、交易记录、手动下单 |
 | `/pipeline` | 流程图 | 关键链路拆解、参数解释、节点详情、流向高亮 |
 | `/datahub` | 数据中台 | 维度状态、数据健康、存储统计、单表修复 |
-| `/system` | 系统控制 | 系统信息、配置中心、测试设计、AST 检测、CodeGraph、架构诊断 |
+| `/system` | 系统控制 | 系统信息、配置中心、生命周期门禁、测试设计、AST 检测、CodeGraph、架构诊断 |
 
 前端支持中文 / English 切换，入口在左侧导航栏底部。
 

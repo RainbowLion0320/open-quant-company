@@ -4,4 +4,5 @@ export const errors = {
       strategySignalLoad: "Strategy signals failed to load",
       progressConnection: "Progress connection failed",
       strategyRunStart: "Strategy run failed to start",
+      loadFailed: "Load failed",
     } as const;

@@ -87,6 +87,11 @@ export const modules = {
             meta: "AST Intelligence",
             description: "检查全项目重复实现、近似 clone、重复 helper 和 canonical helper 绕行风险",
           },
+          lifecycle: {
+            label: "生命周期",
+            meta: "Evidence chain",
+            description: "查看数据源、数据健康、策略证据和执行链路是否满足正式运行门禁",
+          },
           codegraph: {
             label: "代码图谱",
             meta: "CodeGraph",

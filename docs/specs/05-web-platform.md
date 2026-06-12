@@ -153,6 +153,7 @@ def get_db() -> Database:
 | Docs | `astroq docs check --json` | 扫描已知陈旧文档短语 |
 | Tests | `astroq test check --suite quick --json` / `astroq test design --json` | `test check` 运行固定测试 suite；`test design` 生成 `var/artifacts/tests/design/latest.json`，Web 只读展示测试设计图谱、风险矩阵和异味诊断 |
 | Architecture | `astroq architecture ast --json` | 生成 `var/artifacts/architecture/ast/latest.json`，Web 只读展示 Python/TS/Vue/CSS 的重复实现、近似 clone、重复 helper 和 canonical helper 绕行风险 |
+| Lifecycle | `astroq lifecycle check --json` | 生成 `var/artifacts/lifecycle/latest.json`；Web 只读展示 source capability、local freshness、strategy evidence 和 execution readiness，缺数据/缺能力/缺证据必须显示 blocked/not_applicable |
 | Web | `astroq web build --json` / `astroq web serve --host HOST --port PORT` | 委托 Vite build 和 FastAPI/uvicorn |
 
 ## 3. 数据流

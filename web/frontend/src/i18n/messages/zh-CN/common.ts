@@ -13,6 +13,7 @@ export const common = {
       readonly: "只读",
       reset: "重置",
       retry: "重试",
+      refresh: "刷新",
       save: "保存",
       saving: "保存中...",
       sell: "卖出",

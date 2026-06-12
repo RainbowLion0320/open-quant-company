@@ -1,5 +1,5 @@
 import { get, post } from "../client";
-import type { AstIntelligenceResponse, CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LlmUsageResponse, SystemHistoryResponse, SystemMonitor, TestDesignResponse } from "../types";
+import type { AstIntelligenceResponse, CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LifecycleResponse, LlmUsageResponse, SystemHistoryResponse, SystemMonitor, TestDesignResponse } from "../types";
 
 function queryString(params: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams();
@@ -24,6 +24,7 @@ export const systemApi = {
   systemMode: () => get<{ mode: string; has_api_key: boolean; allows_settings_write: boolean; allows_paper_trading: boolean; readonly_sections: string[] }>("/api/system/mode"),
   testDesign: () => get<TestDesignResponse>("/api/system/tests/design"),
   astIntelligence: () => get<AstIntelligenceResponse>("/api/system/ast-intelligence"),
+  lifecycle: () => get<LifecycleResponse>("/api/system/lifecycle"),
   codeGraphStatus: () => get<CodeGraphStatusResponse>("/api/codegraph/status"),
   codeGraphGraph: (params: { level?: string; root?: string; edge_kinds?: string; node_kinds?: string; limit?: number } = {}) =>
     get<CodeGraphGraphResponse>(`/api/codegraph/graph${queryString(params)}`),

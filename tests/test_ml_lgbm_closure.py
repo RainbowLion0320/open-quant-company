@@ -250,6 +250,37 @@ def test_ml_strategy_coerces_feature_store_objects_to_numeric(tmp_path, monkeypa
     assert score_map["000001"] > 85.0
 
 
+def test_ml_score_map_skips_rows_missing_required_features(tmp_path, monkeypatch):
+    import backtest.strategies.ml_strategy as ml_strategy
+
+    model = CountingModel()
+    (tmp_path / "lgbm_best.pkl").write_bytes(b"model")
+    (tmp_path / "lgbm_best_meta.json").write_text('{"features":["fund_roe","val_pb"]}', encoding="utf-8")
+    feature_panel = pd.DataFrame(
+        {
+            "month": ["2026-04", "2026-04"],
+            "as_of_date": ["2026-04-30", "2026-04-30"],
+            "symbol": ["000001", "000002"],
+            "fund_roe": [0.2, None],
+        }
+    )
+    monkeypatch.setattr(ml_strategy, "MODEL_DIR", tmp_path)
+    monkeypatch.setattr(pickle, "load", lambda _file: model)
+    monkeypatch.setattr(ml_strategy, "load_feature_panel", lambda hub=None: feature_panel, raising=False)
+
+    strategy = ml_strategy.MLStrategy("best")
+    prices = pd.DataFrame(
+        {"000001": [10.0] * 90, "000002": [10.0] * 90},
+        index=pd.date_range("2026-02-01", periods=90, freq="D"),
+    )
+
+    score_map = strategy.pit_score_map(prices, len(prices) - 1, "sideways")
+
+    assert score_map == {}
+    assert model.calls == 0
+    assert any("missing_required_features" in err for err in strategy.load_errors)
+
+
 def test_ml_model_bundle_reports_load_errors(tmp_path, monkeypatch):
     from signals import ml_signals
 

@@ -92,6 +92,25 @@ def test_system_module_exposes_test_design_intelligence_tab():
     assert ("test" + "SystemRuns") not in api_system
 
 
+def test_system_module_exposes_lifecycle_readiness_tab():
+    system_hub = read_frontend("views/SystemHub.vue")
+    zh_modules = read_frontend("i18n/messages/zh-CN/modules.ts")
+    en_modules = read_frontend("i18n/messages/en-US/modules.ts")
+    api_system = read_frontend("api/modules/system.ts")
+    zh_index = read_frontend("i18n/messages/zh-CN/index.ts")
+    en_index = read_frontend("i18n/messages/en-US/index.ts")
+
+    assert "LifecycleReadiness" in system_hub
+    assert '{ key: "lifecycle" }' in system_hub
+    assert "lifecycle: {" in zh_modules
+    assert "生命周期" in zh_modules
+    assert "lifecycle: {" in en_modules
+    assert "Lifecycle" in en_modules
+    assert "lifecycle" in zh_index
+    assert "lifecycle" in en_index
+    assert "lifecycle:" in api_system
+
+
 def test_high_traffic_views_use_i18n_for_static_copy():
     for view in (
         "Market.vue",

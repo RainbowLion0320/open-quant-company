@@ -36,6 +36,16 @@ class AlphaModel(ABC):
         """Produce alpha signals for all symbols in the universe at a given date."""
         ...
 
+    def generate_score_panel(
+        self,
+        universe: list[str],
+        prices: pd.DataFrame,
+        date_idx: int,
+        regime: str,
+    ) -> list[dict]:
+        """Produce full cross-sectional scores for evidence calculations."""
+        return []
+
     def rebalance_trigger(
         self,
         dt: date,
@@ -106,6 +116,43 @@ class StrategyAlphaAdapter(AlphaModel):
 
         signals.sort(key=lambda s: s.score, reverse=True)
         return signals
+
+    def generate_score_panel(
+        self,
+        universe: list[str],
+        prices: pd.DataFrame,
+        date_idx: int,
+        regime: str,
+    ) -> list[dict]:
+        rows: list[dict] = []
+        ts = datetime.now().isoformat()
+        for sym in universe:
+            if sym not in prices.columns:
+                continue
+            try:
+                score = float(self._scorer(sym, prices[sym], date_idx, regime))
+                rows.append(
+                    {
+                        "symbol": sym,
+                        "strategy": self.name,
+                        "score": round(score, 6),
+                        "horizon_days": self.horizon_days,
+                        "timestamp": ts,
+                        "data_quality": "ok",
+                    }
+                )
+            except Exception as exc:
+                rows.append(
+                    {
+                        "symbol": sym,
+                        "strategy": self.name,
+                        "score": None,
+                        "horizon_days": self.horizon_days,
+                        "timestamp": ts,
+                        "data_quality": f"score_error:{type(exc).__name__}",
+                    }
+                )
+        return rows
 
     def rebalance_trigger(self, dt, regime, holdings):
         if self._rebalance_trigger:

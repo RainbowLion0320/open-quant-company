@@ -21,6 +21,7 @@ from astrolabe_cli.commands.architecture import ast_check as architecture_ast_ch
 from astrolabe_cli.commands.data import status as data_status
 from astrolabe_cli.commands.docs import check_docs
 from astrolabe_cli.commands.health import run_health
+from astrolabe_cli.commands.lifecycle import check as lifecycle_check
 from astrolabe_cli.commands.regime import status as regime_status
 from astrolabe_cli.commands.regime import train_profit as regime_train_profit
 from astrolabe_cli.commands.strategy import catalog as strategy_catalog
@@ -204,6 +205,12 @@ def build_parser() -> argparse.ArgumentParser:
     assets_overview_cmd = assets_sub.add_parser("overview", help="Show asset coverage and readiness")
     add_common_flags(assets_overview_cmd)
     assets_overview_cmd.set_defaults(handler=lambda args: assets_overview())
+
+    lifecycle = sub.add_parser("lifecycle", help="Inspect end-to-end lifecycle readiness")
+    lifecycle_sub = lifecycle.add_subparsers(dest="lifecycle_command", required=True)
+    lifecycle_check_cmd = lifecycle_sub.add_parser("check", help="Generate lifecycle readiness artifact")
+    add_common_flags(lifecycle_check_cmd)
+    lifecycle_check_cmd.set_defaults(handler=lambda args: lifecycle_check())
 
     docs = sub.add_parser("docs", help="Check documentation hygiene")
     docs_sub = docs.add_subparsers(dest="docs_command", required=True)

@@ -31,6 +31,7 @@ from web.api.services.system_tests import (
     tests_design_payload,
 )
 from web.api.services.system_ast import ast_intelligence_payload
+from web.api.services.system_lifecycle import lifecycle_payload
 
 router = APIRouter(prefix="/api/system", tags=["System"])
 
@@ -219,3 +220,9 @@ async def get_tests_design():
 async def get_ast_intelligence():
     """Latest deterministic AST Intelligence duplicate implementation artifact."""
     return ast_intelligence_payload()
+
+
+@router.get("/lifecycle")
+async def get_lifecycle():
+    """Latest end-to-end lifecycle readiness artifact."""
+    return lifecycle_payload()

@@ -1,0 +1,154 @@
+.lifecycle-readiness {
+  display: grid;
+  gap: 14px;
+}
+
+.lifecycle-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lifecycle-toolbar h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.lifecycle-summary,
+.lifecycle-grid,
+.lifecycle-lists {
+  display: grid;
+  gap: 10px;
+}
+
+.lifecycle-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.summary-tile,
+.check-card,
+.lifecycle-empty,
+.lifecycle-alert,
+.lifecycle-lists article {
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  padding: 12px;
+}
+
+.summary-tile {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.summary-tile span,
+.check-card-head span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.summary-tile strong {
+  overflow-wrap: anywhere;
+  font-size: 18px;
+}
+
+.summary-tile.ok strong,
+.check-card-head .ok {
+  color: var(--positive);
+}
+
+.summary-tile.blocked strong,
+.check-card-head .blocked,
+.lifecycle-alert.danger {
+  color: var(--negative);
+}
+
+.summary-tile.warn strong,
+.check-card-head .warn {
+  color: var(--warning);
+}
+
+.summary-tile.unknown strong {
+  color: var(--text-secondary);
+}
+
+.lifecycle-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lifecycle-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.check-card {
+  display: grid;
+  gap: 10px;
+}
+
+.check-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.check-meta {
+  display: grid;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.lifecycle-lists {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.lifecycle-lists h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.lifecycle-lists ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lifecycle-lists code,
+.lifecycle-empty code {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+}
+
+.muted {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+  .lifecycle-summary,
+  .lifecycle-grid,
+  .lifecycle-lists {
+    grid-template-columns: 1fr;
+  }
+
+  .lifecycle-toolbar,
+  .lifecycle-empty {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -75,3 +75,22 @@ class CandidateStrategyAlphaModel(AlphaModel):
             ))
         signals.sort(key=lambda item: item.score, reverse=True)
         return signals
+
+    def generate_score_panel(self, universe: list[str], prices: pd.DataFrame, date_idx: int, regime: str) -> list[dict]:
+        rows = score_candidate_strategy(self.name, universe, prices, date_idx, regime)
+        timestamp = datetime.now().isoformat()
+        out: list[dict] = []
+        for symbol in universe:
+            row = rows.get(symbol, {})
+            score = row.get("score")
+            out.append(
+                {
+                    "symbol": symbol,
+                    "strategy": self.name,
+                    "score": float(score) if score is not None else None,
+                    "horizon_days": 20,
+                    "timestamp": timestamp,
+                    "data_quality": "ok" if score is not None else "missing_score",
+                }
+            )
+        return out

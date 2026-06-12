@@ -21,6 +21,8 @@ from research.strategy_governance import default_strategy_roles
 DEFAULT_OOS_MONTHS = 36
 MIN_ML_FEATURE_DATES = 24
 MIN_ML_FEATURE_SYMBOLS = 100
+MIN_ALPHA_EVIDENCE_DATES = 12
+MIN_ALPHA_EVIDENCE_PAIRS = 24
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -56,6 +58,96 @@ def _trade_date(trade: Any) -> pd.Timestamp | None:
         return pd.Timestamp(trade[0]).normalize()
     except Exception:
         return None
+
+
+def _alpha_evidence_from_result(result: dict[str, Any], *, layer: str, horizon_days: int = 20) -> dict[str, Any]:
+    if layer == "risk_overlay":
+        return {
+            "status": "not_applicable",
+            "reason": "risk_overlay_uses_overlay_evidence",
+            "ic": None,
+            "icir": None,
+            "horizon_days": horizon_days,
+            "n_dates": 0,
+            "n_pairs": 0,
+        }
+
+    panel = result.get("score_panel")
+    if not isinstance(panel, pd.DataFrame) or panel.empty:
+        return {
+            "status": "missing",
+            "reason": "missing_score_panel",
+            "ic": None,
+            "icir": None,
+            "horizon_days": horizon_days,
+            "n_dates": 0,
+            "n_pairs": 0,
+        }
+
+    frame = panel.copy()
+    forward_col = f"forward_return_{horizon_days}d"
+    if forward_col not in frame.columns:
+        forward_col = "forward_return" if "forward_return" in frame.columns else ""
+    required = {"as_of_date", "symbol", "score"}
+    if not forward_col or not required.issubset(frame.columns):
+        return {
+            "status": "missing",
+            "reason": "score_panel_missing_required_columns",
+            "ic": None,
+            "icir": None,
+            "horizon_days": horizon_days,
+            "n_dates": 0,
+            "n_pairs": 0,
+        }
+
+    frame["score"] = pd.to_numeric(frame["score"], errors="coerce")
+    frame[forward_col] = pd.to_numeric(frame[forward_col], errors="coerce")
+    frame["as_of_date"] = pd.to_datetime(frame["as_of_date"], errors="coerce")
+    valid = frame.dropna(subset=["as_of_date", "symbol", "score", forward_col])
+    if valid.empty:
+        return {
+            "status": "insufficient_samples",
+            "reason": "no_aligned_forward_returns",
+            "ic": None,
+            "icir": None,
+            "horizon_days": horizon_days,
+            "n_dates": 0,
+            "n_pairs": 0,
+        }
+
+    ics: list[float] = []
+    pair_count = 0
+    for _, group in valid.groupby("as_of_date"):
+        if len(group) < 2:
+            continue
+        corr = group["score"].corr(group[forward_col], method="spearman")
+        if pd.notna(corr) and np.isfinite(float(corr)):
+            ics.append(float(corr))
+            pair_count += int(len(group))
+    if len(ics) < MIN_ALPHA_EVIDENCE_DATES or pair_count < MIN_ALPHA_EVIDENCE_PAIRS:
+        return {
+            "status": "insufficient_samples",
+            "reason": "insufficient_cross_sectional_evidence",
+            "ic": None,
+            "icir": None,
+            "horizon_days": horizon_days,
+            "n_dates": len(ics),
+            "n_pairs": pair_count,
+        }
+
+    series = pd.Series(ics, dtype=float)
+    mean_ic = float(series.mean())
+    std_ic = float(series.std(ddof=1))
+    icir = 999.0 if std_ic == 0 and mean_ic > 0 else (mean_ic / std_ic if std_ic > 0 else 0.0)
+    return {
+        "status": "measured",
+        "reason": "",
+        "ic": round(mean_ic, 6),
+        "icir": round(float(icir), 6),
+        "horizon_days": horizon_days,
+        "n_dates": int(len(series)),
+        "n_pairs": int(pair_count),
+    }
 
 
 def _slice_trades(trades: list[Any], start: pd.Timestamp, end: pd.Timestamp) -> list[Any]:
@@ -168,13 +260,29 @@ def _rank_score(oos: dict[str, Any], layer: str) -> float:
 def _data_quality(
     strategy: str,
     oos: dict[str, Any],
+    alpha_evidence: dict[str, Any],
+    data_readiness: dict[str, Any],
+    alpha_diagnostics: dict[str, Any] | None = None,
 ) -> tuple[list[str], dict[str, Any], list[str]]:
     blockers: list[str] = []
     warnings: list[str] = []
     diagnostics: dict[str, Any] = {}
+    diagnostics["data_readiness"] = data_readiness
+    if alpha_diagnostics:
+        diagnostics["alpha_diagnostics"] = alpha_diagnostics
+
+    readiness_status = str(data_readiness.get("status") or "missing")
+    if readiness_status != "ok":
+        readiness_blockers = data_readiness.get("blockers") or [f"data_readiness_{readiness_status}"]
+        blockers.extend(str(item) for item in readiness_blockers if item)
 
     if int(oos.get("trade_count", 0) or 0) <= 0:
         blockers.append("no_oos_trades")
+
+    evidence_status = str(alpha_evidence.get("status") or "")
+    if evidence_status in {"missing", "insufficient_samples"}:
+        blockers.append(str(alpha_evidence.get("reason") or evidence_status))
+    diagnostics["alpha_evidence"] = alpha_evidence
 
     if strategy == "ml_lgbm":
         from data.features.feature_store import feature_store_coverage
@@ -237,12 +345,25 @@ def _paper_blockers(oos: dict[str, Any], *, layer: str) -> list[str]:
     return blockers
 
 
-def _decision(strategy: str, item: dict[str, Any], metrics: dict[str, Any]) -> dict[str, Any]:
+def _decision(
+    strategy: str,
+    item: dict[str, Any],
+    metrics: dict[str, Any],
+    alpha_evidence: dict[str, Any],
+    data_readiness: dict[str, Any],
+    alpha_diagnostics: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     layer = _strategy_layer(strategy, item)
     oos = dict(metrics.get("oos") or {})
-    alpha_ic = None
-    alpha_icir = None
-    data_blockers, data_diagnostics, data_warnings = _data_quality(strategy, oos)
+    alpha_ic = alpha_evidence.get("ic")
+    alpha_icir = alpha_evidence.get("icir")
+    data_blockers, data_diagnostics, data_warnings = _data_quality(
+        strategy,
+        oos,
+        alpha_evidence,
+        data_readiness,
+        alpha_diagnostics,
+    )
     production_blockers = _production_blockers(oos, layer=layer, alpha_ic=alpha_ic, alpha_icir=alpha_icir)
     paper_blockers = _paper_blockers(oos, layer=layer)
     production_blockers = data_blockers + production_blockers
@@ -257,9 +378,9 @@ def _decision(strategy: str, item: dict[str, Any], metrics: dict[str, Any]) -> d
         recommended = "candidate"
 
     warnings: list[str] = []
-    if alpha_ic is None:
+    if layer != "risk_overlay" and alpha_ic is None:
         warnings.append("missing_ic")
-    if alpha_icir is None:
+    if layer != "risk_overlay" and alpha_icir is None:
         warnings.append("missing_icir")
     if _safe_float(oos.get("turnover")) > 6.0:
         warnings.append("high_turnover")
@@ -281,11 +402,7 @@ def _decision(strategy: str, item: dict[str, Any], metrics: dict[str, Any]) -> d
         "production_blockers": production_blockers,
         "paper_blockers": paper_blockers,
         "warnings": warnings,
-        "alpha_evidence": {
-            "ic": alpha_ic,
-            "icir": alpha_icir,
-            "status": "missing",
-        },
+        "alpha_evidence": alpha_evidence,
         "metrics": metrics,
     }
 
@@ -328,7 +445,13 @@ def build_strategy_competition_report(
             with path.open("rb") as f:
                 result = pickle.load(f)
             metrics = summarize_backtest_result(result, oos_months=oos_months)
-            row = _decision(name, item, metrics)
+            layer = _strategy_layer(name, item)
+            alpha_evidence = _alpha_evidence_from_result(result, layer=layer)
+            data_readiness = result.get("data_readiness")
+            if not isinstance(data_readiness, dict):
+                data_readiness = {"status": "missing", "blockers": ["missing_data_readiness"]}
+            alpha_diagnostics = result.get("alpha_diagnostics") if isinstance(result.get("alpha_diagnostics"), dict) else {}
+            row = _decision(name, item, metrics, alpha_evidence, data_readiness, alpha_diagnostics)
             row["artifact"] = str(path)
             decisions.append(row)
         except Exception as exc:

@@ -88,7 +88,7 @@ Local data dimensions, health status, storage size, and single-table repair acti
 
 ### System Control
 
-Config Center, test design intelligence, AST diagnostics, CodeGraph, and architecture diagnostics.
+Config Center, lifecycle readiness, test design intelligence, AST diagnostics, CodeGraph, and architecture diagnostics.
 
 ![System Control](docs/assets/readme/screenshots/05-system-control.png)
 

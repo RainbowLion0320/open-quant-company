@@ -280,6 +280,8 @@ def get_buffett_inputs(symbol: str, current_price: float = 0, industry: str = ""
     df = get_financial_summary(symbol)
     if len(df) == 0:
         return {}
+    if current_price is None or current_price <= 0:
+        return {}
 
     roe_history = extract_roe_history(df)
     gm_history = extract_gross_margin_history(df)
@@ -295,12 +297,18 @@ def get_buffett_inputs(symbol: str, current_price: float = 0, industry: str = ""
             shares = float(price_df["outstanding_share"].iloc[-1]) / 1e8  # 转为亿股
     except Exception:
         pass
+    if shares <= 0:
+        return {}
 
     # 真实 FCF — 从同花顺现金流量表计算
     fcf = _estimate_fcf(symbol, net_profit)
+    if fcf is None or fcf <= 0:
+        return {}
 
     # 增长预期 — 从近5年净利润增速中位数计算
     growth = _estimate_growth(df)
+    if growth is None:
+        return {}
 
     # 板块类型
     sector = SYMBOL_SECTOR.get(symbol, FALLBACK_SECTOR)
@@ -308,7 +316,7 @@ def get_buffett_inputs(symbol: str, current_price: float = 0, industry: str = ""
     return {
         "fcf": fcf,
         "growth_rate": growth,
-        "shares_outstanding": max(shares, 0.1),  # 至少 0.1 亿股防止除零
+        "shares_outstanding": shares,
         "current_price": current_price,
         "roe_history": roe_history,
         "gross_margin_history": gm_history,
@@ -320,11 +328,11 @@ def get_buffett_inputs(symbol: str, current_price: float = 0, industry: str = ""
 
 
 # ---- FCF 估算 ----
-def _estimate_fcf(symbol: str, net_profit_fallback: float = 0) -> float:
+def _estimate_fcf(symbol: str, net_profit_fallback: float = 0) -> float | None:
     """
     从同花顺现金流量表计算真实 FCF
     FCF = 经营活动现金流净额 - 购建固定资产支付的现金
-    失败时回退到净利润 × 0.7
+    失败时返回 None，由上层显式跳过该标的。
     """
     try:
         import akshare as ak
@@ -369,17 +377,16 @@ def _estimate_fcf(symbol: str, net_profit_fallback: float = 0) -> float:
     except Exception:
         pass
 
-    # 回退
-    return net_profit_fallback * _FCF_FALLBACK_RATIO if net_profit_fallback > 0 else 0
+    return None
 
 
-def _estimate_growth(df: pd.DataFrame) -> float:
+def _estimate_growth(df: pd.DataFrame) -> float | None:
     """
     从近5年净利润同比增长率中位数估算增长率
-    保守下限/上限从 config 读取
+    保守下限/上限从 config 读取；缺增长样本时返回 None。
     """
     if "净利润同比增长率" not in df.columns:
-        return _GROWTH_DEFAULT
+        return None
 
     report_col = "报告期"
     if report_col in df.columns:
@@ -387,12 +394,12 @@ def _estimate_growth(df: pd.DataFrame) -> float:
     else:
         annual = df.copy()
     if len(annual) < 3:
-        return _GROWTH_DEFAULT
+        return None
 
     growth_rates = annual["净利润同比增长率"].apply(_parse_pct).tail(5).tolist()
     growth_rates = [g for g in growth_rates if abs(g) < 1.0]  # 过滤异常值 (>100%)
     if not growth_rates:
-        return _GROWTH_DEFAULT
+        return None
 
     median_growth = np.median(growth_rates)
     return max(_GROWTH_MIN, min(_GROWTH_MAX, median_growth))

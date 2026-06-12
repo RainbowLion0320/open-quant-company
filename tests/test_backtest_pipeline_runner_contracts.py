@@ -121,6 +121,32 @@ class FuturePeekingAlpha(AlphaModel):
         return signals
 
 
+class PanelAlpha(AlphaModel):
+    name = "panel_alpha"
+    label = "Panel Alpha"
+
+    def generate_score_panel(self, universe, prices, date_idx, regime):
+        return [
+            {
+                "symbol": symbol,
+                "score": 90.0 if symbol == "AAA" else 10.0,
+                "data_quality": "ok",
+            }
+            for symbol in universe
+        ]
+
+    def generate_alpha(self, universe, prices, date_idx, regime):
+        return [
+            AlphaSignal(
+                symbol="AAA",
+                strategy=self.name,
+                direction="buy",
+                confidence=0.9,
+                score=90.0,
+            )
+        ]
+
+
 def test_pipeline_backtest_uses_production_shared_stage_sequence():
     events: list[str] = []
     dates = pd.date_range("2024-01-02", periods=5, freq="B")
@@ -171,3 +197,29 @@ def test_pipeline_backtest_filters_universe_to_available_price_columns():
 
     assert alpha.seen_universe == ["AAA"]
     assert result["trade_count"] == 1
+
+
+def test_pipeline_backtest_persists_full_score_panel_for_alpha_evidence():
+    dates = pd.date_range("2024-01-02", periods=25, freq="B")
+    prices = pd.DataFrame(
+        {
+            "AAA": [10 + i for i in range(25)],
+            "BBB": [30 - i * 0.2 for i in range(25)],
+        },
+        index=dates,
+    )
+    bench = pd.Series([100 + i for i in range(25)], index=dates)
+
+    result = PipelineBacktest(
+        alpha=PanelAlpha(),
+        portfolio=EqualWeightConstructor(max_positions=1, position_pct=0.5),
+        scheduler=RebalanceScheduler(RebalanceConfig(schedule="daily")),
+    ).run(prices, bench, universe=["AAA", "BBB"])
+
+    panel = result["score_panel"]
+    assert set(panel["symbol"]) == {"AAA", "BBB"}
+    assert set(panel["strategy"]) == {"panel_alpha"}
+    assert {"as_of_date", "score", "rank", "selected", "forward_return_20d", "data_quality"}.issubset(panel.columns)
+    latest_rows = panel[panel["as_of_date"] == panel["as_of_date"].min()]
+    assert latest_rows.set_index("symbol").loc["AAA", "rank"] == 1
+    assert bool(latest_rows.set_index("symbol").loc["AAA", "selected"]) is True

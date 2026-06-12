@@ -527,6 +527,23 @@ def test_data_freshness_gate_is_shared_outside_cli_layer():
     }
 
 
+def test_formal_lifecycle_does_not_silently_fill_core_evidence_gaps():
+    price_service = Path("data/market/price_service.py").read_text(encoding="utf-8")
+    competition = Path("research/strategy_competition.py").read_text(encoding="utf-8")
+    ml_strategy = Path("backtest/strategies/ml_strategy.py").read_text(encoding="utf-8")
+    runners = Path("signals/runners.py").read_text(encoding="utf-8")
+
+    assert "strict: bool = False" in price_service
+    assert "raise FileNotFoundError" in price_service
+    assert "alpha_ic = None" not in competition
+    assert "missing_score_panel" in competition
+    assert "missing_data_readiness" in competition
+    assert "X = X.replace([np.inf, -np.inf], np.nan).fillna(0)" not in ml_strategy
+    assert "missing_required_features" in ml_strategy
+    assert "return latest cached/refreshed close price, or 0" not in runners.lower()
+    assert "SignalDataUnavailable" in runners
+
+
 def test_portfolio_sector_exposure_alias_is_removed():
     route_text = Path("web/api/routes/portfolio.py").read_text()
     sectors_route_text = Path("web/api/routes/sectors.py").read_text()

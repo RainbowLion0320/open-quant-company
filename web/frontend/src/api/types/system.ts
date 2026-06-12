@@ -313,3 +313,23 @@ export interface AstIntelligenceResponse {
   errors: { path?: string; language?: string; message?: string; line?: number }[];
   recommended_command: string;
 }
+
+export interface LifecycleCheck {
+  status: string;
+  summary?: Record<string, any>;
+  blockers?: string[];
+  warnings?: string[];
+  [key: string]: any;
+}
+
+export interface LifecycleResponse {
+  schema_version?: number;
+  status: "no_artifact" | "ok" | "blocked" | string;
+  generated_at?: string;
+  latest: { generated_at?: string; artifact_path?: string } | null;
+  artifact_age_seconds?: number | null;
+  checks: Record<string, LifecycleCheck>;
+  blockers: string[];
+  warnings: string[];
+  recommended_command: string;
+}

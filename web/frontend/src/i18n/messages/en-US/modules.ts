@@ -87,6 +87,11 @@ export const modules = {
             meta: "AST analysis",
             description: "Inspect duplicate implementations, near clones, repeated helpers, and canonical helper bypass risks",
           },
+          lifecycle: {
+            label: "Lifecycle",
+            meta: "Evidence chain",
+            description: "Inspect whether source, data health, strategy evidence, and execution gates are ready for formal runs",
+          },
           codegraph: {
             label: "CodeGraph",
             meta: "Code graph",

@@ -40,6 +40,7 @@ from data.ingestion.fetcher import get_index_daily
 from data.market.symbols import CIRCLE_STOCKS
 from data.storage.datahub import get_datahub
 from research.strategy_evaluation import write_backtest_evidence
+from backtest.data_readiness import strategy_data_readiness
 
 HUB = get_datahub()
 BACKTEST_ARTIFACT_DIR = HUB.artifact_dir("backtests")
@@ -226,6 +227,7 @@ def run_strategy_comparison(strategy: str = "") -> dict:
             cash=float(bt_cfg.get("initial_cash", 1_000_000)),
             label=item.get("label", name),
         )
+        results[name]["data_readiness"] = strategy_data_readiness(item)
         with open(BACKTEST_ARTIFACT_DIR / f"backtest_{name}.pkl", "wb") as f:
             pickle.dump(results[name], f)
         write_backtest_evidence(

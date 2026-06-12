@@ -58,6 +58,7 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq strategy run all --mode production --json` | 运行生产策略扫描 |
 | `astroq strategy run trend_following --mode research --dry-run --json` | 候选策略研究扫描演练 |
 | `astroq strategy compete --json` | 生成 12 策略统一 OOS 公平竞赛报告 |
+| `astroq lifecycle check --json` | 生成全运行周期证据链 readiness 产物 |
 | `astroq regime status --json` | 查看当前 market regime |
 | `astroq regime train-profit --dry-run --json` | 演练利润导向 regime 训练入口 |
 | `astroq backtest run --strategy multifactor --dry-run --json` | 回测入口演练 |
@@ -127,6 +128,7 @@ For system-intelligence changes, regenerate the relevant artifact and validate t
 ```bash
 astroq architecture ast --json
 astroq test design --json
+astroq lifecycle check --json
 ```
 
 ## Current Architecture Notes
@@ -135,7 +137,8 @@ astroq test design --json
 - External provider capabilities are governed separately from project dimensions: Source Capability Registry describes what sources can provide, `data_registry` describes what the project uses, and DataHub coverage describes what exists locally.
 - Production backtests use `backtest/pipeline_runner.py` plus shared modules under `pipeline/`.
 - Strategy state is owned by Strategy Catalog and separated into production, paper, and candidate layers.
-- Web System visualizations include CodeGraph, AST diagnostics, architecture diagnostics, and test design intelligence.
+- Web System visualizations include CodeGraph, AST diagnostics, architecture diagnostics, test design intelligence, and lifecycle readiness.
+- Formal strategy promotion depends on score panels, alpha evidence, data readiness, and execution assumptions. Missing data, missing source capability, missing score panels, and insufficient evidence must be reported as blocked/not_applicable states, not filled with placeholder values.
 - The project is local-first. Network access, provider permissions, and data completeness must be explicit, observable, and never hidden behind fake defaults.
 
 ## Git Hygiene
