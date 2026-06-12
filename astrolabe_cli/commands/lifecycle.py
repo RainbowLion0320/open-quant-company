@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from astrolabe_cli.results import CliResult
@@ -91,7 +91,7 @@ def build_lifecycle_payload() -> dict[str, Any]:
     unique_warnings = sorted(dict.fromkeys(str(item) for item in warnings if item))
     return {
         "schema_version": 1,
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "status": "blocked" if unique_blockers else "ok",
         "checks": checks,
         "blockers": unique_blockers,

@@ -84,3 +84,28 @@ def test_lifecycle_api_is_read_only_no_artifact(monkeypatch, tmp_path):
     assert payload["status"] == "no_artifact"
     assert payload["recommended_command"] == "astroq lifecycle check --json"
     assert payload["checks"] == {}
+
+
+def test_lifecycle_api_accepts_naive_artifact_timestamp(monkeypatch, tmp_path):
+    from web.api.services import system_lifecycle
+
+    monkeypatch.setattr(system_lifecycle, "get_datahub", lambda: type("Hub", (), {"artifact_dir": lambda self, kind: tmp_path / kind})())
+    artifact_dir = tmp_path / "lifecycle"
+    artifact_dir.mkdir()
+    (artifact_dir / "latest.json").write_text(
+        json.dumps(
+            {
+                "status": "blocked",
+                "generated_at": "2026-06-13T07:08:44",
+                "checks": {},
+                "blockers": ["stale_data:bond_treasury_yields"],
+                "warnings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = system_lifecycle.lifecycle_payload()
+
+    assert payload["status"] == "blocked"
+    assert payload["artifact_age_seconds"] is not None
