@@ -13,15 +13,16 @@ from signals.selection import apply_ranked_buys
 from signals.technical import technical_factors_from_frame
 
 
-def _get_latest_price(symbol: str) -> float:
-    """Return latest cached/refreshed close price, or 0 when unavailable."""
-    try:
-        from data.market.price_service import get_latest_price
-        from data.market.price_types import PriceUseCase
+class SignalDataUnavailable(RuntimeError):
+    """Raised when a production signal cannot be computed from real inputs."""
 
-        return get_latest_price(symbol, use_case=PriceUseCase.VALUATION)
-    except Exception:
-        return 0.0
+
+def _get_latest_price(symbol: str) -> float:
+    """Return latest raw valuation price, raising when unavailable."""
+    from data.market.price_service import get_latest_price
+    from data.market.price_types import PriceUseCase
+
+    return get_latest_price(symbol, use_case=PriceUseCase.VALUATION, strict=True)
 
 
 def compute_buffett(limit: int = 0) -> list[dict]:
@@ -195,25 +196,19 @@ def _roe_trend(history: list) -> str:
 
 def _get_technical_factors(symbol: str) -> dict:
     """Compute momentum, trend and volatility from local market data."""
-    fallback = {
-        "momentum_1m": 0,
-        "momentum_3m": 0,
-        "momentum_3m_skip_1m": 0,
-        "momentum_6m_skip_1m": 0,
-        "trend_strength": 0,
-        "volatility": 0.30,
-    }
     try:
         from data.market.price_service import get_stock_prices
         from data.market.price_types import PriceUseCase
 
         df = get_stock_prices(symbol, use_case=PriceUseCase.SIGNAL)
         if df is None or len(df) < 63:
-            return fallback
+            raise SignalDataUnavailable(f"insufficient_signal_price_history:{symbol}")
         df = df.sort_values("date") if "date" in df.columns else df
         return technical_factors_from_frame(df)
-    except Exception:
-        return fallback
+    except SignalDataUnavailable:
+        raise
+    except Exception as exc:
+        raise SignalDataUnavailable(f"technical_factors_unavailable:{symbol}:{type(exc).__name__}") from exc
 
 
 def compute_cybernetic(limit: int = 0) -> list[dict]:
@@ -240,32 +235,35 @@ def compute_cybernetic(limit: int = 0) -> list[dict]:
 
     results = []
     for sym in symbols:
-        ind = SYMBOL_INDUSTRY.get(sym, "待分类")
-        sec = SYMBOL_SECTOR.get(sym, FALLBACK_SECTOR)
-        name = SYMBOL_NAME.get(sym, sym)
+        try:
+            ind = SYMBOL_INDUSTRY.get(sym, "待分类")
+            sec = SYMBOL_SECTOR.get(sym, FALLBACK_SECTOR)
+            name = SYMBOL_NAME.get(sym, sym)
 
-        tech = _get_technical_factors(sym)
-        score = score_cybernetic_from_factors(ind, regime, tech, regime_probs=regime_probs)
+            tech = _get_technical_factors(sym)
+            score = score_cybernetic_from_factors(ind, regime, tech, regime_probs=regime_probs)
 
-        results.append(
-            {
-                "symbol": sym,
-                "name": name,
-                "industry": ind,
-                "sector": sec,
-                "score": round(score, 1),
-                "signal": "hold",
-                "detail": {
-                    "regime": regime,
-                    "favored_sectors": favored,
-                    "position_pct": params.get("position_size", params.get("position_pct", 0.15)),
-                    "max_positions": params.get("max_positions", 5),
-                    "trend_strength": round(tech.get("trend_strength", 0), 4),
-                    "momentum_3m_skip_1m": round(tech.get("momentum_3m_skip_1m", 0), 4),
-                    "volatility": round(tech.get("volatility", 0), 4),
-                },
-            }
-        )
+            results.append(
+                {
+                    "symbol": sym,
+                    "name": name,
+                    "industry": ind,
+                    "sector": sec,
+                    "score": round(score, 1),
+                    "signal": "hold",
+                    "detail": {
+                        "regime": regime,
+                        "favored_sectors": favored,
+                        "position_pct": params.get("position_size", params.get("position_pct", 0.15)),
+                        "max_positions": params.get("max_positions", 5),
+                        "trend_strength": round(tech.get("trend_strength", 0), 4),
+                        "momentum_3m_skip_1m": round(tech.get("momentum_3m_skip_1m", 0), 4),
+                        "volatility": round(tech.get("volatility", 0), 4),
+                    },
+                }
+            )
+        except SignalDataUnavailable:
+            continue
 
     min_score = float(params.get("confidence_threshold", 0.60)) * 100
     max_buys = max(10, int(params.get("max_positions", 5)) * 4)

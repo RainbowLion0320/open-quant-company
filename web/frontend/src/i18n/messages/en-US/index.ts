@@ -16,11 +16,13 @@ import { backtest } from "./backtest";
 import { evidence } from "./evidence";
 import { database } from "./database";
 import { assetCoverage } from "./assetCoverage";
+import { dataSources } from "./dataSources";
 import { activity } from "./activity";
 import { configCenter } from "./configCenter";
 import { codegraph } from "./codegraph";
 import { testDesign } from "./testDesign";
 import { astIntelligence } from "./astIntelligence";
+import { lifecycle } from "./lifecycle";
 
 export const enUS = {
   app,
@@ -41,9 +43,11 @@ export const enUS = {
   evidence,
   database,
   assetCoverage,
+  dataSources,
   activity,
   configCenter,
   codegraph,
   testDesign,
   astIntelligence,
+  lifecycle,
 } as const;

@@ -145,9 +145,25 @@ class MLStrategy(BaseStrategy):
             except KeyError:
                 self._pit_score_cache[cache_key] = {}
                 return {}
-            X = rows.reindex(columns=feature_names, fill_value=0)
+            missing_columns = [name for name in feature_names if name not in rows.columns]
+            if missing_columns:
+                self.load_errors.append(
+                    f"missing_required_features:{as_of_date}:{regime}: {','.join(missing_columns[:10])}"
+                )
+                self._pit_score_cache[cache_key] = {}
+                return {}
+            X = rows.loc[:, feature_names]
             X = X.apply(pd.to_numeric, errors="coerce")
-            X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
+            X = X.replace([np.inf, -np.inf], np.nan)
+            missing_mask = X.isna().any(axis=1)
+            if missing_mask.any():
+                self.load_errors.append(
+                    f"missing_required_features:{as_of_date}:{regime}: rows={int(missing_mask.sum())}"
+                )
+                X = X.loc[~missing_mask]
+            if X.empty:
+                self._pit_score_cache[cache_key] = {}
+                return {}
             try:
                 preds = np.asarray(model.predict(X), dtype=float)
             except Exception as exc:
@@ -158,7 +174,7 @@ class MLStrategy(BaseStrategy):
             scores = np.clip(scores, 0.0, 100.0)
             self._pit_score_cache[cache_key] = {
                 str(sym): float(score)
-                for sym, score in zip(rows.index.astype(str), scores)
+                for sym, score in zip(X.index.astype(str), scores)
             }
         return self._pit_score_cache[cache_key]
 
@@ -332,3 +348,39 @@ class MLFeatureStoreAlphaModel(AlphaModel):
 
         signals.sort(key=lambda s: s.score, reverse=True)
         return signals
+
+    def generate_score_panel(
+        self,
+        universe: list[str],
+        prices: pd.DataFrame,
+        date_idx: int,
+        regime: str,
+    ) -> list[dict]:
+        if not getattr(self.strategy, "is_ready", False):
+            return []
+        score_map = self.strategy.pit_score_map(prices, date_idx, regime)
+        if not score_map:
+            return []
+        as_of_date = self.strategy._feature_date_for_price_index(prices, date_idx)
+        cache_key = self.strategy._cache_key_for_regime(regime)
+        rows: list[dict] = []
+        ts = datetime.now().isoformat()
+        available = set(str(col) for col in getattr(prices, "columns", []))
+        for symbol in universe:
+            sym = str(symbol)
+            if available and sym not in available:
+                continue
+            score = score_map.get(sym)
+            rows.append(
+                {
+                    "symbol": sym,
+                    "strategy": self.name,
+                    "score": float(score) if score is not None else None,
+                    "horizon_days": self.horizon_days,
+                    "timestamp": ts,
+                    "feature_version": as_of_date or "",
+                    "model_version": cache_key,
+                    "data_quality": "ok" if score is not None else "missing_feature_row",
+                }
+            )
+        return rows

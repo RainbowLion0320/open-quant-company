@@ -13,6 +13,7 @@ export const common = {
       readonly: "Read-only",
       reset: "Reset",
       retry: "Retry",
+      refresh: "Refresh",
       save: "Save",
       saving: "Saving...",
       sell: "Sell",

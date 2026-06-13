@@ -68,6 +68,7 @@ class PipelineBacktest:
 
         trade_log: list[tuple] = []
         daily_values: list[tuple] = []
+        score_panel_rows: list[dict] = []
         total_days = len(prices)
 
         for day_idx in range(total_days):
@@ -120,6 +121,17 @@ class PipelineBacktest:
 
                 # Stage 1: Alpha
                 ctx.signals = self.alpha.generate_alpha(universe, visible_price_history, visible_day_idx, regime)
+                score_panel_rows.extend(
+                    self._score_panel_rows(
+                        universe=universe,
+                        visible_prices=visible_price_history,
+                        full_prices=price_history,
+                        full_idx=day_idx,
+                        visible_idx=visible_day_idx,
+                        regime=regime,
+                        signals=ctx.signals,
+                    )
+                )
 
                 # Stage 2: Portfolio
                 ctx.targets = self.portfolio.construct(ctx.signals, ctx)
@@ -184,6 +196,8 @@ class PipelineBacktest:
             "daily_returns": daily_returns,
             "bench_returns": bench_returns,
             "trade_log": trade_log,
+            "score_panel": pd.DataFrame(score_panel_rows),
+            "alpha_diagnostics": self._alpha_diagnostics(),
             "final_holdings": dict(holdings),
             "total_return": report.total_return,
             "bench_return": (bench_close.iloc[-1] / bench_close.iloc[0] - 1) if len(bench_close) > 0 else 0,
@@ -205,3 +219,94 @@ class PipelineBacktest:
         except Exception:
             pass
         return None
+
+    def _score_panel_rows(
+        self,
+        *,
+        universe: list[str],
+        visible_prices: pd.DataFrame,
+        full_prices: pd.DataFrame,
+        full_idx: int,
+        visible_idx: int,
+        regime: str,
+        signals: list,
+    ) -> list[dict]:
+        raw_rows = self.alpha.generate_score_panel(universe, visible_prices, visible_idx, regime)
+        if not raw_rows:
+            raw_rows = [
+                {
+                    "symbol": signal.symbol,
+                    "strategy": signal.strategy,
+                    "score": signal.score,
+                    "horizon_days": signal.horizon_days,
+                    "timestamp": signal.timestamp,
+                    "data_quality": "signal_only",
+                }
+                for signal in signals
+            ]
+        if not raw_rows:
+            return []
+
+        signal_symbols = {str(signal.symbol) for signal in signals}
+        dt = full_prices.index[full_idx]
+        numeric_scores = pd.Series(
+            {
+                idx: pd.to_numeric(row.get("score"), errors="coerce")
+                for idx, row in enumerate(raw_rows)
+            },
+            dtype="float64",
+        )
+        ranks = numeric_scores.rank(ascending=False, method="first")
+        out: list[dict] = []
+        for idx, row in enumerate(raw_rows):
+            symbol = str(row.get("symbol", ""))
+            if not symbol or symbol not in full_prices.columns:
+                continue
+            horizon = int(row.get("horizon_days") or 20)
+            forward_return = self._forward_return(full_prices[symbol], full_idx, horizon)
+            score_value = pd.to_numeric(row.get("score"), errors="coerce")
+            out.append(
+                {
+                    "as_of_date": dt.date().isoformat() if hasattr(dt, "date") else str(dt),
+                    "symbol": symbol,
+                    "strategy": row.get("strategy") or self.alpha.name,
+                    "score": float(score_value) if pd.notna(score_value) else None,
+                    "rank": int(ranks.loc[idx]) if pd.notna(ranks.loc[idx]) else None,
+                    "selected": bool(symbol in signal_symbols),
+                    "forward_return_20d": forward_return if horizon == 20 else None,
+                    "forward_return": forward_return,
+                    "horizon_days": horizon,
+                    "feature_version": row.get("feature_version", ""),
+                    "model_version": row.get("model_version", ""),
+                    "data_quality": row.get("data_quality", "ok"),
+                    "regime": regime,
+                }
+            )
+        return out
+
+    @staticmethod
+    def _forward_return(series: pd.Series, idx: int, horizon: int) -> float | None:
+        target_idx = idx + horizon
+        if target_idx >= len(series):
+            return None
+        try:
+            current = float(series.iloc[idx])
+            future = float(series.iloc[target_idx])
+        except Exception:
+            return None
+        if not np.isfinite(current) or not np.isfinite(future) or current <= 0:
+            return None
+        return float(future / current - 1.0)
+
+    def _alpha_diagnostics(self) -> dict:
+        errors = []
+        if hasattr(self.alpha, "load_errors"):
+            errors.extend(str(item) for item in getattr(self.alpha, "load_errors") or [])
+        strategy = getattr(self.alpha, "strategy", None)
+        if strategy is not None and hasattr(strategy, "load_errors"):
+            errors.extend(str(item) for item in getattr(strategy, "load_errors") or [])
+        return {
+            "alpha_model": self.alpha.__class__.__name__,
+            "strategy": getattr(self.alpha, "name", ""),
+            "load_errors": sorted(dict.fromkeys(errors)),
+        }

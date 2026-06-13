@@ -61,7 +61,7 @@ class TestExecutionDryRun:
         )
         monkeypatch.setattr(
             "scripts.db_health_check.run_health_check",
-            lambda: pd.DataFrame([{"table": "stock_daily", "missing_pct": 75.0}]),
+            lambda: pd.DataFrame([{"table": "stock_daily", "freshness_status": "stale", "missing_pct": 75.0}]),
         )
 
         from astrolabe_cli.commands.execution import dry_run

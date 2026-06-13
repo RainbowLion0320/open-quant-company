@@ -26,4 +26,6 @@ def artifact_age_seconds(payload: dict[str, Any]) -> float | None:
         dt = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.now().astimezone().tzinfo)
     return round((datetime.now(timezone.utc) - dt).total_seconds(), 3)

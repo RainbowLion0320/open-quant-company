@@ -32,6 +32,8 @@ class StrategyEvaluation:
     oos_months: int
     trades: int
     baseline_win_rate: float = 0.0
+    ic: float = 0.0
+    icir: float = 0.0
     regime_coverage: dict[str, float] = field(default_factory=dict)
     cost_model: str = "commission_slippage"
 
@@ -44,8 +46,8 @@ def promotion_ready(evaluation: StrategyEvaluation, target_status: str = "paper"
         turnover=evaluation.turnover,
         oos_months=evaluation.oos_months,
         trades=evaluation.trades,
-        ic=0.03 if evaluation.baseline_win_rate >= 0.6 else 0.0,
-        icir=0.4 if evaluation.baseline_win_rate >= 0.6 else 0.0,
+        ic=evaluation.ic,
+        icir=evaluation.icir,
     )
     return evaluate_promotion(metrics, target_status=target_status)
 
@@ -81,18 +83,49 @@ def build_evidence_report(
     oos: dict[str, Any] | None = None,
     cost_model: dict[str, Any] | None = None,
     regime_breakdown: dict[str, Any] | None = None,
+    alpha_evidence: dict[str, Any] | None = None,
+    data_readiness: dict[str, Any] | None = None,
+    backtest_evidence: dict[str, Any] | None = None,
     target_status: str = "paper",
 ) -> dict[str, Any]:
     metric_src = metrics or {}
     oos_src = oos or {}
     baseline_src = baselines or {name: {} for name in required_baselines()}
+    missing_evidence = [
+        key
+        for key in ("ic", "icir")
+        if key not in metric_src or metric_src.get(key) is None
+    ]
     normalized_metrics = {
         "cagr": _metric_value(metric_src, "cagr", _metric_value(metric_src, "total_return", 0.0)),
         "sharpe": _metric_value(metric_src, "sharpe"),
         "max_drawdown": _metric_value(metric_src, "max_drawdown"),
         "turnover": _metric_value(metric_src, "turnover"),
         "trades": int(_metric_value(metric_src, "trades", _metric_value(metric_src, "trade_count", 0.0))),
+        "win_rate": _metric_value(metric_src, "win_rate"),
+        "benchmark_total_return": _metric_value(metric_src, "benchmark_total_return"),
+        "excess_return": _metric_value(metric_src, "excess_return"),
     }
+    if "ic" in metric_src and metric_src.get("ic") is not None:
+        normalized_metrics["ic"] = _metric_value(metric_src, "ic")
+    if "icir" in metric_src and metric_src.get("icir") is not None:
+        normalized_metrics["icir"] = _metric_value(metric_src, "icir")
+    alpha_src = dict(alpha_evidence or {})
+    if not alpha_src:
+        if missing_evidence:
+            alpha_src = {
+                "status": "missing",
+                "reason": "missing_alpha_evidence",
+                "ic": None,
+                "icir": None,
+            }
+        else:
+            alpha_src = {
+                "status": "measured",
+                "reason": "",
+                "ic": normalized_metrics.get("ic"),
+                "icir": normalized_metrics.get("icir"),
+            }
     evaluation = StrategyEvaluation(
         name=strategy,
         cagr=normalized_metrics["cagr"],
@@ -102,14 +135,26 @@ def build_evidence_report(
         oos_months=int(oos_src.get("months", 0) or 0),
         trades=normalized_metrics["trades"],
         baseline_win_rate=_metric_value(metric_src, "baseline_win_rate"),
+        ic=_metric_value(normalized_metrics, "ic"),
+        icir=_metric_value(normalized_metrics, "icir"),
         regime_coverage={k: 1.0 for k, v in _normalized_regime_breakdown(regime_breakdown).items() if v},
     )
     decision = promotion_ready(evaluation, target_status=target_status)
+    failed_rules = list(decision.failed_rules)
+    if missing_evidence:
+        for key in missing_evidence:
+            marker = f"missing_evidence:{key}"
+            if marker not in failed_rules:
+                failed_rules.append(marker)
+    passed = decision.passed and not missing_evidence
     return {
         "strategy": strategy,
         "status": status,
         "baselines": {name: dict(baseline_src.get(name, {})) for name in required_baselines()},
         "metrics": normalized_metrics,
+        "alpha_evidence": alpha_src,
+        "data_readiness": dict(data_readiness or {"status": "unknown", "blockers": []}),
+        "backtest_evidence": dict(backtest_evidence or {}),
         "oos": {
             "months": int(oos_src.get("months", 0) or 0),
             "start": str(oos_src.get("start", "")),
@@ -120,10 +165,11 @@ def build_evidence_report(
             "slippage": _metric_value(cost_model or {}, "slippage", 0.001),
         },
         "regime_breakdown": _normalized_regime_breakdown(regime_breakdown),
+        "missing_evidence": missing_evidence,
         "promotion_decision": {
             "target_status": decision.target_status,
-            "passed": decision.passed,
-            "failed_rules": list(decision.failed_rules),
+            "passed": passed,
+            "failed_rules": failed_rules,
             "warnings": list(decision.warnings),
             "rationale": decision.rationale,
         },
@@ -253,14 +299,53 @@ def write_backtest_evidence(
     end: str,
     output_dir: str | Path | None = None,
 ) -> Path:
+    from research.strategy_competition import _alpha_evidence_from_result, summarize_backtest_result
+    from research.strategy_governance import default_strategy_roles
+
+    summary = summarize_backtest_result(result)
+    oos_metrics = dict(summary.get("oos") or {})
+    role = default_strategy_roles().get(strategy)
+    layer = role.layer if role is not None else "candidate_alpha"
+    alpha_evidence = _alpha_evidence_from_result(result, layer=layer)
+    report_metrics = {
+        "cagr": _metric_value(oos_metrics, "annual_return"),
+        "total_return": _metric_value(oos_metrics, "total_return"),
+        "sharpe": _metric_value(oos_metrics, "sharpe"),
+        "max_drawdown": _metric_value(oos_metrics, "max_drawdown"),
+        "turnover": _metric_value(oos_metrics, "turnover"),
+        "trades": int(_metric_value(oos_metrics, "trade_count")),
+        "win_rate": _metric_value(oos_metrics, "win_rate"),
+        "benchmark_total_return": _metric_value(oos_metrics, "benchmark_total_return"),
+        "excess_return": _metric_value(oos_metrics, "excess_return"),
+    }
+    if alpha_evidence.get("status") == "measured":
+        report_metrics["ic"] = alpha_evidence.get("ic")
+        report_metrics["icir"] = alpha_evidence.get("icir")
+    score_panel = result.get("score_panel")
+    score_panel_rows = int(len(score_panel)) if hasattr(score_panel, "__len__") else 0
     report = build_evidence_report(
         strategy=strategy,
         status=status,
-        metrics=result,
-        oos={"months": 0, "start": start, "end": end},
+        metrics=report_metrics,
+        oos={
+            "months": int(oos_metrics.get("months", 0) or 0),
+            "start": str(oos_metrics.get("start", start)),
+            "end": str(oos_metrics.get("end", end)),
+        },
         cost_model={
             "commission": _metric_value(result, "commission", 0.00025),
             "slippage": _metric_value(result, "slippage", 0.001),
+        },
+        alpha_evidence=alpha_evidence,
+        data_readiness={
+            "status": "ok" if alpha_evidence.get("status") in {"measured", "not_applicable"} else "blocked",
+            "blockers": [] if alpha_evidence.get("status") in {"measured", "not_applicable"} else [alpha_evidence.get("reason")],
+        },
+        backtest_evidence={
+            "score_panel_rows": score_panel_rows,
+            "has_score_panel": score_panel_rows > 0,
+            "start": start,
+            "end": end,
         },
     )
     return write_strategy_evidence_report(report, output_dir=output_dir)

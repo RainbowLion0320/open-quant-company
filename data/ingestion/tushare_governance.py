@@ -12,6 +12,7 @@ import pandas as pd
 import requests
 
 from core.env_secrets import secret_status
+from data.ingestion.tushare_capabilities import build_tushare_probe_calls
 from data.ingestion.tushare_coverage import build_tushare_coverage, missing_symbol_files
 from data.ingestion.tushare_tasks import BACKFILL_TASKS, MINUTE_POLICY, REPORT_SCHEMA_VERSION
 from data.ingestion.tushare_utils import get_tushare_token
@@ -101,39 +102,7 @@ class TushareGovernance:
 
         end = _today()
         start = (datetime.now() - timedelta(days=20)).strftime("%Y%m%d")
-        sample_symbol = "000001.SZ"
-        sample_sw = "801010.SI"
-        probes: dict[str, Callable[[Any], object]] = {
-            "stock_basic": lambda api: api.stock_basic(exchange="", list_status="L", fields="ts_code,symbol,name,area,industry,list_date"),
-            "trade_cal": lambda api: api.trade_cal(exchange="SSE", start_date=start, end_date=end),
-            "daily": lambda api: api.daily(ts_code=sample_symbol, start_date=start, end_date=end),
-            "adj_factor": lambda api: api.adj_factor(ts_code=sample_symbol, start_date=start, end_date=end),
-            "daily_basic": lambda api: api.daily_basic(ts_code=sample_symbol, start_date=start, end_date=end),
-            "fina_indicator": lambda api: api.fina_indicator(ts_code=sample_symbol, start_date="20240101", end_date=end),
-            "moneyflow": lambda api: api.moneyflow(ts_code=sample_symbol, start_date=start, end_date=end),
-            "moneyflow_mkt_dc": lambda api: api.moneyflow_mkt_dc(start_date=start, end_date=end),
-            "limit_list_d": lambda api: api.limit_list_d(trade_date=end, limit_type="U"),
-            "top_list": lambda api: api.top_list(trade_date=end),
-            "broker_recommend": lambda api: api.broker_recommend(month=datetime.now().strftime("%Y%m")),
-            "report_rc": lambda api: api.report_rc(start_date=start, end_date=end),
-            "share_float": lambda api: api.share_float(start_date=start, end_date=end),
-            "repurchase": lambda api: api.repurchase(start_date=start, end_date=end),
-            "dividend": lambda api: api.dividend(start_date=f"{datetime.now().year}0101", end_date=end),
-            "cyq_perf": lambda api: api.cyq_perf(trade_date=end),
-            "stk_factor_pro": lambda api: api.stk_factor_pro(ts_code=sample_symbol, start_date=start, end_date=end),
-            "stk_mins": lambda api: api.stk_mins(ts_code=sample_symbol, freq="1min", start_date=start, end_date=end),
-            "cn_pmi": lambda api: api.cn_pmi(),
-            "cn_cpi": lambda api: api.cn_cpi(),
-            "cn_ppi": lambda api: api.cn_ppi(),
-            "cn_gdp": lambda api: api.cn_gdp(),
-            "shibor_lpr": lambda api: api.shibor_lpr(),
-            "fund_basic": lambda api: api.fund_basic(market="E"),
-            "fund_daily": lambda api: api.fund_daily(ts_code="510050.SH"),
-            "fund_nav": lambda api: api.fund_nav(ts_code="510050.SH"),
-            "fund_portfolio": lambda api: api.fund_portfolio(period="20250331"),
-            "fut_daily": lambda api: api.fut_daily(ts_code="IF.CFX"),
-            "sw_daily": lambda api: api.sw_daily(ts_code=sample_sw, start_date=start, end_date=end),
-        }
+        probes = build_tushare_probe_calls(start, end)
         return {name: self._safe_probe(name, call) for name, call in probes.items()}
 
     def trade_days(self, days: int = 365) -> list[str]:

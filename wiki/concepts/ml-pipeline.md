@@ -83,9 +83,9 @@ ma_golden = Gt(MA("close", 5), MA("close", 20))
 4. 生成标准信号行。
 5. 由 `data/strategy/plugins.py` 统一持久化。
 
-如果特征文件过期或覆盖不足，系统应显式告警或跳过，而不是用缺失值默默补 0。
+如果特征文件过期、覆盖不足、缺必需特征列或单行必需特征为空，系统应显式告警或跳过，而不是用缺失值默默补 0。
 
-`backtest/strategies/ml_strategy.py` 负责回测 Alpha。正式回测使用 `MLFeatureStoreAlphaModel` 批量读取调仓日之前可见的最新 PIT as-of 视图并一次性预测横截面 score map，随后进入统一 Pipeline 的 portfolio/risk/execution 阶段。这个路径和生产信号共享模型加载、特征名和 dtype 清洗规则，但不消费当天最新信号文件，避免 paper 信号新鲜度与历史回测语义混在一起。
+`backtest/strategies/ml_strategy.py` 负责回测 Alpha。正式回测使用 `MLFeatureStoreAlphaModel` 批量读取调仓日之前可见的最新 PIT as-of 视图并一次性预测横截面 score map，随后进入统一 Pipeline 的 portfolio/risk/execution 阶段。score map 会进入回测 `score_panel`，用于后续 IC/ICIR 证据计算。这个路径和生产信号共享模型加载、特征名和 dtype 清洗规则，但不消费当天最新信号文件，避免 paper 信号新鲜度与历史回测语义混在一起。
 
 ## 6. LLM 因子发现
 
@@ -107,7 +107,7 @@ LLM 因子必须防止两类常见错误：
 
 ## 技术债务
 
-- 模型晋级需要更正式的 artifact manifest。
+- 模型晋级需要更完整的 artifact manifest，包括训练窗口、特征列、数据覆盖和 OOS 证据。
 - 因子记分板需要驱动自动淘汰，而不是只做记录。
 - 回测和 paper trading 需要统一执行账本，避免研究收益和模拟 NAV 不可对账。
 

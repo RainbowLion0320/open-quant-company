@@ -160,7 +160,8 @@ var/store/signals/*.parquet  (预计算信号)
     FullReport: {metrics, trades, monthly_returns}
              │
              ▼
-    var/artifacts/tournaments/{date}.json
+    var/artifacts/tournaments/strategy_competition_{timestamp}.json
+    var/artifacts/tournaments/strategy_competition_latest.json
              │
              ▼
     var/store/research/strategy_evidence/{strategy}.json
@@ -177,6 +178,7 @@ var/store/signals/*.parquet  (预计算信号)
 | 无风险利率 | 本地收益率曲线 (默认 CN 2Y) | Sharpe/Sortino/Alpha 不能使用固定值或静默 fallback |
 | 交易约束 | 100 股整数倍 + 手续费 | 模拟真实 A 股交易规则 |
 | 巴菲特评分 | 滚动窗口逐年评估 | 避免全局数据泄露 |
+| 策略公平竞赛 | `astroq strategy compete --json` | 12 个启用策略使用同一 backtest artifact、同一 OOS 窗口、同一基准和成本口径排名；artifact 必须包含 data readiness 与 score panel，alpha 策略必须由 score panel 计算 IC/ICIR，缺证据时标记 blocked |
 | 候选晋级证据 | 统一 JSON artifact | 避免 UI、文档和研究脚本各自解释策略是否可晋级 |
 
 ## 5. 接口合约

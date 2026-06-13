@@ -21,7 +21,6 @@ import pandas as pd
 import numpy as np
 
 from data.storage.datahub import get_datahub
-from data.market.symbol_utils import to_ts_code
 from signals.expression import Factor, alpha_factors
 
 
@@ -29,6 +28,7 @@ HUB = get_datahub()
 FEATURES_DIR = HUB.features_dir()
 FEATURES_DIR.mkdir(parents=True, exist_ok=True)
 FEATURE_METADATA_STEMS = frozenset({"scan_meta", "buffett_scan"})
+_HOLDER_HISTORY_CACHE: dict[str, pd.DataFrame | None] = {}
 
 
 def feature_key_to_date(key: str) -> pd.Timestamp | None:
@@ -63,6 +63,64 @@ def iter_feature_files(directory: Path | None = None) -> list[Path]:
         for path in root.glob("*.parquet")
         if path.stem not in FEATURE_METADATA_STEMS and feature_key_to_date(path.stem) is not None
     )
+
+
+def ignored_feature_files(directory: Path | None = None) -> list[Path]:
+    """List feature-like parquet files ignored by the canonical daily PIT loader."""
+    root = directory or FEATURES_DIR
+    if not root.exists():
+        return []
+    return sorted(
+        path
+        for path in root.glob("*.parquet")
+        if path.stem not in FEATURE_METADATA_STEMS and feature_key_to_date(path.stem) is None
+    )
+
+
+def feature_store_coverage(
+    directory: Path | None = None,
+    *,
+    start: str | pd.Timestamp | None = None,
+    end: str | pd.Timestamp | None = None,
+    max_files: int = 256,
+) -> dict:
+    """Return lightweight coverage diagnostics for canonical daily PIT features."""
+    files = iter_feature_files(directory)
+    if start is not None:
+        start_ts = pd.Timestamp(start).normalize()
+        files = [path for path in files if (feature_key_to_date(path.stem) or start_ts) >= start_ts]
+    if end is not None:
+        end_ts = pd.Timestamp(end).normalize()
+        files = [path for path in files if (feature_key_to_date(path.stem) or end_ts) <= end_ts]
+
+    ignored = ignored_feature_files(directory)
+    selected = files[-max_files:] if max_files and len(files) > max_files else files
+    symbols: set[str] = set()
+    row_count = 0
+    read_errors: list[str] = []
+    for path in selected:
+        try:
+            frame = pd.read_parquet(path, columns=["symbol"])
+        except Exception as exc:
+            read_errors.append(f"{path.name}: {exc}")
+            continue
+        row_count += len(frame)
+        if "symbol" in frame.columns:
+            symbols.update(str(symbol) for symbol in frame["symbol"].dropna().unique())
+
+    date_keys = [feature_date_key(feature_key_to_date(path.stem)) for path in files if feature_key_to_date(path.stem) is not None]
+    return {
+        "directory": str(directory or FEATURES_DIR),
+        "daily_file_count": len(files),
+        "ignored_file_count": len(ignored),
+        "sampled_file_count": len(selected),
+        "row_count": int(row_count),
+        "symbol_count": len(symbols),
+        "start": date_keys[0] if date_keys else "",
+        "end": date_keys[-1] if date_keys else "",
+        "truncated": bool(max_files and len(files) > max_files),
+        "read_errors": read_errors[:10],
+    }
 
 
 def latest_feature_file(directory: Path | None = None, as_of: str | pd.Timestamp | None = None) -> Path | None:
@@ -329,24 +387,30 @@ def enrich_from_registry(
                     break
 
             if mf_df is not None and len(mf_df) > 0:
-                for sym in symbols:
-                    ts_code = to_ts_code(sym)
-                    row_match = mf_df[mf_df["ts_code"] == ts_code]
-                    if len(row_match) > 0:
-                        row = row_match.iloc[0]
-                        mask = df["symbol"] == sym
-                        buy_lg = float(row.get("buy_lg_amount", 0) or 0)
-                        sell_lg = float(row.get("sell_lg_amount", 0) or 0)
-                        buy_elg = float(row.get("buy_elg_amount", 0) or 0)
-                        sell_elg = float(row.get("sell_elg_amount", 0) or 0)
-                        net_mf = float(row.get("net_mf_amount", 0) or 0)
-
-                        total_abs = abs(buy_lg) + abs(sell_lg) + abs(buy_elg) + abs(sell_elg) + 1
-                        df.loc[mask, "mf_net_amount"] = net_mf
-                        df.loc[mask, "mf_inst_net"] = buy_lg + buy_elg - sell_lg - sell_elg
-                        sell_total = sell_lg + sell_elg
-                        df.loc[mask, "mf_smart_ratio"] = (buy_lg + buy_elg) / sell_total if sell_total > 0 else 50.0
-        except Exception as e:
+                required = {
+                    "ts_code",
+                    "buy_lg_amount",
+                    "sell_lg_amount",
+                    "buy_elg_amount",
+                    "sell_elg_amount",
+                    "net_mf_amount",
+                }
+                if required.issubset(mf_df.columns):
+                    mf = mf_df[list(required)].copy()
+                    for col in required - {"ts_code"}:
+                        mf[col] = pd.to_numeric(mf[col], errors="coerce").fillna(0.0)
+                    mf["symbol"] = mf["ts_code"].astype(str).str.slice(0, 6)
+                    mf["mf_net_amount"] = mf["net_mf_amount"]
+                    mf["mf_inst_net"] = mf["buy_lg_amount"] + mf["buy_elg_amount"] - mf["sell_lg_amount"] - mf["sell_elg_amount"]
+                    sell_total = mf["sell_lg_amount"] + mf["sell_elg_amount"]
+                    mf["mf_smart_ratio"] = np.where(
+                        sell_total > 0,
+                        (mf["buy_lg_amount"] + mf["buy_elg_amount"]) / sell_total,
+                        50.0,
+                    )
+                    enriched = mf[["symbol", "mf_net_amount", "mf_inst_net", "mf_smart_ratio"]].drop_duplicates("symbol")
+                    df = df.merge(enriched, on="symbol", how="left")
+        except Exception:
             pass  # Non-critical enrichment
 
     # ── Holder factors ──
@@ -354,13 +418,24 @@ def enrich_from_registry(
         try:
             holders_dir = HUB.store_dir("stock") / "holders"
             for sym in symbols:
-                hf_path = holders_dir / f"{sym}.parquet"
-                if not hf_path.exists():
+                if sym not in _HOLDER_HISTORY_CACHE:
+                    hf_path = holders_dir / f"{sym}.parquet"
+                    if not hf_path.exists():
+                        _HOLDER_HISTORY_CACHE[sym] = None
+                    else:
+                        loaded = HUB.read_parquet(hf_path)
+                        if loaded is None or "end_date" not in loaded.columns or len(loaded) < 2:
+                            _HOLDER_HISTORY_CACHE[sym] = None
+                        else:
+                            loaded = loaded.copy()
+                            loaded["end_date"] = pd.to_datetime(loaded["end_date"], errors="coerce")
+                            loaded = loaded.dropna(subset=["end_date"]).sort_values("end_date")
+                            _HOLDER_HISTORY_CACHE[sym] = loaded
+                hf_df = _HOLDER_HISTORY_CACHE.get(sym)
+                if hf_df is None:
                     continue
-                hf_df = HUB.read_parquet(hf_path)
                 if "end_date" not in hf_df.columns or len(hf_df) < 2:
                     continue
-                hf_df["end_date"] = pd.to_datetime(hf_df["end_date"], errors="coerce")
                 hf_df = hf_df[hf_df["end_date"] <= as_of_date]
                 if len(hf_df) < 2:
                     continue

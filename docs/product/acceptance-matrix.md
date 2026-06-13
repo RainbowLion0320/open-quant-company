@@ -57,7 +57,7 @@
 | 3.7 | 生产共享回测流水线 | `backtest/pipeline_runner.py` + `pipeline/*` | `test_backtest_pipeline_runner_contracts.py` | — | `PipelineBacktest` 按 Alpha→Portfolio→Risk→Execution 生产阶段运行，并过滤缺失价格列 | OK | — |
 | 3.8 | 基准使用上证综指 (非个股) | `config/settings.yaml` backtest.benchmark | — | — | 确认 benchmark=sh000001 (非 000001) | OK (已修复) | — |
 | 3.9 | 约束组合构建 | `pipeline/portfolio.py:ConstrainedPortfolioConstructor` | `test_strategy_research_governance.py:test_constrained_portfolio_constructor_caps_sector_and_single_name_weight` | — | Top-N 同时受单票/行业/总仓位上限约束 | OK | — |
-| 3.10 | 候选策略证据报告契约 | `research/strategy_evaluation.py`, `backtest/run_all_strategies.py` | `test_strategy_backtest_evidence.py`, `test_strategy_evaluation.py` | `var/store/research/strategy_evidence/*.json` | 报告含强基准、metrics、OOS、成本、regime breakdown 和 promotion decision | OK | 待接入更多真实 baseline 结果 |
+| 3.10 | 候选策略证据报告契约 | `research/strategy_evaluation.py`, `backtest/run_all_strategies.py` | `test_strategy_backtest_evidence.py`, `test_strategy_evaluation.py` | `var/store/research/strategy_evidence/*.json` | 报告含强基准、metrics、OOS、成本、regime breakdown、alpha evidence、data readiness 和 promotion decision；缺证据明确 blocked | OK | 待接入更多真实 baseline 结果 |
 
 ## 4. 执行层 (Execution Layer)
 
@@ -87,13 +87,14 @@
 | 5.9 | CodeGraph 代码图谱 + 架构诊断 | `web/api/routes/codegraph.py`, `web/api/services/codegraph.py`, `web/api/services/codegraph_diagnostics.py` | `test_codegraph_contracts.py` | `/system?tab=codegraph` → `CodeGraph.vue` | 模块/文件/符号图谱可下钻，索引状态和显式 Sync/Rebuild 可用；架构诊断用确定性规则展示循环依赖、跨层调用、热点、孤岛候选等风险 | OK | — |
 | 5.10 | Test Design Intelligence | `web/api/routes/system.py`, `web/api/services/system_tests.py`, `astrolabe_cli/design_intelligence.py`, `astrolabe_cli/commands/test_system` | `test_test_design_intelligence.py`, `test_web_system_contracts.py`, `test_cli_ops_commands.py`, `test_frontend_i18n_contracts.py` | `/system?tab=tests` → `TestDesign.vue` | `astroq test design --json` 写入 `var/artifacts/tests/design/latest.json`；Web 只读展示测试设计分数、风险矩阵、测试图谱、用例审查器和异味诊断 | OK | — |
 | 5.11 | AST Intelligence 重复实现检测 | `astrolabe_cli/ast_intelligence.py`, `scripts/ast_frontend_collector.mjs`, `web/api/services/system_ast.py` | `test_ast_intelligence.py`, `test_web_system_contracts.py` | `/system?tab=ast` → `AstIntelligence.vue` | `astroq architecture ast --json` 写入 `var/artifacts/architecture/ast/latest.json`；Web 只读展示重复风险分、clone groups、模块热力和诊断 inspector | OK | — |
-| 5.12 | 前端构建通过且 bundle 体积可追踪 | `web/frontend/vite.config.ts` | — | — | `npm run build` 通过；chunk warning 作为分包质量债追踪 | WARN | vendor / ECharts / DWP chunk 仍超过 Vite warning threshold，后续继续拆分 |
-| 5.13 | System monitor (CPU/MEM/DISK) | `web/api/routes/system.py` | `test_web_system_contracts.py` | `/system?tab=monitor` → `ActivityMonitor.vue` | 资源面板 + LLM provider 用量 + Top 进程 + API Health/Cron Jobs | OK | — |
-| 5.14 | Monitor/Settings/Config Center 职责边界清晰 | `ActivityMonitor.vue` + `Settings.vue` + `ConfigCenter.vue` | `test_web_system_contracts.py` | `/system` tabs | Monitor 只读运行观测；Settings 管基础设置和审计；Config Center 按一级域 + 页面内二级分组编辑可调参数 | OK | — |
-| 5.15 | 行业雷达 Web 页面 | `Sectors.vue` + `web/api/routes/sectors.py`, `web/api/services/sectors.py`, `data/market/sector_pipeline/` | `test_sector_pipeline.py`, `test_api_services.py`, `test_web_system_contracts.py` | `/research?tab=sectors` + `GET /api/sectors/*` | 行业资金方块矩阵主视图 + 行业面积按资金量映射 + 资金/动量/信号热力切换 + 申万行业排名表 + 行业级信号分布；不展示行业内具体股票；组合敞口归属组合执行页 | OK | — |
-| 5.16 | Strategy Lab 目录化 UI + evidence artifact 下钻 | `Strategies.vue`, `StrategyLab.vue`, `StrategyEvidence.vue`, `web/frontend/src/api/index.ts` | `test_web_system_contracts.py:test_strategy_lab_exposes_catalog_and_candidate_language`, `test_strategy_evaluation.py` | `/strategy-lab?tab=strategies`, `/strategy-lab?tab=evidence`, `GET /api/strategies/evidence` | 首屏展示策略目录、生命周期筛选、候选策略、生产隔离横幅；证据面板展示 missing/available/blocked/promotion_ready 状态和 artifact 明细 | OK | — |
-| 5.17 | CLI Control Plane | `astrolabe_cli/` | `test_cli_*.py` | `astroq health`, `astroq strategy catalog`, `astroq data status`, `astroq strategy evidence`, `astroq pipeline`, `astroq assets overview`, `astroq architecture ast`, `astroq execution dry-run` | Agent 可通过 JSON 输出判断下一步动作 | OK | — |
-| 5.18 | Pipeline 关键参数透明度页面 | `web/api/routes/pipeline.py`, `web/api/services/pipeline.py`, `web/frontend/src/views/Pipeline.vue` | `test_pipeline_route_contracts.py`, `test_documentation_contracts.py` | `/pipeline` + `GET /api/pipeline` + `GET /api/pipeline/{key}` | Market Regime、Data Quality、Strategy Evidence、Portfolio Execution 四条流程图；节点可点击查看输入/输出 | OK | — |
+| 5.12 | Lifecycle Readiness 全周期门禁 | `astrolabe_cli/commands/lifecycle.py`, `web/api/services/system_lifecycle.py`, `LifecycleReadiness.vue` | `test_lifecycle_readiness.py`, `test_strategy_competition.py`, `test_strategy_backtest_evidence.py` | `/system?tab=lifecycle` → `LifecycleReadiness.vue` | `astroq lifecycle check --json` 写入 `var/artifacts/lifecycle/latest.json`；Web 只读展示 source capability、data freshness、strategy evidence、execution readiness 和 blockers | OK | — |
+| 5.13 | 前端构建通过且 bundle 体积可追踪 | `web/frontend/vite.config.ts` | — | — | `npm run build` 通过；chunk warning 作为分包质量债追踪 | WARN | vendor / ECharts / DWP chunk 仍超过 Vite warning threshold，后续继续拆分 |
+| 5.14 | System monitor (CPU/MEM/DISK) | `web/api/routes/system.py` | `test_web_system_contracts.py` | `/system?tab=monitor` → `ActivityMonitor.vue` | 资源面板 + LLM provider 用量 + Top 进程 + API Health/Cron Jobs | OK | — |
+| 5.15 | Monitor/Settings/Config Center 职责边界清晰 | `ActivityMonitor.vue` + `Settings.vue` + `ConfigCenter.vue` | `test_web_system_contracts.py` | `/system` tabs | Monitor 只读运行观测；Settings 管基础设置和审计；Config Center 按一级域 + 页面内二级分组编辑可调参数 | OK | — |
+| 5.16 | 行业雷达 Web 页面 | `Sectors.vue` + `web/api/routes/sectors.py`, `web/api/services/sectors.py`, `data/market/sector_pipeline/` | `test_sector_pipeline.py`, `test_api_services.py`, `test_web_system_contracts.py` | `/research?tab=sectors` + `GET /api/sectors/*` | 行业资金方块矩阵主视图 + 行业面积按资金量映射 + 资金/动量/信号热力切换 + 申万行业排名表 + 行业级信号分布；不展示行业内具体股票；组合敞口归属组合执行页 | OK | — |
+| 5.17 | Strategy Lab 目录化 UI + evidence artifact 下钻 | `Strategies.vue`, `StrategyLab.vue`, `StrategyEvidence.vue`, `web/frontend/src/api/index.ts` | `test_web_system_contracts.py:test_strategy_lab_exposes_catalog_and_candidate_language`, `test_strategy_evaluation.py` | `/strategy-lab?tab=strategies`, `/strategy-lab?tab=evidence`, `GET /api/strategies/evidence` | 首屏展示策略目录、生命周期筛选、候选策略、生产隔离横幅；证据面板展示 missing/available/blocked/promotion_ready 状态和 artifact 明细 | OK | — |
+| 5.18 | CLI Control Plane | `astrolabe_cli/` | `test_cli_*.py` | `astroq health`, `astroq strategy catalog`, `astroq data status`, `astroq strategy evidence`, `astroq pipeline`, `astroq assets overview`, `astroq architecture ast`, `astroq execution dry-run`, `astroq lifecycle check` | Agent 可通过 JSON 输出判断下一步动作 | OK | — |
+| 5.19 | Pipeline 关键参数透明度页面 | `web/api/routes/pipeline.py`, `web/api/services/pipeline.py`, `web/frontend/src/views/Pipeline.vue` | `test_pipeline_route_contracts.py`, `test_documentation_contracts.py` | `/pipeline` + `GET /api/pipeline` + `GET /api/pipeline/{key}` | Market Regime、Data Quality、Strategy Evidence、Portfolio Execution 四条流程图；节点可点击查看输入/输出 | OK | — |
 
 ## 6. 多资产架构 (Multi-Asset)
 
@@ -118,9 +119,9 @@
 | 信号系统 | 17 | 17 | 1 | 0 |
 | 回测引擎 | 10 | 10 | 1 | 0 |
 | 执行层 | 8 | 8 | 0 | 0 |
-| Web 平台 | 18 | 18 | 1 | 0 |
+| Web 平台 | 19 | 19 | 1 | 0 |
 | 多资产架构 | 10 | 10 | 0 | 0 |
-| **合计** | **76** | **76** | **3** | **0** |
+| **合计** | **77** | **77** | **3** | **0** |
 
 > **说明：** `功能可验收` 表示该能力有可用代码路径。`质量债条目` 统计"缺口"列非 `—` 的行。当前剩余 3 项质量债：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化。
 

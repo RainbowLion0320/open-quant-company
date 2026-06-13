@@ -12,6 +12,17 @@ def test_strategy_catalog_has_required_fields_for_every_enabled_strategy():
         assert item.output_contract == "StrategySignalRows"
 
 
+def test_data_strategy_catalog_applies_canonical_metadata_defaults():
+    from data.strategy.catalog import get_strategy, load_registry
+
+    load_registry(force_reload=True)
+    ml = get_strategy("ml_lgbm")
+
+    assert ml is not None
+    assert ml["layer"] == "auxiliary_alpha"
+    assert {"features", "stock_daily", "sector", "market_regime"} <= set(ml["data_requirements"])
+
+
 def test_strategy_catalog_api_is_not_shadowed(monkeypatch):
     from fastapi.testclient import TestClient
 

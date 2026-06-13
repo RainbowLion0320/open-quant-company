@@ -43,12 +43,17 @@ astroq data repair stock_valuation --limit 100 --days 365 --json
 ```bash
 astroq strategy run all --mode production --json
 astroq strategy run trend_following --mode research --dry-run --json
+astroq strategy compete --json
 astroq strategy evidence --json
 astroq strategy evidence multifactor --json
+astroq lifecycle check --json
 ```
 
 生产扫描只运行 `status=production` 的策略。候选策略如果没有 `--mode research` 应返回失败，防止研究候选误入生产信号。
+`strategy compete` 读取 canonical backtest artifacts，按同一 OOS 窗口生成 12 策略公平竞赛排名和 production/paper 推荐，不直接改写策略注册表。
 `strategy evidence` 不带名称时返回所有策略的 evidence 状态，带名称时返回单策略 detail；缺失报告返回结构化 `exists=false`，不作为 CLI 执行失败。
+
+`lifecycle check` 聚合 source capability diff、本地数据 freshness、策略 evidence 和执行链路 readiness，写入 `var/artifacts/lifecycle/latest.json`。缺数据、缺能力、缺 score panel、IC/ICIR 样本不足等都必须以 blocked/not_applicable 状态暴露，不允许填默认值继续晋级。季度宏观数据按披露窗口判断，例如 `macro_gdp` 使用“季度结束 + 45 天”；限频事件表如 `stock_limit_list` 在全局生命周期中先作为 warning，只有依赖它的策略链路才升级为 blocker。
 
 ## Regime 与回测
 

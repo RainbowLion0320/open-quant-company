@@ -23,6 +23,11 @@ export const modules = {
             meta: "Asset coverage",
             description: "查看多资产数据来源、研究就绪度和交易能力",
           },
+          sources: {
+            label: "数据源能力",
+            meta: "Capability registry",
+            description: "对比外部数据源能力、项目数据维度和本地来源缺口",
+          },
         },
       },
       strategyLab: {
@@ -81,6 +86,11 @@ export const modules = {
             label: "AST 检测",
             meta: "AST Intelligence",
             description: "检查全项目重复实现、近似 clone、重复 helper 和 canonical helper 绕行风险",
+          },
+          lifecycle: {
+            label: "生命周期",
+            meta: "Evidence chain",
+            description: "查看数据源、数据健康、策略证据和执行链路是否满足正式运行门禁",
           },
           codegraph: {
             label: "代码图谱",

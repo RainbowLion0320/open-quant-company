@@ -36,6 +36,16 @@ class AlphaModel(ABC):
         """Produce alpha signals for all symbols in the universe at a given date."""
         ...
 
+    def generate_score_panel(
+        self,
+        universe: list[str],
+        prices: pd.DataFrame,
+        date_idx: int,
+        regime: str,
+    ) -> list[dict]:
+        """Produce full cross-sectional scores for evidence calculations."""
+        return []
+
     def rebalance_trigger(
         self,
         dt: date,
@@ -69,6 +79,69 @@ class StrategyAlphaAdapter(AlphaModel):
         self.min_score = min_score
         self.horizon_days = horizon_days
         self._rebalance_trigger = rebalance_trigger
+        self._score_cache_key: tuple | None = None
+        self._score_cache_rows: tuple[dict, ...] | None = None
+
+    def _cache_key(
+        self,
+        universe: list[str],
+        prices: pd.DataFrame,
+        date_idx: int,
+        regime: str,
+    ) -> tuple:
+        as_of = prices.index[date_idx] if 0 <= date_idx < len(prices.index) else None
+        return (
+            id(prices),
+            len(prices),
+            str(as_of),
+            int(date_idx),
+            str(regime),
+            tuple(universe),
+        )
+
+    def _score_rows(
+        self,
+        universe: list[str],
+        prices: pd.DataFrame,
+        date_idx: int,
+        regime: str,
+    ) -> list[dict]:
+        key = self._cache_key(universe, prices, date_idx, regime)
+        if self._score_cache_key == key and self._score_cache_rows is not None:
+            return [dict(row) for row in self._score_cache_rows]
+
+        rows: list[dict] = []
+        ts = datetime.now().isoformat()
+        for sym in universe:
+            if sym not in prices.columns:
+                continue
+            try:
+                score = float(self._scorer(sym, prices[sym], date_idx, regime))
+                rows.append(
+                    {
+                        "symbol": sym,
+                        "strategy": self.name,
+                        "score": round(score, 6),
+                        "horizon_days": self.horizon_days,
+                        "timestamp": ts,
+                        "data_quality": "ok",
+                    }
+                )
+            except Exception as exc:
+                rows.append(
+                    {
+                        "symbol": sym,
+                        "strategy": self.name,
+                        "score": None,
+                        "horizon_days": self.horizon_days,
+                        "timestamp": ts,
+                        "data_quality": f"score_error:{type(exc).__name__}",
+                    }
+                )
+
+        self._score_cache_key = key
+        self._score_cache_rows = tuple(dict(row) for row in rows)
+        return rows
 
     def generate_alpha(
         self,
@@ -78,15 +151,9 @@ class StrategyAlphaAdapter(AlphaModel):
         regime: str,
     ) -> list[AlphaSignal]:
         signals: list[AlphaSignal] = []
-        ts = datetime.now().isoformat()
-
-        for sym in universe:
-            if sym not in prices.columns:
-                continue
-            series = prices[sym]
-            try:
-                score = self._scorer(sym, series, date_idx, regime)
-            except Exception:
+        for row in self._score_rows(universe, prices, date_idx, regime):
+            score = row["score"]
+            if score is None:
                 continue
 
             if score < self.min_score:
@@ -94,18 +161,27 @@ class StrategyAlphaAdapter(AlphaModel):
 
             direction = "buy" if score >= 50 else "hold"
             signals.append(AlphaSignal(
-                symbol=sym,
+                symbol=row["symbol"],
                 strategy=self.name,
                 direction=direction,
                 confidence=min(1.0, max(0.0, score / 100)),
                 score=round(float(score), 1),
                 horizon_days=self.horizon_days,
                 reason=f"{self.label} score={score:.1f} regime={regime}",
-                timestamp=ts,
+                timestamp=row["timestamp"],
             ))
 
         signals.sort(key=lambda s: s.score, reverse=True)
         return signals
+
+    def generate_score_panel(
+        self,
+        universe: list[str],
+        prices: pd.DataFrame,
+        date_idx: int,
+        regime: str,
+    ) -> list[dict]:
+        return self._score_rows(universe, prices, date_idx, regime)
 
     def rebalance_trigger(self, dt, regime, holdings):
         if self._rebalance_trigger:

@@ -35,6 +35,29 @@ STATUS_CAPABILITIES = {
     "retired":    set(),
 }
 
+DEFAULT_STRATEGY_METADATA = {
+    "buffett": {
+        "strategy_type": "selection",
+        "layer": "quality_filter",
+        "data_requirements": ["financials", "valuation_daily", "stock_daily"],
+    },
+    "multifactor": {
+        "strategy_type": "selection",
+        "layer": "primary_alpha",
+        "data_requirements": ["financials", "valuation_daily", "stock_daily", "sector"],
+    },
+    "ml_lgbm": {
+        "strategy_type": "selection",
+        "layer": "auxiliary_alpha",
+        "data_requirements": ["features", "stock_daily", "sector", "market_regime"],
+    },
+    "cybernetic": {
+        "strategy_type": "risk_overlay",
+        "layer": "risk_overlay",
+        "data_requirements": ["market_regime", "stock_daily", "portfolio"],
+    },
+}
+
 
 def _load_raw() -> dict:
     return get_settings()
@@ -48,8 +71,10 @@ def load_registry(force_reload: bool = False) -> List[Dict]:
 
     cfg = _load_raw()
     raw = cfg.get("strategies", {})
-    _REGISTRY = [
-        {
+    _REGISTRY = []
+    for name, v in raw.items():
+        defaults = DEFAULT_STRATEGY_METADATA.get(name, {})
+        _REGISTRY.append({
             "name": name,
             "label": v.get("label", name),
             "color": v.get("color", "#7170ff"),
@@ -58,15 +83,13 @@ def load_registry(force_reload: bool = False) -> List[Dict]:
             "signal_name": v.get("signal_name", name),
             "enabled": v.get("enabled", True),
             "status": v.get("status", "candidate"),
-            "strategy_type": v.get("strategy_type", ""),
-            "layer": v.get("layer", ""),
-            "data_requirements": v.get("data_requirements", []),
+            "strategy_type": v.get("strategy_type") or defaults.get("strategy_type", ""),
+            "layer": v.get("layer") or defaults.get("layer", ""),
+            "data_requirements": v.get("data_requirements") or defaults.get("data_requirements", []),
             "parameters": v.get("parameters", {}),
             "output_contract": v.get("output_contract", "StrategySignalRows"),
             "research_sources": v.get("research_sources", []),
-        }
-        for name, v in raw.items()
-    ]
+        })
     return _REGISTRY
 
 

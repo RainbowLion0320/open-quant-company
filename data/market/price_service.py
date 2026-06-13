@@ -210,12 +210,21 @@ def get_latest_price(
     mode: str | PriceMode = PriceMode.RAW,
     use_case: str | PriceUseCase | None = None,
     hub: DataHub | None = None,
+    strict: bool = False,
 ) -> float:
-    prices = get_stock_prices(symbol, mode=mode, use_case=use_case, hub=hub)
+    prices = get_stock_prices(symbol, mode=mode, use_case=use_case, hub=hub, strict=strict)
     if prices.empty or "close" not in prices.columns:
+        if strict:
+            requested = mode_for_use_case(use_case) if use_case is not None else normalize_price_mode(mode)
+            raise FileNotFoundError(f"{requested.value} latest price not found for {symbol}")
         return 0.0
     close = pd.to_numeric(prices.sort_values("date")["close"], errors="coerce").dropna()
-    return float(close.iloc[-1]) if len(close) else 0.0
+    if len(close):
+        return float(close.iloc[-1])
+    if strict:
+        requested = mode_for_use_case(use_case) if use_case is not None else normalize_price_mode(mode)
+        raise FileNotFoundError(f"{requested.value} latest close not found for {symbol}")
+    return 0.0
 
 
 def get_stock_price_matrix(

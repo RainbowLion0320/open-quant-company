@@ -10,16 +10,52 @@ def freshness_gate(audit_rows: list[dict[str, Any]], *, required: list[str] | No
     required_keys = set(required or [])
     stale: list[str] = []
     missing: list[str] = []
+    warnings: list[str] = []
+    details: list[dict[str, str]] = []
     for row in audit_rows:
         key = str(row.get("key") or row.get("table") or row.get("dimension") or "")
         status = str(row.get("status") or "").lower()
         if required_keys and key not in required_keys:
             continue
+        severity = _freshness_severity(row, required=key in required_keys)
         if status == "missing":
-            missing.append(key)
+            if severity == "warning":
+                warnings.append(key)
+            else:
+                missing.append(key)
         elif status in {"stale", "error"}:
-            stale.append(key)
-    return {"ok": not stale and not missing, "stale": stale, "missing": missing}
+            if severity == "warning":
+                warnings.append(key)
+            else:
+                stale.append(key)
+        if status in {"missing", "stale", "error"}:
+            details.append(
+                {
+                    "key": key,
+                    "status": status,
+                    "severity": severity,
+                    "reason": str(row.get("reason") or row.get("freshness_reason") or ""),
+                    "scope": str(row.get("scope") or row.get("data_domain") or ""),
+                }
+            )
+    return {"ok": not stale and not missing, "stale": stale, "missing": missing, "warnings": warnings, "details": details}
+
+
+def _freshness_severity(row: dict[str, Any], *, required: bool) -> str:
+    if required:
+        return "blocker"
+    repair_policy = str(row.get("repair_policy") or "").lower()
+    data_domain = str(row.get("data_domain") or row.get("scope") or "").lower()
+    registry_key = str(row.get("registry_key") or row.get("key") or row.get("dimension") or "").lower()
+    table = str(row.get("table") or "").lower()
+    if (
+        repair_policy == "rate_limited"
+        and data_domain in {"market_event", "event", ""}
+        and registry_key in {"limit_list", "stock_limit_list", ""}
+        and table in {"stock_limit_list", "limit_list", ""}
+    ):
+        return "warning"
+    return "blocker"
 
 
 def _iter_health_rows(result: object) -> list[dict[str, Any]]:
@@ -43,13 +79,16 @@ def health_result_to_gate_data(result: object) -> list[dict[str, str]]:
         status_value = str(row.get("freshness_status") or row.get("status") or "").lower()
         if not status_value:
             status_value = "ok"
-        try:
-            missing_pct = float(row.get("missing_pct", 0) or 0)
-        except Exception:
-            missing_pct = 0.0
-        if missing_pct > 50 and status_value in {"ok", "fresh"}:
-            status_value = "stale"
-        gate_data.append({"table": key, "status": status_value})
+        gate_data.append(
+            {
+                "table": key,
+                "status": status_value,
+                "registry_key": str(row.get("registry_key") or row.get("key") or row.get("dimension") or ""),
+                "repair_policy": str(row.get("repair_policy") or ""),
+                "data_domain": str(row.get("data_domain") or row.get("scope") or ""),
+                "freshness_reason": str(row.get("freshness_reason") or row.get("reason") or ""),
+            }
+        )
     return gate_data
 
 

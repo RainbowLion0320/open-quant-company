@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -29,6 +29,30 @@ from data.features.feature_store import iter_feature_files
 
 HUB = get_datahub()
 STORE = HUB.store_root
+
+DATE_COLUMN_PRIORITY = (
+    "date",
+    "trade_date",
+    "end_date",
+    "ann_date",
+    "utc_date",
+    "ts",
+    "month",
+    "日期",
+    "报告期",
+    "quarter",
+)
+DATE_COLUMN_NAMES = set(DATE_COLUMN_PRIORITY)
+
+
+def _date_columns(df: pd.DataFrame) -> list[str]:
+    candidates = [
+        str(col)
+        for col in df.columns
+        if str(col).lower() in DATE_COLUMN_NAMES or str(col) in DATE_COLUMN_NAMES
+    ]
+    rank = {name: idx for idx, name in enumerate(DATE_COLUMN_PRIORITY)}
+    return sorted(candidates, key=lambda col: rank.get(col.lower(), rank.get(col, len(rank))))
 
 
 def _missing_pct(df: pd.DataFrame) -> dict:
@@ -60,18 +84,26 @@ def _outlier_count(df: pd.DataFrame) -> dict:
     return {"total": total, "per_column": per_col}
 
 
-def _freshness_days(df: pd.DataFrame) -> Optional[int]:
-    for dc in df.columns:
-        if str(dc).lower() not in ("date", "trade_date", "ann_date", "end_date", "ts", "quarter", "utc_date", "month") and str(dc) not in ("日期", "报告期"):
-            continue
+def _freshness_profile(df: pd.DataFrame) -> dict[str, object]:
+    for dc in _date_columns(df):
         try:
             s = pd.to_datetime(df[dc], errors="coerce").dropna()
             if len(s) == 0:
                 continue
-            return (date.today() - s.max().date()).days
+            latest = s.max().date()
+            return {
+                "days": (date.today() - latest).days,
+                "date": latest.isoformat(),
+                "column": dc,
+            }
         except Exception:
             continue
-    return None
+    return {"days": None, "date": "", "column": ""}
+
+
+def _freshness_days(df: pd.DataFrame) -> Optional[int]:
+    days = _freshness_profile(df).get("days")
+    return int(days) if days is not None else None
 
 
 def _manifest_for_file(path: Path) -> dict:
@@ -119,14 +151,13 @@ def _manifest_for_many(paths: list[Path]) -> dict:
 
 def _find_date_col(df: pd.DataFrame) -> Optional[str]:
     """Find a date-like column in the DataFrame."""
-    for dc in df.columns:
-        if str(dc).lower() in ("date", "trade_date", "ann_date", "end_date", "ts", "quarter", "utc_date", "month") or str(dc) in ("日期", "报告期"):
-            try:
-                s = pd.to_datetime(df[dc], errors="coerce")
-                if s.notna().sum() > 0:
-                    return dc
-            except Exception:
-                continue
+    for dc in _date_columns(df):
+        try:
+            s = pd.to_datetime(df[dc], errors="coerce")
+            if s.notna().sum() > 0:
+                return dc
+        except Exception:
+            continue
     return None
 
 
@@ -226,7 +257,8 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
         df = HUB.read_parquet(path)
         missing = _missing_pct(df)
         outliers = _outlier_count(df)
-        freshness = _freshness_days(df)
+        freshness_profile = _freshness_profile(df)
+        freshness = freshness_profile.get("days")
         tb = _time_breakdown(df)
         # Extract 10y split from time breakdown
         miss_10y = 0.0
@@ -258,6 +290,8 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
             "outlier_count_10y_plus": out_10y_plus,
             "outlier_cols": json.dumps(outliers["per_column"], ensure_ascii=False),
             "freshness_days": freshness,
+            "freshness_date": freshness_profile.get("date", ""),
+            "freshness_column": freshness_profile.get("column", ""),
             "time_breakdown": json.dumps(tb, ensure_ascii=False) if tb else "{}",
             "error": None,
             **_manifest_for_file(path),
@@ -279,6 +313,8 @@ def _scan_single(label: str, path: Path, source: str = "") -> dict:
             "outlier_count_10y_plus": 0,
             "outlier_cols": "{}",
             "freshness_days": None,
+            "freshness_date": "",
+            "freshness_column": "",
             "time_breakdown": "{}",
             "error": str(e),
             **_manifest_for_file(path),
@@ -294,6 +330,7 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
             "missing_pct_10y": 0, "missing_pct_10y_plus": 0,
             "outlier_count": 0, "outlier_count_10y": 0, "outlier_count_10y_plus": 0,
             "outlier_cols": "{}", "freshness_days": None, "time_breakdown": "{}",
+            "freshness_date": "", "freshness_column": "",
             "error": "no files",
             "manifest_files": 0, "manifest_updated_at": "", "schema_hash": "", "file_sha256": "",
         }
@@ -306,6 +343,8 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
     missing_cols_agg = {}
     outlier_cols_agg = {}
     min_freshness = None
+    latest_freshness_date = ""
+    latest_freshness_column = ""
     cols = 0
     errors = 0
 
@@ -328,9 +367,14 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
             total_outliers += o["total"]
             for k, v in o["per_column"].items():
                 outlier_cols_agg[k] = outlier_cols_agg.get(k, 0) + v
-            fday = _freshness_days(df)
+            profile = _freshness_profile(df)
+            fday = profile.get("days")
             if fday is not None:
-                min_freshness = fday if min_freshness is None else min(min_freshness, fday)
+                min_freshness = int(fday) if min_freshness is None else min(min_freshness, int(fday))
+                candidate_date = str(profile.get("date") or "")
+                if candidate_date and (not latest_freshness_date or candidate_date > latest_freshness_date):
+                    latest_freshness_date = candidate_date
+                    latest_freshness_column = str(profile.get("column") or "")
         except Exception:
             errors += 1
 
@@ -355,10 +399,85 @@ def _scan_many(label: str, paths: list[Path], max_sample: int = 50, source: str 
         "outlier_count_10y_plus": 0,
         "outlier_cols": json.dumps(outlier_cols_agg, ensure_ascii=False),
         "freshness_days": min_freshness,
+        "freshness_date": latest_freshness_date,
+        "freshness_column": latest_freshness_column,
         "time_breakdown": "{}",
         "error": f"{errors} read errors" if errors else None,
         **_manifest_for_many(paths),
     }
+
+
+def _quarter_label(day: date) -> str:
+    return f"{day.year}Q{((day.month - 1) // 3) + 1}"
+
+
+def _quarter_end(year: int, quarter: int) -> date:
+    month = quarter * 3
+    day = 31 if month in {3, 12} else 30
+    return date(year, month, day)
+
+
+def _latest_due_quarter_end(today: date, release_lag_days: int = 45) -> Optional[date]:
+    candidates = [
+        _quarter_end(year, quarter)
+        for year in range(today.year - 2, today.year + 1)
+        for quarter in range(1, 5)
+    ]
+    due = [item for item in candidates if item + timedelta(days=release_lag_days) <= today]
+    return max(due) if due else None
+
+
+def _macro_gdp_freshness_status(row: dict, today: date) -> tuple[str, dict[str, str]]:
+    expected = _latest_due_quarter_end(today)
+    latest = pd.to_datetime(row.get("freshness_date"), errors="coerce")
+    detail = {
+        "reason": "quarter_available",
+        "expected_period": _quarter_label(expected) if expected else "",
+        "expected_date": expected.isoformat() if expected else "",
+        "latest_period": "",
+        "latest_date": "",
+        "release_lag_days": "45",
+    }
+    if pd.isna(latest):
+        return "unknown", {**detail, "reason": "latest_date_unavailable"}
+    latest_date = latest.date()
+    detail["latest_date"] = latest_date.isoformat()
+    detail["latest_period"] = _quarter_label(latest_date)
+    if expected is None:
+        return "fresh", {**detail, "reason": "no_due_quarter"}
+    if latest_date >= expected:
+        return "fresh", detail
+    return "stale", {**detail, "reason": "source_not_updated"}
+
+
+def _freshness_scope(meta: HealthTableMeta) -> str:
+    if meta.registry_key == "limit_list":
+        return "market_event"
+    return ""
+
+
+def _freshness_status(
+    row: dict,
+    meta: HealthTableMeta,
+    *,
+    today: date | None = None,
+) -> tuple[str, dict[str, str]]:
+    if int(row.get("files") or 0) == 0:
+        return "missing", {"reason": "no_files"}
+    if row.get("error"):
+        return "error", {"reason": "scan_error"}
+    if meta.registry_key == "macro_gdp":
+        return _macro_gdp_freshness_status(row, today or date.today())
+    days = row.get("freshness_days")
+    if days is None or pd.isna(days):
+        return "unknown", {"reason": "latest_date_unavailable"}
+    if meta.freshness_sla_days is None:
+        return "untracked", {"reason": "no_sla"}
+    if int(days) <= int(meta.freshness_sla_days):
+        return "fresh", {"reason": "within_sla"}
+    if meta.registry_key == "limit_list":
+        return "stale", {"reason": "rate_limited_background_collection"}
+    return "stale", {"reason": "sla_exceeded"}
 
 
 def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
@@ -433,21 +552,10 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         if paths:
             records.append(_scan_many("cache_api_calls", paths, max_sample=50, source="AKShare Cache"))
 
-    def _freshness_status(row: dict, sla: Optional[int]) -> str:
-        if int(row.get("files") or 0) == 0:
-            return "missing"
-        if row.get("error"):
-            return "error"
-        days = row.get("freshness_days")
-        if days is None or pd.isna(days):
-            return "unknown"
-        if sla is None:
-            return "untracked"
-        return "fresh" if int(days) <= int(sla) else "stale"
-
     # ── Inject source/label/SLA/repair metadata from data_registry ──
     for r in records:
         meta = _meta(r["table"])
+        status, detail = _freshness_status(r, meta)
         r["source"] = meta.source
         r["label_zh"] = meta.label_zh
         r["repairable"] = meta.repairable
@@ -455,7 +563,11 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         r["freshness_sla_days"] = meta.freshness_sla_days
         r["repair_policy"] = meta.repair_policy
         r["partition_key"] = meta.partition_key
-        r["freshness_status"] = _freshness_status(r, meta.freshness_sla_days)
+        r["data_domain"] = _freshness_scope(meta)
+        r["freshness_status"] = status
+        r["freshness_reason"] = detail.get("reason", "")
+        r["freshness_expected_period"] = detail.get("expected_period", "")
+        r["freshness_latest_period"] = detail.get("latest_period", "")
 
     # ── Summary ──
     n = len(records)
@@ -481,11 +593,17 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         "outlier_count_10y_plus": 0,
         "outlier_cols": "{}",
         "freshness_days": None,
+        "freshness_date": "",
+        "freshness_column": "",
         "freshness_sla_days": None,
         "freshness_status": "summary",
+        "freshness_reason": "",
+        "freshness_expected_period": "",
+        "freshness_latest_period": "",
         "registry_key": "",
         "partition_key": "",
         "repair_policy": "none",
+        "data_domain": "",
         "time_breakdown": "{}",
         "error": None,
         "manifest_files": sum(int(r.get("manifest_files") or 0) for r in records),

@@ -212,6 +212,30 @@ def test_execution_use_case_does_not_fallback_to_adjusted_prices(tmp_path):
     assert prices.empty
 
 
+def test_latest_execution_price_can_fail_strictly_when_raw_price_missing(tmp_path):
+    from data.storage.datahub import DataHub
+    from data.market.price_service import get_latest_price
+    from data.market.price_types import PriceUseCase
+
+    hub = DataHub(store_root=tmp_path / "store", cache_root=tmp_path / "cache")
+    hub.write_parquet(
+        pd.DataFrame(
+            {
+                "date": ["2026-01-01"],
+                "open": [10.0],
+                "high": [11.0],
+                "low": [9.0],
+                "close": [10.0],
+                "volume": [100.0],
+            }
+        ),
+        hub.stock_daily_path("000001"),
+    )
+
+    with pytest.raises(FileNotFoundError):
+        get_latest_price("000001", use_case=PriceUseCase.EXECUTION, hub=hub, strict=True)
+
+
 def test_major_price_consumers_declare_price_use_cases():
     expectations = {
         "backtest/run_all_strategies.py": ("get_stock_price_matrix", "PriceUseCase.BACKTEST"),

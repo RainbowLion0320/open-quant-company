@@ -4,4 +4,5 @@ export const errors = {
       strategySignalLoad: "策略信号加载失败",
       progressConnection: "进度连接失败",
       strategyRunStart: "策略运行启动失败",
+      loadFailed: "加载失败",
     } as const;

@@ -23,6 +23,11 @@ export const modules = {
             meta: "Asset coverage",
             description: "Inspect multi-asset data sources, research readiness, and trading capability",
           },
+          sources: {
+            label: "Source Capabilities",
+            meta: "Capability registry",
+            description: "Compare external provider capabilities with project data dimensions and local source gaps",
+          },
         },
       },
       strategyLab: {
@@ -81,6 +86,11 @@ export const modules = {
             label: "AST Intelligence",
             meta: "AST analysis",
             description: "Inspect duplicate implementations, near clones, repeated helpers, and canonical helper bypass risks",
+          },
+          lifecycle: {
+            label: "Lifecycle",
+            meta: "Evidence chain",
+            description: "Inspect whether source, data health, strategy evidence, and execution gates are ready for formal runs",
           },
           codegraph: {
             label: "CodeGraph",

@@ -19,8 +19,6 @@ from pathlib import Path
 
 import pandas as pd
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
 from data.storage.datahub import get_datahub
 from data.ingestion.fetchers.macro import MacroFetcher
 from data.market.symbols import CIRCLE_STOCKS
@@ -39,8 +37,36 @@ def _require_rows_or_cache(label: str, count: int, path: Path, pattern: str = "*
         raise RuntimeError(f"{label} returned no rows and no cached parquet files exist")
 
 
+def _freshness_status_for_table(table: str) -> str:
+    try:
+        from scripts.db_health_check import run_health_check
+
+        result = run_health_check()
+    except Exception:
+        return "unknown"
+    if not hasattr(result, "iterrows"):
+        return "unknown"
+    for _, row in result.iterrows():
+        keys = {
+            str(row.get("table") or ""),
+            str(row.get("registry_key") or ""),
+        }
+        if table in keys:
+            return str(row.get("freshness_status") or row.get("status") or "unknown").lower()
+    return "unknown"
+
+
 def _symbols(limit: int = 0) -> list[str]:
     return list(CIRCLE_STOCKS[:limit]) if limit > 0 else list(CIRCLE_STOCKS)
+
+
+def _latest_completed_quarter_end() -> str:
+    today = pd.Timestamp.today()
+    current_quarter = (today.month - 1) // 3 + 1
+    if current_quarter == 1:
+        return f"{today.year - 1}1231"
+    quarter_month = (current_quarter - 1) * 3
+    return f"{today.year}{quarter_month:02d}{pd.Period(f'{today.year}-{quarter_month:02d}', freq='M').days_in_month:02d}"
 
 
 def _tushare_api():
@@ -80,9 +106,18 @@ def repair_bond_treasury_yields() -> None:
 def repair_holders(limit: int = 0) -> None:
     from data.ingestion.fetchers.holders import HolderFetcher
 
+    fetcher = HolderFetcher()
+    if limit <= 0:
+        end_date = _latest_completed_quarter_end()
+        print(f"  Fetching holders for report period {end_date}...")
+        count = fetcher.fetch_period(end_date)
+        _require_rows("stock_holders", count)
+        print(f"  ✓ {count} symbols for {end_date}")
+        return
+
     symbols = _symbols(limit)
     print(f"  Fetching holders for {len(symbols)} symbols...")
-    rows = HolderFetcher().batch_fetch(symbols, force=True)
+    rows = fetcher.batch_fetch(symbols, force=True)
     _require_rows("stock_holders", len(rows))
     print(f"  ✓ {len(rows)}/{len(symbols)} symbols")
 
@@ -184,6 +219,12 @@ def repair_limit_list() -> None:
     from scripts.cron_fetch_extra import fetch_limit_list
 
     fetched = fetch_limit_list(full_history=False)
+    if int(fetched) <= 0:
+        status = _freshness_status_for_table("stock_limit_list")
+        if status in {"stale", "missing", "error"}:
+            raise RuntimeError(
+                f"stock_limit_list remains {status}; provider returned no new rows"
+            )
     _require_rows_or_cache("stock_limit_list", int(fetched), HUB.store_dir("stock") / "limit_list")
 
 
@@ -335,19 +376,15 @@ def repair(table: str, limit: int = 0, days: int = 365) -> None:
 
     try:
         REPAIR_MAP[table](limit=limit, days=days)
+        print(f"\n  Re-running health check...")
+        status = _freshness_status_for_table(table)
+        print(f"  Health status: {status}")
+        if status in {"stale", "missing", "error"}:
+            raise RuntimeError(f"{table} remains {status} after repair")
         ledger.complete(run_id)
     except Exception as e:
         ledger.fail(run_id, error=str(e))
         raise
-
-    # Re-run health check
-    import subprocess
-    print(f"\n  Re-running health check...")
-    result = subprocess.run(
-        [sys.executable, "scripts/db_health_check.py"],
-        cwd=str(PROJECT_ROOT), capture_output=True, text=True, timeout=300,
-    )
-    print(f"  {result.stdout.strip()}")
 
     print(f"\nRepair complete: {table}")
 

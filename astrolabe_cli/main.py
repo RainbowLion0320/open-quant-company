@@ -9,6 +9,9 @@ from astrolabe_cli.commands.config import validate_config
 from astrolabe_cli.commands.backtest import check as backtest_check
 from astrolabe_cli.commands.backtest import run_backtest
 from astrolabe_cli.commands.data import repair as data_repair
+from astrolabe_cli.commands.data import sources as data_sources
+from astrolabe_cli.commands.data import sources_audit as data_sources_audit
+from astrolabe_cli.commands.data import sources_diff_registry as data_sources_diff_registry
 from astrolabe_cli.commands.data import tushare_audit as data_tushare_audit
 from astrolabe_cli.commands.data import tushare_backfill as data_tushare_backfill
 from astrolabe_cli.commands.execution import dry_run as execution_dry_run
@@ -18,9 +21,11 @@ from astrolabe_cli.commands.architecture import ast_check as architecture_ast_ch
 from astrolabe_cli.commands.data import status as data_status
 from astrolabe_cli.commands.docs import check_docs
 from astrolabe_cli.commands.health import run_health
+from astrolabe_cli.commands.lifecycle import check as lifecycle_check
 from astrolabe_cli.commands.regime import status as regime_status
 from astrolabe_cli.commands.regime import train_profit as regime_train_profit
 from astrolabe_cli.commands.strategy import catalog as strategy_catalog
+from astrolabe_cli.commands.strategy import compete as strategy_compete
 from astrolabe_cli.commands.strategy import evidence as strategy_evidence
 from astrolabe_cli.commands.strategy import run_strategy
 from astrolabe_cli.commands.test_system import check as test_check
@@ -78,12 +83,55 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_flags(strategy_evidence_cmd)
     strategy_evidence_cmd.set_defaults(handler=lambda args: strategy_evidence(args.name))
 
+    strategy_compete_cmd = strategy_sub.add_parser("compete", help="Generate a fair strategy competition report")
+    strategy_compete_cmd.add_argument("--run-backtest", action="store_true", help="Run all strategy backtests first")
+    strategy_compete_cmd.add_argument("--oos-months", type=int, default=36)
+    add_common_flags(strategy_compete_cmd)
+    strategy_compete_cmd.set_defaults(
+        handler=lambda args: strategy_compete(args.run_backtest, args.oos_months)
+    )
+
     data = sub.add_parser("data", help="Inspect and repair local DataHub datasets")
     data_sub = data.add_subparsers(dest="data_command", required=True)
 
     data_status_cmd = data_sub.add_parser("status", help="Run DB health check")
     add_common_flags(data_status_cmd)
     data_status_cmd.set_defaults(handler=lambda args: data_status())
+
+    data_sources_cmd = data_sub.add_parser("sources", help="Inspect external data source capability registry")
+    add_common_flags(data_sources_cmd)
+    data_sources_cmd.set_defaults(handler=lambda args: data_sources())
+    data_sources_sub = data_sources_cmd.add_subparsers(dest="sources_command")
+
+    data_sources_audit_cmd = data_sources_sub.add_parser("audit", help="Audit external source capabilities")
+    data_sources_audit_cmd.add_argument(
+        "--source",
+        choices=[
+            "all",
+            "akshare",
+            "tushare",
+            "tencent_finance",
+            "eastmoney",
+            "sina_finance",
+            "tonghuashun",
+            "exchange_official",
+            "cninfo",
+            "computed",
+        ],
+        default="all",
+    )
+    data_sources_audit_cmd.add_argument("--offline", action="store_true", help="Skip token-gated network probes")
+    add_common_flags(data_sources_audit_cmd)
+    data_sources_audit_cmd.set_defaults(
+        handler=lambda args: data_sources_audit(args.source, args.source in {"all", "tushare"} and not args.offline)
+    )
+
+    data_sources_diff_cmd = data_sources_sub.add_parser(
+        "diff-registry",
+        help="Diff external source capabilities against project data_registry",
+    )
+    add_common_flags(data_sources_diff_cmd)
+    data_sources_diff_cmd.set_defaults(handler=lambda args: data_sources_diff_registry())
 
     data_repair_cmd = data_sub.add_parser("repair", help="Repair one logical table")
     data_repair_cmd.add_argument("table")
@@ -157,6 +205,12 @@ def build_parser() -> argparse.ArgumentParser:
     assets_overview_cmd = assets_sub.add_parser("overview", help="Show asset coverage and readiness")
     add_common_flags(assets_overview_cmd)
     assets_overview_cmd.set_defaults(handler=lambda args: assets_overview())
+
+    lifecycle = sub.add_parser("lifecycle", help="Inspect end-to-end lifecycle readiness")
+    lifecycle_sub = lifecycle.add_subparsers(dest="lifecycle_command", required=True)
+    lifecycle_check_cmd = lifecycle_sub.add_parser("check", help="Generate lifecycle readiness artifact")
+    add_common_flags(lifecycle_check_cmd)
+    lifecycle_check_cmd.set_defaults(handler=lambda args: lifecycle_check())
 
     docs = sub.add_parser("docs", help="Check documentation hygiene")
     docs_sub = docs.add_subparsers(dest="docs_command", required=True)

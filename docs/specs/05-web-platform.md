@@ -1,6 +1,6 @@
 # Spec: Web 平台 (Web Platform)
 
-> 版本: 2.6 | 更新: 2026-06-03 | 关联: [PRD](../product/prd.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
+> 版本: 2.7 | 更新: 2026-06-11 | 关联: [PRD](../product/prd.md) [Data Pipeline](01-data-pipeline.md) [Signal System](02-signal-system.md)
 
 ## 1. 概述
 
@@ -25,7 +25,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 ┌──────────────────────▼──────────────────────────────┐
 │              web/api/ (FastAPI)                        │
 │   app.py:create_app() → CORS → Router → Error Handler │
-│   routes/ (12 domain modules) + ws.py + jobs.py        │
+│   routes/ (13 domain modules) + ws.py + jobs.py        │
 └──────────────────────┬──────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────┐
@@ -48,7 +48,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | `/strategy-lab` | 策略实验室 | 二级 tab: 策略目录、信号历史、回测分析、证据面板 |
 | `/portfolio` | 组合执行 | PaperBroker 持仓 + NAV 曲线 + 交易记录 + 手动下单 |
 | `/pipeline` | 流程图 | 关键参数计算透明度入口；展示四条关键链路，Market Regime 为细粒度 DAG |
-| `/datahub` | 数据中台 | DataRegistry 启用维度健康扫描 + 大小统计 + 单表修复 |
+| `/datahub` | 数据中台 | 二级 tab: 健康扫描、资产覆盖、数据源能力；展示 DataRegistry 健康、本地覆盖和外部 source capability diff |
 | `/system` | 系统控制 | 二级 tab: 系统信息、系统设置、配置中心、测试设计、AST 检测、代码图谱与架构诊断 |
 
 旧一级页面 redirect 已移除。除 `/stocks/:code` 个股详情隐藏路由外，用户应通过七个一级模块、二级 tab 和 Pipeline 透明度页访问原子功能。
@@ -85,7 +85,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 
 **应用工厂：** `web/api/app.py` → `create_app()` → 注册 CORS、AuthMiddleware、12 个业务路由、错误处理和生产静态文件 fallback。`web/api/__init__.py` 只保留包级说明。
 
-**12 个业务路由模块 + Auth/WS/Jobs：**
+**13 个业务路由模块 + Auth/WS/Jobs：**
 
 | 模块 | 文件 | 端点 |
 |------|------|------|
@@ -98,6 +98,7 @@ Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 
 | Sectors | `routes/sectors.py` | `GET /api/sectors/overview`, `GET /api/sectors/exposure`, `GET /api/sectors/{industry}`, `GET /api/sectors/{industry}/stocks` (410 retired) |
 | Pipeline | `routes/pipeline.py` | `GET /api/pipeline`, `GET /api/pipeline/market-regime`, `GET /api/pipeline/{pipeline_key}` |
 | Assets | `routes/assets.py` | `GET /api/assets/overview` |
+| Data Sources | `routes/data_sources.py` | `GET /api/data-sources/capabilities` |
 | Settings | `routes/settings.py` | `GET /api/settings`, `GET /api/settings/schema`, `PUT /api/settings`, `PATCH /api/settings/section/{section}` |
 | System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/llm-usage`, `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/mode`, `GET /api/system/tests/design`, `GET /api/system/ast-intelligence` |
 | CodeGraph | `routes/codegraph.py` | `GET /api/codegraph/status`, `GET /api/codegraph/graph`, `GET /api/codegraph/search`, `GET /api/codegraph/neighborhood`, `GET /api/codegraph/diagnostics`, `POST /api/codegraph/sync` |
@@ -145,12 +146,14 @@ def get_db() -> Database:
 | Health | `astroq health --json` | 返回项目版本、DataHub store/cache 路径 |
 | Config | `astroq config validate --json` | 校验 settings 和策略注册表 |
 | Data | `astroq data status --json` / `astroq data repair <table> --dry-run --json` | 委托 DB health 和单表修复，dry-run 不触发写入 |
+| Data Sources | `astroq data sources --json` / `astroq data sources audit --source all --json` / `astroq data sources diff-registry --json` | 生成和读取外部 source capability registry，并与项目 `data_registry` 做 diff；Web 只读消费 artifact |
 | Strategy | `astroq strategy catalog --json` / `astroq strategy run <name|all>` | 委托 Strategy Catalog 和 runtime gates，candidate 必须显式 `--mode research` |
 | Regime | `astroq regime status --json` / `astroq regime train-profit --dry-run --json` | 读取当前生产 regime；训练命令默认可 dry-run |
 | Backtest | `astroq backtest run [--strategy NAME] --dry-run --json` | 委托回测 runner，不在 CLI 重写回测逻辑 |
 | Docs | `astroq docs check --json` | 扫描已知陈旧文档短语 |
 | Tests | `astroq test check --suite quick --json` / `astroq test design --json` | `test check` 运行固定测试 suite；`test design` 生成 `var/artifacts/tests/design/latest.json`，Web 只读展示测试设计图谱、风险矩阵和异味诊断 |
 | Architecture | `astroq architecture ast --json` | 生成 `var/artifacts/architecture/ast/latest.json`，Web 只读展示 Python/TS/Vue/CSS 的重复实现、近似 clone、重复 helper 和 canonical helper 绕行风险 |
+| Lifecycle | `astroq lifecycle check --json` | 生成 `var/artifacts/lifecycle/latest.json`；Web 只读展示 source capability、local freshness、strategy evidence 和 execution readiness，缺数据/缺能力/缺证据必须显示 blocked/not_applicable |
 | Web | `astroq web build --json` / `astroq web serve --host HOST --port PORT` | 委托 Vite build 和 FastAPI/uvicorn |
 
 ## 3. 数据流
