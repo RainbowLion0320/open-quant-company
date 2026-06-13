@@ -28,12 +28,14 @@ def _freshness_check() -> tuple[dict[str, Any], list[str], list[str]]:
     gate, rows = freshness_gate_from_health_check()
     stale = list(gate.get("stale") or [])
     missing = list(gate.get("missing") or [])
+    warning_keys = list(gate.get("warnings") or [])
     blockers = [f"stale_data:{key}" for key in stale] + [f"missing_data:{key}" for key in missing]
+    warnings = [f"freshness_warning:{key}" for key in warning_keys]
     return {
         "status": "ok" if gate.get("ok") else "blocked",
         "rows": rows,
         "freshness_gate": gate,
-    }, blockers, []
+    }, blockers, warnings
 
 
 def _strategy_evidence_check() -> tuple[dict[str, Any], list[str], list[str]]:

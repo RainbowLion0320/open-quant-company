@@ -1,4 +1,5 @@
 import importlib
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -128,6 +129,49 @@ def test_db_health_prefers_explicit_date_over_quarter_column():
     assert health._freshness_days(frame) == (
         pd.Timestamp.today().date() - pd.Timestamp("2025-12-31").date()
     ).days
+
+
+def test_macro_gdp_freshness_uses_quarter_release_window():
+    import scripts.db_health_check as health
+    from data.storage.dimensions import HealthTableMeta
+
+    meta = HealthTableMeta(
+        "macro_gdp",
+        "Tushare",
+        "国内生产总值 GDP",
+        registry_key="macro_gdp",
+        freshness_sla_days=140,
+    )
+
+    stale_status, stale_detail = health._freshness_status(
+        {
+            "table": "macro_gdp",
+            "files": 1,
+            "freshness_date": "2025-12-31",
+            "freshness_days": 164,
+            "error": None,
+        },
+        meta,
+        today=date(2026, 6, 13),
+    )
+    fresh_status, fresh_detail = health._freshness_status(
+        {
+            "table": "macro_gdp",
+            "files": 1,
+            "freshness_date": "2026-03-31",
+            "freshness_days": 74,
+            "error": None,
+        },
+        meta,
+        today=date(2026, 6, 13),
+    )
+
+    assert stale_status == "stale"
+    assert stale_detail["reason"] == "source_not_updated"
+    assert stale_detail["expected_period"] == "2026Q1"
+    assert stale_detail["latest_period"] == "2025Q4"
+    assert fresh_status == "fresh"
+    assert fresh_detail["reason"] == "quarter_available"
 
 
 def test_datahub_uses_canonical_runtime_env(tmp_path, monkeypatch):

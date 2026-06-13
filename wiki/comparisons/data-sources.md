@@ -24,7 +24,7 @@ tags: [akshare, tushare, data, capability, registry]
 |--------|------|-------------|
 | `akshare` | 免费 Python 聚合包，覆盖行情、宏观、基金、债券、期货等大量接口 | 本地安装包 introspection，记录版本、callable、module、signature、docstring 摘要；只对白名单接口做安全 probe |
 | `tushare` | Token-gated Pro API，财务、估值、资金流、行业和宏观深度更强 | 使用当前 `TUSHARE_TOKEN` probe 权限；缺 token 时标记 `missing_secret` |
-| `tencent_finance` | 行情 backend / 直接候选源 | v1 记录为 AKShare backend 或 direct candidate，不承诺全量稳定 API |
+| `tencent_finance` | 行情 backend / 直接候选源 | v1 记录为 AKShare backend 或 direct candidate；已观察到 `qt.gtimg.cn` 实时行情和 `web.ifzq.gtimg.cn/appstock/app/fqkline/get` K 线接口，但仍标为 `candidate/manual_review` |
 | `eastmoney` | 行情、盘口、基金等 backend / 直接候选源 | v1 记录已在代码中出现的 backend 能力 |
 | `sina_finance` | 行情、指数、期货等 backend / 直接候选源 | v1 记录已在代码中出现的 backend 能力 |
 | `tonghuashun` | 财务摘要、资金流等 backend / 直接候选源 | v1 记录已在代码中出现的 backend 能力 |
@@ -49,6 +49,8 @@ var/artifacts/data-sources/latest.json
 ```
 
 Web 的 DataHub → Sources 页签只读这个产物。页面加载不扫描 AKShare 包、不访问 Tushare、不触发任何外部网络请求。
+
+腾讯财经当前没有被提升为生产主数据源。它的候选接口只用于能力治理和未来字段契约评估；若要正式接入，必须先完成字段漂移、限流、授权边界和复权口径审查，再同步 `data_registry`。
 
 ## AKShare 与 Tushare 的实际分工
 

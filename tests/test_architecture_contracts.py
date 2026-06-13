@@ -576,11 +576,38 @@ def test_data_freshness_gate_is_shared_outside_cli_layer():
         {"table": "stock_income_statement", "freshness_status": "fresh", "missing_pct": 60.85},
     ])
 
-    assert freshness_gate(rows) == {
-        "ok": False,
-        "stale": ["stock_daily"],
-        "missing": ["macro_gdp"],
-    }
+    gate = freshness_gate(rows)
+
+    assert gate["ok"] is False
+    assert gate["stale"] == ["stock_daily"]
+    assert gate["missing"] == ["macro_gdp"]
+    assert gate["warnings"] == []
+    assert {item["key"] for item in gate["details"]} == {"stock_daily", "macro_gdp"}
+
+
+def test_rate_limited_market_event_freshness_is_warning_until_required():
+    from data.quality.freshness_gate import freshness_gate, health_result_to_gate_data
+
+    rows = health_result_to_gate_data([
+        {
+            "table": "stock_limit_list",
+            "registry_key": "limit_list",
+            "freshness_status": "stale",
+            "repair_policy": "rate_limited",
+            "data_domain": "market_event",
+            "freshness_reason": "rate_limited_background_collection",
+        }
+    ])
+
+    global_gate = freshness_gate(rows)
+    required_gate = freshness_gate(rows, required=["stock_limit_list"])
+
+    assert global_gate["ok"] is True
+    assert global_gate["stale"] == []
+    assert global_gate["warnings"] == ["stock_limit_list"]
+    assert global_gate["details"][0]["severity"] == "warning"
+    assert required_gate["ok"] is False
+    assert required_gate["stale"] == ["stock_limit_list"]
 
 
 def test_formal_lifecycle_does_not_silently_fill_core_evidence_gaps():

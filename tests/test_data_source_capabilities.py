@@ -7,6 +7,7 @@ from types import ModuleType
 
 def test_source_catalog_separates_external_capabilities_from_project_registry():
     from data.ingestion.source_capabilities import SOURCE_IDS, source_catalog
+    from data.ingestion.source_capability_catalog import CANDIDATE_CAPABILITIES
     from data.storage.dimensions import get_registry
 
     expected = {
@@ -29,6 +30,48 @@ def test_source_catalog_separates_external_capabilities_from_project_registry():
     assert "eastmoney" not in registry_sources
     assert "sina_finance" not in registry_sources
     assert "tonghuashun" not in registry_sources
+
+    tx_capabilities = [item for item in CANDIDATE_CAPABILITIES if item["source"] == "tencent_finance"]
+    interfaces = {item["interface"] for item in tx_capabilities}
+    assert {"qt_gtimg_realtime_quote", "ifzq_fqkline"}.issubset(interfaces)
+    assert all(not item["mapped_dimensions"] for item in tx_capabilities)
+    assert all(item["integration_status"] == "candidate" for item in tx_capabilities if item["interface"] != "stock_zh_index_daily_tx")
+    assert all(item["access_status"] in {"candidate", "manual_review"} for item in tx_capabilities)
+
+
+def test_tencent_finance_candidate_parsers_are_explicit_and_non_production():
+    from data.ingestion.tencent_finance import parse_fqkline_payload, parse_realtime_quote
+
+    quote = parse_realtime_quote(
+        'v_sh600519="1~贵州茅台~600519~1550.00~1540.00~1541.00~12000~'
+        '6000~6000~1550.00~10~1549.00~20~1551.00~30~1552.00~40~1553.00~50~'
+        '1548.00~60~1547.00~70~1546.00~80~1545.00~90~1544.00~100~'
+        '20260613150003";'
+    )
+    kline = parse_fqkline_payload(
+        {
+            "code": 0,
+            "data": {
+                "sh600519": {
+                    "qfqday": [
+                        ["2024-01-02", "1700.00", "1705.00", "1710.00", "1690.00", "12345"],
+                    ]
+                }
+            },
+        },
+        symbol="sh600519",
+        adjust="qfq",
+    )
+
+    assert quote["symbol"] == "sh600519"
+    assert quote["name"] == "贵州茅台"
+    assert quote["last_price"] == 1550.0
+    assert quote["previous_close"] == 1540.0
+    assert quote["timestamp"] == "20260613150003"
+    assert kline[0]["symbol"] == "sh600519"
+    assert kline[0]["adjust"] == "qfq"
+    assert kline[0]["open"] == 1700.0
+    assert kline[0]["close"] == 1705.0
 
 
 def test_akshare_introspection_uses_local_package_without_network(monkeypatch):
