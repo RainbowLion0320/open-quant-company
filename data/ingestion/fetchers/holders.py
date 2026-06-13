@@ -16,7 +16,7 @@ import pandas as pd
 
 from data.storage.datahub import get_datahub
 from data.ingestion.fetchers.base import get_tushare_token
-from data.market.symbol_utils import to_ts_code
+from data.market.symbol_utils import normalize_symbol, to_ts_code
 
 HUB = get_datahub()
 
@@ -72,6 +72,44 @@ class HolderFetcher:
 
     def batch_fetch(self, symbols: List[str], force: bool = False) -> Dict[str, pd.DataFrame]:
         return _batch_fetch_symbols(self, "holders", symbols, force)
+
+    def fetch_period(self, end_date: str) -> int:
+        """Fetch all holder counts for one report date and merge into per-symbol files."""
+        import tushare as ts
+
+        api = ts.pro_api(get_tushare_token())
+        df = api.stk_holdernumber(end_date=end_date)
+        if df is None or len(df) == 0:
+            return 0
+
+        frame = df.copy()
+        frame["ann_date"] = pd.to_datetime(frame["ann_date"], errors="coerce")
+        frame["end_date"] = pd.to_datetime(frame["end_date"], errors="coerce")
+        frame = frame.dropna(subset=["ts_code", "end_date"]).sort_values("end_date")
+        written = 0
+        for ts_code, group in frame.groupby("ts_code"):
+            symbol = normalize_symbol(str(ts_code).split(".")[0])
+            if not symbol:
+                continue
+            cache_path = self.store_dir / f"{symbol}.parquet"
+            merged = group.copy()
+            if cache_path.exists():
+                try:
+                    existing = HUB.read_parquet(cache_path)
+                    if existing is not None and len(existing) > 0:
+                        existing["ann_date"] = pd.to_datetime(existing["ann_date"], errors="coerce")
+                        existing["end_date"] = pd.to_datetime(existing["end_date"], errors="coerce")
+                        merged = pd.concat([existing, merged], ignore_index=True)
+                except Exception:
+                    pass
+            merged = (
+                merged.dropna(subset=["ts_code", "end_date"])
+                .drop_duplicates(subset=["ts_code", "ann_date", "end_date"], keep="last")
+                .sort_values("end_date")
+            )
+            HUB.write_parquet(merged, cache_path)
+            written += 1
+        return written
 
     def get_latest(self, symbol: str) -> Optional[Dict]:
         df = self.fetch_symbol(symbol)

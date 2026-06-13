@@ -100,7 +100,7 @@ def audit_sources(
         "errors": errors,
     }
     if write:
-        path = _artifact_path(hub)
+        path = _artifact_path(hub, source=source)
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
         payload["latest"] = {"generated_at": generated_at, "artifact_path": path.as_posix()}
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
@@ -437,8 +437,9 @@ def _normalize_payload(payload: dict[str, Any], path: Path) -> dict[str, Any]:
     return normalized
 
 
-def _artifact_path(hub: DataHub | None = None) -> Path:
-    return (hub or get_datahub()).artifact_path("data-sources", "latest.json")
+def _artifact_path(hub: DataHub | None = None, *, source: str = "all") -> Path:
+    name = "latest.json" if source == "all" else f"latest-{source}.json"
+    return (hub or get_datahub()).artifact_path("data-sources", name)
 
 
 def _read_artifact(path: Path) -> dict[str, Any] | None:

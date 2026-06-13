@@ -113,6 +113,23 @@ def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatc
     reset_datahub()
 
 
+def test_db_health_prefers_explicit_date_over_quarter_column():
+    import scripts.db_health_check as health
+
+    frame = pd.DataFrame(
+        {
+            "quarter": ["2025Q4"],
+            "date": [pd.Timestamp("2025-12-31")],
+            "gdp": [1401879.2],
+        }
+    )
+
+    assert health._find_date_col(frame) == "date"
+    assert health._freshness_days(frame) == (
+        pd.Timestamp.today().date() - pd.Timestamp("2025-12-31").date()
+    ).days
+
+
 def test_datahub_uses_canonical_runtime_env(tmp_path, monkeypatch):
     from data.storage.datahub import DataHub
 

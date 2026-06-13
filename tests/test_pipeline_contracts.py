@@ -37,6 +37,32 @@ class TestAlphaSignal:
         assert signals[2].symbol == "c"
 
 
+class TestStrategyAlphaAdapter:
+    def test_reuses_scores_between_signal_generation_and_score_panel(self):
+        calls: list[tuple[str, int, str]] = []
+        dates = pd.date_range("2024-01-02", periods=3, freq="B")
+        prices = pd.DataFrame(
+            {
+                "AAA": [10.0, 10.5, 11.0],
+                "BBB": [20.0, 20.2, 20.1],
+            },
+            index=dates,
+        )
+
+        def scorer(symbol: str, series: pd.Series, date_idx: int, regime: str) -> float:
+            calls.append((symbol, date_idx, regime))
+            return 80.0 if symbol == "AAA" else 20.0
+
+        alpha = StrategyAlphaAdapter("unit_alpha", "Unit Alpha", scorer, min_score=30)
+
+        signals = alpha.generate_alpha(["AAA", "BBB"], prices, 2, "sideways")
+        panel = alpha.generate_score_panel(["AAA", "BBB"], prices, 2, "sideways")
+
+        assert [(signal.symbol, signal.score) for signal in signals] == [("AAA", 80.0)]
+        assert {row["symbol"] for row in panel} == {"AAA", "BBB"}
+        assert calls == [("AAA", 2, "sideways"), ("BBB", 2, "sideways")]
+
+
 class TestPortfolioTarget:
     def test_side_buy(self):
         t = PortfolioTarget("000001", "s", 0.1, delta_shares=500)

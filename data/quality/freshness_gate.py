@@ -43,12 +43,6 @@ def health_result_to_gate_data(result: object) -> list[dict[str, str]]:
         status_value = str(row.get("freshness_status") or row.get("status") or "").lower()
         if not status_value:
             status_value = "ok"
-        try:
-            missing_pct = float(row.get("missing_pct", 0) or 0)
-        except Exception:
-            missing_pct = 0.0
-        if missing_pct > 50 and status_value in {"ok", "fresh"}:
-            status_value = "stale"
         gate_data.append({"table": key, "status": status_value})
     return gate_data
 

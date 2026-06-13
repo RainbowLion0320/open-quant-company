@@ -115,11 +115,43 @@ def test_diff_registry_reports_capability_and_registry_mismatches():
     assert diff["capability_unmapped"][0]["interface"] == "stock_board_industry_name_em"
 
 
+def test_diff_registry_matches_normalized_registry_source_aliases():
+    from data.ingestion.source_capabilities import diff_capabilities_with_registry
+
+    capabilities = [
+        {
+            "source": "tushare",
+            "interface": "stock_basic",
+            "mapped_dimensions": ["stock_basic"],
+            "integration_status": "project_integrated",
+            "frequency": "event",
+            "data_domain": "reference",
+        },
+        {
+            "source": "computed",
+            "interface": "sector_performance_snapshot",
+            "mapped_dimensions": ["sector_performance_snapshot"],
+            "integration_status": "project_integrated",
+            "frequency": "daily",
+            "data_domain": "derived_snapshot",
+        },
+    ]
+    dimensions = [
+        {"key": "stock_basic", "source": "tushare_free", "freq": "event", "status": "available"},
+        {"key": "sector_performance_snapshot", "source": "computed", "freq": "daily", "status": "available"},
+    ]
+
+    diff = diff_capabilities_with_registry(capabilities, dimensions)
+
+    assert diff["registry_missing_source"] == []
+    assert diff["summary"]["registry_missing_source_count"] == 0
+
+
 def test_capability_artifact_written_to_runtime_artifacts(tmp_path, monkeypatch):
     from data.ingestion import source_capabilities as caps
     from data.storage.datahub import DataHub
 
-    hub = DataHub(runtime_root=tmp_path / "var")
+    hub = DataHub(runtime_root=tmp_path / "var", artifact_root=tmp_path / "var" / "artifacts")
     monkeypatch.setattr(
         caps,
         "audit_akshare_capabilities",
@@ -142,9 +174,57 @@ def test_capability_artifact_written_to_runtime_artifacts(tmp_path, monkeypatch)
 
     payload = caps.audit_sources(source="akshare", hub=hub, write=True)
 
-    artifact = hub.artifact_path("data-sources", "latest.json")
+    artifact = hub.artifact_path("data-sources", "latest-akshare.json")
     assert artifact.exists()
     saved = json.loads(artifact.read_text(encoding="utf-8"))
     assert saved["status"] == "ok"
     assert saved["summary"]["capability_count"] == 1
     assert payload["latest"]["artifact_path"] == artifact.as_posix()
+
+
+def test_single_source_audit_does_not_overwrite_full_capability_artifact(tmp_path, monkeypatch):
+    from data.ingestion import source_capabilities as caps
+    from data.storage.datahub import DataHub
+
+    hub = DataHub(runtime_root=tmp_path / "var", artifact_root=tmp_path / "var" / "artifacts")
+    canonical = hub.artifact_path("data-sources", "latest.json")
+    canonical.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "status": "ok",
+                "generated_at": "2026-06-12T00:00:00Z",
+                "summary": {"audited_source_count": 9, "capability_count": 9, "sources": {"tushare": 1}},
+                "capabilities": [{"source": "tushare", "interface": "stock_basic", "mapped_dimensions": ["stock_basic"]}],
+                "diff": {"summary": {"registry_missing_source_count": 0}, "registry_missing_source": []},
+            }
+        ),
+        encoding="utf-8",
+    )
+    before = canonical.read_text(encoding="utf-8")
+    monkeypatch.setattr(
+        caps,
+        "audit_akshare_capabilities",
+        lambda limit=None: {
+            "source": "akshare",
+            "version": "unit",
+            "capabilities": [
+                {
+                    "source": "akshare",
+                    "interface": "stock_zh_a_daily",
+                    "mapped_dimensions": ["ohlcv_daily"],
+                    "integration_status": "project_integrated",
+                    "frequency": "daily",
+                    "data_domain": "market_price",
+                }
+            ],
+            "errors": [],
+        },
+    )
+
+    payload = caps.audit_sources(source="akshare", hub=hub, write=True)
+
+    source_artifact = hub.artifact_path("data-sources", "latest-akshare.json")
+    assert source_artifact.exists()
+    assert payload["latest"]["artifact_path"] == source_artifact.as_posix()
+    assert canonical.read_text(encoding="utf-8") == before

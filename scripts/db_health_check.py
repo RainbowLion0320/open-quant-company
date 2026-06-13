@@ -30,6 +30,30 @@ from data.features.feature_store import iter_feature_files
 HUB = get_datahub()
 STORE = HUB.store_root
 
+DATE_COLUMN_PRIORITY = (
+    "date",
+    "trade_date",
+    "end_date",
+    "ann_date",
+    "utc_date",
+    "ts",
+    "month",
+    "日期",
+    "报告期",
+    "quarter",
+)
+DATE_COLUMN_NAMES = set(DATE_COLUMN_PRIORITY)
+
+
+def _date_columns(df: pd.DataFrame) -> list[str]:
+    candidates = [
+        str(col)
+        for col in df.columns
+        if str(col).lower() in DATE_COLUMN_NAMES or str(col) in DATE_COLUMN_NAMES
+    ]
+    rank = {name: idx for idx, name in enumerate(DATE_COLUMN_PRIORITY)}
+    return sorted(candidates, key=lambda col: rank.get(col.lower(), rank.get(col, len(rank))))
+
 
 def _missing_pct(df: pd.DataFrame) -> dict:
     cols = {}
@@ -61,9 +85,7 @@ def _outlier_count(df: pd.DataFrame) -> dict:
 
 
 def _freshness_days(df: pd.DataFrame) -> Optional[int]:
-    for dc in df.columns:
-        if str(dc).lower() not in ("date", "trade_date", "ann_date", "end_date", "ts", "quarter", "utc_date", "month") and str(dc) not in ("日期", "报告期"):
-            continue
+    for dc in _date_columns(df):
         try:
             s = pd.to_datetime(df[dc], errors="coerce").dropna()
             if len(s) == 0:
@@ -119,14 +141,13 @@ def _manifest_for_many(paths: list[Path]) -> dict:
 
 def _find_date_col(df: pd.DataFrame) -> Optional[str]:
     """Find a date-like column in the DataFrame."""
-    for dc in df.columns:
-        if str(dc).lower() in ("date", "trade_date", "ann_date", "end_date", "ts", "quarter", "utc_date", "month") or str(dc) in ("日期", "报告期"):
-            try:
-                s = pd.to_datetime(df[dc], errors="coerce")
-                if s.notna().sum() > 0:
-                    return dc
-            except Exception:
-                continue
+    for dc in _date_columns(df):
+        try:
+            s = pd.to_datetime(df[dc], errors="coerce")
+            if s.notna().sum() > 0:
+                return dc
+        except Exception:
+            continue
     return None
 
 

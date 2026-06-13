@@ -1,4 +1,8 @@
 import json
+from types import SimpleNamespace
+
+import pandas as pd
+import pytest
 
 
 def _json_from_cli(capsys):
@@ -33,6 +37,82 @@ def test_data_repair_dry_run_does_not_call_repair(monkeypatch, capsys):
     assert code == 0
     assert calls == []
     assert data["data"]["dry_run"] is True
+
+
+def test_limit_list_repair_fails_when_provider_returns_no_rows_and_table_stays_stale(monkeypatch):
+    from scripts import repair_table
+
+    monkeypatch.setattr(
+        "scripts.cron_fetch_extra.fetch_limit_list",
+        lambda full_history=False: 0,
+    )
+    monkeypatch.setattr(
+        "scripts.db_health_check.run_health_check",
+        lambda: pd.DataFrame(
+            [{"table": "stock_limit_list", "registry_key": "limit_list", "freshness_status": "stale"}]
+        ),
+    )
+    monkeypatch.setattr(repair_table, "_require_rows_or_cache", lambda *args, **kwargs: None)
+
+    with pytest.raises(RuntimeError, match="stock_limit_list remains stale"):
+        repair_table.repair_limit_list()
+
+
+def test_data_repair_fails_when_table_remains_stale_after_repair(monkeypatch):
+    from scripts import repair_table
+
+    class DummyLedger:
+        def start(self, *args, **kwargs):
+            return "run-1"
+
+        def complete(self, *args, **kwargs):
+            raise AssertionError("stale repair must not be marked complete")
+
+        def fail(self, *args, **kwargs):
+            return None
+
+    monkeypatch.setattr("data.ops.backfill.BackfillLedger", lambda: DummyLedger())
+    monkeypatch.setitem(repair_table.REPAIR_MAP, "macro_gdp", lambda limit=0, days=365: None)
+    monkeypatch.setattr(
+        "scripts.db_health_check.run_health_check",
+        lambda: pd.DataFrame([{"registry_key": "macro_gdp", "freshness_status": "stale"}]),
+    )
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(stdout="Health check done"),
+    )
+
+    with pytest.raises(RuntimeError, match="macro_gdp remains stale after repair"):
+        repair_table.repair("macro_gdp")
+
+
+def test_stock_holders_repair_uses_period_batch_fetch_for_full_refresh(monkeypatch):
+    from scripts import repair_table
+
+    calls = []
+
+    class FakeHolderFetcher:
+        def fetch_period(self, end_date):
+            calls.append(end_date)
+            return 5500
+
+        def batch_fetch(self, symbols, force=False):
+            raise AssertionError("full holder repair must use period batch fetch")
+
+    monkeypatch.setattr(
+        "data.ingestion.fetchers.holders.HolderFetcher",
+        FakeHolderFetcher,
+    )
+    monkeypatch.setattr(
+        repair_table,
+        "_latest_completed_quarter_end",
+        lambda: "20260331",
+        raising=False,
+    )
+
+    repair_table.repair_holders(limit=0)
+
+    assert calls == ["20260331"]
 
 
 def test_tushare_audit_cli_reports_capabilities_and_coverage(monkeypatch, capsys):

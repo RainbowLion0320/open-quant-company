@@ -269,6 +269,61 @@ def test_multifactor_backtest_uses_point_in_time_financial_snapshots(monkeypatch
     assert built_years == [(2020, ["AAA"], "多因子")]
 
 
+def test_buffett_pit_builder_reuses_symbol_source_frames(monkeypatch):
+    import backtest.buffett_real_scorer as scorer
+
+    financial_reads = []
+    daily_reads = []
+    financial = pd.DataFrame(
+        {
+            "报告期": pd.to_datetime(
+                [
+                    "2014-12-31",
+                    "2015-12-31",
+                    "2016-12-31",
+                    "2017-12-31",
+                    "2018-12-31",
+                    "2019-12-31",
+                    "2020-12-31",
+                ]
+            ),
+            "净利润": ["100"] * 7,
+            "净利润同比增长率": ["5%"] * 7,
+            "销售毛利率": ["35%"] * 7,
+            "销售净利率": ["12%"] * 7,
+            "净资产收益率": ["15%"] * 7,
+            "产权比率": ["0.3"] * 7,
+        }
+    )
+    daily = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2019-12-30", "2020-12-30"]),
+            "outstanding_share": [100_000_000.0, 120_000_000.0],
+        }
+    )
+
+    def fake_financial_summary(symbol):
+        financial_reads.append(symbol)
+        return financial.copy()
+
+    def fake_stock_daily(symbol):
+        daily_reads.append(symbol)
+        return daily.copy()
+
+    monkeypatch.setattr("data.market.financials.get_financial_summary", fake_financial_summary)
+    monkeypatch.setattr("data.ingestion.fetcher.get_stock_daily", fake_stock_daily)
+    scorer._PIT_FINANCIAL_INPUTS_CACHE.clear()
+    scorer._PIT_SYMBOL_SOURCE_CACHE.clear()
+
+    first = scorer.build_pit_financial_inputs(2020, ["AAA"], log_label="测试")
+    second = scorer.build_pit_financial_inputs(2021, ["AAA"], log_label="测试")
+
+    assert "AAA" in first
+    assert "AAA" in second
+    assert financial_reads == ["AAA"]
+    assert daily_reads == ["AAA"]
+
+
 def test_backtest_runner_persists_each_strategy_result_file():
     text = Path("backtest/run_all_strategies.py").read_text(encoding="utf-8")
 
@@ -518,6 +573,7 @@ def test_data_freshness_gate_is_shared_outside_cli_layer():
         {"table": "stock_daily", "freshness_status": "stale", "missing_pct": 0},
         {"table": "macro_gdp", "freshness_status": "missing", "missing_pct": 100},
         {"table": "features_all", "freshness_status": "fresh", "missing_pct": 0},
+        {"table": "stock_income_statement", "freshness_status": "fresh", "missing_pct": 60.85},
     ])
 
     assert freshness_gate(rows) == {

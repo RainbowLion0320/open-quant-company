@@ -14,6 +14,51 @@ import numpy as np
 # 项目根
 
 _PIT_FINANCIAL_INPUTS_CACHE = {}
+_PIT_SYMBOL_SOURCE_CACHE = {}
+
+
+def _shares_by_report_year(price_df: pd.DataFrame) -> dict[int, float]:
+    if price_df is None or price_df.empty or "outstanding_share" not in price_df.columns:
+        return {}
+    frame = price_df[["date", "outstanding_share"]].copy()
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["outstanding_share"] = pd.to_numeric(frame["outstanding_share"], errors="coerce")
+    frame = frame.dropna(subset=["date", "outstanding_share"]).sort_values("date")
+    if frame.empty:
+        return {}
+    annual = frame.groupby(frame["date"].dt.year)["outstanding_share"].last()
+    return {int(year): float(value) / 1e8 for year, value in annual.items()}
+
+
+def _shares_before_year(shares_by_year: dict[int, float], year: int) -> float:
+    cutoff_year = int(year) - 1
+    eligible = [item_year for item_year in shares_by_year if item_year <= cutoff_year]
+    if not eligible:
+        return 0.0
+    return float(shares_by_year[max(eligible)])
+
+
+def _load_symbol_sources(sym: str) -> dict:
+    cached = _PIT_SYMBOL_SOURCE_CACHE.get(sym)
+    if cached is not None:
+        return cached
+
+    from data.market.financials import get_financial_summary
+    from data.ingestion.fetcher import get_stock_daily
+
+    financial = get_financial_summary(sym)
+    shares_by_year: dict[int, float] = {}
+    try:
+        shares_by_year = _shares_by_report_year(get_stock_daily(sym))
+    except Exception:
+        shares_by_year = {}
+
+    cached = {
+        "financial": financial if financial is not None else pd.DataFrame(),
+        "shares_by_year": shares_by_year,
+    }
+    _PIT_SYMBOL_SOURCE_CACHE[sym] = cached
+    return cached
 
 
 def build_pit_financial_inputs(year, stock_pool, *, log_label="财务PIT"):
@@ -27,12 +72,11 @@ def build_pit_financial_inputs(year, stock_pool, *, log_label="财务PIT"):
         return result
 
     from data.market.financials import (
-        get_financial_summary, extract_roe_history,
+        extract_roe_history,
         extract_gross_margin_history, extract_net_margin_history,
         extract_debt_equity_ratio, extract_latest_net_profit,
         _estimate_growth,
     )
-    from data.ingestion.fetcher import get_stock_daily
     from data.market.symbols import SYMBOL_NAME, SYMBOL_INDUSTRY, SYMBOL_SECTOR, FALLBACK_SECTOR
 
     result = {}
@@ -40,7 +84,8 @@ def build_pit_financial_inputs(year, stock_pool, *, log_label="财务PIT"):
 
     for sym in stock_pool:
         try:
-            df = get_financial_summary(sym)
+            sources = _load_symbol_sources(sym)
+            df = sources["financial"].copy()
             if df is None or len(df) == 0:
                 continue
 
@@ -67,15 +112,7 @@ def build_pit_financial_inputs(year, stock_pool, *, log_label="财务PIT"):
             industry = SYMBOL_INDUSTRY.get(sym, "待分类")
             sector = SYMBOL_SECTOR.get(sym, FALLBACK_SECTOR)
 
-            shares = 0.0
-            try:
-                price_df = get_stock_daily(sym)
-                price_df["date"] = pd.to_datetime(price_df["date"])
-                price_df = price_df[price_df["date"] <= cutoff]
-                if len(price_df) > 0 and "outstanding_share" in price_df.columns:
-                    shares = float(price_df.iloc[-1]["outstanding_share"]) / 1e8
-            except Exception:
-                pass
+            shares = _shares_before_year(sources.get("shares_by_year", {}), year)
 
             result[sym] = {
                 "symbol": sym,

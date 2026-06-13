@@ -11,10 +11,12 @@
 from dataclasses import dataclass, field
 from typing import List, Tuple, Optional
 from enum import Enum
+from functools import lru_cache
 
 from core.settings import get_section
 
 
+@lru_cache(maxsize=1)
 def _buffett_config():
     return get_section("buffett", {})
 
