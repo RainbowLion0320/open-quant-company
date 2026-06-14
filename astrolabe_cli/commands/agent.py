@@ -128,6 +128,19 @@ def generate_report(kind: str, session_id: str) -> CliResult:
     )
 
 
+def run_report_rhythm(session_id: str, *, force: bool = False) -> CliResult:
+    try:
+        rhythm = AgentRuntime().run_report_rhythm(session_id=session_id, force=force)
+    except KeyError as exc:
+        return CliResult(False, "agent rhythm", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent rhythm",
+        message=f"Generated {rhythm['generated_count']} report(s), skipped {rhythm['skipped_count']} report(s)",
+        data={"rhythm": rhythm},
+    )
+
+
 def handoffs(session_id: str = "") -> CliResult:
     runtime = AgentRuntime()
     rows = runtime.list_handoffs(session_id or None)

@@ -172,8 +172,19 @@
               <button class="btn btn-xs" type="button" :disabled="generatingReport" @click="generateReport">
                 {{ t("ceoOffice.generateReport") }}
               </button>
+              <button class="btn btn-xs btn-ghost" type="button" :disabled="runningRhythm" @click="runReportRhythm">
+                {{ t("ceoOffice.runRhythm") }}
+              </button>
             </div>
           </header>
+          <div v-if="rhythmResult" class="rhythm-status">
+            <span>{{ t("ceoOffice.rhythmStatus") }}</span>
+            <strong>
+              {{ t("ceoOffice.generated") }} {{ rhythmResult.generated_count }} ·
+              {{ t("ceoOffice.skipped") }} {{ rhythmResult.skipped_count }}
+            </strong>
+            <small>{{ rhythmResult.checked_at }}</small>
+          </div>
           <div v-if="!reports.length" class="ceo-empty">{{ t("ceoOffice.noReports") }}</div>
           <div v-else class="report-list">
             <div v-for="report in reports" :key="report.report_id" class="report-row">
@@ -399,7 +410,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveReadiness, type AgentMessage, type AgentReport, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveReadiness, type AgentMessage, type AgentReport, type AgentReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -410,6 +421,7 @@ const messages = ref<AgentMessage[]>([]);
 const actions = ref<AgentAction[]>([]);
 const handoffs = ref<AgentHandoff[]>([]);
 const reports = ref<AgentReport[]>([]);
+const rhythmResult = ref<AgentReportRhythm | null>(null);
 const liveReadiness = ref<AgentLiveReadiness | null>(null);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
@@ -423,6 +435,7 @@ const cancelingAction = ref("");
 const archivingSession = ref(false);
 const resolvingHandoff = ref("");
 const generatingReport = ref(false);
+const runningRhythm = ref(false);
 const selectedReportKind = ref("daily_brief");
 const draft = ref("");
 const sending = ref(false);
@@ -687,6 +700,21 @@ async function generateReport() {
     error.value = `${t("ceoOffice.reportFailed")}: ${err?.message || err}`;
   } finally {
     generatingReport.value = false;
+  }
+}
+
+async function runReportRhythm() {
+  runningRhythm.value = true;
+  error.value = "";
+  try {
+    const session = await ensureSession();
+    const payload = await api.agentRunReportRhythm({ session_id: session.session_id });
+    rhythmResult.value = payload.rhythm;
+    await loadSession(session.session_id);
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.rhythmFailed")}: ${err?.message || err}`;
+  } finally {
+    runningRhythm.value = false;
   }
 }
 

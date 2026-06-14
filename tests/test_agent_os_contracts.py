@@ -943,6 +943,82 @@ def test_agent_reports_support_dedicated_operating_rhythm_templates(tmp_path, mo
     reset_datahub()
 
 
+def test_agent_report_rhythm_generates_due_templates_and_skips_fresh_reports(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Operating rhythm runner", default_desk="reporting")
+
+    first = runtime.run_report_rhythm(session_id=session.session_id)
+    second = runtime.run_report_rhythm(session_id=session.session_id)
+    forced = runtime.run_report_rhythm(session_id=session.session_id, force=True)
+
+    assert first["status"] == "ready"
+    assert first["generated_count"] == 8
+    assert first["skipped_count"] == 0
+    assert {item["kind"] for item in first["items"]} == {
+        "daily_brief",
+        "weekly_review",
+        "audit_pack",
+        "data_quality_review",
+        "risk_review",
+        "execution_reconciliation",
+        "engineering_digest",
+        "release_audit",
+    }
+    assert all(item["status"] == "generated" for item in first["items"])
+    assert Path(first["path"]).exists()
+    assert first["evidence"]["kind"] == "ledger"
+    assert Path(first["evidence"]["snapshot_uri"]).exists()
+
+    assert second["generated_count"] == 0
+    assert second["skipped_count"] == 8
+    assert all(item["status"] == "skipped" for item in second["items"])
+    assert all(item["reason"] == "not_due" for item in second["items"])
+    assert Path(second["path"]).exists()
+
+    assert forced["generated_count"] == 8
+    assert forced["force"] is True
+    assert all(item["reason"] == "force" for item in forced["items"])
+    assert runtime.list_reports(session.session_id)["total"] == 16
+    reset_datahub()
+
+
+def test_agent_report_rhythm_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Rhythm API", default_desk="reporting")
+
+    cli_code = run_cli(["agent", "rhythm", "--session", session.session_id, "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_client = TestClient(create_app())
+    api_rhythm = api_client.post("/api/agent/reports/rhythm", json={"session_id": session.session_id, "force": True})
+
+    assert cli_code == 0
+    assert cli_payload["data"]["rhythm"]["generated_count"] == 8
+    assert cli_payload["data"]["rhythm"]["skipped_count"] == 0
+    assert Path(cli_payload["data"]["rhythm"]["path"]).exists()
+    assert api_rhythm.status_code == 200
+    assert api_rhythm.json()["rhythm"]["generated_count"] == 8
+    assert api_rhythm.json()["rhythm"]["force"] is True
+    assert Path(api_rhythm.json()["rhythm"]["path"]).exists()
+    reset_datahub()
+
+
 def test_agent_evidence_resolver_returns_safe_web_route_navigation(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

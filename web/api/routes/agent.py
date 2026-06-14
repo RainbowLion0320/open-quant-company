@@ -146,6 +146,19 @@ async def generate_agent_report(payload: dict[str, Any]) -> dict[str, Any]:
     return {"report": report}
 
 
+@router.post("/reports/rhythm")
+async def run_agent_report_rhythm(payload: dict[str, Any]) -> dict[str, Any]:
+    session_id = str(payload.get("session_id") or "")
+    try:
+        rhythm = AgentRuntime().run_report_rhythm(
+            session_id=session_id,
+            force=bool(payload.get("force") or False),
+        )
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+    return {"rhythm": rhythm}
+
+
 @router.get("/handoffs")
 async def list_agent_handoffs(session_id: str = "") -> dict[str, Any]:
     handoffs = AgentRuntime().list_handoffs(session_id or None)

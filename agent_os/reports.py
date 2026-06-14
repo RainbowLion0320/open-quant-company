@@ -38,6 +38,18 @@ REPORT_TITLES = {
 }
 
 
+REPORT_RHYTHM_TEMPLATES = [
+    {"kind": "daily_brief", "cadence": "daily", "interval_hours": 24},
+    {"kind": "data_quality_review", "cadence": "daily", "interval_hours": 24},
+    {"kind": "risk_review", "cadence": "daily", "interval_hours": 24},
+    {"kind": "execution_reconciliation", "cadence": "daily", "interval_hours": 24},
+    {"kind": "weekly_review", "cadence": "weekly", "interval_hours": 168},
+    {"kind": "engineering_digest", "cadence": "weekly", "interval_hours": 168},
+    {"kind": "audit_pack", "cadence": "weekly", "interval_hours": 168},
+    {"kind": "release_audit", "cadence": "weekly", "interval_hours": 168},
+]
+
+
 def normalize_report_kind(kind: str) -> str:
     normalized = REPORT_KIND_ALIASES.get(kind.strip().lower())
     if not normalized:
@@ -47,6 +59,16 @@ def normalize_report_kind(kind: str) -> str:
 
 def report_title(kind: str) -> str:
     return REPORT_TITLES[normalize_report_kind(kind)]
+
+
+def report_rhythm_templates() -> list[dict[str, Any]]:
+    return [
+        {
+            **template,
+            "title": report_title(str(template["kind"])),
+        }
+        for template in REPORT_RHYTHM_TEMPLATES
+    ]
 
 
 def build_report_payload(

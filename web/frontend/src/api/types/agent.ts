@@ -181,6 +181,38 @@ export interface AgentReportResponse {
   report: AgentReport;
 }
 
+export interface AgentReportRhythmItem {
+  kind: string;
+  title: string;
+  cadence: string;
+  interval_hours: number;
+  last_generated_at: string;
+  due: boolean;
+  reason: string;
+  status: string;
+  report_id: string;
+  evidence_id: string;
+  generated_at?: string;
+}
+
+export interface AgentReportRhythm {
+  status: string;
+  run_id: string;
+  session_id: string;
+  checked_at: string;
+  force: boolean;
+  generated_count: number;
+  skipped_count: number;
+  items: AgentReportRhythmItem[];
+  reports: AgentReport[];
+  path: string;
+  evidence: EvidenceRef;
+}
+
+export interface AgentReportRhythmResponse {
+  rhythm: AgentReportRhythm;
+}
+
 export interface AgentLiveReadinessResponse {
   health: AgentLiveReadiness;
 }

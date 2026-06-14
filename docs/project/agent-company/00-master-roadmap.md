@@ -250,7 +250,8 @@ Current foundation:
 - Reports are written as JSON and Markdown, cite session/action/run/handoff evidence ids, and register the JSON artifact as resolvable `report` evidence.
 - Dedicated report templates are deterministic and available through `astroq agent report ... --json` and `POST /api/agent/reports`.
 - CEO Office exposes a report-template selector and can generate the selected report from the main control page.
-- Scheduled operating rhythm and deeper cross-artifact report aggregation remain future work.
+- `astroq agent rhythm --session ... --json`, `POST /api/agent/reports/rhythm`, and CEO Office can explicitly run due report templates and write a rhythm audit artifact.
+- Background scheduling, notification triggers, and deeper cross-artifact report aggregation remain future work.
 
 ## 8. Design Decisions Locked by This Roadmap
 

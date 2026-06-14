@@ -14,7 +14,7 @@ from agent_os.approval import approval_required_for_risk
 from agent_os.desks import get_desk, list_desks
 from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file
 from agent_os.ledger import AgentLedger
-from agent_os.reports import build_report_payload, normalize_report_kind, read_report_index, render_report_markdown, write_report_index
+from agent_os.reports import build_report_payload, normalize_report_kind, read_report_index, render_report_markdown, report_rhythm_templates, write_report_index
 from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentReport, AgentRun, AgentSession, DeskResponse, EvidenceRef
 from agent_os.tools import AgentToolRegistry
 from agent_os.workflows import build_desk_workflow_plan
@@ -712,12 +712,103 @@ class AgentRuntime:
             "total": len(reports),
         }
 
+    def plan_report_rhythm(self, *, session_id: str, force: bool = False, as_of: str | None = None) -> dict[str, Any]:
+        if not self.ledger.get_session(session_id):
+            raise KeyError(f"Agent session not found: {session_id}")
+        checked_at = as_of or _now()
+        checked_dt = _parse_timestamp(checked_at)
+        reports = self.list_reports(session_id)["reports"]
+        items: list[dict[str, Any]] = []
+        for template in report_rhythm_templates():
+            kind = str(template["kind"])
+            last_report = self._latest_report_for_kind(reports, kind)
+            last_generated_at = str(last_report.get("generated_at") or "") if last_report else ""
+            if force:
+                due = True
+                reason = "force"
+            elif not last_report:
+                due = True
+                reason = "never_generated"
+            else:
+                last_dt = _parse_timestamp(last_generated_at)
+                due = checked_dt - last_dt >= timedelta(hours=int(template["interval_hours"]))
+                reason = "cadence_elapsed" if due else "not_due"
+            items.append(
+                {
+                    "kind": kind,
+                    "title": template["title"],
+                    "cadence": template["cadence"],
+                    "interval_hours": template["interval_hours"],
+                    "last_generated_at": last_generated_at,
+                    "due": due,
+                    "reason": reason,
+                    "status": "planned" if due else "skipped",
+                    "report_id": "",
+                    "evidence_id": "",
+                }
+            )
+        return {
+            "status": "ready",
+            "session_id": session_id,
+            "checked_at": checked_at,
+            "force": force,
+            "items": items,
+            "due_count": sum(1 for item in items if item["due"]),
+        }
+
+    def run_report_rhythm(self, *, session_id: str, force: bool = False, as_of: str | None = None) -> dict[str, Any]:
+        plan = self.plan_report_rhythm(session_id=session_id, force=force, as_of=as_of)
+        generated: list[dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
+        for item in plan["items"]:
+            if item["due"]:
+                report = self.generate_report(session_id=session_id, kind=str(item["kind"]))
+                generated.append(report)
+                items.append(
+                    {
+                        **item,
+                        "status": "generated",
+                        "report_id": report["report_id"],
+                        "evidence_id": report["evidence_id"],
+                        "generated_at": report["generated_at"],
+                    }
+                )
+            else:
+                items.append({**item, "status": "skipped"})
+        payload = {
+            "status": "ready",
+            "run_id": _id("rhythm"),
+            "session_id": session_id,
+            "checked_at": plan["checked_at"],
+            "force": force,
+            "generated_count": len(generated),
+            "skipped_count": sum(1 for item in items if item["status"] == "skipped"),
+            "items": items,
+            "reports": generated,
+        }
+        path = self._write_report_rhythm_artifact(payload)
+        evidence = self.create_evidence(
+            kind="ledger",
+            label="Agent report operating rhythm",
+            uri=str(path),
+            summary=f"Generated {payload['generated_count']} report(s), skipped {payload['skipped_count']} report(s).",
+        )
+        return {**payload, "path": str(path), "evidence": evidence.to_dict()}
+
     def _snapshot_evidence_file(self, evidence_id: str, source: Path) -> Path:
         root = get_datahub().artifact_dir("agent") / "evidence" / evidence_id
         root.mkdir(parents=True, exist_ok=True)
         target = root / (source.name or "evidence")
         shutil.copy2(source, target)
         return target
+
+    def _write_report_rhythm_artifact(self, payload: dict[str, Any]) -> Path:
+        root = get_datahub().artifact_dir("agent") / "reports" / "rhythm"
+        root.mkdir(parents=True, exist_ok=True)
+        checked_at = str(payload["checked_at"]).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
+        path = root / f"{checked_at}-{payload['run_id']}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return path
 
     def _write_paper_preview_artifact(self, session_id: str, preview: dict[str, Any]) -> Path:
         root = get_datahub().artifact_dir("agent") / "paper_previews"
@@ -978,6 +1069,13 @@ class AgentRuntime:
         for action in self.ledger.list_actions(session_id):
             runs.extend(self.ledger.list_runs(str(action["action_id"])))
         return runs
+
+    @staticmethod
+    def _latest_report_for_kind(reports: list[dict[str, Any]], kind: str) -> dict[str, Any] | None:
+        candidates = [report for report in reports if report.get("kind") == kind and report.get("generated_at")]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda report: _parse_timestamp(str(report["generated_at"])))
 
     @staticmethod
     def _tool_id_for_action(action_type: str, parameters: dict[str, Any] | None) -> str:
