@@ -378,11 +378,11 @@ class AgentLedger:
         with self._connect() as conn:
             if action_id:
                 rows = conn.execute(
-                    "SELECT * FROM runs WHERE action_id = ? ORDER BY started_at DESC, run_id DESC",
+                    "SELECT * FROM runs WHERE action_id = ? ORDER BY started_at DESC, rowid DESC",
                     (action_id,),
                 ).fetchall()
             else:
-                rows = conn.execute("SELECT * FROM runs ORDER BY started_at DESC, run_id DESC").fetchall()
+                rows = conn.execute("SELECT * FROM runs ORDER BY started_at DESC, rowid DESC").fetchall()
         return [self._run_row(row) for row in rows]
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:

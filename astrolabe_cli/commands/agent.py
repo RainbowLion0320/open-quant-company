@@ -332,6 +332,21 @@ def paper_submit(action_id: str) -> CliResult:
     )
 
 
+def paper_cancel(action_id: str, reason: str) -> CliResult:
+    try:
+        cancellation = AgentRuntime().cancel_paper_order_action(action_id, reason=reason)
+    except KeyError as exc:
+        return CliResult(False, "agent paper cancel", {"action_id": action_id}, "Agent action missing", [str(exc)])
+    ok = cancellation["status"] == "canceled"
+    return CliResult(
+        ok=ok,
+        command="agent paper cancel",
+        message=f"Paper order cancel: {cancellation['status']}",
+        data={"cancellation": cancellation},
+        errors=[] if ok else [cancellation["run"]["stderr_summary"] or cancellation["status"]],
+    )
+
+
 def memory_summary() -> CliResult:
     snapshot = AgentRuntime().memory_snapshot()
     return CliResult(

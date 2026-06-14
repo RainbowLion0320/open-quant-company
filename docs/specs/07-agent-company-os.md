@@ -9,7 +9,7 @@
 
 Agent Company OS is the planned local-first operating layer for Open Quant Company. It lets the human user act as CEO while desk agents coordinate data, research, risk, execution, engineering, and reporting work.
 
-This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, explicit operating-rhythm report runs, paper order preview/proposal/approved-submit cards with inline paper reconciliation summaries, default-disabled live readiness probing, and live order preview risk gating are implemented first; streaming, background scheduled report cadence, advanced desk reasoning, and live order submission/reconciliation remain planned until their phase lands.
+This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, explicit operating-rhythm report runs, paper order preview/proposal/approved-submit/cancel cards with inline paper reconciliation summaries, default-disabled live readiness probing, and live order preview risk gating are implemented first; streaming, background scheduled report cadence, advanced desk reasoning, and live order submission/reconciliation remain planned until their phase lands.
 
 ## 2. Product Contract
 
@@ -47,6 +47,7 @@ All endpoints are planned under `/api/agent/*`.
 | `GET` | `/api/agent/desks` | List desk agents, health, allowed tools, and current blockers. | Implemented |
 | `POST` | `/api/agent/paper/proposals` | Preview and propose a PaperBroker order as an approval-required action without submitting it. | Implemented proposal gate |
 | `POST` | `/api/agent/paper/actions/{action_id}/submit` | Submit an approved PaperBroker order action after re-running preview/risk gates and writing reconciliation evidence. | Implemented approved submit gate |
+| `POST` | `/api/agent/paper/actions/{action_id}/cancel` | Cancel a queued paper approval request or a submitted PaperBroker order when broker state still permits cancellation. | Implemented cancellation gate |
 | `GET` | `/api/agent/live/readiness` | Report MiniQMT/QMT live readiness without submitting orders. | Implemented readiness probe |
 | `POST` | `/api/agent/live/preview` | Preview a MiniQMT/QMT live order with readiness, cash gate, broker impact, and `submitted=false`. | Implemented preview gate |
 | `GET` | `/api/agent/reports` | List generated CEO reports, optionally scoped to a session. | Implemented |
@@ -83,6 +84,7 @@ All commands must support `--json`.
 | `astroq agent rhythm --session SESSION_ID --json` | Generate due operating-rhythm reports and write a rhythm audit artifact. | Implemented |
 | `astroq agent paper propose --session SESSION_ID --symbol SYMBOL --side buy\|sell --quantity N --limit-price PRICE --evidence EVIDENCE_ID --json` | Preview and propose a PaperBroker order approval card without submitting it. | Implemented proposal gate |
 | `astroq agent paper submit ACTION_ID --json` | Submit an approved PaperBroker order action after re-running preview/risk gates and writing reconciliation evidence. | Implemented approved submit gate |
+| `astroq agent paper cancel ACTION_ID --reason REASON --json` | Cancel a queued paper approval request or a submitted PaperBroker order when broker state still permits cancellation. | Implemented cancellation gate |
 | `astroq agent live readiness --json` | Report MiniQMT/QMT live readiness and blockers without PaperBroker fallback. | Implemented readiness probe |
 | `astroq agent live preview --symbol SYMBOL --side buy\|sell --quantity N --limit-price PRICE --evidence EVIDENCE_ID --json` | Preview a live limit order without submission, including approval requirement, readiness blockers, cash gate, and estimated broker impact. | Implemented preview gate |
 | `astroq agent evidence EVIDENCE_ID --json` | Resolve evidence. | Implemented |
@@ -454,6 +456,17 @@ Paper submit rules:
 - A successful submit must return a `PAPER_*` order id, write `AgentRun.tool_name=paper.paper_order.submit`, register reconciliation evidence under `var/artifacts/agent/paper_reconciliation/`, and mark the action `succeeded`.
 - The default PaperBroker submit path persists state, trade, and NAV rows under the active `ASTROLABE_VAR` runtime root.
 
+`POST /api/agent/paper/actions/{action_id}/cancel` and
+`astroq agent paper cancel ACTION_ID --json` are the dedicated paper-order
+cancellation paths.
+
+Paper cancel rules:
+
+- `proposed`, `approval_required`, and `approved` paper actions are canceled as queued approval requests, write `AgentRun.tool_name=paper.paper_order.cancel`, and register reconciliation evidence with `status=queued_action_canceled`.
+- Submitted paper actions keep the original action `succeeded`; cancellation is recorded as a new run and reconciliation evidence instead of rewriting the historical submission.
+- Submitted paper orders only cancel when `PaperBroker.cancel_order(order_id)` succeeds; filled, missing, expired, rejected, or otherwise non-cancelable orders return `blocked` with structured reconciliation evidence.
+- Paper cancellation never falls back to generic action dispatch and never pretends a broker order was canceled when the broker rejects the state transition.
+
 ## 6. Risk Levels and Default Policies
 
 | Risk level | Examples | Default policy |
@@ -601,14 +614,14 @@ As of 2026-06-14:
 
 - Foundation runtime is partially implemented in `agent_os/`.
 - The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and open/resolved cross-desk handoffs under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/reports/report/rhythm/paper propose/paper submit/live readiness/live preview/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
-- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/paper/proposals`, `/api/agent/paper/actions/{action_id}/submit`, `/api/agent/live/readiness`, `/api/agent/live/preview`, `/api/agent/reports`, `/api/agent/reports/rhythm`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
+- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/reports/report/rhythm/paper propose/paper submit/paper cancel/live readiness/live preview/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
+- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/paper/proposals`, `/api/agent/paper/actions/{action_id}/submit`, `/api/agent/paper/actions/{action_id}/cancel`, `/api/agent/live/readiness`, `/api/agent/live/preview`, `/api/agent/reports`, `/api/agent/reports/rhythm`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; approved fixed-registry templated commands bind only tool-declared safe parameters.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
 - Web-route evidence resolves to safe local navigation metadata, and CEO Office can render an evidence link into the related Web view.
 - CEO reports can be generated as JSON/Markdown artifacts, registered as report evidence, listed through CLI/API, and shown as CEO Office report cards. Dedicated templates cover daily, weekly, audit, data quality, risk, execution reconciliation, engineering digest, and release audit reports; CEO Office can generate a selected template or run due templates through the explicit operating-rhythm runner.
-- PaperBroker order proposal and approved submission are available through CLI/API. Proposal writes preview artifact evidence and creates an approval-required `paper_order` action only when the non-mutating preview passes; submission requires approval, re-runs preview/risk gates, blocks stale previews, writes run/reconciliation evidence, persists default PaperBroker state on success, and exposes paper reconciliation summaries on action detail.
+- PaperBroker order proposal, approved submission, and cancellation are available through CLI/API. Proposal writes preview artifact evidence and creates an approval-required `paper_order` action only when the non-mutating preview passes; submission requires approval, re-runs preview/risk gates, blocks stale previews, writes run/reconciliation evidence, persists default PaperBroker state on success, and exposes paper reconciliation summaries on action detail. Cancellation writes dedicated `paper.paper_order.cancel` runs and reconciliation evidence for queued approval requests or broker-confirmed active order cancellations.
 - MiniQMT/QMT readiness probing is available and defaults to `live_disabled`; missing SDK, login, permission, or disabled kill switch returns `blocked`, and `paper_fallback` is always false.
 - MiniQMT/QMT live order preview is available through CLI/API. It never submits, never falls back to PaperBroker, always requires approval, and blocks on readiness, invalid intent, missing evidence, or insufficient cash.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.

@@ -590,6 +590,73 @@ def test_agent_paper_order_submit_cli_and_api(tmp_path, monkeypatch, capsys):
     reset_datahub()
 
 
+def test_agent_paper_order_cancel_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Paper cancel CLI/API", default_desk="execution")
+    cli_proposal = runtime.propose_paper_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "000001",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "cli cancel",
+            "evidence_refs": ["ev_demo"],
+        },
+    )
+    api_proposal = runtime.propose_paper_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "000002",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "api cancel",
+            "evidence_refs": ["ev_demo"],
+        },
+    )
+
+    cli_code = run_cli(
+        [
+            "agent",
+            "paper",
+            "cancel",
+            cli_proposal["action"]["action_id"],
+            "--reason",
+            "CLI paper cancel",
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(
+        f"/api/agent/paper/actions/{api_proposal['action']['action_id']}/cancel",
+        json={"reason": "API paper cancel"},
+    )
+
+    assert cli_code == 0
+    assert cli_payload["data"]["cancellation"]["status"] == "canceled"
+    assert cli_payload["data"]["cancellation"]["run"]["tool_name"] == "paper.paper_order.cancel"
+    assert cli_payload["data"]["cancellation"]["reconciliation"]["status"] == "queued_action_canceled"
+    assert api_res.status_code == 200
+    assert api_res.json()["cancellation"]["status"] == "canceled"
+    assert api_res.json()["cancellation"]["reconciliation"]["cancel_reason"] == "API paper cancel"
+    assert runtime.get_action(cli_proposal["action"]["action_id"])["status"] == "canceled"
+    assert runtime.get_action(api_proposal["action"]["action_id"])["status"] == "canceled"
+    reset_datahub()
+
+
 def test_agent_action_api_includes_paper_reconciliation_summaries(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
@@ -631,6 +698,97 @@ def test_agent_action_api_includes_paper_reconciliation_summaries(tmp_path, monk
     assert reconciliations[0]["account_after"]["cash"] < 50_000.0
     assert reconciliations[0]["evidence_id"].startswith("ev_")
     assert reconciliations[0]["path"].endswith(".json")
+    reset_datahub()
+
+
+def test_agent_paper_order_cancel_records_queue_and_broker_cancellation_evidence(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from broker import PaperBroker
+    from broker.fill_models import FillModel, MatchResult
+
+    class PartialFill(FillModel):
+        def evaluate(self, requested_shares, side, market_price, symbol="", ctx=None):
+            return MatchResult(
+                filled_shares=40,
+                fill_price=market_price,
+                status="partial_filled",
+                reason="test partial fill",
+            )
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Paper cancel semantics", default_desk="execution")
+    queued_broker = PaperBroker(initial_cash=50_000.0, enable_risk=True)
+    queued_broker.set_prices({"000001": 10.0})
+    queued = runtime.propose_paper_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "000001",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "queued cancel",
+            "evidence_refs": ["ev_demo"],
+        },
+        broker=queued_broker,
+    )
+
+    queued_cancel = runtime.cancel_paper_order_action(
+        queued["action"]["action_id"],
+        broker=queued_broker,
+        reason="CEO withdrew approval request",
+    )
+
+    assert queued_cancel["status"] == "canceled"
+    assert queued_cancel["run"]["tool_name"] == "paper.paper_order.cancel"
+    assert queued_cancel["reconciliation"]["status"] == "queued_action_canceled"
+    assert queued_cancel["reconciliation"]["order_id"] == ""
+    assert queued_cancel["run"]["artifact_refs"]
+    assert queued_broker.get_orders() == []
+    assert runtime.get_action(queued["action"]["action_id"])["status"] == "canceled"
+
+    active_broker = PaperBroker(initial_cash=50_000.0, enable_risk=True, fill_model=PartialFill())
+    active_broker.set_prices({"000002": 10.0})
+    submitted = runtime.propose_paper_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "000002",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "submitted cancel",
+            "evidence_refs": ["ev_demo"],
+        },
+        broker=active_broker,
+    )
+    action_id = submitted["action"]["action_id"]
+    runtime.approve_action(action_id, decided_by="ceo")
+    submission = runtime.submit_paper_order_action(action_id, broker=active_broker)
+
+    broker_cancel = runtime.cancel_paper_order_action(
+        action_id,
+        broker=active_broker,
+        reason="CEO cancels remaining shares",
+    )
+
+    assert submission["status"] == "succeeded"
+    assert active_broker.get_orders()[0].status == "cancelled"
+    assert broker_cancel["status"] == "canceled"
+    assert broker_cancel["run"]["status"] == "succeeded"
+    assert broker_cancel["reconciliation"]["status"] == "order_canceled"
+    assert broker_cancel["reconciliation"]["order_id"] == submission["reconciliation"]["order_id"]
+    assert broker_cancel["reconciliation"]["orders_after"][0]["status"] == "cancelled"
+    assert runtime.get_action(action_id)["status"] == "succeeded"
+    assert [item["status"] for item in runtime.paper_reconciliations_for_action(action_id)][:2] == [
+        "order_canceled",
+        "submitted",
+    ]
     reset_datahub()
 
 

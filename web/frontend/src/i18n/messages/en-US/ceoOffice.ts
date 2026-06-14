@@ -67,6 +67,8 @@ export const ceoOffice = {
       proposed: "Proposed",
       running: "Running",
       submitted: "Submitted",
+      orderCanceled: "Order Canceled",
+      queuedActionCanceled: "Approval Request Canceled",
       succeeded: "Succeeded",
       failed: "Failed",
       blocked: "Blocked",

@@ -67,6 +67,8 @@ export const ceoOffice = {
       proposed: "已提议",
       running: "运行中",
       submitted: "已提交",
+      orderCanceled: "订单已撤销",
+      queuedActionCanceled: "审批请求已取消",
       succeeded: "成功",
       failed: "失败",
       blocked: "阻断",

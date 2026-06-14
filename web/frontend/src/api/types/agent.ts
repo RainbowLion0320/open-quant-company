@@ -238,12 +238,20 @@ export interface AgentPaperSubmission {
   evidence: EvidenceRef;
 }
 
+export interface AgentPaperCancellation {
+  status: string;
+  run: AgentRun;
+  reconciliation: Record<string, unknown>;
+  evidence: EvidenceRef;
+}
+
 export interface AgentPaperReconciliation {
   action_id: string;
   session_id: string;
   status: string;
   order_id: string;
   error: string;
+  cancel_reason?: string;
   preview: Record<string, unknown>;
   account_after: Record<string, unknown>;
   positions_after: Array<Record<string, unknown>>;
@@ -257,6 +265,10 @@ export interface AgentPaperReconciliation {
 
 export interface AgentPaperSubmitResponse {
   submission: AgentPaperSubmission;
+}
+
+export interface AgentPaperCancelResponse {
+  cancellation: AgentPaperCancellation;
 }
 
 export interface AgentAddMessageResponse {

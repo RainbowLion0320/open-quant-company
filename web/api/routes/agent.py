@@ -132,6 +132,18 @@ async def submit_agent_paper_order(action_id: str) -> dict[str, Any]:
     return {"submission": submission}
 
 
+@router.post("/paper/actions/{action_id}/cancel")
+async def cancel_agent_paper_order(action_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    try:
+        cancellation = AgentRuntime().cancel_paper_order_action(
+            action_id,
+            reason=str((payload or {}).get("reason") or ""),
+        )
+    except KeyError:
+        raise DataNotFoundError("agent action", action_id)
+    return {"cancellation": cancellation}
+
+
 @router.post("/reports")
 async def generate_agent_report(payload: dict[str, Any]) -> dict[str, Any]:
     try:

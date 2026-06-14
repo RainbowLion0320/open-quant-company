@@ -1,6 +1,6 @@
 # Agent Company OS Phase 5 - Paper Execution Control Plan
 
-> Status: preview/proposal/submission/CEO Office card foundation implemented; richer reconciliation and cancellation planned
+> Status: preview/proposal/submission/cancellation/CEO Office card foundation implemented
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Related spec: [07-agent-company-os.md](../../specs/07-agent-company-os.md)
@@ -22,7 +22,7 @@ In scope:
 - Risk gate blockers for missing price, missing evidence, insufficient cash, sellability, and broker risk rules
 - Approved paper submission after re-running preview/risk gates
 - Broker ledger linkage, reconciliation artifact, and outcome evidence
-- Later: richer reconciliation drill-down and cancellation controls
+- Dedicated cancellation controls for queued approval requests and broker-cancelable submitted paper orders
 
 Out of scope:
 
@@ -39,7 +39,10 @@ Out of scope:
 - `POST /api/agent/paper/proposals` exposes the same proposal flow for CEO Office and future UI cards.
 - `agent_os.runtime.AgentRuntime.submit_paper_order_action()` submits only approved `paper_order` actions, re-runs PaperBroker preview/risk gates against current broker state, and blocks stale approvals before any order is created.
 - `astroq agent paper submit ACTION_ID --json` and `POST /api/agent/paper/actions/{action_id}/submit` expose the approved submit flow.
+- `astroq agent paper cancel ACTION_ID --json` and `POST /api/agent/paper/actions/{action_id}/cancel` expose the dedicated paper cancellation flow.
 - Successful submits write an `AgentRun`, register reconciliation evidence, and persist default PaperBroker state/trades/NAV through the current `ASTROLABE_VAR` runtime root.
+- Queued paper approval-request cancellation writes a `paper.paper_order.cancel` run and reconciliation evidence with `status=queued_action_canceled`.
+- Submitted paper order cancellation keeps the original action `succeeded`; if `PaperBroker.cancel_order(order_id)` accepts the active order, runtime writes a new `paper.paper_order.cancel` run and `status=order_canceled` reconciliation evidence. If the order is filled, missing, expired, rejected, or otherwise non-cancelable, runtime writes a blocked cancellation run instead of pretending success.
 - CEO Office action detail shows PaperBroker preview/risk gate summary and exposes a dedicated submit button for approved `paper_order` actions; paper orders do not use the generic action run button.
 - CEO Office run history exposes run artifact evidence refs, so reconciliation artifacts can be opened from the submitted action without leaving the control page.
 
@@ -98,11 +101,10 @@ Approved paper submission must:
 
 ## 7. Remaining Work
 
-Before paper execution control is complete, implement:
+Paper execution control is functionally complete for local paper proposal, approval, submission, cancellation, and reconciliation evidence. Future improvements should deepen the view rather than change the safety contract:
 
-- Kill/cancel semantics for queued paper order actions.
-- Richer PaperBroker reconciliation summaries comparing intended order, broker order, trade, cash, and position deltas inline, without requiring the user to inspect raw JSON evidence first.
-- Dedicated cancellation semantics for already-submitted paper orders if the broker state still permits cancellation.
+- More compact inline diff views for intended order, broker order, trade, cash, and position deltas.
+- Optional PaperBroker order-state persistence if the default paper broker later needs cancellation after process restart; until then, missing order state must block with evidence.
 
 ## 8. Acceptance Criteria
 
@@ -115,3 +117,5 @@ Before paper execution control is complete, implement:
 - Successful submission writes an `AgentRun`, reconciliation artifact evidence, and default PaperBroker persistence state.
 - CEO Office displays paper preview/risk summary and uses the dedicated approved submit path instead of generic action dispatch.
 - CEO Office run history links reconciliation evidence from `AgentRun.artifact_refs`.
+- Queued paper approval requests can be canceled through the dedicated paper cancel path and write reconciliation evidence.
+- Submitted paper actions can record a broker-confirmed paper order cancellation when the order is still active; non-cancelable orders return blocked cancellation evidence.

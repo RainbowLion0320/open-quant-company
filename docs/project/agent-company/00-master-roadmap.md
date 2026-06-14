@@ -207,7 +207,8 @@ Current foundation:
 - `AgentRuntime.submit_paper_order_action()` submits only approved `paper_order` actions after re-running PaperBroker preview/risk gates against current broker state.
 - `astroq agent paper submit ACTION_ID --json` and `POST /api/agent/paper/actions/{action_id}/submit` expose the approved submit path.
 - CEO Office action detail shows PaperBroker preview/risk summary and uses the dedicated approved paper submit path instead of generic dispatch.
-- Successful paper submits write run ledger rows, reconciliation evidence, and default PaperBroker state/trade/NAV persistence. CEO Office run history can open run artifact evidence and action detail shows inline reconciliation status, order id, cash, and market value. Cancel semantics remain future work.
+- Successful paper submits write run ledger rows, reconciliation evidence, and default PaperBroker state/trade/NAV persistence. CEO Office run history can open run artifact evidence and action detail shows inline reconciliation status, order id, cash, and market value.
+- `astroq agent paper cancel ACTION_ID --json` and `POST /api/agent/paper/actions/{action_id}/cancel` write dedicated `paper.paper_order.cancel` runs and reconciliation evidence for queued approval-request cancellation or broker-confirmed active order cancellation. Submitted actions keep their original succeeded ledger row; cancellation is recorded as a separate auditable run.
 
 ### Phase 6 - MiniQMT/QMT Live Execution
 

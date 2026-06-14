@@ -696,6 +696,109 @@ class AgentRuntime:
             "evidence": evidence.to_dict(),
         }
 
+    def cancel_paper_order_action(
+        self,
+        action_id: str,
+        *,
+        broker: PaperBroker | None = None,
+        reason: str = "",
+    ) -> dict[str, Any]:
+        action = self.ledger.get_action(action_id)
+        if not action:
+            raise KeyError(f"Agent action not found: {action_id}")
+        action = self._refresh_action_expiry(action)
+        if str(action.get("action_type")) != "paper_order" or str(action.get("risk_level")) != "paper_order":
+            return self._record_paper_cancellation_block(
+                action,
+                broker=broker,
+                reason="action is not a paper_order",
+            )
+
+        paper_broker = broker or self._load_default_paper_broker()
+        if action.get("status") in EXPIRABLE_ACTION_STATUSES:
+            canceled = self.cancel_action(action_id, reason=reason or "Paper order approval request canceled")
+            reconciliation = self._paper_reconciliation_payload(
+                action=canceled.to_dict(),
+                status="queued_action_canceled",
+                preview=dict((action.get("parameters") or {}).get("paper_order_preview") or {}),
+                broker=paper_broker,
+                order_id="",
+                error="",
+            )
+            reconciliation["cancel_reason"] = reason
+            evidence = self._write_paper_reconciliation_evidence(canceled.to_dict(), reconciliation)
+            run = self.record_run(
+                action_id=action_id,
+                tool_name="paper.paper_order.cancel",
+                command=["paper_order_cancel", action_id],
+                status="succeeded",
+                return_code=0,
+                stdout_summary="paper order approval request canceled",
+                stderr_summary="",
+                artifact_refs=[evidence.evidence_id],
+            )
+            return {
+                "status": "canceled",
+                "run": run.to_dict(),
+                "reconciliation": reconciliation,
+                "evidence": evidence.to_dict(),
+            }
+
+        if action.get("status") != "succeeded":
+            return self._record_paper_cancellation_block(
+                action,
+                broker=paper_broker,
+                reason=f"paper order cannot be canceled from action status: {action.get('status')}",
+            )
+
+        submitted = self._latest_submitted_paper_reconciliation(action_id)
+        order_id = str(submitted.get("order_id") or "")
+        if not order_id:
+            return self._record_paper_cancellation_block(
+                action,
+                broker=paper_broker,
+                reason="missing submitted paper order id",
+            )
+
+        canceled = paper_broker.cancel_order(order_id)
+        if not canceled:
+            return self._record_paper_cancellation_block(
+                action,
+                broker=paper_broker,
+                reason=f"paper order is not cancelable or missing: {order_id}",
+                order_id=order_id,
+                preview=dict(submitted.get("preview") or {}),
+            )
+
+        if broker is None:
+            self._persist_default_paper_broker(paper_broker, dict(submitted.get("preview") or {}))
+        reconciliation = self._paper_reconciliation_payload(
+            action=action,
+            status="order_canceled",
+            preview=dict(submitted.get("preview") or {}),
+            broker=paper_broker,
+            order_id=order_id,
+            error="",
+        )
+        reconciliation["cancel_reason"] = reason
+        evidence = self._write_paper_reconciliation_evidence(action, reconciliation)
+        run = self.record_run(
+            action_id=action_id,
+            tool_name="paper.paper_order.cancel",
+            command=["paper_order_cancel", action_id, order_id],
+            status="succeeded",
+            return_code=0,
+            stdout_summary=f"paper order canceled: {order_id}",
+            stderr_summary="",
+            artifact_refs=[evidence.evidence_id],
+        )
+        return {
+            "status": "canceled",
+            "run": run.to_dict(),
+            "reconciliation": reconciliation,
+            "evidence": evidence.to_dict(),
+        }
+
     def generate_report(self, *, session_id: str, kind: str = "daily_brief") -> dict[str, Any]:
         session = self.ledger.get_session(session_id)
         if not session:
@@ -901,6 +1004,49 @@ class AgentRuntime:
             "evidence": evidence.to_dict(),
         }
 
+    def _record_paper_cancellation_block(
+        self,
+        action: dict[str, Any],
+        *,
+        broker: PaperBroker | None,
+        reason: str,
+        order_id: str = "",
+        preview: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        action_id = str(action["action_id"])
+        paper_broker = broker or self._load_default_paper_broker()
+        reconciliation = self._paper_reconciliation_payload(
+            action=action,
+            status="blocked",
+            preview=preview or dict((action.get("parameters") or {}).get("paper_order_preview") or {}),
+            broker=paper_broker,
+            order_id=order_id,
+            error=reason,
+        )
+        evidence = self._write_paper_reconciliation_evidence(action, reconciliation)
+        run = self.record_run(
+            action_id=action_id,
+            tool_name="paper.paper_order.cancel",
+            command=["paper_order_cancel", action_id] + ([order_id] if order_id else []),
+            status="blocked",
+            return_code=None,
+            stdout_summary="",
+            stderr_summary=reason,
+            artifact_refs=[evidence.evidence_id],
+        )
+        return {
+            "status": "blocked",
+            "run": run.to_dict(),
+            "reconciliation": reconciliation,
+            "evidence": evidence.to_dict(),
+        }
+
+    def _latest_submitted_paper_reconciliation(self, action_id: str) -> dict[str, Any]:
+        for reconciliation in self.paper_reconciliations_for_action(action_id):
+            if reconciliation.get("status") == "submitted" and reconciliation.get("order_id"):
+                return reconciliation
+        return {}
+
     def _paper_reconciliation_payload(
         self,
         *,
@@ -936,7 +1082,7 @@ class AgentRuntime:
             kind="artifact",
             label="Paper order reconciliation",
             uri=str(path),
-            summary=f"Paper order submission {reconciliation['status']} for {action['action_id']}",
+            summary=f"Paper order reconciliation {reconciliation['status']} for {action['action_id']}",
         )
 
     def _load_default_paper_broker(self) -> PaperBroker:

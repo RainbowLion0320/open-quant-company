@@ -520,6 +520,8 @@ function statusLabel(status: string) {
   if (status === "running") return t("ceoOffice.running");
   if (status === "succeeded") return t("ceoOffice.succeeded");
   if (status === "submitted") return t("ceoOffice.submitted");
+  if (status === "order_canceled") return t("ceoOffice.orderCanceled");
+  if (status === "queued_action_canceled") return t("ceoOffice.queuedActionCanceled");
   if (status === "failed") return t("ceoOffice.failed");
   if (status === "blocked") return t("ceoOffice.blocked");
   if (status === "canceled") return t("ceoOffice.canceled");
@@ -542,12 +544,16 @@ function canRunAction(action: AgentAction) {
   return ["proposed", "approved"].includes(action.status) && action.action_type !== "paper_order";
 }
 
+function isPaperAction(action: AgentAction | null | undefined) {
+  return action?.action_type === "paper_order" && action?.risk_level === "paper_order";
+}
+
 function canSubmitPaperAction(action: AgentAction) {
-  return action.action_type === "paper_order" && action.risk_level === "paper_order" && action.status === "approved";
+  return isPaperAction(action) && action.status === "approved";
 }
 
 function canCancelAction(action: AgentAction) {
-  return ["proposed", "approval_required", "approved"].includes(action.status);
+  return ["proposed", "approval_required", "approved"].includes(action.status) || (isPaperAction(action) && action.status === "succeeded");
 }
 
 function formatTime(value: string) {
@@ -680,7 +686,14 @@ async function cancelAction(actionId: string) {
   cancelingAction.value = actionId;
   error.value = "";
   try {
-    await api.agentCancelAction(actionId, "Canceled from CEO Office");
+    const action = selectedAction.value?.action.action_id === actionId
+      ? selectedAction.value.action
+      : actions.value.find(item => item.action_id === actionId);
+    if (isPaperAction(action)) {
+      await api.agentPaperCancelAction(actionId, "Canceled from CEO Office");
+    } else {
+      await api.agentCancelAction(actionId, "Canceled from CEO Office");
+    }
     await load();
   } catch (err: any) {
     error.value = `${t("ceoOffice.cancelFailed")}: ${err?.message || err}`;

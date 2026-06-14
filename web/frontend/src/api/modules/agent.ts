@@ -9,6 +9,7 @@ import type {
   AgentHandoff,
   AgentHandoffsResponse,
   AgentLiveReadinessResponse,
+  AgentPaperCancelResponse,
   AgentPaperSubmitResponse,
   AgentReportRhythmResponse,
   AgentReportResponse,
@@ -47,6 +48,8 @@ export const agentApi = {
   agentRunAction: (actionId: string) => post<AgentRunActionResponse>(`/api/agent/actions/${encodeURIComponent(actionId)}/run`),
   agentPaperSubmitAction: (actionId: string) =>
     post<AgentPaperSubmitResponse>(`/api/agent/paper/actions/${encodeURIComponent(actionId)}/submit`),
+  agentPaperCancelAction: (actionId: string, reason = "") =>
+    post<AgentPaperCancelResponse>(`/api/agent/paper/actions/${encodeURIComponent(actionId)}/cancel`, { reason }),
   agentReports: (sessionId = "") =>
     get<AgentReportsResponse>(`/api/agent/reports${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
   agentGenerateReport: (payload: { kind: string; session_id: string }) => post<AgentReportResponse>("/api/agent/reports", payload),

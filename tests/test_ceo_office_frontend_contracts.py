@@ -44,9 +44,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentAction" in view
     assert "api.agentRunAction" in view
     assert "api.agentPaperSubmitAction" in view
+    assert "api.agentPaperCancelAction" in view
     assert "api.agentCancelAction" in view
     assert "selectedAction" in view
     assert "submitPaperAction" in view
+    assert "isPaperAction" in view
     assert "canSubmitPaperAction" in view
     assert "paperOrderPreview" in view
     assert "paperReconciliation" in view
@@ -144,6 +146,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "对账后现金" in zh_ceo
     assert "对账后市值" in zh_ceo
     assert "已提交" in zh_ceo
+    assert "订单已撤销" in zh_ceo
+    assert "审批请求已取消" in zh_ceo
     assert "风控门" in zh_ceo
     assert "运行证据" in zh_ceo
     assert "Reports" in en_ceo
@@ -168,6 +172,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Cash After" in en_ceo
     assert "Market Value After" in en_ceo
     assert "Submitted" in en_ceo
+    assert "Order Canceled" in en_ceo
+    assert "Approval Request Canceled" in en_ceo
     assert "Risk Gate" in en_ceo
     assert "Run Evidence" in en_ceo
     assert "实盘就绪" in zh_ceo
@@ -192,6 +198,7 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentCancelAction" in agent_api
     assert "agentRunAction" in agent_api
     assert "agentPaperSubmitAction" in agent_api
+    assert "agentPaperCancelAction" in agent_api
     assert "/api/agent/paper/actions" in agent_api
     assert "agentHandoffs" in agent_api
     assert "agentResolveHandoff" in agent_api
@@ -214,6 +221,7 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentDeskResponse" in agent_types
     assert "export interface AgentAddMessageResponse" in agent_types
     assert "export interface AgentPaperSubmitResponse" in agent_types
+    assert "export interface AgentPaperCancelResponse" in agent_types
     assert "desk_response?: AgentDeskResponse" in agent_types
     assert "export interface EvidenceRef" in agent_types
     assert "snapshot_uri: string" in agent_types

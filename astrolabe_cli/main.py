@@ -22,6 +22,7 @@ from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
 from astrolabe_cli.commands.agent import memory_export as agent_memory_export
 from astrolabe_cli.commands.agent import memory_prune as agent_memory_prune
 from astrolabe_cli.commands.agent import memory_summary as agent_memory_summary
+from astrolabe_cli.commands.agent import paper_cancel as agent_paper_cancel
 from astrolabe_cli.commands.agent import paper_propose as agent_paper_propose
 from astrolabe_cli.commands.agent import paper_submit as agent_paper_submit
 from astrolabe_cli.commands.agent import reject as agent_reject
@@ -271,6 +272,11 @@ def build_parser() -> argparse.ArgumentParser:
     agent_paper_submit_cmd.add_argument("action_id")
     add_common_flags(agent_paper_submit_cmd)
     agent_paper_submit_cmd.set_defaults(handler=lambda args: agent_paper_submit(args.action_id))
+    agent_paper_cancel_cmd = agent_paper_sub.add_parser("cancel", help="Cancel a queued or active PaperBroker order action")
+    agent_paper_cancel_cmd.add_argument("action_id")
+    agent_paper_cancel_cmd.add_argument("--reason", default="")
+    add_common_flags(agent_paper_cancel_cmd)
+    agent_paper_cancel_cmd.set_defaults(handler=lambda args: agent_paper_cancel(args.action_id, args.reason))
 
     agent_memory_cmd = agent_sub.add_parser("memory", help="Inspect, export, or maintain local transparent memory")
     agent_memory_sub = agent_memory_cmd.add_subparsers(dest="agent_memory_command", required=True)
