@@ -22,6 +22,7 @@ from astrolabe_cli.commands.agent import run_action as agent_run_action
 from astrolabe_cli.commands.agent import sessions as agent_sessions
 from astrolabe_cli.commands.agent import show_action as agent_show_action
 from astrolabe_cli.commands.agent import show_session as agent_show_session
+from astrolabe_cli.commands.agent import update_session as agent_update_session
 from astrolabe_cli.commands.backtest import check as backtest_check
 from astrolabe_cli.commands.backtest import run_backtest
 from astrolabe_cli.commands.data import repair as data_repair
@@ -85,6 +86,22 @@ def build_parser() -> argparse.ArgumentParser:
     agent_session_show.add_argument("session_id")
     add_common_flags(agent_session_show)
     agent_session_show.set_defaults(handler=lambda args: agent_show_session(args.session_id))
+    agent_session_update = agent_session_sub.add_parser("update", help="Update an agent session")
+    agent_session_update.add_argument("session_id")
+    agent_session_update.add_argument("--title", default=None)
+    agent_session_update.add_argument("--status", choices=["active", "archived", "blocked"], default=None)
+    agent_session_update.add_argument("--default-desk", default=None)
+    agent_session_update.add_argument("--tag", action="append", dest="tags", default=None)
+    add_common_flags(agent_session_update)
+    agent_session_update.set_defaults(
+        handler=lambda args: agent_update_session(
+            args.session_id,
+            title=args.title,
+            status=args.status,
+            default_desk=args.default_desk,
+            tags=args.tags,
+        )
+    )
 
     agent_message_cmd = agent_sub.add_parser("message", help="Add a CEO message to a session")
     agent_message_cmd.add_argument("--session", required=True)

@@ -47,6 +47,7 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq health --json` | 检查项目版本、DataHub 路径和本地健康状态 |
 | `astroq agent sessions --json` | 查看本地 Agent Company OS 会话 ledger |
 | `astroq agent session create --title "Daily CEO Brief" --json` | 创建 CEO Office / desk agent 会话 |
+| `astroq agent session update <session_id> --title "..." --tag daily --json` | 重命名、归档或更新本地 agent 会话标签 |
 | `astroq agent run <action_id> --json` | Dispatch 安全或已批准 agent action 并写入 run ledger |
 | `astroq agent cancel <action_id> --reason "..." --json` | 取消尚未完成的 agent action |
 | `astroq agent handoffs --json` | 查看跨 desk 交接 ledger |
@@ -149,7 +150,7 @@ astroq lifecycle check --json
 - Production backtests use `backtest/pipeline_runner.py` plus shared modules under `pipeline/`.
 - Strategy state is owned by Strategy Catalog and separated into production, paper, and candidate layers.
 - Web System visualizations include CodeGraph, AST diagnostics, architecture diagnostics, test design intelligence, and lifecycle readiness.
-- Agent Company OS has a foundation runtime for sessions, messages, actions, approvals, runs, evidence, desk registry, fixed-registry tool permission checks, open/resolved cross-desk handoffs, and transparent memory inspect/export. Desk reasoning, automated handoff workflows, memory prune/clear, and live execution are still phased work; do not present them as complete.
+- Agent Company OS has a foundation runtime for session metadata, messages, actions, approvals, runs, evidence, desk registry, fixed-registry tool permission checks, open/resolved cross-desk handoffs, and transparent memory inspect/export. Desk reasoning, automated handoff workflows, memory prune/clear, and live execution are still phased work; do not present them as complete.
 - Formal strategy promotion depends on score panels, alpha evidence, data readiness, and execution assumptions. Missing data, missing source capability, missing score panels, and insufficient evidence must be reported as blocked/not_applicable states, not filled with placeholder values.
 - The project is local-first. Network access, provider permissions, and data completeness must be explicit, observable, and never hidden behind fake defaults.
 

@@ -44,6 +44,66 @@ def test_agent_runtime_creates_session_message_and_action(tmp_path, monkeypatch)
     reset_datahub()
 
 
+def test_agent_runtime_cli_and_api_update_session_metadata(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Original", default_desk="reporting", tags=["daily"])
+
+    updated = runtime.update_session(
+        session.session_id,
+        title="Runtime renamed",
+        status="archived",
+        tags=["review", "risk"],
+    )
+
+    assert updated.title == "Runtime renamed"
+    assert updated.status == "archived"
+    assert updated.tags == ["review", "risk"]
+    assert updated.updated_at >= session.updated_at
+
+    cli_code = run_cli(
+        [
+            "agent",
+            "session",
+            "update",
+            session.session_id,
+            "--title",
+            "CLI renamed",
+            "--status",
+            "active",
+            "--tag",
+            "ops",
+            "--tag",
+            "daily",
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).patch(
+        f"/api/agent/sessions/{session.session_id}",
+        json={"title": "API renamed", "status": "blocked", "tags": ["ceo", "blocked"]},
+    )
+
+    assert cli_code == 0
+    assert cli_payload["data"]["session"]["title"] == "CLI renamed"
+    assert cli_payload["data"]["session"]["status"] == "active"
+    assert cli_payload["data"]["session"]["tags"] == ["ops", "daily"]
+    assert api_res.status_code == 200
+    assert api_res.json()["session"]["title"] == "API renamed"
+    assert api_res.json()["session"]["status"] == "blocked"
+    assert api_res.json()["session"]["tags"] == ["ceo", "blocked"]
+    reset_datahub()
+
+
 def test_agent_approval_policy_blocks_state_changing_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

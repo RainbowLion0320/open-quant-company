@@ -65,6 +65,43 @@ class AgentRuntime:
     def list_sessions(self) -> list[dict[str, Any]]:
         return self.ledger.list_sessions()
 
+    def update_session(
+        self,
+        session_id: str,
+        *,
+        title: str | None = None,
+        status: str | None = None,
+        default_desk: str | None = None,
+        tags: list[str] | None = None,
+    ) -> AgentSession:
+        current = self.ledger.get_session(session_id)
+        if not current:
+            raise KeyError(f"Agent session not found: {session_id}")
+        next_status = status if status is not None else str(current["status"])
+        if next_status not in {"active", "archived", "blocked"}:
+            raise ValueError(f"Invalid agent session status: {next_status}")
+        next_title = title.strip() if title is not None else str(current["title"])
+        if not next_title:
+            raise ValueError("Agent session title cannot be empty")
+        next_default_desk = default_desk.strip() if default_desk is not None else str(current["default_desk"])
+        try:
+            get_desk(next_default_desk)
+        except KeyError as exc:
+            raise ValueError(f"Invalid default desk: {next_default_desk}") from exc
+        next_tags = [str(tag).strip() for tag in (tags if tags is not None else current.get("tags", []))]
+        session = AgentSession(
+            session_id=session_id,
+            title=next_title,
+            status=next_status,
+            created_by=str(current["created_by"]),
+            default_desk=next_default_desk,
+            tags=[tag for tag in next_tags if tag],
+            created_at=str(current["created_at"]),
+            updated_at=_now(),
+        )
+        self.ledger.update_session(session.to_dict())
+        return session
+
     def get_session(self, session_id: str) -> dict[str, Any] | None:
         session = self.ledger.get_session(session_id)
         if not session:

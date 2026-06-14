@@ -37,6 +37,34 @@ def show_session(session_id: str) -> CliResult:
     )
 
 
+def update_session(
+    session_id: str,
+    *,
+    title: str | None = None,
+    status: str | None = None,
+    default_desk: str | None = None,
+    tags: list[str] | None = None,
+) -> CliResult:
+    try:
+        session = AgentRuntime().update_session(
+            session_id,
+            title=title,
+            status=status,
+            default_desk=default_desk,
+            tags=tags,
+        )
+    except KeyError as exc:
+        return CliResult(False, "agent session update", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    except ValueError as exc:
+        return CliResult(False, "agent session update", {"session_id": session_id}, "Agent session update invalid", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent session update",
+        message=f"Updated agent session {session_id}",
+        data={"session": session.to_dict()},
+    )
+
+
 def add_message(session_id: str, desk: str, text: str) -> CliResult:
     try:
         message = AgentRuntime().add_message(session_id, role="ceo", desk=desk, content=text)

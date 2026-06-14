@@ -37,6 +37,26 @@ async def get_agent_session(session_id: str) -> dict[str, Any]:
     return payload
 
 
+@router.patch("/sessions/{session_id}")
+async def update_agent_session(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    raw_tags = payload.get("tags") if "tags" in payload else None
+    if raw_tags is not None and not isinstance(raw_tags, list):
+        raise InvalidParameterError("tags", str(raw_tags), "expected a list")
+    try:
+        session = AgentRuntime().update_session(
+            session_id,
+            title=payload.get("title") if "title" in payload else None,
+            status=payload.get("status") if "status" in payload else None,
+            default_desk=payload.get("default_desk") if "default_desk" in payload else None,
+            tags=[str(tag) for tag in raw_tags] if raw_tags is not None else None,
+        )
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+    except ValueError as exc:
+        raise InvalidParameterError("session", session_id, str(exc))
+    return {"session": session.to_dict()}
+
+
 @router.post("/sessions/{session_id}/messages")
 async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     try:

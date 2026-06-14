@@ -125,6 +125,19 @@ class AgentLedger:
                 payload,
             )
 
+    def update_session(self, row: dict[str, Any]) -> None:
+        payload = {**row, "tags": _json_dumps(row.get("tags", []))}
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE sessions
+                SET title = :title, status = :status, default_desk = :default_desk,
+                    tags = :tags, updated_at = :updated_at
+                WHERE session_id = :session_id
+                """,
+                payload,
+            )
+
     def insert_message(self, row: dict[str, Any]) -> None:
         payload = {
             **row,

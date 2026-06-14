@@ -32,7 +32,7 @@ All endpoints are planned under `/api/agent/*`.
 | `GET` | `/api/agent/sessions` | List agent sessions. | Implemented |
 | `POST` | `/api/agent/sessions` | Create a new session. | Implemented |
 | `GET` | `/api/agent/sessions/{session_id}` | Read a session with messages and linked actions. | Implemented |
-| `PATCH` | `/api/agent/sessions/{session_id}` | Rename, archive, tag, or update session metadata. | Planned |
+| `PATCH` | `/api/agent/sessions/{session_id}` | Rename, archive, tag, or update session metadata. | Implemented |
 | `POST` | `/api/agent/sessions/{session_id}/messages` | Add a CEO message and route it to a desk. | Implemented |
 | `GET` | `/api/agent/actions` | List actions with filters for session and future status/desk/risk filters. | Implemented |
 | `GET` | `/api/agent/handoffs` | List cross-desk handoff ledger rows, optionally scoped to a session. | Implemented |
@@ -59,6 +59,7 @@ All commands must support `--json`.
 | `astroq agent sessions --json` | List sessions. | Implemented |
 | `astroq agent session create --title TITLE --json` | Create a session. | Implemented |
 | `astroq agent session show SESSION_ID --json` | Show session details. | Implemented |
+| `astroq agent session update SESSION_ID --title TITLE --status active\|archived\|blocked --tag TAG --json` | Rename, archive, or retag a session. | Implemented |
 | `astroq agent message --session SESSION_ID --desk DESK --text TEXT --json` | Add a message and route it. | Implemented |
 | `astroq agent actions --session SESSION_ID --json` | List session actions. | Implemented |
 | `astroq agent handoffs --session SESSION_ID --json` | List cross-desk handoffs. | Implemented |
@@ -401,8 +402,8 @@ As of 2026-06-14:
 
 - Foundation runtime is partially implemented in `agent_os/`.
 - The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and open/resolved cross-desk handoffs under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/evidence/desks/memory show/memory export --json` is available.
-- `/api/agent/sessions`, `/api/agent/actions`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/memory`, and `/api/agent/memory/export` are available.
+- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/evidence/desks/memory show/memory export --json` is available.
+- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/memory`, and `/api/agent/memory/export` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; unsafe templated write commands remain blocked until a stricter parameter binding phase lands.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
