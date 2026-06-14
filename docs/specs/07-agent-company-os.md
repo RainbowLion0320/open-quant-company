@@ -9,7 +9,7 @@
 
 Agent Company OS is the planned local-first operating layer for Open Quant Company. It lets the human user act as CEO while desk agents coordinate data, research, risk, execution, engineering, and reporting work.
 
-This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces and the first CEO Office page are implemented first; tool execution, memory governance, and live execution remain planned until their phase lands.
+This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, and transparent memory governance are implemented first; streaming, report generation, advanced desk reasoning, and live execution remain planned until their phase lands.
 
 ## 2. Product Contract
 
@@ -33,7 +33,7 @@ All endpoints are planned under `/api/agent/*`.
 | `POST` | `/api/agent/sessions` | Create a new session. | Implemented |
 | `GET` | `/api/agent/sessions/{session_id}` | Read a session with messages and linked actions. | Implemented |
 | `PATCH` | `/api/agent/sessions/{session_id}` | Rename, archive, tag, or update session metadata. | Implemented |
-| `POST` | `/api/agent/sessions/{session_id}/messages` | Add a CEO message and route it to a desk. | Implemented |
+| `POST` | `/api/agent/sessions/{session_id}/messages` | Add a CEO message, create a deterministic desk response, and link evidence/actions/handoffs. | Implemented |
 | `GET` | `/api/agent/actions` | List actions with filters for session and future status/desk/risk filters. | Implemented |
 | `GET` | `/api/agent/handoffs` | List cross-desk handoff ledger rows, optionally scoped to a session. | Implemented |
 | `POST` | `/api/agent/handoffs/{handoff_id}/resolve` | Mark a cross-desk handoff as resolved and write `resolved_at`. | Implemented |
@@ -60,7 +60,7 @@ All commands must support `--json`.
 | `astroq agent session create --title TITLE --json` | Create a session. | Implemented |
 | `astroq agent session show SESSION_ID --json` | Show session details. | Implemented |
 | `astroq agent session update SESSION_ID --title TITLE --status active\|archived\|blocked --tag TAG --json` | Rename, archive, or retag a session. | Implemented |
-| `astroq agent message --session SESSION_ID --desk DESK --text TEXT --json` | Add a message and route it. | Implemented |
+| `astroq agent message --session SESSION_ID --desk DESK --text TEXT --json` | Add a CEO message and return the deterministic desk response. | Implemented |
 | `astroq agent actions --session SESSION_ID --json` | List session actions. | Implemented |
 | `astroq agent handoffs --session SESSION_ID --json` | List cross-desk handoffs. | Implemented |
 | `astroq agent handoff resolve HANDOFF_ID --json` | Mark a cross-desk handoff as resolved. | Implemented |
@@ -75,6 +75,27 @@ All commands must support `--json`.
 | `astroq agent memory export --json` | Export local transparent memory. | Implemented |
 | `astroq agent memory prune --dry-run --json` | Preview or prune archived session memory. | Implemented |
 | `astroq agent memory clear --confirm --json` | Clear local memory after explicit confirmation. | Implemented |
+
+`POST /api/agent/sessions/{session_id}/messages` and
+`astroq agent message ... --json` return:
+
+```json
+{
+  "message": {"role": "ceo"},
+  "desk_response": {
+    "message": {"role": "desk_agent"},
+    "answer": "Reporting Desk 已记录 CEO 问题。",
+    "evidence_refs": ["ev_..."],
+    "proposed_actions": ["act_..."],
+    "blockers": [],
+    "handoffs": []
+  }
+}
+```
+
+The first implementation is deterministic: it does not call an LLM. It creates
+safe local evidence references, proposes only desk-scoped fixed-registry actions,
+and records any required cross-desk handoffs in the ledger.
 
 ## 5. Data Model
 

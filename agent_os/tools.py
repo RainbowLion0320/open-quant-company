@@ -50,6 +50,20 @@ DEFAULT_TOOLS: dict[str, ToolDescriptor] = {
         risk_level="read_only",
         desk_scopes=["risk", "reporting", "execution"],
     ),
+    "astroq.execution.dry_run": ToolDescriptor(
+        tool_id="astroq.execution.dry_run",
+        label="Execution dry-run",
+        command=_astroq_command("execution", "dry-run", "--json"),
+        risk_level="dry_run",
+        desk_scopes=["execution", "risk"],
+    ),
+    "astroq.architecture.ast": ToolDescriptor(
+        tool_id="astroq.architecture.ast",
+        label="AST intelligence",
+        command=_astroq_command("architecture", "ast", "--json"),
+        risk_level="read_only",
+        desk_scopes=["engineering"],
+    ),
     "astroq.data.status": ToolDescriptor(
         tool_id="astroq.data.status",
         label="Data status",

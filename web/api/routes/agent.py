@@ -59,17 +59,28 @@ async def update_agent_session(session_id: str, payload: dict[str, Any]) -> dict
 
 @router.post("/sessions/{session_id}/messages")
 async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    role = str(payload.get("role") or "ceo")
+    desk = str(payload.get("desk") or "reporting")
     try:
+        if role == "ceo":
+            routed = AgentRuntime().submit_ceo_message(
+                session_id,
+                desk=desk,
+                content=str(payload.get("content") or ""),
+            )
+            return {"message": routed["message"].to_dict(), "desk_response": routed["desk_response"].to_dict()}
         message = AgentRuntime().add_message(
             session_id,
-            role=str(payload.get("role") or "ceo"),
-            desk=str(payload.get("desk") or "reporting"),
+            role=role,
+            desk=desk,
             content=str(payload.get("content") or ""),
             evidence_refs=list(payload.get("evidence_refs") or []),
             action_refs=list(payload.get("action_refs") or []),
         )
     except KeyError:
         raise DataNotFoundError("agent session", session_id)
+    except ValueError as exc:
+        raise InvalidParameterError("agent_message", session_id, str(exc))
     return {"message": message.to_dict()}
 
 

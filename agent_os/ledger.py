@@ -331,7 +331,7 @@ class AgentLedger:
     def list_messages(self, session_id: str) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC, message_id ASC",
+                "SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC, rowid ASC",
                 (session_id,),
             ).fetchall()
         return [self._message_row(row) for row in rows]

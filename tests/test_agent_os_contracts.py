@@ -253,6 +253,92 @@ def test_agent_api_reads_local_ledger_without_running_tools(tmp_path, monkeypatc
     reset_datahub()
 
 
+def test_agent_runtime_routes_ceo_message_to_deterministic_desk_response(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Daily CEO Brief", default_desk="reporting")
+
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        desk="reporting",
+        content="今天系统该做什么？",
+    )
+
+    ceo_message = routed["message"]
+    desk_response = routed["desk_response"]
+    loaded = runtime.get_session(session.session_id)
+    action = runtime.get_action(desk_response.proposed_actions[0])
+    evidence = runtime.ledger.get_evidence(desk_response.evidence_refs[0])
+    handoff_targets = {handoff["target_desk"] for handoff in desk_response.handoffs}
+
+    assert ceo_message.role == "ceo"
+    assert desk_response.message.role == "desk_agent"
+    assert desk_response.message.desk == "reporting"
+    assert "Reporting Desk" in desk_response.answer
+    assert desk_response.confidence >= 0.6
+    assert action["risk_level"] == "read_only"
+    assert action["parameters"]["tool_id"] == "astroq.lifecycle.check"
+    assert action["status"] == "proposed"
+    assert evidence["kind"] == "web_route"
+    assert evidence["uri"] == "/system?tab=lifecycle"
+    assert handoff_targets >= {"data", "research", "risk"}
+    assert loaded["messages"][0]["message_id"] == ceo_message.message_id
+    assert loaded["messages"][1]["message_id"] == desk_response.message.message_id
+    assert loaded["actions"][0]["action_id"] == action["action_id"]
+    assert {handoff["target_desk"] for handoff in loaded["handoffs"]} >= {"data", "research", "risk"}
+    reset_datahub()
+
+
+def test_agent_cli_and_api_message_return_desk_response(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Message routing", default_desk="reporting")
+
+    cli_code = run_cli(
+        [
+            "agent",
+            "message",
+            "--session",
+            session.session_id,
+            "--desk",
+            "reporting",
+            "--text",
+            "给我一份日常简报",
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(
+        f"/api/agent/sessions/{session.session_id}/messages",
+        json={"role": "ceo", "desk": "data", "content": "检查一下数据缺口"},
+    )
+
+    assert cli_code == 0
+    assert cli_payload["data"]["message"]["role"] == "ceo"
+    assert cli_payload["data"]["desk_response"]["message"]["role"] == "desk_agent"
+    assert cli_payload["data"]["desk_response"]["proposed_actions"]
+    assert api_res.status_code == 200
+    assert api_res.json()["message"]["role"] == "ceo"
+    assert api_res.json()["desk_response"]["message"]["desk"] == "data"
+    assert api_res.json()["desk_response"]["evidence_refs"]
+    reset_datahub()
+
+
 def test_agent_runtime_records_run_and_tool_registry_uses_fixed_command_arrays(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

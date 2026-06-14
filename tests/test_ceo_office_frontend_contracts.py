@@ -87,6 +87,7 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentSessions" in agent_api
     assert "agentCreateSession" in agent_api
     assert "agentUpdateSession" in agent_api
+    assert "AgentAddMessageResponse" in agent_api
     assert "agentActions" in agent_api
     assert "agentApproveAction" in agent_api
     assert "agentRejectAction" in agent_api
@@ -98,6 +99,9 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentAction" in agent_types
     assert "export interface AgentActionDetail" in agent_types
     assert "export interface AgentHandoff" in agent_types
+    assert "export interface AgentDeskResponse" in agent_types
+    assert "export interface AgentAddMessageResponse" in agent_types
+    assert "desk_response?: AgentDeskResponse" in agent_types
     assert "export interface EvidenceRef" in agent_types
     assert "export interface EvidenceNavigation" in agent_types
     assert "navigation: EvidenceNavigation | null" in agent_types

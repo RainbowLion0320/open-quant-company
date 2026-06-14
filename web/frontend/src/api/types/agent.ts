@@ -81,6 +81,16 @@ export interface AgentHandoff {
   resolved_at: string;
 }
 
+export interface AgentDeskResponse {
+  message: AgentMessage;
+  answer: string;
+  confidence: number;
+  evidence_refs: string[];
+  proposed_actions: string[];
+  blockers: string[];
+  handoffs: AgentHandoff[];
+}
+
 export interface AgentDesk {
   desk_id: string;
   display_name: string;
@@ -133,4 +143,9 @@ export interface AgentEvidenceResponse {
 
 export interface AgentRunActionResponse {
   run: AgentRun;
+}
+
+export interface AgentAddMessageResponse {
+  message: AgentMessage;
+  desk_response?: AgentDeskResponse;
 }

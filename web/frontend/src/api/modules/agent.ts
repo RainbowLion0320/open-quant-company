@@ -2,14 +2,13 @@ import { get, patch, post } from "../client";
 import type {
   AgentAction,
   AgentActionDetail,
+  AgentAddMessageResponse,
   AgentActionsResponse,
   AgentDesksResponse,
   AgentEvidenceResponse,
   AgentHandoff,
   AgentHandoffsResponse,
-  AgentRun,
   AgentRunActionResponse,
-  AgentMessage,
   AgentSession,
   AgentSessionDetail,
   AgentSessionsResponse,
@@ -27,7 +26,7 @@ export const agentApi = {
   agentAddMessage: (
     sessionId: string,
     payload: { role?: string; desk?: string; content: string; evidence_refs?: string[]; action_refs?: string[] },
-  ) => post<{ message: AgentMessage }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/messages`, payload),
+  ) => post<AgentAddMessageResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/messages`, payload),
   agentActions: (sessionId = "") =>
     get<AgentActionsResponse>(`/api/agent/actions${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
   agentHandoffs: (sessionId = "") =>

@@ -13,6 +13,7 @@ from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file
 from agent_os.ledger import AgentLedger
 from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentRun, AgentSession, DeskResponse, EvidenceRef
 from agent_os.tools import AgentToolRegistry
+from agent_os.workflows import build_desk_workflow_plan
 from data.storage.datahub import get_datahub
 
 
@@ -138,6 +139,22 @@ class AgentRuntime:
         )
         self.ledger.insert_message(message.to_dict())
         return message
+
+    def submit_ceo_message(self, session_id: str, *, desk: str, content: str) -> dict[str, AgentMessage | DeskResponse]:
+        session = self.ledger.get_session(session_id)
+        if not session:
+            raise KeyError(f"Agent session not found: {session_id}")
+        target_desk = (desk or str(session.get("default_desk") or "reporting")).strip()
+        if get_desk(target_desk) is None:
+            raise ValueError(f"Unknown desk: {target_desk}")
+        message = self.add_message(session_id, role="ceo", desk=target_desk, content=content)
+        desk_response = self._route_ceo_message(
+            session_id=session_id,
+            source_message_id=message.message_id,
+            desk=target_desk,
+            content=content,
+        )
+        return {"message": message, "desk_response": desk_response}
 
     def propose_action(
         self,
@@ -458,6 +475,36 @@ class AgentRuntime:
 
     def list_desks(self) -> list[dict[str, Any]]:
         return list_desks()
+
+    def _route_ceo_message(self, *, session_id: str, source_message_id: str, desk: str, content: str) -> DeskResponse:
+        plan = build_desk_workflow_plan(desk=desk, content=content)
+        evidence = self.create_evidence(
+            kind="web_route",
+            label=plan.evidence_label,
+            uri=plan.evidence_uri,
+            summary=plan.evidence_summary,
+        )
+        action = self.propose_action(
+            session_id=session_id,
+            desk=plan.desk,
+            action_type=plan.action_type,
+            risk_level=plan.risk_level,
+            summary=plan.action_summary,
+            parameters={"tool_id": plan.tool_id},
+            expected_effect=plan.expected_effect,
+            evidence_refs=[evidence.evidence_id],
+        )
+        return self.respond_as_desk(
+            session_id=session_id,
+            source_message_id=source_message_id,
+            desk=plan.desk,
+            answer=plan.answer,
+            confidence=plan.confidence,
+            evidence_refs=[evidence.evidence_id],
+            proposed_actions=[action.action_id],
+            blockers=plan.blockers,
+            handoffs=plan.handoffs,
+        )
 
     def memory_snapshot(self) -> dict[str, Any]:
         sessions = self.ledger.list_sessions()

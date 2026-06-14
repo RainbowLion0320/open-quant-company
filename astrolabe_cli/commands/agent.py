@@ -67,14 +67,18 @@ def update_session(
 
 def add_message(session_id: str, desk: str, text: str) -> CliResult:
     try:
-        message = AgentRuntime().add_message(session_id, role="ceo", desk=desk, content=text)
+        routed = AgentRuntime().submit_ceo_message(session_id, desk=desk, content=text)
     except KeyError as exc:
         return CliResult(False, "agent message", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    except ValueError as exc:
+        return CliResult(False, "agent message", {"session_id": session_id, "desk": desk}, "Agent message invalid", [str(exc)])
+    message = routed["message"]
+    desk_response = routed["desk_response"]
     return CliResult(
         ok=True,
         command="agent message",
         message=f"Added message {message.message_id}",
-        data={"message": message.to_dict()},
+        data={"message": message.to_dict(), "desk_response": desk_response.to_dict()},
     )
 
 
