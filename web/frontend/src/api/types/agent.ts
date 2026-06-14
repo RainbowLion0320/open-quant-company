@@ -62,6 +62,19 @@ export interface AgentRun {
   artifact_refs: string[];
 }
 
+export interface AgentHandoff {
+  handoff_id: string;
+  session_id: string;
+  source_message_id: string;
+  source_desk: string;
+  target_desk: string;
+  reason: string;
+  status: string;
+  evidence_refs: string[];
+  created_at: string;
+  resolved_at: string;
+}
+
 export interface AgentDesk {
   desk_id: string;
   display_name: string;
@@ -77,6 +90,7 @@ export interface AgentSessionDetail {
   messages: AgentMessage[];
   actions: AgentAction[];
   runs: AgentRun[];
+  handoffs: AgentHandoff[];
 }
 
 export interface AgentActionDetail {
@@ -96,6 +110,11 @@ export interface AgentActionsResponse {
 
 export interface AgentDesksResponse {
   desks: AgentDesk[];
+  total: number;
+}
+
+export interface AgentHandoffsResponse {
+  handoffs: AgentHandoff[];
   total: number;
 }
 

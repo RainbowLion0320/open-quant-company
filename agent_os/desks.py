@@ -15,7 +15,9 @@ DESKS: list[dict[str, Any]] = [
             "astroq.data.repair.dry_run",
         ],
         "forbidden_actions": ["live_order", "code_change"],
+        "evidence_required": ["data_status", "source_capability", "coverage"],
         "handoff_targets": ["research", "risk", "reporting"],
+        "default_policy": "approval_required_for_writes",
         "status": "available",
     },
     {
@@ -28,7 +30,9 @@ DESKS: list[dict[str, Any]] = [
             "astroq.backtest.run.dry_run",
         ],
         "forbidden_actions": ["live_order", "code_change"],
+        "evidence_required": ["strategy_evidence", "backtest_evidence", "alpha_evidence"],
         "handoff_targets": ["data", "risk", "reporting"],
+        "default_policy": "approval_required_for_official_backtests",
         "status": "available",
     },
     {
@@ -37,7 +41,9 @@ DESKS: list[dict[str, Any]] = [
         "mandate": "Lifecycle, exposure, data readiness, and execution risk gates.",
         "allowed_tools": ["astroq.lifecycle.check", "astroq.execution.dry_run"],
         "forbidden_actions": ["code_change"],
+        "evidence_required": ["lifecycle_readiness", "risk_gate", "execution_readiness"],
         "handoff_targets": ["data", "research", "execution", "reporting"],
+        "default_policy": "approval_required_for_gate_override",
         "status": "available",
     },
     {
@@ -46,7 +52,9 @@ DESKS: list[dict[str, Any]] = [
         "mandate": "Paper orders, broker readiness, live proposals, reconciliation, and kill switch state.",
         "allowed_tools": ["astroq.execution.dry_run"],
         "forbidden_actions": ["code_change"],
+        "evidence_required": ["execution_preview", "broker_readiness", "risk_gate"],
         "handoff_targets": ["risk", "reporting"],
+        "default_policy": "approval_required_for_orders",
         "status": "available",
     },
     {
@@ -55,7 +63,9 @@ DESKS: list[dict[str, Any]] = [
         "mandate": "CodeGraph, AST, test design diagnostics, bug triage, and work orders.",
         "allowed_tools": ["astroq.architecture.ast", "astroq.test.design", "astroq.docs.check"],
         "forbidden_actions": ["write_data", "paper_order", "live_order"],
+        "evidence_required": ["codegraph", "ast_intelligence", "test_design"],
         "handoff_targets": ["data", "research", "risk", "reporting"],
+        "default_policy": "work_order_only",
         "status": "available",
     },
     {
@@ -68,7 +78,9 @@ DESKS: list[dict[str, Any]] = [
             "astroq.strategy.catalog",
         ],
         "forbidden_actions": ["write_config", "write_data", "paper_order", "live_order", "code_change"],
+        "evidence_required": ["lifecycle_readiness", "data_status", "strategy_catalog"],
         "handoff_targets": ["data", "research", "risk", "execution", "engineering"],
+        "default_policy": "read_only_summary",
         "status": "available",
     },
 ]
@@ -76,3 +88,10 @@ DESKS: list[dict[str, Any]] = [
 
 def list_desks() -> list[dict[str, Any]]:
     return [dict(desk) for desk in DESKS]
+
+
+def get_desk(desk_id: str) -> dict[str, Any] | None:
+    for desk in DESKS:
+        if desk["desk_id"] == desk_id:
+            return dict(desk)
+    return None

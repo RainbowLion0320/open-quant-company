@@ -61,6 +61,17 @@ def actions(session_id: str = "") -> CliResult:
     )
 
 
+def handoffs(session_id: str = "") -> CliResult:
+    runtime = AgentRuntime()
+    rows = runtime.list_handoffs(session_id or None)
+    return CliResult(
+        ok=True,
+        command="agent handoffs",
+        message=f"{len(rows)} agent handoff(s)",
+        data={"handoffs": rows, "total": len(rows)},
+    )
+
+
 def show_action(action_id: str) -> CliResult:
     runtime = AgentRuntime()
     action = runtime.get_action(action_id)

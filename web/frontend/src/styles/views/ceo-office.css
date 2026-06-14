@@ -30,7 +30,7 @@
 
 .ceo-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -97,6 +97,7 @@
 .message-list,
 .desk-list,
 .action-list,
+.handoff-list,
 .ceo-side {
   display: grid;
   gap: 10px;
@@ -110,6 +111,7 @@
 .message-row,
 .desk-row,
 .action-row,
+.handoff-row,
 .run-row,
 .ceo-empty {
   border: 1px solid var(--border-subtle);
@@ -175,6 +177,36 @@
 .action-row {
   display: grid;
   gap: 8px;
+}
+
+.handoff-row {
+  display: grid;
+  gap: 7px;
+}
+
+.handoff-route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.handoff-route span {
+  color: var(--text-tertiary);
+}
+
+.handoff-row p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.handoff-row small {
+  color: var(--text-tertiary);
+  font-size: 11px;
 }
 
 .action-row.selected {

@@ -27,6 +27,10 @@
         <strong>{{ pendingActions.length }}</strong>
       </article>
       <article class="ceo-metric">
+        <span>{{ t("ceoOffice.handoffs") }}</span>
+        <strong>{{ handoffs.length }}</strong>
+      </article>
+      <article class="ceo-metric">
         <span>{{ t("ceoOffice.evidence") }}</span>
         <strong>{{ evidenceCount }}</strong>
       </article>
@@ -72,6 +76,25 @@
                 <strong>{{ deskLabel(desk.desk_id) }}</strong>
                 <small>{{ desk.allowed_tools.length }} tools</small>
               </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="ceo-panel">
+          <header class="panel-head">
+            <span>{{ t("ceoOffice.handoffs") }}</span>
+            <small>{{ handoffs.length }}</small>
+          </header>
+          <div v-if="!handoffs.length" class="ceo-empty">{{ t("ceoOffice.noHandoffs") }}</div>
+          <div v-else class="handoff-list">
+            <div v-for="handoff in handoffs" :key="handoff.handoff_id" class="handoff-row">
+              <div class="handoff-route">
+                <strong>{{ deskLabel(handoff.source_desk) }}</strong>
+                <span>→</span>
+                <strong>{{ deskLabel(handoff.target_desk) }}</strong>
+              </div>
+              <p>{{ handoff.reason }}</p>
+              <small>{{ statusLabel(handoff.status) }} · {{ formatTime(handoff.created_at) }}</small>
             </div>
           </div>
         </article>
@@ -190,7 +213,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentMessage, type AgentSession, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentHandoff, type AgentMessage, type AgentSession, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -199,6 +222,7 @@ const sessions = ref<AgentSession[]>([]);
 const activeSession = ref<AgentSession | null>(null);
 const messages = ref<AgentMessage[]>([]);
 const actions = ref<AgentAction[]>([]);
+const handoffs = ref<AgentHandoff[]>([]);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
@@ -235,6 +259,7 @@ function statusLabel(status: string) {
   if (status === "succeeded") return t("ceoOffice.succeeded");
   if (status === "failed") return t("ceoOffice.failed");
   if (status === "blocked") return t("ceoOffice.blocked");
+  if (status === "open") return "open";
   return status;
 }
 
@@ -256,19 +281,22 @@ async function loadSession(sessionId: string) {
   activeSession.value = detail.session;
   messages.value = detail.messages || [];
   actions.value = detail.actions || [];
+  handoffs.value = detail.handoffs || [];
 }
 
 async function load() {
   error.value = "";
   try {
-    const [sessionPayload, deskPayload, actionPayload] = await Promise.all([
+    const [sessionPayload, deskPayload, actionPayload, handoffPayload] = await Promise.all([
       api.agentSessions(),
       api.agentDesks(),
       api.agentActions(),
+      api.agentHandoffs(),
     ]);
     sessions.value = sessionPayload.sessions || [];
     desks.value = deskPayload.desks || [];
     actions.value = actionPayload.actions || [];
+    handoffs.value = handoffPayload.handoffs || [];
     if (sessions.value.length) {
       await loadSession(activeSession.value?.session_id || sessions.value[0].session_id);
     }

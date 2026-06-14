@@ -12,6 +12,7 @@ from astrolabe_cli.commands.agent import approve as agent_approve
 from astrolabe_cli.commands.agent import create_session as agent_create_session
 from astrolabe_cli.commands.agent import desks as agent_desks
 from astrolabe_cli.commands.agent import evidence as agent_evidence
+from astrolabe_cli.commands.agent import handoffs as agent_handoffs
 from astrolabe_cli.commands.agent import reject as agent_reject
 from astrolabe_cli.commands.agent import run_action as agent_run_action
 from astrolabe_cli.commands.agent import sessions as agent_sessions
@@ -92,6 +93,11 @@ def build_parser() -> argparse.ArgumentParser:
     agent_actions_cmd.add_argument("--session", default="")
     add_common_flags(agent_actions_cmd)
     agent_actions_cmd.set_defaults(handler=lambda args: agent_actions(args.session))
+
+    agent_handoffs_cmd = agent_sub.add_parser("handoffs", help="List cross-desk handoffs")
+    agent_handoffs_cmd.add_argument("--session", default="")
+    add_common_flags(agent_handoffs_cmd)
+    agent_handoffs_cmd.set_defaults(handler=lambda args: agent_handoffs(args.session))
 
     agent_action_cmd = agent_sub.add_parser("action", help="Inspect one agent action")
     agent_action_sub = agent_action_cmd.add_subparsers(dest="agent_action_command", required=True)

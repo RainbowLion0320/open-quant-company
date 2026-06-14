@@ -98,6 +98,19 @@ class AgentLedger:
                     stderr_summary TEXT NOT NULL,
                     artifact_refs TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS handoffs (
+                    handoff_id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    source_message_id TEXT NOT NULL,
+                    source_desk TEXT NOT NULL,
+                    target_desk TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    evidence_refs TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    resolved_at TEXT NOT NULL
+                );
                 """
             )
 
@@ -203,6 +216,23 @@ class AgentLedger:
                 payload,
             )
 
+    def insert_handoff(self, row: dict[str, Any]) -> None:
+        payload = {**row, "evidence_refs": _json_dumps(row.get("evidence_refs", []))}
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO handoffs(
+                    handoff_id, session_id, source_message_id, source_desk, target_desk,
+                    reason, status, evidence_refs, created_at, resolved_at
+                )
+                VALUES(
+                    :handoff_id, :session_id, :source_message_id, :source_desk, :target_desk,
+                    :reason, :status, :evidence_refs, :created_at, :resolved_at
+                )
+                """,
+                payload,
+            )
+
     def list_sessions(self) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM sessions ORDER BY created_at DESC, session_id DESC").fetchall()
@@ -258,6 +288,17 @@ class AgentLedger:
             row = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         return self._run_row(row) if row else None
 
+    def list_handoffs(self, session_id: str | None = None) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            if session_id:
+                rows = conn.execute(
+                    "SELECT * FROM handoffs WHERE session_id = ? ORDER BY created_at DESC, handoff_id DESC",
+                    (session_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM handoffs ORDER BY created_at DESC, handoff_id DESC").fetchall()
+        return [self._handoff_row(row) for row in rows]
+
     @staticmethod
     def _session_row(row: sqlite3.Row) -> dict[str, Any]:
         data = dict(row)
@@ -285,4 +326,10 @@ class AgentLedger:
         data = dict(row)
         data["command"] = _json_loads(data.get("command"), [])
         data["artifact_refs"] = _json_loads(data.get("artifact_refs"), [])
+        return data
+
+    @staticmethod
+    def _handoff_row(row: sqlite3.Row) -> dict[str, Any]:
+        data = dict(row)
+        data["evidence_refs"] = _json_loads(data.get("evidence_refs"), [])
         return data

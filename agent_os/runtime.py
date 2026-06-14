@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from agent_os.approval import approval_required_for_risk
-from agent_os.desks import list_desks
+from agent_os.desks import get_desk, list_desks
 from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file
 from agent_os.ledger import AgentLedger
-from agent_os.schemas import AgentAction, AgentMessage, AgentRun, AgentSession, EvidenceRef
+from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentRun, AgentSession, DeskResponse, EvidenceRef
 from agent_os.tools import AgentToolRegistry
 
 
@@ -72,6 +72,7 @@ class AgentRuntime:
             "messages": self.ledger.list_messages(session_id),
             "actions": self.ledger.list_actions(session_id),
             "runs": self._session_runs(session_id),
+            "handoffs": self.ledger.list_handoffs(session_id),
         }
 
     def add_message(
@@ -306,6 +307,67 @@ class AgentRuntime:
 
     def list_runs(self, action_id: str | None = None) -> list[dict[str, Any]]:
         return self.ledger.list_runs(action_id)
+
+    def list_handoffs(self, session_id: str | None = None) -> list[dict[str, Any]]:
+        return self.ledger.list_handoffs(session_id)
+
+    def respond_as_desk(
+        self,
+        *,
+        session_id: str,
+        source_message_id: str,
+        desk: str,
+        answer: str,
+        confidence: float = 0.5,
+        evidence_refs: list[str] | None = None,
+        proposed_actions: list[str] | None = None,
+        blockers: list[str] | None = None,
+        handoffs: list[dict[str, Any]] | None = None,
+    ) -> DeskResponse:
+        if not self.ledger.get_session(session_id):
+            raise KeyError(f"Agent session not found: {session_id}")
+        desk_record = get_desk(desk)
+        if desk_record is None:
+            raise ValueError(f"Unknown desk: {desk}")
+        evidence = list(evidence_refs or [])
+        action_refs = list(proposed_actions or [])
+        handoff_rows: list[dict[str, Any]] = []
+        for handoff in handoffs or []:
+            target = str(handoff.get("target_desk") or "")
+            if target not in desk_record.get("handoff_targets", []):
+                raise ValueError(f"handoff from {desk} to {target} is not allowed")
+            row = AgentHandoff(
+                handoff_id=_id("handoff"),
+                session_id=session_id,
+                source_message_id=source_message_id,
+                source_desk=desk,
+                target_desk=target,
+                reason=str(handoff.get("reason") or ""),
+                status="open",
+                evidence_refs=list(handoff.get("evidence_refs") or evidence),
+                created_at=_now(),
+                resolved_at="",
+            )
+            self.ledger.insert_handoff(row.to_dict())
+            handoff_rows.append(row.to_dict())
+
+        message = self.add_message(
+            session_id,
+            role="desk_agent",
+            desk=desk,
+            content=answer,
+            evidence_refs=evidence,
+            action_refs=action_refs,
+        )
+        return DeskResponse(
+            message=message,
+            answer=answer,
+            confidence=confidence,
+            evidence_refs=evidence,
+            proposed_actions=action_refs,
+            blockers=list(blockers or []),
+            handoffs=handoff_rows,
+        )
 
     def list_desks(self) -> list[dict[str, Any]]:
         return list_desks()

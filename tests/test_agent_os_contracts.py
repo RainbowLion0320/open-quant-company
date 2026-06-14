@@ -292,6 +292,40 @@ def test_agent_cli_action_show_and_api_run_detail(tmp_path, monkeypatch, capsys)
 
     reset_datahub()
 
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Action show")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="risk",
+        action_type="lifecycle_check",
+        risk_level="read_only",
+        summary="Check lifecycle",
+    )
+    run = runtime.record_run(
+        action_id=action.action_id,
+        tool_name="astroq.lifecycle.check",
+        command=[".venv/bin/astroq", "lifecycle", "check", "--json"],
+        status="succeeded",
+        return_code=0,
+        stdout_summary="blocked",
+        stderr_summary="",
+    )
+
+    code = run_cli(["agent", "action", "show", action.action_id, "--json"])
+    payload = json.loads(capsys.readouterr().out)
+    res = TestClient(create_app()).get(f"/api/agent/runs/{run.run_id}")
+
+    assert code == 0
+    assert payload["data"]["action"]["summary"] == "Check lifecycle"
+    assert payload["data"]["runs"][0]["run_id"] == run.run_id
+    assert res.status_code == 200
+    assert res.json()["run"]["stdout_summary"] == "blocked"
+    reset_datahub()
+
 
 def test_agent_cli_and_api_dispatch_action_run(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
@@ -339,36 +373,103 @@ def test_agent_cli_and_api_dispatch_action_run(tmp_path, monkeypatch, capsys):
     assert api_res.json()["run"]["status"] == "succeeded"
     reset_datahub()
 
+
+def test_desk_response_records_structured_reply_and_handoff(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Strategy blocker review", default_desk="research")
+    ceo_message = runtime.add_message(
+        session.session_id,
+        role="ceo",
+        desk="research",
+        content="为什么策略被阻断，是否是数据问题？",
+    )
+
+    response = runtime.respond_as_desk(
+        session_id=session.session_id,
+        source_message_id=ceo_message.message_id,
+        desk="research",
+        answer="策略证据缺口需要先由 Data Desk 确认数据覆盖。",
+        confidence=0.74,
+        blockers=["missing_score_panel"],
+        handoffs=[{"target_desk": "data", "reason": "确认 strategy evidence 的数据覆盖缺口"}],
+    )
+
+    loaded = runtime.get_session(session.session_id)
+    handoffs = runtime.list_handoffs(session.session_id)
+
+    assert response.message.role == "desk_agent"
+    assert response.answer.startswith("策略证据缺口")
+    assert response.confidence == 0.74
+    assert response.blockers == ["missing_score_panel"]
+    assert response.handoffs[0]["target_desk"] == "data"
+    assert loaded["messages"][-1]["message_id"] == response.message.message_id
+    assert loaded["handoffs"][0]["source_desk"] == "research"
+    assert handoffs[0]["status"] == "open"
+    reset_datahub()
+
+
+def test_desk_response_rejects_invalid_handoff_target(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Invalid handoff", default_desk="execution")
+    message = runtime.add_message(session.session_id, role="ceo", desk="execution", content="需要改代码吗？")
+
+    try:
+        runtime.respond_as_desk(
+            session_id=session.session_id,
+            source_message_id=message.message_id,
+            desk="execution",
+            answer="Execution Desk 不能直接交给不存在的 desk。",
+            handoffs=[{"target_desk": "engineering", "reason": "not allowed for execution"}],
+        )
+    except ValueError as exc:
+        assert "handoff" in str(exc)
+    else:
+        raise AssertionError("invalid handoff target should fail")
+    reset_datahub()
+
+
+def test_agent_cli_and_api_list_handoffs(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
     from agent_os.runtime import AgentRuntime
     from astrolabe_cli.main import run_cli
     from web.api.app import create_app
 
     runtime = AgentRuntime()
-    session = runtime.create_session(title="Action show")
-    action = runtime.propose_action(
+    session = runtime.create_session(title="Handoff API", default_desk="reporting")
+    message = runtime.add_message(session.session_id, role="ceo", desk="reporting", content="今天哪些 desk 要处理？")
+    runtime.respond_as_desk(
         session_id=session.session_id,
-        desk="risk",
-        action_type="lifecycle_check",
-        risk_level="read_only",
-        summary="Check lifecycle",
-    )
-    run = runtime.record_run(
-        action_id=action.action_id,
-        tool_name="astroq.lifecycle.check",
-        command=[".venv/bin/astroq", "lifecycle", "check", "--json"],
-        status="succeeded",
-        return_code=0,
-        stdout_summary="blocked",
-        stderr_summary="",
+        source_message_id=message.message_id,
+        desk="reporting",
+        answer="需要 Data Desk 检查数据阻断。",
+        handoffs=[{"target_desk": "data", "reason": "数据阻断需要确认"}],
     )
 
-    code = run_cli(["agent", "action", "show", action.action_id, "--json"])
-    payload = json.loads(capsys.readouterr().out)
-    res = TestClient(create_app()).get(f"/api/agent/runs/{run.run_id}")
+    code = run_cli(["agent", "handoffs", "--session", session.session_id, "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).get(f"/api/agent/handoffs?session_id={session.session_id}")
 
     assert code == 0
-    assert payload["data"]["action"]["summary"] == "Check lifecycle"
-    assert payload["data"]["runs"][0]["run_id"] == run.run_id
-    assert res.status_code == 200
-    assert res.json()["run"]["stdout_summary"] == "blocked"
+    assert cli_payload["data"]["handoffs"][0]["target_desk"] == "data"
+    assert api_res.status_code == 200
+    assert api_res.json()["handoffs"][0]["reason"] == "数据阻断需要确认"
     reset_datahub()

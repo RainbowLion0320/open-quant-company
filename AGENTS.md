@@ -48,6 +48,7 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq agent sessions --json` | 查看本地 Agent Company OS 会话 ledger |
 | `astroq agent session create --title "Daily CEO Brief" --json` | 创建 CEO Office / desk agent 会话 |
 | `astroq agent run <action_id> --json` | Dispatch 安全或已批准 agent action 并写入 run ledger |
+| `astroq agent handoffs --json` | 查看跨 desk 交接 ledger |
 | `astroq agent desks --json` | 查看 Data / Research / Risk / Execution / Engineering / Reporting desk agents |
 | `astroq config env --json` | 检查当前进程环境变量密钥状态（脱敏输出） |
 | `astroq config validate --json` | 校验 settings 和策略注册表 |
@@ -145,6 +146,7 @@ astroq lifecycle check --json
 - Production backtests use `backtest/pipeline_runner.py` plus shared modules under `pipeline/`.
 - Strategy state is owned by Strategy Catalog and separated into production, paper, and candidate layers.
 - Web System visualizations include CodeGraph, AST diagnostics, architecture diagnostics, test design intelligence, and lifecycle readiness.
+- Agent Company OS has a foundation runtime for sessions, messages, actions, approvals, runs, evidence, desk registry, and cross-desk handoffs. Desk reasoning and live execution are still phased work; do not present them as complete.
 - Formal strategy promotion depends on score panels, alpha evidence, data readiness, and execution assumptions. Missing data, missing source capability, missing score panels, and insufficient evidence must be reported as blocked/not_applicable states, not filled with placeholder values.
 - The project is local-first. Network access, provider permissions, and data completeness must be explicit, observable, and never hidden behind fake defaults.
 

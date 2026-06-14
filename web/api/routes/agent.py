@@ -59,6 +59,12 @@ async def list_agent_actions(session_id: str = "") -> dict[str, Any]:
     return {"actions": actions, "total": len(actions)}
 
 
+@router.get("/handoffs")
+async def list_agent_handoffs(session_id: str = "") -> dict[str, Any]:
+    handoffs = AgentRuntime().list_handoffs(session_id or None)
+    return {"handoffs": handoffs, "total": len(handoffs)}
+
+
 @router.get("/actions/{action_id}")
 async def get_agent_action(action_id: str) -> dict[str, Any]:
     action = AgentRuntime().get_action(action_id)

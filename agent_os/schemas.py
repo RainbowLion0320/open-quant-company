@@ -86,3 +86,42 @@ class AgentRun:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class AgentHandoff:
+    handoff_id: str
+    session_id: str
+    source_message_id: str
+    source_desk: str
+    target_desk: str
+    reason: str
+    status: str
+    evidence_refs: list[str]
+    created_at: str
+    resolved_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DeskResponse:
+    message: AgentMessage
+    answer: str
+    confidence: float
+    evidence_refs: list[str]
+    proposed_actions: list[str]
+    blockers: list[str]
+    handoffs: list[dict[str, Any]]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "message": self.message.to_dict(),
+            "answer": self.answer,
+            "confidence": self.confidence,
+            "evidence_refs": list(self.evidence_refs),
+            "proposed_actions": list(self.proposed_actions),
+            "blockers": list(self.blockers),
+            "handoffs": [dict(handoff) for handoff in self.handoffs],
+        }
