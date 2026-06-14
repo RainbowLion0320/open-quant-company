@@ -299,6 +299,22 @@ class AgentLedger:
                 rows = conn.execute("SELECT * FROM handoffs ORDER BY created_at DESC, handoff_id DESC").fetchall()
         return [self._handoff_row(row) for row in rows]
 
+    def get_handoff(self, handoff_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM handoffs WHERE handoff_id = ?", (handoff_id,)).fetchone()
+        return self._handoff_row(row) if row else None
+
+    def update_handoff_status(self, handoff_id: str, status: str, resolved_at: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE handoffs
+                SET status = ?, resolved_at = ?
+                WHERE handoff_id = ?
+                """,
+                (status, resolved_at, handoff_id),
+            )
+
     @staticmethod
     def _session_row(row: sqlite3.Row) -> dict[str, Any]:
         data = dict(row)

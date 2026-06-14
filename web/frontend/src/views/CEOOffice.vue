@@ -95,6 +95,16 @@
               </div>
               <p>{{ handoff.reason }}</p>
               <small>{{ statusLabel(handoff.status) }} · {{ formatTime(handoff.created_at) }}</small>
+              <div v-if="handoff.status === 'open'" class="handoff-actions">
+                <button
+                  class="btn btn-xs"
+                  type="button"
+                  :disabled="resolvingHandoff === handoff.handoff_id"
+                  @click="resolveHandoff(handoff.handoff_id)"
+                >
+                  {{ t("ceoOffice.resolveHandoff") }}
+                </button>
+              </div>
             </div>
           </div>
         </article>
@@ -227,6 +237,7 @@ const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
 const runningAction = ref("");
+const resolvingHandoff = ref("");
 const draft = ref("");
 const sending = ref(false);
 const error = ref("");
@@ -259,7 +270,8 @@ function statusLabel(status: string) {
   if (status === "succeeded") return t("ceoOffice.succeeded");
   if (status === "failed") return t("ceoOffice.failed");
   if (status === "blocked") return t("ceoOffice.blocked");
-  if (status === "open") return "open";
+  if (status === "open") return t("ceoOffice.open");
+  if (status === "resolved") return t("ceoOffice.resolved");
   return status;
 }
 
@@ -396,6 +408,19 @@ async function loadEvidence(evidenceId: string) {
     selectedEvidence.value = payload.evidence;
   } catch (err: any) {
     error.value = `${t("ceoOffice.evidenceLoadFailed")}: ${err?.message || err}`;
+  }
+}
+
+async function resolveHandoff(handoffId: string) {
+  resolvingHandoff.value = handoffId;
+  error.value = "";
+  try {
+    await api.agentResolveHandoff(handoffId);
+    await load();
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;
+  } finally {
+    resolvingHandoff.value = "";
   }
 }
 

@@ -46,12 +46,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "selectedEvidence" in view
     assert "handoffs" in view
     assert "api.agentHandoffs" in view
+    assert "api.agentResolveHandoff" in view
+    assert "resolveHandoff" in view
     assert "ceoOffice" in zh_index
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
     assert "Action Queue" in en_ceo
     assert "交接事项" in zh_ceo
+    assert "标记完成" in zh_ceo
     assert "Handoffs" in en_ceo
+    assert "Resolve" in en_ceo
     assert "证据详情" in zh_ceo
     assert "Evidence Detail" in en_ceo
 
@@ -71,6 +75,7 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentRejectAction" in agent_api
     assert "agentRunAction" in agent_api
     assert "agentHandoffs" in agent_api
+    assert "agentResolveHandoff" in agent_api
     assert "export interface AgentSession" in agent_types
     assert "export interface AgentAction" in agent_types
     assert "export interface AgentActionDetail" in agent_types

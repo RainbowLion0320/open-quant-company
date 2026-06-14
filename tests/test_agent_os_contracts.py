@@ -578,3 +578,80 @@ def test_agent_cli_and_api_list_handoffs(tmp_path, monkeypatch, capsys):
     assert api_res.status_code == 200
     assert api_res.json()["handoffs"][0]["reason"] == "数据阻断需要确认"
     reset_datahub()
+
+
+def test_agent_runtime_resolves_handoff_with_audit_timestamp(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Resolve handoff", default_desk="reporting")
+    message = runtime.add_message(session.session_id, role="ceo", desk="reporting", content="处理交接")
+    response = runtime.respond_as_desk(
+        session_id=session.session_id,
+        source_message_id=message.message_id,
+        desk="reporting",
+        answer="交给 Data Desk。",
+        handoffs=[{"target_desk": "data", "reason": "确认数据缺口"}],
+    )
+    handoff_id = response.handoffs[0]["handoff_id"]
+
+    resolved = runtime.resolve_handoff(handoff_id, resolved_by="ceo")
+
+    assert resolved["handoff_id"] == handoff_id
+    assert resolved["status"] == "resolved"
+    assert resolved["resolved_at"]
+    assert runtime.list_handoffs(session.session_id)[0]["status"] == "resolved"
+
+    try:
+        runtime.resolve_handoff("handoff_missing")
+    except KeyError as exc:
+        assert "handoff_missing" in str(exc)
+    else:
+        raise AssertionError("missing handoff should fail")
+    reset_datahub()
+
+
+def test_agent_cli_and_api_resolve_handoff(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Resolve Handoff API", default_desk="reporting")
+    message = runtime.add_message(session.session_id, role="ceo", desk="reporting", content="处理交接")
+    first = runtime.respond_as_desk(
+        session_id=session.session_id,
+        source_message_id=message.message_id,
+        desk="reporting",
+        answer="需要 Data Desk。",
+        handoffs=[{"target_desk": "data", "reason": "数据阻断"}],
+    ).handoffs[0]
+    second = runtime.respond_as_desk(
+        session_id=session.session_id,
+        source_message_id=message.message_id,
+        desk="reporting",
+        answer="需要 Research Desk。",
+        handoffs=[{"target_desk": "research", "reason": "策略证据"}],
+    ).handoffs[0]
+
+    cli_code = run_cli(["agent", "handoff", "resolve", first["handoff_id"], "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(f"/api/agent/handoffs/{second['handoff_id']}/resolve")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["handoff"]["status"] == "resolved"
+    assert api_res.status_code == 200
+    assert api_res.json()["handoff"]["status"] == "resolved"
+    assert runtime.list_handoffs(session.session_id)[0]["status"] == "resolved"
+    reset_datahub()

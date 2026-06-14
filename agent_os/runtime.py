@@ -336,6 +336,17 @@ class AgentRuntime:
     def list_handoffs(self, session_id: str | None = None) -> list[dict[str, Any]]:
         return self.ledger.list_handoffs(session_id)
 
+    def resolve_handoff(self, handoff_id: str, *, resolved_by: str = "ceo") -> dict[str, Any]:
+        handoff = self.ledger.get_handoff(handoff_id)
+        if handoff is None:
+            raise KeyError(f"Agent handoff not found: {handoff_id}")
+        if handoff.get("status") != "resolved":
+            self.ledger.update_handoff_status(handoff_id, "resolved", _now())
+            handoff = self.ledger.get_handoff(handoff_id)
+        if handoff is None:
+            raise KeyError(f"Agent handoff not found after update: {handoff_id}")
+        return handoff
+
     def respond_as_desk(
         self,
         *,

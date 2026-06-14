@@ -72,6 +72,19 @@ def handoffs(session_id: str = "") -> CliResult:
     )
 
 
+def resolve_handoff(handoff_id: str) -> CliResult:
+    try:
+        handoff = AgentRuntime().resolve_handoff(handoff_id)
+    except KeyError as exc:
+        return CliResult(False, "agent handoff resolve", {"handoff_id": handoff_id}, "Agent handoff missing", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent handoff resolve",
+        message=f"Resolved {handoff_id}",
+        data={"handoff": handoff},
+    )
+
+
 def show_action(action_id: str) -> CliResult:
     runtime = AgentRuntime()
     action = runtime.get_action(action_id)

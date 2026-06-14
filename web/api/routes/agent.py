@@ -65,6 +65,15 @@ async def list_agent_handoffs(session_id: str = "") -> dict[str, Any]:
     return {"handoffs": handoffs, "total": len(handoffs)}
 
 
+@router.post("/handoffs/{handoff_id}/resolve")
+async def resolve_agent_handoff(handoff_id: str) -> dict[str, Any]:
+    try:
+        handoff = AgentRuntime().resolve_handoff(handoff_id)
+    except KeyError:
+        raise DataNotFoundError("agent handoff", handoff_id)
+    return {"handoff": handoff}
+
+
 @router.get("/actions/{action_id}")
 async def get_agent_action(action_id: str) -> dict[str, Any]:
     action = AgentRuntime().get_action(action_id)

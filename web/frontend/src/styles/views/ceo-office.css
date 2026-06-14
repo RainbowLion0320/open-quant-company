@@ -209,6 +209,11 @@
   font-size: 11px;
 }
 
+.handoff-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .action-row.selected {
   border-color: rgba(6, 182, 212, 0.36);
   background: rgba(6, 182, 212, 0.06);

@@ -36,6 +36,7 @@ All endpoints are planned under `/api/agent/*`.
 | `POST` | `/api/agent/sessions/{session_id}/messages` | Add a CEO message and route it to a desk. | Implemented |
 | `GET` | `/api/agent/actions` | List actions with filters for session and future status/desk/risk filters. | Implemented |
 | `GET` | `/api/agent/handoffs` | List cross-desk handoff ledger rows, optionally scoped to a session. | Implemented |
+| `POST` | `/api/agent/handoffs/{handoff_id}/resolve` | Mark a cross-desk handoff as resolved and write `resolved_at`. | Implemented |
 | `GET` | `/api/agent/actions/{action_id}` | Read an action and approval state. | Implemented |
 | `POST` | `/api/agent/actions/{action_id}/approve` | Approve a pending action. | Implemented |
 | `POST` | `/api/agent/actions/{action_id}/reject` | Reject a pending action with reason. | Implemented |
@@ -61,6 +62,7 @@ All commands must support `--json`.
 | `astroq agent message --session SESSION_ID --desk DESK --text TEXT --json` | Add a message and route it. | Implemented |
 | `astroq agent actions --session SESSION_ID --json` | List session actions. | Implemented |
 | `astroq agent handoffs --session SESSION_ID --json` | List cross-desk handoffs. | Implemented |
+| `astroq agent handoff resolve HANDOFF_ID --json` | Mark a cross-desk handoff as resolved. | Implemented |
 | `astroq agent action show ACTION_ID --json` | Show action details. | Implemented |
 | `astroq agent run ACTION_ID --json` | Dispatch a safe or approved action through the fixed tool registry. | Implemented for bounded fixed commands |
 | `astroq agent approve ACTION_ID --json` | Approve an action. | Implemented |
@@ -393,12 +395,12 @@ Implementation must include:
 As of 2026-06-14:
 
 - Foundation runtime is partially implemented in `agent_os/`.
-- The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and cross-desk handoffs under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session/message/actions/handoffs/action show/run/approve/reject/evidence/desks --json` is available.
-- `/api/agent/sessions`, `/api/agent/actions`, `/api/agent/handoffs`, `/api/agent/actions/{action_id}/run`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, and `/api/agent/desks` are available.
+- The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and open/resolved cross-desk handoffs under `var/db/agent_os.sqlite`.
+- `astroq agent sessions/session/message/actions/handoffs/handoff resolve/action show/run/approve/reject/evidence/desks --json` is available.
+- `/api/agent/sessions`, `/api/agent/actions`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, and `/api/agent/desks` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; unsafe templated write commands remain blocked until a stricter parameter binding phase lands.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
-- Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`, and invalid handoff targets are rejected by runtime desk policy.
+- Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
