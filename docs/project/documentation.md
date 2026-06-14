@@ -1,6 +1,6 @@
 # Open Quant Company 文档目录规范
 
-> 更新: 2026-06-09
+> 更新: 2026-06-14
 
 本仓库的文档按读者和稳定性分层。根目录只保留第一次进入仓库时必须看到的入口，长期维护、产品、运维、质量和合规文档放进 `docs/` 的明确子目录。
 
@@ -24,6 +24,7 @@
 | `docs/specs/` | 子系统行为契约，是代码行为的权威设计文档。 |
 | `docs/strategies/` | 策略设计、策略族说明和研究到生产的边界。 |
 | `docs/project/` | 文档治理、项目治理、维护者、路线图和发布流程。 |
+| `docs/project/agent-company/` | Agent Company OS 长期路线图和分阶段改造计划。 |
 | `docs/project/compliance/` | 开源合规、隐私、安全、SBOM、无密钥入门等合规材料。 |
 | `docs/operations/` | 本地运维、外部服务接入和可执行操作手册。 |
 | `docs/quality/` | 测试、质量审计和验证体系说明。 |
@@ -46,12 +47,14 @@
 | 回测/锦标赛指标 | `var/artifacts/tournaments/` 和生成报告 | 除非明确标记为历史样本，否则不把 Sharpe/MaxDD 写进长期文档。 |
 | Web 路由和 UI 模块 | `web/api/routes/` + `web/frontend/src/router` | spec 记录主要业务路由组，不追逐每个临时端点细节。 |
 | Agent/cron/local 操作入口 | `astroq` CLI (`astrolabe_cli/`) | 新自动化优先调用 CLI；CLI 编排当前维护的底层模块。 |
+| Agent Company OS 长期改造 | `docs/project/agent-company/00-master-roadmap.md` + `docs/specs/07-agent-company-os.md` | 路线图记录 100% 目标和阶段计划；spec 记录未来 API/CLI/schema/approval/evidence 行为契约。 |
 | 操作历史 | git log | 仓库不保留历史计划归档；发布变更记录只写入 `CHANGELOG.md`。 |
 
 ## 更新规则
 
 - 改动公开契约的代码提交，必须同步更新对应 `docs/specs/` 页面；必要时更新 `docs/product/acceptance-matrix.md`。
 - 产品范围变化更新 `docs/product/prd.md`，不要把实施阶段清单塞进 PRD。
+- Agent Company OS 方向变化必须同步更新 `docs/project/agent-company/` 和 `docs/specs/07-agent-company-os.md`，再按需要更新 PRD、Web spec 和验收矩阵。
 - 项目维护规则写入 `docs/project/` 或根目录的 GitHub 标准文档，不塞回 README。
 - 运维步骤写入 `docs/operations/`，测试和质量说明写入 `docs/quality/`。
 - 合规和安全材料写入 `docs/project/compliance/`，根目录只保留 `SECURITY.md` 这类一线入口。

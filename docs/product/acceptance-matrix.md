@@ -111,19 +111,33 @@
 | 6.9 | 行业/板块数据维度 | `data/market/sectors.py` + `scripts/build_sector_snapshots.py` | — | `GET /api/sectors/*` | 申万行业指数 + 行业映射 + 信号聚合 + 敞口 | OK | — |
 | 6.10 | 行业 Web 雷达页面 | `web/frontend/src/views/Sectors.vue` + `data/market/sectors.py` | `test_sector_pipeline.py`, `test_web_system_contracts.py` | `/research?tab=sectors` | 申万行业资金方块矩阵 + 按资金量映射面积 + 排名表 + 行业级信号分布，不显示行业内个股 | OK | — |
 
+## 7. Agent Company OS (Planned)
+
+| # | PRD/Spec 条目 | 代码文件 | 测试 | API / Web | 手工验收 | 状态 | 缺口 |
+|---|--------------|---------|------|-----------|---------|------|------|
+| 7.1 | Agent Company OS 长期路线图和分阶段计划 | `docs/project/agent-company/*.md` | `astroq docs check --json` | — | 文档入口从 PRD、Web spec、wiki 和文档治理页可达 | PLANNED | Phase 0 只落文档，不实现运行时 |
+| 7.2 | Agent Runtime 本地会话/消息/行动/运行 ledger | 规划: `agent_os/*` 或等价 canonical 包 | 规划: schema + ledger contract tests | `GET/POST /api/agent/sessions`, `POST /api/agent/sessions/{id}/messages` | 创建 session/message 后可从 CLI/API/Web 读取 | PLANNED | 未实现 |
+| 7.3 | ApprovalPolicy 审批系统 | 规划: `agent_os/approval.py` | 规划: 风险级别审批测试 | `POST /api/agent/actions/{id}/approve`, `POST /api/agent/actions/{id}/reject` | write/backfill/backtest/paper/live/code action 均按策略进入审批或 work order | PLANNED | 未实现 |
+| 7.4 | EvidenceRef 证据解析 | 规划: `agent_os/evidence.py` | 规划: fresh/stale/missing evidence tests | `GET /api/agent/evidence/{evidence_id}` | Agent 回答可跳转到 Web route、CLI、artifact、file/code/report/ledger | PLANNED | 未实现 |
+| 7.5 | CEO Office 默认首页 | 规划: `web/frontend/src/views/CEOOffice.vue` | 规划: 前端状态和 API contract tests | `/` CEO Office, `/market` 市场总览 | 对话、行动卡、审批、证据下钻、desk status 可用 | PLANNED | 未实现 |
+| 7.6 | Desk agents 权责和工具权限 | 规划: `agent_os/desks/*` | 规划: desk permission and handoff tests | `GET /api/agent/desks` | Data/Research/Risk/Execution/Engineering/Reporting desks 有边界和 handoff ledger | PLANNED | 未实现 |
+| 7.7 | MiniQMT/QMT live execution adapter | 规划: `broker/live/*` 或等价 canonical 模块 | 规划: fake adapter + SDK missing + no paper fallback tests | Portfolio/CEO Office live readiness and approval cards | live 默认关闭；缺 SDK/权限/account 直接 blocked；CEO approval 后才可提交 | PLANNED | 未实现 |
+| 7.8 | CEO reports and operating rhythm | 规划: `agent_os/reports/*` | 规划: report evidence citation tests | CEO Office report cards, artifact links | Daily CEO brief、weekly review、audit pack 均引用 evidence artifacts | PLANNED | 未实现 |
+
 ## 汇总
 
-| 能力域 | 总条目 | 功能可验收 | 质量债条目 | 待补自动化测试 |
-|--------|-------|------------|------------|----------------|
-| 数据管道 | 13 | 13 | 0 | 0 |
-| 信号系统 | 17 | 17 | 1 | 0 |
-| 回测引擎 | 10 | 10 | 1 | 0 |
-| 执行层 | 8 | 8 | 0 | 0 |
-| Web 平台 | 19 | 19 | 1 | 0 |
-| 多资产架构 | 10 | 10 | 0 | 0 |
-| **合计** | **77** | **77** | **3** | **0** |
+| 能力域 | 总条目 | 功能可验收 | 规划中 | 质量债条目 | 待补自动化测试 |
+|--------|-------|------------|--------|------------|----------------|
+| 数据管道 | 13 | 13 | 0 | 0 | 0 |
+| 信号系统 | 17 | 17 | 0 | 1 | 0 |
+| 回测引擎 | 10 | 10 | 0 | 1 | 0 |
+| 执行层 | 8 | 8 | 0 | 0 | 0 |
+| Web 平台 | 19 | 19 | 0 | 1 | 0 |
+| 多资产架构 | 10 | 10 | 0 | 0 | 0 |
+| Agent Company OS | 8 | 0 | 8 | 0 | 0 |
+| **合计** | **85** | **77** | **8** | **3** | **0** |
 
-> **说明：** `功能可验收` 表示该能力有可用代码路径。`质量债条目` 统计"缺口"列非 `—` 的行。当前剩余 3 项质量债：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化。
+> **说明：** `功能可验收` 表示该能力有可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数，也不作为质量债。`质量债条目` 统计当前实现能力中"缺口"列非 `—` 的行。当前剩余 3 项质量债：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化。
 
 **维护说明:**
 
