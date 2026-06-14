@@ -54,6 +54,7 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq agent report daily --session <session_id> --json` | 生成带 evidence 引用的 CEO brief 报告 artifact |
 | `astroq agent reports --session <session_id> --json` | 查看本地已生成的 agent reports |
 | `astroq agent live readiness --json` | 检查 MiniQMT/QMT 实盘 readiness；默认关闭且不会回退到 PaperBroker |
+| `astroq agent live preview --symbol 600000.SH --side buy --quantity 100 --limit-price 10 --evidence <evidence_id> --json` | 预览实盘限价单，不提交订单；输出 approval、risk gate、现金影响和 blocker |
 | `astroq agent handoffs --json` | 查看跨 desk 交接 ledger |
 | `astroq agent handoff resolve <handoff_id> --json` | 标记跨 desk 交接事项已完成 |
 | `astroq agent memory export --json` | 导出本地透明 memory ledger 到 `var/artifacts/agent/memory/` |
@@ -156,7 +157,7 @@ astroq lifecycle check --json
 - Production backtests use `backtest/pipeline_runner.py` plus shared modules under `pipeline/`.
 - Strategy state is owned by Strategy Catalog and separated into production, paper, and candidate layers.
 - Web System visualizations include CodeGraph, AST diagnostics, architecture diagnostics, test design intelligence, and lifecycle readiness.
-- Agent Company OS has a foundation runtime for session metadata, messages, deterministic desk responses, desk-scoped actions, approvals, action expiry, runs, evidence resolution/snapshots, desk registry, fixed-registry tool permission checks, open/resolved cross-desk handoffs, transparent memory inspect/export/prune/clear, evidence-cited CEO report artifacts, and default-disabled MiniQMT/QMT readiness probing with no PaperBroker fallback. Advanced desk reasoning, streaming updates, full operating-rhythm report cadence, broad workflow orchestration, and live order submission/reconciliation are still phased work; do not present them as complete.
+- Agent Company OS has a foundation runtime for session metadata, messages, deterministic desk responses, desk-scoped actions, approvals, action expiry, runs, evidence resolution/snapshots, desk registry, fixed-registry tool permission checks, open/resolved cross-desk handoffs, transparent memory inspect/export/prune/clear, evidence-cited CEO report artifacts, default-disabled MiniQMT/QMT readiness probing, and non-submitting live order preview with no PaperBroker fallback. Advanced desk reasoning, streaming updates, full operating-rhythm report cadence, broad workflow orchestration, and live order submission/reconciliation are still phased work; do not present them as complete.
 - Formal strategy promotion depends on score panels, alpha evidence, data readiness, and execution assumptions. Missing data, missing source capability, missing score panels, and insufficient evidence must be reported as blocked/not_applicable states, not filled with placeholder values.
 - The project is local-first. Network access, provider permissions, and data completeness must be explicit, observable, and never hidden behind fake defaults.
 

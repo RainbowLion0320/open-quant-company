@@ -526,6 +526,9 @@ class AgentRuntime:
     def live_readiness(self) -> dict[str, Any]:
         return MiniQmtLiveBroker().health()
 
+    def preview_live_order(self, intent: dict[str, Any]) -> dict[str, Any]:
+        return MiniQmtLiveBroker().preview_order(intent)
+
     def generate_report(self, *, session_id: str, kind: str = "daily_brief") -> dict[str, Any]:
         session = self.ledger.get_session(session_id)
         if not session:

@@ -239,6 +239,36 @@ def live_readiness() -> CliResult:
     )
 
 
+def live_preview(
+    *,
+    symbol: str,
+    side: str,
+    quantity: int,
+    limit_price: float,
+    strategy: str,
+    reason: str,
+    evidence_refs: list[str],
+) -> CliResult:
+    preview = AgentRuntime().preview_live_order(
+        {
+            "symbol": symbol,
+            "side": side,
+            "quantity": quantity,
+            "order_type": "limit",
+            "limit_price": limit_price,
+            "strategy": strategy,
+            "reason": reason,
+            "evidence_refs": evidence_refs,
+        }
+    )
+    return CliResult(
+        ok=True,
+        command="agent live preview",
+        message=f"Live order preview: {preview['status']}",
+        data={"preview": preview},
+    )
+
+
 def memory_summary() -> CliResult:
     snapshot = AgentRuntime().memory_snapshot()
     return CliResult(

@@ -16,6 +16,7 @@ from astrolabe_cli.commands.agent import evidence as agent_evidence
 from astrolabe_cli.commands.agent import expire_actions as agent_expire_actions
 from astrolabe_cli.commands.agent import generate_report as agent_generate_report
 from astrolabe_cli.commands.agent import handoffs as agent_handoffs
+from astrolabe_cli.commands.agent import live_preview as agent_live_preview
 from astrolabe_cli.commands.agent import live_readiness as agent_live_readiness
 from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
 from astrolabe_cli.commands.agent import memory_export as agent_memory_export
@@ -192,6 +193,26 @@ def build_parser() -> argparse.ArgumentParser:
     agent_live_readiness_cmd = agent_live_sub.add_parser("readiness", help="Check MiniQMT/QMT live readiness")
     add_common_flags(agent_live_readiness_cmd)
     agent_live_readiness_cmd.set_defaults(handler=lambda args: agent_live_readiness())
+    agent_live_preview_cmd = agent_live_sub.add_parser("preview", help="Preview a live order without submitting it")
+    agent_live_preview_cmd.add_argument("--symbol", required=True)
+    agent_live_preview_cmd.add_argument("--side", choices=["buy", "sell"], required=True)
+    agent_live_preview_cmd.add_argument("--quantity", type=int, required=True)
+    agent_live_preview_cmd.add_argument("--limit-price", type=float, required=True)
+    agent_live_preview_cmd.add_argument("--strategy", default="manual")
+    agent_live_preview_cmd.add_argument("--reason", default="")
+    agent_live_preview_cmd.add_argument("--evidence", action="append", dest="evidence_refs", default=[])
+    add_common_flags(agent_live_preview_cmd)
+    agent_live_preview_cmd.set_defaults(
+        handler=lambda args: agent_live_preview(
+            symbol=args.symbol,
+            side=args.side,
+            quantity=args.quantity,
+            limit_price=args.limit_price,
+            strategy=args.strategy,
+            reason=args.reason,
+            evidence_refs=args.evidence_refs,
+        )
+    )
 
     agent_memory_cmd = agent_sub.add_parser("memory", help="Inspect, export, or maintain local transparent memory")
     agent_memory_sub = agent_memory_cmd.add_subparsers(dest="agent_memory_command", required=True)

@@ -1,6 +1,6 @@
 # Agent Company OS Phase 6 - MiniQMT/QMT Live Execution Plan
 
-> Status: readiness foundation implemented; submission/reconciliation planned
+> Status: readiness and preview foundation implemented; submission/reconciliation planned
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Related spec: [04-execution-layer.md](../../specs/04-execution-layer.md)
@@ -245,12 +245,14 @@ Current foundation:
 
 - `broker.live.qmt.MiniQmtLiveBroker.health()` reports default-disabled readiness.
 - `astroq agent live readiness --json` and `GET /api/agent/live/readiness` expose the same readiness state.
+- `broker.live.qmt.MiniQmtLiveBroker.preview_order()` returns a non-submitting live order preview with intent normalization, estimated cash/position impact, fees, readiness blockers, evidence requirement, and a basic cash gate.
+- `astroq agent live preview ... --json` and `POST /api/agent/live/preview` expose the same preview state with `approval_required=true`, `submitted=false`, and `paper_fallback=false`.
 - CEO Office shows a read-only live readiness card.
 - Blocked readiness always reports `paper_fallback=false`; no live path submits through PaperBroker.
 
 Remaining work:
 
-- Order preview and risk gate.
+- Production-grade risk gates beyond readiness/evidence/cash, including concentration, exposure, tradability, data freshness, drawdown, daily order count, and broker account consistency.
 - CEO-approved live submission.
 - Broker order/trade/position reconciliation.
 - Kill-switch operations beyond readiness reporting.

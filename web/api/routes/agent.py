@@ -106,6 +106,11 @@ async def get_agent_live_readiness() -> dict[str, Any]:
     return {"health": AgentRuntime().live_readiness()}
 
 
+@router.post("/live/preview")
+async def preview_agent_live_order(payload: dict[str, Any]) -> dict[str, Any]:
+    return {"preview": AgentRuntime().preview_live_order(payload)}
+
+
 @router.post("/reports")
 async def generate_agent_report(payload: dict[str, Any]) -> dict[str, Any]:
     try:

@@ -7,7 +7,7 @@
 执行层负责将信号转化为模拟交易——PaperBroker 本地模拟撮合、RiskManager 5 规则风控、Persistence 层 Parquet 持久化状态和净值。Cron 日频调度：15:30 扫描信号，09:30 执行模拟交易。
 
 **设计原则：**
-- **Facade Pattern** — Broker 抽象接口 → PaperBroker (当前模拟交易) / MiniQMT/QMT readiness probe (当前只读) / MiniQMT/QMT live adapter (后续实盘提交)
+- **Facade Pattern** — Broker 抽象接口 → PaperBroker (当前模拟交易) / MiniQMT/QMT readiness + order preview (当前只读、不提交) / MiniQMT/QMT live adapter (后续实盘提交)
 - **配置驱动风控** — 规则在 `settings.yaml` 中可开关、可调参
 - **状态持久化** — 所有持仓/订单/NAV 写入 Parquet，重启不丢失
 
@@ -162,7 +162,7 @@ class BondExchange:
 
 | 决策 | 选择 | 原因 |
 |------|------|------|
-| Broker 抽象接口 | Facade Pattern | PaperBroker 与 MiniQMT/QMT live adapter 边界分离；当前只实现 default-disabled readiness probe，实盘提交仍需独立 adapter |
+| Broker 抽象接口 | Facade Pattern | PaperBroker 与 MiniQMT/QMT live adapter 边界分离；当前只实现 default-disabled readiness probe 和不提交订单的 preview gate，实盘提交仍需独立 adapter |
 | 风控预检 (pre-trade) | 下单前执行，非下单后 | 阻止违规订单进入执行队列 |
 | 熔断只阻止买入 | 允许卖出不允许买入 | 熔断期间应允许减仓止损 |
 | Parquet 持久化 | 非 SQLite | 与数据层统一格式，DuckDB 可直接查询 |
@@ -221,5 +221,5 @@ rm.check_portfolio(portfolio) → list[RiskCheckResult]
 - **无日内成交模型：** 全部以收盘价成交，未考虑日内价格波动
 - **无部分成交：** 模拟全额成交，实盘中限价单可能部分成交
 - **风控无组合层面：** 未计算组合 VaR/CVaR 作为动态风控阈值
-- **MiniQMT/QMT readiness foundation：** `broker.live.qmt.MiniQmtLiveBroker` 只读探测 default-disabled / missing SDK / login / permission / kill-switch 状态，`paper_fallback=false`
-- **未来方向：** 完成 MiniQMT/QMT order preview、risk gate、CEO approval、submission、reconciliation 和 kill switch 操作；不得回退到 PaperBroker
+- **MiniQMT/QMT readiness + preview foundation：** `broker.live.qmt.MiniQmtLiveBroker` 只读探测 default-disabled / missing SDK / login / permission / kill-switch 状态，`paper_fallback=false`；`preview_order()` 只计算 intent、fees、现金/持仓影响和基础 risk gate，始终 `submitted=false`
+- **未来方向：** 完成 MiniQMT/QMT production-grade risk gate、CEO approval、submission、reconciliation 和 kill switch 操作；不得回退到 PaperBroker

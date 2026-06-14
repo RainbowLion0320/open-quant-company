@@ -198,6 +198,142 @@ def test_agent_live_readiness_cli_and_api(tmp_path, monkeypatch, capsys):
     reset_datahub()
 
 
+def test_agent_live_order_preview_blocks_when_readiness_not_ready(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    preview = AgentRuntime().preview_live_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "CEO preview only",
+            "evidence_refs": ["ev_demo"],
+        }
+    )
+
+    assert preview["status"] == "blocked"
+    assert preview["approval_required"] is True
+    assert preview["paper_fallback"] is False
+    assert preview["submitted"] is False
+    assert preview["risk_gate"]["passed"] is False
+    assert "live_disabled" in preview["risk_gate"]["blockers"]
+    reset_datahub()
+
+
+def test_agent_live_order_preview_passes_with_ready_fake_broker_and_cash_gate():
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    broker = MiniQmtLiveBroker(
+        enabled=True,
+        import_checker=lambda _name: object(),
+        logged_in=True,
+        permissions=["query", "trade"],
+        account_id="1234567890",
+        account={"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+    )
+    preview = broker.preview_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "CEO preview only",
+            "evidence_refs": ["ev_demo"],
+        }
+    )
+    blocked = broker.preview_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 20_000,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "Too large",
+            "evidence_refs": ["ev_demo"],
+        }
+    )
+
+    assert preview["status"] == "preview_ready"
+    assert preview["approval_required"] is True
+    assert preview["paper_fallback"] is False
+    assert preview["submitted"] is False
+    assert preview["intent"]["symbol"] == "600000.SH"
+    assert preview["estimated_cash_effect"] < 0
+    assert preview["estimated_position_effect"]["symbol"] == "600000.SH"
+    assert preview["risk_gate"]["passed"] is True
+    assert preview["health"]["mode"] == "live_ready"
+    assert blocked["status"] == "blocked"
+    assert blocked["risk_gate"]["passed"] is False
+    assert "insufficient_cash" in blocked["risk_gate"]["blockers"]
+
+
+def test_agent_live_preview_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    cli_code = run_cli(
+        [
+            "agent",
+            "live",
+            "preview",
+            "--symbol",
+            "600000.SH",
+            "--side",
+            "buy",
+            "--quantity",
+            "100",
+            "--limit-price",
+            "10",
+            "--strategy",
+            "manual",
+            "--reason",
+            "preview",
+            "--evidence",
+            "ev_demo",
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(
+        "/api/agent/live/preview",
+        json={
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "preview",
+            "evidence_refs": ["ev_demo"],
+        },
+    )
+
+    assert cli_code == 0
+    assert cli_payload["data"]["preview"]["status"] == "blocked"
+    assert cli_payload["data"]["preview"]["paper_fallback"] is False
+    assert api_res.status_code == 200
+    assert api_res.json()["preview"]["status"] == "blocked"
+    assert api_res.json()["preview"]["submitted"] is False
+    reset_datahub()
+
+
 def test_agent_actions_expire_before_approval_or_dispatch(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
