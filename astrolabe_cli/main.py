@@ -9,6 +9,7 @@ from astrolabe_cli.commands.config import validate_config
 from astrolabe_cli.commands.agent import actions as agent_actions
 from astrolabe_cli.commands.agent import add_message as agent_add_message
 from astrolabe_cli.commands.agent import approve as agent_approve
+from astrolabe_cli.commands.agent import cancel as agent_cancel
 from astrolabe_cli.commands.agent import create_session as agent_create_session
 from astrolabe_cli.commands.agent import desks as agent_desks
 from astrolabe_cli.commands.agent import evidence as agent_evidence
@@ -126,6 +127,12 @@ def build_parser() -> argparse.ArgumentParser:
     agent_reject_cmd.add_argument("--reason", default="")
     add_common_flags(agent_reject_cmd)
     agent_reject_cmd.set_defaults(handler=lambda args: agent_reject(args.action_id, args.reason))
+
+    agent_cancel_cmd = agent_sub.add_parser("cancel", help="Cancel a queued or proposed agent action")
+    agent_cancel_cmd.add_argument("action_id")
+    agent_cancel_cmd.add_argument("--reason", default="")
+    add_common_flags(agent_cancel_cmd)
+    agent_cancel_cmd.set_defaults(handler=lambda args: agent_cancel(args.action_id, args.reason))
 
     agent_run_cmd = agent_sub.add_parser("run", help="Dispatch an approved or safe agent action")
     agent_run_cmd.add_argument("action_id")

@@ -319,6 +319,105 @@ def test_agent_dispatch_blocks_unapproved_state_changing_action_without_running(
     reset_datahub()
 
 
+def test_agent_runtime_cancels_action_and_blocks_dispatch(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout="should not run", stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Cancel action")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Health check that CEO cancels.",
+        parameters={"tool_id": "astroq.health"},
+    )
+
+    canceled = runtime.cancel_action(action.action_id, decided_by="ceo", reason="No longer needed")
+    run = runtime.dispatch_action(action.action_id, runner=fake_run)
+
+    assert canceled.status == "canceled"
+    assert canceled.approval_decision["decision"] == "canceled"
+    assert canceled.approval_decision["reason"] == "No longer needed"
+    assert calls == []
+    assert run.status == "blocked"
+    assert "canceled" in run.stderr_summary
+    assert runtime.get_action(action.action_id)["status"] == "canceled"
+    reset_datahub()
+
+
+def test_agent_cli_and_api_cancel_action(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Cancel CLI API")
+    first = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Cancel from CLI",
+        parameters={"tool_id": "astroq.health"},
+    )
+    second = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Cancel from API",
+        parameters={"tool_id": "astroq.health"},
+    )
+    terminal = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Already completed",
+        parameters={"tool_id": "astroq.health"},
+    )
+    runtime.dispatch_action(
+        terminal.action_id,
+        runner=lambda command, **kwargs: CompletedProcess(command, 0, stdout="ok", stderr=""),
+    )
+
+    cli_code = run_cli(["agent", "cancel", first.action_id, "--reason", "CLI cancel", "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(f"/api/agent/actions/{second.action_id}/cancel", json={"reason": "API cancel"})
+    terminal_res = TestClient(create_app()).post(
+        f"/api/agent/actions/{terminal.action_id}/cancel",
+        json={"reason": "too late"},
+    )
+
+    assert cli_code == 0
+    assert cli_payload["data"]["action"]["status"] == "canceled"
+    assert cli_payload["data"]["action"]["approval_decision"]["reason"] == "CLI cancel"
+    assert api_res.status_code == 200
+    assert api_res.json()["action"]["status"] == "canceled"
+    assert api_res.json()["action"]["approval_decision"]["reason"] == "API cancel"
+    assert terminal_res.status_code == 400
+    assert runtime.get_action(terminal.action_id)["status"] == "succeeded"
+    reset_datahub()
+
+
 def test_agent_runtime_rejects_desk_tool_outside_allowed_scope(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

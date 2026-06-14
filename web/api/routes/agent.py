@@ -8,7 +8,7 @@ from fastapi import APIRouter
 
 from agent_os.evidence import EvidenceResolver
 from agent_os.runtime import AgentRuntime
-from web.api.errors import DataNotFoundError
+from web.api.errors import DataNotFoundError, InvalidParameterError
 
 router = APIRouter(prefix="/api/agent", tags=["Agent"])
 
@@ -97,6 +97,17 @@ async def reject_agent_action(action_id: str, payload: dict[str, Any] | None = N
         action = AgentRuntime().reject_action(action_id, reason=str((payload or {}).get("reason") or ""))
     except KeyError:
         raise DataNotFoundError("agent action", action_id)
+    return {"action": action.to_dict()}
+
+
+@router.post("/actions/{action_id}/cancel")
+async def cancel_agent_action(action_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    try:
+        action = AgentRuntime().cancel_action(action_id, reason=str((payload or {}).get("reason") or ""))
+    except KeyError:
+        raise DataNotFoundError("agent action", action_id)
+    except ValueError as exc:
+        raise InvalidParameterError("action_id", action_id, str(exc))
     return {"action": action.to_dict()}
 
 

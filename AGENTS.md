@@ -48,6 +48,7 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq agent sessions --json` | 查看本地 Agent Company OS 会话 ledger |
 | `astroq agent session create --title "Daily CEO Brief" --json` | 创建 CEO Office / desk agent 会话 |
 | `astroq agent run <action_id> --json` | Dispatch 安全或已批准 agent action 并写入 run ledger |
+| `astroq agent cancel <action_id> --reason "..." --json` | 取消尚未完成的 agent action |
 | `astroq agent handoffs --json` | 查看跨 desk 交接 ledger |
 | `astroq agent handoff resolve <handoff_id> --json` | 标记跨 desk 交接事项已完成 |
 | `astroq agent memory export --json` | 导出本地透明 memory ledger 到 `var/artifacts/agent/memory/` |

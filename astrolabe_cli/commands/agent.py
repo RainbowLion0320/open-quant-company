@@ -130,6 +130,16 @@ def reject(action_id: str, reason: str) -> CliResult:
     return CliResult(True, "agent reject", {"action": action.to_dict()}, f"Rejected {action_id}")
 
 
+def cancel(action_id: str, reason: str) -> CliResult:
+    try:
+        action = AgentRuntime().cancel_action(action_id, reason=reason)
+    except KeyError as exc:
+        return CliResult(False, "agent cancel", {"action_id": action_id}, "Agent action missing", [str(exc)])
+    except ValueError as exc:
+        return CliResult(False, "agent cancel", {"action_id": action_id}, "Agent action cannot be canceled", [str(exc)])
+    return CliResult(True, "agent cancel", {"action": action.to_dict()}, f"Canceled {action_id}")
+
+
 def evidence(evidence_id: str) -> CliResult:
     payload = EvidenceResolver().resolve(evidence_id)
     ok = payload.get("status") not in {"missing_evidence"}

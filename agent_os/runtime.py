@@ -155,6 +155,14 @@ class AgentRuntime:
     def reject_action(self, action_id: str, *, decided_by: str = "ceo", reason: str = "") -> AgentAction:
         return self._decide_action(action_id, "rejected", decided_by=decided_by, reason=reason)
 
+    def cancel_action(self, action_id: str, *, decided_by: str = "ceo", reason: str = "") -> AgentAction:
+        current = self.ledger.get_action(action_id)
+        if not current:
+            raise KeyError(f"Agent action not found: {action_id}")
+        if current.get("status") not in {"proposed", "approval_required", "approved"}:
+            raise ValueError(f"Agent action cannot be canceled from status: {current['status']}")
+        return self._decide_action(action_id, "canceled", decided_by=decided_by, reason=reason)
+
     def create_evidence(
         self,
         *,
