@@ -94,6 +94,7 @@ Required fields:
 - `evidence_refs`
 - `approval_required`
 - `approval_decision`
+- `expires_at`
 - `created_at`
 - `updated_at`
 
@@ -210,6 +211,7 @@ Phase 1 should add JSON-readable commands:
 - Read-only tools can run through fixed command arrays.
 - State-changing actions are queued as `approval_required`.
 - Approval and rejection decisions are persisted.
+- Expired queued actions are marked `expired` and cannot be approved or dispatched.
 - Evidence references resolve without requiring a running Web server.
 - Missing evidence returns `missing_evidence`, not an empty success.
 - Test coverage verifies no arbitrary shell execution, no secret persistence, and no paper/live execution without approval.

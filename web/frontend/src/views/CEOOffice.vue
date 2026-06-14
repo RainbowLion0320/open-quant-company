@@ -168,6 +168,10 @@
               <p>{{ selectedAction.action.expected_effect || "—" }}</p>
             </div>
             <div class="detail-row">
+              <span>{{ t("ceoOffice.expiresAt") }}</span>
+              <code>{{ formatTime(selectedAction.action.expires_at) }}</code>
+            </div>
+            <div class="detail-row">
               <span>{{ t("ceoOffice.parameters") }}</span>
               <pre>{{ formatJson(selectedAction.action.parameters) }}</pre>
             </div>
@@ -322,6 +326,7 @@ function statusLabel(status: string) {
   if (status === "failed") return t("ceoOffice.failed");
   if (status === "blocked") return t("ceoOffice.blocked");
   if (status === "canceled") return t("ceoOffice.canceled");
+  if (status === "expired") return t("ceoOffice.expired");
   if (status === "archived") return t("ceoOffice.archived");
   if (status === "active") return t("ceoOffice.active");
   if (status === "open") return t("ceoOffice.open");

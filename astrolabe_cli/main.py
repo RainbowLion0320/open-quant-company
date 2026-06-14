@@ -13,6 +13,7 @@ from astrolabe_cli.commands.agent import cancel as agent_cancel
 from astrolabe_cli.commands.agent import create_session as agent_create_session
 from astrolabe_cli.commands.agent import desks as agent_desks
 from astrolabe_cli.commands.agent import evidence as agent_evidence
+from astrolabe_cli.commands.agent import expire_actions as agent_expire_actions
 from astrolabe_cli.commands.agent import handoffs as agent_handoffs
 from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
 from astrolabe_cli.commands.agent import memory_export as agent_memory_export
@@ -116,6 +117,11 @@ def build_parser() -> argparse.ArgumentParser:
     agent_actions_cmd.add_argument("--session", default="")
     add_common_flags(agent_actions_cmd)
     agent_actions_cmd.set_defaults(handler=lambda args: agent_actions(args.session))
+
+    agent_expire_cmd = agent_sub.add_parser("expire", help="Mark expired queued agent actions")
+    agent_expire_cmd.add_argument("--session", default="")
+    add_common_flags(agent_expire_cmd)
+    agent_expire_cmd.set_defaults(handler=lambda args: agent_expire_actions(args.session))
 
     agent_handoffs_cmd = agent_sub.add_parser("handoffs", help="List cross-desk handoffs")
     agent_handoffs_cmd.add_argument("--session", default="")

@@ -140,6 +140,127 @@ def test_agent_approval_policy_blocks_state_changing_actions(tmp_path, monkeypat
     reset_datahub()
 
 
+def test_agent_actions_expire_before_approval_or_dispatch(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    now = {"value": "2026-06-14T00:00:00Z"}
+    monkeypatch.setattr("agent_os.runtime._now", lambda: now["value"])
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Action expiry")
+    write_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="data",
+        action_type="data_repair",
+        risk_level="write_data",
+        summary="Repair stale data",
+        parameters={"tool_id": "astroq.data.repair", "table": "stock_limit_list"},
+    )
+    read_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Health check",
+        parameters={"tool_id": "astroq.health"},
+    )
+
+    assert write_action.expires_at == "2026-06-14T00:15:00Z"
+    assert read_action.expires_at == "2026-06-14T00:15:00Z"
+
+    now["value"] = "2026-06-14T00:16:00Z"
+    expired = runtime.expire_actions()
+
+    assert expired["expired"] == 2
+    assert {row["action_id"] for row in expired["actions"]} == {write_action.action_id, read_action.action_id}
+    assert runtime.get_action(write_action.action_id)["status"] == "expired"
+
+    try:
+        runtime.approve_action(write_action.action_id)
+    except ValueError as exc:
+        assert "expired" in str(exc)
+    else:
+        raise AssertionError("expired action should not be approved")
+
+    run = runtime.dispatch_action(read_action.action_id, runner=fake_run)
+
+    assert calls == []
+    assert run.status == "blocked"
+    assert "expired" in run.stderr_summary
+    assert runtime.get_action(read_action.action_id)["status"] == "expired"
+    reset_datahub()
+
+
+def test_agent_cli_and_api_expire_actions(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    now = {"value": "2026-06-14T00:00:00Z"}
+    monkeypatch.setattr("agent_os.runtime._now", lambda: now["value"])
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Expire CLI API")
+    cli_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="CLI expiry",
+        parameters={"tool_id": "astroq.health"},
+    )
+    api_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="API expiry",
+        parameters={"tool_id": "astroq.health"},
+    )
+
+    now["value"] = "2026-06-14T00:16:00Z"
+    cli_code = run_cli(["agent", "expire", "--session", session.session_id, "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+
+    now["value"] = "2026-06-14T00:00:00Z"
+    fresh_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="API second expiry",
+        parameters={"tool_id": "astroq.health"},
+    )
+    now["value"] = "2026-06-14T00:16:00Z"
+    api_res = TestClient(create_app()).post("/api/agent/actions/expire", json={"session_id": session.session_id})
+
+    assert cli_code == 0
+    assert cli_payload["data"]["result"]["expired"] == 2
+    assert {row["action_id"] for row in cli_payload["data"]["result"]["actions"]} == {
+        cli_action.action_id,
+        api_action.action_id,
+    }
+    assert api_res.status_code == 200
+    assert api_res.json()["result"]["expired"] == 1
+    assert api_res.json()["result"]["actions"][0]["action_id"] == fresh_action.action_id
+    reset_datahub()
+
+
 def test_agent_evidence_resolver_reports_missing_and_fresh_evidence(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

@@ -33,6 +33,7 @@ export interface AgentAction {
   evidence_refs: string[];
   approval_required: boolean;
   approval_decision: Record<string, unknown> | null;
+  expires_at: string;
   created_at: string;
   updated_at: string;
 }

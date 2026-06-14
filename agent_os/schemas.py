@@ -48,6 +48,7 @@ class AgentAction:
     evidence_refs: list[str]
     approval_required: bool
     approval_decision: dict[str, Any] | None
+    expires_at: str
     created_at: str
     updated_at: str
 

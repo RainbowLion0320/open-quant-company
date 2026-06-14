@@ -69,6 +69,7 @@ All commands must support `--json`.
 | `astroq agent approve ACTION_ID --json` | Approve an action. | Implemented |
 | `astroq agent reject ACTION_ID --reason REASON --json` | Reject an action. | Implemented |
 | `astroq agent cancel ACTION_ID --reason REASON --json` | Cancel a proposed, approval-pending, or approved action before terminal completion. | Implemented |
+| `astroq agent expire --session SESSION_ID --json` | Mark expired queued actions. | Implemented |
 | `astroq agent evidence EVIDENCE_ID --json` | Resolve evidence. | Implemented |
 | `astroq agent desks --json` | List desk registry and health. | Implemented |
 | `astroq agent memory show --json` | Inspect local transparent memory. | Implemented |
@@ -158,6 +159,7 @@ Allowed roles:
   "evidence_refs": ["ev_..."],
   "approval_required": true,
   "approval_decision": null,
+  "expires_at": "2026-06-14T09:23:00+08:00",
   "created_at": "2026-06-14T09:08:00+08:00",
   "updated_at": "2026-06-14T09:08:00+08:00"
 }
@@ -244,6 +246,11 @@ returns:
   "reason": "Live broker orders require explicit CEO approval."
 }
 ```
+
+Every action has an `expires_at` timestamp. `astroq agent expire`,
+`POST /api/agent/actions/expire`, approval, and dispatch all enforce expiry:
+expired actions are marked `expired`, cannot be approved, and dispatch records a
+blocked run without calling the tool runner.
 
 ### 5.7 DeskAgent
 
@@ -437,8 +444,8 @@ As of 2026-06-14:
 
 - Foundation runtime is partially implemented in `agent_os/`.
 - The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and open/resolved cross-desk handoffs under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
-- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
+- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
+- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; approved fixed-registry templated commands bind only tool-declared safe parameters.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.

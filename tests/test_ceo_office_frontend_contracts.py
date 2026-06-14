@@ -47,6 +47,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "selectedAction" in view
     assert "cancelAction" in view
     assert "canCancelAction" in view
+    assert "selectedAction.action.expires_at" in view
+    assert "ceoOffice.expiresAt" in view
     assert "archiveSession" in view
     assert "archivingSession" in view
     assert "selectedEvidence" in view
@@ -70,8 +72,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Resolve" in en_ceo
     assert "取消行动" in zh_ceo
     assert "已取消" in zh_ceo
+    assert "已过期" in zh_ceo
+    assert "过期时间" in zh_ceo
     assert "Cancel Action" in en_ceo
     assert "Canceled" in en_ceo
+    assert "Expired" in en_ceo
+    assert "Expires At" in en_ceo
     assert "证据详情" in zh_ceo
     assert "证据快照" in zh_ceo
     assert "当前哈希" in zh_ceo
@@ -103,6 +109,7 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentResolveHandoff" in agent_api
     assert "export interface AgentSession" in agent_types
     assert "export interface AgentAction" in agent_types
+    assert "expires_at: string" in agent_types
     assert "export interface AgentActionDetail" in agent_types
     assert "export interface AgentHandoff" in agent_types
     assert "export interface AgentDeskResponse" in agent_types

@@ -80,6 +80,7 @@ class AgentLedger:
                     evidence_refs TEXT NOT NULL,
                     approval_required INTEGER NOT NULL,
                     approval_decision TEXT,
+                    expires_at TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -124,6 +125,7 @@ class AgentLedger:
                 );
                 """
             )
+            self._ensure_column(conn, "actions", "expires_at", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(conn, "evidence", "snapshot_uri", "TEXT NOT NULL DEFAULT ''")
 
     def insert_session(self, row: dict[str, Any]) -> None:
@@ -172,17 +174,18 @@ class AgentLedger:
             "evidence_refs": _json_dumps(row.get("evidence_refs", [])),
             "approval_required": 1 if row.get("approval_required") else 0,
             "approval_decision": _json_dumps(row.get("approval_decision")) if row.get("approval_decision") else None,
+            "expires_at": row.get("expires_at", ""),
         }
         with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO actions(
                     action_id, session_id, desk, action_type, risk_level, status, summary, parameters,
-                    expected_effect, evidence_refs, approval_required, approval_decision, created_at, updated_at
+                    expected_effect, evidence_refs, approval_required, approval_decision, expires_at, created_at, updated_at
                 )
                 VALUES(
                     :action_id, :session_id, :desk, :action_type, :risk_level, :status, :summary, :parameters,
-                    :expected_effect, :evidence_refs, :approval_required, :approval_decision, :created_at, :updated_at
+                    :expected_effect, :evidence_refs, :approval_required, :approval_decision, :expires_at, :created_at, :updated_at
                 )
                 """,
                 payload,

@@ -4,7 +4,7 @@ import json
 import shutil
 import subprocess
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -18,8 +18,30 @@ from agent_os.workflows import build_desk_workflow_plan
 from data.storage.datahub import get_datahub
 
 
+ACTION_EXPIRES_AFTER_SECONDS = 900
+EXPIRABLE_ACTION_STATUSES = {"proposed", "approval_required", "approved"}
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _parse_timestamp(value: str) -> datetime:
+    text = value.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(text)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _format_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _expires_at(created_at: str, seconds: int = ACTION_EXPIRES_AFTER_SECONDS) -> str:
+    return _format_timestamp(_parse_timestamp(created_at) + timedelta(seconds=seconds))
 
 
 def _id(prefix: str) -> str:
@@ -192,6 +214,7 @@ class AgentRuntime:
             evidence_refs=list(evidence_refs or []),
             approval_required=approval_required,
             approval_decision=None,
+            expires_at=_expires_at(timestamp),
             created_at=timestamp,
             updated_at=timestamp,
         )
@@ -203,6 +226,22 @@ class AgentRuntime:
 
     def list_actions(self, session_id: str | None = None) -> list[dict[str, Any]]:
         return self.ledger.list_actions(session_id)
+
+    def expire_actions(self, *, session_id: str | None = None) -> dict[str, Any]:
+        expired: list[dict[str, Any]] = []
+        timestamp = _now()
+        for action in self.ledger.list_actions(session_id):
+            if self._action_is_expired(action, now=timestamp):
+                self.ledger.update_action_status(str(action["action_id"]), "expired", timestamp)
+                updated = self.ledger.get_action(str(action["action_id"]))
+                if updated is not None:
+                    expired.append(updated)
+        return {
+            "status": "ok",
+            "expired": len(expired),
+            "actions": expired,
+            "checked_at": timestamp,
+        }
 
     def approve_action(self, action_id: str, *, decided_by: str = "ceo") -> AgentAction:
         return self._decide_action(action_id, "approved", decided_by=decided_by, reason="")
@@ -294,6 +333,7 @@ class AgentRuntime:
         action = self.ledger.get_action(action_id)
         if not action:
             raise KeyError(f"Agent action not found: {action_id}")
+        action = self._refresh_action_expiry(action)
 
         tool_id = self._tool_id_for_action(str(action.get("action_type") or ""), action.get("parameters", {}))
         tool_name = tool_id or "unbound_tool"
@@ -590,6 +630,9 @@ class AgentRuntime:
         current = self.ledger.get_action(action_id)
         if not current:
             raise KeyError(f"Agent action not found: {action_id}")
+        current = self._refresh_action_expiry(current)
+        if current.get("status") == "expired":
+            raise ValueError(f"Agent action is expired: {action_id}")
         timestamp = _now()
         decision = {
             "decision": status,
@@ -602,6 +645,24 @@ class AgentRuntime:
         if updated is None:
             raise KeyError(f"Agent action not found after update: {action_id}")
         return AgentAction(**updated)
+
+    def _refresh_action_expiry(self, action: dict[str, Any]) -> dict[str, Any]:
+        if self._action_is_expired(action, now=_now()):
+            action_id = str(action["action_id"])
+            self.ledger.update_action_status(action_id, "expired", _now())
+            updated = self.ledger.get_action(action_id)
+            if updated is not None:
+                return updated
+        return action
+
+    @staticmethod
+    def _action_is_expired(action: dict[str, Any], *, now: str) -> bool:
+        if str(action.get("status") or "") not in EXPIRABLE_ACTION_STATUSES:
+            return False
+        expires_at = str(action.get("expires_at") or "").strip()
+        if not expires_at:
+            return False
+        return _parse_timestamp(expires_at) <= _parse_timestamp(now)
 
     def _session_runs(self, session_id: str) -> list[dict[str, Any]]:
         runs: list[dict[str, Any]] = []

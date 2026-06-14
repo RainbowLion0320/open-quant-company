@@ -93,6 +93,16 @@ def actions(session_id: str = "") -> CliResult:
     )
 
 
+def expire_actions(session_id: str = "") -> CliResult:
+    result = AgentRuntime().expire_actions(session_id=session_id or None)
+    return CliResult(
+        ok=True,
+        command="agent expire",
+        message=f"Expired {result['expired']} agent action(s)",
+        data={"result": result},
+    )
+
+
 def handoffs(session_id: str = "") -> CliResult:
     runtime = AgentRuntime()
     rows = runtime.list_handoffs(session_id or None)
