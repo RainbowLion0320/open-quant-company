@@ -1,4 +1,4 @@
-# 星盘 / Astrolabe Quant OS 文档目录规范
+# Open Quant Company 文档目录规范
 
 > 更新: 2026-06-09
 

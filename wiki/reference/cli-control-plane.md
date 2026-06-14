@@ -8,7 +8,7 @@ tags: [cli, automation, operations]
 
 # CLI Control Plane
 
-`astroq` 是星盘 / Astrolabe Quant OS 的本地控制平面，给 agent、cron 和人工维护使用。它不是新的业务实现层，只负责把命令路由到现有模块。
+`astroq` 是 Open Quant Company 的本地控制平面，给 agent、cron 和人工维护使用。它不是新的业务实现层，只负责把命令路由到现有模块。
 
 ## 使用原则
 

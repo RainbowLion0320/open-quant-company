@@ -1,7 +1,7 @@
 [project]
-name = "astrolabe-quant"
+name = "open-quant-company"
 version = "2.0.0"
-description = "星盘 / Astrolabe Quant OS：个人量化研究与执行操作系统"
+description = "Open Quant Company：开源量化公司操作系统，用户作为 CEO，多个 agent 负责数据、研究、风控、工程与报告，所有结论可回溯到 Web UI、CLI 和 evidence artifacts"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -51,10 +51,10 @@ dependencies = [
 astroq = "astrolabe_cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/RainbowLion0320/astrolabe-quant"
-Documentation = "https://github.com/RainbowLion0320/astrolabe-quant/tree/main/docs"
-Repository = "https://github.com/RainbowLion0320/astrolabe-quant"
-Issues = "https://github.com/RainbowLion0320/astrolabe-quant/issues"
+Homepage = "https://github.com/RainbowLion0320/open-quant-company"
+Documentation = "https://github.com/RainbowLion0320/open-quant-company/tree/main/docs"
+Repository = "https://github.com/RainbowLion0320/open-quant-company"
+Issues = "https://github.com/RainbowLion0320/open-quant-company/issues"
 
 [project.optional-dependencies]
 ml = ["lightgbm>=4.0", "scikit-learn>=1.3", "optuna>=3.0"]

@@ -1,7 +1,7 @@
 export const app = {
-      brand: "星盘量化操作系统",
+      brand: "Open Quant Company",
       build: "BUILD",
-      fallbackTitle: "星盘终端",
+      fallbackTitle: "Open Quant Company 控制台",
       navAria: "主导航",
       statusAria: "系统状态",
       mode: "MODE",

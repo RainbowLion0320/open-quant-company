@@ -44,7 +44,7 @@ def _health_command(args: argparse.Namespace) -> CliResult:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="astroq", description="Astrolabe Quant OS control plane")
+    parser = argparse.ArgumentParser(prog="astroq", description="Open Quant Company control plane")
     sub = parser.add_subparsers(dest="command", required=True)
 
     health = sub.add_parser("health", help="Check CLI and local project health")

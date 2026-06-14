@@ -1,5 +1,5 @@
 """
-Astrolabe Quant API v2 -- Application Factory
+Open Quant Company API v2 -- Application Factory
 """
 
 import os, sys
@@ -22,9 +22,12 @@ from web.api.version import get_project_version
 def create_app() -> FastAPI:
     version = get_project_version()
     app = FastAPI(
-        title="Astrolabe Quant API",
+        title="Open Quant Company API",
         version=version,
-        description="星盘 / Astrolabe Quant OS — 个人量化研究与执行操作系统",
+        description=(
+            "Open Quant Company — 开源量化公司操作系统：用户作为 CEO，多个 agent 负责数据、研究、风控、"
+            "工程与报告，所有结论可回溯到 Web UI、CLI 和 evidence artifacts。"
+        ),
     )
 
     app.add_middleware(

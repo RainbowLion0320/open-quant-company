@@ -1,4 +1,4 @@
-name: Astrolabe Quant Daily Scan
+name: Open Quant Company Daily Scan
 
 on:
   schedule:

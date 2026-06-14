@@ -2,7 +2,7 @@
 
 ## Our Standard
 
-Astrolabe is a technical open source project for quant research infrastructure. The project welcomes contributors who communicate clearly, argue from evidence, and keep discussions focused on improving the software.
+Open Quant Company is a technical open source project for quant research infrastructure. The project welcomes contributors who communicate clearly, argue from evidence, and keep discussions focused on improving the software.
 
 Expected behavior:
 
@@ -29,4 +29,3 @@ This Code of Conduct applies to all project spaces, including GitHub issues, pul
 Maintainers may remove comments, close issues, block contributors, or reject contributions that violate this Code of Conduct. Enforcement decisions should be proportional, documented when appropriate, and focused on protecting the project and its contributors.
 
 If you need to report conduct concerns, contact the repository owner through GitHub profile contact channels. Do not post private or sensitive reports in public issues.
-

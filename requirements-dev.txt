@@ -1,4 +1,4 @@
-# 星盘 / Astrolabe Quant OS — 开发依赖
+# Open Quant Company — 开发依赖
 # 安装: pip install -r requirements-dev.txt
 
 -r requirements.txt

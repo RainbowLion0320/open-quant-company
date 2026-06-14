@@ -11,9 +11,9 @@ def run_health() -> CliResult:
     return CliResult(
         ok=True,
         command="health",
-        message="Astrolabe local environment is reachable",
+        message="Open Quant Company local environment is reachable",
         data={
-            "project": "astrolabe-quant",
+            "project": "open-quant-company",
             "version": get_project_version(),
             "store_root": str(hub.store_root),
             "cache_root": str(hub.cache_root),

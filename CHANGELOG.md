@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Astrolabe are tracked here. The project uses semantic versioning for public release tags.
+All notable changes to Open Quant Company are tracked here. The project uses semantic versioning for public release tags.
 
 ## [2.0.0] - 2026-06-08
 

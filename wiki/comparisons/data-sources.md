@@ -13,7 +13,7 @@ tags: [akshare, tushare, data, capability, registry]
 | 层级 | 权威入口 | 含义 |
 |------|----------|------|
 | 外部能力 | `data.ingestion.source_capabilities` | 外部 source 理论上或当前环境可提供哪些接口、资产、频率和权限状态 |
-| 项目接入 | `config/settings.yaml` → `data_registry` | Astrolabe 正式使用、健康检查、可修复的数据维度 |
+| 项目接入 | `config/settings.yaml` → `data_registry` | Open Quant Company 正式使用、健康检查、可修复的数据维度 |
 | 本地覆盖 | DataHub store/cache/manifest | 当前机器实际下载了多少数据，是否新鲜完整 |
 
 过去只写“AKShare vs Tushare”会漏掉两个问题：一是 AKShare 本身包装了腾讯、东方财富、新浪、同花顺等 backend；二是外部源能提供的接口远多于项目当前接入的维度。现在用 Source Capability Registry 单独治理外部能力，再和 `data_registry` 做 diff。能力状态按 `discovered`、`sample_probed`、`contracted`、`project_integrated` 分层，不能把“发现到接口”当成“生产已接入”。

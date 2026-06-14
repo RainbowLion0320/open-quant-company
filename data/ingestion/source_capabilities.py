@@ -1,7 +1,7 @@
 """External data source capability governance.
 
 This module deliberately models provider capabilities separately from the
-project data registry. ``data_registry`` says what Astrolabe currently uses;
+project data registry. ``data_registry`` says what Open Quant Company currently uses;
 this registry says what each external source appears able to provide.
 """
 

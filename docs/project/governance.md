@@ -1,6 +1,6 @@
 # Governance
 
-Astrolabe is maintained as a pragmatic open source project with a small-maintainer model.
+Open Quant Company is maintained as a pragmatic open source project with a small-maintainer model.
 
 ## Maintainer Authority
 

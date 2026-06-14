@@ -46,7 +46,7 @@
       <header class="command-bar">
         <div class="system-title">
           <strong>{{ routeTitle }}</strong>
-          <span class="system-kicker">ASTROLABE QUANT OS</span>
+          <span class="system-kicker">OPEN QUANT COMPANY</span>
         </div>
       </header>
 
@@ -89,7 +89,7 @@ import { useParticles } from "./charts/particles";
 import { api } from "./api";
 import type { RegimeResponse } from "./api";
 import { useI18n } from "./i18n";
-import logoUrl from "./assets/astrolabe-logo.svg";
+import logoUrl from "./assets/open-quant-company-logo.svg";
 
 const route = useRoute();
 const { currentLocale, t, toggleLocale } = useI18n();

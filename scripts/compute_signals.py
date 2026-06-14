@@ -151,7 +151,7 @@ def notify_signals(strategies: list[dict]):
 
     # 格式化推送
     print(f"\n📊 信号变更: {len(changes)}条")
-    lines = [f"📡 星盘信号变更 ({datetime.now().strftime('%m/%d %H:%M')})", ""]
+    lines = [f"📡 Open Quant Company 信号变更 ({datetime.now().strftime('%m/%d %H:%M')})", ""]
     by_strategy = {}
     for c in changes:
         by_strategy.setdefault(c["strategy"], []).append(c)
@@ -169,7 +169,7 @@ def notify_signals(strategies: list[dict]):
     # 发送到Telegram
     try:
         from notify import push_report
-        push_report("星盘日频信号", body)
+        push_report("Open Quant Company 日频信号", body)
         print("  📤 已推送到Telegram")
     except Exception as e:
         print(f"  ⚠️ 推送失败: {e}")

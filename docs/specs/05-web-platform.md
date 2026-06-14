@@ -4,7 +4,7 @@
 
 ## 1. 概述
 
-Web 平台提供 星盘终端 — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 实时推送。一级导航收敛为市场总览、市场研究、策略实验室、组合执行、流程图、数据中台、系统控制；原子功能通过二级 tab 或关键参数 Pipeline 访问。
+Web 平台提供 Open Quant Company Console — Vue 3 SPA 前端 + FastAPI 后端 + WebSocket 实时推送。一级导航收敛为市场总览、市场研究、策略实验室、组合执行、流程图、数据中台、系统控制；原子功能通过二级 tab 或关键参数 Pipeline 访问。
 
 **设计原则：**
 - **前后端分离** — Vue 3 (Vite) + FastAPI，独立开发/部署

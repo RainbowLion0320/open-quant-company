@@ -1,6 +1,6 @@
 # Roadmap
 
-Astrolabe is developed as a local-first quant research and execution operating system. This roadmap describes direction, not guaranteed delivery dates.
+Open Quant Company is developed as a local-first quant research and execution operating system. This roadmap describes direction, not guaranteed delivery dates.
 
 ## Near Term
 
@@ -25,6 +25,6 @@ Astrolabe is developed as a local-first quant research and execution operating s
 
 ## Non-Goals
 
-- Astrolabe is not investment advice and does not promise returns.
+- Open Quant Company is not investment advice and does not promise returns.
 - The repository will not redistribute paid provider data or private trading records.
 - Web UI convenience should not bypass the CLI/control-plane contracts used by automation.

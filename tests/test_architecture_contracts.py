@@ -941,13 +941,16 @@ def test_signal_spec_describes_current_regime_formula():
     assert "月度 K 线判断" not in text
 
 
-def test_tracked_project_context_uses_canonical_astrolabe_names():
+def test_tracked_project_context_uses_canonical_open_quant_company_branding():
     tracked_files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
     forbidden = [
         "QUANT" + "_AGENT_",
         "XING" + "PAN_",
         "quant" + "-agent",
         "xing" + "pan",
+        "Astro" + "labe Quant",
+        "astro" + "labe-quant",
+        "星" + "盘",
     ]
 
     offenders = []
