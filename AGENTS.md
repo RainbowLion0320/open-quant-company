@@ -50,6 +50,7 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq agent run <action_id> --json` | Dispatch 安全或已批准 agent action 并写入 run ledger |
 | `astroq agent handoffs --json` | 查看跨 desk 交接 ledger |
 | `astroq agent handoff resolve <handoff_id> --json` | 标记跨 desk 交接事项已完成 |
+| `astroq agent memory export --json` | 导出本地透明 memory ledger 到 `var/artifacts/agent/memory/` |
 | `astroq agent desks --json` | 查看 Data / Research / Risk / Execution / Engineering / Reporting desk agents |
 | `astroq config env --json` | 检查当前进程环境变量密钥状态（脱敏输出） |
 | `astroq config validate --json` | 校验 settings 和策略注册表 |
@@ -147,7 +148,7 @@ astroq lifecycle check --json
 - Production backtests use `backtest/pipeline_runner.py` plus shared modules under `pipeline/`.
 - Strategy state is owned by Strategy Catalog and separated into production, paper, and candidate layers.
 - Web System visualizations include CodeGraph, AST diagnostics, architecture diagnostics, test design intelligence, and lifecycle readiness.
-- Agent Company OS has a foundation runtime for sessions, messages, actions, approvals, runs, evidence, desk registry, fixed-registry tool permission checks, and open/resolved cross-desk handoffs. Desk reasoning, automated handoff workflows, and live execution are still phased work; do not present them as complete.
+- Agent Company OS has a foundation runtime for sessions, messages, actions, approvals, runs, evidence, desk registry, fixed-registry tool permission checks, open/resolved cross-desk handoffs, and transparent memory inspect/export. Desk reasoning, automated handoff workflows, memory prune/clear, and live execution are still phased work; do not present them as complete.
 - Formal strategy promotion depends on score panels, alpha evidence, data readiness, and execution assumptions. Missing data, missing source capability, missing score panels, and insufficient evidence must be reported as blocked/not_applicable states, not filled with placeholder values.
 - The project is local-first. Network access, provider permissions, and data completeness must be explicit, observable, and never hidden behind fake defaults.
 

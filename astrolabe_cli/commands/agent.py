@@ -150,3 +150,23 @@ def desks() -> CliResult:
         message=f"{len(rows)} desk agent(s)",
         data={"desks": rows, "total": len(rows)},
     )
+
+
+def memory_summary() -> CliResult:
+    snapshot = AgentRuntime().memory_snapshot()
+    return CliResult(
+        ok=True,
+        command="agent memory",
+        message="Agent memory summary",
+        data=snapshot,
+    )
+
+
+def memory_export() -> CliResult:
+    artifact = AgentRuntime().export_memory()
+    return CliResult(
+        ok=True,
+        command="agent memory export",
+        message=f"Exported agent memory to {artifact['path']}",
+        data={"artifact": artifact},
+    )

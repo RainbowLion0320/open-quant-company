@@ -45,8 +45,8 @@ All endpoints are planned under `/api/agent/*`.
 | `GET` | `/api/agent/runs/{run_id}` | Read a tool or workflow run. | Implemented |
 | `GET` | `/api/agent/evidence/{evidence_id}` | Resolve an evidence reference. | Implemented |
 | `GET` | `/api/agent/desks` | List desk agents, health, allowed tools, and current blockers. | Implemented |
-| `GET` | `/api/agent/memory` | Inspect transparent memory summaries. | Planned |
-| `POST` | `/api/agent/memory/export` | Export memory and evidence references. | Planned |
+| `GET` | `/api/agent/memory` | Inspect transparent memory summaries and local ledger records. | Implemented |
+| `POST` | `/api/agent/memory/export` | Export memory and evidence references to `var/artifacts/agent/memory/`. | Implemented |
 | `POST` | `/api/agent/memory/prune` | Prune memory by policy. | Planned |
 | `POST` | `/api/agent/memory/clear` | Clear memory after explicit approval. | Planned |
 
@@ -69,7 +69,8 @@ All commands must support `--json`.
 | `astroq agent reject ACTION_ID --reason REASON --json` | Reject an action. | Implemented |
 | `astroq agent evidence EVIDENCE_ID --json` | Resolve evidence. | Implemented |
 | `astroq agent desks --json` | List desk registry and health. | Implemented |
-| `astroq agent memory export --json` | Export local transparent memory. | Planned |
+| `astroq agent memory show --json` | Inspect local transparent memory. | Implemented |
+| `astroq agent memory export --json` | Export local transparent memory. | Implemented |
 
 ## 5. Data Model
 
@@ -372,6 +373,7 @@ Planned paths:
 | `var/db/agent_os.sqlite` | Sessions, messages, actions, approvals, runs, and desk registry snapshots. |
 | `var/artifacts/agent/runs/` | Run outputs. |
 | `var/artifacts/agent/evidence/` | Evidence snapshots. |
+| `var/artifacts/agent/memory/` | Transparent memory exports. |
 | `var/artifacts/agent/reports/` | CEO briefs and audit packs. |
 
 These are runtime outputs and must not be committed.
@@ -396,12 +398,12 @@ As of 2026-06-14:
 
 - Foundation runtime is partially implemented in `agent_os/`.
 - The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and open/resolved cross-desk handoffs under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session/message/actions/handoffs/handoff resolve/action show/run/approve/reject/evidence/desks --json` is available.
-- `/api/agent/sessions`, `/api/agent/actions`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, and `/api/agent/desks` are available.
+- `astroq agent sessions/session/message/actions/handoffs/handoff resolve/action show/run/approve/reject/evidence/desks/memory show/memory export --json` is available.
+- `/api/agent/sessions`, `/api/agent/actions`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/memory`, and `/api/agent/memory/export` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; unsafe templated write commands remain blocked until a stricter parameter binding phase lands.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
-- Actual desk reasoning, broad tool execution, memory export/prune/clear, web-route evidence navigation, streaming updates, and MiniQMT/QMT live adapter are not yet implemented.
+- Actual desk reasoning, broad tool execution, memory prune/clear, web-route evidence navigation, streaming updates, and MiniQMT/QMT live adapter are not yet implemented.

@@ -272,6 +272,11 @@ class AgentLedger:
             row = conn.execute("SELECT * FROM evidence WHERE evidence_id = ?", (evidence_id,)).fetchone()
         return dict(row) if row else None
 
+    def list_evidence(self) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM evidence ORDER BY generated_at DESC, evidence_id DESC").fetchall()
+        return [dict(row) for row in rows]
+
     def list_runs(self, action_id: str | None = None) -> list[dict[str, Any]]:
         with self._connect() as conn:
             if action_id:

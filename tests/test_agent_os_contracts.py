@@ -655,3 +655,92 @@ def test_agent_cli_and_api_resolve_handoff(tmp_path, monkeypatch, capsys):
     assert api_res.json()["handoff"]["status"] == "resolved"
     assert runtime.list_handoffs(session.session_id)[0]["status"] == "resolved"
     reset_datahub()
+
+
+def test_agent_memory_snapshot_and_export_include_ledger_records(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Memory snapshot", default_desk="reporting")
+    message = runtime.add_message(session.session_id, role="ceo", desk="reporting", content="导出本地记忆")
+    evidence = runtime.create_evidence(
+        kind="ledger",
+        label="Memory evidence",
+        uri="var/db/agent_os.sqlite",
+        summary="Local ledger reference.",
+    )
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Check health",
+        parameters={"tool_id": "astroq.health"},
+        evidence_refs=[evidence.evidence_id],
+    )
+    runtime.record_run(
+        action_id=action.action_id,
+        tool_name="astroq.health",
+        command=[".venv/bin/astroq", "health", "--json"],
+        status="succeeded",
+        return_code=0,
+        stdout_summary="ok",
+        stderr_summary="",
+    )
+    runtime.respond_as_desk(
+        session_id=session.session_id,
+        source_message_id=message.message_id,
+        desk="reporting",
+        answer="Memory export ready.",
+        handoffs=[{"target_desk": "data", "reason": "检查 memory export"}],
+    )
+
+    snapshot = runtime.memory_snapshot()
+    exported = runtime.export_memory()
+    exported_payload = json.loads(Path(exported["path"]).read_text(encoding="utf-8"))
+
+    assert snapshot["status"] == "ready"
+    assert snapshot["summary"]["session_count"] == 1
+    assert snapshot["summary"]["message_count"] == 2
+    assert snapshot["summary"]["action_count"] == 1
+    assert snapshot["summary"]["run_count"] == 1
+    assert snapshot["summary"]["evidence_count"] == 1
+    assert snapshot["summary"]["handoff_count"] == 1
+    assert exported["path"].endswith(".json")
+    assert "/agent/memory/" in exported["path"]
+    assert exported_payload["records"]["sessions"][0]["session_id"] == session.session_id
+    reset_datahub()
+
+
+def test_agent_memory_cli_and_api_export(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    runtime.create_session(title="Memory CLI/API")
+
+    cli_code = run_cli(["agent", "memory", "export", "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    client = TestClient(create_app())
+    summary_res = client.get("/api/agent/memory")
+    export_res = client.post("/api/agent/memory/export")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["artifact"]["path"].endswith(".json")
+    assert summary_res.status_code == 200
+    assert summary_res.json()["summary"]["session_count"] == 1
+    assert export_res.status_code == 200
+    assert export_res.json()["artifact"]["path"].endswith(".json")
+    reset_datahub()

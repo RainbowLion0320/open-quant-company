@@ -126,3 +126,13 @@ async def get_agent_run(run_id: str) -> dict[str, Any]:
 async def list_agent_desks() -> dict[str, Any]:
     desks = AgentRuntime().list_desks()
     return {"desks": desks, "total": len(desks)}
+
+
+@router.get("/memory")
+async def get_agent_memory() -> dict[str, Any]:
+    return AgentRuntime().memory_snapshot()
+
+
+@router.post("/memory/export")
+async def export_agent_memory() -> dict[str, Any]:
+    return {"artifact": AgentRuntime().export_memory()}

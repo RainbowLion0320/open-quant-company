@@ -13,6 +13,8 @@ from astrolabe_cli.commands.agent import create_session as agent_create_session
 from astrolabe_cli.commands.agent import desks as agent_desks
 from astrolabe_cli.commands.agent import evidence as agent_evidence
 from astrolabe_cli.commands.agent import handoffs as agent_handoffs
+from astrolabe_cli.commands.agent import memory_export as agent_memory_export
+from astrolabe_cli.commands.agent import memory_summary as agent_memory_summary
 from astrolabe_cli.commands.agent import reject as agent_reject
 from astrolabe_cli.commands.agent import resolve_handoff as agent_resolve_handoff
 from astrolabe_cli.commands.agent import run_action as agent_run_action
@@ -138,6 +140,15 @@ def build_parser() -> argparse.ArgumentParser:
     agent_desks_cmd = agent_sub.add_parser("desks", help="List desk agents")
     add_common_flags(agent_desks_cmd)
     agent_desks_cmd.set_defaults(handler=lambda args: agent_desks())
+
+    agent_memory_cmd = agent_sub.add_parser("memory", help="Inspect or export local transparent memory")
+    agent_memory_sub = agent_memory_cmd.add_subparsers(dest="agent_memory_command", required=True)
+    agent_memory_show = agent_memory_sub.add_parser("show", help="Show local memory summary")
+    add_common_flags(agent_memory_show)
+    agent_memory_show.set_defaults(handler=lambda args: agent_memory_summary())
+    agent_memory_export_cmd = agent_memory_sub.add_parser("export", help="Export local memory to an artifact")
+    add_common_flags(agent_memory_export_cmd)
+    agent_memory_export_cmd.set_defaults(handler=lambda args: agent_memory_export())
 
     config = sub.add_parser("config", help="Inspect and validate project configuration")
     config_sub = config.add_subparsers(dest="config_command", required=True)

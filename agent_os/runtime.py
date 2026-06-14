@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file
 from agent_os.ledger import AgentLedger
 from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentRun, AgentSession, DeskResponse, EvidenceRef
 from agent_os.tools import AgentToolRegistry
+from data.storage.datahub import get_datahub
 
 
 def _now() -> str:
@@ -407,6 +409,49 @@ class AgentRuntime:
 
     def list_desks(self) -> list[dict[str, Any]]:
         return list_desks()
+
+    def memory_snapshot(self) -> dict[str, Any]:
+        sessions = self.ledger.list_sessions()
+        messages: list[dict[str, Any]] = []
+        for session in sessions:
+            messages.extend(self.ledger.list_messages(str(session["session_id"])))
+        actions = self.ledger.list_actions()
+        runs = self.ledger.list_runs()
+        evidence = self.ledger.list_evidence()
+        handoffs = self.ledger.list_handoffs()
+        summary = {
+            "session_count": len(sessions),
+            "message_count": len(messages),
+            "action_count": len(actions),
+            "run_count": len(runs),
+            "evidence_count": len(evidence),
+            "handoff_count": len(handoffs),
+        }
+        return {
+            "status": "ready",
+            "generated_at": _now(),
+            "summary": summary,
+            "records": {
+                "sessions": sessions,
+                "messages": messages,
+                "actions": actions,
+                "runs": runs,
+                "evidence": evidence,
+                "handoffs": handoffs,
+            },
+        }
+
+    def export_memory(self) -> dict[str, Any]:
+        snapshot = self.memory_snapshot()
+        filename_ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        path = get_datahub().artifact_dir("agent") / "memory" / f"memory-{filename_ts}-{uuid.uuid4().hex[:8]}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return {
+            "path": str(path),
+            "generated_at": snapshot["generated_at"],
+            "summary": snapshot["summary"],
+        }
 
     def _decide_action(self, action_id: str, status: str, *, decided_by: str, reason: str) -> AgentAction:
         current = self.ledger.get_action(action_id)
