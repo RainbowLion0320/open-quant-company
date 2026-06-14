@@ -122,7 +122,7 @@ Allowed tools:
 - `astroq execution dry-run --json`
 - Broker readiness checks
 - Paper broker state read APIs
-- Future MiniQMT/QMT adapter probes
+- `astroq agent live readiness --json` MiniQMT/QMT readiness probe
 
 Hard rules:
 

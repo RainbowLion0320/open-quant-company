@@ -104,6 +104,20 @@ export interface AgentReport {
   generated_at: string;
 }
 
+export interface AgentLiveReadiness {
+  broker: string;
+  mode: string;
+  enabled: boolean;
+  sdk_available: boolean;
+  logged_in: boolean;
+  account_id_masked: string;
+  permissions: string[];
+  kill_switch: boolean;
+  paper_fallback: boolean;
+  last_probe_at: string;
+  blockers: string[];
+}
+
 export interface AgentDeskResponse {
   message: AgentMessage;
   answer: string;
@@ -165,6 +179,10 @@ export interface AgentReportsResponse {
 
 export interface AgentReportResponse {
   report: AgentReport;
+}
+
+export interface AgentLiveReadinessResponse {
+  health: AgentLiveReadiness;
 }
 
 export interface AgentEvidenceResponse {

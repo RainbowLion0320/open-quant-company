@@ -8,6 +8,7 @@ import type {
   AgentEvidenceResponse,
   AgentHandoff,
   AgentHandoffsResponse,
+  AgentLiveReadinessResponse,
   AgentReportResponse,
   AgentReportsResponse,
   AgentRunActionResponse,
@@ -45,6 +46,7 @@ export const agentApi = {
   agentReports: (sessionId = "") =>
     get<AgentReportsResponse>(`/api/agent/reports${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
   agentGenerateReport: (payload: { kind: string; session_id: string }) => post<AgentReportResponse>("/api/agent/reports", payload),
+  agentLiveReadiness: () => get<AgentLiveReadinessResponse>("/api/agent/live/readiness"),
   agentEvidence: (evidenceId: string) => get<AgentEvidenceResponse>(`/api/agent/evidence/${encodeURIComponent(evidenceId)}`),
   agentDesks: () => get<AgentDesksResponse>("/api/agent/desks"),
 };

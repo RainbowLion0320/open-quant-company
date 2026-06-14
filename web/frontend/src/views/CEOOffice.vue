@@ -48,6 +48,11 @@
         <span>{{ t("ceoOffice.reports") }}</span>
         <strong>{{ reports.length }}</strong>
       </article>
+      <article class="ceo-metric">
+        <span>{{ t("ceoOffice.liveReadiness") }}</span>
+        <strong>{{ statusLabel(liveReadiness?.mode || "unknown") }}</strong>
+        <small>{{ liveReadiness?.paper_fallback === false ? t("ceoOffice.noPaperFallback") : "—" }}</small>
+      </article>
     </section>
 
     <section class="ceo-grid">
@@ -118,6 +123,35 @@
                 >
                   {{ t("ceoOffice.resolveHandoff") }}
                 </button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="ceo-panel">
+          <header class="panel-head">
+            <span>{{ t("ceoOffice.liveReadiness") }}</span>
+            <small>{{ liveReadiness?.broker || "—" }}</small>
+          </header>
+          <div v-if="!liveReadiness" class="ceo-empty">{{ t("ceoOffice.noLiveReadiness") }}</div>
+          <div v-else class="detail-stack">
+            <div class="detail-row">
+              <span>{{ t("ceoOffice.liveMode") }}</span>
+              <code>{{ liveReadiness.mode }}</code>
+            </div>
+            <div class="detail-row">
+              <span>{{ t("ceoOffice.noPaperFallback") }}</span>
+              <code>{{ String(liveReadiness.paper_fallback === false) }}</code>
+            </div>
+            <div class="detail-row">
+              <span>{{ t("ceoOffice.blockers") }}</span>
+              <div v-if="!liveReadiness.blockers.length" class="ceo-empty compact">
+                {{ t("ceoOffice.noBlockers") }}
+              </div>
+              <div v-else class="run-list">
+                <div v-for="blocker in liveReadiness.blockers" :key="blocker" class="run-row">
+                  <strong>{{ blocker }}</strong>
+                </div>
               </div>
             </div>
           </div>
@@ -302,7 +336,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentMessage, type AgentReport, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveReadiness, type AgentMessage, type AgentReport, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -313,6 +347,7 @@ const messages = ref<AgentMessage[]>([]);
 const actions = ref<AgentAction[]>([]);
 const handoffs = ref<AgentHandoff[]>([]);
 const reports = ref<AgentReport[]>([]);
+const liveReadiness = ref<AgentLiveReadiness | null>(null);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
@@ -358,6 +393,9 @@ function statusLabel(status: string) {
   if (status === "blocked") return t("ceoOffice.blocked");
   if (status === "canceled") return t("ceoOffice.canceled");
   if (status === "expired") return t("ceoOffice.expired");
+  if (status === "live_disabled") return t("ceoOffice.liveDisabled");
+  if (status === "live_ready") return t("ceoOffice.liveReady");
+  if (status === "unknown") return t("ceoOffice.unknown");
   if (status === "archived") return t("ceoOffice.archived");
   if (status === "active") return t("ceoOffice.active");
   if (status === "open") return t("ceoOffice.open");
@@ -394,16 +432,18 @@ async function loadSession(sessionId: string) {
 async function load() {
   error.value = "";
   try {
-    const [sessionPayload, deskPayload, actionPayload, handoffPayload] = await Promise.all([
+    const [sessionPayload, deskPayload, actionPayload, handoffPayload, livePayload] = await Promise.all([
       api.agentSessions(),
       api.agentDesks(),
       api.agentActions(),
       api.agentHandoffs(),
+      api.agentLiveReadiness(),
     ]);
     sessions.value = sessionPayload.sessions || [];
     desks.value = deskPayload.desks || [];
     actions.value = actionPayload.actions || [];
     handoffs.value = handoffPayload.handoffs || [];
+    liveReadiness.value = livePayload.health;
     if (sessions.value.length) {
       await loadSession(activeSession.value?.session_id || sessions.value[0].session_id);
     }

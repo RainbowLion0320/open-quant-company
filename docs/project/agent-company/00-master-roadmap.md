@@ -213,6 +213,12 @@ Minimum requirements:
 - Audit pack export
 - No fallback to paper trading
 
+Current foundation:
+
+- Default-disabled MiniQMT/QMT readiness probe is implemented and visible through CLI/API/CEO Office.
+- Missing SDK/login/permissions/kill switch readiness blockers are explicit.
+- `paper_fallback=false` is part of the readiness contract.
+
 ### Phase 7 - Reporting and Operating Rhythm
 
 The system should behave like a small quant company with a local operating rhythm.

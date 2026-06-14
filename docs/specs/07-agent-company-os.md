@@ -9,7 +9,7 @@
 
 Agent Company OS is the planned local-first operating layer for Open Quant Company. It lets the human user act as CEO while desk agents coordinate data, research, risk, execution, engineering, and reporting work.
 
-This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, transparent memory governance, and evidence-cited report artifacts are implemented first; streaming, full operating-rhythm report cadence, advanced desk reasoning, and live execution remain planned until their phase lands.
+This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, transparent memory governance, evidence-cited report artifacts, and default-disabled live readiness probing are implemented first; streaming, full operating-rhythm report cadence, advanced desk reasoning, and live order submission/reconciliation remain planned until their phase lands.
 
 ## 2. Product Contract
 
@@ -45,6 +45,7 @@ All endpoints are planned under `/api/agent/*`.
 | `GET` | `/api/agent/runs/{run_id}` | Read a tool or workflow run. | Implemented |
 | `GET` | `/api/agent/evidence/{evidence_id}` | Resolve an evidence reference. | Implemented |
 | `GET` | `/api/agent/desks` | List desk agents, health, allowed tools, and current blockers. | Implemented |
+| `GET` | `/api/agent/live/readiness` | Report MiniQMT/QMT live readiness without submitting orders. | Implemented readiness probe |
 | `GET` | `/api/agent/reports` | List generated CEO reports, optionally scoped to a session. | Implemented |
 | `POST` | `/api/agent/reports` | Generate a CEO report artifact and register report evidence. | Implemented |
 | `GET` | `/api/agent/memory` | Inspect transparent memory summaries and local ledger records. | Implemented |
@@ -74,6 +75,7 @@ All commands must support `--json`.
 | `astroq agent expire --session SESSION_ID --json` | Mark expired queued actions. | Implemented |
 | `astroq agent reports --session SESSION_ID --json` | List generated CEO reports. | Implemented |
 | `astroq agent report daily --session SESSION_ID --json` | Generate an evidence-cited daily CEO brief. | Implemented |
+| `astroq agent live readiness --json` | Report MiniQMT/QMT live readiness and blockers without PaperBroker fallback. | Implemented readiness probe |
 | `astroq agent evidence EVIDENCE_ID --json` | Resolve evidence. | Implemented |
 | `astroq agent desks --json` | List desk registry and health. | Implemented |
 | `astroq agent memory show --json` | Inspect local transparent memory. | Implemented |
@@ -299,7 +301,7 @@ blocked run without calling the tool runner.
 }
 ```
 
-### 5.8 AgentHandoff
+### 5.9 AgentHandoff
 
 ```json
 {
@@ -316,7 +318,7 @@ blocked run without calling the tool runner.
 }
 ```
 
-### 5.9 DeskResponse
+### 5.10 DeskResponse
 
 ```json
 {
@@ -329,6 +331,32 @@ blocked run without calling the tool runner.
   "handoffs": [{"handoff_id": "handoff_...", "target_desk": "data"}]
 }
 ```
+
+### 5.11 LiveBrokerHealth
+
+```json
+{
+  "broker": "miniqmt",
+  "mode": "live_disabled",
+  "enabled": false,
+  "sdk_available": false,
+  "logged_in": false,
+  "account_id_masked": "",
+  "permissions": [],
+  "kill_switch": true,
+  "paper_fallback": false,
+  "last_probe_at": "2026-06-14T09:40:00Z",
+  "blockers": ["live_disabled"]
+}
+```
+
+Readiness mode semantics:
+
+- `live_disabled`: live mode is explicitly off or absent from config.
+- `blocked`: live mode is enabled but SDK, login, permission, or kill-switch checks fail.
+- `live_ready`: all readiness checks pass. This does not bypass order preview, risk gate, or CEO approval.
+
+`paper_fallback` must remain `false`; a blocked live path must never submit through PaperBroker.
 
 ## 6. Risk Levels and Default Policies
 
@@ -477,14 +505,15 @@ As of 2026-06-14:
 
 - Foundation runtime is partially implemented in `agent_os/`.
 - The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and open/resolved cross-desk handoffs under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/reports/report/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
-- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/reports`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
+- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/reports/report/live readiness/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
+- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/live/readiness`, `/api/agent/reports`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; approved fixed-registry templated commands bind only tool-declared safe parameters.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
 - Web-route evidence resolves to safe local navigation metadata, and CEO Office can render an evidence link into the related Web view.
 - CEO reports can be generated as JSON/Markdown artifacts, registered as report evidence, listed through CLI/API, and shown as CEO Office report cards.
+- MiniQMT/QMT readiness probing is available and defaults to `live_disabled`; missing SDK, login, permission, or disabled kill switch returns `blocked`, and `paper_fallback` is always false.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
-- Actual advanced desk reasoning, broad tool execution, streaming updates, full operating-rhythm report cadence, and MiniQMT/QMT live adapter are not yet implemented.
+- Actual advanced desk reasoning, broad tool execution, streaming updates, full operating-rhythm report cadence, and MiniQMT/QMT live submission/reconciliation are not yet implemented.

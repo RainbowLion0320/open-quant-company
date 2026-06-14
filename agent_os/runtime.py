@@ -16,6 +16,7 @@ from agent_os.reports import build_report_payload, normalize_report_kind, read_r
 from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentReport, AgentRun, AgentSession, DeskResponse, EvidenceRef
 from agent_os.tools import AgentToolRegistry
 from agent_os.workflows import build_desk_workflow_plan
+from broker.live.qmt import MiniQmtLiveBroker
 from data.storage.datahub import get_datahub
 
 
@@ -521,6 +522,9 @@ class AgentRuntime:
 
     def list_desks(self) -> list[dict[str, Any]]:
         return list_desks()
+
+    def live_readiness(self) -> dict[str, Any]:
+        return MiniQmtLiveBroker().health()
 
     def generate_report(self, *, session_id: str, kind: str = "daily_brief") -> dict[str, Any]:
         session = self.ledger.get_session(session_id)

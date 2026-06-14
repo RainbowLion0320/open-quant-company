@@ -121,7 +121,7 @@
 | 7.4 | EvidenceRef 证据解析 | `agent_os/evidence.py`, `agent_os/runtime.py` | `test_agent_os_contracts.py` | `GET /api/agent/evidence/{evidence_id}`, `astroq agent evidence` | missing/fresh artifact evidence 返回结构化状态和 sha256 hash；file-backed evidence 会复制到 `var/artifacts/agent/evidence/`，源文件变化返回 `source_changed`，源文件丢失但快照存在返回 `source_missing`；`web_route` evidence 只为安全本地 route 返回 navigation 元数据 | OK | — |
 | 7.5 | CEO Office 默认首页 | `web/frontend/src/views/CEOOffice.vue`, `web/frontend/src/router/index.ts`, `web/frontend/src/api/modules/agent.ts` | `test_ceo_office_frontend_contracts.py`, `test_frontend_i18n_contracts.py`, browser smoke | `/` CEO Office, `/market` 市场总览 | 默认首页显示 CEO 对话、deterministic desk response、session 创建/归档、desk status、审批队列、handoff 面板、handoff resolve、action detail、run history、report cards、evidence detail 和安全 web-route evidence 深链；市场总览迁移到 `/market` | PARTIAL | streaming 和 richer desk reasoning 仍未实现 |
 | 7.6 | Desk agents 权责和工具权限 | `agent_os/desks.py`, `agent_os/runtime.py`, `agent_os/ledger.py` | `test_agent_os_contracts.py` | `GET /api/agent/desks`, `GET /api/agent/handoffs`, `POST /api/agent/handoffs/{id}/resolve`, `astroq agent desks/handoffs/handoff resolve` | Data/Research/Risk/Execution/Engineering/Reporting desks 有 mandate、allowed_tools、forbidden_actions、evidence_required、handoff_targets；固定 registry 工具在 propose 和 dispatch 阶段均执行 desk scope 校验；CEO message 可触发 deterministic desk workflow；结构化 desk response、open/resolved handoff ledger 和 resolved_at 审计时间可验证 | PARTIAL | 尚未实现 advanced desk reasoning 和广义 tool permission policy |
-| 7.7 | MiniQMT/QMT live execution adapter | 规划: `broker/live/*` 或等价 canonical 模块 | 规划: fake adapter + SDK missing + no paper fallback tests | Portfolio/CEO Office live readiness and approval cards | live 默认关闭；缺 SDK/权限/account 直接 blocked；CEO approval 后才可提交 | PLANNED | 未实现 |
+| 7.7 | MiniQMT/QMT live execution adapter | `broker/live/qmt.py`, `agent_os/runtime.py` | `test_agent_os_contracts.py`, `test_ceo_office_frontend_contracts.py` | `GET /api/agent/live/readiness`, `astroq agent live readiness`, CEO Office live readiness card | live 默认关闭；缺 SDK/权限/account/kill switch 返回 blocked readiness，不 import crash；`paper_fallback=false`，不会回退到 PaperBroker | PARTIAL | live order preview、risk gate、CEO-approved submission、reconciliation 和 kill switch 操作尚未完成 |
 | 7.8 | CEO reports and operating rhythm | `agent_os/reports.py`, `agent_os/runtime.py` | `test_agent_os_contracts.py`, `test_ceo_office_frontend_contracts.py` | `GET/POST /api/agent/reports`, `astroq agent reports/report`, CEO Office report cards | Daily CEO brief、weekly review、audit pack 写入 `var/artifacts/agent/reports/` JSON/Markdown，引用 session/action/run/handoff evidence，缺失 evidence 明确列出，并登记为可解析 `report` evidence | PARTIAL | 数据质量、风控、执行、工程、release 等专用报告模板和定时 operating rhythm 尚未完成 |
 
 ## 汇总
@@ -134,10 +134,10 @@
 | 执行层 | 8 | 8 | 0 | 0 | 0 |
 | Web 平台 | 19 | 19 | 0 | 1 | 0 |
 | 多资产架构 | 10 | 10 | 0 | 0 | 0 |
-| Agent Company OS | 8 | 3 | 1 | 5 | 0 |
-| **合计** | **85** | **80** | **1** | **8** | **0** |
+| Agent Company OS | 8 | 3 | 0 | 5 | 0 |
+| **合计** | **85** | **80** | **0** | **8** | **0** |
 
-> **说明：** `功能可验收` 表示该能力有完整可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数。`质量债条目` 统计"缺口"列非 `—` 的行，包含已实现能力的质量债和规划能力的未实现缺口。当前剩余缺口包括：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化；Agent Company OS 的 ledger、approval/action expiry、evidence safe navigation/snapshot、desk registry、deterministic desk workflow、固定命令 dispatch、固定 registry tool permission enforcement、handoff ledger/resolve、transparent memory inspect/export/prune/clear、evidence-cited report artifacts 和 CEO Office 已有 foundation，但仍缺 advanced desk reasoning、streaming、完整报告节奏和 live adapter。
+> **说明：** `功能可验收` 表示该能力有完整可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数。`质量债条目` 统计"缺口"列非 `—` 的行，包含已实现能力的质量债和规划能力的未实现缺口。当前剩余缺口包括：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化；Agent Company OS 的 ledger、approval/action expiry、evidence safe navigation/snapshot、desk registry、deterministic desk workflow、固定命令 dispatch、固定 registry tool permission enforcement、handoff ledger/resolve、transparent memory inspect/export/prune/clear、evidence-cited report artifacts、default-disabled live readiness probe 和 CEO Office 已有 foundation，但仍缺 advanced desk reasoning、streaming、完整报告节奏和 live order submission/reconciliation。
 
 **维护说明:**
 

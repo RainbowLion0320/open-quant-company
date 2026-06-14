@@ -229,6 +229,16 @@ def desks() -> CliResult:
     )
 
 
+def live_readiness() -> CliResult:
+    health = AgentRuntime().live_readiness()
+    return CliResult(
+        ok=True,
+        command="agent live readiness",
+        message=f"Live broker readiness: {health['mode']}",
+        data={"health": health},
+    )
+
+
 def memory_summary() -> CliResult:
     snapshot = AgentRuntime().memory_snapshot()
     return CliResult(

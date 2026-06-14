@@ -101,6 +101,11 @@ async def list_agent_reports(session_id: str = "") -> dict[str, Any]:
     return AgentRuntime().list_reports(session_id or None)
 
 
+@router.get("/live/readiness")
+async def get_agent_live_readiness() -> dict[str, Any]:
+    return {"health": AgentRuntime().live_readiness()}
+
+
 @router.post("/reports")
 async def generate_agent_report(payload: dict[str, Any]) -> dict[str, Any]:
     try:

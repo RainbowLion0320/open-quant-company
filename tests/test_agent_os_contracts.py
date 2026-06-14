@@ -140,6 +140,64 @@ def test_agent_approval_policy_blocks_state_changing_actions(tmp_path, monkeypat
     reset_datahub()
 
 
+def test_agent_live_readiness_defaults_disabled_and_never_falls_back_to_paper(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    direct = MiniQmtLiveBroker(enabled=False).health()
+    runtime_health = AgentRuntime().live_readiness()
+
+    assert direct["broker"] == "miniqmt"
+    assert direct["mode"] == "live_disabled"
+    assert direct["enabled"] is False
+    assert direct["paper_fallback"] is False
+    assert direct["kill_switch"] is True
+    assert "live_disabled" in direct["blockers"]
+    assert runtime_health["mode"] == "live_disabled"
+    assert runtime_health["paper_fallback"] is False
+    reset_datahub()
+
+
+def test_agent_live_readiness_enabled_missing_sdk_blocks_without_import_crash():
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    health = MiniQmtLiveBroker(enabled=True, import_checker=lambda _name: None).health()
+
+    assert health["mode"] == "blocked"
+    assert health["enabled"] is True
+    assert health["sdk_available"] is False
+    assert health["paper_fallback"] is False
+    assert any(reason.startswith("missing_sdk") for reason in health["blockers"])
+
+
+def test_agent_live_readiness_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    cli_code = run_cli(["agent", "live", "readiness", "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).get("/api/agent/live/readiness")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["health"]["mode"] == "live_disabled"
+    assert cli_payload["data"]["health"]["paper_fallback"] is False
+    assert api_res.status_code == 200
+    assert api_res.json()["health"]["mode"] == "live_disabled"
+    assert api_res.json()["health"]["paper_fallback"] is False
+    reset_datahub()
+
+
 def test_agent_actions_expire_before_approval_or_dispatch(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

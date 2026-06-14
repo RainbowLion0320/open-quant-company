@@ -16,6 +16,7 @@ from astrolabe_cli.commands.agent import evidence as agent_evidence
 from astrolabe_cli.commands.agent import expire_actions as agent_expire_actions
 from astrolabe_cli.commands.agent import generate_report as agent_generate_report
 from astrolabe_cli.commands.agent import handoffs as agent_handoffs
+from astrolabe_cli.commands.agent import live_readiness as agent_live_readiness
 from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
 from astrolabe_cli.commands.agent import memory_export as agent_memory_export
 from astrolabe_cli.commands.agent import memory_prune as agent_memory_prune
@@ -185,6 +186,12 @@ def build_parser() -> argparse.ArgumentParser:
     agent_desks_cmd = agent_sub.add_parser("desks", help="List desk agents")
     add_common_flags(agent_desks_cmd)
     agent_desks_cmd.set_defaults(handler=lambda args: agent_desks())
+
+    agent_live_cmd = agent_sub.add_parser("live", help="Inspect live broker readiness")
+    agent_live_sub = agent_live_cmd.add_subparsers(dest="agent_live_command", required=True)
+    agent_live_readiness_cmd = agent_live_sub.add_parser("readiness", help="Check MiniQMT/QMT live readiness")
+    add_common_flags(agent_live_readiness_cmd)
+    agent_live_readiness_cmd.set_defaults(handler=lambda args: agent_live_readiness())
 
     agent_memory_cmd = agent_sub.add_parser("memory", help="Inspect, export, or maintain local transparent memory")
     agent_memory_sub = agent_memory_cmd.add_subparsers(dest="agent_memory_command", required=True)

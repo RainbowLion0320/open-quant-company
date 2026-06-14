@@ -1,6 +1,6 @@
 # Agent Company OS Phase 6 - MiniQMT/QMT Live Execution Plan
 
-> Status: planned implementation phase
+> Status: readiness foundation implemented; submission/reconciliation planned
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Related spec: [04-execution-layer.md](../../specs/04-execution-layer.md)
@@ -240,6 +240,20 @@ Real broker integration tests should be opt-in and never run in default CI.
 - No live path falls back to PaperBroker.
 - Reconciliation artifacts and ledger entries are written after live submission.
 - Kill switch prevents further live execution.
+
+Current foundation:
+
+- `broker.live.qmt.MiniQmtLiveBroker.health()` reports default-disabled readiness.
+- `astroq agent live readiness --json` and `GET /api/agent/live/readiness` expose the same readiness state.
+- CEO Office shows a read-only live readiness card.
+- Blocked readiness always reports `paper_fallback=false`; no live path submits through PaperBroker.
+
+Remaining work:
+
+- Order preview and risk gate.
+- CEO-approved live submission.
+- Broker order/trade/position reconciliation.
+- Kill-switch operations beyond readiness reporting.
 
 ## 13. Open Design Questions
 
