@@ -15,6 +15,7 @@ import type {
   AgentReportResponse,
   AgentReportsResponse,
   AgentRunActionResponse,
+  AgentScheduledReportRhythmResponse,
   AgentSession,
   AgentSessionDetail,
   AgentSessionsResponse,
@@ -55,6 +56,8 @@ export const agentApi = {
   agentGenerateReport: (payload: { kind: string; session_id: string }) => post<AgentReportResponse>("/api/agent/reports", payload),
   agentRunReportRhythm: (payload: { session_id: string; force?: boolean }) =>
     post<AgentReportRhythmResponse>("/api/agent/reports/rhythm", payload),
+  agentRunScheduledReportRhythm: (payload: { force?: boolean } = {}) =>
+    post<AgentScheduledReportRhythmResponse>("/api/agent/reports/rhythm/scheduled", payload),
   agentLiveReadiness: () => get<AgentLiveReadinessResponse>("/api/agent/live/readiness"),
   agentEvidence: (evidenceId: string) => get<AgentEvidenceResponse>(`/api/agent/evidence/${encodeURIComponent(evidenceId)}`),
   agentDesks: () => get<AgentDesksResponse>("/api/agent/desks"),

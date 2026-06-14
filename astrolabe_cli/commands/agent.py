@@ -141,6 +141,20 @@ def run_report_rhythm(session_id: str, *, force: bool = False) -> CliResult:
     )
 
 
+def run_scheduled_report_rhythm(*, force: bool = False) -> CliResult:
+    schedule = AgentRuntime().run_scheduled_report_rhythm(force=force)
+    return CliResult(
+        ok=schedule["status"] == "ready",
+        command="agent rhythm",
+        message=(
+            f"Scheduled {schedule['session_count']} session(s), "
+            f"generated {schedule['generated_count']} report(s), failed {schedule['failed_count']} session(s)"
+        ),
+        data={"schedule": schedule},
+        errors=[] if schedule["status"] == "ready" else [f"failed_sessions:{schedule['failed_count']}"],
+    )
+
+
 def handoffs(session_id: str = "") -> CliResult:
     runtime = AgentRuntime()
     rows = runtime.list_handoffs(session_id or None)

@@ -1221,6 +1221,66 @@ def test_agent_report_rhythm_cli_and_api(tmp_path, monkeypatch, capsys):
     reset_datahub()
 
 
+def test_agent_scheduled_report_rhythm_runs_active_sessions_and_writes_audit(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    first = runtime.create_session(title="Active reporting A", default_desk="reporting")
+    second = runtime.create_session(title="Active reporting B", default_desk="reporting")
+    archived = runtime.create_session(title="Archived reporting", default_desk="reporting")
+    runtime.update_session(archived.session_id, status="archived")
+
+    scheduled = runtime.run_scheduled_report_rhythm()
+
+    assert scheduled["status"] == "ready"
+    assert scheduled["session_count"] == 2
+    assert scheduled["generated_count"] == 16
+    assert scheduled["skipped_count"] == 0
+    assert {item["session_id"] for item in scheduled["sessions"]} == {first.session_id, second.session_id}
+    assert scheduled["evidence"]["label"] == "Agent scheduled report rhythm"
+    assert Path(scheduled["path"]).exists()
+    assert runtime.list_reports(first.session_id)["total"] == 8
+    assert runtime.list_reports(second.session_id)["total"] == 8
+    assert runtime.list_reports(archived.session_id)["total"] == 0
+    reset_datahub()
+
+
+def test_agent_scheduled_report_rhythm_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    first = runtime.create_session(title="Scheduled rhythm CLI", default_desk="reporting")
+    second = runtime.create_session(title="Scheduled rhythm API", default_desk="reporting")
+
+    cli_code = run_cli(["agent", "rhythm", "--all-active", "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post("/api/agent/reports/rhythm/scheduled", json={"force": True})
+
+    assert cli_code == 0
+    assert cli_payload["data"]["schedule"]["session_count"] == 2
+    assert cli_payload["data"]["schedule"]["generated_count"] == 16
+    assert Path(cli_payload["data"]["schedule"]["path"]).exists()
+    assert api_res.status_code == 200
+    assert api_res.json()["schedule"]["force"] is True
+    assert api_res.json()["schedule"]["session_count"] == 2
+    assert api_res.json()["schedule"]["generated_count"] == 16
+    assert {item["session_id"] for item in api_res.json()["schedule"]["sessions"]} == {first.session_id, second.session_id}
+    reset_datahub()
+
+
 def test_agent_evidence_resolver_returns_safe_web_route_navigation(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

@@ -171,6 +171,12 @@ async def run_agent_report_rhythm(payload: dict[str, Any]) -> dict[str, Any]:
     return {"rhythm": rhythm}
 
 
+@router.post("/reports/rhythm/scheduled")
+async def run_agent_scheduled_report_rhythm(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    schedule = AgentRuntime().run_scheduled_report_rhythm(force=bool((payload or {}).get("force") or False))
+    return {"schedule": schedule}
+
+
 @router.get("/handoffs")
 async def list_agent_handoffs(session_id: str = "") -> dict[str, Any]:
     handoffs = AgentRuntime().list_handoffs(session_id or None)

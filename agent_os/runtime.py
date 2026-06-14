@@ -932,6 +932,73 @@ class AgentRuntime:
         )
         return {**payload, "path": str(path), "evidence": evidence.to_dict()}
 
+    def run_scheduled_report_rhythm(
+        self,
+        *,
+        force: bool = False,
+        as_of: str | None = None,
+        session_status: str = "active",
+    ) -> dict[str, Any]:
+        checked_at = as_of or _now()
+        session_ids = self.ledger.list_session_ids_by_status(session_status)
+        sessions: list[dict[str, Any]] = []
+        generated_count = 0
+        skipped_count = 0
+        failed_count = 0
+        for session_id in session_ids:
+            try:
+                rhythm = self.run_report_rhythm(session_id=session_id, force=force, as_of=checked_at)
+                sessions.append(
+                    {
+                        "session_id": session_id,
+                        "status": "ready",
+                        "generated_count": rhythm["generated_count"],
+                        "skipped_count": rhythm["skipped_count"],
+                        "rhythm_run_id": rhythm["run_id"],
+                        "path": rhythm["path"],
+                        "evidence_id": rhythm["evidence"]["evidence_id"],
+                    }
+                )
+                generated_count += int(rhythm["generated_count"])
+                skipped_count += int(rhythm["skipped_count"])
+            except Exception as exc:
+                failed_count += 1
+                sessions.append(
+                    {
+                        "session_id": session_id,
+                        "status": "failed",
+                        "generated_count": 0,
+                        "skipped_count": 0,
+                        "rhythm_run_id": "",
+                        "path": "",
+                        "evidence_id": "",
+                        "error": str(exc),
+                    }
+                )
+        payload = {
+            "status": "ready" if failed_count == 0 else "partial",
+            "schedule_id": _id("schedule"),
+            "checked_at": checked_at,
+            "force": force,
+            "session_status": session_status,
+            "session_count": len(session_ids),
+            "generated_count": generated_count,
+            "skipped_count": skipped_count,
+            "failed_count": failed_count,
+            "sessions": sessions,
+        }
+        path = self._write_scheduled_report_rhythm_artifact(payload)
+        evidence = self.create_evidence(
+            kind="ledger",
+            label="Agent scheduled report rhythm",
+            uri=str(path),
+            summary=(
+                f"Scheduled report rhythm scanned {payload['session_count']} session(s), "
+                f"generated {payload['generated_count']} report(s), failed {payload['failed_count']} session(s)."
+            ),
+        )
+        return {**payload, "path": str(path), "evidence": evidence.to_dict()}
+
     def _snapshot_evidence_file(self, evidence_id: str, source: Path) -> Path:
         root = get_datahub().artifact_dir("agent") / "evidence" / evidence_id
         root.mkdir(parents=True, exist_ok=True)
@@ -944,6 +1011,14 @@ class AgentRuntime:
         root.mkdir(parents=True, exist_ok=True)
         checked_at = str(payload["checked_at"]).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
         path = root / f"{checked_at}-{payload['run_id']}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return path
+
+    def _write_scheduled_report_rhythm_artifact(self, payload: dict[str, Any]) -> Path:
+        root = get_datahub().artifact_dir("agent") / "reports" / "scheduled"
+        root.mkdir(parents=True, exist_ok=True)
+        checked_at = str(payload["checked_at"]).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
+        path = root / f"{checked_at}-{payload['schedule_id']}.json"
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
         return path
 

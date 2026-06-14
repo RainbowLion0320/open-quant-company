@@ -175,6 +175,9 @@
               <button class="btn btn-xs btn-ghost" type="button" :disabled="runningRhythm" @click="runReportRhythm">
                 {{ t("ceoOffice.runRhythm") }}
               </button>
+              <button class="btn btn-xs btn-ghost" type="button" :disabled="runningScheduledRhythm" @click="runScheduledReportRhythm">
+                {{ t("ceoOffice.runScheduledRhythm") }}
+              </button>
             </div>
           </header>
           <div v-if="rhythmResult" class="rhythm-status">
@@ -184,6 +187,15 @@
               {{ t("ceoOffice.skipped") }} {{ rhythmResult.skipped_count }}
             </strong>
             <small>{{ rhythmResult.checked_at }}</small>
+          </div>
+          <div v-if="scheduledRhythmResult" class="rhythm-status">
+            <span>{{ t("ceoOffice.scheduledRhythmStatus") }}</span>
+            <strong>
+              {{ t("ceoOffice.sessionCount") }} {{ scheduledRhythmResult.session_count }} ·
+              {{ t("ceoOffice.generated") }} {{ scheduledRhythmResult.generated_count }} ·
+              {{ t("ceoOffice.skipped") }} {{ scheduledRhythmResult.skipped_count }}
+            </strong>
+            <small>{{ scheduledRhythmResult.checked_at }} · {{ t("ceoOffice.failed") }} {{ scheduledRhythmResult.failed_count }}</small>
           </div>
           <div v-if="!reports.length" class="ceo-empty">{{ t("ceoOffice.noReports") }}</div>
           <div v-else class="report-list">
@@ -435,7 +447,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveReadiness, type AgentMessage, type AgentReport, type AgentReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveReadiness, type AgentMessage, type AgentReport, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -447,6 +459,7 @@ const actions = ref<AgentAction[]>([]);
 const handoffs = ref<AgentHandoff[]>([]);
 const reports = ref<AgentReport[]>([]);
 const rhythmResult = ref<AgentReportRhythm | null>(null);
+const scheduledRhythmResult = ref<AgentScheduledReportRhythm | null>(null);
 const liveReadiness = ref<AgentLiveReadiness | null>(null);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
@@ -461,6 +474,7 @@ const archivingSession = ref(false);
 const resolvingHandoff = ref("");
 const generatingReport = ref(false);
 const runningRhythm = ref(false);
+const runningScheduledRhythm = ref(false);
 const selectedReportKind = ref("daily_brief");
 const draft = ref("");
 const sending = ref(false);
@@ -767,6 +781,24 @@ async function runReportRhythm() {
     error.value = `${t("ceoOffice.rhythmFailed")}: ${err?.message || err}`;
   } finally {
     runningRhythm.value = false;
+  }
+}
+
+async function runScheduledReportRhythm() {
+  runningScheduledRhythm.value = true;
+  error.value = "";
+  try {
+    const payload = await api.agentRunScheduledReportRhythm();
+    scheduledRhythmResult.value = payload.schedule;
+    if (activeSession.value) {
+      await loadSession(activeSession.value.session_id);
+    } else {
+      await load();
+    }
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.rhythmFailed")}: ${err?.message || err}`;
+  } finally {
+    runningScheduledRhythm.value = false;
   }
 }
 

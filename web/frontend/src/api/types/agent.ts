@@ -214,6 +214,36 @@ export interface AgentReportRhythmResponse {
   rhythm: AgentReportRhythm;
 }
 
+export interface AgentScheduledReportRhythmSession {
+  session_id: string;
+  status: string;
+  generated_count: number;
+  skipped_count: number;
+  rhythm_run_id: string;
+  path: string;
+  evidence_id: string;
+  error?: string;
+}
+
+export interface AgentScheduledReportRhythm {
+  status: string;
+  schedule_id: string;
+  checked_at: string;
+  force: boolean;
+  session_status: string;
+  session_count: number;
+  generated_count: number;
+  skipped_count: number;
+  failed_count: number;
+  sessions: AgentScheduledReportRhythmSession[];
+  path: string;
+  evidence: EvidenceRef;
+}
+
+export interface AgentScheduledReportRhythmResponse {
+  schedule: AgentScheduledReportRhythm;
+}
+
 export interface AgentLiveReadinessResponse {
   health: AgentLiveReadiness;
 }

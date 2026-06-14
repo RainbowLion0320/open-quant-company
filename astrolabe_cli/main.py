@@ -29,6 +29,7 @@ from astrolabe_cli.commands.agent import reject as agent_reject
 from astrolabe_cli.commands.agent import reports as agent_reports
 from astrolabe_cli.commands.agent import resolve_handoff as agent_resolve_handoff
 from astrolabe_cli.commands.agent import run_report_rhythm as agent_run_report_rhythm
+from astrolabe_cli.commands.agent import run_scheduled_report_rhythm as agent_run_scheduled_report_rhythm
 from astrolabe_cli.commands.agent import run_action as agent_run_action
 from astrolabe_cli.commands.agent import sessions as agent_sessions
 from astrolabe_cli.commands.agent import show_action as agent_show_action
@@ -163,10 +164,18 @@ def build_parser() -> argparse.ArgumentParser:
     agent_report_cmd.set_defaults(handler=lambda args: agent_generate_report(args.kind, args.session))
 
     agent_rhythm_cmd = agent_sub.add_parser("rhythm", help="Run due agent report operating rhythm")
-    agent_rhythm_cmd.add_argument("--session", required=True)
+    agent_rhythm_target = agent_rhythm_cmd.add_mutually_exclusive_group(required=True)
+    agent_rhythm_target.add_argument("--session")
+    agent_rhythm_target.add_argument("--all-active", action="store_true")
     agent_rhythm_cmd.add_argument("--force", action="store_true")
     add_common_flags(agent_rhythm_cmd)
-    agent_rhythm_cmd.set_defaults(handler=lambda args: agent_run_report_rhythm(args.session, force=args.force))
+    agent_rhythm_cmd.set_defaults(
+        handler=lambda args: (
+            agent_run_scheduled_report_rhythm(force=args.force)
+            if args.all_active
+            else agent_run_report_rhythm(args.session, force=args.force)
+        )
+    )
 
     agent_handoffs_cmd = agent_sub.add_parser("handoffs", help="List cross-desk handoffs")
     agent_handoffs_cmd.add_argument("--session", default="")

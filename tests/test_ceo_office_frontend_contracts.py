@@ -74,8 +74,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentReports" in view
     assert "api.agentGenerateReport" in view
     assert "api.agentRunReportRhythm" in view
+    assert "api.agentRunScheduledReportRhythm" in view
     assert "rhythmResult" in view
+    assert "scheduledRhythmResult" in view
     assert "runReportRhythm" in view
+    assert "runScheduledReportRhythm" in view
     assert "runningRhythm" in view
     assert "selectedReportKind" in view
     assert "reportKindOptions" in view
@@ -88,7 +91,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.reportKind" in view
     assert "ceoOffice.generateReport" in view
     assert "ceoOffice.runRhythm" in view
+    assert "ceoOffice.runScheduledRhythm" in view
     assert "ceoOffice.rhythmStatus" in view
+    assert "ceoOffice.sessionCount" in view
     assert "ceoOffice.reports" in view
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
@@ -136,7 +141,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "工程摘要" in zh_ceo
     assert "发布审计" in zh_ceo
     assert "运行节奏" in zh_ceo
+    assert "运行后台节奏" in zh_ceo
     assert "节奏状态" in zh_ceo
+    assert "会话数" in zh_ceo
     assert "已生成" in zh_ceo
     assert "已跳过" in zh_ceo
     assert "提交纸面订单" in zh_ceo
@@ -162,7 +169,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Engineering Digest" in en_ceo
     assert "Release Audit" in en_ceo
     assert "Run Rhythm" in en_ceo
+    assert "Run Scheduled Rhythm" in en_ceo
     assert "Rhythm Status" in en_ceo
+    assert "Sessions" in en_ceo
     assert "Generated" in en_ceo
     assert "Skipped" in en_ceo
     assert "Submit Paper Order" in en_ceo
@@ -205,12 +214,16 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentReports" in agent_api
     assert "agentGenerateReport" in agent_api
     assert "agentRunReportRhythm" in agent_api
+    assert "agentRunScheduledReportRhythm" in agent_api
     assert "/api/agent/reports/rhythm" in agent_api
+    assert "/api/agent/reports/rhythm/scheduled" in agent_api
     assert "agentLiveReadiness" in agent_api
     assert "export interface AgentSession" in agent_types
     assert "export interface AgentReport" in agent_types
     assert "export interface AgentReportRhythm" in agent_types
     assert "export interface AgentReportRhythmResponse" in agent_types
+    assert "export interface AgentScheduledReportRhythm" in agent_types
+    assert "export interface AgentScheduledReportRhythmResponse" in agent_types
     assert "export interface AgentLiveReadiness" in agent_types
     assert "export interface AgentAction" in agent_types
     assert "expires_at: string" in agent_types
