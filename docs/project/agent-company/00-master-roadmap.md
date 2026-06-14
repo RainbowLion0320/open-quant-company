@@ -249,7 +249,8 @@ Current foundation:
 - Daily, weekly, audit, data quality, risk, execution reconciliation, engineering digest, and release audit report artifacts can be generated under `var/artifacts/agent/reports/`.
 - Reports are written as JSON and Markdown, cite session/action/run/handoff evidence ids, and register the JSON artifact as resolvable `report` evidence.
 - Dedicated report templates are deterministic and available through `astroq agent report ... --json` and `POST /api/agent/reports`.
-- Scheduled operating rhythm and richer CEO Office report-template controls remain future work.
+- CEO Office exposes a report-template selector and can generate the selected report from the main control page.
+- Scheduled operating rhythm and deeper cross-artifact report aggregation remain future work.
 
 ## 8. Design Decisions Locked by This Roadmap
 

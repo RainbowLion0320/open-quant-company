@@ -196,6 +196,31 @@
   gap: 7px;
 }
 
+.report-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.report-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.report-toolbar select {
+  min-width: 150px;
+  height: 30px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
 .report-row p {
   margin: 0;
   color: var(--text-secondary);

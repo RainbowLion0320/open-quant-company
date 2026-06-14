@@ -68,11 +68,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "resolveHandoff" in view
     assert "api.agentReports" in view
     assert "api.agentGenerateReport" in view
+    assert "selectedReportKind" in view
+    assert "reportKindOptions" in view
+    assert "kind: selectedReportKind.value" in view
     assert "api.agentLiveReadiness" in view
     assert "liveReadiness" in view
     assert "ceoOffice.liveReadiness" in view
     assert "reports" in view
     assert "generateReport" in view
+    assert "ceoOffice.reportKind" in view
+    assert "ceoOffice.generateReport" in view
     assert "ceoOffice.reports" in view
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
@@ -105,13 +110,31 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Current Hash" in en_ceo
     assert "Open Linked View" in en_ceo
     assert "报告" in zh_ceo
-    assert "生成日报" in zh_ceo
+    assert "报告类型" in zh_ceo
+    assert "生成报告" in zh_ceo
+    assert "CEO 日报" in zh_ceo
+    assert "周度研究复盘" in zh_ceo
+    assert "审计包" in zh_ceo
+    assert "数据质量报告" in zh_ceo
+    assert "风控报告" in zh_ceo
+    assert "执行对账报告" in zh_ceo
+    assert "工程摘要" in zh_ceo
+    assert "发布审计" in zh_ceo
     assert "提交纸面订单" in zh_ceo
     assert "纸面订单预览" in zh_ceo
     assert "风控门" in zh_ceo
     assert "运行证据" in zh_ceo
     assert "Reports" in en_ceo
-    assert "Generate Daily" in en_ceo
+    assert "Report Type" in en_ceo
+    assert "Generate Report" in en_ceo
+    assert "Daily Brief" in en_ceo
+    assert "Weekly Review" in en_ceo
+    assert "Audit Pack" in en_ceo
+    assert "Data Quality Report" in en_ceo
+    assert "Risk Report" in en_ceo
+    assert "Execution Reconciliation" in en_ceo
+    assert "Engineering Digest" in en_ceo
+    assert "Release Audit" in en_ceo
     assert "Submit Paper Order" in en_ceo
     assert "Paper Order Preview" in en_ceo
     assert "Risk Gate" in en_ceo

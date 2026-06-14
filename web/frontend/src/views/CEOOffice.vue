@@ -160,9 +160,19 @@
         <article class="ceo-panel">
           <header class="panel-head">
             <span>{{ t("ceoOffice.reports") }}</span>
-            <button class="btn btn-xs" type="button" :disabled="generatingReport" @click="generateReport">
-              {{ t("ceoOffice.generateDaily") }}
-            </button>
+            <div class="report-toolbar">
+              <label>
+                <span>{{ t("ceoOffice.reportKind") }}</span>
+                <select v-model="selectedReportKind" :disabled="generatingReport">
+                  <option v-for="option in reportKindOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+              <button class="btn btn-xs" type="button" :disabled="generatingReport" @click="generateReport">
+                {{ t("ceoOffice.generateReport") }}
+              </button>
+            </div>
           </header>
           <div v-if="!reports.length" class="ceo-empty">{{ t("ceoOffice.noReports") }}</div>
           <div v-else class="report-list">
@@ -413,6 +423,7 @@ const cancelingAction = ref("");
 const archivingSession = ref(false);
 const resolvingHandoff = ref("");
 const generatingReport = ref(false);
+const selectedReportKind = ref("daily_brief");
 const draft = ref("");
 const sending = ref(false);
 const error = ref("");
@@ -426,6 +437,16 @@ const paperOrderPreview = computed(() => objectParam(selectedAction.value?.actio
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
 const paperRiskGatePassed = computed(() => Boolean(paperRiskGate.value?.passed));
 const paperRiskBlockers = computed(() => arrayParam(paperRiskGate.value?.blockers));
+const reportKindOptions = computed(() => [
+  { value: "daily_brief", label: t("ceoOffice.dailyBrief") },
+  { value: "weekly_review", label: t("ceoOffice.weeklyReview") },
+  { value: "audit_pack", label: t("ceoOffice.auditPack") },
+  { value: "data_quality_review", label: t("ceoOffice.dataQualityReport") },
+  { value: "risk_review", label: t("ceoOffice.riskReport") },
+  { value: "execution_reconciliation", label: t("ceoOffice.executionReconciliation") },
+  { value: "engineering_digest", label: t("ceoOffice.engineeringDigest") },
+  { value: "release_audit", label: t("ceoOffice.releaseAudit") },
+]);
 
 const deskNames = computed<Record<string, string>>(() => ({
   data: t("ceoOffice.dataDesk"),
@@ -658,7 +679,7 @@ async function generateReport() {
   error.value = "";
   try {
     const session = await ensureSession();
-    const payload = await api.agentGenerateReport({ kind: "daily_brief", session_id: session.session_id });
+    const payload = await api.agentGenerateReport({ kind: selectedReportKind.value, session_id: session.session_id });
     reports.value = [payload.report, ...reports.value.filter(report => report.report_id !== payload.report.report_id)];
     await loadEvidence(payload.report.evidence_id);
     await loadSession(session.session_id);
