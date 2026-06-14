@@ -741,6 +741,8 @@ def test_datahub_sources_tab_and_api_contract():
     assert "sample_probe" in data_source_types
     assert "discoveryFilter" in data_sources_view
     assert "probeFilter" in data_sources_view
+    assert 'class="capability-filter-bar"' in data_sources_view
+    assert 'class="sources-filters glass-card"' not in data_sources_view
     assert "currentPage" in data_sources_view
     assert "pageSize" in data_sources_view
     assert "pagedCapabilities" in data_sources_view

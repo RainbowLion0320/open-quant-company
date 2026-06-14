@@ -50,47 +50,6 @@
       </article>
     </section>
 
-    <section class="sources-filters glass-card">
-      <label>
-        <span>{{ t("dataSources.source") }}</span>
-        <select v-model="sourceFilter">
-          <option value="all">{{ t("dataSources.all") }}</option>
-          <option v-for="source in sourceOptions" :key="source" :value="source">{{ source }}</option>
-        </select>
-      </label>
-      <label>
-        <span>{{ t("dataSources.status") }}</span>
-        <select v-model="statusFilter">
-          <option value="all">{{ t("dataSources.all") }}</option>
-          <option value="project_integrated">{{ t("dataSources.projectIntegrated") }}</option>
-          <option value="unmapped">{{ t("dataSources.notMapped") }}</option>
-          <option value="candidate">{{ t("dataSources.candidate") }}</option>
-          <option value="backend_source">{{ t("dataSources.backendSource") }}</option>
-        </select>
-      </label>
-      <label>
-        <span>{{ t("dataSources.discoveryStatus") }}</span>
-        <select v-model="discoveryFilter">
-          <option value="all">{{ t("dataSources.all") }}</option>
-          <option v-for="status in discoveryStatuses" :key="status" :value="status">{{ status }}</option>
-        </select>
-      </label>
-      <label>
-        <span>{{ t("dataSources.probeStatus") }}</span>
-        <select v-model="probeFilter">
-          <option value="all">{{ t("dataSources.all") }}</option>
-          <option v-for="status in probeStatuses" :key="status" :value="status">{{ status }}</option>
-        </select>
-      </label>
-      <label>
-        <span>{{ t("dataSources.domain") }}</span>
-        <select v-model="domainFilter">
-          <option value="all">{{ t("dataSources.all") }}</option>
-          <option v-for="domain in domains" :key="domain" :value="domain">{{ domain }}</option>
-        </select>
-      </label>
-    </section>
-
     <section class="sources-grid">
       <article class="glass-card source-panel">
         <div class="panel-head">
@@ -134,6 +93,46 @@
       <div class="panel-head">
         <span>{{ t("dataSources.capabilityTable") }}</span>
         <small>{{ paginationRange }}</small>
+      </div>
+      <div class="capability-filter-bar">
+        <label>
+          <span>{{ t("dataSources.source") }}</span>
+          <select v-model="sourceFilter">
+            <option value="all">{{ t("dataSources.all") }}</option>
+            <option v-for="source in sourceOptions" :key="source" :value="source">{{ source }}</option>
+          </select>
+        </label>
+        <label>
+          <span>{{ t("dataSources.status") }}</span>
+          <select v-model="statusFilter">
+            <option value="all">{{ t("dataSources.all") }}</option>
+            <option value="project_integrated">{{ t("dataSources.projectIntegrated") }}</option>
+            <option value="unmapped">{{ t("dataSources.notMapped") }}</option>
+            <option value="candidate">{{ t("dataSources.candidate") }}</option>
+            <option value="backend_source">{{ t("dataSources.backendSource") }}</option>
+          </select>
+        </label>
+        <label>
+          <span>{{ t("dataSources.discoveryStatus") }}</span>
+          <select v-model="discoveryFilter">
+            <option value="all">{{ t("dataSources.all") }}</option>
+            <option v-for="status in discoveryStatuses" :key="status" :value="status">{{ status }}</option>
+          </select>
+        </label>
+        <label>
+          <span>{{ t("dataSources.probeStatus") }}</span>
+          <select v-model="probeFilter">
+            <option value="all">{{ t("dataSources.all") }}</option>
+            <option v-for="status in probeStatuses" :key="status" :value="status">{{ status }}</option>
+          </select>
+        </label>
+        <label>
+          <span>{{ t("dataSources.domain") }}</span>
+          <select v-model="domainFilter">
+            <option value="all">{{ t("dataSources.all") }}</option>
+            <option v-for="domain in domains" :key="domain" :value="domain">{{ domain }}</option>
+          </select>
+        </label>
       </div>
       <div class="capability-pagination">
         <span>{{ paginationRange }}</span>
