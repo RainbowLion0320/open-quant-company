@@ -208,3 +208,26 @@ def memory_export() -> CliResult:
         message=f"Exported agent memory to {artifact['path']}",
         data={"artifact": artifact},
     )
+
+
+def memory_prune(dry_run: bool) -> CliResult:
+    result = AgentRuntime().prune_memory(dry_run=dry_run)
+    return CliResult(
+        ok=True,
+        command="agent memory prune",
+        message="Agent memory prune dry-run" if dry_run else "Pruned archived agent memory",
+        data={"result": result},
+    )
+
+
+def memory_clear(confirm: bool, dry_run: bool) -> CliResult:
+    try:
+        result = AgentRuntime().clear_memory(confirm=confirm, dry_run=dry_run)
+    except ValueError as exc:
+        return CliResult(False, "agent memory clear", {}, "Agent memory clear requires confirmation", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent memory clear",
+        message="Agent memory clear dry-run" if dry_run else "Cleared agent memory",
+        data={"result": result},
+    )

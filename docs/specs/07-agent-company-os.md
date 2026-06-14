@@ -47,8 +47,8 @@ All endpoints are planned under `/api/agent/*`.
 | `GET` | `/api/agent/desks` | List desk agents, health, allowed tools, and current blockers. | Implemented |
 | `GET` | `/api/agent/memory` | Inspect transparent memory summaries and local ledger records. | Implemented |
 | `POST` | `/api/agent/memory/export` | Export memory and evidence references to `var/artifacts/agent/memory/`. | Implemented |
-| `POST` | `/api/agent/memory/prune` | Prune memory by policy. | Planned |
-| `POST` | `/api/agent/memory/clear` | Clear memory after explicit approval. | Planned |
+| `POST` | `/api/agent/memory/prune` | Prune archived-session memory by explicit policy with dry-run support. | Implemented |
+| `POST` | `/api/agent/memory/clear` | Clear memory after explicit confirmation. | Implemented |
 
 ## 4. CLI Surface
 
@@ -73,6 +73,8 @@ All commands must support `--json`.
 | `astroq agent desks --json` | List desk registry and health. | Implemented |
 | `astroq agent memory show --json` | Inspect local transparent memory. | Implemented |
 | `astroq agent memory export --json` | Export local transparent memory. | Implemented |
+| `astroq agent memory prune --dry-run --json` | Preview or prune archived session memory. | Implemented |
+| `astroq agent memory clear --confirm --json` | Clear local memory after explicit confirmation. | Implemented |
 
 ## 5. Data Model
 
@@ -402,8 +404,8 @@ As of 2026-06-14:
 
 - Foundation runtime is partially implemented in `agent_os/`.
 - The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and open/resolved cross-desk handoffs under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/evidence/desks/memory show/memory export --json` is available.
-- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/memory`, and `/api/agent/memory/export` are available.
+- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
+- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; unsafe templated write commands remain blocked until a stricter parameter binding phase lands.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
@@ -411,4 +413,4 @@ As of 2026-06-14:
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
-- Actual desk reasoning, broad tool execution, memory prune/clear, evidence snapshot governance, streaming updates, and MiniQMT/QMT live adapter are not yet implemented.
+- Actual desk reasoning, broad tool execution, evidence snapshot governance, streaming updates, reports, and MiniQMT/QMT live adapter are not yet implemented.

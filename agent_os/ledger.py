@@ -18,6 +18,10 @@ def _json_loads(value: str | None, default: Any) -> Any:
     return json.loads(value)
 
 
+def _placeholders(values: list[str]) -> str:
+    return ",".join("?" for _ in values)
+
+
 class AgentLedger:
     """SQLite ledger for local Agent Company OS state."""
 
@@ -251,6 +255,74 @@ class AgentLedger:
             rows = conn.execute("SELECT * FROM sessions ORDER BY created_at DESC, session_id DESC").fetchall()
         return [self._session_row(row) for row in rows]
 
+    def list_session_ids_by_status(self, status: str) -> list[str]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT session_id FROM sessions WHERE status = ? ORDER BY created_at ASC", (status,)).fetchall()
+        return [str(row["session_id"]) for row in rows]
+
+    def memory_counts(self) -> dict[str, int]:
+        with self._connect() as conn:
+            return {
+                "sessions": int(conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]),
+                "messages": int(conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]),
+                "actions": int(conn.execute("SELECT COUNT(*) FROM actions").fetchone()[0]),
+                "runs": int(conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]),
+                "evidence": int(conn.execute("SELECT COUNT(*) FROM evidence").fetchone()[0]),
+                "handoffs": int(conn.execute("SELECT COUNT(*) FROM handoffs").fetchone()[0]),
+            }
+
+    def delete_sessions(self, session_ids: list[str], *, dry_run: bool = False) -> dict[str, int]:
+        ids = [str(session_id) for session_id in session_ids if str(session_id)]
+        if not ids:
+            return {"sessions": 0, "messages": 0, "actions": 0, "runs": 0, "evidence": 0, "handoffs": 0}
+        placeholders = _placeholders(ids)
+        with self._connect() as conn:
+            action_rows = conn.execute(
+                f"SELECT action_id FROM actions WHERE session_id IN ({placeholders})",
+                ids,
+            ).fetchall()
+            action_ids = [str(row["action_id"]) for row in action_rows]
+            action_placeholders = _placeholders(action_ids)
+            candidate_evidence = self._session_evidence_refs(conn, ids, action_ids)
+            outside_evidence = self._outside_session_evidence_refs(conn, ids, action_ids)
+            evidence_to_delete = sorted(candidate_evidence - outside_evidence)
+            counts = {
+                "sessions": int(conn.execute(f"SELECT COUNT(*) FROM sessions WHERE session_id IN ({placeholders})", ids).fetchone()[0]),
+                "messages": int(conn.execute(f"SELECT COUNT(*) FROM messages WHERE session_id IN ({placeholders})", ids).fetchone()[0]),
+                "actions": len(action_ids),
+                "runs": int(
+                    conn.execute(
+                        f"SELECT COUNT(*) FROM runs WHERE action_id IN ({action_placeholders})",
+                        action_ids,
+                    ).fetchone()[0]
+                    if action_ids
+                    else 0
+                ),
+                "evidence": len(evidence_to_delete),
+                "handoffs": int(conn.execute(f"SELECT COUNT(*) FROM handoffs WHERE session_id IN ({placeholders})", ids).fetchone()[0]),
+            }
+            if dry_run:
+                return counts
+            if action_ids:
+                conn.execute(f"DELETE FROM runs WHERE action_id IN ({action_placeholders})", action_ids)
+                conn.execute(f"DELETE FROM actions WHERE action_id IN ({action_placeholders})", action_ids)
+            conn.execute(f"DELETE FROM handoffs WHERE session_id IN ({placeholders})", ids)
+            conn.execute(f"DELETE FROM messages WHERE session_id IN ({placeholders})", ids)
+            conn.execute(f"DELETE FROM sessions WHERE session_id IN ({placeholders})", ids)
+            if evidence_to_delete:
+                evidence_placeholders = _placeholders(evidence_to_delete)
+                conn.execute(f"DELETE FROM evidence WHERE evidence_id IN ({evidence_placeholders})", evidence_to_delete)
+            return counts
+
+    def clear_memory(self, *, dry_run: bool = False) -> dict[str, int]:
+        counts = self.memory_counts()
+        if dry_run:
+            return counts
+        with self._connect() as conn:
+            for table in ("runs", "handoffs", "actions", "messages", "evidence", "sessions"):
+                conn.execute(f"DELETE FROM {table}")
+        return counts
+
     def get_session(self, session_id: str) -> dict[str, Any] | None:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
@@ -332,6 +404,71 @@ class AgentLedger:
                 """,
                 (status, resolved_at, handoff_id),
             )
+
+    @staticmethod
+    def _collect_json_refs(rows: list[sqlite3.Row], column: str) -> set[str]:
+        refs: set[str] = set()
+        for row in rows:
+            refs.update(str(value) for value in _json_loads(row[column], []) if str(value))
+        return refs
+
+    def _session_evidence_refs(self, conn: sqlite3.Connection, session_ids: list[str], action_ids: list[str]) -> set[str]:
+        placeholders = _placeholders(session_ids)
+        refs = self._collect_json_refs(
+            conn.execute(f"SELECT evidence_refs FROM messages WHERE session_id IN ({placeholders})", session_ids).fetchall(),
+            "evidence_refs",
+        )
+        refs.update(
+            self._collect_json_refs(
+                conn.execute(f"SELECT evidence_refs FROM actions WHERE session_id IN ({placeholders})", session_ids).fetchall(),
+                "evidence_refs",
+            )
+        )
+        refs.update(
+            self._collect_json_refs(
+                conn.execute(f"SELECT evidence_refs FROM handoffs WHERE session_id IN ({placeholders})", session_ids).fetchall(),
+                "evidence_refs",
+            )
+        )
+        if action_ids:
+            action_placeholders = _placeholders(action_ids)
+            refs.update(
+                self._collect_json_refs(
+                    conn.execute(f"SELECT artifact_refs FROM runs WHERE action_id IN ({action_placeholders})", action_ids).fetchall(),
+                    "artifact_refs",
+                )
+            )
+        return refs
+
+    def _outside_session_evidence_refs(self, conn: sqlite3.Connection, session_ids: list[str], action_ids: list[str]) -> set[str]:
+        placeholders = _placeholders(session_ids)
+        refs = self._collect_json_refs(
+            conn.execute(f"SELECT evidence_refs FROM messages WHERE session_id NOT IN ({placeholders})", session_ids).fetchall(),
+            "evidence_refs",
+        )
+        refs.update(
+            self._collect_json_refs(
+                conn.execute(f"SELECT evidence_refs FROM actions WHERE session_id NOT IN ({placeholders})", session_ids).fetchall(),
+                "evidence_refs",
+            )
+        )
+        refs.update(
+            self._collect_json_refs(
+                conn.execute(f"SELECT evidence_refs FROM handoffs WHERE session_id NOT IN ({placeholders})", session_ids).fetchall(),
+                "evidence_refs",
+            )
+        )
+        if action_ids:
+            action_placeholders = _placeholders(action_ids)
+            refs.update(
+                self._collect_json_refs(
+                    conn.execute(f"SELECT artifact_refs FROM runs WHERE action_id NOT IN ({action_placeholders})", action_ids).fetchall(),
+                    "artifact_refs",
+                )
+            )
+        else:
+            refs.update(self._collect_json_refs(conn.execute("SELECT artifact_refs FROM runs").fetchall(), "artifact_refs"))
+        return refs
 
     @staticmethod
     def _session_row(row: sqlite3.Row) -> dict[str, Any]:

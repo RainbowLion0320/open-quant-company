@@ -167,3 +167,27 @@ async def get_agent_memory() -> dict[str, Any]:
 @router.post("/memory/export")
 async def export_agent_memory() -> dict[str, Any]:
     return {"artifact": AgentRuntime().export_memory()}
+
+
+@router.post("/memory/prune")
+async def prune_agent_memory(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    try:
+        result = AgentRuntime().prune_memory(
+            policy=str((payload or {}).get("policy") or "archived_sessions"),
+            dry_run=bool((payload or {}).get("dry_run", False)),
+        )
+    except ValueError as exc:
+        raise InvalidParameterError("policy", str((payload or {}).get("policy") or ""), str(exc))
+    return {"result": result}
+
+
+@router.post("/memory/clear")
+async def clear_agent_memory(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    try:
+        result = AgentRuntime().clear_memory(
+            confirm=bool((payload or {}).get("confirm", False)),
+            dry_run=bool((payload or {}).get("dry_run", False)),
+        )
+    except ValueError as exc:
+        raise InvalidParameterError("confirm", str((payload or {}).get("confirm") or ""), str(exc))
+    return {"result": result}

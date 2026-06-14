@@ -937,3 +937,77 @@ def test_agent_memory_cli_and_api_export(tmp_path, monkeypatch, capsys):
     assert export_res.status_code == 200
     assert export_res.json()["artifact"]["path"].endswith(".json")
     reset_datahub()
+
+
+def test_agent_memory_prune_and_clear_require_explicit_policy(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    active = runtime.create_session(title="Active memory", default_desk="reporting")
+    archived = runtime.create_session(title="Archived memory", default_desk="reporting")
+    runtime.update_session(archived.session_id, status="archived")
+    runtime.add_message(active.session_id, role="ceo", desk="reporting", content="keep me")
+    archived_message = runtime.add_message(archived.session_id, role="ceo", desk="reporting", content="prune me")
+    active_evidence = runtime.create_evidence(kind="ledger", label="Active", uri="active", summary="keep")
+    archived_evidence = runtime.create_evidence(kind="ledger", label="Archived", uri="archived", summary="prune")
+    action = runtime.propose_action(
+        session_id=archived.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Archived health",
+        parameters={"tool_id": "astroq.health"},
+        evidence_refs=[archived_evidence.evidence_id],
+    )
+    runtime.record_run(
+        action_id=action.action_id,
+        tool_name="astroq.health",
+        command=[".venv/bin/astroq", "health", "--json"],
+        status="succeeded",
+        return_code=0,
+        stdout_summary="ok",
+        stderr_summary="",
+        artifact_refs=[archived_evidence.evidence_id],
+    )
+    runtime.respond_as_desk(
+        session_id=archived.session_id,
+        source_message_id=archived_message.message_id,
+        desk="reporting",
+        answer="handoff",
+        evidence_refs=[archived_evidence.evidence_id],
+        handoffs=[{"target_desk": "data", "reason": "prune handoff"}],
+    )
+
+    dry_run = runtime.prune_memory(dry_run=True)
+    snapshot_before = runtime.memory_snapshot()
+    cli_code = run_cli(["agent", "memory", "prune", "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    client = TestClient(create_app())
+    cli_clear_code = run_cli(["agent", "memory", "clear", "--json"])
+    cli_clear_payload = json.loads(capsys.readouterr().out)
+    clear_without_confirm = client.post("/api/agent/memory/clear", json={})
+
+    assert dry_run["dry_run"] is True
+    assert dry_run["counts"]["sessions"] == 1
+    assert snapshot_before["summary"]["session_count"] == 2
+    assert cli_code == 0
+    assert cli_payload["data"]["result"]["counts"]["sessions"] == 1
+    assert runtime.memory_snapshot()["records"]["sessions"][0]["session_id"] == active.session_id
+    assert runtime.memory_snapshot()["records"]["evidence"][0]["evidence_id"] == active_evidence.evidence_id
+    assert cli_clear_code == 1
+    assert cli_clear_payload["ok"] is False
+    assert clear_without_confirm.status_code == 400
+    clear_with_confirm = client.post("/api/agent/memory/clear", json={"confirm": True})
+    assert clear_with_confirm.status_code == 200
+    assert clear_with_confirm.json()["result"]["counts"]["sessions"] == 1
+    assert runtime.memory_snapshot()["summary"]["session_count"] == 0
+    assert runtime.memory_snapshot()["summary"]["evidence_count"] == 0
+    reset_datahub()

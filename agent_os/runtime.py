@@ -498,6 +498,31 @@ class AgentRuntime:
             "summary": snapshot["summary"],
         }
 
+    def prune_memory(self, *, policy: str = "archived_sessions", dry_run: bool = False) -> dict[str, Any]:
+        if policy != "archived_sessions":
+            raise ValueError(f"Unsupported memory prune policy: {policy}")
+        session_ids = self.ledger.list_session_ids_by_status("archived")
+        counts = self.ledger.delete_sessions(session_ids, dry_run=dry_run)
+        return {
+            "status": "dry_run" if dry_run else "pruned",
+            "policy": policy,
+            "dry_run": dry_run,
+            "session_ids": session_ids,
+            "counts": counts,
+            "generated_at": _now(),
+        }
+
+    def clear_memory(self, *, confirm: bool = False, dry_run: bool = False) -> dict[str, Any]:
+        if not confirm and not dry_run:
+            raise ValueError("Agent memory clear requires confirm=True")
+        counts = self.ledger.clear_memory(dry_run=dry_run)
+        return {
+            "status": "dry_run" if dry_run else "cleared",
+            "dry_run": dry_run,
+            "counts": counts,
+            "generated_at": _now(),
+        }
+
     def _decide_action(self, action_id: str, status: str, *, decided_by: str, reason: str) -> AgentAction:
         current = self.ledger.get_action(action_id)
         if not current:
