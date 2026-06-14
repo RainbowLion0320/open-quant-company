@@ -334,6 +334,93 @@ def test_agent_evidence_snapshots_survive_source_mutation_and_deletion(tmp_path,
     reset_datahub()
 
 
+def test_agent_reports_generate_artifacts_and_cite_evidence(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.evidence import EvidenceResolver
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Daily CEO Brief", default_desk="reporting")
+    lifecycle = runtime.create_evidence(
+        kind="web_route",
+        label="Lifecycle readiness",
+        uri="/system?tab=lifecycle",
+        summary="Lifecycle readiness is blocked by missing strategy evidence.",
+    )
+    runtime.add_message(
+        session.session_id,
+        role="desk_agent",
+        desk="reporting",
+        content="Lifecycle readiness needs CEO attention.",
+        evidence_refs=[lifecycle.evidence_id],
+    )
+
+    report = runtime.generate_report(session_id=session.session_id, kind="daily_brief")
+
+    report_path = Path(report["path"])
+    markdown_path = Path(report["markdown_path"])
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    evidence_resolution = EvidenceResolver().resolve(report["evidence_id"])
+
+    assert report["kind"] == "daily_brief"
+    assert report["title"] == "Daily CEO Brief"
+    assert report_path.exists()
+    assert markdown_path.exists()
+    assert str(report_path).endswith(".json")
+    assert str(markdown_path).endswith(".md")
+    assert payload["session_id"] == session.session_id
+    assert payload["evidence_refs"] == [lifecycle.evidence_id]
+    assert payload["missing_evidence"] == []
+    assert payload["sections"][0]["evidence_refs"] == [lifecycle.evidence_id]
+    assert "Lifecycle readiness needs CEO attention." in markdown_path.read_text(encoding="utf-8")
+    assert evidence_resolution["status"] == "fresh"
+    assert evidence_resolution["evidence"]["kind"] == "report"
+    assert evidence_resolution["snapshot"] is not None
+
+    listed = runtime.list_reports(session.session_id)
+
+    assert listed["total"] == 1
+    assert listed["reports"][0]["report_id"] == report["report_id"]
+    assert listed["reports"][0]["evidence_id"] == report["evidence_id"]
+    reset_datahub()
+
+
+def test_agent_report_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Reports API", default_desk="reporting")
+
+    cli_code = run_cli(["agent", "report", "daily", "--session", session.session_id, "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_client = TestClient(create_app())
+    api_create = api_client.post("/api/agent/reports", json={"kind": "weekly_review", "session_id": session.session_id})
+    api_list = api_client.get(f"/api/agent/reports?session_id={session.session_id}")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["report"]["kind"] == "daily_brief"
+    assert Path(cli_payload["data"]["report"]["path"]).exists()
+    assert api_create.status_code == 200
+    assert api_create.json()["report"]["kind"] == "weekly_review"
+    assert Path(api_create.json()["report"]["path"]).exists()
+    assert api_list.status_code == 200
+    assert api_list.json()["total"] == 2
+    assert {row["kind"] for row in api_list.json()["reports"]} == {"daily_brief", "weekly_review"}
+    reset_datahub()
+
+
 def test_agent_evidence_resolver_returns_safe_web_route_navigation(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

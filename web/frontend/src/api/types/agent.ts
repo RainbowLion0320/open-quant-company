@@ -89,6 +89,21 @@ export interface AgentHandoff {
   resolved_at: string;
 }
 
+export interface AgentReport {
+  report_id: string;
+  session_id: string;
+  kind: string;
+  title: string;
+  summary: string;
+  path: string;
+  markdown_path: string;
+  evidence_id: string;
+  evidence_refs: string[];
+  missing_evidence: string[];
+  sections: Array<Record<string, unknown>>;
+  generated_at: string;
+}
+
 export interface AgentDeskResponse {
   message: AgentMessage;
   answer: string;
@@ -140,6 +155,16 @@ export interface AgentDesksResponse {
 export interface AgentHandoffsResponse {
   handoffs: AgentHandoff[];
   total: number;
+}
+
+export interface AgentReportsResponse {
+  status: string;
+  reports: AgentReport[];
+  total: number;
+}
+
+export interface AgentReportResponse {
+  report: AgentReport;
 }
 
 export interface AgentEvidenceResponse {

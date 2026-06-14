@@ -14,12 +14,14 @@ from astrolabe_cli.commands.agent import create_session as agent_create_session
 from astrolabe_cli.commands.agent import desks as agent_desks
 from astrolabe_cli.commands.agent import evidence as agent_evidence
 from astrolabe_cli.commands.agent import expire_actions as agent_expire_actions
+from astrolabe_cli.commands.agent import generate_report as agent_generate_report
 from astrolabe_cli.commands.agent import handoffs as agent_handoffs
 from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
 from astrolabe_cli.commands.agent import memory_export as agent_memory_export
 from astrolabe_cli.commands.agent import memory_prune as agent_memory_prune
 from astrolabe_cli.commands.agent import memory_summary as agent_memory_summary
 from astrolabe_cli.commands.agent import reject as agent_reject
+from astrolabe_cli.commands.agent import reports as agent_reports
 from astrolabe_cli.commands.agent import resolve_handoff as agent_resolve_handoff
 from astrolabe_cli.commands.agent import run_action as agent_run_action
 from astrolabe_cli.commands.agent import sessions as agent_sessions
@@ -122,6 +124,17 @@ def build_parser() -> argparse.ArgumentParser:
     agent_expire_cmd.add_argument("--session", default="")
     add_common_flags(agent_expire_cmd)
     agent_expire_cmd.set_defaults(handler=lambda args: agent_expire_actions(args.session))
+
+    agent_reports_cmd = agent_sub.add_parser("reports", help="List generated agent reports")
+    agent_reports_cmd.add_argument("--session", default="")
+    add_common_flags(agent_reports_cmd)
+    agent_reports_cmd.set_defaults(handler=lambda args: agent_reports(args.session))
+
+    agent_report_cmd = agent_sub.add_parser("report", help="Generate an agent report")
+    agent_report_cmd.add_argument("kind", choices=["daily", "daily_brief", "weekly", "weekly_review", "audit", "audit_pack"])
+    agent_report_cmd.add_argument("--session", required=True)
+    add_common_flags(agent_report_cmd)
+    agent_report_cmd.set_defaults(handler=lambda args: agent_generate_report(args.kind, args.session))
 
     agent_handoffs_cmd = agent_sub.add_parser("handoffs", help="List cross-desk handoffs")
     agent_handoffs_cmd.add_argument("--session", default="")

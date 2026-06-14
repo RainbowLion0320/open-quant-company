@@ -108,6 +108,25 @@ class AgentHandoff:
 
 
 @dataclass(frozen=True)
+class AgentReport:
+    report_id: str
+    session_id: str
+    kind: str
+    title: str
+    summary: str
+    path: str
+    markdown_path: str
+    evidence_id: str
+    evidence_refs: list[str]
+    missing_evidence: list[str]
+    sections: list[dict[str, Any]]
+    generated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class DeskResponse:
     message: AgentMessage
     answer: str

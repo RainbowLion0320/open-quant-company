@@ -60,6 +60,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentHandoffs" in view
     assert "api.agentResolveHandoff" in view
     assert "resolveHandoff" in view
+    assert "api.agentReports" in view
+    assert "api.agentGenerateReport" in view
+    assert "reports" in view
+    assert "generateReport" in view
+    assert "ceoOffice.reports" in view
     assert "ceoOffice" in zh_index
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
@@ -86,6 +91,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Evidence Snapshot" in en_ceo
     assert "Current Hash" in en_ceo
     assert "Open Linked View" in en_ceo
+    assert "报告" in zh_ceo
+    assert "生成日报" in zh_ceo
+    assert "Reports" in en_ceo
+    assert "Generate Daily" in en_ceo
 
 
 def test_frontend_agent_api_module_exports_runtime_types_and_calls():
@@ -107,7 +116,10 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentRunAction" in agent_api
     assert "agentHandoffs" in agent_api
     assert "agentResolveHandoff" in agent_api
+    assert "agentReports" in agent_api
+    assert "agentGenerateReport" in agent_api
     assert "export interface AgentSession" in agent_types
+    assert "export interface AgentReport" in agent_types
     assert "export interface AgentAction" in agent_types
     assert "expires_at: string" in agent_types
     assert "export interface AgentActionDetail" in agent_types

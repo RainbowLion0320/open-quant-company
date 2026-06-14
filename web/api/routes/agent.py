@@ -96,6 +96,25 @@ async def expire_agent_actions(payload: dict[str, Any] | None = None) -> dict[st
     return {"result": result}
 
 
+@router.get("/reports")
+async def list_agent_reports(session_id: str = "") -> dict[str, Any]:
+    return AgentRuntime().list_reports(session_id or None)
+
+
+@router.post("/reports")
+async def generate_agent_report(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        report = AgentRuntime().generate_report(
+            session_id=str(payload.get("session_id") or ""),
+            kind=str(payload.get("kind") or "daily_brief"),
+        )
+    except KeyError:
+        raise DataNotFoundError("agent session", str(payload.get("session_id") or ""))
+    except ValueError as exc:
+        raise InvalidParameterError("agent_report", str(payload.get("kind") or ""), str(exc))
+    return {"report": report}
+
+
 @router.get("/handoffs")
 async def list_agent_handoffs(session_id: str = "") -> dict[str, Any]:
     handoffs = AgentRuntime().list_handoffs(session_id or None)

@@ -44,6 +44,10 @@
         <span>{{ t("ceoOffice.evidence") }}</span>
         <strong>{{ evidenceCount }}</strong>
       </article>
+      <article class="ceo-metric">
+        <span>{{ t("ceoOffice.reports") }}</span>
+        <strong>{{ reports.length }}</strong>
+      </article>
     </section>
 
     <section class="ceo-grid">
@@ -113,6 +117,31 @@
                   @click="resolveHandoff(handoff.handoff_id)"
                 >
                   {{ t("ceoOffice.resolveHandoff") }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="ceo-panel">
+          <header class="panel-head">
+            <span>{{ t("ceoOffice.reports") }}</span>
+            <button class="btn btn-xs" type="button" :disabled="generatingReport" @click="generateReport">
+              {{ t("ceoOffice.generateDaily") }}
+            </button>
+          </header>
+          <div v-if="!reports.length" class="ceo-empty">{{ t("ceoOffice.noReports") }}</div>
+          <div v-else class="report-list">
+            <div v-for="report in reports" :key="report.report_id" class="report-row">
+              <div class="action-title">
+                <strong>{{ report.title }}</strong>
+                <span>{{ formatTime(report.generated_at) }}</span>
+              </div>
+              <p>{{ report.summary }}</p>
+              <small>{{ report.kind }} · {{ report.evidence_refs.length }} evidence refs</small>
+              <div class="approval-buttons">
+                <button class="btn btn-xs" type="button" @click="loadEvidence(report.evidence_id)">
+                  {{ t("ceoOffice.openEvidence") }}
                 </button>
               </div>
             </div>
@@ -273,7 +302,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentMessage, type AgentReport, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -283,6 +312,7 @@ const activeSession = ref<AgentSession | null>(null);
 const messages = ref<AgentMessage[]>([]);
 const actions = ref<AgentAction[]>([]);
 const handoffs = ref<AgentHandoff[]>([]);
+const reports = ref<AgentReport[]>([]);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
@@ -293,6 +323,7 @@ const runningAction = ref("");
 const cancelingAction = ref("");
 const archivingSession = ref(false);
 const resolvingHandoff = ref("");
+const generatingReport = ref(false);
 const draft = ref("");
 const sending = ref(false);
 const error = ref("");
@@ -352,11 +383,12 @@ function formatTime(value: string) {
 }
 
 async function loadSession(sessionId: string) {
-  const detail = await api.agentSession(sessionId);
+  const [detail, reportPayload] = await Promise.all([api.agentSession(sessionId), api.agentReports(sessionId)]);
   activeSession.value = detail.session;
   messages.value = detail.messages || [];
   actions.value = detail.actions || [];
   handoffs.value = detail.handoffs || [];
+  reports.value = reportPayload.reports || [];
 }
 
 async function load() {
@@ -488,6 +520,22 @@ async function runAction(actionId: string) {
     error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
   } finally {
     runningAction.value = "";
+  }
+}
+
+async function generateReport() {
+  generatingReport.value = true;
+  error.value = "";
+  try {
+    const session = await ensureSession();
+    const payload = await api.agentGenerateReport({ kind: "daily_brief", session_id: session.session_id });
+    reports.value = [payload.report, ...reports.value.filter(report => report.report_id !== payload.report.report_id)];
+    await loadEvidence(payload.report.evidence_id);
+    await loadSession(session.session_id);
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.reportFailed")}: ${err?.message || err}`;
+  } finally {
+    generatingReport.value = false;
   }
 }
 

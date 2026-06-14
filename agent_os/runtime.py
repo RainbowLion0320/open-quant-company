@@ -12,7 +12,8 @@ from agent_os.approval import approval_required_for_risk
 from agent_os.desks import get_desk, list_desks
 from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file
 from agent_os.ledger import AgentLedger
-from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentRun, AgentSession, DeskResponse, EvidenceRef
+from agent_os.reports import build_report_payload, normalize_report_kind, read_report_index, render_report_markdown, write_report_index
+from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentReport, AgentRun, AgentSession, DeskResponse, EvidenceRef
 from agent_os.tools import AgentToolRegistry
 from agent_os.workflows import build_desk_workflow_plan
 from data.storage.datahub import get_datahub
@@ -520,6 +521,56 @@ class AgentRuntime:
 
     def list_desks(self) -> list[dict[str, Any]]:
         return list_desks()
+
+    def generate_report(self, *, session_id: str, kind: str = "daily_brief") -> dict[str, Any]:
+        session = self.ledger.get_session(session_id)
+        if not session:
+            raise KeyError(f"Agent session not found: {session_id}")
+        normalized_kind = normalize_report_kind(kind)
+        report_id = _id("rep")
+        generated_at = _now()
+        report_dir = get_datahub().artifact_dir("agent") / "reports"
+        report_dir.mkdir(parents=True, exist_ok=True)
+        stem = f"{normalized_kind}-{generated_at.replace(':', '').replace('-', '').replace('T', '-')}-{report_id}"
+        path = report_dir / f"{stem}.json"
+        markdown_path = report_dir / f"{stem}.md"
+        report = build_report_payload(
+            report_id=report_id,
+            session=session,
+            messages=self.ledger.list_messages(session_id),
+            actions=self.ledger.list_actions(session_id),
+            runs=self._session_runs(session_id),
+            handoffs=self.ledger.list_handoffs(session_id),
+            evidence=self.ledger.list_evidence(),
+            kind=normalized_kind,
+            path=path,
+            markdown_path=markdown_path,
+            generated_at=generated_at,
+        )
+        path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        markdown_path.write_text(render_report_markdown(report), encoding="utf-8")
+        evidence = self.create_evidence(
+            kind="report",
+            label=str(report["title"]),
+            uri=str(path),
+            summary=str(report["summary"]),
+        )
+        report = {**report, "evidence_id": evidence.evidence_id}
+        index_path = report_dir / "index.json"
+        reports = [report, *[row for row in read_report_index(index_path) if row.get("report_id") != report_id]]
+        write_report_index(index_path, reports)
+        return AgentReport(**report).to_dict()
+
+    def list_reports(self, session_id: str | None = None) -> dict[str, Any]:
+        index_path = get_datahub().artifact_dir("agent") / "reports" / "index.json"
+        reports = read_report_index(index_path)
+        if session_id:
+            reports = [row for row in reports if row.get("session_id") == session_id]
+        return {
+            "status": "ready",
+            "reports": reports,
+            "total": len(reports),
+        }
 
     def _snapshot_evidence_file(self, evidence_id: str, source: Path) -> Path:
         root = get_datahub().artifact_dir("agent") / "evidence" / evidence_id

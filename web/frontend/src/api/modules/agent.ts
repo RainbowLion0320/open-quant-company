@@ -8,6 +8,8 @@ import type {
   AgentEvidenceResponse,
   AgentHandoff,
   AgentHandoffsResponse,
+  AgentReportResponse,
+  AgentReportsResponse,
   AgentRunActionResponse,
   AgentSession,
   AgentSessionDetail,
@@ -40,6 +42,9 @@ export const agentApi = {
   agentCancelAction: (actionId: string, reason = "") =>
     post<{ action: AgentAction }>(`/api/agent/actions/${encodeURIComponent(actionId)}/cancel`, { reason }),
   agentRunAction: (actionId: string) => post<AgentRunActionResponse>(`/api/agent/actions/${encodeURIComponent(actionId)}/run`),
+  agentReports: (sessionId = "") =>
+    get<AgentReportsResponse>(`/api/agent/reports${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
+  agentGenerateReport: (payload: { kind: string; session_id: string }) => post<AgentReportResponse>("/api/agent/reports", payload),
   agentEvidence: (evidenceId: string) => get<AgentEvidenceResponse>(`/api/agent/evidence/${encodeURIComponent(evidenceId)}`),
   agentDesks: () => get<AgentDesksResponse>("/api/agent/desks"),
 };

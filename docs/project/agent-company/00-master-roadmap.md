@@ -227,6 +227,12 @@ Required outputs:
 - Engineering work-order digest
 - Release and audit pack
 
+Current foundation:
+
+- Generic daily, weekly, and audit report artifacts can be generated under `var/artifacts/agent/reports/`.
+- Reports are written as JSON and Markdown, cite session/action/run/handoff evidence ids, and register the JSON artifact as resolvable `report` evidence.
+- Dedicated data quality, risk, execution, engineering, release templates and scheduled operating rhythm remain future work.
+
 ## 8. Design Decisions Locked by This Roadmap
 
 | Decision | Locked choice |

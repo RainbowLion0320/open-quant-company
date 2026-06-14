@@ -103,6 +103,31 @@ def expire_actions(session_id: str = "") -> CliResult:
     )
 
 
+def reports(session_id: str = "") -> CliResult:
+    result = AgentRuntime().list_reports(session_id or None)
+    return CliResult(
+        ok=True,
+        command="agent reports",
+        message=f"{result['total']} agent report(s)",
+        data=result,
+    )
+
+
+def generate_report(kind: str, session_id: str) -> CliResult:
+    try:
+        report = AgentRuntime().generate_report(session_id=session_id, kind=kind)
+    except KeyError as exc:
+        return CliResult(False, "agent report", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    except ValueError as exc:
+        return CliResult(False, "agent report", {"kind": kind}, "Agent report invalid", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent report",
+        message=f"Generated {report['kind']} report",
+        data={"report": report},
+    )
+
+
 def handoffs(session_id: str = "") -> CliResult:
     runtime = AgentRuntime()
     rows = runtime.list_handoffs(session_id or None)
