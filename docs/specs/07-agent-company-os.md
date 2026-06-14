@@ -2,14 +2,14 @@
 
 > Version: 0.1
 > Updated: 2026-06-14
-> Status: planned contract, not current implementation
+> Status: phased implementation contract
 > Related: [PRD](../product/prd.md), [Web Platform](05-web-platform.md), [Master Roadmap](../project/agent-company/00-master-roadmap.md)
 
 ## 1. Purpose
 
 Agent Company OS is the planned local-first operating layer for Open Quant Company. It lets the human user act as CEO while desk agents coordinate data, research, risk, execution, engineering, and reporting work.
 
-This spec defines future behavior contracts. It does not claim that `/api/agent/*`, `astroq agent *`, CEO Office, or desk agents are implemented today.
+This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces and the first CEO Office page are implemented first; tool execution, memory governance, and live execution remain planned until their phase lands.
 
 ## 2. Product Contract
 
@@ -29,23 +29,23 @@ All endpoints are planned under `/api/agent/*`.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/agent/sessions` | List agent sessions. |
-| `POST` | `/api/agent/sessions` | Create a new session. |
-| `GET` | `/api/agent/sessions/{session_id}` | Read a session with messages and linked actions. |
-| `PATCH` | `/api/agent/sessions/{session_id}` | Rename, archive, tag, or update session metadata. |
-| `POST` | `/api/agent/sessions/{session_id}/messages` | Add a CEO message and route it to a desk. |
-| `GET` | `/api/agent/actions` | List actions with filters for session, status, desk, and risk level. |
-| `GET` | `/api/agent/actions/{action_id}` | Read an action, approval state, evidence, runs, and outcome. |
-| `POST` | `/api/agent/actions/{action_id}/approve` | Approve a pending action. |
-| `POST` | `/api/agent/actions/{action_id}/reject` | Reject a pending action with reason. |
-| `POST` | `/api/agent/actions/{action_id}/cancel` | Cancel a queued or running action where cancellation is supported. |
-| `GET` | `/api/agent/runs/{run_id}` | Read a tool or workflow run. |
-| `GET` | `/api/agent/evidence/{evidence_id}` | Resolve an evidence reference. |
-| `GET` | `/api/agent/desks` | List desk agents, health, allowed tools, and current blockers. |
-| `GET` | `/api/agent/memory` | Inspect transparent memory summaries. |
-| `POST` | `/api/agent/memory/export` | Export memory and evidence references. |
-| `POST` | `/api/agent/memory/prune` | Prune memory by policy. |
-| `POST` | `/api/agent/memory/clear` | Clear memory after explicit approval. |
+| `GET` | `/api/agent/sessions` | List agent sessions. | Implemented |
+| `POST` | `/api/agent/sessions` | Create a new session. | Implemented |
+| `GET` | `/api/agent/sessions/{session_id}` | Read a session with messages and linked actions. | Implemented |
+| `PATCH` | `/api/agent/sessions/{session_id}` | Rename, archive, tag, or update session metadata. | Planned |
+| `POST` | `/api/agent/sessions/{session_id}/messages` | Add a CEO message and route it to a desk. | Implemented |
+| `GET` | `/api/agent/actions` | List actions with filters for session and future status/desk/risk filters. | Implemented |
+| `GET` | `/api/agent/actions/{action_id}` | Read an action and approval state. | Implemented |
+| `POST` | `/api/agent/actions/{action_id}/approve` | Approve a pending action. | Implemented |
+| `POST` | `/api/agent/actions/{action_id}/reject` | Reject a pending action with reason. | Implemented |
+| `POST` | `/api/agent/actions/{action_id}/cancel` | Cancel a queued or running action where cancellation is supported. | Planned |
+| `GET` | `/api/agent/runs/{run_id}` | Read a tool or workflow run. | Implemented |
+| `GET` | `/api/agent/evidence/{evidence_id}` | Resolve an evidence reference. | Implemented |
+| `GET` | `/api/agent/desks` | List desk agents, health, allowed tools, and current blockers. | Implemented |
+| `GET` | `/api/agent/memory` | Inspect transparent memory summaries. | Planned |
+| `POST` | `/api/agent/memory/export` | Export memory and evidence references. | Planned |
+| `POST` | `/api/agent/memory/prune` | Prune memory by policy. | Planned |
+| `POST` | `/api/agent/memory/clear` | Clear memory after explicit approval. | Planned |
 
 ## 4. CLI Surface
 
@@ -53,17 +53,17 @@ All commands must support `--json`.
 
 | Command | Purpose |
 | --- | --- |
-| `astroq agent sessions --json` | List sessions. |
-| `astroq agent session create --title TITLE --json` | Create a session. |
-| `astroq agent session show SESSION_ID --json` | Show session details. |
-| `astroq agent message --session SESSION_ID --desk DESK --text TEXT --json` | Add a message and route it. |
-| `astroq agent actions --session SESSION_ID --json` | List session actions. |
-| `astroq agent action show ACTION_ID --json` | Show action details. |
-| `astroq agent approve ACTION_ID --json` | Approve an action. |
-| `astroq agent reject ACTION_ID --reason REASON --json` | Reject an action. |
-| `astroq agent evidence EVIDENCE_ID --json` | Resolve evidence. |
-| `astroq agent desks --json` | List desk registry and health. |
-| `astroq agent memory export --json` | Export local transparent memory. |
+| `astroq agent sessions --json` | List sessions. | Implemented |
+| `astroq agent session create --title TITLE --json` | Create a session. | Implemented |
+| `astroq agent session show SESSION_ID --json` | Show session details. | Implemented |
+| `astroq agent message --session SESSION_ID --desk DESK --text TEXT --json` | Add a message and route it. | Implemented |
+| `astroq agent actions --session SESSION_ID --json` | List session actions. | Implemented |
+| `astroq agent action show ACTION_ID --json` | Show action details. | Implemented |
+| `astroq agent approve ACTION_ID --json` | Approve an action. | Implemented |
+| `astroq agent reject ACTION_ID --reason REASON --json` | Reject an action. | Implemented |
+| `astroq agent evidence EVIDENCE_ID --json` | Resolve evidence. | Implemented |
+| `astroq agent desks --json` | List desk registry and health. | Implemented |
+| `astroq agent memory export --json` | Export local transparent memory. | Planned |
 
 ## 5. Data Model
 
@@ -357,7 +357,11 @@ Implementation must include:
 
 As of 2026-06-14:
 
-- This spec is planned.
+- Foundation runtime is partially implemented in `agent_os/`.
+- The local SQLite ledger stores sessions, messages, actions, evidence, and run table schema under `var/db/agent_os.sqlite`.
+- `astroq agent sessions/session/message/actions/action show/approve/reject/evidence/desks --json` is available.
+- `/api/agent/sessions`, `/api/agent/actions`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, and `/api/agent/desks` are available.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
-- Agent Runtime, CEO Office, desk agents, `/api/agent/*`, `astroq agent *`, and MiniQMT/QMT live adapter are not yet implemented.
+- CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
+- Actual desk reasoning/tool execution, memory export/prune/clear, run execution dispatch, evidence deep-link UI, streaming updates, and MiniQMT/QMT live adapter are not yet implemented.

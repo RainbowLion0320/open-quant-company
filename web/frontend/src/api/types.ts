@@ -7,3 +7,4 @@ export * from "./types/system";
 export * from "./types/sectors";
 export * from "./types/pipeline";
 export * from "./types/dataSources";
+export * from "./types/agent";

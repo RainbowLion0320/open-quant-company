@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from web.api.routes import market, strategies, stocks, portfolio, signals, settings, backtest, system, codegraph, sectors, pipeline, assets, data_sources
+from web.api.routes import agent, market, strategies, stocks, portfolio, signals, settings, backtest, system, codegraph, sectors, pipeline, assets, data_sources
 from web.api.errors import register_error_handlers
 from web.api.auth import AuthMiddleware
 from web.api.version import get_project_version
@@ -46,6 +46,7 @@ def create_app() -> FastAPI:
     app.add_middleware(AuthMiddleware)
 
     app.include_router(market.router)
+    app.include_router(agent.router)
     app.include_router(strategies.router)
     app.include_router(stocks.router)
     app.include_router(portfolio.router)
@@ -89,7 +90,7 @@ def create_app() -> FastAPI:
         assets_dir = static_dir / "assets"
         if assets_dir.exists():
             app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
-        
+
         # SPA fallback: 非 API 路径回退到 index.html
         from fastapi.responses import FileResponse
         @app.get("/{full_path:path}")

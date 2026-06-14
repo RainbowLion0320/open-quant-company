@@ -1,7 +1,7 @@
 # Open Quant Company — PRD/Spec 验收矩阵
 
 > 日期: 2026-06-02 | 来源: 文档治理基线
-> 用途: 追踪 6 个能力域从 PRD/spec → 代码 → 测试 → API/Web → 手工验收的完整链路
+> 用途: 追踪 7 个能力域从 PRD/spec → 代码 → 测试 → API/Web → 手工验收的完整链路
 > 维护规则: 本文件记录当前可验收能力链路，不作为 sprint 日志；历史计划和任务过程通过 git 追溯。
 
 ## 1. 数据管道 (Data Pipeline)
@@ -76,8 +76,8 @@
 
 | # | PRD/Spec 条目 | 代码文件 | 测试 | API / Web | 手工验收 | 状态 | 缺口 |
 |---|--------------|---------|------|-----------|---------|------|------|
-| 5.1 | Vue 3 SPA + Pinia + ECharts + Tailwind | `web/frontend/` | — | 7 个一级入口 + 二级 tab 工作区 | `npm run build` 通过 | OK | — |
-| 5.2 | FastAPI 12 业务路由模块 | `web/api/routes/` (12 文件) | `test_web_system_contracts.py` (strategy jobs 路由) | 全部业务路由模块 | `python -m uvicorn web.api.app:create_app --factory` 启动无报错 | OK | — |
+| 5.1 | Vue 3 SPA + Pinia + ECharts + Tailwind | `web/frontend/` | — | 8 个一级入口 + 二级 tab 工作区 | `npm run build` 通过 | OK | — |
+| 5.2 | FastAPI 14 业务路由模块 | `web/api/routes/` (14 文件) | `test_web_system_contracts.py` (strategy jobs 路由), `test_agent_os_contracts.py` | 全部业务路由模块 | `python -m uvicorn web.api.app:create_app --factory` 启动无报错 | OK | — |
 | 5.3 | WebSocket 实时进度推送 | `web/api/ws.py`, `web/api/jobs.py` | `test_websocket_contracts.py` | Strategy run 进度条 | 触发策略扫描 → 前端进度条实时更新 | OK | — |
 | 5.4 | DuckDB :memory: 零锁查询 | `web/api/db.py` / `data/storage/db.py` | `test_boundary.py` (DuckDB CRUD) | 所有数据查询端点 | Web 页面数据加载无延迟 | OK | — |
 | 5.5 | API 错误响应统一 + 稳定端点 response_model | 各路由文件 + `web/api/errors.py` + `web/api/schemas/*` | `test_web_system_contracts.py`, `test_market_route_contracts.py`, `test_pipeline_route_contracts.py` | — | 4xx/5xx 错误结构一致，关键成功响应有 Pydantic schema | OK | — |
@@ -111,16 +111,16 @@
 | 6.9 | 行业/板块数据维度 | `data/market/sectors.py` + `scripts/build_sector_snapshots.py` | — | `GET /api/sectors/*` | 申万行业指数 + 行业映射 + 信号聚合 + 敞口 | OK | — |
 | 6.10 | 行业 Web 雷达页面 | `web/frontend/src/views/Sectors.vue` + `data/market/sectors.py` | `test_sector_pipeline.py`, `test_web_system_contracts.py` | `/research?tab=sectors` | 申万行业资金方块矩阵 + 按资金量映射面积 + 排名表 + 行业级信号分布，不显示行业内个股 | OK | — |
 
-## 7. Agent Company OS (Planned)
+## 7. Agent Company OS
 
 | # | PRD/Spec 条目 | 代码文件 | 测试 | API / Web | 手工验收 | 状态 | 缺口 |
 |---|--------------|---------|------|-----------|---------|------|------|
-| 7.1 | Agent Company OS 长期路线图和分阶段计划 | `docs/project/agent-company/*.md` | `astroq docs check --json` | — | 文档入口从 PRD、Web spec、wiki 和文档治理页可达 | PLANNED | Phase 0 只落文档，不实现运行时 |
-| 7.2 | Agent Runtime 本地会话/消息/行动/运行 ledger | 规划: `agent_os/*` 或等价 canonical 包 | 规划: schema + ledger contract tests | `GET/POST /api/agent/sessions`, `POST /api/agent/sessions/{id}/messages` | 创建 session/message 后可从 CLI/API/Web 读取 | PLANNED | 未实现 |
-| 7.3 | ApprovalPolicy 审批系统 | 规划: `agent_os/approval.py` | 规划: 风险级别审批测试 | `POST /api/agent/actions/{id}/approve`, `POST /api/agent/actions/{id}/reject` | write/backfill/backtest/paper/live/code action 均按策略进入审批或 work order | PLANNED | 未实现 |
-| 7.4 | EvidenceRef 证据解析 | 规划: `agent_os/evidence.py` | 规划: fresh/stale/missing evidence tests | `GET /api/agent/evidence/{evidence_id}` | Agent 回答可跳转到 Web route、CLI、artifact、file/code/report/ledger | PLANNED | 未实现 |
-| 7.5 | CEO Office 默认首页 | 规划: `web/frontend/src/views/CEOOffice.vue` | 规划: 前端状态和 API contract tests | `/` CEO Office, `/market` 市场总览 | 对话、行动卡、审批、证据下钻、desk status 可用 | PLANNED | 未实现 |
-| 7.6 | Desk agents 权责和工具权限 | 规划: `agent_os/desks/*` | 规划: desk permission and handoff tests | `GET /api/agent/desks` | Data/Research/Risk/Execution/Engineering/Reporting desks 有边界和 handoff ledger | PLANNED | 未实现 |
+| 7.1 | Agent Company OS 长期路线图和分阶段计划 | `docs/project/agent-company/*.md`, `docs/specs/07-agent-company-os.md` | `astroq docs check --json` | — | 文档入口从 PRD、Web spec、wiki 和文档治理页可达 | OK | — |
+| 7.2 | Agent Runtime 本地会话/消息/行动/运行 ledger | `agent_os/runtime.py`, `agent_os/ledger.py`, `agent_os/schemas.py` | `test_agent_os_contracts.py` | `GET/POST /api/agent/sessions`, `POST /api/agent/sessions/{id}/messages`, `GET /api/agent/runs/{id}`, `astroq agent sessions/session/message/action show` | 创建 session/message/action/run 后可从 CLI/API 读取；run 记录可审计 | PARTIAL | run dispatch 尚未接入真实工具执行 |
+| 7.3 | ApprovalPolicy 审批系统 | `agent_os/approval.py`, `agent_os/runtime.py` | `test_agent_os_contracts.py` | `POST /api/agent/actions/{id}/approve`, `POST /api/agent/actions/{id}/reject`, `astroq agent approve/reject` | write/backfill/backtest/paper/live/code risk level 默认进入 approval-required 状态；approve/reject 写入 ledger | PARTIAL | 还未接入真实工具执行前审批队列 |
+| 7.4 | EvidenceRef 证据解析 | `agent_os/evidence.py`, `agent_os/runtime.py` | `test_agent_os_contracts.py` | `GET /api/agent/evidence/{evidence_id}`, `astroq agent evidence` | missing/fresh artifact evidence 返回结构化状态和 sha256 hash | PARTIAL | Web deep link 展示和 evidence snapshot 治理未实现 |
+| 7.5 | CEO Office 默认首页 | `web/frontend/src/views/CEOOffice.vue`, `web/frontend/src/router/index.ts`, `web/frontend/src/api/modules/agent.ts` | `test_ceo_office_frontend_contracts.py`, `test_frontend_i18n_contracts.py`, browser smoke | `/` CEO Office, `/market` 市场总览 | 默认首页显示 CEO 对话、desk status 和审批队列；市场总览迁移到 `/market` | PARTIAL | evidence deep links、streaming、完整 action cards 和报告卡片仍未实现 |
+| 7.6 | Desk agents 权责和工具权限 | `agent_os/desks.py` | `test_agent_os_contracts.py` | `GET /api/agent/desks`, `astroq agent desks` | Data/Research/Risk/Execution/Engineering/Reporting desks 有 mandate、allowed_tools、forbidden_actions 和 handoff_targets | PARTIAL | 尚未实现 desk reasoning、tool permission enforcement 和 handoff ledger |
 | 7.7 | MiniQMT/QMT live execution adapter | 规划: `broker/live/*` 或等价 canonical 模块 | 规划: fake adapter + SDK missing + no paper fallback tests | Portfolio/CEO Office live readiness and approval cards | live 默认关闭；缺 SDK/权限/account 直接 blocked；CEO approval 后才可提交 | PLANNED | 未实现 |
 | 7.8 | CEO reports and operating rhythm | 规划: `agent_os/reports/*` | 规划: report evidence citation tests | CEO Office report cards, artifact links | Daily CEO brief、weekly review、audit pack 均引用 evidence artifacts | PLANNED | 未实现 |
 
@@ -134,10 +134,10 @@
 | 执行层 | 8 | 8 | 0 | 0 | 0 |
 | Web 平台 | 19 | 19 | 0 | 1 | 0 |
 | 多资产架构 | 10 | 10 | 0 | 0 | 0 |
-| Agent Company OS | 8 | 0 | 8 | 0 | 0 |
-| **合计** | **85** | **77** | **8** | **3** | **0** |
+| Agent Company OS | 8 | 1 | 2 | 7 | 0 |
+| **合计** | **85** | **78** | **2** | **10** | **0** |
 
-> **说明：** `功能可验收` 表示该能力有可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数，也不作为质量债。`质量债条目` 统计当前实现能力中"缺口"列非 `—` 的行。当前剩余 3 项质量债：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化。
+> **说明：** `功能可验收` 表示该能力有完整可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数。`质量债条目` 统计"缺口"列非 `—` 的行，包含已实现能力的质量债和规划能力的未实现缺口。当前剩余 10 项缺口：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化；Agent Company OS 的 ledger、approval、evidence、desk registry 和 CEO Office 已有 foundation，但仍缺 run dispatch、tool permission enforcement、handoff ledger、evidence deep links、streaming、reports 和 live adapter。
 
 **维护说明:**
 

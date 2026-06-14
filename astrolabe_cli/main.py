@@ -6,6 +6,16 @@ from collections.abc import Sequence
 
 from astrolabe_cli.commands.config import env_status
 from astrolabe_cli.commands.config import validate_config
+from astrolabe_cli.commands.agent import actions as agent_actions
+from astrolabe_cli.commands.agent import add_message as agent_add_message
+from astrolabe_cli.commands.agent import approve as agent_approve
+from astrolabe_cli.commands.agent import create_session as agent_create_session
+from astrolabe_cli.commands.agent import desks as agent_desks
+from astrolabe_cli.commands.agent import evidence as agent_evidence
+from astrolabe_cli.commands.agent import reject as agent_reject
+from astrolabe_cli.commands.agent import sessions as agent_sessions
+from astrolabe_cli.commands.agent import show_action as agent_show_action
+from astrolabe_cli.commands.agent import show_session as agent_show_session
 from astrolabe_cli.commands.backtest import check as backtest_check
 from astrolabe_cli.commands.backtest import run_backtest
 from astrolabe_cli.commands.data import repair as data_repair
@@ -50,6 +60,64 @@ def build_parser() -> argparse.ArgumentParser:
     health = sub.add_parser("health", help="Check CLI and local project health")
     add_common_flags(health)
     health.set_defaults(handler=_health_command)
+
+    agent = sub.add_parser("agent", help="Operate the local Agent Company OS runtime")
+    agent_sub = agent.add_subparsers(dest="agent_command", required=True)
+
+    agent_sessions_cmd = agent_sub.add_parser("sessions", help="List agent sessions")
+    add_common_flags(agent_sessions_cmd)
+    agent_sessions_cmd.set_defaults(handler=lambda args: agent_sessions())
+
+    agent_session_cmd = agent_sub.add_parser("session", help="Create or inspect one agent session")
+    agent_session_sub = agent_session_cmd.add_subparsers(dest="agent_session_command", required=True)
+    agent_session_create = agent_session_sub.add_parser("create", help="Create an agent session")
+    agent_session_create.add_argument("--title", required=True)
+    agent_session_create.add_argument("--default-desk", default="reporting")
+    add_common_flags(agent_session_create)
+    agent_session_create.set_defaults(handler=lambda args: agent_create_session(args.title, args.default_desk))
+    agent_session_show = agent_session_sub.add_parser("show", help="Show an agent session")
+    agent_session_show.add_argument("session_id")
+    add_common_flags(agent_session_show)
+    agent_session_show.set_defaults(handler=lambda args: agent_show_session(args.session_id))
+
+    agent_message_cmd = agent_sub.add_parser("message", help="Add a CEO message to a session")
+    agent_message_cmd.add_argument("--session", required=True)
+    agent_message_cmd.add_argument("--desk", default="reporting")
+    agent_message_cmd.add_argument("--text", required=True)
+    add_common_flags(agent_message_cmd)
+    agent_message_cmd.set_defaults(handler=lambda args: agent_add_message(args.session, args.desk, args.text))
+
+    agent_actions_cmd = agent_sub.add_parser("actions", help="List agent actions")
+    agent_actions_cmd.add_argument("--session", default="")
+    add_common_flags(agent_actions_cmd)
+    agent_actions_cmd.set_defaults(handler=lambda args: agent_actions(args.session))
+
+    agent_action_cmd = agent_sub.add_parser("action", help="Inspect one agent action")
+    agent_action_sub = agent_action_cmd.add_subparsers(dest="agent_action_command", required=True)
+    agent_action_show = agent_action_sub.add_parser("show", help="Show one agent action")
+    agent_action_show.add_argument("action_id")
+    add_common_flags(agent_action_show)
+    agent_action_show.set_defaults(handler=lambda args: agent_show_action(args.action_id))
+
+    agent_approve_cmd = agent_sub.add_parser("approve", help="Approve an agent action")
+    agent_approve_cmd.add_argument("action_id")
+    add_common_flags(agent_approve_cmd)
+    agent_approve_cmd.set_defaults(handler=lambda args: agent_approve(args.action_id))
+
+    agent_reject_cmd = agent_sub.add_parser("reject", help="Reject an agent action")
+    agent_reject_cmd.add_argument("action_id")
+    agent_reject_cmd.add_argument("--reason", default="")
+    add_common_flags(agent_reject_cmd)
+    agent_reject_cmd.set_defaults(handler=lambda args: agent_reject(args.action_id, args.reason))
+
+    agent_evidence_cmd = agent_sub.add_parser("evidence", help="Resolve an agent evidence reference")
+    agent_evidence_cmd.add_argument("evidence_id")
+    add_common_flags(agent_evidence_cmd)
+    agent_evidence_cmd.set_defaults(handler=lambda args: agent_evidence(args.evidence_id))
+
+    agent_desks_cmd = agent_sub.add_parser("desks", help="List desk agents")
+    add_common_flags(agent_desks_cmd)
+    agent_desks_cmd.set_defaults(handler=lambda args: agent_desks())
 
     config = sub.add_parser("config", help="Inspect and validate project configuration")
     config_sub = config.add_subparsers(dest="config_command", required=True)

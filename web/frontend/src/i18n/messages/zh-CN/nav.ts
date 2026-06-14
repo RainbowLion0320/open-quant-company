@@ -1,4 +1,5 @@
 export const nav = {
+      ceoOffice: "CEO 办公室",
       market: "市场总览",
       research: "市场研究",
       strategyLab: "策略实验室",

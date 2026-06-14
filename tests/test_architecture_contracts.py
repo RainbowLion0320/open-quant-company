@@ -814,7 +814,7 @@ def test_web_docs_match_current_api_pipeline_and_schema_contracts():
 
     required_by_source = {
         "web spec": (
-            "routes/ (13 domain modules)",
+            "routes/ (14 domain modules)",
             "`elkjs` layered + orthogonal routing",
             "GET /api/stocks",
             "POST /api/stocks/dcf",
@@ -838,7 +838,7 @@ def test_web_docs_match_current_api_pipeline_and_schema_contracts():
             "路由 response models",
         ),
         "api init": (
-            "13个业务路由模块",
+            "14个业务路由模块",
             "Pydantic 类型分域定义",
         ),
     }

@@ -45,6 +45,9 @@ Use `astroq` for automation and JSON-readable operations:
 | 命令 | 用途 |
 |------|------|
 | `astroq health --json` | 检查项目版本、DataHub 路径和本地健康状态 |
+| `astroq agent sessions --json` | 查看本地 Agent Company OS 会话 ledger |
+| `astroq agent session create --title "Daily CEO Brief" --json` | 创建 CEO Office / desk agent 会话 |
+| `astroq agent desks --json` | 查看 Data / Research / Risk / Execution / Engineering / Reporting desk agents |
 | `astroq config env --json` | 检查当前进程环境变量密钥状态（脱敏输出） |
 | `astroq config validate --json` | 校验 settings 和策略注册表 |
 | `astroq data status --json` | 扫描本地数据健康 |

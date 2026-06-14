@@ -32,6 +32,7 @@ def test_acceptance_matrix_summary_counts_match_domain_rows():
         "## 4.": "执行层",
         "## 5.": "Web 平台",
         "## 6.": "多资产架构",
+        "## 7.": "Agent Company OS",
     }
     current_domain = ""
     row_counts = {label: 0 for label in domain_labels.values()}
@@ -45,7 +46,7 @@ def test_acceptance_matrix_summary_counts_match_domain_rows():
             )
         if current_domain and line.startswith("|") and not line.startswith("|---"):
             cols = [col.strip() for col in line.strip("|").split("|")]
-            if cols and cols[0].startswith(tuple(str(i) for i in range(1, 7))):
+            if cols and cols[0].startswith(tuple(str(i) for i in range(1, 8))):
                 row_counts[current_domain] += 1
         if line.startswith("|") and not line.startswith("|---"):
             cols = [col.strip().strip("*") for col in line.strip("|").split("|")]
