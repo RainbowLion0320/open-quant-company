@@ -269,6 +269,41 @@ def live_preview(
     )
 
 
+def paper_propose(
+    *,
+    session_id: str,
+    symbol: str,
+    side: str,
+    quantity: int,
+    limit_price: float,
+    strategy: str,
+    reason: str,
+    evidence_refs: list[str],
+) -> CliResult:
+    try:
+        proposal = AgentRuntime().propose_paper_order(
+            session_id=session_id,
+            intent={
+                "symbol": symbol,
+                "side": side,
+                "quantity": quantity,
+                "order_type": "limit",
+                "limit_price": limit_price,
+                "strategy": strategy,
+                "reason": reason,
+                "evidence_refs": evidence_refs,
+            },
+        )
+    except KeyError as exc:
+        return CliResult(False, "agent paper propose", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent paper propose",
+        message=f"Paper order proposal: {proposal['status']}",
+        data={"proposal": proposal},
+    )
+
+
 def memory_summary() -> CliResult:
     snapshot = AgentRuntime().memory_snapshot()
     return CliResult(

@@ -16,6 +16,7 @@ from agent_os.reports import build_report_payload, normalize_report_kind, read_r
 from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentReport, AgentRun, AgentSession, DeskResponse, EvidenceRef
 from agent_os.tools import AgentToolRegistry
 from agent_os.workflows import build_desk_workflow_plan
+from broker import PaperBroker
 from broker.live.qmt import MiniQmtLiveBroker
 from data.storage.datahub import get_datahub
 
@@ -529,6 +530,52 @@ class AgentRuntime:
     def preview_live_order(self, intent: dict[str, Any]) -> dict[str, Any]:
         return MiniQmtLiveBroker().preview_order(intent)
 
+    def propose_paper_order(
+        self,
+        *,
+        session_id: str,
+        intent: dict[str, Any],
+        broker: PaperBroker | None = None,
+    ) -> dict[str, Any]:
+        if not self.ledger.get_session(session_id):
+            raise KeyError(f"Agent session not found: {session_id}")
+        paper_broker = broker or PaperBroker()
+        preview = paper_broker.preview_order(intent)
+        if preview["status"] != "preview_ready":
+            return {
+                "status": "blocked",
+                "preview": preview,
+                "action": None,
+            }
+
+        artifact_path = self._write_paper_preview_artifact(session_id, preview)
+        evidence = self.create_evidence(
+            kind="artifact",
+            label="Paper order preview",
+            uri=str(artifact_path),
+            summary=f"Paper order preview for {preview['intent']['side']} {preview['intent']['symbol']}",
+        )
+        action = self.propose_action(
+            session_id=session_id,
+            desk="execution",
+            action_type="paper_order",
+            risk_level="paper_order",
+            summary=f"Approve paper {preview['intent']['side']} {preview['intent']['symbol']} x{preview['intent']['quantity']}",
+            parameters={
+                "paper_order_intent": preview["intent"],
+                "paper_order_preview": preview,
+                "preview_artifact": str(artifact_path),
+            },
+            expected_effect="Creates an approval card only; paper order submission requires a separate approved execution implementation.",
+            evidence_refs=[evidence.evidence_id],
+        )
+        return {
+            "status": action.status,
+            "preview": preview,
+            "action": action.to_dict(),
+            "evidence": evidence.to_dict(),
+        }
+
     def generate_report(self, *, session_id: str, kind: str = "daily_brief") -> dict[str, Any]:
         session = self.ledger.get_session(session_id)
         if not session:
@@ -585,6 +632,20 @@ class AgentRuntime:
         target = root / (source.name or "evidence")
         shutil.copy2(source, target)
         return target
+
+    def _write_paper_preview_artifact(self, session_id: str, preview: dict[str, Any]) -> Path:
+        root = get_datahub().artifact_dir("agent") / "paper_previews"
+        root.mkdir(parents=True, exist_ok=True)
+        preview_id = _id("paper_preview")
+        path = root / f"{preview_id}.json"
+        payload = {
+            "preview_id": preview_id,
+            "session_id": session_id,
+            "preview": preview,
+            "generated_at": _now(),
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return path
 
     def _route_ceo_message(self, *, session_id: str, source_message_id: str, desk: str, content: str) -> DeskResponse:
         plan = build_desk_workflow_plan(desk=desk, content=content)

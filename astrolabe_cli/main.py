@@ -22,6 +22,7 @@ from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
 from astrolabe_cli.commands.agent import memory_export as agent_memory_export
 from astrolabe_cli.commands.agent import memory_prune as agent_memory_prune
 from astrolabe_cli.commands.agent import memory_summary as agent_memory_summary
+from astrolabe_cli.commands.agent import paper_propose as agent_paper_propose
 from astrolabe_cli.commands.agent import reject as agent_reject
 from astrolabe_cli.commands.agent import reports as agent_reports
 from astrolabe_cli.commands.agent import resolve_handoff as agent_resolve_handoff
@@ -204,6 +205,31 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_flags(agent_live_preview_cmd)
     agent_live_preview_cmd.set_defaults(
         handler=lambda args: agent_live_preview(
+            symbol=args.symbol,
+            side=args.side,
+            quantity=args.quantity,
+            limit_price=args.limit_price,
+            strategy=args.strategy,
+            reason=args.reason,
+            evidence_refs=args.evidence_refs,
+        )
+    )
+
+    agent_paper_cmd = agent_sub.add_parser("paper", help="Create approval-gated paper execution proposals")
+    agent_paper_sub = agent_paper_cmd.add_subparsers(dest="agent_paper_command", required=True)
+    agent_paper_propose_cmd = agent_paper_sub.add_parser("propose", help="Preview and propose a PaperBroker order")
+    agent_paper_propose_cmd.add_argument("--session", required=True)
+    agent_paper_propose_cmd.add_argument("--symbol", required=True)
+    agent_paper_propose_cmd.add_argument("--side", choices=["buy", "sell"], required=True)
+    agent_paper_propose_cmd.add_argument("--quantity", type=int, required=True)
+    agent_paper_propose_cmd.add_argument("--limit-price", type=float, required=True)
+    agent_paper_propose_cmd.add_argument("--strategy", default="manual")
+    agent_paper_propose_cmd.add_argument("--reason", default="")
+    agent_paper_propose_cmd.add_argument("--evidence", action="append", dest="evidence_refs", default=[])
+    add_common_flags(agent_paper_propose_cmd)
+    agent_paper_propose_cmd.set_defaults(
+        handler=lambda args: agent_paper_propose(
+            session_id=args.session,
             symbol=args.symbol,
             side=args.side,
             quantity=args.quantity,

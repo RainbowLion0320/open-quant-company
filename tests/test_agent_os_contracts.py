@@ -334,6 +334,157 @@ def test_agent_live_preview_cli_and_api(tmp_path, monkeypatch, capsys):
     reset_datahub()
 
 
+def test_paper_order_preview_does_not_submit_or_mutate_broker_state():
+    from broker import PaperBroker
+
+    broker = PaperBroker(initial_cash=50_000.0, enable_risk=True)
+    broker.set_prices({"000001": 10.0})
+
+    preview = broker.preview_order(
+        {
+            "symbol": "000001",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "preview only",
+            "evidence_refs": ["ev_demo"],
+        }
+    )
+    blocked = broker.preview_order(
+        {
+            "symbol": "000001",
+            "side": "buy",
+            "quantity": 10_000,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "too large",
+            "evidence_refs": ["ev_demo"],
+        }
+    )
+
+    assert preview["status"] == "preview_ready"
+    assert preview["submitted"] is False
+    assert preview["approval_required"] is True
+    assert preview["risk_gate"]["passed"] is True
+    assert preview["estimated_cash_effect"] < 0
+    assert broker.get_orders() == []
+    assert broker.get_balance().cash == 50_000.0
+    assert blocked["status"] == "blocked"
+    assert blocked["risk_gate"]["passed"] is False
+    assert "insufficient_cash" in blocked["risk_gate"]["blockers"]
+
+
+def test_agent_paper_order_proposal_requires_approval_and_never_submits_in_runtime(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from broker import PaperBroker
+
+    broker = PaperBroker(initial_cash=50_000.0, enable_risk=True)
+    broker.set_prices({"000001": 10.0})
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Paper order control", default_desk="execution")
+
+    proposal = runtime.propose_paper_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "000001",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "CEO approval card only",
+            "evidence_refs": ["ev_demo"],
+        },
+        broker=broker,
+    )
+    action = proposal["action"]
+    blocked_run = runtime.dispatch_action(action["action_id"])
+    runtime.approve_action(action["action_id"], decided_by="ceo")
+    approved_run = runtime.dispatch_action(action["action_id"])
+
+    assert proposal["status"] == "approval_required"
+    assert proposal["preview"]["status"] == "preview_ready"
+    assert action["risk_level"] == "paper_order"
+    assert action["status"] == "approval_required"
+    assert action["approval_required"] is True
+    assert action["evidence_refs"]
+    assert action["parameters"]["paper_order_preview"]["submitted"] is False
+    assert blocked_run.status == "blocked"
+    assert "approval required" in blocked_run.stderr_summary
+    assert approved_run.status == "blocked"
+    assert "Unknown agent tool: paper_order" in approved_run.stderr_summary
+    assert broker.get_orders() == []
+    assert broker.get_balance().cash == 50_000.0
+    reset_datahub()
+
+
+def test_agent_paper_order_proposal_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Paper order CLI/API", default_desk="execution")
+    cli_code = run_cli(
+        [
+            "agent",
+            "paper",
+            "propose",
+            "--session",
+            session.session_id,
+            "--symbol",
+            "000001",
+            "--side",
+            "buy",
+            "--quantity",
+            "100",
+            "--limit-price",
+            "10",
+            "--strategy",
+            "manual",
+            "--reason",
+            "approval card",
+            "--evidence",
+            "ev_demo",
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(
+        "/api/agent/paper/proposals",
+        json={
+            "session_id": session.session_id,
+            "symbol": "000001",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "approval card",
+            "evidence_refs": ["ev_demo"],
+        },
+    )
+
+    assert cli_code == 0
+    assert cli_payload["data"]["proposal"]["status"] == "approval_required"
+    assert cli_payload["data"]["proposal"]["action"]["status"] == "approval_required"
+    assert cli_payload["data"]["proposal"]["preview"]["submitted"] is False
+    assert api_res.status_code == 200
+    assert api_res.json()["proposal"]["status"] == "approval_required"
+    assert api_res.json()["proposal"]["action"]["risk_level"] == "paper_order"
+    reset_datahub()
+
+
 def test_agent_actions_expire_before_approval_or_dispatch(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

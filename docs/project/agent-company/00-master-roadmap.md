@@ -115,6 +115,7 @@ Deliverables:
 - `docs/project/agent-company/01-foundation-plan.md`
 - `docs/project/agent-company/02-ceo-office-plan.md`
 - `docs/project/agent-company/03-desk-agents-plan.md`
+- `docs/project/agent-company/05-paper-execution-plan.md`
 - `docs/project/agent-company/04-live-execution-plan.md`
 - `docs/specs/07-agent-company-os.md`
 - PRD, Web spec, acceptance matrix, documentation guide, and wiki links
@@ -197,6 +198,13 @@ No paper order may be created by an agent unless:
 - Risk gate accepts the preview.
 - The CEO approves the action.
 - The action result is written to the ledger.
+
+Current foundation:
+
+- `PaperBroker.preview_order()` returns a non-mutating order preview.
+- `AgentRuntime.propose_paper_order()` writes a preview artifact and creates an approval-required `paper_order` action only when the preview passes.
+- `astroq agent paper propose ... --json` and `POST /api/agent/paper/proposals` expose paper order proposal cards.
+- Approved paper order actions still do not submit automatically; submission wiring, reconciliation, and durable order-ledger integration remain future work.
 
 ### Phase 6 - MiniQMT/QMT Live Execution
 

@@ -71,6 +71,7 @@
 | 4.6 | Cron 调度 (15:30 扫描 + 09:30 执行) | `scripts/compute_signals.py`, `scripts/execute_paper_trades.py` | — | `POST /api/strategies/run` (手动触发策略扫描) | GitHub Actions `daily-scan.yml` 正常执行 | OK | — |
 | 4.7 | Cron 日志可观测 | `data/ops/cron_logger.py` | — | `GET /api/system/cron-jobs` + JSONL 文件 | 每次 cron 执行后日志 JSONL 有记录 | OK | — |
 | 4.8 | 多资产交易所 (差异化费率) | `broker/exchange.py` | `test_broker_risk_persistence_allocator.py:test_exchange_costs_are_asset_specific` | — | A股 vs ETF 费率不同 | OK | — |
+| 4.9 | Agent paper order preview/proposal gate | `broker/paper_core.py`, `agent_os/runtime.py` | `test_agent_os_contracts.py` | `POST /api/agent/paper/proposals`, `astroq agent paper propose` | PaperBroker preview 不改现金/持仓/订单；通过 preview 后只创建 `approval_required` 的 `paper_order` action 和 evidence artifact；当前 dispatch 不会隐藏提交订单 | PARTIAL | 仍需 approved submit tool、重新风控、订单 ledger 与 reconciliation |
 
 ## 5. Web 平台 (Web Platform)
 
@@ -116,7 +117,7 @@
 | # | PRD/Spec 条目 | 代码文件 | 测试 | API / Web | 手工验收 | 状态 | 缺口 |
 |---|--------------|---------|------|-----------|---------|------|------|
 | 7.1 | Agent Company OS 长期路线图和分阶段计划 | `docs/project/agent-company/*.md`, `docs/specs/07-agent-company-os.md` | `astroq docs check --json` | — | 文档入口从 PRD、Web spec、wiki 和文档治理页可达 | OK | — |
-| 7.2 | Agent Runtime 本地会话/消息/行动/运行 ledger | `agent_os/runtime.py`, `agent_os/ledger.py`, `agent_os/schemas.py` | `test_agent_os_contracts.py` | `GET/POST/PATCH /api/agent/sessions`, `POST /api/agent/sessions/{id}/messages`, `POST /api/agent/actions/{id}/run`, `GET /api/agent/runs/{id}`, `GET/POST /api/agent/memory(/export/prune/clear)`, `astroq agent sessions/session create/session show/session update/message/action show/run/memory export/memory prune/memory clear` | 创建 session/message/action/run 后可从 CLI/API 读取；CEO message 会生成 deterministic desk response、web-route evidence、desk-scoped action 和必要 handoff；session title/status/tags 可更新；固定 registry 命令可 dispatch 并记录 succeeded/failed/blocked run；已批准 fixed-registry 模板命令可按参数 schema 安全绑定；transparent memory 可 inspect/export 到 `var/artifacts/agent/memory/`，并支持 archived session prune 与显式确认 clear | PARTIAL | 长任务状态流、advanced desk reasoning 和广义工具执行尚未完成 |
+| 7.2 | Agent Runtime 本地会话/消息/行动/运行 ledger | `agent_os/runtime.py`, `agent_os/ledger.py`, `agent_os/schemas.py` | `test_agent_os_contracts.py` | `GET/POST/PATCH /api/agent/sessions`, `POST /api/agent/sessions/{id}/messages`, `POST /api/agent/actions/{id}/run`, `GET /api/agent/runs/{id}`, `GET/POST /api/agent/memory(/export/prune/clear)`, `POST /api/agent/paper/proposals`, `astroq agent sessions/session create/session show/session update/message/action show/run/paper propose/memory export/memory prune/memory clear` | 创建 session/message/action/run 后可从 CLI/API 读取；CEO message 会生成 deterministic desk response、web-route evidence、desk-scoped action 和必要 handoff；session title/status/tags 可更新；固定 registry 命令可 dispatch 并记录 succeeded/failed/blocked run；已批准 fixed-registry 模板命令可按参数 schema 安全绑定；PaperBroker preview 通过后可生成 approval-required 订单行动卡和 preview evidence；transparent memory 可 inspect/export 到 `var/artifacts/agent/memory/`，并支持 archived session prune 与显式确认 clear | PARTIAL | 长任务状态流、advanced desk reasoning、广义工具执行和真正 paper submit/reconcile 尚未完成 |
 | 7.3 | ApprovalPolicy 审批系统 | `agent_os/approval.py`, `agent_os/runtime.py` | `test_agent_os_contracts.py` | `POST /api/agent/actions/{id}/approve`, `POST /api/agent/actions/{id}/reject`, `POST /api/agent/actions/{id}/cancel`, `POST /api/agent/actions/expire`, `astroq agent approve/reject/cancel/expire` | write/backfill/backtest/paper/live/code risk level 默认进入 approval-required 状态；未审批 action dispatch 只记录 blocked run，不执行命令；proposed/approval-required/approved action 可在终态前取消；queued action 有 `expires_at`，过期后不能审批或执行；已成功/失败 action 不会被改写 | OK | — |
 | 7.4 | EvidenceRef 证据解析 | `agent_os/evidence.py`, `agent_os/runtime.py` | `test_agent_os_contracts.py` | `GET /api/agent/evidence/{evidence_id}`, `astroq agent evidence` | missing/fresh artifact evidence 返回结构化状态和 sha256 hash；file-backed evidence 会复制到 `var/artifacts/agent/evidence/`，源文件变化返回 `source_changed`，源文件丢失但快照存在返回 `source_missing`；`web_route` evidence 只为安全本地 route 返回 navigation 元数据 | OK | — |
 | 7.5 | CEO Office 默认首页 | `web/frontend/src/views/CEOOffice.vue`, `web/frontend/src/router/index.ts`, `web/frontend/src/api/modules/agent.ts` | `test_ceo_office_frontend_contracts.py`, `test_frontend_i18n_contracts.py`, browser smoke | `/` CEO Office, `/market` 市场总览 | 默认首页显示 CEO 对话、deterministic desk response、session 创建/归档、desk status、审批队列、handoff 面板、handoff resolve、action detail、run history、report cards、evidence detail 和安全 web-route evidence 深链；市场总览迁移到 `/market` | PARTIAL | streaming 和 richer desk reasoning 仍未实现 |
@@ -131,13 +132,13 @@
 | 数据管道 | 13 | 13 | 0 | 0 | 0 |
 | 信号系统 | 17 | 17 | 0 | 1 | 0 |
 | 回测引擎 | 10 | 10 | 0 | 1 | 0 |
-| 执行层 | 8 | 8 | 0 | 0 | 0 |
+| 执行层 | 9 | 8 | 0 | 1 | 0 |
 | Web 平台 | 19 | 19 | 0 | 1 | 0 |
 | 多资产架构 | 10 | 10 | 0 | 0 | 0 |
 | Agent Company OS | 8 | 3 | 0 | 5 | 0 |
-| **合计** | **85** | **80** | **0** | **8** | **0** |
+| **合计** | **86** | **80** | **0** | **9** | **0** |
 
-> **说明：** `功能可验收` 表示该能力有完整可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数。`质量债条目` 统计"缺口"列非 `—` 的行，包含已实现能力的质量债和规划能力的未实现缺口。当前剩余缺口包括：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化；Agent Company OS 的 ledger、approval/action expiry、evidence safe navigation/snapshot、desk registry、deterministic desk workflow、固定命令 dispatch、固定 registry tool permission enforcement、handoff ledger/resolve、transparent memory inspect/export/prune/clear、evidence-cited report artifacts、default-disabled live readiness probe、live order preview gate 和 CEO Office 已有 foundation，但仍缺 advanced desk reasoning、streaming、完整报告节奏和 live order submission/reconciliation。
+> **说明：** `功能可验收` 表示该能力有完整可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数。`质量债条目` 统计"缺口"列非 `—` 的行，包含已实现能力的质量债和规划能力的未实现缺口。当前剩余缺口包括：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果、前端 vendor/ECharts/DWP chunk 分包警告需继续优化；Agent Company OS 的 ledger、approval/action expiry、evidence safe navigation/snapshot、desk registry、deterministic desk workflow、固定命令 dispatch、固定 registry tool permission enforcement、handoff ledger/resolve、transparent memory inspect/export/prune/clear、evidence-cited report artifacts、paper order proposal gate、default-disabled live readiness probe、live order preview gate 和 CEO Office 已有 foundation，但仍缺 advanced desk reasoning、streaming、完整报告节奏和 paper/live order submission/reconciliation。
 
 **维护说明:**
 

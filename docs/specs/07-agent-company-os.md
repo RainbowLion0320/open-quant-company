@@ -9,7 +9,7 @@
 
 Agent Company OS is the planned local-first operating layer for Open Quant Company. It lets the human user act as CEO while desk agents coordinate data, research, risk, execution, engineering, and reporting work.
 
-This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, transparent memory governance, evidence-cited report artifacts, default-disabled live readiness probing, and live order preview risk gating are implemented first; streaming, full operating-rhythm report cadence, advanced desk reasoning, and live order submission/reconciliation remain planned until their phase lands.
+This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, transparent memory governance, evidence-cited report artifacts, paper order preview/proposal cards, default-disabled live readiness probing, and live order preview risk gating are implemented first; streaming, full operating-rhythm report cadence, advanced desk reasoning, and paper/live order submission/reconciliation remain planned until their phase lands.
 
 ## 2. Product Contract
 
@@ -45,6 +45,7 @@ All endpoints are planned under `/api/agent/*`.
 | `GET` | `/api/agent/runs/{run_id}` | Read a tool or workflow run. | Implemented |
 | `GET` | `/api/agent/evidence/{evidence_id}` | Resolve an evidence reference. | Implemented |
 | `GET` | `/api/agent/desks` | List desk agents, health, allowed tools, and current blockers. | Implemented |
+| `POST` | `/api/agent/paper/proposals` | Preview and propose a PaperBroker order as an approval-required action without submitting it. | Implemented proposal gate |
 | `GET` | `/api/agent/live/readiness` | Report MiniQMT/QMT live readiness without submitting orders. | Implemented readiness probe |
 | `POST` | `/api/agent/live/preview` | Preview a MiniQMT/QMT live order with readiness, cash gate, broker impact, and `submitted=false`. | Implemented preview gate |
 | `GET` | `/api/agent/reports` | List generated CEO reports, optionally scoped to a session. | Implemented |
@@ -76,6 +77,7 @@ All commands must support `--json`.
 | `astroq agent expire --session SESSION_ID --json` | Mark expired queued actions. | Implemented |
 | `astroq agent reports --session SESSION_ID --json` | List generated CEO reports. | Implemented |
 | `astroq agent report daily --session SESSION_ID --json` | Generate an evidence-cited daily CEO brief. | Implemented |
+| `astroq agent paper propose --session SESSION_ID --symbol SYMBOL --side buy\|sell --quantity N --limit-price PRICE --evidence EVIDENCE_ID --json` | Preview and propose a PaperBroker order approval card without submitting it. | Implemented proposal gate |
 | `astroq agent live readiness --json` | Report MiniQMT/QMT live readiness and blockers without PaperBroker fallback. | Implemented readiness probe |
 | `astroq agent live preview --symbol SYMBOL --side buy\|sell --quantity N --limit-price PRICE --evidence EVIDENCE_ID --json` | Preview a live limit order without submission, including approval requirement, readiness blockers, cash gate, and estimated broker impact. | Implemented preview gate |
 | `astroq agent evidence EVIDENCE_ID --json` | Resolve evidence. | Implemented |
@@ -400,6 +402,42 @@ Current preview rules:
 - Missing symbol, side, positive quantity, limit price, or evidence reference blocks preview.
 - The response must always keep `approval_required=true`, `submitted=false`, and `paper_fallback=false`.
 
+### 5.13 PaperOrderProposal
+
+`POST /api/agent/paper/proposals` and
+`astroq agent paper propose ... --json` create approval cards only after a
+non-mutating PaperBroker preview passes.
+
+```json
+{
+  "status": "approval_required",
+  "preview": {
+    "status": "preview_ready",
+    "broker": "paper",
+    "submitted": false,
+    "approval_required": true,
+    "risk_gate": {"passed": true, "blockers": []}
+  },
+  "action": {
+    "action_type": "paper_order",
+    "risk_level": "paper_order",
+    "status": "approval_required",
+    "parameters": {
+      "paper_order_intent": {"symbol": "000001", "side": "buy"},
+      "paper_order_preview": {"submitted": false}
+    }
+  }
+}
+```
+
+Paper proposal rules:
+
+- Preview uses the current PaperBroker state and must not call `submit_order()`.
+- Blocked previews do not create approval actions.
+- Passing previews create Execution Desk `paper_order` actions with preview artifact evidence.
+- Dispatch before approval must record a blocked run.
+- Current approved dispatch still blocks because the actual submit tool is not implemented; this prevents a hidden submit path while the reconciliation layer is incomplete.
+
 ## 6. Risk Levels and Default Policies
 
 | Risk level | Examples | Default policy |
@@ -547,16 +585,17 @@ As of 2026-06-14:
 
 - Foundation runtime is partially implemented in `agent_os/`.
 - The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and open/resolved cross-desk handoffs under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/reports/report/live readiness/live preview/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
-- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/live/readiness`, `/api/agent/live/preview`, `/api/agent/reports`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
+- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/reports/report/paper propose/live readiness/live preview/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
+- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/paper/proposals`, `/api/agent/live/readiness`, `/api/agent/live/preview`, `/api/agent/reports`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; approved fixed-registry templated commands bind only tool-declared safe parameters.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
 - Web-route evidence resolves to safe local navigation metadata, and CEO Office can render an evidence link into the related Web view.
 - CEO reports can be generated as JSON/Markdown artifacts, registered as report evidence, listed through CLI/API, and shown as CEO Office report cards.
+- PaperBroker order proposal is available through CLI/API. It writes preview artifact evidence and creates an approval-required `paper_order` action only when the non-mutating preview passes.
 - MiniQMT/QMT readiness probing is available and defaults to `live_disabled`; missing SDK, login, permission, or disabled kill switch returns `blocked`, and `paper_fallback` is always false.
 - MiniQMT/QMT live order preview is available through CLI/API. It never submits, never falls back to PaperBroker, always requires approval, and blocks on readiness, invalid intent, missing evidence, or insufficient cash.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
-- Actual advanced desk reasoning, broad tool execution, streaming updates, full operating-rhythm report cadence, and MiniQMT/QMT live submission/reconciliation are not yet implemented.
+- Actual advanced desk reasoning, broad tool execution, streaming updates, full operating-rhythm report cadence, and paper/live submission/reconciliation are not yet implemented.

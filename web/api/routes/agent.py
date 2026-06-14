@@ -111,6 +111,18 @@ async def preview_agent_live_order(payload: dict[str, Any]) -> dict[str, Any]:
     return {"preview": AgentRuntime().preview_live_order(payload)}
 
 
+@router.post("/paper/proposals")
+async def propose_agent_paper_order(payload: dict[str, Any]) -> dict[str, Any]:
+    session_id = str(payload.get("session_id") or "")
+    if not session_id:
+        raise InvalidParameterError("session_id", session_id, "expected an agent session id")
+    try:
+        proposal = AgentRuntime().propose_paper_order(session_id=session_id, intent=payload)
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+    return {"proposal": proposal}
+
+
 @router.post("/reports")
 async def generate_agent_report(payload: dict[str, Any]) -> dict[str, Any]:
     try:
