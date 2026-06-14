@@ -202,6 +202,7 @@ Allowed statuses:
   "kind": "artifact",
   "label": "Lifecycle readiness latest artifact",
   "uri": "var/artifacts/lifecycle/latest.json",
+  "snapshot_uri": "var/artifacts/agent/evidence/ev_.../latest.json",
   "summary": "Data readiness blocked by macro_gdp source_not_updated.",
   "generated_at": "2026-06-14T09:00:00+08:00",
   "hash": "sha256:...",
@@ -219,6 +220,17 @@ Allowed kinds:
 - `code`
 - `report`
 - `ledger`
+
+For file-backed evidence kinds (`artifact`, `file`, `code`, `report`, `ledger`),
+the runtime copies the source file into `var/artifacts/agent/evidence/{evidence_id}/`.
+The ledger stores the original `hash` and `snapshot_uri`. Resolving evidence
+returns:
+
+- `fresh` when the source still exists and matches the stored hash.
+- `source_changed` when the source exists but no longer matches the stored hash.
+- `source_missing` when the source is gone but the snapshot remains available.
+- `missing_evidence` only when no ledger row exists, or an old file-backed row has
+  neither source nor snapshot.
 
 ### 5.6 ApprovalPolicy
 
@@ -434,4 +446,4 @@ As of 2026-06-14:
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
-- Actual desk reasoning, broad tool execution, evidence snapshot governance, streaming updates, reports, and MiniQMT/QMT live adapter are not yet implemented.
+- Actual advanced desk reasoning, broad tool execution, streaming updates, reports, and MiniQMT/QMT live adapter are not yet implemented.

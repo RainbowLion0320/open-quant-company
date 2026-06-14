@@ -246,7 +246,19 @@
             </div>
             <div class="detail-row">
               <span>{{ t("ceoOffice.freshness") }}</span>
-              <code>{{ selectedEvidence.freshness_status }}</code>
+              <code>{{ selectedEvidenceStatus || selectedEvidence.freshness_status }}</code>
+            </div>
+            <div v-if="selectedEvidence.hash" class="detail-row">
+              <span>{{ t("ceoOffice.sourceHash") }}</span>
+              <code>{{ selectedEvidence.hash }}</code>
+            </div>
+            <div v-if="selectedEvidence.current_hash" class="detail-row">
+              <span>{{ t("ceoOffice.currentHash") }}</span>
+              <code>{{ selectedEvidence.current_hash }}</code>
+            </div>
+            <div v-if="selectedEvidenceSnapshot" class="detail-row">
+              <span>{{ t("ceoOffice.evidenceSnapshot") }}</span>
+              <code>{{ selectedEvidenceSnapshot.uri }}</code>
             </div>
           </div>
         </article>
@@ -257,7 +269,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentHandoff, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -270,7 +282,9 @@ const handoffs = ref<AgentHandoff[]>([]);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
+const selectedEvidenceSnapshot = ref<AgentEvidenceSnapshot | null>(null);
 const selectedEvidenceNavigation = ref<EvidenceNavigation | null>(null);
+const selectedEvidenceStatus = ref("");
 const runningAction = ref("");
 const cancelingAction = ref("");
 const archivingSession = ref(false);
@@ -475,10 +489,14 @@ async function runAction(actionId: string) {
 async function loadEvidence(evidenceId: string) {
   error.value = "";
   selectedEvidenceNavigation.value = null;
+  selectedEvidenceSnapshot.value = null;
+  selectedEvidenceStatus.value = "";
   try {
     const payload = await api.agentEvidence(evidenceId);
     selectedEvidence.value = payload.evidence;
     selectedEvidenceNavigation.value = payload.navigation;
+    selectedEvidenceSnapshot.value = payload.snapshot;
+    selectedEvidenceStatus.value = payload.status;
   } catch (err: any) {
     error.value = `${t("ceoOffice.evidenceLoadFailed")}: ${err?.message || err}`;
   }

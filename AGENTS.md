@@ -152,7 +152,7 @@ astroq lifecycle check --json
 - Production backtests use `backtest/pipeline_runner.py` plus shared modules under `pipeline/`.
 - Strategy state is owned by Strategy Catalog and separated into production, paper, and candidate layers.
 - Web System visualizations include CodeGraph, AST diagnostics, architecture diagnostics, test design intelligence, and lifecycle readiness.
-- Agent Company OS has a foundation runtime for session metadata, messages, deterministic desk responses, desk-scoped actions, approvals, runs, evidence, desk registry, fixed-registry tool permission checks, open/resolved cross-desk handoffs, and transparent memory inspect/export/prune/clear. Advanced desk reasoning, streaming reports, broad workflow orchestration, and live execution are still phased work; do not present them as complete.
+- Agent Company OS has a foundation runtime for session metadata, messages, deterministic desk responses, desk-scoped actions, approvals, runs, evidence resolution/snapshots, desk registry, fixed-registry tool permission checks, open/resolved cross-desk handoffs, and transparent memory inspect/export/prune/clear. Advanced desk reasoning, streaming reports, broad workflow orchestration, and live execution are still phased work; do not present them as complete.
 - Formal strategy promotion depends on score panels, alpha evidence, data readiness, and execution assumptions. Missing data, missing source capability, missing score panels, and insufficient evidence must be reported as blocked/not_applicable states, not filled with placeholder values.
 - The project is local-first. Network access, provider permissions, and data completeness must be explicit, observable, and never hidden behind fake defaults.
 

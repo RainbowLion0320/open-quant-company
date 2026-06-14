@@ -42,10 +42,17 @@ export interface EvidenceRef {
   kind: string;
   label: string;
   uri: string;
+  snapshot_uri: string;
   summary: string;
   generated_at: string;
   hash: string;
+  current_hash?: string;
   freshness_status: string;
+}
+
+export interface AgentEvidenceSnapshot {
+  uri: string;
+  hash: string;
 }
 
 export interface EvidenceNavigation {
@@ -138,6 +145,7 @@ export interface AgentEvidenceResponse {
   status: string;
   evidence_id: string;
   evidence: EvidenceRef | null;
+  snapshot: AgentEvidenceSnapshot | null;
   navigation: EvidenceNavigation | null;
 }
 

@@ -170,6 +170,49 @@ def test_agent_evidence_resolver_reports_missing_and_fresh_evidence(tmp_path, mo
     reset_datahub()
 
 
+def test_agent_evidence_snapshots_survive_source_mutation_and_deletion(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.evidence import EvidenceResolver
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    artifact = tmp_path / "runtime" / "artifacts" / "lifecycle" / "latest.json"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text('{"status": "original"}\n', encoding="utf-8")
+
+    evidence = runtime.create_evidence(
+        kind="artifact",
+        label="Lifecycle original",
+        uri=str(artifact),
+        summary="Lifecycle readiness source artifact.",
+    )
+    snapshot_path = Path(evidence.snapshot_uri)
+    source_hash = evidence.hash
+
+    artifact.write_text('{"status": "mutated"}\n', encoding="utf-8")
+    changed = EvidenceResolver().resolve(evidence.evidence_id)
+    artifact.unlink()
+    missing_source = EvidenceResolver().resolve(evidence.evidence_id)
+
+    assert source_hash.startswith("sha256:")
+    assert snapshot_path.exists()
+    assert snapshot_path.read_text(encoding="utf-8") == '{"status": "original"}\n'
+    assert "/agent/evidence/" in evidence.snapshot_uri
+    assert changed["status"] == "source_changed"
+    assert changed["evidence"]["hash"] == source_hash
+    assert changed["evidence"]["current_hash"] != source_hash
+    assert changed["snapshot"]["uri"] == evidence.snapshot_uri
+    assert changed["snapshot"]["hash"] == source_hash
+    assert missing_source["status"] == "source_missing"
+    assert missing_source["evidence"]["evidence_id"] == evidence.evidence_id
+    assert missing_source["snapshot"]["uri"] == evidence.snapshot_uri
+    reset_datahub()
+
+
 def test_agent_evidence_resolver_returns_safe_web_route_navigation(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

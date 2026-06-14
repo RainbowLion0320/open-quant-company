@@ -51,6 +51,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "archivingSession" in view
     assert "selectedEvidence" in view
     assert "selectedEvidenceNavigation" in view
+    assert "selectedEvidenceSnapshot" in view
+    assert "selectedEvidenceStatus" in view
     assert "openLinkedView" in view
     assert "handoffs" in view
     assert "api.agentHandoffs" in view
@@ -71,8 +73,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Cancel Action" in en_ceo
     assert "Canceled" in en_ceo
     assert "证据详情" in zh_ceo
+    assert "证据快照" in zh_ceo
+    assert "当前哈希" in zh_ceo
     assert "打开关联视图" in zh_ceo
     assert "Evidence Detail" in en_ceo
+    assert "Evidence Snapshot" in en_ceo
+    assert "Current Hash" in en_ceo
     assert "Open Linked View" in en_ceo
 
 
@@ -103,5 +109,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentAddMessageResponse" in agent_types
     assert "desk_response?: AgentDeskResponse" in agent_types
     assert "export interface EvidenceRef" in agent_types
+    assert "snapshot_uri: string" in agent_types
+    assert "export interface AgentEvidenceSnapshot" in agent_types
+    assert "snapshot: AgentEvidenceSnapshot | null" in agent_types
     assert "export interface EvidenceNavigation" in agent_types
     assert "navigation: EvidenceNavigation | null" in agent_types

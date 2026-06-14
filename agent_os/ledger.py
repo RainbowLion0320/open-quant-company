@@ -35,6 +35,12 @@ class AgentLedger:
         conn.row_factory = sqlite3.Row
         return conn
 
+    @staticmethod
+    def _ensure_column(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+        columns = {str(row["name"]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
     def _init(self) -> None:
         with self._connect() as conn:
             conn.executescript(
@@ -83,6 +89,7 @@ class AgentLedger:
                     kind TEXT NOT NULL,
                     label TEXT NOT NULL,
                     uri TEXT NOT NULL,
+                    snapshot_uri TEXT NOT NULL DEFAULT '',
                     summary TEXT NOT NULL,
                     generated_at TEXT NOT NULL,
                     hash TEXT NOT NULL,
@@ -117,6 +124,7 @@ class AgentLedger:
                 );
                 """
             )
+            self._ensure_column(conn, "evidence", "snapshot_uri", "TEXT NOT NULL DEFAULT ''")
 
     def insert_session(self, row: dict[str, Any]) -> None:
         payload = {**row, "tags": _json_dumps(row.get("tags", []))}
@@ -203,13 +211,14 @@ class AgentLedger:
             )
 
     def insert_evidence(self, row: dict[str, Any]) -> None:
+        payload = {**row, "snapshot_uri": row.get("snapshot_uri", "")}
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO evidence(evidence_id, kind, label, uri, summary, generated_at, hash, freshness_status)
-                VALUES(:evidence_id, :kind, :label, :uri, :summary, :generated_at, :hash, :freshness_status)
+                INSERT INTO evidence(evidence_id, kind, label, uri, snapshot_uri, summary, generated_at, hash, freshness_status)
+                VALUES(:evidence_id, :kind, :label, :uri, :snapshot_uri, :summary, :generated_at, :hash, :freshness_status)
                 """,
-                row,
+                payload,
             )
 
     def insert_run(self, row: dict[str, Any]) -> None:

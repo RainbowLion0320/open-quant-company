@@ -107,6 +107,7 @@ Required fields:
 - `kind`: `web_route`, `api_endpoint`, `cli_command`, `artifact`, `file`, `code`, `report`, `ledger`
 - `label`
 - `uri`
+- `snapshot_uri`
 - `summary`
 - `generated_at`
 - `hash`

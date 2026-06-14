@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import uuid
 from datetime import datetime, timezone
@@ -226,14 +227,18 @@ class AgentRuntime:
         summary: str,
         freshness_status: str = "fresh",
     ) -> EvidenceRef:
+        evidence_id = _id("ev")
         evidence_hash = ""
+        snapshot_uri = ""
         if kind in FILE_EVIDENCE_KINDS and Path(uri).exists():
             evidence_hash = hash_file(uri)
+            snapshot_uri = str(self._snapshot_evidence_file(evidence_id, Path(uri)))
         evidence = EvidenceRef(
-            evidence_id=_id("ev"),
+            evidence_id=evidence_id,
             kind=kind,
             label=label,
             uri=uri,
+            snapshot_uri=snapshot_uri,
             summary=summary,
             generated_at=_now(),
             hash=evidence_hash,
@@ -475,6 +480,13 @@ class AgentRuntime:
 
     def list_desks(self) -> list[dict[str, Any]]:
         return list_desks()
+
+    def _snapshot_evidence_file(self, evidence_id: str, source: Path) -> Path:
+        root = get_datahub().artifact_dir("agent") / "evidence" / evidence_id
+        root.mkdir(parents=True, exist_ok=True)
+        target = root / (source.name or "evidence")
+        shutil.copy2(source, target)
+        return target
 
     def _route_ceo_message(self, *, session_id: str, source_message_id: str, desk: str, content: str) -> DeskResponse:
         plan = build_desk_workflow_plan(desk=desk, content=content)

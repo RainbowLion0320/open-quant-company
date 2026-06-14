@@ -61,6 +61,7 @@ class EvidenceRef:
     kind: str
     label: str
     uri: str
+    snapshot_uri: str
     summary: str
     generated_at: str
     hash: str

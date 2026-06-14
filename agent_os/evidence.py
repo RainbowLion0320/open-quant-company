@@ -29,23 +29,57 @@ class EvidenceResolver:
                 "status": "missing_evidence",
                 "evidence_id": evidence_id,
                 "evidence": None,
+                "snapshot": None,
                 "navigation": None,
             }
 
         status = evidence.get("freshness_status") or "unknown"
         if evidence.get("kind") in FILE_EVIDENCE_KINDS:
+            snapshot = _snapshot_for_evidence(evidence)
             path = Path(str(evidence.get("uri") or ""))
             if not path.exists():
-                return {"status": "missing_evidence", "evidence_id": evidence_id, "evidence": evidence, "navigation": None}
-            evidence = {**evidence, "hash": hash_file(path)}
-            status = "fresh"
+                if snapshot is None:
+                    return {
+                        "status": "missing_evidence",
+                        "evidence_id": evidence_id,
+                        "evidence": evidence,
+                        "snapshot": None,
+                        "navigation": None,
+                    }
+                return {
+                    "status": "source_missing",
+                    "evidence_id": evidence_id,
+                    "evidence": evidence,
+                    "snapshot": snapshot,
+                    "navigation": None,
+                }
+            current_hash = hash_file(path)
+            expected_hash = str(evidence.get("hash") or "")
+            evidence = {**evidence, "current_hash": current_hash}
+            status = "source_changed" if expected_hash and current_hash != expected_hash else "fresh"
+        else:
+            snapshot = _snapshot_for_evidence(evidence)
 
         return {
             "status": status,
             "evidence_id": evidence_id,
             "evidence": evidence,
+            "snapshot": snapshot,
             "navigation": _navigation_for_evidence(evidence),
         }
+
+
+def _snapshot_for_evidence(evidence: dict[str, Any]) -> dict[str, str] | None:
+    snapshot_uri = str(evidence.get("snapshot_uri") or "").strip()
+    if not snapshot_uri:
+        return None
+    path = Path(snapshot_uri)
+    if not path.exists():
+        return None
+    return {
+        "uri": str(path),
+        "hash": hash_file(path),
+    }
 
 
 def _navigation_for_evidence(evidence: dict[str, Any]) -> dict[str, str] | None:
