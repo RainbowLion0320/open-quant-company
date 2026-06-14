@@ -1,4 +1,4 @@
-"""Central settings loader for the Astrolabe Quant project."""
+"""Central settings loader for Open Quant Company."""
 
 from __future__ import annotations
 

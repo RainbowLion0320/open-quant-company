@@ -1,6 +1,6 @@
 # Privacy
 
-Astrolabe is local-first by design. The application does not intentionally collect telemetry from users, upload local trading records, or send repository runtime data to project maintainers.
+Open Quant Company is local-first by design. The application does not intentionally collect telemetry from users, upload local trading records, or send repository runtime data to project maintainers.
 
 ## Local-First Defaults
 
@@ -8,7 +8,7 @@ By default, runtime outputs stay on the user's machine under `var/`. This includ
 
 ## External Calls
 
-Astrolabe can make external calls when the user explicitly configures provider credentials or runs workflows that require network access:
+Open Quant Company can make external calls when the user explicitly configures provider credentials or runs workflows that require network access:
 
 - Market data providers such as AKShare and Tushare.
 - LLM providers configured for factor research or usage reporting.

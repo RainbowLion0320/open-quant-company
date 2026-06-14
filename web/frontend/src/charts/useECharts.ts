@@ -1,5 +1,5 @@
 /**
- * 星盘终端 — ECharts Composable
+ * Open Quant Company Console — ECharts Composable
  *
  * Single shared wrapper for all ECharts instances across the app.
  * ECharts is dynamically imported — only loaded when a chart is first rendered.
@@ -98,7 +98,7 @@ export function useECharts(elRef: Ref<HTMLElement | null>) {
 }
 
 /**
- * 星盘终端 ECharts theme defaults.
+ * Open Quant Company Console ECharts theme defaults.
  * Apply these to every chart via setOption + spread.
  */
 export const QUANTUM_THEME = {

@@ -6,11 +6,11 @@ type: decision
 tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-center, monitor]
 ---
 
-# Decision: 星盘终端 Web SPA
+# Decision: Open Quant Company Console Web SPA
 
 - **Date**: 2026-05-12 (initial), 2026-05-16 (command center upgrade), 2026-05-23 (refresh), 2026-05-27 (doc/code alignment), 2026-06-02 (doc/wiki/spec/code alignment)
 - **Status**: Implemented
-- **Author**: 星盘 + Codex
+- **Author**: Open Quant Company + Codex
 
 ## Stack
 

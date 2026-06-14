@@ -1,6 +1,6 @@
 """
 消息推送模块 — 支持 Telegram / 企业微信 / 飞书
-配置: 星盘 config/notify.yaml 或环境变量
+配置: Open Quant Company config/notify.yaml 或环境变量
 """
 import os, requests
 from typing import List
@@ -63,7 +63,7 @@ def send_feishu(message: str, webhook: str = "") -> bool:
         r = requests.post(webhook, json={
             "msg_type": "interactive",
             "card": {
-                "header": {"title": {"content": "星盘日报", "tag": "plain_text"}},
+                "header": {"title": {"content": "Open Quant Company 日报", "tag": "plain_text"}},
                 "elements": [{"tag": "markdown", "content": message}],
             },
         }, timeout=10)

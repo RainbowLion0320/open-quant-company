@@ -50,7 +50,10 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq data status --json` | 扫描本地数据健康 |
 | `astroq data repair stock_valuation --dry-run --json` | 演练单表修复 |
 | `astroq data sources --json` | 查看外部数据源能力目录最近一次审计摘要 |
-| `astroq data sources audit --source all --json` | 生成 AKShare/Tushare/候选源能力治理产物 |
+| `astroq data sources audit --source all --discovery-depth catalog --json` | 生成 AKShare/Tushare/候选源能力治理产物，不访问候选源网络接口 |
+| `astroq data sources audit --source all --discovery-depth sample --json` | 只对白名单候选接口做极小样本探测并记录元数据 |
+| `astroq data sources audit --source all --discovery-depth full-sample --resume --json` | 对所有已发现能力生成样本探测或阻断原因闭环，不写入真实数据仓 |
+| `astroq data sources audit --source all --discovery-depth full-sample --dry-run --json` | 只输出全量样本探测计划，不调用 provider |
 | `astroq data sources diff-registry --json` | 对比 source capability registry 与项目 data_registry |
 | `astroq data tushare-audit --json` | 审计 Tushare 权限和本地覆盖率 |
 | `astroq data tushare-backfill --scope missing --resume --json` | 按缺口补齐 Tushare 数据 |
@@ -134,7 +137,7 @@ astroq lifecycle check --json
 ## Current Architecture Notes
 
 - Data access is organized under `data.storage`, `data.ingestion`, `data.market`, `data.features`, `data.quality`, `data.ops`, `data.llm`, `data.rates`, `data.strategy`, and `data.reference`.
-- External provider capabilities are governed separately from project dimensions: Source Capability Registry describes what sources can provide, `data_registry` describes what the project uses, and DataHub coverage describes what exists locally.
+- External provider capabilities are governed separately from project dimensions: Source Capability Registry describes what sources can provide, `data_registry` describes what the project uses, and DataHub coverage describes what exists locally. Capability discovery is layered as `discovered`, `sample_probed`, `contracted`, and `project_integrated`; never treat a discovered candidate endpoint as production-ready without a contract and registry mapping.
 - Production backtests use `backtest/pipeline_runner.py` plus shared modules under `pipeline/`.
 - Strategy state is owned by Strategy Catalog and separated into production, paper, and candidate layers.
 - Web System visualizations include CodeGraph, AST diagnostics, architecture diagnostics, test design intelligence, and lifecycle readiness.

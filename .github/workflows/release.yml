@@ -56,7 +56,7 @@ jobs:
           npm ci
           npm run typecheck
           npm run build
-          tar -czf ../../astrolabe-frontend-dist.tar.gz dist
+          tar -czf ../../open-quant-company-frontend-dist.tar.gz dist
 
       - name: Publish GitHub release
         env:
@@ -64,7 +64,7 @@ jobs:
         run: |
           gh release create "${{ steps.release_tag.outputs.tag }}" \
             dist/* \
-            astrolabe-frontend-dist.tar.gz \
-            --title "Astrolabe ${{ steps.release_tag.outputs.tag }}" \
+            open-quant-company-frontend-dist.tar.gz \
+            --title "Open Quant Company ${{ steps.release_tag.outputs.tag }}" \
             --notes-file CHANGELOG.md \
             --verify-tag

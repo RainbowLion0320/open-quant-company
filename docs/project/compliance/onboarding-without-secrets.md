@@ -1,6 +1,6 @@
 # Onboarding Without Secrets
 
-Astrolabe should be inspectable without provider credentials. A new contributor can validate the codebase, build the Web UI, and run deterministic checks without `TUSHARE_TOKEN`, `DEEPSEEK_API_KEY`, notification webhooks, or private local data.
+Open Quant Company should be inspectable without provider credentials. A new contributor can validate the codebase, build the Web UI, and run deterministic checks without `TUSHARE_TOKEN`, `DEEPSEEK_API_KEY`, notification webhooks, or private local data.
 
 Development checks require Python 3.11+, Node.js 18+, Git, and ripgrep (`rg`).
 

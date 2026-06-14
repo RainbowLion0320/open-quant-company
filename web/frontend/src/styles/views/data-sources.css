@@ -4,8 +4,7 @@
   gap: 12px;
 }
 
-.sources-toolbar,
-.sources-filters {
+.sources-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -42,7 +41,7 @@
 
 .sources-metrics {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
 
@@ -77,11 +76,17 @@
   white-space: nowrap;
 }
 
-.sources-filters {
+.capability-filter-bar {
+  display: flex;
+  align-items: center;
   justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  padding: 10px 0;
 }
 
-.sources-filters label {
+.capability-filter-bar label {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -89,7 +94,7 @@
   font-size: 12px;
 }
 
-.sources-filters select {
+.capability-filter-bar select {
   min-width: 148px;
   border: 1px solid var(--border, rgba(148, 163, 184, 0.18));
   border-radius: 6px;
@@ -233,6 +238,47 @@
   padding-bottom: 0;
 }
 
+.capability-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  padding: 10px 0;
+  color: var(--text-secondary, #8c96a8);
+  font-size: 12px;
+}
+
+.capability-pagination label,
+.pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.capability-pagination select {
+  min-width: 72px;
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.18));
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--text-primary, #f1f5f9);
+  padding: 5px 7px;
+  font-size: 12px;
+}
+
+.pagination-actions strong {
+  min-width: 88px;
+  color: var(--text-primary, #f1f5f9);
+  font-size: 12px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.pagination-actions .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .capability-table-wrap {
   overflow: auto;
   max-height: 520px;
@@ -346,9 +392,14 @@
 @media (max-width: 760px) {
   .sources-toolbar,
   .sources-command,
-  .sources-filters {
+  .capability-filter-bar,
+  .capability-pagination {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .pagination-actions {
+    justify-content: space-between;
   }
 
   .sources-metrics {
@@ -360,7 +411,7 @@
     grid-template-columns: 1fr;
   }
 
-  .sources-filters label {
+  .capability-filter-bar label {
     align-items: stretch;
     flex-direction: column;
   }

@@ -20,8 +20,8 @@ def test_project_meta_uses_pyproject_version_and_hides_config_secrets(tmp_path, 
             {
                 "project": {
                     "name": "config-name",
-                    "display_name": "星盘测试",
-                    "english_name": "Astrolabe Test",
+                    "display_name": "Open Quant Company测试",
+                    "english_name": "Open Quant Company Test",
                     "version": "1.2.3",
                     "api_key": "secret",
                     "run_mode": "live",
@@ -37,7 +37,7 @@ def test_project_meta_uses_pyproject_version_and_hides_config_secrets(tmp_path, 
 
     assert meta["name"] == "config-name"
     assert meta["version"] == "9.8.7"
-    assert meta["display_name"] == "星盘测试"
+    assert meta["display_name"] == "Open Quant Company测试"
     assert "api_key" not in meta
     assert "run_mode" not in meta
 

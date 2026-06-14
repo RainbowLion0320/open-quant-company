@@ -1,6 +1,6 @@
 # Data Compliance
 
-Astrolabe is code and local workflow infrastructure. It is not a market data redistribution project.
+Open Quant Company is code and local workflow infrastructure. It is not a market data redistribution project.
 
 ## Provider Terms
 

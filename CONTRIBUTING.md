@@ -1,6 +1,6 @@
-# Contributing to Astrolabe
+# Contributing to Open Quant Company
 
-Thank you for considering a contribution. Astrolabe is treated as a real open source project, not a demo repository. Contributions should preserve reproducibility, data integrity, and clear boundaries between research, paper trading, and production-like workflows.
+Thank you for considering a contribution. Open Quant Company is treated as a real open source project, not a demo repository. Contributions should preserve reproducibility, data integrity, and clear boundaries between research, paper trading, and production-like workflows.
 
 ## Project Principles
 
@@ -33,8 +33,8 @@ Requirements:
 Basic setup:
 
 ```bash
-git clone https://github.com/RainbowLion0320/astrolabe-quant.git
-cd astrolabe-quant
+git clone https://github.com/RainbowLion0320/open-quant-company.git
+cd open-quant-company
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -64,7 +64,7 @@ The current ruff gate is intentionally conservative. It checks syntax, invalid c
 
 ## Secrets and Local Data
 
-Astrolabe reads secrets only from process environment variables. Do not add secrets to YAML, `.env`, notebooks, tests, screenshots, or documentation.
+Open Quant Company reads secrets only from process environment variables. Do not add secrets to YAML, `.env`, notebooks, tests, screenshots, or documentation.
 
 Common variables:
 
@@ -115,4 +115,4 @@ Use the issue templates when possible. Include enough context for maintainers to
 
 ## Financial Disclaimer
 
-Astrolabe is research and infrastructure software. It is not investment advice, does not promise returns, and should not be used as the only basis for trading decisions.
+Open Quant Company is research and infrastructure software. It is not investment advice, does not promise returns, and should not be used as the only basis for trading decisions.

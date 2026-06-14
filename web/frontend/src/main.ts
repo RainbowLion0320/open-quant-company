@@ -2,7 +2,7 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
 import router from "./router";
-import "./assets/astrolabe-quant.css";
+import "./assets/open-quant-company.css";
 
 const app = createApp(App);
 app.use(createPinia());

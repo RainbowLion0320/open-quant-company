@@ -1,6 +1,6 @@
 # Support
 
-Astrolabe is open source research infrastructure. Support is best handled through public, reproducible GitHub issues.
+Open Quant Company is open source research infrastructure. Support is best handled through public, reproducible GitHub issues.
 
 ## Where to Ask
 
@@ -32,4 +32,3 @@ The project does not provide:
 - Return guarantees.
 - Support for private provider accounts or proprietary datasets.
 - Debugging for untracked local changes without a reproducible example.
-

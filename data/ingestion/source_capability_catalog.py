@@ -16,7 +16,7 @@ SOURCE_IDS = (
     "computed",
 )
 
-RECOMMENDED_AUDIT_COMMAND = "astroq data sources audit --source all --json"
+RECOMMENDED_AUDIT_COMMAND = "astroq data sources audit --source all --discovery-depth catalog --json"
 
 SOURCE_LABELS = {
     "akshare": "AKShare",
@@ -60,6 +60,9 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": [],
         "probe_strategy": "documented_backend_only",
         "access_status": "candidate",
+        "discovery_status": "discovered",
+        "discovery_scope": "package_backend_mapping",
+        "probe_status": "not_probed",
         "notes": "Observed as AKShare index source='tx'; direct provider adapter is not production-ready.",
     },
     {
@@ -73,7 +76,11 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": [],
         "probe_strategy": "safe_read_only_http_probe",
         "access_status": "manual_review",
+        "discovery_status": "discovered",
+        "discovery_scope": "static_endpoint_catalog",
+        "probe_status": "not_probed",
         "endpoint_pattern": "https://qt.gtimg.cn/q={symbol}",
+        "source_url": "https://qt.gtimg.cn/",
         "parser": "data.ingestion.tencent_finance.parse_realtime_quote",
         "field_sample": ["symbol", "name", "last_price", "previous_close", "open", "volume", "timestamp"],
         "notes": "Observed public web quote endpoint; non-standard text payload, no official open API contract found.",
@@ -89,7 +96,11 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": [],
         "probe_strategy": "safe_read_only_http_probe",
         "access_status": "manual_review",
+        "discovery_status": "discovered",
+        "discovery_scope": "static_endpoint_catalog",
+        "probe_status": "not_probed",
         "endpoint_pattern": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={symbol},day,{start},{end},{limit},{adjust}",
+        "source_url": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
         "parser": "data.ingestion.tencent_finance.parse_fqkline_payload",
         "field_sample": ["date", "open", "close", "high", "low", "volume", "adjust"],
         "notes": "Observed public web K-line endpoint; candidate fallback only until field drift, rate limits, and authorization are reviewed.",
@@ -105,6 +116,9 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": [],
         "probe_strategy": "documented_backend_only",
         "access_status": "candidate",
+        "discovery_status": "discovered",
+        "discovery_scope": "package_backend_mapping",
+        "probe_status": "not_probed",
         "notes": "Observed as AKShare index source='em'; direct provider adapter is not production-ready.",
     },
     {
@@ -118,6 +132,9 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": [],
         "probe_strategy": "documented_backend_only",
         "access_status": "candidate",
+        "discovery_status": "discovered",
+        "discovery_scope": "package_backend_mapping",
+        "probe_status": "not_probed",
     },
     {
         "source": "sina_finance",
@@ -130,6 +147,9 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": [],
         "probe_strategy": "documented_backend_only",
         "access_status": "candidate",
+        "discovery_status": "discovered",
+        "discovery_scope": "package_backend_mapping",
+        "probe_status": "not_probed",
     },
     {
         "source": "sina_finance",
@@ -142,6 +162,9 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": ["futures_daily"],
         "probe_strategy": "documented_backend_only",
         "access_status": "candidate",
+        "discovery_status": "discovered",
+        "discovery_scope": "package_backend_mapping",
+        "probe_status": "not_probed",
     },
     {
         "source": "tonghuashun",
@@ -154,6 +177,9 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": ["financial_summary"],
         "probe_strategy": "documented_backend_only",
         "access_status": "candidate",
+        "discovery_status": "discovered",
+        "discovery_scope": "package_backend_mapping",
+        "probe_status": "not_probed",
     },
     {
         "source": "exchange_official",
@@ -166,6 +192,9 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": [],
         "probe_strategy": "manual_review",
         "access_status": "manual_review",
+        "discovery_status": "discovered",
+        "discovery_scope": "manual_seed",
+        "probe_status": "manual_review",
     },
     {
         "source": "cninfo",
@@ -178,6 +207,9 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": [],
         "probe_strategy": "manual_review",
         "access_status": "manual_review",
+        "discovery_status": "discovered",
+        "discovery_scope": "manual_seed",
+        "probe_status": "manual_review",
     },
     {
         "source": "computed",
@@ -190,6 +222,9 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": ["sector_performance_snapshot"],
         "probe_strategy": "internal_registry",
         "access_status": "internal",
+        "discovery_status": "project_integrated",
+        "discovery_scope": "internal_registry",
+        "probe_status": "internal",
     },
     {
         "source": "computed",
@@ -202,6 +237,9 @@ CANDIDATE_CAPABILITIES = [
         "mapped_dimensions": ["features_all"],
         "probe_strategy": "internal_registry",
         "access_status": "internal",
+        "discovery_status": "project_integrated",
+        "discovery_scope": "internal_registry",
+        "probe_status": "internal",
     },
 ]
 
@@ -240,6 +278,7 @@ def source_catalog() -> list[dict[str, Any]]:
             "status": SOURCE_STATUS.get(source, "candidate"),
             "requires_token": source == "tushare",
             "discovery_method": _discovery_method(source),
+            "discovery_scope": _discovery_scope(source),
             "notes": SOURCE_NOTES[source],
         }
         for source in SOURCE_IDS
@@ -253,4 +292,16 @@ def _discovery_method(source: str) -> str:
         return "account_probe"
     if source == "computed":
         return "internal_registry"
-    return "candidate_registry"
+    return "deterministic_catalog"
+
+
+def _discovery_scope(source: str) -> str:
+    if source == "akshare":
+        return "full_local_introspection"
+    if source == "tushare":
+        return "official_catalog_account_probe"
+    if source == "computed":
+        return "internal_registry"
+    if source in {"exchange_official", "cninfo"}:
+        return "manual_seed"
+    return "package_backend_mapping_static_endpoint_catalog"

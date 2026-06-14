@@ -298,10 +298,10 @@ ingestion:
     shenzhen: sz399001
   provider: akshare
 project:
-  name: astrolabe-quant
-  display_name: 星盘
-  english_name: Astrolabe Quant OS
-  description: 个人量化研究与执行操作系统 — 日频 · 自托管 · AI增强
+  name: open-quant-company
+  display_name: Open Quant Company
+  english_name: Open Quant Company
+  description: 开源量化公司操作系统：用户作为 CEO，多个 agent 负责数据、研究、风控、工程与报告，所有结论可回溯到 Web UI、CLI 和 evidence artifacts。
 llm:
   default_provider: deepseek
   use_cases:

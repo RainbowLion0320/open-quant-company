@@ -42,7 +42,7 @@ LLM Research → 自动化R&D      Circuit Breaker → -15%熔断  Self-healing 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  Web Dashboard (port 8501)                               │
-│  Vue 3 + Pinia + ECharts + Tailwind — 星盘终端           │
+│  Vue 3 + Pinia + ECharts + Tailwind — Open Quant Company Console           │
 │  /pipeline 关键参数计算透明度页                           │
 ├──────────────────────────────────────────────────────────┤
 │  FastAPI Backend                                         │

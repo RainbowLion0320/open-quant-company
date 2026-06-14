@@ -108,7 +108,7 @@ def test_data_sources_capabilities_api_returns_no_artifact(monkeypatch, tmp_path
     assert payload["status"] == "no_artifact"
     assert payload["summary"]["source_count"] >= 9
     assert payload["capabilities"] == []
-    assert payload["recommended_command"] == "astroq data sources audit --source all --json"
+    assert payload["recommended_command"] == "astroq data sources audit --source all --discovery-depth catalog --json"
     reset_datahub()
 
 
@@ -139,7 +139,7 @@ def test_data_sources_capabilities_api_reads_latest_artifact(monkeypatch, tmp_pa
             {
                 "status": "ok",
                 "generated_at": "2026-06-11T08:00:00+00:00",
-                "recommended_command": "astroq data sources audit --source all --json",
+                "recommended_command": "astroq data sources audit --source all --discovery-depth catalog --json",
                 "summary": {"source_count": 9, "capability_count": 2},
                 "sources": [{"source": "akshare", "capability_count": 2}],
                 "capabilities": [{"source": "akshare", "interface": "stock_zh_a_daily"}],
@@ -735,6 +735,23 @@ def test_datahub_sources_tab_and_api_contract():
     assert "/api/data-sources/capabilities" in data_sources_api
     assert "types/dataSources" in types
     assert "DataSourceCapabilityResponse" in data_source_types
+    assert "discovery_status" in data_source_types
+    assert "discovery_scope" in data_source_types
+    assert "probe_status" in data_source_types
+    assert "probe_block_reason" in data_source_types
+    assert "probe_contract_id" in data_source_types
+    assert "sample_probe" in data_source_types
+    assert "discoveryFilter" in data_sources_view
+    assert "probeFilter" in data_sources_view
+    assert "blockReasonFilter" in data_sources_view
+    assert "probeDetail" in data_sources_view
+    assert 'class="capability-filter-bar"' in data_sources_view
+    assert 'class="sources-filters glass-card"' not in data_sources_view
+    assert "currentPage" in data_sources_view
+    assert "pageSize" in data_sources_view
+    assert "pagedCapabilities" in data_sources_view
+    assert "paginationRange" in data_sources_view
+    assert "slice(0, 300)" not in data_sources_view
     assert "dataSources" in zh_index
     assert "dataSources" in en_index
     assert "数据源能力" in zh_modules

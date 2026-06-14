@@ -37,7 +37,7 @@ class DatasetSpec:
 
 
 class DataHub:
-    """Unified local data hub for the 星盘 repository."""
+    """Unified local data hub for the Open Quant Company repository."""
 
     def __init__(
         self,

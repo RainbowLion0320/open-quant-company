@@ -1,7 +1,7 @@
 export const app = {
-      brand: "Astrolabe Quant OS",
+      brand: "Open Quant Company",
       build: "BUILD",
-      fallbackTitle: "Astrolabe Terminal",
+      fallbackTitle: "Open Quant Company Console",
       navAria: "Primary navigation",
       statusAria: "System status",
       mode: "MODE",

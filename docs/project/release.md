@@ -1,6 +1,6 @@
 # Release Process
 
-Astrolabe uses semantic versioning for public tags:
+Open Quant Company uses semantic versioning for public tags:
 
 - `MAJOR`: breaking architecture, CLI, API, data layout, or strategy contract changes.
 - `MINOR`: new Web UI, CLI, data, strategy, or diagnostics capabilities that preserve current contracts.
@@ -24,7 +24,7 @@ Astrolabe uses semantic versioning for public tags:
 5. Create and push an annotated tag:
 
    ```bash
-   git tag -a v2.0.0 -m "Astrolabe v2.0.0"
+   git tag -a v2.0.0 -m "Open Quant Company v2.0.0"
    git push origin v2.0.0
    ```
 
@@ -35,6 +35,6 @@ Astrolabe uses semantic versioning for public tags:
 The release workflow attaches:
 
 - Python source and wheel distributions from `python -m build`.
-- `astrolabe-frontend-dist.tar.gz`, containing the built Web UI assets.
+- `open-quant-company-frontend-dist.tar.gz`, containing the built Web UI assets.
 
 Runtime data, model artifacts, local databases, provider caches, and reports under `var/` are never release artifacts.

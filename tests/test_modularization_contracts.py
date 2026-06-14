@@ -206,7 +206,7 @@ def test_p0_p2_modularization_hotspots_are_split():
     assert _line_count("web/frontend/src/views/Stocks.vue") <= 260
     assert _line_count("web/frontend/src/views/Portfolio.vue") <= 260
 
-    assert _line_count("web/frontend/src/assets/astrolabe-quant.css") <= 80
+    assert _line_count("web/frontend/src/assets/open-quant-company.css") <= 80
     assert _line_count("web/frontend/src/api/types.ts") <= 80
     assert _line_count("web/frontend/src/i18n/messages/zh-CN.ts") <= 80
     assert _line_count("web/frontend/src/i18n/messages/en-US.ts") <= 80

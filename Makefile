@@ -1,4 +1,4 @@
-# 星盘 / Astrolabe Quant OS — 维护命令
+# Open Quant Company — 维护命令
 PYTHON ?= .venv/bin/python
 
 .PHONY: install test lint ci clean scan backtest regime web web-build web-dev web-stop

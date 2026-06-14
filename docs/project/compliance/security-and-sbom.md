@@ -1,6 +1,6 @@
 # Security Scanning and SBOM
 
-Astrolabe uses GitHub-native security automation plus release-time artifact discipline.
+Open Quant Company uses GitHub-native security automation plus release-time artifact discipline.
 
 ## Automated Security Checks
 

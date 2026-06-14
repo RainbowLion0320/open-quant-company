@@ -43,7 +43,7 @@ def get_project_meta() -> dict[str, Any]:
     """Return public project metadata without secrets such as API keys."""
     project = _read_settings_project()
     project["version"] = get_project_version()
-    project.setdefault("name", "astrolabe-quant")
-    project.setdefault("display_name", "星盘")
-    project.setdefault("english_name", "Astrolabe Quant OS")
+    project.setdefault("name", "open-quant-company")
+    project.setdefault("display_name", "Open Quant Company")
+    project.setdefault("english_name", "Open Quant Company")
     return project

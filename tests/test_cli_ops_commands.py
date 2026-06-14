@@ -13,7 +13,7 @@ def test_health_command_reports_core_sections(capsys):
 
     assert code == 0
     assert data["ok"] is True
-    assert data["data"]["project"] == "astrolabe-quant"
+    assert data["data"]["project"] == "open-quant-company"
     assert "version" in data["data"]
     assert "store_root" in data["data"]
 

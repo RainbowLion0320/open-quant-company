@@ -1,10 +1,10 @@
-# 星盘 / Astrolabe Quant OS — 产品需求文档 (PRD)
+# Open Quant Company — 产品需求文档 (PRD)
 
 > 版本: 1.2 | 更新: 2026-06-06 | 状态: 产品范围基线
 
 ## 1. 产品定义
 
-星盘（Astrolabe Quant OS）是一个个人量化研究与执行操作系统。分阶段从数据分析助手演进为信号生成系统，最终支持半自动交易。核心理念：**巴菲特价值投资为决策约束层，钱学森控制论为运行机制层**——两者正交，前者管边界和原则，后者管执行和反馈。
+Open Quant Company 是一个开源量化公司操作系统：用户作为 CEO，多个 agent 负责数据、研究、风控、工程与报告，所有结论可回溯到 Web UI、CLI 和 evidence artifacts。项目分阶段从数据分析助手演进为信号生成系统，最终支持半自动交易。核心理念：**巴菲特价值投资为决策约束层，钱学森控制论为运行机制层**——两者正交，前者管边界和原则，后者管执行和反馈。
 
 - **频率**: 日线级别，低频交易
 - **市场**: A股全量 + 申万行业
@@ -33,7 +33,7 @@
 PaperBroker 本地模拟撮合，5 规则风控（仓位上限/总敞口/下单次数/回撤熔断/单笔金额），Parquet 持久化状态和 NAV。Cron 日频调度（15:30 扫描，09:30 执行）。
 
 ### 3.5 Web 平台
-Vue 3 星盘终端（Pinia + ECharts + Tailwind），FastAPI 后端按业务域拆分路由，WebSocket 实时进度推送，DuckDB :memory: 零锁查询。
+Vue 3 Open Quant Company Console（Pinia + ECharts + Tailwind），FastAPI 后端按业务域拆分路由，WebSocket 实时进度推送，DuckDB :memory: 零锁查询。
 
 ### 3.6 多资产架构
 Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，AssetAllocator 按 regime 动态分配权重。开关控制：`config/settings.yaml` 中每个资产类型可独立启用/禁用。
@@ -105,7 +105,7 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 ## 8. 项目结构
 
 ```
-~/astrolabe-quant/
+~/open-quant-company/
 ├── config/settings.yaml          # 全局配置 (策略/数据/风控/资产)
 ├── data/                         # 数据层源码包
 │   ├── storage/                  # DataHub、manifest、DuckDB、DataRegistry
@@ -141,7 +141,7 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 │   └── orchestrator.py           # 市场状态检测+自适应参数
 ├── web/                          # Web 平台
 │   ├── api/                      # FastAPI (业务路由 + WebSocket + Jobs)
-│   └── frontend/                 # Vue 3 SPA 星盘终端
+│   └── frontend/                 # Vue 3 SPA Open Quant Company Console
 ├── models/                       # ML 模型注册表
 ├── scripts/                      # Cron/工作流脚本
 ├── tests/                        # 合约测试+边界测试
