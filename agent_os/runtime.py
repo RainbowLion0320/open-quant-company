@@ -576,7 +576,7 @@ class AgentRuntime:
                 "paper_order_preview": preview,
                 "preview_artifact": str(artifact_path),
             },
-            expected_effect="Creates an approval card only; paper order submission requires a separate approved execution implementation.",
+            expected_effect="Requires CEO approval; approved submit re-runs PaperBroker preview/risk gates, writes a run, and records reconciliation evidence before marking success.",
             evidence_refs=[evidence.evidence_id],
         )
         return {

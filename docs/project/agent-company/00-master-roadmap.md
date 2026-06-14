@@ -206,7 +206,8 @@ Current foundation:
 - `astroq agent paper propose ... --json` and `POST /api/agent/paper/proposals` expose paper order proposal cards.
 - `AgentRuntime.submit_paper_order_action()` submits only approved `paper_order` actions after re-running PaperBroker preview/risk gates against current broker state.
 - `astroq agent paper submit ACTION_ID --json` and `POST /api/agent/paper/actions/{action_id}/submit` expose the approved submit path.
-- Successful paper submits write run ledger rows, reconciliation evidence, and default PaperBroker state/trade/NAV persistence. Richer CEO Office order-card UI, cancel semantics, and expanded reconciliation views remain future work.
+- CEO Office action detail shows PaperBroker preview/risk summary and uses the dedicated approved paper submit path instead of generic dispatch.
+- Successful paper submits write run ledger rows, reconciliation evidence, and default PaperBroker state/trade/NAV persistence. Cancel semantics and expanded reconciliation views remain future work.
 
 ### Phase 6 - MiniQMT/QMT Live Execution
 

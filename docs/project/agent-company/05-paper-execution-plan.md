@@ -1,6 +1,6 @@
 # Agent Company OS Phase 5 - Paper Execution Control Plan
 
-> Status: preview/proposal/submission foundation implemented; richer reconciliation and UI planned
+> Status: preview/proposal/submission/CEO Office card foundation implemented; richer reconciliation and cancellation planned
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Related spec: [07-agent-company-os.md](../../specs/07-agent-company-os.md)
@@ -22,7 +22,7 @@ In scope:
 - Risk gate blockers for missing price, missing evidence, insufficient cash, sellability, and broker risk rules
 - Approved paper submission after re-running preview/risk gates
 - Broker ledger linkage, reconciliation artifact, and outcome evidence
-- Later: richer CEO Office action card UI and cancellation controls
+- Later: richer reconciliation drill-down and cancellation controls
 
 Out of scope:
 
@@ -40,6 +40,7 @@ Out of scope:
 - `agent_os.runtime.AgentRuntime.submit_paper_order_action()` submits only approved `paper_order` actions, re-runs PaperBroker preview/risk gates against current broker state, and blocks stale approvals before any order is created.
 - `astroq agent paper submit ACTION_ID --json` and `POST /api/agent/paper/actions/{action_id}/submit` expose the approved submit flow.
 - Successful submits write an `AgentRun`, register reconciliation evidence, and persist default PaperBroker state/trades/NAV through the current `ASTROLABE_VAR` runtime root.
+- CEO Office action detail shows PaperBroker preview/risk gate summary and exposes a dedicated submit button for approved `paper_order` actions; paper orders do not use the generic action run button.
 
 ## 4. PaperOrderPreview Contract
 
@@ -98,7 +99,6 @@ Approved paper submission must:
 
 Before paper execution control is complete, implement:
 
-- CEO Office paper order action card UI with preview/risk details and approve/reject controls.
 - Kill/cancel semantics for queued paper order actions.
 - Richer PaperBroker reconciliation views comparing intended order, broker order, trade, cash, and position deltas across multiple submit outcomes.
 - Dedicated cancellation semantics for already-submitted paper orders if the broker state still permits cancellation.
@@ -112,3 +112,4 @@ Before paper execution control is complete, implement:
 - Approved submission re-checks preview/risk gates before any broker mutation.
 - A stale approval is re-blocked when cash, price, holdings, or evidence no longer satisfies preview requirements.
 - Successful submission writes an `AgentRun`, reconciliation artifact evidence, and default PaperBroker persistence state.
+- CEO Office displays paper preview/risk summary and uses the dedicated approved submit path instead of generic action dispatch.

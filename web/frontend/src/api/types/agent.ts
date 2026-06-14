@@ -197,6 +197,18 @@ export interface AgentRunActionResponse {
   run: AgentRun;
 }
 
+export interface AgentPaperSubmission {
+  status: string;
+  preview: Record<string, unknown>;
+  run: AgentRun;
+  reconciliation: Record<string, unknown>;
+  evidence: EvidenceRef;
+}
+
+export interface AgentPaperSubmitResponse {
+  submission: AgentPaperSubmission;
+}
+
 export interface AgentAddMessageResponse {
   message: AgentMessage;
   desk_response?: AgentDeskResponse;

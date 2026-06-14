@@ -416,6 +416,8 @@ def test_agent_paper_order_submission_requires_approval_reruns_preview_and_write
     assert action["approval_required"] is True
     assert action["evidence_refs"]
     assert action["parameters"]["paper_order_preview"]["submitted"] is False
+    assert "separate approved execution implementation" not in action["expected_effect"]
+    assert "re-runs PaperBroker preview/risk gates" in action["expected_effect"]
     assert blocked_submission["status"] == "blocked"
     assert "approval required" in blocked_submission["run"]["stderr_summary"]
     assert approved_submission["status"] == "succeeded"

@@ -206,6 +206,15 @@
                   {{ t("ceoOffice.rejected") }}
                 </button>
                 <button
+                  v-if="canSubmitPaperAction(action)"
+                  class="btn btn-xs btn-primary"
+                  type="button"
+                  :disabled="submittingPaperAction === action.action_id"
+                  @click="submitPaperAction(action.action_id)"
+                >
+                  {{ t("ceoOffice.submitPaperOrder") }}
+                </button>
+                <button
                   v-if="canCancelAction(action)"
                   class="btn btn-xs btn-ghost"
                   type="button"
@@ -238,6 +247,28 @@
               <span>{{ t("ceoOffice.parameters") }}</span>
               <pre>{{ formatJson(selectedAction.action.parameters) }}</pre>
             </div>
+            <div v-if="paperOrderPreview" class="detail-row">
+              <span>{{ t("ceoOffice.paperOrderPreview") }}</span>
+              <div class="paper-preview-grid">
+                <div class="paper-preview-cell">
+                  <small>{{ t("ceoOffice.status") }}</small>
+                  <strong>{{ statusLabel(String(paperOrderPreview.status || "unknown")) }}</strong>
+                </div>
+                <div class="paper-preview-cell">
+                  <small>{{ t("ceoOffice.riskGate") }}</small>
+                  <strong>{{ paperRiskGatePassed ? t("ceoOffice.passed") : t("ceoOffice.blocked") }}</strong>
+                </div>
+                <div class="paper-preview-cell">
+                  <small>{{ t("ceoOffice.cashEffect") }}</small>
+                  <strong>{{ formatNumber(paperOrderPreview.estimated_cash_effect) }}</strong>
+                </div>
+              </div>
+              <div class="paper-blockers">
+                <small>{{ t("ceoOffice.blockers") }}</small>
+                <span v-if="!paperRiskBlockers.length">{{ t("ceoOffice.noBlockers") }}</span>
+                <code v-for="blocker in paperRiskBlockers" :key="blocker">{{ blocker }}</code>
+              </div>
+            </div>
             <div class="detail-row">
               <span>{{ t("ceoOffice.evidenceRefs") }}</span>
               <div v-if="!selectedAction.action.evidence_refs.length" class="ceo-empty compact">
@@ -257,6 +288,16 @@
             </div>
             <div class="approval-buttons">
               <button
+                v-if="canSubmitPaperAction(selectedAction.action)"
+                class="btn btn-xs btn-primary"
+                type="button"
+                :disabled="submittingPaperAction === selectedAction.action.action_id"
+                @click="submitPaperAction(selectedAction.action.action_id)"
+              >
+                {{ t("ceoOffice.submitPaperOrder") }}
+              </button>
+              <button
+                v-else
                 class="btn btn-xs"
                 type="button"
                 :disabled="runningAction === selectedAction.action.action_id || !canRunAction(selectedAction.action)"
@@ -355,6 +396,7 @@ const selectedEvidenceSnapshot = ref<AgentEvidenceSnapshot | null>(null);
 const selectedEvidenceNavigation = ref<EvidenceNavigation | null>(null);
 const selectedEvidenceStatus = ref("");
 const runningAction = ref("");
+const submittingPaperAction = ref("");
 const cancelingAction = ref("");
 const archivingSession = ref(false);
 const resolvingHandoff = ref("");
@@ -368,6 +410,10 @@ const evidenceCount = computed(() => [
   ...messages.value.flatMap(message => message.evidence_refs || []),
   ...actions.value.flatMap(action => action.evidence_refs || []),
 ].length);
+const paperOrderPreview = computed(() => objectParam(selectedAction.value?.action.parameters.paper_order_preview));
+const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
+const paperRiskGatePassed = computed(() => Boolean(paperRiskGate.value?.passed));
+const paperRiskBlockers = computed(() => arrayParam(paperRiskGate.value?.blockers));
 
 const deskNames = computed<Record<string, string>>(() => ({
   data: t("ceoOffice.dataDesk"),
@@ -408,7 +454,11 @@ function formatJson(value: Record<string, unknown>) {
 }
 
 function canRunAction(action: AgentAction) {
-  return ["proposed", "approved"].includes(action.status);
+  return ["proposed", "approved"].includes(action.status) && action.action_type !== "paper_order";
+}
+
+function canSubmitPaperAction(action: AgentAction) {
+  return action.action_type === "paper_order" && action.risk_level === "paper_order" && action.status === "approved";
 }
 
 function canCancelAction(action: AgentAction) {
@@ -418,6 +468,20 @@ function canCancelAction(action: AgentAction) {
 function formatTime(value: string) {
   if (!value) return "—";
   return value.replace("T", " ").replace("Z", "");
+}
+
+function objectParam(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function arrayParam(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : [];
+}
+
+function formatNumber(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "—";
+  return numeric.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 async function loadSession(sessionId: string) {
@@ -560,6 +624,20 @@ async function runAction(actionId: string) {
     error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
   } finally {
     runningAction.value = "";
+  }
+}
+
+async function submitPaperAction(actionId: string) {
+  submittingPaperAction.value = actionId;
+  error.value = "";
+  try {
+    await api.agentPaperSubmitAction(actionId);
+    await selectAction(actionId);
+    await load();
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.paperSubmitFailed")}: ${err?.message || err}`;
+  } finally {
+    submittingPaperAction.value = "";
   }
 }
 

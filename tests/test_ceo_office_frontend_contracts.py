@@ -43,8 +43,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentAddMessage" in view
     assert "api.agentAction" in view
     assert "api.agentRunAction" in view
+    assert "api.agentPaperSubmitAction" in view
     assert "api.agentCancelAction" in view
     assert "selectedAction" in view
+    assert "submitPaperAction" in view
+    assert "canSubmitPaperAction" in view
+    assert "paperOrderPreview" in view
     assert "cancelAction" in view
     assert "canCancelAction" in view
     assert "selectedAction.action.expires_at" in view
@@ -68,6 +72,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "reports" in view
     assert "generateReport" in view
     assert "ceoOffice.reports" in view
+    assert "ceoOffice.submitPaperOrder" in view
+    assert "ceoOffice.paperOrderPreview" in view
+    assert "ceoOffice.riskGate" in view
     assert "ceoOffice" in zh_index
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
@@ -96,8 +103,14 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Open Linked View" in en_ceo
     assert "报告" in zh_ceo
     assert "生成日报" in zh_ceo
+    assert "提交纸面订单" in zh_ceo
+    assert "纸面订单预览" in zh_ceo
+    assert "风控门" in zh_ceo
     assert "Reports" in en_ceo
     assert "Generate Daily" in en_ceo
+    assert "Submit Paper Order" in en_ceo
+    assert "Paper Order Preview" in en_ceo
+    assert "Risk Gate" in en_ceo
     assert "实盘就绪" in zh_ceo
     assert "Live Readiness" in en_ceo
 
@@ -119,6 +132,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentRejectAction" in agent_api
     assert "agentCancelAction" in agent_api
     assert "agentRunAction" in agent_api
+    assert "agentPaperSubmitAction" in agent_api
+    assert "/api/agent/paper/actions" in agent_api
     assert "agentHandoffs" in agent_api
     assert "agentResolveHandoff" in agent_api
     assert "agentReports" in agent_api
@@ -133,6 +148,7 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentHandoff" in agent_types
     assert "export interface AgentDeskResponse" in agent_types
     assert "export interface AgentAddMessageResponse" in agent_types
+    assert "export interface AgentPaperSubmitResponse" in agent_types
     assert "desk_response?: AgentDeskResponse" in agent_types
     assert "export interface EvidenceRef" in agent_types
     assert "snapshot_uri: string" in agent_types
