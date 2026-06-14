@@ -200,7 +200,7 @@ def test_data_sources_cli_lists_latest_capability_summary(monkeypatch, capsys):
             "status": "no_artifact",
             "sources": [{"source": "akshare", "capability_count": 0}],
             "summary": {"source_count": 9, "capability_count": 0},
-            "recommended_command": "astroq data sources audit --source all --json",
+            "recommended_command": "astroq data sources audit --source all --discovery-depth catalog --json",
         },
     )
 
@@ -219,8 +219,15 @@ def test_data_sources_audit_cli_supports_akshare(monkeypatch, capsys):
 
     calls = []
 
-    def fake_audit_sources(source="all", probe_network=False, write=True):
-        calls.append({"source": source, "probe_network": probe_network, "write": write})
+    def fake_audit_sources(source="all", probe_network=False, write=True, discovery_depth="catalog"):
+        calls.append(
+            {
+                "source": source,
+                "probe_network": probe_network,
+                "write": write,
+                "discovery_depth": discovery_depth,
+            }
+        )
         return {
             "status": "ok",
             "summary": {"source_count": 1, "capability_count": 2},
@@ -236,8 +243,58 @@ def test_data_sources_audit_cli_supports_akshare(monkeypatch, capsys):
     assert code == 0
     assert data["ok"] is True
     assert data["command"] == "data sources audit"
-    assert calls == [{"source": "akshare", "probe_network": False, "write": True}]
+    assert calls == [{"source": "akshare", "probe_network": False, "write": True, "discovery_depth": "catalog"}]
     assert data["data"]["summary"]["capability_count"] == 2
+
+
+def test_data_sources_audit_cli_passes_sample_discovery_depth(monkeypatch, capsys):
+    from astrolabe_cli.main import run_cli
+    import astrolabe_cli.commands.data as data_commands
+
+    calls = []
+
+    def fake_audit_sources(source="all", probe_network=False, write=True, discovery_depth="catalog"):
+        calls.append(
+            {
+                "source": source,
+                "probe_network": probe_network,
+                "write": write,
+                "discovery_depth": discovery_depth,
+            }
+        )
+        return {
+            "status": "ok",
+            "summary": {"source_count": 1, "capability_count": 2, "sample_probed_count": 1},
+            "sources": [{"source": "tencent_finance", "capability_count": 2}],
+            "diff": {"summary": {}},
+        }
+
+    monkeypatch.setattr(data_commands, "audit_sources", fake_audit_sources)
+
+    code = run_cli(
+        [
+            "data",
+            "sources",
+            "audit",
+            "--source",
+            "tencent_finance",
+            "--discovery-depth",
+            "sample",
+            "--json",
+        ]
+    )
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert calls == [
+        {
+            "source": "tencent_finance",
+            "probe_network": False,
+            "write": True,
+            "discovery_depth": "sample",
+        }
+    ]
+    assert data["data"]["summary"]["sample_probed_count"] == 1
 
 
 def test_data_sources_audit_cli_supports_tushare_offline(monkeypatch, capsys):
@@ -248,8 +305,15 @@ def test_data_sources_audit_cli_supports_tushare_offline(monkeypatch, capsys):
     monkeypatch.setattr(
         data_commands,
         "audit_sources",
-        lambda source="all", probe_network=False, write=True: (
-            calls.append({"source": source, "probe_network": probe_network, "write": write})
+        lambda source="all", probe_network=False, write=True, discovery_depth="catalog": (
+            calls.append(
+                {
+                    "source": source,
+                    "probe_network": probe_network,
+                    "write": write,
+                    "discovery_depth": discovery_depth,
+                }
+            )
             or {
                 "status": "ok",
                 "summary": {"source_count": 1, "capability_count": 1},
@@ -264,7 +328,7 @@ def test_data_sources_audit_cli_supports_tushare_offline(monkeypatch, capsys):
 
     assert code == 0
     assert data["ok"] is True
-    assert calls == [{"source": "tushare", "probe_network": False, "write": True}]
+    assert calls == [{"source": "tushare", "probe_network": False, "write": True, "discovery_depth": "catalog"}]
     assert data["data"]["sources"][0]["source"] == "tushare"
 
 

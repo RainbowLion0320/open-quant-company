@@ -29,24 +29,24 @@
         <em>{{ t("dataSources.audited", { count: payload?.summary.audited_source_count ?? 0 }) }}</em>
       </article>
       <article class="source-metric glass-card">
-        <small>{{ t("dataSources.capabilities") }}</small>
-        <strong>{{ payload?.summary.capability_count ?? 0 }}</strong>
+        <small>{{ t("dataSources.discovered") }}</small>
+        <strong>{{ payload?.summary.discovered_count ?? payload?.summary.capability_count ?? 0 }}</strong>
         <em>{{ generatedAt }}</em>
       </article>
       <article class="source-metric glass-card">
+        <small>{{ t("dataSources.sampleProbed") }}</small>
+        <strong>{{ payload?.summary.sample_probed_count ?? 0 }}</strong>
+        <em>{{ t("dataSources.contracted", { count: payload?.summary.contracted_count ?? 0 }) }}</em>
+      </article>
+      <article class="source-metric glass-card">
         <small>{{ t("dataSources.integrated") }}</small>
-        <strong>{{ payload?.summary.integrated_count ?? 0 }}</strong>
+        <strong>{{ payload?.summary.project_integrated_count ?? payload?.summary.integrated_count ?? 0 }}</strong>
         <em>{{ t("dataSources.unmapped", { count: payload?.summary.unmapped_count ?? 0 }) }}</em>
       </article>
       <article class="source-metric glass-card">
-        <small>{{ t("dataSources.registryDiff") }}</small>
-        <strong>{{ diffTotal }}</strong>
-        <em>{{ diffText }}</em>
-      </article>
-      <article class="source-metric glass-card">
-        <small>{{ t("dataSources.tokenGated") }}</small>
-        <strong>{{ payload?.summary.requires_token_count ?? 0 }}</strong>
-        <em>{{ t("dataSources.candidates", { count: payload?.summary.candidate_count ?? 0 }) }}</em>
+        <small>{{ t("dataSources.manualReview") }}</small>
+        <strong>{{ payload?.summary.manual_review_count ?? payload?.summary.candidate_count ?? 0 }}</strong>
+        <em>{{ t("dataSources.tokenGatedWithCount", { count: payload?.summary.requires_token_count ?? 0 }) }}</em>
       </article>
     </section>
 
@@ -66,6 +66,20 @@
           <option value="unmapped">{{ t("dataSources.notMapped") }}</option>
           <option value="candidate">{{ t("dataSources.candidate") }}</option>
           <option value="backend_source">{{ t("dataSources.backendSource") }}</option>
+        </select>
+      </label>
+      <label>
+        <span>{{ t("dataSources.discoveryStatus") }}</span>
+        <select v-model="discoveryFilter">
+          <option value="all">{{ t("dataSources.all") }}</option>
+          <option v-for="status in discoveryStatuses" :key="status" :value="status">{{ status }}</option>
+        </select>
+      </label>
+      <label>
+        <span>{{ t("dataSources.probeStatus") }}</span>
+        <select v-model="probeFilter">
+          <option value="all">{{ t("dataSources.all") }}</option>
+          <option v-for="status in probeStatuses" :key="status" :value="status">{{ status }}</option>
         </select>
       </label>
       <label>
@@ -94,8 +108,8 @@
             <span class="status-dot" :class="sourceStatusClass(row)"></span>
             <strong>{{ row.label }}</strong>
             <code>{{ row.source }}</code>
-            <span>{{ row.discovery_method }}</span>
-            <em>{{ row.capability_count }} / {{ row.integrated_count }}</em>
+            <span>{{ row.discovery_scope || row.discovery_method }}</span>
+            <em>{{ row.discovered_count ?? row.capability_count }} / {{ row.project_integrated_count ?? row.integrated_count }}</em>
           </button>
         </div>
       </article>
@@ -130,6 +144,8 @@
               <th>{{ t("dataSources.asset") }}</th>
               <th>{{ t("dataSources.domain") }}</th>
               <th>{{ t("dataSources.frequency") }}</th>
+              <th>{{ t("dataSources.discoveryStatus") }}</th>
+              <th>{{ t("dataSources.probeStatus") }}</th>
               <th>{{ t("dataSources.access") }}</th>
               <th>{{ t("dataSources.mappedDimensions") }}</th>
             </tr>
@@ -144,6 +160,18 @@
               <td>{{ cap.asset_type }}</td>
               <td>{{ cap.data_domain }}</td>
               <td>{{ cap.frequency }}</td>
+              <td>
+                <span class="access-badge" :class="discoveryClass(cap.discovery_status)">
+                  {{ cap.discovery_status }}
+                </span>
+                <small>{{ cap.discovery_scope }}</small>
+              </td>
+              <td>
+                <span class="access-badge" :class="accessClass(cap.probe_status)">
+                  {{ cap.probe_status }}
+                </span>
+                <small>{{ cap.sample_probe?.message || cap.endpoint_pattern || cap.source_url || "" }}</small>
+              </td>
               <td>
                 <span class="access-badge" :class="accessClass(cap.access_status)">
                   {{ cap.access_status }}
@@ -175,11 +203,15 @@ const payload = ref<DataSourceCapabilityResponse | null>(null);
 const error = ref("");
 const sourceFilter = ref("all");
 const statusFilter = ref("all");
+const discoveryFilter = ref("all");
+const probeFilter = ref("all");
 const domainFilter = ref("all");
 
 const generatedAt = computed(() => formatDate(payload.value?.generated_at || payload.value?.latest?.generated_at || ""));
 const sourceOptions = computed(() => (payload.value?.sources || []).map(item => item.source));
 const domains = computed(() => Array.from(new Set((payload.value?.capabilities || []).map(item => item.data_domain))).sort());
+const discoveryStatuses = computed(() => Array.from(new Set((payload.value?.capabilities || []).map(item => item.discovery_status).filter(Boolean))).sort());
+const probeStatuses = computed(() => Array.from(new Set((payload.value?.capabilities || []).map(item => item.probe_status).filter(Boolean))).sort());
 const filteredCapabilities = computed(() => (payload.value?.capabilities || []).filter(matchesCapability).slice(0, 300));
 const diffSummary = computed(() => payload.value?.diff?.summary || { capability_unmapped_count: 0, registry_missing_source_count: 0, field_frequency_mismatch_count: 0 });
 const diffTotal = computed(() => diffSummary.value.capability_unmapped_count + diffSummary.value.registry_missing_source_count + diffSummary.value.field_frequency_mismatch_count);
@@ -224,6 +256,8 @@ async function load() {
 function matchesCapability(capability: DataSourceCapability) {
   if (sourceFilter.value !== "all" && capability.source !== sourceFilter.value) return false;
   if (domainFilter.value !== "all" && capability.data_domain !== domainFilter.value) return false;
+  if (discoveryFilter.value !== "all" && capability.discovery_status !== discoveryFilter.value) return false;
+  if (probeFilter.value !== "all" && capability.probe_status !== probeFilter.value) return false;
   if (statusFilter.value === "project_integrated") return capability.integration_status === "project_integrated";
   if (statusFilter.value === "unmapped") return !capability.mapped_dimensions.length;
   if (statusFilter.value !== "all") return capability.integration_status === statusFilter.value || capability.access_status === statusFilter.value;
@@ -242,6 +276,13 @@ function accessClass(status: string) {
   if (["candidate", "manual_review", "not_probed"].includes(status)) return "candidate";
   if (["no_permission", "rate_limited", "missing_secret", "error"].includes(status)) return "warn";
   return "off";
+}
+
+function discoveryClass(status: string) {
+  if (["project_integrated", "contracted"].includes(status)) return "ok";
+  if (status === "sample_probed") return "candidate";
+  if (status === "discovered") return "off";
+  return accessClass(status);
 }
 
 function formatDate(value: string) {

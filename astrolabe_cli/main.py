@@ -121,9 +121,19 @@ def build_parser() -> argparse.ArgumentParser:
         default="all",
     )
     data_sources_audit_cmd.add_argument("--offline", action="store_true", help="Skip token-gated network probes")
+    data_sources_audit_cmd.add_argument(
+        "--discovery-depth",
+        choices=["catalog", "sample"],
+        default="catalog",
+        help="catalog only discovers interfaces; sample also runs allowlisted tiny probes",
+    )
     add_common_flags(data_sources_audit_cmd)
     data_sources_audit_cmd.set_defaults(
-        handler=lambda args: data_sources_audit(args.source, args.source in {"all", "tushare"} and not args.offline)
+        handler=lambda args: data_sources_audit(
+            args.source,
+            args.source in {"all", "tushare"} and not args.offline,
+            args.discovery_depth,
+        )
     )
 
     data_sources_diff_cmd = data_sources_sub.add_parser(

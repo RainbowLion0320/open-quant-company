@@ -106,6 +106,88 @@ def test_akshare_introspection_uses_local_package_without_network(monkeypatch):
     assert stock["probe_strategy"] == "introspection_only"
 
 
+def test_full_source_discovery_layers_candidate_backend_capabilities(monkeypatch):
+    from data.ingestion import source_capabilities as caps
+
+    fake = ModuleType("akshare")
+    fake.__version__ = "9.9.9"
+
+    def stock_board_industry_name_em():
+        """Eastmoney industry board names."""
+        return None
+
+    def futures_main_sina():
+        """Sina main futures quotes."""
+        return None
+
+    def stock_financial_cash_ths():
+        """Tonghuashun cash flow statement."""
+        return None
+
+    def stock_zh_a_hist_tx():
+        """Tencent A-share historical quotes."""
+        return None
+
+    fake.stock_board_industry_name_em = stock_board_industry_name_em
+    fake.futures_main_sina = futures_main_sina
+    fake.stock_financial_cash_ths = stock_financial_cash_ths
+    fake.stock_zh_a_hist_tx = stock_zh_a_hist_tx
+    fake.__all__ = [
+        "stock_board_industry_name_em",
+        "futures_main_sina",
+        "stock_financial_cash_ths",
+        "stock_zh_a_hist_tx",
+    ]
+    monkeypatch.setitem(sys.modules, "akshare", fake)
+    monkeypatch.setattr(caps, "audit_tushare_capabilities", lambda probe_network=False: {"source": "tushare", "capabilities": []})
+
+    payload = caps.audit_sources(source="all", discovery_depth="catalog", write=False)
+
+    by_source = {}
+    for item in payload["capabilities"]:
+        by_source.setdefault(item["source"], set()).add(item["interface"])
+
+    assert "stock_zh_a_hist_tx" in by_source["tencent_finance"]
+    assert "stock_board_industry_name_em" in by_source["eastmoney"]
+    assert "futures_main_sina" in by_source["sina_finance"]
+    assert "stock_financial_cash_ths" in by_source["tonghuashun"]
+    tx = next(item for item in payload["capabilities"] if item["source"] == "tencent_finance" and item["interface"] == "stock_zh_a_hist_tx")
+    assert tx["discovery_status"] == "discovered"
+    assert tx["discovery_scope"] == "package_backend_mapping"
+    assert tx["probe_status"] == "not_probed"
+    assert tx["sample_probe"]["status"] == "not_probed"
+    assert tx["integration_status"] != "project_integrated"
+    assert payload["summary"]["discovered_count"] >= 4
+    assert payload["summary"]["sample_probed_count"] == 0
+
+
+def test_sample_discovery_only_records_allowlisted_probe_metadata(monkeypatch):
+    from data.ingestion import source_capabilities as caps
+
+    def fake_probe(capability):
+        if capability["interface"] != "qt_gtimg_realtime_quote":
+            return None
+        return {
+            "status": "ok",
+            "row_count": 1,
+            "field_sample": ["symbol", "name", "last_price"],
+            "message": "sample parsed",
+        }
+
+    monkeypatch.setattr(caps, "probe_candidate_capability_sample", fake_probe)
+
+    payload = caps.audit_sources(source="tencent_finance", discovery_depth="sample", write=False)
+
+    quote = next(item for item in payload["capabilities"] if item["interface"] == "qt_gtimg_realtime_quote")
+    kline = next(item for item in payload["capabilities"] if item["interface"] == "ifzq_fqkline")
+    assert quote["discovery_status"] == "sample_probed"
+    assert quote["probe_status"] == "ok"
+    assert quote["sample_probe"]["row_count"] == 1
+    assert quote["field_sample"] == ["symbol", "name", "last_price"]
+    assert kline["probe_status"] == "not_probed"
+    assert payload["summary"]["sample_probed_count"] == 1
+
+
 def test_tushare_offline_audit_uses_capability_shape_without_secret(monkeypatch):
     from data.ingestion import source_capabilities as caps
 
@@ -188,6 +270,37 @@ def test_diff_registry_matches_normalized_registry_source_aliases():
 
     assert diff["registry_missing_source"] == []
     assert diff["summary"]["registry_missing_source_count"] == 0
+
+
+def test_diff_registry_frequency_mismatch_only_compares_same_source():
+    from data.ingestion.source_capabilities import diff_capabilities_with_registry
+
+    capabilities = [
+        {
+            "source": "tushare",
+            "interface": "fut_daily",
+            "mapped_dimensions": ["futures_daily"],
+            "integration_status": "project_integrated",
+            "frequency": "daily",
+            "data_domain": "market_price",
+        },
+        {
+            "source": "sina_finance",
+            "interface": "futures_main_sina",
+            "mapped_dimensions": ["futures_daily"],
+            "integration_status": "backend_source",
+            "frequency": "event",
+            "data_domain": "market_price",
+        },
+    ]
+    dimensions = [
+        {"key": "futures_daily", "source": "tushare_free", "freq": "daily", "status": "available"},
+    ]
+
+    diff = diff_capabilities_with_registry(capabilities, dimensions)
+
+    assert diff["field_frequency_mismatch"] == []
+    assert diff["summary"]["field_frequency_mismatch_count"] == 0
 
 
 def test_capability_artifact_written_to_runtime_artifacts(tmp_path, monkeypatch):

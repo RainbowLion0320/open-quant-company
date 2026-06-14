@@ -153,16 +153,21 @@ def sources() -> CliResult:
     )
 
 
-def sources_audit(source: str, probe_network: bool) -> CliResult:
+def sources_audit(source: str, probe_network: bool, discovery_depth: str = "catalog") -> CliResult:
     try:
-        payload = audit_sources(source=source, probe_network=probe_network, write=True)
+        payload = audit_sources(
+            source=source,
+            probe_network=probe_network,
+            discovery_depth=discovery_depth,
+            write=True,
+        )
     except Exception as exc:
         return CliResult(
             ok=False,
             command="data sources audit",
             message="Data source capability audit failed",
             errors=[str(exc)],
-            data={"source": source, "probe_network": probe_network},
+            data={"source": source, "probe_network": probe_network, "discovery_depth": discovery_depth},
         )
     return CliResult(
         ok=payload.get("status") in {"ok", "degraded"},
