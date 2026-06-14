@@ -109,6 +109,7 @@ The CEO Office should consume the Agent Runtime API defined in [07-agent-company
 - `GET /api/agent/actions`
 - `POST /api/agent/actions/{action_id}/approve`
 - `POST /api/agent/actions/{action_id}/reject`
+- `POST /api/agent/actions/{action_id}/cancel`
 - `GET /api/agent/evidence/{evidence_id}`
 - `GET /api/agent/desks`
 
@@ -151,7 +152,7 @@ Chinese and English strings must be maintained together. The Chinese wording sho
 - A user message appears in the timeline and is persisted.
 - A desk response includes evidence references.
 - A proposed write action appears as an approval card instead of executing immediately.
-- Approving and rejecting actions update the ledger and UI state.
+- Approving, rejecting, and canceling actions update the ledger and UI state.
 - Evidence cards deep-link into existing views.
 - No Web control directly edits repository files.
 - Frontend typecheck and build pass.

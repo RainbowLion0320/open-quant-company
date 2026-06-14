@@ -42,7 +42,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentAddMessage" in view
     assert "api.agentAction" in view
     assert "api.agentRunAction" in view
+    assert "api.agentCancelAction" in view
     assert "selectedAction" in view
+    assert "cancelAction" in view
+    assert "canCancelAction" in view
     assert "selectedEvidence" in view
     assert "selectedEvidenceNavigation" in view
     assert "openLinkedView" in view
@@ -58,6 +61,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "标记完成" in zh_ceo
     assert "Handoffs" in en_ceo
     assert "Resolve" in en_ceo
+    assert "取消行动" in zh_ceo
+    assert "已取消" in zh_ceo
+    assert "Cancel Action" in en_ceo
+    assert "Canceled" in en_ceo
     assert "证据详情" in zh_ceo
     assert "打开关联视图" in zh_ceo
     assert "Evidence Detail" in en_ceo
@@ -77,6 +84,7 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentActions" in agent_api
     assert "agentApproveAction" in agent_api
     assert "agentRejectAction" in agent_api
+    assert "agentCancelAction" in agent_api
     assert "agentRunAction" in agent_api
     assert "agentHandoffs" in agent_api
     assert "agentResolveHandoff" in agent_api

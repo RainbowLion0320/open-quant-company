@@ -264,6 +264,11 @@
   color: var(--accent-primary);
 }
 
+.action-status.canceled {
+  border-color: rgba(148, 163, 184, 0.32);
+  color: var(--text-tertiary);
+}
+
 .approval-buttons {
   justify-content: flex-start;
 }

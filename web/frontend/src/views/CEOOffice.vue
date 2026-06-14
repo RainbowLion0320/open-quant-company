@@ -125,12 +125,21 @@
               <button class="btn btn-xs" type="button" @click="selectAction(action.action_id)">
                 {{ t("ceoOffice.viewDetails") }}
               </button>
-              <div v-if="action.status === 'approval_required'" class="approval-buttons">
-                <button class="btn btn-xs" type="button" @click="approveAction(action.action_id)">
+              <div v-if="action.status === 'approval_required' || canCancelAction(action)" class="approval-buttons">
+                <button v-if="action.status === 'approval_required'" class="btn btn-xs" type="button" @click="approveAction(action.action_id)">
                   {{ t("ceoOffice.approved") }}
                 </button>
-                <button class="btn btn-xs btn-danger" type="button" @click="rejectAction(action.action_id)">
+                <button v-if="action.status === 'approval_required'" class="btn btn-xs btn-danger" type="button" @click="rejectAction(action.action_id)">
                   {{ t("ceoOffice.rejected") }}
+                </button>
+                <button
+                  v-if="canCancelAction(action)"
+                  class="btn btn-xs btn-ghost"
+                  type="button"
+                  :disabled="cancelingAction === action.action_id"
+                  @click="cancelAction(action.action_id)"
+                >
+                  {{ t("ceoOffice.cancelAction") }}
                 </button>
               </div>
             </div>
@@ -177,6 +186,15 @@
                 @click="runAction(selectedAction.action.action_id)"
               >
                 {{ t("ceoOffice.runAction") }}
+              </button>
+              <button
+                v-if="canCancelAction(selectedAction.action)"
+                class="btn btn-xs btn-ghost"
+                type="button"
+                :disabled="cancelingAction === selectedAction.action.action_id"
+                @click="cancelAction(selectedAction.action.action_id)"
+              >
+                {{ t("ceoOffice.cancelAction") }}
               </button>
             </div>
             <div class="detail-row">
@@ -244,6 +262,7 @@ const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
 const selectedEvidenceNavigation = ref<EvidenceNavigation | null>(null);
 const runningAction = ref("");
+const cancelingAction = ref("");
 const resolvingHandoff = ref("");
 const draft = ref("");
 const sending = ref(false);
@@ -277,6 +296,7 @@ function statusLabel(status: string) {
   if (status === "succeeded") return t("ceoOffice.succeeded");
   if (status === "failed") return t("ceoOffice.failed");
   if (status === "blocked") return t("ceoOffice.blocked");
+  if (status === "canceled") return t("ceoOffice.canceled");
   if (status === "open") return t("ceoOffice.open");
   if (status === "resolved") return t("ceoOffice.resolved");
   return status;
@@ -288,6 +308,10 @@ function formatJson(value: Record<string, unknown>) {
 
 function canRunAction(action: AgentAction) {
   return ["proposed", "approved"].includes(action.status);
+}
+
+function canCancelAction(action: AgentAction) {
+  return ["proposed", "approval_required", "approved"].includes(action.status);
 }
 
 function formatTime(value: string) {
@@ -383,6 +407,19 @@ async function approveAction(actionId: string) {
 async function rejectAction(actionId: string) {
   await api.agentRejectAction(actionId, "Rejected from CEO Office");
   await load();
+}
+
+async function cancelAction(actionId: string) {
+  cancelingAction.value = actionId;
+  error.value = "";
+  try {
+    await api.agentCancelAction(actionId, "Canceled from CEO Office");
+    await load();
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.cancelFailed")}: ${err?.message || err}`;
+  } finally {
+    cancelingAction.value = "";
+  }
 }
 
 async function selectAction(actionId: string) {
