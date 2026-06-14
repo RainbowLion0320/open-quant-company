@@ -71,6 +71,8 @@ CLI：
 - `astroq data sources --json` 读取最近一次能力审计摘要；没有产物时返回 `no_artifact`。
 - `astroq data sources audit --source all --discovery-depth catalog --json` 通过本地包 introspection、Tushare catalog/account probe 和候选源静态目录生成全 source 能力目录；候选源不访问网络。
 - `astroq data sources audit --source all --discovery-depth sample --json` 只对白名单候选接口做极小样本 probe，并只记录 `sample_probe` 元数据。
+- `astroq data sources audit --source all --discovery-depth full-sample --resume --json` 对每个 discovered capability 生成探测闭环：有安全探测契约的接口执行极小样本 probe；没有契约、参数不可控或权限不足的接口写入 `blocked / missing_secret / no_permission / rate_limited / error` 等结构化状态。该命令不下载历史数据，不写入 DataHub store，不做随机 URL 扫描。
+- `astroq data sources audit --source all --discovery-depth full-sample --dry-run --json` 只输出探测计划和阻断原因，不调用 provider。
 - `astroq data sources audit --source akshare --json` 通过本地安装包 introspection 枚举 AKShare callable，不访问网络。
 - `astroq data sources audit --source tushare --offline --json` 输出 Tushare 能力目录形状，不做账号 probe。
 - `astroq data sources audit --source tushare --json` 使用当前进程 `TUSHARE_TOKEN` 做账号权限 probe。

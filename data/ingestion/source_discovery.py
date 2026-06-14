@@ -6,7 +6,7 @@ import json
 import urllib.request
 from typing import Any
 
-DISCOVERY_DEPTHS = {"catalog", "sample"}
+DISCOVERY_DEPTHS = {"catalog", "sample", "full-sample"}
 BACKEND_SOURCE_SUFFIXES = {
     "_tx": "tencent_finance",
     "_em": "eastmoney",

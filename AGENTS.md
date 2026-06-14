@@ -52,6 +52,8 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq data sources --json` | 查看外部数据源能力目录最近一次审计摘要 |
 | `astroq data sources audit --source all --discovery-depth catalog --json` | 生成 AKShare/Tushare/候选源能力治理产物，不访问候选源网络接口 |
 | `astroq data sources audit --source all --discovery-depth sample --json` | 只对白名单候选接口做极小样本探测并记录元数据 |
+| `astroq data sources audit --source all --discovery-depth full-sample --resume --json` | 对所有已发现能力生成样本探测或阻断原因闭环，不写入真实数据仓 |
+| `astroq data sources audit --source all --discovery-depth full-sample --dry-run --json` | 只输出全量样本探测计划，不调用 provider |
 | `astroq data sources diff-registry --json` | 对比 source capability registry 与项目 data_registry |
 | `astroq data tushare-audit --json` | 审计 Tushare 权限和本地覆盖率 |
 | `astroq data tushare-backfill --scope missing --resume --json` | 按缺口补齐 Tushare 数据 |

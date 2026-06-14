@@ -123,16 +123,20 @@ def build_parser() -> argparse.ArgumentParser:
     data_sources_audit_cmd.add_argument("--offline", action="store_true", help="Skip token-gated network probes")
     data_sources_audit_cmd.add_argument(
         "--discovery-depth",
-        choices=["catalog", "sample"],
+        choices=["catalog", "sample", "full-sample"],
         default="catalog",
-        help="catalog only discovers interfaces; sample also runs allowlisted tiny probes",
+        help="catalog discovers interfaces; sample runs allowlisted tiny probes; full-sample closes every capability with probe metadata or a block reason",
     )
+    data_sources_audit_cmd.add_argument("--dry-run", action="store_true", help="Plan full-sample probes without calling providers")
+    data_sources_audit_cmd.add_argument("--resume", action="store_true", help="Reuse completed probe metadata from the latest artifact")
     add_common_flags(data_sources_audit_cmd)
     data_sources_audit_cmd.set_defaults(
         handler=lambda args: data_sources_audit(
             args.source,
             args.source in {"all", "tushare"} and not args.offline,
             args.discovery_depth,
+            args.dry_run,
+            args.resume,
         )
     )
 

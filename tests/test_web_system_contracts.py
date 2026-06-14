@@ -738,9 +738,13 @@ def test_datahub_sources_tab_and_api_contract():
     assert "discovery_status" in data_source_types
     assert "discovery_scope" in data_source_types
     assert "probe_status" in data_source_types
+    assert "probe_block_reason" in data_source_types
+    assert "probe_contract_id" in data_source_types
     assert "sample_probe" in data_source_types
     assert "discoveryFilter" in data_sources_view
     assert "probeFilter" in data_sources_view
+    assert "blockReasonFilter" in data_sources_view
+    assert "probeDetail" in data_sources_view
     assert 'class="capability-filter-bar"' in data_sources_view
     assert 'class="sources-filters glass-card"' not in data_sources_view
     assert "currentPage" in data_sources_view

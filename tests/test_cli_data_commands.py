@@ -297,6 +297,69 @@ def test_data_sources_audit_cli_passes_sample_discovery_depth(monkeypatch, capsy
     assert data["data"]["summary"]["sample_probed_count"] == 1
 
 
+def test_data_sources_audit_cli_supports_full_sample_resume_and_dry_run(monkeypatch, capsys):
+    from astrolabe_cli.main import run_cli
+    import astrolabe_cli.commands.data as data_commands
+
+    calls = []
+
+    def fake_audit_sources(
+        source="all",
+        probe_network=False,
+        write=True,
+        discovery_depth="catalog",
+        dry_run=False,
+        resume=False,
+    ):
+        calls.append(
+            {
+                "source": source,
+                "probe_network": probe_network,
+                "write": write,
+                "discovery_depth": discovery_depth,
+                "dry_run": dry_run,
+                "resume": resume,
+            }
+        )
+        return {
+            "status": "ok",
+            "summary": {"source_count": 9, "capability_count": 2, "probe_planned_count": 2},
+            "sources": [{"source": "all", "capability_count": 2}],
+            "diff": {"summary": {}},
+        }
+
+    monkeypatch.setattr(data_commands, "audit_sources", fake_audit_sources)
+
+    code = run_cli(
+        [
+            "data",
+            "sources",
+            "audit",
+            "--source",
+            "all",
+            "--discovery-depth",
+            "full-sample",
+            "--resume",
+            "--dry-run",
+            "--json",
+        ]
+    )
+    data = _json_from_cli(capsys)
+
+    assert code == 0
+    assert calls == [
+        {
+            "source": "all",
+            "probe_network": True,
+            "write": True,
+            "discovery_depth": "full-sample",
+            "dry_run": True,
+            "resume": True,
+        }
+    ]
+    assert data["data"]["summary"]["probe_planned_count"] == 2
+
+
 def test_data_sources_audit_cli_supports_tushare_offline(monkeypatch, capsys):
     from astrolabe_cli.main import run_cli
     import astrolabe_cli.commands.data as data_commands

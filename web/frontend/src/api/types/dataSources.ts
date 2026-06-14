@@ -11,6 +11,11 @@ export interface DataSourceCatalogRow {
   sample_probed_count: number;
   contracted_count: number;
   project_integrated_count: number;
+  probe_attempted_count: number;
+  probe_planned_count: number;
+  probe_blocked_count: number;
+  probe_error_count: number;
+  probe_ok_count: number;
   integrated_count: number;
   unmapped_count: number;
   access_statuses: Record<string, number>;
@@ -33,11 +38,20 @@ export interface DataSourceCapability {
   discovery_status: string;
   discovery_scope: string;
   probe_status: string;
+  probe_contract_id?: string;
+  probe_attempted_at?: string;
+  probe_block_reason?: string;
+  elapsed_ms?: number | null;
+  row_count?: number | null;
+  error_class?: string;
   sample_probe?: {
     status?: string;
+    contract_id?: string;
     row_count?: number;
     field_sample?: string[];
+    block_reason?: string;
     message?: string;
+    resume_skipped?: boolean;
   };
   source_url?: string;
   endpoint_pattern?: string;
@@ -78,6 +92,13 @@ export interface DataSourceCapabilitySummary {
   candidate_count: number;
   manual_review_count: number;
   requires_token_count: number;
+  probe_attempted_count: number;
+  probe_planned_count: number;
+  probe_blocked_count: number;
+  probe_error_count: number;
+  probe_ok_count: number;
+  no_permission_count: number;
+  rate_limited_count: number;
   probe_statuses?: Record<string, number>;
   discovery_statuses?: Record<string, number>;
   sources: Record<string, number>;

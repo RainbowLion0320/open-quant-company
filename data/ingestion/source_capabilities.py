@@ -31,6 +31,7 @@ from data.ingestion.source_discovery import (
     backend_source_for_akshare_name,
     probe_candidate_capability_sample,
 )
+from data.ingestion.source_probe_contracts import probe_capability_full_sample
 from data.ingestion.tushare_capabilities import TUSHARE_CAPABILITY_CATALOG
 from data.storage.datahub import DataHub, get_datahub
 from data.storage.dimensions import DataDimension, get_registry
@@ -71,6 +72,8 @@ def audit_sources(
     *,
     probe_network: bool = False,
     discovery_depth: str = "catalog",
+    dry_run: bool = False,
+    resume: bool = False,
     write: bool = True,
     hub: DataHub | None = None,
 ) -> dict[str, Any]:
@@ -95,7 +98,7 @@ def audit_sources(
         errors.extend(result.get("errors", []))
 
     if "tushare" in selected:
-        result = audit_tushare_capabilities(probe_network=probe_network)
+        result = audit_tushare_capabilities(probe_network=probe_network and not dry_run)
         capabilities.extend(result["capabilities"])
         audit_details["tushare"] = {k: v for k, v in result.items() if k != "capabilities"}
 
@@ -106,6 +109,8 @@ def audit_sources(
     capabilities = _dedupe_capabilities(capabilities)
     if discovery_depth == "sample":
         capabilities = _apply_sample_probes(capabilities)
+    if discovery_depth == "full-sample":
+        capabilities = _apply_full_sample_probes(capabilities, dry_run=dry_run, resume=resume, hub=hub, source=source)
 
     generated_at = datetime.now(timezone.utc).isoformat()
     diff = diff_capabilities_with_registry(capabilities)
@@ -115,6 +120,8 @@ def audit_sources(
         "generated_at": generated_at,
         "recommended_command": RECOMMENDED_AUDIT_COMMAND,
         "discovery_depth": discovery_depth,
+        "dry_run": dry_run,
+        "resume": resume,
         "sources": _source_rows(capabilities, generated_at=generated_at),
         "summary": _summary(capabilities),
         "capabilities": sorted(capabilities, key=_capability_sort_key),
@@ -123,6 +130,15 @@ def audit_sources(
         "errors": errors,
     }
     if write:
+        if discovery_depth == "full-sample":
+            payload["probe_run"] = _write_probe_run(
+                payload,
+                hub=hub,
+                source=source,
+                dry_run=dry_run,
+                resume=resume,
+                generated_at=generated_at,
+            )
         path = _artifact_path(hub, source=source)
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
         payload["latest"] = {"generated_at": generated_at, "artifact_path": path.as_posix()}
@@ -374,6 +390,12 @@ def _capability(**kwargs: Any) -> dict[str, Any]:
         "discovery_scope": kwargs.pop("discovery_scope", "manual_seed"),
         "probe_status": probe_status,
         "sample_probe": sample_probe if isinstance(sample_probe, dict) else {"status": str(sample_probe)},
+        "probe_contract_id": kwargs.pop("probe_contract_id", ""),
+        "probe_attempted_at": kwargs.pop("probe_attempted_at", ""),
+        "probe_block_reason": kwargs.pop("probe_block_reason", ""),
+        "elapsed_ms": kwargs.pop("elapsed_ms", None),
+        "row_count": kwargs.pop("row_count", None),
+        "error_class": kwargs.pop("error_class", ""),
         "source_url": kwargs.pop("source_url", ""),
         "endpoint_pattern": kwargs.pop("endpoint_pattern", ""),
         "field_sample": kwargs.pop("field_sample", []),
@@ -451,6 +473,93 @@ def _apply_sample_probes(capabilities: list[dict[str, Any]]) -> list[dict[str, A
                     current["probe_status"] = status
         updated.append(current)
     return updated
+
+
+def _apply_full_sample_probes(
+    capabilities: list[dict[str, Any]],
+    *,
+    dry_run: bool,
+    resume: bool,
+    hub: DataHub | None,
+    source: str,
+) -> list[dict[str, Any]]:
+    resume_map = _resume_probe_results(hub=hub, source=source) if resume else {}
+    updated = []
+    for item in capabilities:
+        current = dict(item)
+        status = str(current.get("probe_status") or "")
+        if current.get("source") == "computed" or current.get("access_status") == "internal":
+            updated.append(current)
+            continue
+        if current.get("source") == "tushare" and status not in {"", "not_probed", "unknown"}:
+            updated.append(current)
+            continue
+        key = (str(current.get("source", "")), str(current.get("interface", "")))
+        result = probe_capability_full_sample(current, dry_run=dry_run, resumed=resume_map.get(key))
+        current.update({k: v for k, v in result.items() if v is not None or k in {"elapsed_ms", "row_count"}})
+        fields = current.get("sample_probe", {}).get("field_sample") if isinstance(current.get("sample_probe"), dict) else None
+        if isinstance(fields, list) and fields:
+            current["field_sample"] = [str(field) for field in fields]
+        if current.get("probe_status") == "ok":
+            current["discovery_status"] = "sample_probed"
+        updated.append(current)
+    return updated
+
+
+def _resume_probe_results(*, hub: DataHub | None, source: str) -> dict[tuple[str, str], dict[str, Any]]:
+    payload = _read_artifact(_artifact_path(hub, source=source)) or {}
+    rows = payload.get("capabilities", []) if isinstance(payload, dict) else []
+    results: dict[tuple[str, str], dict[str, Any]] = {}
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        key = (str(item.get("source", "")), str(item.get("interface", "")))
+        if key[0] and key[1] and str(item.get("probe_status") or "") not in {"", "not_probed", "planned"}:
+            results[key] = item
+    return results
+
+
+def _write_probe_run(
+    payload: dict[str, Any],
+    *,
+    hub: DataHub | None,
+    source: str,
+    dry_run: bool,
+    resume: bool,
+    generated_at: str,
+) -> dict[str, Any]:
+    data_hub = hub or get_datahub()
+    run_id = generated_at.replace(":", "").replace("+", "Z").replace(".", "-")
+    run_dir = data_hub.artifact_dir("data-sources") / "probe-runs"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    path = run_dir / f"{run_id}.json"
+    caps = payload.get("capabilities", [])
+    probe_rows = [
+        {
+            "source": item.get("source", ""),
+            "interface": item.get("interface", ""),
+            "probe_status": item.get("probe_status", ""),
+            "probe_contract_id": item.get("probe_contract_id", ""),
+            "probe_block_reason": item.get("probe_block_reason", ""),
+            "row_count": item.get("row_count"),
+            "elapsed_ms": item.get("elapsed_ms"),
+            "error_class": item.get("error_class", ""),
+        }
+        for item in caps
+        if isinstance(item, dict)
+    ]
+    run_payload = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "generated_at": generated_at,
+        "source": source,
+        "dry_run": dry_run,
+        "resume": resume,
+        "summary": payload.get("summary", {}),
+        "capabilities": probe_rows,
+    }
+    path.write_text(json.dumps(run_payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+    return {"run_id": run_id, "artifact_path": path.as_posix()}
 
 
 def _capability_sort_key(item: dict[str, Any]) -> tuple[str, int, str]:
@@ -552,6 +661,11 @@ def _source_rows(capabilities: Iterable[dict[str, Any]], generated_at: str) -> l
                 "sample_probed_count": discovery.get("sample_probed", 0),
                 "contracted_count": discovery.get("contracted", 0),
                 "project_integrated_count": discovery.get("project_integrated", 0),
+                "probe_attempted_count": sum(1 for cap in source_caps if cap.get("probe_attempted_at")),
+                "probe_planned_count": probes.get("planned", 0),
+                "probe_blocked_count": probes.get("blocked", 0),
+                "probe_error_count": probes.get("error", 0),
+                "probe_ok_count": probes.get("ok", 0),
                 "access_statuses": dict(sorted(access.items())),
                 "discovery_statuses": dict(sorted(discovery.items())),
                 "probe_statuses": dict(sorted(probes.items())),
@@ -575,6 +689,7 @@ def _summary(capabilities: list[dict[str, Any]]) -> dict[str, Any]:
     integrated = sum(1 for item in capabilities if item.get("integration_status") == "project_integrated")
     discovery = Counter(str(item.get("discovery_status", "discovered")) for item in capabilities)
     probes = Counter(str(item.get("probe_status", "not_probed")) for item in capabilities)
+    probe_attempted = sum(1 for item in capabilities if item.get("probe_attempted_at"))
     return {
         "source_count": len(SOURCE_IDS),
         "audited_source_count": len([source for source, count in source_counts.items() if count]),
@@ -592,6 +707,13 @@ def _summary(capabilities: list[dict[str, Any]]) -> dict[str, Any]:
             if item.get("access_status") == "manual_review" or item.get("probe_status") == "manual_review"
         ),
         "requires_token_count": sum(1 for item in capabilities if item.get("requires_token")),
+        "probe_attempted_count": probe_attempted,
+        "probe_planned_count": probes.get("planned", 0),
+        "probe_blocked_count": probes.get("blocked", 0),
+        "probe_error_count": probes.get("error", 0),
+        "probe_ok_count": probes.get("ok", 0),
+        "no_permission_count": probes.get("no_permission", 0),
+        "rate_limited_count": probes.get("rate_limited", 0),
         "probe_statuses": dict(sorted(probes.items())),
         "discovery_statuses": dict(sorted(discovery.items())),
         "sources": dict(sorted(source_counts.items())),
@@ -612,6 +734,13 @@ def _empty_summary() -> dict[str, Any]:
         "candidate_count": 0,
         "manual_review_count": 0,
         "requires_token_count": 0,
+        "probe_attempted_count": 0,
+        "probe_planned_count": 0,
+        "probe_blocked_count": 0,
+        "probe_error_count": 0,
+        "probe_ok_count": 0,
+        "no_permission_count": 0,
+        "rate_limited_count": 0,
         "probe_statuses": {},
         "discovery_statuses": {},
         "sources": {},

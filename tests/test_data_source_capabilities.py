@@ -4,6 +4,8 @@ import json
 import sys
 from types import ModuleType
 
+import pandas as pd
+
 
 def test_source_catalog_separates_external_capabilities_from_project_registry():
     from data.ingestion.source_capabilities import SOURCE_IDS, source_catalog
@@ -186,6 +188,103 @@ def test_sample_discovery_only_records_allowlisted_probe_metadata(monkeypatch):
     assert quote["field_sample"] == ["symbol", "name", "last_price"]
     assert kline["probe_status"] == "not_probed"
     assert payload["summary"]["sample_probed_count"] == 1
+
+
+def test_full_sample_probe_records_safe_akshare_contract_and_blocks_unsafe(monkeypatch):
+    from data.ingestion import source_capabilities as caps
+
+    fake = ModuleType("akshare")
+    fake.__version__ = "9.9.9"
+
+    def stock_zh_a_spot_em():
+        """Eastmoney spot quotes."""
+        return pd.DataFrame([{"symbol": "600519", "name": "贵州茅台", "price": 1550.0}])
+
+    def stock_zh_a_hist(symbol, start_date="", end_date="", adjust=""):
+        """Historical quotes require an explicit symbol and date contract."""
+        return pd.DataFrame([{"date": "2026-06-12", "close": 10.0}])
+
+    def amac_fund_info(start_page="1", end_page="2000"):
+        """Default page range is too broad for a safe sample probe."""
+        return pd.DataFrame([{"fund": "sample"}])
+
+    fake.stock_zh_a_spot_em = stock_zh_a_spot_em
+    fake.stock_zh_a_hist = stock_zh_a_hist
+    fake.amac_fund_info = amac_fund_info
+    fake.__all__ = ["stock_zh_a_spot_em", "stock_zh_a_hist", "amac_fund_info"]
+    monkeypatch.setitem(sys.modules, "akshare", fake)
+    monkeypatch.setattr(caps, "audit_tushare_capabilities", lambda probe_network=False: {"source": "tushare", "capabilities": []})
+
+    payload = caps.audit_sources(source="akshare", discovery_depth="full-sample", write=False)
+
+    spot = next(item for item in payload["capabilities"] if item["interface"] == "stock_zh_a_spot_em")
+    hist = next(item for item in payload["capabilities"] if item["interface"] == "stock_zh_a_hist")
+    unbounded = next(item for item in payload["capabilities"] if item["interface"] == "amac_fund_info")
+    assert spot["probe_status"] == "ok"
+    assert spot["probe_contract_id"] == "akshare.no_arg_dataframe"
+    assert spot["row_count"] == 1
+    assert spot["field_sample"] == ["name", "price", "symbol"]
+    assert spot["elapsed_ms"] >= 0
+    assert hist["probe_status"] == "blocked"
+    assert hist["probe_block_reason"] == "missing_probe_contract"
+    assert unbounded["probe_status"] == "blocked"
+    assert unbounded["probe_block_reason"] == "unsafe_unbounded_query"
+    assert payload["summary"]["probe_statuses"]["ok"] == 1
+    assert payload["summary"]["probe_blocked_count"] >= 1
+
+
+def test_full_sample_dry_run_marks_probe_plan_without_calling_provider(monkeypatch):
+    from data.ingestion import source_capabilities as caps
+
+    fake = ModuleType("akshare")
+    fake.__version__ = "9.9.9"
+
+    def stock_zh_a_spot_em():
+        raise AssertionError("dry-run must not call provider functions")
+
+    fake.stock_zh_a_spot_em = stock_zh_a_spot_em
+    fake.__all__ = ["stock_zh_a_spot_em"]
+    monkeypatch.setitem(sys.modules, "akshare", fake)
+    monkeypatch.setattr(caps, "audit_tushare_capabilities", lambda probe_network=False: {"source": "tushare", "capabilities": []})
+
+    payload = caps.audit_sources(source="akshare", discovery_depth="full-sample", dry_run=True, write=False)
+
+    spot = next(item for item in payload["capabilities"] if item["interface"] == "stock_zh_a_spot_em")
+    assert spot["probe_status"] == "planned"
+    assert spot["probe_contract_id"] == "akshare.no_arg_dataframe"
+    assert spot["probe_block_reason"] == ""
+    assert payload["summary"]["probe_planned_count"] == 1
+
+
+def test_full_sample_resume_skips_completed_probe_run(tmp_path, monkeypatch):
+    from data.ingestion import source_capabilities as caps
+    from data.storage.datahub import DataHub
+
+    hub = DataHub(runtime_root=tmp_path / "var", artifact_root=tmp_path / "var" / "artifacts")
+    fake = ModuleType("akshare")
+    fake.__version__ = "9.9.9"
+    calls = []
+
+    def stock_zh_a_spot_em():
+        calls.append("called")
+        return pd.DataFrame([{"symbol": "600519", "price": 1550.0}])
+
+    fake.stock_zh_a_spot_em = stock_zh_a_spot_em
+    fake.__all__ = ["stock_zh_a_spot_em"]
+    monkeypatch.setitem(sys.modules, "akshare", fake)
+    monkeypatch.setattr(caps, "audit_tushare_capabilities", lambda probe_network=False: {"source": "tushare", "capabilities": []})
+
+    first = caps.audit_sources(source="akshare", discovery_depth="full-sample", write=True, hub=hub)
+    second = caps.audit_sources(source="akshare", discovery_depth="full-sample", resume=True, write=True, hub=hub)
+
+    assert calls == ["called"]
+    first_spot = next(item for item in first["capabilities"] if item["interface"] == "stock_zh_a_spot_em")
+    second_spot = next(item for item in second["capabilities"] if item["interface"] == "stock_zh_a_spot_em")
+    assert first_spot["probe_status"] == "ok"
+    assert second_spot["probe_status"] == "ok"
+    assert second_spot["sample_probe"]["resume_skipped"] is True
+    run_dir = hub.artifact_dir("data-sources") / "probe-runs"
+    assert any(path.name.endswith(".json") for path in run_dir.iterdir())
 
 
 def test_tushare_offline_audit_uses_capability_shape_without_secret(monkeypatch):

@@ -146,7 +146,7 @@ def get_db() -> Database:
 | Health | `astroq health --json` | 返回项目版本、DataHub store/cache 路径 |
 | Config | `astroq config validate --json` | 校验 settings 和策略注册表 |
 | Data | `astroq data status --json` / `astroq data repair <table> --dry-run --json` | 委托 DB health 和单表修复，dry-run 不触发写入 |
-| Data Sources | `astroq data sources --json` / `astroq data sources audit --source all --discovery-depth catalog --json` / `astroq data sources diff-registry --json` | 生成和读取外部 source capability registry，并与项目 `data_registry` 做 diff；Web 只读消费 artifact，区分 discovered / sample_probed / contracted / project_integrated |
+| Data Sources | `astroq data sources --json` / `astroq data sources audit --source all --discovery-depth full-sample --resume --json` / `astroq data sources diff-registry --json` | 生成和读取外部 source capability registry，并与项目 `data_registry` 做 diff；Web 只读消费 artifact，区分 discovered / sample_probed / contracted / project_integrated，并展示探测成功、阻断原因、无权限、限流和错误状态 |
 | Strategy | `astroq strategy catalog --json` / `astroq strategy run <name|all>` | 委托 Strategy Catalog 和 runtime gates，candidate 必须显式 `--mode research` |
 | Regime | `astroq regime status --json` / `astroq regime train-profit --dry-run --json` | 读取当前生产 regime；训练命令默认可 dry-run |
 | Backtest | `astroq backtest run [--strategy NAME] --dry-run --json` | 委托回测 runner，不在 CLI 重写回测逻辑 |

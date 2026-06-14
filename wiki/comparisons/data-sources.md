@@ -38,6 +38,8 @@ tags: [akshare, tushare, data, capability, registry]
 astroq data sources --json
 astroq data sources audit --source all --discovery-depth catalog --json
 astroq data sources audit --source all --discovery-depth sample --json
+astroq data sources audit --source all --discovery-depth full-sample --resume --json
+astroq data sources audit --source all --discovery-depth full-sample --dry-run --json
 astroq data sources audit --source akshare --json
 astroq data sources audit --source tushare --offline --json
 astroq data sources audit --source tushare --json
@@ -53,6 +55,8 @@ var/artifacts/data-sources/latest.json
 Web 的 DataHub → Sources 页签只读这个产物。页面加载不扫描 AKShare 包、不访问 Tushare、不触发任何外部网络请求。
 
 候选源当前没有被提升为生产主数据源。它们的候选接口只用于能力治理和未来字段契约评估；若要正式接入，必须先完成字段漂移、限流、授权边界和复权口径审查，再同步 `data_registry`。
+
+`full-sample` 是全量能力状态闭环：每个已发现接口都要么完成极小样本探测，要么给出 `missing_probe_contract`、`missing_secret`、`no_permission`、`rate_limited`、`error` 等结构化原因。它不下载全历史数据，不写入 `var/store`，也不做非授权接口盲扫。
 
 ## AKShare 与 Tushare 的实际分工
 
@@ -77,6 +81,7 @@ Web 的 DataHub → Sources 页签只读这个产物。页面加载不扫描 AKS
 
 ```bash
 astroq data sources audit --source all --discovery-depth catalog --json
+astroq data sources audit --source all --discovery-depth full-sample --dry-run --json
 astroq data sources diff-registry --json
 ```
 
