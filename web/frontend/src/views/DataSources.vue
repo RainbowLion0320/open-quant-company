@@ -133,7 +133,25 @@
     <section class="glass-card source-panel capability-panel">
       <div class="panel-head">
         <span>{{ t("dataSources.capabilityTable") }}</span>
-        <small>{{ filteredCapabilities.length }}</small>
+        <small>{{ paginationRange }}</small>
+      </div>
+      <div class="capability-pagination">
+        <span>{{ paginationRange }}</span>
+        <label>
+          <span>{{ t("dataSources.pageSize") }}</span>
+          <select v-model.number="pageSize">
+            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+          </select>
+        </label>
+        <div class="pagination-actions">
+          <button class="btn btn-xs" :disabled="currentPage <= 1" @click="currentPage -= 1">
+            {{ t("dataSources.prevPage") }}
+          </button>
+          <strong>{{ t("dataSources.pageIndicator", { page: currentPage, pages: pageCount }) }}</strong>
+          <button class="btn btn-xs" :disabled="currentPage >= pageCount" @click="currentPage += 1">
+            {{ t("dataSources.nextPage") }}
+          </button>
+        </div>
       </div>
       <div class="capability-table-wrap">
         <table>
@@ -151,7 +169,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="cap in filteredCapabilities" :key="`${cap.source}:${cap.interface}`">
+            <tr v-for="cap in pagedCapabilities" :key="`${cap.source}:${cap.interface}`">
               <td><span class="source-chip">{{ cap.source }}</span></td>
               <td>
                 <strong>{{ cap.interface }}</strong>
@@ -193,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { api } from "../api";
 import type { DataSourceCapability, DataSourceCapabilityResponse, DataSourceCatalogRow } from "../api";
 import { useI18n } from "../i18n";
@@ -206,13 +224,28 @@ const statusFilter = ref("all");
 const discoveryFilter = ref("all");
 const probeFilter = ref("all");
 const domainFilter = ref("all");
+const currentPage = ref(1);
+const pageSize = ref(100);
+const pageSizeOptions = [50, 100, 200];
 
 const generatedAt = computed(() => formatDate(payload.value?.generated_at || payload.value?.latest?.generated_at || ""));
 const sourceOptions = computed(() => (payload.value?.sources || []).map(item => item.source));
 const domains = computed(() => Array.from(new Set((payload.value?.capabilities || []).map(item => item.data_domain))).sort());
 const discoveryStatuses = computed(() => Array.from(new Set((payload.value?.capabilities || []).map(item => item.discovery_status).filter(Boolean))).sort());
 const probeStatuses = computed(() => Array.from(new Set((payload.value?.capabilities || []).map(item => item.probe_status).filter(Boolean))).sort());
-const filteredCapabilities = computed(() => (payload.value?.capabilities || []).filter(matchesCapability).slice(0, 300));
+const filteredCapabilities = computed(() => (payload.value?.capabilities || []).filter(matchesCapability));
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredCapabilities.value.length / pageSize.value)));
+const pagedCapabilities = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredCapabilities.value.slice(start, start + pageSize.value);
+});
+const paginationRange = computed(() => {
+  const total = filteredCapabilities.value.length;
+  if (!total) return t("dataSources.paginationEmpty");
+  const start = (currentPage.value - 1) * pageSize.value + 1;
+  const end = Math.min(total, start + pageSize.value - 1);
+  return t("dataSources.paginationRange", { start, end, total });
+});
 const diffSummary = computed(() => payload.value?.diff?.summary || { capability_unmapped_count: 0, registry_missing_source_count: 0, field_frequency_mismatch_count: 0 });
 const diffTotal = computed(() => diffSummary.value.capability_unmapped_count + diffSummary.value.registry_missing_source_count + diffSummary.value.field_frequency_mismatch_count);
 const diffText = computed(() => [
@@ -248,6 +281,7 @@ async function load() {
   error.value = "";
   try {
     payload.value = await api.dataSourceCapabilities();
+    currentPage.value = 1;
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
   }
@@ -296,6 +330,14 @@ function formatDate(value: string) {
     minute: "2-digit",
   }).format(date);
 }
+
+watch([sourceFilter, statusFilter, discoveryFilter, probeFilter, domainFilter, pageSize], () => {
+  currentPage.value = 1;
+});
+
+watch(pageCount, (pages) => {
+  if (currentPage.value > pages) currentPage.value = pages;
+});
 
 onMounted(load);
 </script>
