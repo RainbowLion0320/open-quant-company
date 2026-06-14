@@ -42,6 +42,17 @@ def test_datahub_runtime_env_is_single_canonical_override(tmp_path, monkeypatch)
     assert hub.db_path("x.duckdb") == tmp_path / "runtime" / "db" / "x.duckdb"
 
 
+def test_paper_trading_store_dir_tracks_runtime_env_after_datahub_reset(tmp_path, monkeypatch):
+    import broker.persistence as persistence
+    from data.storage.datahub import reset_datahub
+
+    runtime = tmp_path / "runtime"
+    monkeypatch.setenv("ASTROLABE_VAR", str(runtime))
+    reset_datahub()
+
+    assert persistence._resolve_store() == runtime / "store" / "paper"
+
+
 def test_datahub_explicit_roots_override_runtime_env(tmp_path, monkeypatch):
     from data.storage.datahub import DataHub, reset_datahub
 

@@ -375,7 +375,7 @@ def test_paper_order_preview_does_not_submit_or_mutate_broker_state():
     assert "insufficient_cash" in blocked["risk_gate"]["blockers"]
 
 
-def test_agent_paper_order_proposal_requires_approval_and_never_submits_in_runtime(tmp_path, monkeypatch):
+def test_agent_paper_order_submission_requires_approval_reruns_preview_and_writes_reconciliation(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
 
@@ -403,9 +403,11 @@ def test_agent_paper_order_proposal_requires_approval_and_never_submits_in_runti
         broker=broker,
     )
     action = proposal["action"]
-    blocked_run = runtime.dispatch_action(action["action_id"])
+    blocked_submission = runtime.submit_paper_order_action(action["action_id"], broker=broker)
     runtime.approve_action(action["action_id"], decided_by="ceo")
-    approved_run = runtime.dispatch_action(action["action_id"])
+    approved_submission = runtime.submit_paper_order_action(action["action_id"], broker=broker)
+    run = approved_submission["run"]
+    reconciliation = approved_submission["reconciliation"]
 
     assert proposal["status"] == "approval_required"
     assert proposal["preview"]["status"] == "preview_ready"
@@ -414,12 +416,60 @@ def test_agent_paper_order_proposal_requires_approval_and_never_submits_in_runti
     assert action["approval_required"] is True
     assert action["evidence_refs"]
     assert action["parameters"]["paper_order_preview"]["submitted"] is False
-    assert blocked_run.status == "blocked"
-    assert "approval required" in blocked_run.stderr_summary
-    assert approved_run.status == "blocked"
-    assert "Unknown agent tool: paper_order" in approved_run.stderr_summary
+    assert blocked_submission["status"] == "blocked"
+    assert "approval required" in blocked_submission["run"]["stderr_summary"]
+    assert approved_submission["status"] == "succeeded"
+    assert run["status"] == "succeeded"
+    assert run["tool_name"] == "paper.paper_order.submit"
+    assert run["artifact_refs"]
+    assert reconciliation["status"] == "submitted"
+    assert reconciliation["order_id"].startswith("PAPER_")
+    assert reconciliation["preview"]["status"] == "preview_ready"
+    assert reconciliation["account_after"]["cash"] < 50_000.0
+    assert broker.get_orders()[0].order_id == reconciliation["order_id"]
+    assert broker.get_balance().cash < 50_000.0
+    assert runtime.get_action(action["action_id"])["status"] == "succeeded"
+    reset_datahub()
+
+
+def test_agent_paper_order_submission_reblocks_stale_preview_without_submitting(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from broker import PaperBroker
+
+    broker = PaperBroker(initial_cash=50_000.0, enable_risk=True)
+    broker.set_prices({"000001": 10.0})
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Paper stale preview", default_desk="execution")
+    proposal = runtime.propose_paper_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "000001",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "will become stale",
+            "evidence_refs": ["ev_demo"],
+        },
+        broker=broker,
+    )
+    runtime.approve_action(proposal["action"]["action_id"], decided_by="ceo")
+    broker._cash = 0.0
+
+    blocked = runtime.submit_paper_order_action(proposal["action"]["action_id"], broker=broker)
+
+    assert blocked["status"] == "blocked"
+    assert blocked["preview"]["status"] == "blocked"
+    assert "insufficient_cash" in blocked["preview"]["risk_gate"]["blockers"]
+    assert blocked["run"]["status"] == "blocked"
+    assert blocked["run"]["artifact_refs"]
     assert broker.get_orders() == []
-    assert broker.get_balance().cash == 50_000.0
+    assert runtime.get_action(proposal["action"]["action_id"])["status"] == "blocked"
     reset_datahub()
 
 
@@ -482,6 +532,59 @@ def test_agent_paper_order_proposal_cli_and_api(tmp_path, monkeypatch, capsys):
     assert api_res.status_code == 200
     assert api_res.json()["proposal"]["status"] == "approval_required"
     assert api_res.json()["proposal"]["action"]["risk_level"] == "paper_order"
+    reset_datahub()
+
+
+def test_agent_paper_order_submit_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Paper submit CLI/API", default_desk="execution")
+    cli_proposal = runtime.propose_paper_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "000001",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "cli submit",
+            "evidence_refs": ["ev_demo"],
+        },
+    )
+    api_proposal = runtime.propose_paper_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "000002",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "api submit",
+            "evidence_refs": ["ev_demo"],
+        },
+    )
+    runtime.approve_action(cli_proposal["action"]["action_id"], decided_by="ceo")
+    runtime.approve_action(api_proposal["action"]["action_id"], decided_by="ceo")
+
+    cli_code = run_cli(["agent", "paper", "submit", cli_proposal["action"]["action_id"], "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(f"/api/agent/paper/actions/{api_proposal['action']['action_id']}/submit")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["submission"]["status"] == "succeeded"
+    assert cli_payload["data"]["submission"]["reconciliation"]["order_id"].startswith("PAPER_")
+    assert api_res.status_code == 200
+    assert api_res.json()["submission"]["status"] == "succeeded"
+    assert api_res.json()["submission"]["run"]["artifact_refs"]
     reset_datahub()
 
 

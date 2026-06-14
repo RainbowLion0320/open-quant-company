@@ -4,6 +4,8 @@ import json
 import shutil
 import subprocess
 import uuid
+from dataclasses import asdict, is_dataclass
+from datetime import date
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -55,6 +57,14 @@ def _summary(value: str, *, limit: int = 4000) -> str:
     if len(value) <= limit:
         return value
     return value[:limit] + "\n...[truncated]"
+
+
+def _dataclass_to_dict(value: Any) -> dict[str, Any]:
+    if is_dataclass(value):
+        return asdict(value)
+    if isinstance(value, dict):
+        return dict(value)
+    return dict(getattr(value, "__dict__", {}))
 
 
 class AgentRuntime:
@@ -539,7 +549,7 @@ class AgentRuntime:
     ) -> dict[str, Any]:
         if not self.ledger.get_session(session_id):
             raise KeyError(f"Agent session not found: {session_id}")
-        paper_broker = broker or PaperBroker()
+        paper_broker = broker or self._load_default_paper_broker()
         preview = paper_broker.preview_order(intent)
         if preview["status"] != "preview_ready":
             return {
@@ -573,6 +583,82 @@ class AgentRuntime:
             "status": action.status,
             "preview": preview,
             "action": action.to_dict(),
+            "evidence": evidence.to_dict(),
+        }
+
+    def submit_paper_order_action(
+        self,
+        action_id: str,
+        *,
+        broker: PaperBroker | None = None,
+    ) -> dict[str, Any]:
+        action = self.ledger.get_action(action_id)
+        if not action:
+            raise KeyError(f"Agent action not found: {action_id}")
+        action = self._refresh_action_expiry(action)
+        if str(action.get("action_type")) != "paper_order" or str(action.get("risk_level")) != "paper_order":
+            return self._record_paper_submission_block(
+                action,
+                broker=broker,
+                reason="action is not a paper_order",
+                update_action_status=True,
+            )
+        if action.get("status") != "approved":
+            return self._record_paper_submission_block(
+                action,
+                broker=broker,
+                reason=f"approval required before paper submit: {action.get('status')}",
+                update_action_status=False,
+            )
+
+        paper_broker = broker or self._load_default_paper_broker()
+        intent = dict((action.get("parameters") or {}).get("paper_order_intent") or {})
+        preview = paper_broker.preview_order(intent)
+        if preview.get("status") != "preview_ready":
+            return self._record_paper_submission_block(
+                action,
+                broker=paper_broker,
+                reason="paper preview blocked before submission",
+                preview=preview,
+                update_action_status=True,
+            )
+
+        normalized = preview["intent"]
+        order_id_or_reason = paper_broker.submit_order(
+            code=str(normalized["symbol"]),
+            price=float(normalized["limit_price"]),
+            volume=int(normalized["quantity"]),
+            side=str(normalized["side"]),
+        )
+        submitted = str(order_id_or_reason).startswith("PAPER_")
+        status = "succeeded" if submitted else "failed"
+        reconciliation = self._paper_reconciliation_payload(
+            action=action,
+            status="submitted" if submitted else "failed",
+            preview=preview,
+            broker=paper_broker,
+            order_id=str(order_id_or_reason) if submitted else "",
+            error="" if submitted else str(order_id_or_reason),
+        )
+        evidence = self._write_paper_reconciliation_evidence(action, reconciliation)
+        if submitted and broker is None:
+            self._persist_default_paper_broker(paper_broker, preview)
+        self.ledger.update_action_status(action_id, status, _now())
+        run = self.record_run(
+            action_id=action_id,
+            tool_name="paper.paper_order.submit",
+            command=["paper_order_submit", action_id],
+            status=status,
+            return_code=0 if submitted else 1,
+            stdout_summary=f"paper order submitted: {order_id_or_reason}" if submitted else "",
+            stderr_summary="" if submitted else str(order_id_or_reason),
+            artifact_refs=[evidence.evidence_id],
+        )
+        return {
+            "status": status,
+            "preview": preview,
+            "run": run.to_dict(),
+            "reconciliation": reconciliation,
             "evidence": evidence.to_dict(),
         }
 
@@ -646,6 +732,110 @@ class AgentRuntime:
         }
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
         return path
+
+    def _record_paper_submission_block(
+        self,
+        action: dict[str, Any],
+        *,
+        broker: PaperBroker | None,
+        reason: str,
+        preview: dict[str, Any] | None = None,
+        update_action_status: bool,
+    ) -> dict[str, Any]:
+        action_id = str(action["action_id"])
+        paper_broker = broker or self._load_default_paper_broker()
+        resolved_preview = preview or {}
+        if not resolved_preview and action.get("parameters", {}).get("paper_order_intent"):
+            resolved_preview = paper_broker.preview_order(dict(action.get("parameters", {}).get("paper_order_intent") or {}))
+        reconciliation = self._paper_reconciliation_payload(
+            action=action,
+            status="blocked",
+            preview=resolved_preview,
+            broker=paper_broker,
+            order_id="",
+            error=reason,
+        )
+        evidence = self._write_paper_reconciliation_evidence(action, reconciliation)
+        if update_action_status:
+            self.ledger.update_action_status(action_id, "blocked", _now())
+        run = self.record_run(
+            action_id=action_id,
+            tool_name="paper.paper_order.submit",
+            command=["paper_order_submit", action_id],
+            status="blocked",
+            return_code=None,
+            stdout_summary="",
+            stderr_summary=reason,
+            artifact_refs=[evidence.evidence_id],
+        )
+        return {
+            "status": "blocked",
+            "preview": resolved_preview,
+            "run": run.to_dict(),
+            "reconciliation": reconciliation,
+            "evidence": evidence.to_dict(),
+        }
+
+    def _paper_reconciliation_payload(
+        self,
+        *,
+        action: dict[str, Any],
+        status: str,
+        preview: dict[str, Any],
+        broker: PaperBroker,
+        order_id: str,
+        error: str,
+    ) -> dict[str, Any]:
+        account = broker.get_balance()
+        orders = [_dataclass_to_dict(order) for order in broker.get_orders()]
+        positions = [_dataclass_to_dict(position) for position in broker.get_positions()]
+        return {
+            "action_id": str(action["action_id"]),
+            "session_id": str(action["session_id"]),
+            "status": status,
+            "order_id": order_id,
+            "error": error,
+            "preview": preview,
+            "account_after": _dataclass_to_dict(account),
+            "positions_after": positions,
+            "orders_after": orders,
+            "generated_at": _now(),
+        }
+
+    def _write_paper_reconciliation_evidence(self, action: dict[str, Any], reconciliation: dict[str, Any]) -> EvidenceRef:
+        root = get_datahub().artifact_dir("agent") / "paper_reconciliation"
+        root.mkdir(parents=True, exist_ok=True)
+        path = root / f"paper_reconciliation-{action['action_id']}-{uuid.uuid4().hex[:8]}.json"
+        path.write_text(json.dumps(reconciliation, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return self.create_evidence(
+            kind="artifact",
+            label="Paper order reconciliation",
+            uri=str(path),
+            summary=f"Paper order submission {reconciliation['status']} for {action['action_id']}",
+        )
+
+    def _load_default_paper_broker(self) -> PaperBroker:
+        from broker.persistence import load_state
+
+        return PaperBroker.from_state(load_state(), enable_risk=True)
+
+    def _persist_default_paper_broker(self, broker: PaperBroker, preview: dict[str, Any]) -> None:
+        from broker.persistence import append_nav, append_trade, save_state
+
+        intent = preview["intent"]
+        run_date = date.today()
+        save_state(broker.snapshot_state())
+        balance = broker.get_balance()
+        append_nav(run_date, balance.total_asset, balance.cash, balance.market_value)
+        append_trade(
+            run_date,
+            str(intent["symbol"]),
+            str(intent["side"]),
+            float(intent["limit_price"]),
+            int(intent["quantity"]),
+            float(preview["notional"]),
+            str(intent.get("strategy") or ""),
+        )
 
     def _route_ceo_message(self, *, session_id: str, source_message_id: str, desk: str, content: str) -> DeskResponse:
         plan = build_desk_workflow_plan(desk=desk, content=content)

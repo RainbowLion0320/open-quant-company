@@ -304,6 +304,21 @@ def paper_propose(
     )
 
 
+def paper_submit(action_id: str) -> CliResult:
+    try:
+        submission = AgentRuntime().submit_paper_order_action(action_id)
+    except KeyError as exc:
+        return CliResult(False, "agent paper submit", {"action_id": action_id}, "Agent action missing", [str(exc)])
+    ok = submission["status"] == "succeeded"
+    return CliResult(
+        ok=ok,
+        command="agent paper submit",
+        message=f"Paper order submit: {submission['status']}",
+        data={"submission": submission},
+        errors=[] if ok else [submission["run"]["stderr_summary"] or submission["status"]],
+    )
+
+
 def memory_summary() -> CliResult:
     snapshot = AgentRuntime().memory_snapshot()
     return CliResult(

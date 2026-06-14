@@ -204,7 +204,9 @@ Current foundation:
 - `PaperBroker.preview_order()` returns a non-mutating order preview.
 - `AgentRuntime.propose_paper_order()` writes a preview artifact and creates an approval-required `paper_order` action only when the preview passes.
 - `astroq agent paper propose ... --json` and `POST /api/agent/paper/proposals` expose paper order proposal cards.
-- Approved paper order actions still do not submit automatically; submission wiring, reconciliation, and durable order-ledger integration remain future work.
+- `AgentRuntime.submit_paper_order_action()` submits only approved `paper_order` actions after re-running PaperBroker preview/risk gates against current broker state.
+- `astroq agent paper submit ACTION_ID --json` and `POST /api/agent/paper/actions/{action_id}/submit` expose the approved submit path.
+- Successful paper submits write run ledger rows, reconciliation evidence, and default PaperBroker state/trade/NAV persistence. Richer CEO Office order-card UI, cancel semantics, and expanded reconciliation views remain future work.
 
 ### Phase 6 - MiniQMT/QMT Live Execution
 

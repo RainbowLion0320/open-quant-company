@@ -4,7 +4,7 @@
 
 ## 1. 概述
 
-执行层负责将信号转化为模拟交易——PaperBroker 本地模拟撮合、RiskManager 5 规则风控、Persistence 层 Parquet 持久化状态和净值。Agent Company OS 可生成 PaperBroker 订单预览和审批卡，但当前不从 agent runtime 自动提交 paper 订单。Cron 日频调度：15:30 扫描信号，09:30 执行模拟交易。
+执行层负责将信号转化为模拟交易——PaperBroker 本地模拟撮合、RiskManager 5 规则风控、Persistence 层 Parquet 持久化状态和净值。Agent Company OS 可生成 PaperBroker 订单预览和审批卡，并且只能在 CEO 批准后通过专用 submit 路径重新预览、重新风控、写入运行和 reconciliation evidence 后提交 paper 订单。Cron 日频调度：15:30 扫描信号，09:30 执行模拟交易。
 
 **设计原则：**
 - **Facade Pattern** — Broker 抽象接口 → PaperBroker (当前模拟交易) / MiniQMT/QMT readiness + order preview (当前只读、不提交) / MiniQMT/QMT live adapter (后续实盘提交)
@@ -61,10 +61,12 @@ class Broker(ABC):
 - 约束：100 股整数倍（A 股规则）
 - 成本：由 `broker/exchange.py` 的资产费率模型和 `trading.exchange.*` 配置驱动
 
-**Agent preview 逻辑：**
+**Agent preview / submit 逻辑：**
 - `PaperBroker.preview_order(intent)` 只读取当前现金、持仓、价格和 RiskManager 状态，不创建订单、不改现金、不写 broker ledger。
 - 预览输出 `submitted=false`、`approval_required=true`、`risk_gate`、费用估算、现金影响和持仓影响。
-- `AgentRuntime.propose_paper_order()` 只在 preview 通过后创建 `paper_order` approval card 和 evidence artifact；实际 submit/reconcile 仍是后续能力。
+- `AgentRuntime.propose_paper_order()` 只在 preview 通过后创建 `paper_order` approval card 和 evidence artifact。
+- `AgentRuntime.submit_paper_order_action()` 只接受已批准的 `paper_order` action，提交前必须重新运行 preview/risk gate；如果现金、持仓、价格或 evidence 已变化导致 preview 不通过，写 blocked run 和 reconciliation evidence，但不调用 `submit_order()`。
+- 成功提交会写 `AgentRun.tool_name=paper.paper_order.submit`、`var/artifacts/agent/paper_reconciliation/` evidence，并通过当前 `ASTROLABE_VAR` 下的 PaperBroker persistence 写入 state/trades/NAV。
 
 **订单生命周期：** `PENDING` → `FILLED`（成交）/ `REJECTED`（风控拒绝）/ `CANCELLED`（撤单）
 
@@ -227,5 +229,5 @@ rm.check_portfolio(portfolio) → list[RiskCheckResult]
 - **无部分成交：** 模拟全额成交，实盘中限价单可能部分成交
 - **风控无组合层面：** 未计算组合 VaR/CVaR 作为动态风控阈值
 - **MiniQMT/QMT readiness + preview foundation：** `broker.live.qmt.MiniQmtLiveBroker` 只读探测 default-disabled / missing SDK / login / permission / kill-switch 状态，`paper_fallback=false`；`preview_order()` 只计算 intent、fees、现金/持仓影响和基础 risk gate，始终 `submitted=false`
-- **Agent paper proposal foundation：** `PaperBroker.preview_order()` 和 `AgentRuntime.propose_paper_order()` 只做预览与审批卡，当前不提交 broker order。
+- **Agent paper execution foundation：** `PaperBroker.preview_order()`、`AgentRuntime.propose_paper_order()` 和 `AgentRuntime.submit_paper_order_action()` 已形成 preview → approval → re-preview → submit/reconciliation 的受控路径；CEO Office 仍需要更完整的订单卡片和对账视图。
 - **未来方向：** 完成 MiniQMT/QMT production-grade risk gate、CEO approval、submission、reconciliation 和 kill switch 操作；不得回退到 PaperBroker

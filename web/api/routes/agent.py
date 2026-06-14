@@ -123,6 +123,15 @@ async def propose_agent_paper_order(payload: dict[str, Any]) -> dict[str, Any]:
     return {"proposal": proposal}
 
 
+@router.post("/paper/actions/{action_id}/submit")
+async def submit_agent_paper_order(action_id: str) -> dict[str, Any]:
+    try:
+        submission = AgentRuntime().submit_paper_order_action(action_id)
+    except KeyError:
+        raise DataNotFoundError("agent action", action_id)
+    return {"submission": submission}
+
+
 @router.post("/reports")
 async def generate_agent_report(payload: dict[str, Any]) -> dict[str, Any]:
     try:
