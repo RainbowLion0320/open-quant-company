@@ -41,6 +41,7 @@ Out of scope:
 - `astroq agent paper submit ACTION_ID --json` and `POST /api/agent/paper/actions/{action_id}/submit` expose the approved submit flow.
 - Successful submits write an `AgentRun`, register reconciliation evidence, and persist default PaperBroker state/trades/NAV through the current `ASTROLABE_VAR` runtime root.
 - CEO Office action detail shows PaperBroker preview/risk gate summary and exposes a dedicated submit button for approved `paper_order` actions; paper orders do not use the generic action run button.
+- CEO Office run history exposes run artifact evidence refs, so reconciliation artifacts can be opened from the submitted action without leaving the control page.
 
 ## 4. PaperOrderPreview Contract
 
@@ -100,7 +101,7 @@ Approved paper submission must:
 Before paper execution control is complete, implement:
 
 - Kill/cancel semantics for queued paper order actions.
-- Richer PaperBroker reconciliation views comparing intended order, broker order, trade, cash, and position deltas across multiple submit outcomes.
+- Richer PaperBroker reconciliation summaries comparing intended order, broker order, trade, cash, and position deltas inline, without requiring the user to inspect raw JSON evidence first.
 - Dedicated cancellation semantics for already-submitted paper orders if the broker state still permits cancellation.
 
 ## 8. Acceptance Criteria
@@ -113,3 +114,4 @@ Before paper execution control is complete, implement:
 - A stale approval is re-blocked when cash, price, holdings, or evidence no longer satisfies preview requirements.
 - Successful submission writes an `AgentRun`, reconciliation artifact evidence, and default PaperBroker persistence state.
 - CEO Office displays paper preview/risk summary and uses the dedicated approved submit path instead of generic action dispatch.
+- CEO Office run history links reconciliation evidence from `AgentRun.artifact_refs`.

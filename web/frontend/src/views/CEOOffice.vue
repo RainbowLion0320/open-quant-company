@@ -327,6 +327,18 @@
                   <code>{{ run.command.join(" ") }}</code>
                   <p v-if="run.stdout_summary">{{ t("ceoOffice.stdout") }}: {{ run.stdout_summary }}</p>
                   <p v-if="run.stderr_summary">{{ t("ceoOffice.stderr") }}: {{ run.stderr_summary }}</p>
+                  <div v-if="run.artifact_refs.length" class="run-evidence-list">
+                    <small>{{ t("ceoOffice.runEvidence") }}</small>
+                    <button
+                      v-for="evidenceId in run.artifact_refs"
+                      :key="`${run.run_id}-${evidenceId}`"
+                      class="btn btn-xs"
+                      type="button"
+                      @click="loadEvidence(evidenceId)"
+                    >
+                      {{ t("ceoOffice.openEvidence") }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

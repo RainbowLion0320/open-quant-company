@@ -412,6 +412,18 @@
   gap: 6px;
 }
 
+.run-evidence-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.run-evidence-list small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
 .run-row strong {
   color: var(--text-primary);
   font-size: 12px;

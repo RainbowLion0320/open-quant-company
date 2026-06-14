@@ -38,6 +38,7 @@ export const ceoOffice = {
       expiresAt: "过期时间",
       parameters: "参数",
       evidenceRefs: "证据引用",
+      runEvidence: "运行证据",
       sourceDesk: "来源",
       targetDesk: "目标",
       noEvidence: "暂无证据",

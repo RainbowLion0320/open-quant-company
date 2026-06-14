@@ -38,6 +38,7 @@ export const ceoOffice = {
       expiresAt: "Expires At",
       parameters: "Parameters",
       evidenceRefs: "Evidence Refs",
+      runEvidence: "Run Evidence",
       sourceDesk: "Source",
       targetDesk: "Target",
       noEvidence: "No evidence",

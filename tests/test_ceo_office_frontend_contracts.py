@@ -49,6 +49,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "submitPaperAction" in view
     assert "canSubmitPaperAction" in view
     assert "paperOrderPreview" in view
+    assert "run.artifact_refs" in view
+    assert "ceoOffice.runEvidence" in view
     assert "cancelAction" in view
     assert "canCancelAction" in view
     assert "selectedAction.action.expires_at" in view
@@ -75,6 +77,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
     assert "ceoOffice.riskGate" in view
+    assert "ceoOffice.runEvidence" in view
     assert "ceoOffice" in zh_index
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
@@ -106,11 +109,13 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "提交纸面订单" in zh_ceo
     assert "纸面订单预览" in zh_ceo
     assert "风控门" in zh_ceo
+    assert "运行证据" in zh_ceo
     assert "Reports" in en_ceo
     assert "Generate Daily" in en_ceo
     assert "Submit Paper Order" in en_ceo
     assert "Paper Order Preview" in en_ceo
     assert "Risk Gate" in en_ceo
+    assert "Run Evidence" in en_ceo
     assert "实盘就绪" in zh_ceo
     assert "Live Readiness" in en_ceo
 
