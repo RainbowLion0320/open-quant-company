@@ -590,6 +590,50 @@ def test_agent_paper_order_submit_cli_and_api(tmp_path, monkeypatch, capsys):
     reset_datahub()
 
 
+def test_agent_action_api_includes_paper_reconciliation_summaries(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from broker import PaperBroker
+    from web.api.app import create_app
+
+    broker = PaperBroker(initial_cash=50_000.0, enable_risk=True)
+    broker.set_prices({"000001": 10.0})
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Paper reconciliation detail", default_desk="execution")
+    proposal = runtime.propose_paper_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "000001",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "api detail",
+            "evidence_refs": ["ev_demo"],
+        },
+        broker=broker,
+    )
+    runtime.approve_action(proposal["action"]["action_id"], decided_by="ceo")
+    runtime.submit_paper_order_action(proposal["action"]["action_id"], broker=broker)
+
+    api_detail = TestClient(create_app()).get(f"/api/agent/actions/{proposal['action']['action_id']}")
+
+    assert api_detail.status_code == 200
+    reconciliations = api_detail.json()["paper_reconciliations"]
+    assert len(reconciliations) == 1
+    assert reconciliations[0]["status"] == "submitted"
+    assert reconciliations[0]["order_id"].startswith("PAPER_")
+    assert reconciliations[0]["account_after"]["cash"] < 50_000.0
+    assert reconciliations[0]["evidence_id"].startswith("ev_")
+    assert reconciliations[0]["path"].endswith(".json")
+    reset_datahub()
+
+
 def test_agent_actions_expire_before_approval_or_dispatch(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

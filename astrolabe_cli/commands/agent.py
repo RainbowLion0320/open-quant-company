@@ -175,7 +175,7 @@ def show_action(action_id: str) -> CliResult:
         ok=True,
         command="agent action show",
         message=f"Agent action {action_id}",
-        data={"action": action, "runs": runs},
+        data={"action": action, "runs": runs, "paper_reconciliations": runtime.paper_reconciliations_for_action(action_id)},
     )
 
 

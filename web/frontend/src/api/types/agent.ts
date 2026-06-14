@@ -149,6 +149,7 @@ export interface AgentSessionDetail {
 export interface AgentActionDetail {
   action: AgentAction;
   runs: AgentRun[];
+  paper_reconciliations: AgentPaperReconciliation[];
 }
 
 export interface AgentSessionsResponse {
@@ -235,6 +236,23 @@ export interface AgentPaperSubmission {
   run: AgentRun;
   reconciliation: Record<string, unknown>;
   evidence: EvidenceRef;
+}
+
+export interface AgentPaperReconciliation {
+  action_id: string;
+  session_id: string;
+  status: string;
+  order_id: string;
+  error: string;
+  preview: Record<string, unknown>;
+  account_after: Record<string, unknown>;
+  positions_after: Array<Record<string, unknown>>;
+  orders_after: Array<Record<string, unknown>>;
+  generated_at: string;
+  evidence_id: string;
+  path: string;
+  run_id: string;
+  freshness_status: string;
 }
 
 export interface AgentPaperSubmitResponse {

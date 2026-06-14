@@ -176,10 +176,15 @@ async def resolve_agent_handoff(handoff_id: str) -> dict[str, Any]:
 
 @router.get("/actions/{action_id}")
 async def get_agent_action(action_id: str) -> dict[str, Any]:
-    action = AgentRuntime().get_action(action_id)
+    runtime = AgentRuntime()
+    action = runtime.get_action(action_id)
     if action is None:
         raise DataNotFoundError("agent action", action_id)
-    return {"action": action, "runs": AgentRuntime().list_runs(action_id)}
+    return {
+        "action": action,
+        "runs": runtime.list_runs(action_id),
+        "paper_reconciliations": runtime.paper_reconciliations_for_action(action_id),
+    }
 
 
 @router.post("/actions/{action_id}/approve")

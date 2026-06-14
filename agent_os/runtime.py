@@ -67,6 +67,14 @@ def _dataclass_to_dict(value: Any) -> dict[str, Any]:
     return dict(getattr(value, "__dict__", {}))
 
 
+def _is_paper_reconciliation_evidence(evidence: dict[str, Any]) -> bool:
+    return (
+        str(evidence.get("kind") or "") == "artifact"
+        and "paper_reconciliation" in str(evidence.get("uri") or "")
+        and str(evidence.get("label") or "") == "Paper order reconciliation"
+    )
+
+
 class AgentRuntime:
     """Local Agent Company OS runtime.
 
@@ -236,6 +244,32 @@ class AgentRuntime:
 
     def get_action(self, action_id: str) -> dict[str, Any] | None:
         return self.ledger.get_action(action_id)
+
+    def paper_reconciliations_for_action(self, action_id: str) -> list[dict[str, Any]]:
+        if not self.ledger.get_action(action_id):
+            raise KeyError(f"Agent action not found: {action_id}")
+        reconciliations: list[dict[str, Any]] = []
+        for run in self.ledger.list_runs(action_id):
+            for evidence_id in run.get("artifact_refs", []) or []:
+                evidence = self.ledger.get_evidence(str(evidence_id))
+                if not evidence or not _is_paper_reconciliation_evidence(evidence):
+                    continue
+                path = Path(str(evidence.get("uri") or ""))
+                if not path.exists():
+                    continue
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(payload, dict) or str(payload.get("action_id") or "") != action_id:
+                    continue
+                reconciliations.append(
+                    {
+                        **payload,
+                        "evidence_id": str(evidence["evidence_id"]),
+                        "path": str(path),
+                        "run_id": str(run["run_id"]),
+                        "freshness_status": str(evidence.get("freshness_status") or ""),
+                    }
+                )
+        return reconciliations
 
     def list_actions(self, session_id: str | None = None) -> list[dict[str, Any]]:
         return self.ledger.list_actions(session_id)

@@ -358,6 +358,10 @@
   gap: 8px;
 }
 
+.paper-reconciliation-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .paper-preview-cell,
 .paper-blockers {
   border: 1px solid var(--border-subtle);

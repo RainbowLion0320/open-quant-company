@@ -290,6 +290,31 @@
                 <code v-for="blocker in paperRiskBlockers" :key="blocker">{{ blocker }}</code>
               </div>
             </div>
+            <div v-if="paperReconciliationSummary" class="detail-row">
+              <span>{{ t("ceoOffice.paperReconciliation") }}</span>
+              <div class="paper-preview-grid paper-reconciliation-grid">
+                <div class="paper-preview-cell">
+                  <small>{{ t("ceoOffice.status") }}</small>
+                  <strong>{{ statusLabel(paperReconciliationSummary.status) }}</strong>
+                </div>
+                <div class="paper-preview-cell">
+                  <small>{{ t("ceoOffice.orderId") }}</small>
+                  <strong>{{ paperReconciliationSummary.orderId || "—" }}</strong>
+                </div>
+                <div class="paper-preview-cell">
+                  <small>{{ t("ceoOffice.cashAfter") }}</small>
+                  <strong>{{ formatNumber(paperReconciliationSummary.cashAfter) }}</strong>
+                </div>
+                <div class="paper-preview-cell">
+                  <small>{{ t("ceoOffice.marketValueAfter") }}</small>
+                  <strong>{{ formatNumber(paperReconciliationSummary.marketValueAfter) }}</strong>
+                </div>
+              </div>
+              <div v-if="paperReconciliationSummary.error" class="paper-blockers">
+                <small>{{ t("ceoOffice.stderr") }}</small>
+                <code>{{ paperReconciliationSummary.error }}</code>
+              </div>
+            </div>
             <div class="detail-row">
               <span>{{ t("ceoOffice.evidenceRefs") }}</span>
               <div v-if="!selectedAction.action.evidence_refs.length" class="ceo-empty compact">
@@ -450,6 +475,19 @@ const paperOrderPreview = computed(() => objectParam(selectedAction.value?.actio
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
 const paperRiskGatePassed = computed(() => Boolean(paperRiskGate.value?.passed));
 const paperRiskBlockers = computed(() => arrayParam(paperRiskGate.value?.blockers));
+const paperReconciliation = computed(() => selectedAction.value?.paper_reconciliations?.[0] || null);
+const paperReconciliationSummary = computed(() => {
+  const reconciliation = paperReconciliation.value;
+  const account = objectParam(reconciliation?.account_after);
+  if (!reconciliation || !account) return null;
+  return {
+    status: String(reconciliation.status || "unknown"),
+    orderId: String(reconciliation.order_id || ""),
+    cashAfter: account.cash,
+    marketValueAfter: account.market_value,
+    error: String(reconciliation.error || ""),
+  };
+});
 const reportKindOptions = computed(() => [
   { value: "daily_brief", label: t("ceoOffice.dailyBrief") },
   { value: "weekly_review", label: t("ceoOffice.weeklyReview") },
@@ -481,6 +519,7 @@ function statusLabel(status: string) {
   if (status === "proposed") return t("ceoOffice.proposed");
   if (status === "running") return t("ceoOffice.running");
   if (status === "succeeded") return t("ceoOffice.succeeded");
+  if (status === "submitted") return t("ceoOffice.submitted");
   if (status === "failed") return t("ceoOffice.failed");
   if (status === "blocked") return t("ceoOffice.blocked");
   if (status === "canceled") return t("ceoOffice.canceled");

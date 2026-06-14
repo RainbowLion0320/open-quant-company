@@ -49,6 +49,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "submitPaperAction" in view
     assert "canSubmitPaperAction" in view
     assert "paperOrderPreview" in view
+    assert "paperReconciliation" in view
+    assert "paperReconciliationSummary" in view
+    assert "paper_reconciliations" in view
     assert "run.artifact_refs" in view
     assert "ceoOffice.runEvidence" in view
     assert "cancelAction" in view
@@ -87,6 +90,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.reports" in view
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
+    assert "ceoOffice.paperReconciliation" in view
+    assert "ceoOffice.orderId" in view
+    assert "ceoOffice.cashAfter" in view
+    assert "ceoOffice.marketValueAfter" in view
     assert "ceoOffice.riskGate" in view
     assert "ceoOffice.runEvidence" in view
     assert "ceoOffice" in zh_index
@@ -132,6 +139,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "已跳过" in zh_ceo
     assert "提交纸面订单" in zh_ceo
     assert "纸面订单预览" in zh_ceo
+    assert "纸面订单对账" in zh_ceo
+    assert "订单号" in zh_ceo
+    assert "对账后现金" in zh_ceo
+    assert "对账后市值" in zh_ceo
+    assert "已提交" in zh_ceo
     assert "风控门" in zh_ceo
     assert "运行证据" in zh_ceo
     assert "Reports" in en_ceo
@@ -151,6 +163,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Skipped" in en_ceo
     assert "Submit Paper Order" in en_ceo
     assert "Paper Order Preview" in en_ceo
+    assert "Paper Reconciliation" in en_ceo
+    assert "Order ID" in en_ceo
+    assert "Cash After" in en_ceo
+    assert "Market Value After" in en_ceo
+    assert "Submitted" in en_ceo
     assert "Risk Gate" in en_ceo
     assert "Run Evidence" in en_ceo
     assert "实盘就绪" in zh_ceo
@@ -191,6 +208,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentAction" in agent_types
     assert "expires_at: string" in agent_types
     assert "export interface AgentActionDetail" in agent_types
+    assert "paper_reconciliations: AgentPaperReconciliation[]" in agent_types
+    assert "export interface AgentPaperReconciliation" in agent_types
     assert "export interface AgentHandoff" in agent_types
     assert "export interface AgentDeskResponse" in agent_types
     assert "export interface AgentAddMessageResponse" in agent_types
