@@ -64,6 +64,11 @@
   overflow-wrap: anywhere;
 }
 
+.ceo-metric small {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
 .ceo-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 0.42fr);

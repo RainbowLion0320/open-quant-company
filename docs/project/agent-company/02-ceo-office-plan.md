@@ -149,6 +149,7 @@ Chinese and English strings must be maintained together. The Chinese wording sho
 - `/` renders the CEO Office.
 - `/market` renders the former market overview.
 - A new session can be created from the Web UI.
+- The current session can be archived from the Web UI without deleting ledger history.
 - A user message appears in the timeline and is persisted.
 - A desk response includes evidence references.
 - A proposed write action appears as an approval card instead of executing immediately.

@@ -7,6 +7,15 @@
       </div>
       <div class="ceo-actions">
         <button class="btn btn-ghost" type="button" @click="load">{{ t("ceoOffice.refresh") }}</button>
+        <button
+          v-if="activeSession && activeSession.status !== 'archived'"
+          class="btn btn-ghost"
+          type="button"
+          :disabled="archivingSession"
+          @click="archiveSession"
+        >
+          {{ t("ceoOffice.archiveSession") }}
+        </button>
         <button class="btn btn-primary" type="button" @click="createSession">{{ t("ceoOffice.createSession") }}</button>
       </div>
     </section>
@@ -17,6 +26,7 @@
       <article class="ceo-metric">
         <span>{{ t("ceoOffice.session") }}</span>
         <strong>{{ activeSession?.title || t("ceoOffice.noSession") }}</strong>
+        <small v-if="activeSession">{{ statusLabel(activeSession.status) }}</small>
       </article>
       <article class="ceo-metric">
         <span>{{ t("ceoOffice.deskStatus") }}</span>
@@ -263,6 +273,7 @@ const selectedEvidence = ref<EvidenceRef | null>(null);
 const selectedEvidenceNavigation = ref<EvidenceNavigation | null>(null);
 const runningAction = ref("");
 const cancelingAction = ref("");
+const archivingSession = ref(false);
 const resolvingHandoff = ref("");
 const draft = ref("");
 const sending = ref(false);
@@ -297,6 +308,8 @@ function statusLabel(status: string) {
   if (status === "failed") return t("ceoOffice.failed");
   if (status === "blocked") return t("ceoOffice.blocked");
   if (status === "canceled") return t("ceoOffice.canceled");
+  if (status === "archived") return t("ceoOffice.archived");
+  if (status === "active") return t("ceoOffice.active");
   if (status === "open") return t("ceoOffice.open");
   if (status === "resolved") return t("ceoOffice.resolved");
   return status;
@@ -364,6 +377,20 @@ async function createSession() {
     await load();
   } catch (err: any) {
     error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;
+  }
+}
+
+async function archiveSession() {
+  if (!activeSession.value) return;
+  archivingSession.value = true;
+  error.value = "";
+  try {
+    await api.agentUpdateSession(activeSession.value.session_id, { status: "archived" });
+    await load();
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.archiveFailed")}: ${err?.message || err}`;
+  } finally {
+    archivingSession.value = false;
   }
 }
 

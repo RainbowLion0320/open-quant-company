@@ -1,4 +1,4 @@
-import { get, post } from "../client";
+import { get, patch, post } from "../client";
 import type {
   AgentAction,
   AgentActionDetail,
@@ -20,6 +20,10 @@ export const agentApi = {
   agentCreateSession: (payload: { title: string; default_desk?: string; tags?: string[] }) =>
     post<{ session: AgentSession }>("/api/agent/sessions", payload),
   agentSession: (sessionId: string) => get<AgentSessionDetail>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`),
+  agentUpdateSession: (
+    sessionId: string,
+    payload: { title?: string; status?: string; default_desk?: string; tags?: string[] },
+  ) => patch<{ session: AgentSession }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`, payload),
   agentAddMessage: (
     sessionId: string,
     payload: { role?: string; desk?: string; content: string; evidence_refs?: string[]; action_refs?: string[] },
