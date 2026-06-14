@@ -317,7 +317,11 @@ class AgentRuntime:
             )
 
         try:
-            command = registry.command_for(tool_id, action.get("parameters", {}))
+            command = registry.command_for(
+                tool_id,
+                action.get("parameters", {}),
+                approved=action.get("status") == "approved",
+            )
         except (KeyError, ValueError) as exc:
             self.ledger.update_action_status(action_id, "blocked", _now())
             return self.record_run(

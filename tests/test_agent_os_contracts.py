@@ -277,6 +277,15 @@ def test_agent_runtime_records_run_and_tool_registry_uses_fixed_command_arrays(t
     else:
         raise AssertionError("write-capable templated command should not be available without an approved action")
 
+    repair_command = registry.command_for("astroq.data.repair", {"table": "stock_limit_list"}, approved=True)
+    assert repair_command[1:] == ["data", "repair", "stock_limit_list", "--json"]
+    try:
+        registry.command_for("astroq.data.repair", {"table": "x; rm -rf /"}, approved=True)
+    except ValueError as exc:
+        assert "invalid command parameter" in str(exc)
+    else:
+        raise AssertionError("unsafe command parameter should not be bound")
+
     runtime = AgentRuntime()
     session = runtime.create_session(title="Run ledger")
     action = runtime.propose_action(
@@ -301,6 +310,43 @@ def test_agent_runtime_records_run_and_tool_registry_uses_fixed_command_arrays(t
     assert Path(loaded["command"][0]).name == "astroq"
     assert loaded["command"][1:] == ["health", "--json"]
     assert runtime.get_session(session.session_id)["runs"][0]["run_id"] == run.run_id
+    reset_datahub()
+
+
+def test_agent_dispatch_binds_approved_templated_tool_parameters(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Dispatch data repair")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="data",
+        action_type="data_repair",
+        risk_level="write_data",
+        summary="Repair one safe table",
+        parameters={"tool_id": "astroq.data.repair", "table": "stock_limit_list"},
+    )
+    blocked = runtime.dispatch_action(action.action_id, runner=fake_run)
+    approved = runtime.approve_action(action.action_id)
+    run = runtime.dispatch_action(action.action_id, runner=fake_run)
+
+    assert blocked.status == "blocked"
+    assert "approval required" in blocked.stderr_summary
+    assert approved.status == "approved"
+    assert run.status == "succeeded"
+    assert calls[0][1:] == ["data", "repair", "stock_limit_list", "--json"]
+    assert runtime.get_action(action.action_id)["status"] == "succeeded"
     reset_datahub()
 
 
