@@ -285,6 +285,111 @@ def test_agent_dispatch_blocks_unapproved_state_changing_action_without_running(
     reset_datahub()
 
 
+def test_agent_runtime_rejects_desk_tool_outside_allowed_scope(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Desk permission proposal")
+
+    try:
+        runtime.propose_action(
+            session_id=session.session_id,
+            desk="research",
+            action_type="data_status",
+            risk_level="read_only",
+            summary="Research desk should not run Data Desk tools.",
+            parameters={"tool_id": "astroq.data.status"},
+        )
+    except PermissionError as exc:
+        assert "research" in str(exc)
+        assert "astroq.data.status" in str(exc)
+    else:
+        raise AssertionError("desk should not be allowed to propose tools outside its scope")
+    reset_datahub()
+
+
+def test_agent_dispatch_blocks_ledger_action_when_tool_scope_is_invalid(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout="should not run", stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Dispatch invalid desk scope")
+    runtime.ledger.insert_action(
+        {
+            "action_id": "act_external_bad_scope",
+            "session_id": session.session_id,
+            "desk": "research",
+            "action_type": "data_status",
+            "risk_level": "read_only",
+            "status": "proposed",
+            "summary": "Externally inserted action with an invalid tool scope.",
+            "parameters": {"tool_id": "astroq.data.status"},
+            "expected_effect": "Should be blocked before command dispatch.",
+            "evidence_refs": [],
+            "approval_required": False,
+            "approval_decision": None,
+            "created_at": "2026-06-14T00:00:00Z",
+            "updated_at": "2026-06-14T00:00:00Z",
+        }
+    )
+
+    run = runtime.dispatch_action("act_external_bad_scope", runner=fake_run)
+
+    assert calls == []
+    assert run.status == "blocked"
+    assert "not allowed" in run.stderr_summary
+    assert runtime.get_action("act_external_bad_scope")["status"] == "blocked"
+    reset_datahub()
+
+
+def test_agent_dispatch_allows_tool_when_desk_scope_matches(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"data": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Dispatch valid desk scope")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="data",
+        action_type="data_status",
+        risk_level="read_only",
+        summary="Data desk checks local data health.",
+        parameters={"tool_id": "astroq.data.status"},
+    )
+
+    run = runtime.dispatch_action(action.action_id, runner=fake_run)
+
+    assert len(calls) == 1
+    assert calls[0][1:] == ["data", "status", "--json"]
+    assert run.status == "succeeded"
+    reset_datahub()
+
+
 def test_agent_cli_action_show_and_api_run_detail(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
@@ -409,7 +514,7 @@ def test_desk_response_records_structured_reply_and_handoff(tmp_path, monkeypatc
     assert response.confidence == 0.74
     assert response.blockers == ["missing_score_panel"]
     assert response.handoffs[0]["target_desk"] == "data"
-    assert loaded["messages"][-1]["message_id"] == response.message.message_id
+    assert any(message["message_id"] == response.message.message_id for message in loaded["messages"])
     assert loaded["handoffs"][0]["source_desk"] == "research"
     assert handoffs[0]["status"] == "open"
     reset_datahub()

@@ -114,6 +114,12 @@ class AgentRuntime:
     ) -> AgentAction:
         if not self.ledger.get_session(session_id):
             raise KeyError(f"Agent session not found: {session_id}")
+        self._validate_desk_action_scope(
+            desk=desk,
+            action_type=action_type,
+            risk_level=risk_level,
+            tool_id=self._tool_id_for_action(action_type, parameters or {}),
+        )
         approval_required = approval_required_for_risk(risk_level)
         timestamp = _now()
         action = AgentAction(
@@ -220,8 +226,28 @@ class AgentRuntime:
         if not action:
             raise KeyError(f"Agent action not found: {action_id}")
 
-        tool_id = str(action.get("parameters", {}).get("tool_id") or action.get("action_type") or "")
+        tool_id = self._tool_id_for_action(str(action.get("action_type") or ""), action.get("parameters", {}))
         tool_name = tool_id or "unbound_tool"
+        registry = tool_registry or AgentToolRegistry()
+        try:
+            self._validate_desk_action_scope(
+                desk=str(action.get("desk") or ""),
+                action_type=str(action.get("action_type") or ""),
+                risk_level=str(action.get("risk_level") or ""),
+                tool_id=tool_id,
+                tool_registry=registry,
+            )
+        except (KeyError, PermissionError, ValueError) as exc:
+            self.ledger.update_action_status(action_id, "blocked", _now())
+            return self.record_run(
+                action_id=action_id,
+                tool_name=tool_name,
+                command=[],
+                status="blocked",
+                return_code=None,
+                stdout_summary="",
+                stderr_summary=str(exc),
+            )
         if action["approval_required"] and action["status"] != "approved":
             return self.record_run(
                 action_id=action_id,
@@ -243,7 +269,6 @@ class AgentRuntime:
                 stderr_summary=f"action status cannot be dispatched: {action['status']}",
             )
 
-        registry = tool_registry or AgentToolRegistry()
         try:
             command = registry.command_for(tool_id, action.get("parameters", {}))
         except (KeyError, ValueError) as exc:
@@ -394,3 +419,33 @@ class AgentRuntime:
         for action in self.ledger.list_actions(session_id):
             runs.extend(self.ledger.list_runs(str(action["action_id"])))
         return runs
+
+    @staticmethod
+    def _tool_id_for_action(action_type: str, parameters: dict[str, Any] | None) -> str:
+        params = parameters or {}
+        return str(params.get("tool_id") or action_type or "")
+
+    def _validate_desk_action_scope(
+        self,
+        *,
+        desk: str,
+        action_type: str,
+        risk_level: str,
+        tool_id: str,
+        tool_registry: AgentToolRegistry | None = None,
+    ) -> None:
+        desk_record = get_desk(desk)
+        if desk_record is None:
+            raise ValueError(f"Unknown desk: {desk}")
+        forbidden = set(desk_record.get("forbidden_actions", []))
+        if risk_level in forbidden or action_type in forbidden:
+            raise PermissionError(f"{desk} desk is not allowed to propose {risk_level or action_type} actions")
+        registry = tool_registry or AgentToolRegistry()
+        if not tool_id or registry.get(tool_id) is None:
+            return
+        tool = registry.get(tool_id)
+        allowed_tools = set(desk_record.get("allowed_tools", []))
+        allowed_by_desk = tool_id in allowed_tools
+        allowed_by_tool = desk in set(tool.desk_scopes if tool else [])
+        if not allowed_by_desk or not allowed_by_tool:
+            raise PermissionError(f"{desk} desk is not allowed to use agent tool {tool_id}")

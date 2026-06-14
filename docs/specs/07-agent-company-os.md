@@ -397,6 +397,7 @@ As of 2026-06-14:
 - `astroq agent sessions/session/message/actions/handoffs/action show/run/approve/reject/evidence/desks --json` is available.
 - `/api/agent/sessions`, `/api/agent/actions`, `/api/agent/handoffs`, `/api/agent/actions/{action_id}/run`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, and `/api/agent/desks` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; unsafe templated write commands remain blocked until a stricter parameter binding phase lands.
+- Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`, and invalid handoff targets are rejected by runtime desk policy.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
