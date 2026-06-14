@@ -853,21 +853,93 @@ def test_agent_report_cli_and_api(tmp_path, monkeypatch, capsys):
     runtime = AgentRuntime()
     session = runtime.create_session(title="Reports API", default_desk="reporting")
 
-    cli_code = run_cli(["agent", "report", "daily", "--session", session.session_id, "--json"])
+    cli_code = run_cli(["agent", "report", "data_quality", "--session", session.session_id, "--json"])
     cli_payload = json.loads(capsys.readouterr().out)
     api_client = TestClient(create_app())
-    api_create = api_client.post("/api/agent/reports", json={"kind": "weekly_review", "session_id": session.session_id})
+    api_create = api_client.post("/api/agent/reports", json={"kind": "risk_review", "session_id": session.session_id})
     api_list = api_client.get(f"/api/agent/reports?session_id={session.session_id}")
 
     assert cli_code == 0
-    assert cli_payload["data"]["report"]["kind"] == "daily_brief"
+    assert cli_payload["data"]["report"]["kind"] == "data_quality_review"
+    assert {section["section_id"] for section in cli_payload["data"]["report"]["sections"]} >= {"data_quality_evidence"}
     assert Path(cli_payload["data"]["report"]["path"]).exists()
     assert api_create.status_code == 200
-    assert api_create.json()["report"]["kind"] == "weekly_review"
+    assert api_create.json()["report"]["kind"] == "risk_review"
+    assert {section["section_id"] for section in api_create.json()["report"]["sections"]} >= {"risk_readiness"}
     assert Path(api_create.json()["report"]["path"]).exists()
     assert api_list.status_code == 200
     assert api_list.json()["total"] == 2
-    assert {row["kind"] for row in api_list.json()["reports"]} == {"daily_brief", "weekly_review"}
+    assert {row["kind"] for row in api_list.json()["reports"]} == {"data_quality_review", "risk_review"}
+    reset_datahub()
+
+
+def test_agent_reports_support_dedicated_operating_rhythm_templates(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Operating rhythm", default_desk="reporting")
+    lifecycle = runtime.create_evidence(
+        kind="web_route",
+        label="Lifecycle readiness",
+        uri="/system?tab=lifecycle",
+        summary="Lifecycle readiness has one risk blocker.",
+    )
+    codegraph = runtime.create_evidence(
+        kind="web_route",
+        label="CodeGraph diagnostics",
+        uri="/system?tab=codegraph",
+        summary="Engineering diagnostics ready.",
+    )
+    runtime.add_message(
+        session.session_id,
+        role="desk_agent",
+        desk="risk",
+        content="Risk Desk flags one open blocker.",
+        evidence_refs=[lifecycle.evidence_id],
+    )
+    engineering_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="work_order",
+        risk_level="read_only",
+        summary="Review CodeGraph architecture finding",
+        evidence_refs=[codegraph.evidence_id],
+    )
+    runtime.record_run(
+        action_id=engineering_action.action_id,
+        tool_name="qa.engineering.digest",
+        command=["qa", "engineering"],
+        status="succeeded",
+        return_code=0,
+        stdout_summary="Engineering diagnostic recorded.",
+        stderr_summary="",
+        artifact_refs=[codegraph.evidence_id],
+    )
+
+    expected_sections = {
+        "data_quality_review": "data_quality_evidence",
+        "risk_review": "risk_readiness",
+        "execution_reconciliation": "execution_reconciliation",
+        "engineering_digest": "engineering_work_orders",
+        "release_audit": "release_audit",
+    }
+    generated = {kind: runtime.generate_report(session_id=session.session_id, kind=kind) for kind in expected_sections}
+
+    assert set(generated) == set(expected_sections)
+    for kind, section_id in expected_sections.items():
+        report = generated[kind]
+        section_ids = {section["section_id"] for section in report["sections"]}
+        assert report["kind"] == kind
+        assert section_id in section_ids
+        assert report["evidence_refs"]
+        assert Path(report["path"]).exists()
+        assert section_id in Path(report["path"]).read_text(encoding="utf-8")
+
     reset_datahub()
 
 

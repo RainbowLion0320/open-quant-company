@@ -135,7 +135,27 @@ def build_parser() -> argparse.ArgumentParser:
     agent_reports_cmd.set_defaults(handler=lambda args: agent_reports(args.session))
 
     agent_report_cmd = agent_sub.add_parser("report", help="Generate an agent report")
-    agent_report_cmd.add_argument("kind", choices=["daily", "daily_brief", "weekly", "weekly_review", "audit", "audit_pack"])
+    agent_report_cmd.add_argument(
+        "kind",
+        choices=[
+            "daily",
+            "daily_brief",
+            "weekly",
+            "weekly_review",
+            "audit",
+            "audit_pack",
+            "data_quality",
+            "data_quality_review",
+            "risk",
+            "risk_review",
+            "execution",
+            "execution_reconciliation",
+            "engineering",
+            "engineering_digest",
+            "release",
+            "release_audit",
+        ],
+    )
     agent_report_cmd.add_argument("--session", required=True)
     add_common_flags(agent_report_cmd)
     agent_report_cmd.set_defaults(handler=lambda args: agent_generate_report(args.kind, args.session))

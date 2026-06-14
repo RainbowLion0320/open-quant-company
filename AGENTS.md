@@ -52,6 +52,7 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq agent cancel <action_id> --reason "..." --json` | 取消尚未完成的 agent action |
 | `astroq agent expire --session <session_id> --json` | 标记已过期的 queued agent action，防止继续审批或执行 |
 | `astroq agent report daily --session <session_id> --json` | 生成带 evidence 引用的 CEO brief 报告 artifact |
+| `astroq agent report data_quality|risk|execution|engineering|release --session <session_id> --json` | 生成 Data/Risk/Execution/Engineering/Release 专用 operating-rhythm 报告 |
 | `astroq agent reports --session <session_id> --json` | 查看本地已生成的 agent reports |
 | `astroq agent paper propose --session <session_id> --symbol 000001 --side buy --quantity 100 --limit-price 10 --evidence <evidence_id> --json` | 生成 PaperBroker 订单预览和审批卡，不提交订单 |
 | `astroq agent paper submit <action_id> --json` | 提交已批准的 PaperBroker order action；提交前重新预览/风控，写 run 与 reconciliation evidence |
