@@ -29,13 +29,14 @@ class EvidenceResolver:
                 "status": "missing_evidence",
                 "evidence_id": evidence_id,
                 "evidence": None,
+                "navigation": None,
             }
 
         status = evidence.get("freshness_status") or "unknown"
         if evidence.get("kind") in FILE_EVIDENCE_KINDS:
             path = Path(str(evidence.get("uri") or ""))
             if not path.exists():
-                return {"status": "missing_evidence", "evidence_id": evidence_id, "evidence": evidence}
+                return {"status": "missing_evidence", "evidence_id": evidence_id, "evidence": evidence, "navigation": None}
             evidence = {**evidence, "hash": hash_file(path)}
             status = "fresh"
 
@@ -43,4 +44,25 @@ class EvidenceResolver:
             "status": status,
             "evidence_id": evidence_id,
             "evidence": evidence,
+            "navigation": _navigation_for_evidence(evidence),
         }
+
+
+def _navigation_for_evidence(evidence: dict[str, Any]) -> dict[str, str] | None:
+    kind = str(evidence.get("kind") or "")
+    uri = str(evidence.get("uri") or "").strip()
+    if kind != "web_route" or not _is_safe_local_route(uri):
+        return None
+    return {
+        "kind": "web_route",
+        "href": uri,
+        "label": str(evidence.get("label") or uri),
+    }
+
+
+def _is_safe_local_route(uri: str) -> bool:
+    if not uri.startswith("/"):
+        return False
+    if uri.startswith("//"):
+        return False
+    return "\\" not in uri

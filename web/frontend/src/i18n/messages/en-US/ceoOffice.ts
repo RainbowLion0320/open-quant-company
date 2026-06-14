@@ -43,6 +43,8 @@ export const ceoOffice = {
       available: "Available",
       command: "Command",
       uri: "URI",
+      linkedView: "Linked View",
+      openLinkedView: "Open Linked View",
       freshness: "Freshness",
       stdout: "Stdout",
       stderr: "Stderr",

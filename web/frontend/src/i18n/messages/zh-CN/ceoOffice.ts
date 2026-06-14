@@ -43,6 +43,8 @@ export const ceoOffice = {
       available: "可用",
       command: "命令",
       uri: "路径",
+      linkedView: "关联视图",
+      openLinkedView: "打开关联视图",
       freshness: "新鲜度",
       stdout: "标准输出",
       stderr: "标准错误",

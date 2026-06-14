@@ -44,6 +44,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentRunAction" in view
     assert "selectedAction" in view
     assert "selectedEvidence" in view
+    assert "selectedEvidenceNavigation" in view
+    assert "openLinkedView" in view
     assert "handoffs" in view
     assert "api.agentHandoffs" in view
     assert "api.agentResolveHandoff" in view
@@ -57,7 +59,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Handoffs" in en_ceo
     assert "Resolve" in en_ceo
     assert "证据详情" in zh_ceo
+    assert "打开关联视图" in zh_ceo
     assert "Evidence Detail" in en_ceo
+    assert "Open Linked View" in en_ceo
 
 
 def test_frontend_agent_api_module_exports_runtime_types_and_calls():
@@ -81,3 +85,5 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentActionDetail" in agent_types
     assert "export interface AgentHandoff" in agent_types
     assert "export interface EvidenceRef" in agent_types
+    assert "export interface EvidenceNavigation" in agent_types
+    assert "navigation: EvidenceNavigation | null" in agent_types

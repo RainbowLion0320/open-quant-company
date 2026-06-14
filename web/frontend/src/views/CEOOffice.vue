@@ -210,6 +210,12 @@
               <span>{{ t("ceoOffice.uri") }}</span>
               <code>{{ selectedEvidence.uri }}</code>
             </div>
+            <div v-if="selectedEvidenceNavigation" class="detail-row">
+              <span>{{ t("ceoOffice.linkedView") }}</span>
+              <a class="evidence-link" :href="selectedEvidenceNavigation.href">
+                {{ t("ceoOffice.openLinkedView") }}
+              </a>
+            </div>
             <div class="detail-row">
               <span>{{ t("ceoOffice.freshness") }}</span>
               <code>{{ selectedEvidence.freshness_status }}</code>
@@ -223,7 +229,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentHandoff, type AgentMessage, type AgentSession, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentHandoff, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -236,6 +242,7 @@ const handoffs = ref<AgentHandoff[]>([]);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
+const selectedEvidenceNavigation = ref<EvidenceNavigation | null>(null);
 const runningAction = ref("");
 const resolvingHandoff = ref("");
 const draft = ref("");
@@ -403,9 +410,11 @@ async function runAction(actionId: string) {
 
 async function loadEvidence(evidenceId: string) {
   error.value = "";
+  selectedEvidenceNavigation.value = null;
   try {
     const payload = await api.agentEvidence(evidenceId);
     selectedEvidence.value = payload.evidence;
+    selectedEvidenceNavigation.value = payload.navigation;
   } catch (err: any) {
     error.value = `${t("ceoOffice.evidenceLoadFailed")}: ${err?.message || err}`;
   }

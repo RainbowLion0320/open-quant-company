@@ -110,6 +110,40 @@ def test_agent_evidence_resolver_reports_missing_and_fresh_evidence(tmp_path, mo
     reset_datahub()
 
 
+def test_agent_evidence_resolver_returns_safe_web_route_navigation(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.evidence import EvidenceResolver
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    local_route = runtime.create_evidence(
+        kind="web_route",
+        label="Lifecycle view",
+        uri="/system?tab=lifecycle",
+        summary="Open lifecycle readiness detail.",
+    )
+    external_route = runtime.create_evidence(
+        kind="web_route",
+        label="External route",
+        uri="https://example.com/not-local",
+        summary="External links must not become CEO Office navigation.",
+    )
+
+    local = EvidenceResolver().resolve(local_route.evidence_id)
+    external = EvidenceResolver().resolve(external_route.evidence_id)
+
+    assert local["status"] == "fresh"
+    assert local["navigation"]["kind"] == "web_route"
+    assert local["navigation"]["href"] == "/system?tab=lifecycle"
+    assert local["navigation"]["label"] == "Lifecycle view"
+    assert external["navigation"] is None
+    reset_datahub()
+
+
 def test_agent_cli_creates_and_lists_sessions(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

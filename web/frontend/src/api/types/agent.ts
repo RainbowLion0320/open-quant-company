@@ -48,6 +48,12 @@ export interface EvidenceRef {
   freshness_status: string;
 }
 
+export interface EvidenceNavigation {
+  kind: string;
+  href: string;
+  label: string;
+}
+
 export interface AgentRun {
   run_id: string;
   action_id: string;
@@ -122,6 +128,7 @@ export interface AgentEvidenceResponse {
   status: string;
   evidence_id: string;
   evidence: EvidenceRef | null;
+  navigation: EvidenceNavigation | null;
 }
 
 export interface AgentRunActionResponse {

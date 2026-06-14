@@ -288,6 +288,8 @@ Evidence resolution must fail explicitly:
 | SDK missing | `not_integrated` or `missing_sdk` |
 | Sample insufficient | `insufficient_samples` |
 
+For `web_route` evidence, the resolver returns a `navigation` object only when `uri` is a safe local route such as `/system?tab=lifecycle`. External URLs and protocol-relative URLs must not become CEO Office navigation links.
+
 ## 8. Memory Contract
 
 Memory is local, inspectable, and limited to operational records:
@@ -403,7 +405,8 @@ As of 2026-06-14:
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; unsafe templated write commands remain blocked until a stricter parameter binding phase lands.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
+- Web-route evidence resolves to safe local navigation metadata, and CEO Office can render an evidence link into the related Web view.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
-- Actual desk reasoning, broad tool execution, memory prune/clear, web-route evidence navigation, streaming updates, and MiniQMT/QMT live adapter are not yet implemented.
+- Actual desk reasoning, broad tool execution, memory prune/clear, evidence snapshot governance, streaming updates, and MiniQMT/QMT live adapter are not yet implemented.
