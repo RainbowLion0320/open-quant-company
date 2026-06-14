@@ -85,6 +85,15 @@ async def reject_agent_action(action_id: str, payload: dict[str, Any] | None = N
     return {"action": action.to_dict()}
 
 
+@router.post("/actions/{action_id}/run")
+async def run_agent_action(action_id: str) -> dict[str, Any]:
+    try:
+        run = AgentRuntime().dispatch_action(action_id)
+    except KeyError:
+        raise DataNotFoundError("agent action", action_id)
+    return {"run": run.to_dict()}
+
+
 @router.get("/evidence/{evidence_id}")
 async def get_agent_evidence(evidence_id: str) -> dict[str, Any]:
     return EvidenceResolver().resolve(evidence_id)

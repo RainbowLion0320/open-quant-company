@@ -79,6 +79,11 @@ export interface AgentSessionDetail {
   runs: AgentRun[];
 }
 
+export interface AgentActionDetail {
+  action: AgentAction;
+  runs: AgentRun[];
+}
+
 export interface AgentSessionsResponse {
   sessions: AgentSession[];
   total: number;
@@ -98,4 +103,8 @@ export interface AgentEvidenceResponse {
   status: string;
   evidence_id: string;
   evidence: EvidenceRef | null;
+}
+
+export interface AgentRunActionResponse {
+  run: AgentRun;
 }

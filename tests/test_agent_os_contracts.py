@@ -1,4 +1,6 @@
 import json
+from subprocess import CompletedProcess
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -169,8 +171,10 @@ def test_agent_runtime_records_run_and_tool_registry_uses_fixed_command_arrays(t
     registry = AgentToolRegistry()
     health_tool = registry.get("astroq.health")
     assert health_tool is not None
-    assert health_tool.command == ["astroq", "health", "--json"]
-    assert registry.command_for("astroq.health") == ["astroq", "health", "--json"]
+    health_command = registry.command_for("astroq.health")
+    assert Path(health_command[0]).name == "astroq"
+    assert health_command[0] != "astroq"
+    assert health_command[1:] == ["health", "--json"]
 
     try:
         registry.command_for("astroq.data.repair", {"table": "x; rm -rf /"})
@@ -200,8 +204,84 @@ def test_agent_runtime_records_run_and_tool_registry_uses_fixed_command_arrays(t
 
     loaded = runtime.get_run(run.run_id)
     assert loaded["tool_name"] == "astroq.health"
-    assert loaded["command"] == ["astroq", "health", "--json"]
+    assert Path(loaded["command"][0]).name == "astroq"
+    assert loaded["command"][1:] == ["health", "--json"]
     assert runtime.get_session(session.session_id)["runs"][0]["run_id"] == run.run_id
+    reset_datahub()
+
+
+def test_agent_dispatch_runs_read_only_tool_and_updates_ledger(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Dispatch read-only")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Run health check",
+        parameters={"tool_id": "astroq.health"},
+        expected_effect="Records health status in the run ledger.",
+    )
+
+    run = runtime.dispatch_action(action.action_id, runner=fake_run)
+
+    assert len(calls) == 1
+    assert Path(calls[0][0]).name == "astroq"
+    assert calls[0][0] != "astroq"
+    assert calls[0][1:] == ["health", "--json"]
+    assert run.status == "succeeded"
+    assert run.return_code == 0
+    assert json.loads(run.stdout_summary)["ok"] is True
+    assert runtime.get_action(action.action_id)["status"] == "succeeded"
+    assert runtime.get_session(session.session_id)["runs"][0]["run_id"] == run.run_id
+    reset_datahub()
+
+
+def test_agent_dispatch_blocks_unapproved_state_changing_action_without_running(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout="should not run", stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Blocked write")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="data",
+        action_type="data_repair",
+        risk_level="write_data",
+        summary="Repair stock_limit_list",
+        parameters={"tool_id": "astroq.data.repair", "table": "stock_limit_list"},
+        expected_effect="Would write repaired data if approved.",
+    )
+
+    run = runtime.dispatch_action(action.action_id, runner=fake_run)
+
+    assert calls == []
+    assert run.status == "blocked"
+    assert "approval" in run.stderr_summary
+    assert runtime.get_action(action.action_id)["status"] == "approval_required"
     reset_datahub()
 
 
@@ -210,6 +290,53 @@ def test_agent_cli_action_show_and_api_run_detail(tmp_path, monkeypatch, capsys)
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
     from data.storage.datahub import reset_datahub
 
+    reset_datahub()
+
+
+def test_agent_cli_and_api_dispatch_action_run(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    def fake_run(command, **kwargs):
+        return CompletedProcess(command, 0, stdout='{"cli": true}', stderr="")
+
+    monkeypatch.setattr("agent_os.runtime.subprocess.run", fake_run)
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Dispatch API")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Run health",
+        parameters={"tool_id": "astroq.health"},
+    )
+
+    code = run_cli(["agent", "run", action.action_id, "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+
+    action2 = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Run health again",
+        parameters={"tool_id": "astroq.health"},
+    )
+    api_res = TestClient(create_app()).post(f"/api/agent/actions/{action2.action_id}/run")
+
+    assert code == 0
+    assert cli_payload["data"]["run"]["status"] == "succeeded"
+    assert api_res.status_code == 200
+    assert api_res.json()["run"]["status"] == "succeeded"
     reset_datahub()
 
     from agent_os.runtime import AgentRuntime
@@ -228,7 +355,7 @@ def test_agent_cli_action_show_and_api_run_detail(tmp_path, monkeypatch, capsys)
     run = runtime.record_run(
         action_id=action.action_id,
         tool_name="astroq.lifecycle.check",
-        command=["astroq", "lifecycle", "check", "--json"],
+        command=[".venv/bin/astroq", "lifecycle", "check", "--json"],
         status="succeeded",
         return_code=0,
         stdout_summary="blocked",

@@ -27,8 +27,8 @@ Agent Company OS must provide:
 
 All endpoints are planned under `/api/agent/*`.
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
+| Method | Endpoint | Purpose | Status |
+| --- | --- | --- | --- |
 | `GET` | `/api/agent/sessions` | List agent sessions. | Implemented |
 | `POST` | `/api/agent/sessions` | Create a new session. | Implemented |
 | `GET` | `/api/agent/sessions/{session_id}` | Read a session with messages and linked actions. | Implemented |
@@ -38,6 +38,7 @@ All endpoints are planned under `/api/agent/*`.
 | `GET` | `/api/agent/actions/{action_id}` | Read an action and approval state. | Implemented |
 | `POST` | `/api/agent/actions/{action_id}/approve` | Approve a pending action. | Implemented |
 | `POST` | `/api/agent/actions/{action_id}/reject` | Reject a pending action with reason. | Implemented |
+| `POST` | `/api/agent/actions/{action_id}/run` | Dispatch a safe or approved fixed-registry action and write a run ledger row. | Implemented for bounded fixed commands |
 | `POST` | `/api/agent/actions/{action_id}/cancel` | Cancel a queued or running action where cancellation is supported. | Planned |
 | `GET` | `/api/agent/runs/{run_id}` | Read a tool or workflow run. | Implemented |
 | `GET` | `/api/agent/evidence/{evidence_id}` | Resolve an evidence reference. | Implemented |
@@ -51,14 +52,15 @@ All endpoints are planned under `/api/agent/*`.
 
 All commands must support `--json`.
 
-| Command | Purpose |
-| --- | --- |
+| Command | Purpose | Status |
+| --- | --- | --- |
 | `astroq agent sessions --json` | List sessions. | Implemented |
 | `astroq agent session create --title TITLE --json` | Create a session. | Implemented |
 | `astroq agent session show SESSION_ID --json` | Show session details. | Implemented |
 | `astroq agent message --session SESSION_ID --desk DESK --text TEXT --json` | Add a message and route it. | Implemented |
 | `astroq agent actions --session SESSION_ID --json` | List session actions. | Implemented |
 | `astroq agent action show ACTION_ID --json` | Show action details. | Implemented |
+| `astroq agent run ACTION_ID --json` | Dispatch a safe or approved action through the fixed tool registry. | Implemented for bounded fixed commands |
 | `astroq agent approve ACTION_ID --json` | Approve an action. | Implemented |
 | `astroq agent reject ACTION_ID --reason REASON --json` | Reject an action. | Implemented |
 | `astroq agent evidence EVIDENCE_ID --json` | Resolve evidence. | Implemented |
@@ -359,9 +361,10 @@ As of 2026-06-14:
 
 - Foundation runtime is partially implemented in `agent_os/`.
 - The local SQLite ledger stores sessions, messages, actions, evidence, and run table schema under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session/message/actions/action show/approve/reject/evidence/desks --json` is available.
-- `/api/agent/sessions`, `/api/agent/actions`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, and `/api/agent/desks` are available.
+- `astroq agent sessions/session/message/actions/action show/run/approve/reject/evidence/desks --json` is available.
+- `/api/agent/sessions`, `/api/agent/actions`, `/api/agent/actions/{action_id}/run`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, and `/api/agent/desks` are available.
+- Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; unsafe templated write commands remain blocked until a stricter parameter binding phase lands.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
-- Actual desk reasoning/tool execution, memory export/prune/clear, run execution dispatch, evidence deep-link UI, streaming updates, and MiniQMT/QMT live adapter are not yet implemented.
+- Actual desk reasoning, broad tool execution, memory export/prune/clear, web-route evidence deep links, streaming updates, and MiniQMT/QMT live adapter are not yet implemented.

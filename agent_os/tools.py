@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -24,39 +25,45 @@ class ToolDescriptor:
         }
 
 
+def _astroq_command(*args: str) -> list[str]:
+    local = Path(".venv/bin/astroq")
+    executable = str(local) if local.exists() else "astroq"
+    return [executable, *args]
+
+
 DEFAULT_TOOLS: dict[str, ToolDescriptor] = {
     "astroq.health": ToolDescriptor(
         tool_id="astroq.health",
         label="Project health",
-        command=["astroq", "health", "--json"],
+        command=_astroq_command("health", "--json"),
         risk_level="read_only",
         desk_scopes=["reporting", "engineering", "risk"],
     ),
     "astroq.lifecycle.check": ToolDescriptor(
         tool_id="astroq.lifecycle.check",
         label="Lifecycle readiness",
-        command=["astroq", "lifecycle", "check", "--json"],
+        command=_astroq_command("lifecycle", "check", "--json"),
         risk_level="read_only",
         desk_scopes=["risk", "reporting", "execution"],
     ),
     "astroq.data.status": ToolDescriptor(
         tool_id="astroq.data.status",
         label="Data status",
-        command=["astroq", "data", "status", "--json"],
+        command=_astroq_command("data", "status", "--json"),
         risk_level="read_only",
         desk_scopes=["data", "reporting"],
     ),
     "astroq.strategy.catalog": ToolDescriptor(
         tool_id="astroq.strategy.catalog",
         label="Strategy catalog",
-        command=["astroq", "strategy", "catalog", "--json"],
+        command=_astroq_command("strategy", "catalog", "--json"),
         risk_level="read_only",
         desk_scopes=["research", "reporting"],
     ),
     "astroq.data.repair": ToolDescriptor(
         tool_id="astroq.data.repair",
         label="Data repair",
-        command=["astroq", "data", "repair", "{table}", "--json"],
+        command=_astroq_command("data", "repair", "{table}", "--json"),
         risk_level="write_data",
         desk_scopes=["data"],
         requires_approved_action=True,

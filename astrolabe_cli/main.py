@@ -13,6 +13,7 @@ from astrolabe_cli.commands.agent import create_session as agent_create_session
 from astrolabe_cli.commands.agent import desks as agent_desks
 from astrolabe_cli.commands.agent import evidence as agent_evidence
 from astrolabe_cli.commands.agent import reject as agent_reject
+from astrolabe_cli.commands.agent import run_action as agent_run_action
 from astrolabe_cli.commands.agent import sessions as agent_sessions
 from astrolabe_cli.commands.agent import show_action as agent_show_action
 from astrolabe_cli.commands.agent import show_session as agent_show_session
@@ -109,6 +110,11 @@ def build_parser() -> argparse.ArgumentParser:
     agent_reject_cmd.add_argument("--reason", default="")
     add_common_flags(agent_reject_cmd)
     agent_reject_cmd.set_defaults(handler=lambda args: agent_reject(args.action_id, args.reason))
+
+    agent_run_cmd = agent_sub.add_parser("run", help="Dispatch an approved or safe agent action")
+    agent_run_cmd.add_argument("action_id")
+    add_common_flags(agent_run_cmd)
+    agent_run_cmd.set_defaults(handler=lambda args: agent_run_action(args.action_id))
 
     agent_evidence_cmd = agent_sub.add_parser("evidence", help="Resolve an agent evidence reference")
     agent_evidence_cmd.add_argument("evidence_id")

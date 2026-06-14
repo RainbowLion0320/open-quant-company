@@ -1,10 +1,12 @@
 import { get, post } from "../client";
 import type {
   AgentAction,
+  AgentActionDetail,
   AgentActionsResponse,
   AgentDesksResponse,
   AgentEvidenceResponse,
   AgentRun,
+  AgentRunActionResponse,
   AgentMessage,
   AgentSession,
   AgentSessionDetail,
@@ -22,10 +24,11 @@ export const agentApi = {
   ) => post<{ message: AgentMessage }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/messages`, payload),
   agentActions: (sessionId = "") =>
     get<AgentActionsResponse>(`/api/agent/actions${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
-  agentAction: (actionId: string) => get<{ action: AgentAction; runs: AgentRun[] }>(`/api/agent/actions/${encodeURIComponent(actionId)}`),
+  agentAction: (actionId: string) => get<AgentActionDetail>(`/api/agent/actions/${encodeURIComponent(actionId)}`),
   agentApproveAction: (actionId: string) => post<{ action: AgentAction }>(`/api/agent/actions/${encodeURIComponent(actionId)}/approve`),
   agentRejectAction: (actionId: string, reason = "") =>
     post<{ action: AgentAction }>(`/api/agent/actions/${encodeURIComponent(actionId)}/reject`, { reason }),
+  agentRunAction: (actionId: string) => post<AgentRunActionResponse>(`/api/agent/actions/${encodeURIComponent(actionId)}/run`),
   agentEvidence: (evidenceId: string) => get<AgentEvidenceResponse>(`/api/agent/evidence/${encodeURIComponent(evidenceId)}`),
   agentDesks: () => get<AgentDesksResponse>("/api/agent/desks"),
 };

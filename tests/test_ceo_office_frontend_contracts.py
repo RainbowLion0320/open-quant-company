@@ -40,10 +40,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentDesks" in view
     assert "api.agentCreateSession" in view
     assert "api.agentAddMessage" in view
+    assert "api.agentAction" in view
+    assert "api.agentRunAction" in view
+    assert "selectedAction" in view
+    assert "selectedEvidence" in view
     assert "ceoOffice" in zh_index
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
     assert "Action Queue" in en_ceo
+    assert "证据详情" in zh_ceo
+    assert "Evidence Detail" in en_ceo
 
 
 def test_frontend_agent_api_module_exports_runtime_types_and_calls():
@@ -59,6 +65,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentActions" in agent_api
     assert "agentApproveAction" in agent_api
     assert "agentRejectAction" in agent_api
+    assert "agentRunAction" in agent_api
     assert "export interface AgentSession" in agent_types
     assert "export interface AgentAction" in agent_types
+    assert "export interface AgentActionDetail" in agent_types
     assert "export interface EvidenceRef" in agent_types

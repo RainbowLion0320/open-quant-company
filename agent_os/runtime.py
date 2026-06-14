@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,6 +11,7 @@ from agent_os.desks import list_desks
 from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file
 from agent_os.ledger import AgentLedger
 from agent_os.schemas import AgentAction, AgentMessage, AgentRun, AgentSession, EvidenceRef
+from agent_os.tools import AgentToolRegistry
 
 
 def _now() -> str:
@@ -18,6 +20,12 @@ def _now() -> str:
 
 def _id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:16]}"
+
+
+def _summary(value: str, *, limit: int = 4000) -> str:
+    if len(value) <= limit:
+        return value
+    return value[:limit] + "\n...[truncated]"
 
 
 class AgentRuntime:
@@ -193,6 +201,105 @@ class AgentRuntime:
         )
         self.ledger.insert_run(run.to_dict())
         return run
+
+    def dispatch_action(
+        self,
+        action_id: str,
+        *,
+        runner: Any | None = None,
+        timeout_seconds: int = 120,
+        tool_registry: AgentToolRegistry | None = None,
+    ) -> AgentRun:
+        """Execute a fixed registry command for a safe or approved action.
+
+        This is intentionally narrow: it dispatches only command arrays from
+        AgentToolRegistry and records every blocked/failed outcome in the run ledger.
+        """
+        action = self.ledger.get_action(action_id)
+        if not action:
+            raise KeyError(f"Agent action not found: {action_id}")
+
+        tool_id = str(action.get("parameters", {}).get("tool_id") or action.get("action_type") or "")
+        tool_name = tool_id or "unbound_tool"
+        if action["approval_required"] and action["status"] != "approved":
+            return self.record_run(
+                action_id=action_id,
+                tool_name=tool_name,
+                command=[],
+                status="blocked",
+                return_code=None,
+                stdout_summary="",
+                stderr_summary=f"approval required before dispatch: {action['status']}",
+            )
+        if action["status"] in {"rejected", "canceled", "expired"}:
+            return self.record_run(
+                action_id=action_id,
+                tool_name=tool_name,
+                command=[],
+                status="blocked",
+                return_code=None,
+                stdout_summary="",
+                stderr_summary=f"action status cannot be dispatched: {action['status']}",
+            )
+
+        registry = tool_registry or AgentToolRegistry()
+        try:
+            command = registry.command_for(tool_id, action.get("parameters", {}))
+        except (KeyError, ValueError) as exc:
+            self.ledger.update_action_status(action_id, "blocked", _now())
+            return self.record_run(
+                action_id=action_id,
+                tool_name=tool_name,
+                command=[],
+                status="blocked",
+                return_code=None,
+                stdout_summary="",
+                stderr_summary=str(exc),
+            )
+
+        self.ledger.update_action_status(action_id, "running", _now())
+        run_callable = runner or subprocess.run
+        try:
+            result = run_callable(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                check=False,
+            )
+            status = "succeeded" if result.returncode == 0 else "failed"
+            self.ledger.update_action_status(action_id, status, _now())
+            return self.record_run(
+                action_id=action_id,
+                tool_name=tool_name,
+                command=command,
+                status=status,
+                return_code=result.returncode,
+                stdout_summary=_summary(result.stdout or ""),
+                stderr_summary=_summary(result.stderr or ""),
+            )
+        except subprocess.TimeoutExpired as exc:
+            self.ledger.update_action_status(action_id, "failed", _now())
+            return self.record_run(
+                action_id=action_id,
+                tool_name=tool_name,
+                command=command,
+                status="failed",
+                return_code=None,
+                stdout_summary=_summary(str(exc.stdout or "")),
+                stderr_summary=f"timeout after {timeout_seconds}s",
+            )
+        except Exception as exc:
+            self.ledger.update_action_status(action_id, "failed", _now())
+            return self.record_run(
+                action_id=action_id,
+                tool_name=tool_name,
+                command=command,
+                status="failed",
+                return_code=None,
+                stdout_summary="",
+                stderr_summary=str(exc),
+            )
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         return self.ledger.get_run(run_id)

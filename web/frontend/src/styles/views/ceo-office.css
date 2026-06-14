@@ -110,6 +110,7 @@
 .message-row,
 .desk-row,
 .action-row,
+.run-row,
 .ceo-empty {
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
@@ -176,6 +177,11 @@
   gap: 8px;
 }
 
+.action-row.selected {
+  border-color: rgba(6, 182, 212, 0.36);
+  background: rgba(6, 182, 212, 0.06);
+}
+
 .action-title strong {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -205,8 +211,85 @@
   color: var(--negative);
 }
 
+.action-status.succeeded {
+  border-color: rgba(34, 197, 94, 0.28);
+  color: var(--positive);
+}
+
+.action-status.failed,
+.action-status.blocked {
+  border-color: rgba(239, 68, 68, 0.28);
+  color: var(--negative);
+}
+
+.action-status.running {
+  border-color: rgba(6, 182, 212, 0.32);
+  color: var(--accent-primary);
+}
+
 .approval-buttons {
   justify-content: flex-start;
+}
+
+.detail-stack,
+.run-list,
+.evidence-ref-list {
+  display: grid;
+  gap: 10px;
+}
+
+.detail-row {
+  display: grid;
+  gap: 6px;
+}
+
+.detail-row span {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.detail-row p,
+.detail-stack p,
+.run-row p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.detail-row pre,
+.detail-row code,
+.run-row code {
+  margin: 0;
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+}
+
+.run-row {
+  display: grid;
+  gap: 6px;
+}
+
+.run-row strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.run-row small {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.ceo-empty.compact {
+  padding: 8px;
 }
 
 .ceo-empty {

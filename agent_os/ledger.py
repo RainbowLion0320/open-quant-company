@@ -161,6 +161,17 @@ class AgentLedger:
                 (status, _json_dumps(decision), updated_at, action_id),
             )
 
+    def update_action_status(self, action_id: str, status: str, updated_at: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE actions
+                SET status = ?, updated_at = ?
+                WHERE action_id = ?
+                """,
+                (status, updated_at, action_id),
+            )
+
     def insert_evidence(self, row: dict[str, Any]) -> None:
         with self._connect() as conn:
             conn.execute(

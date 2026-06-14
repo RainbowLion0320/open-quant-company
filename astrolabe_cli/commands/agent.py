@@ -75,6 +75,21 @@ def show_action(action_id: str) -> CliResult:
     )
 
 
+def run_action(action_id: str) -> CliResult:
+    try:
+        run = AgentRuntime().dispatch_action(action_id)
+    except KeyError as exc:
+        return CliResult(False, "agent run", {"action_id": action_id}, "Agent action missing", [str(exc)])
+    ok = run.status == "succeeded"
+    return CliResult(
+        ok=ok,
+        command="agent run",
+        message=f"Agent run {run.status}",
+        data={"run": run.to_dict()},
+        errors=[] if ok else [run.stderr_summary or run.status],
+    )
+
+
 def approve(action_id: str) -> CliResult:
     try:
         action = AgentRuntime().approve_action(action_id)
