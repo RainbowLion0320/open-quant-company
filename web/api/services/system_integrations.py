@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from core.env_secrets import read_env_secret
+from agent_os.notifications import channel_secret_status
 
 
 def api_health_payload() -> dict:
@@ -45,18 +46,18 @@ def api_health_payload() -> dict:
     except Exception as exc:
         results.append({"name": "LLM", "status": "warn", "detail": f"无法读取 provider 配置: {str(exc)[:60]}"})
 
-    try:
-        from core.settings import load_yaml_config
-        cfg_path = Path(__file__).resolve().parent.parent.parent.parent / "config" / "notify.yaml"
-        cfg = load_yaml_config(cfg_path, default={})
-        if cfg.get("TELEGRAM_BOT_TOKEN") and cfg.get("TELEGRAM_CHAT_ID"):
-            results.append({"name": "Telegram", "status": "ok", "detail": f"已配置 (chat_id={cfg['TELEGRAM_CHAT_ID']})"})
-        elif cfg.get("TELEGRAM_BOT_TOKEN") or cfg.get("TELEGRAM_CHAT_ID"):
-            results.append({"name": "Telegram", "status": "warn", "detail": "配置不完整"})
+    for channel in ("telegram", "wechat", "feishu"):
+        status = channel_secret_status(channel)
+        if status["configured"]:
+            results.append({"name": f"Notify:{channel}", "status": "ok", "detail": "系统环境变量已配置"})
         else:
-            results.append({"name": "Telegram", "status": "disabled", "detail": "未配置"})
-    except Exception:
-        results.append({"name": "Telegram", "status": "unknown", "detail": "无法读取配置"})
+            results.append(
+                {
+                    "name": f"Notify:{channel}",
+                    "status": "disabled",
+                    "detail": f"缺少 {', '.join(status['missing_env'])}",
+                }
+            )
 
     ok = sum(1 for r in results if r["status"] == "ok")
     warn = sum(1 for r in results if r["status"] == "warn")

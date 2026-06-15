@@ -253,7 +253,8 @@ Current foundation:
 - CEO Office exposes a report-template selector and can generate the selected report from the main control page.
 - `astroq agent rhythm --session ... --json`, `POST /api/agent/reports/rhythm`, and CEO Office can explicitly run due report templates and write a rhythm audit artifact.
 - `astroq agent rhythm --all-active --json` and `POST /api/agent/reports/rhythm/scheduled` scan active sessions, run due report templates, and write scheduled audit artifacts under `var/artifacts/agent/reports/scheduled/`; this is the local cron-callable scheduled cadence.
-- Notification triggers and deeper cross-artifact report aggregation remain future work.
+- `astroq agent notify report ... --json`, `POST /api/agent/reports/{report_id}/notify`, and CEO Office report cards can send or dry-run env-only Telegram/WeChat/Feishu report notifications, with audit artifacts under `var/artifacts/agent/reports/notifications/`.
+- Deeper cross-artifact report aggregation remains future work.
 
 ## 8. Design Decisions Locked by This Roadmap
 

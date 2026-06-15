@@ -165,16 +165,46 @@ async def run_agent_report_rhythm(payload: dict[str, Any]) -> dict[str, Any]:
         rhythm = AgentRuntime().run_report_rhythm(
             session_id=session_id,
             force=bool(payload.get("force") or False),
+            notify=bool(payload.get("notify") or False),
+            notification_channels=[str(channel) for channel in payload.get("notification_channels", [])],
+            dry_run_notifications=bool(payload.get("dry_run_notifications") or False),
         )
     except KeyError:
         raise DataNotFoundError("agent session", session_id)
+    except ValueError as exc:
+        raise InvalidParameterError("agent_report_rhythm", session_id, str(exc))
     return {"rhythm": rhythm}
 
 
 @router.post("/reports/rhythm/scheduled")
 async def run_agent_scheduled_report_rhythm(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-    schedule = AgentRuntime().run_scheduled_report_rhythm(force=bool((payload or {}).get("force") or False))
+    body = payload or {}
+    try:
+        schedule = AgentRuntime().run_scheduled_report_rhythm(
+            force=bool(body.get("force") or False),
+            notify=bool(body.get("notify") or False),
+            notification_channels=[str(channel) for channel in body.get("notification_channels", [])],
+            dry_run_notifications=bool(body.get("dry_run_notifications") or False),
+        )
+    except ValueError as exc:
+        raise InvalidParameterError("agent_scheduled_report_rhythm", "notification_channels", str(exc))
     return {"schedule": schedule}
+
+
+@router.post("/reports/{report_id}/notify")
+async def notify_agent_report(report_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    body = payload or {}
+    try:
+        notification = AgentRuntime().notify_report(
+            report_id,
+            channels=[str(channel) for channel in body.get("channels", [])],
+            dry_run=bool(body.get("dry_run") or False),
+        )
+    except KeyError:
+        raise DataNotFoundError("agent report", report_id)
+    except ValueError as exc:
+        raise InvalidParameterError("agent_report_notification", report_id, str(exc))
+    return {"notification": notification}
 
 
 @router.get("/handoffs")

@@ -14,6 +14,7 @@ from agent_os.approval import approval_required_for_risk
 from agent_os.desks import get_desk, list_desks
 from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file
 from agent_os.ledger import AgentLedger
+from agent_os.notifications import NotificationSender, build_report_notification_message, channel_secret_status, send_notification, supported_channels
 from agent_os.reports import build_report_payload, normalize_report_kind, read_report_index, render_report_markdown, report_rhythm_templates, write_report_index
 from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentReport, AgentRun, AgentSession, DeskResponse, EvidenceRef
 from agent_os.tools import AgentToolRegistry
@@ -893,14 +894,140 @@ class AgentRuntime:
             "due_count": sum(1 for item in items if item["due"]),
         }
 
-    def run_report_rhythm(self, *, session_id: str, force: bool = False, as_of: str | None = None) -> dict[str, Any]:
+    def notify_report(
+        self,
+        report_id: str,
+        *,
+        channels: list[str] | None = None,
+        dry_run: bool = False,
+        sender: NotificationSender | None = None,
+    ) -> dict[str, Any]:
+        report = self._find_report(report_id)
+        if report is None:
+            raise KeyError(f"Agent report not found: {report_id}")
+        requested_channels = [str(channel).strip().lower() for channel in (channels or supported_channels()) if str(channel).strip()]
+        if not requested_channels:
+            requested_channels = supported_channels()
+        message = build_report_notification_message(report)
+        send_callable = sender or send_notification
+        channel_results: list[dict[str, Any]] = []
+        sent_count = 0
+        failed_count = 0
+        blocked_count = 0
+        for channel in requested_channels:
+            try:
+                secret_status = channel_secret_status(channel)
+            except ValueError as exc:
+                failed_count += 1
+                channel_results.append(
+                    {
+                        "channel": channel,
+                        "status": "failed",
+                        "configured": False,
+                        "required_env": [],
+                        "missing_env": [],
+                        "error": str(exc),
+                    }
+                )
+                continue
+            base = {
+                "channel": secret_status["channel"],
+                "configured": bool(secret_status["configured"]),
+                "required_env": list(secret_status["required_env"]),
+                "missing_env": list(secret_status["missing_env"]),
+            }
+            if dry_run:
+                channel_results.append({**base, "status": "dry_run", "error": "", "status_code": None})
+                continue
+            if not secret_status["configured"]:
+                blocked_count += 1
+                channel_results.append({**base, "status": "missing_secret", "error": "missing notification environment variable", "status_code": None})
+                continue
+            result = send_callable(str(secret_status["channel"]), message)
+            if bool(result.get("ok")):
+                sent_count += 1
+                channel_results.append(
+                    {
+                        **base,
+                        "status": "sent",
+                        "error": "",
+                        "status_code": result.get("status_code"),
+                        "provider_message_id": str(result.get("provider_message_id") or ""),
+                    }
+                )
+            else:
+                failed_count += 1
+                channel_results.append(
+                    {
+                        **base,
+                        "status": str(result.get("status") or "failed"),
+                        "error": str(result.get("error") or ""),
+                        "status_code": result.get("status_code"),
+                    }
+                )
+        if dry_run:
+            status = "dry_run"
+        elif sent_count == len(channel_results) and channel_results:
+            status = "sent"
+        elif sent_count > 0:
+            status = "partial"
+        else:
+            status = "blocked"
+        payload = {
+            "status": status,
+            "notification_id": _id("notif"),
+            "report_id": str(report["report_id"]),
+            "session_id": str(report["session_id"]),
+            "report_kind": str(report["kind"]),
+            "report_title": str(report["title"]),
+            "report_path": str(report["path"]),
+            "report_evidence_id": str(report.get("evidence_id") or ""),
+            "dry_run": dry_run,
+            "checked_at": _now(),
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "blocked_count": blocked_count,
+            "channels": channel_results,
+            "message_preview": {
+                "title": message["title"],
+                "body": _summary(message["body"], limit=1000),
+            },
+        }
+        path = self._write_report_notification_artifact(payload)
+        evidence = self.create_evidence(
+            kind="ledger",
+            label="Agent report notification",
+            uri=str(path),
+            summary=f"Report notification {payload['status']} for {payload['report_id']}.",
+        )
+        return {**payload, "path": str(path), "evidence": evidence.to_dict()}
+
+    def run_report_rhythm(
+        self,
+        *,
+        session_id: str,
+        force: bool = False,
+        as_of: str | None = None,
+        notify: bool = False,
+        notification_channels: list[str] | None = None,
+        dry_run_notifications: bool = False,
+    ) -> dict[str, Any]:
         plan = self.plan_report_rhythm(session_id=session_id, force=force, as_of=as_of)
         generated: list[dict[str, Any]] = []
         items: list[dict[str, Any]] = []
+        notifications: list[dict[str, Any]] = []
         for item in plan["items"]:
             if item["due"]:
                 report = self.generate_report(session_id=session_id, kind=str(item["kind"]))
                 generated.append(report)
+                notification = None
+                if notify:
+                    notification = self.notify_report(
+                        str(report["report_id"]),
+                        channels=notification_channels,
+                        dry_run=dry_run_notifications,
+                    )
+                    notifications.append(notification)
                 items.append(
                     {
                         **item,
@@ -908,6 +1035,8 @@ class AgentRuntime:
                         "report_id": report["report_id"],
                         "evidence_id": report["evidence_id"],
                         "generated_at": report["generated_at"],
+                        "notification_id": str(notification.get("notification_id") or "") if notification else "",
+                        "notification_status": str(notification.get("status") or "") if notification else "",
                     }
                 )
             else:
@@ -920,8 +1049,11 @@ class AgentRuntime:
             "force": force,
             "generated_count": len(generated),
             "skipped_count": sum(1 for item in items if item["status"] == "skipped"),
+            "notification_count": len(notifications),
+            "notification_failed_count": sum(1 for item in notifications if item.get("status") not in {"sent", "dry_run"}),
             "items": items,
             "reports": generated,
+            "notifications": notifications,
         }
         path = self._write_report_rhythm_artifact(payload)
         evidence = self.create_evidence(
@@ -938,22 +1070,36 @@ class AgentRuntime:
         force: bool = False,
         as_of: str | None = None,
         session_status: str = "active",
+        notify: bool = False,
+        notification_channels: list[str] | None = None,
+        dry_run_notifications: bool = False,
     ) -> dict[str, Any]:
         checked_at = as_of or _now()
         session_ids = self.ledger.list_session_ids_by_status(session_status)
         sessions: list[dict[str, Any]] = []
         generated_count = 0
         skipped_count = 0
+        notification_count = 0
+        notification_failed_count = 0
         failed_count = 0
         for session_id in session_ids:
             try:
-                rhythm = self.run_report_rhythm(session_id=session_id, force=force, as_of=checked_at)
+                rhythm = self.run_report_rhythm(
+                    session_id=session_id,
+                    force=force,
+                    as_of=checked_at,
+                    notify=notify,
+                    notification_channels=notification_channels,
+                    dry_run_notifications=dry_run_notifications,
+                )
                 sessions.append(
                     {
                         "session_id": session_id,
                         "status": "ready",
                         "generated_count": rhythm["generated_count"],
                         "skipped_count": rhythm["skipped_count"],
+                        "notification_count": rhythm["notification_count"],
+                        "notification_failed_count": rhythm["notification_failed_count"],
                         "rhythm_run_id": rhythm["run_id"],
                         "path": rhythm["path"],
                         "evidence_id": rhythm["evidence"]["evidence_id"],
@@ -961,6 +1107,8 @@ class AgentRuntime:
                 )
                 generated_count += int(rhythm["generated_count"])
                 skipped_count += int(rhythm["skipped_count"])
+                notification_count += int(rhythm["notification_count"])
+                notification_failed_count += int(rhythm["notification_failed_count"])
             except Exception as exc:
                 failed_count += 1
                 sessions.append(
@@ -969,6 +1117,8 @@ class AgentRuntime:
                         "status": "failed",
                         "generated_count": 0,
                         "skipped_count": 0,
+                        "notification_count": 0,
+                        "notification_failed_count": 0,
                         "rhythm_run_id": "",
                         "path": "",
                         "evidence_id": "",
@@ -984,6 +1134,8 @@ class AgentRuntime:
             "session_count": len(session_ids),
             "generated_count": generated_count,
             "skipped_count": skipped_count,
+            "notification_count": notification_count,
+            "notification_failed_count": notification_failed_count,
             "failed_count": failed_count,
             "sessions": sessions,
         }
@@ -1019,6 +1171,14 @@ class AgentRuntime:
         root.mkdir(parents=True, exist_ok=True)
         checked_at = str(payload["checked_at"]).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
         path = root / f"{checked_at}-{payload['schedule_id']}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return path
+
+    def _write_report_notification_artifact(self, payload: dict[str, Any]) -> Path:
+        root = get_datahub().artifact_dir("agent") / "reports" / "notifications"
+        root.mkdir(parents=True, exist_ok=True)
+        checked_at = str(payload["checked_at"]).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
+        path = root / f"{checked_at}-{payload['notification_id']}.json"
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
         return path
 
@@ -1324,6 +1484,17 @@ class AgentRuntime:
         for action in self.ledger.list_actions(session_id):
             runs.extend(self.ledger.list_runs(str(action["action_id"])))
         return runs
+
+    @staticmethod
+    def _find_report(report_id: str) -> dict[str, Any] | None:
+        target = str(report_id or "").strip()
+        if not target:
+            return None
+        index_path = get_datahub().artifact_dir("agent") / "reports" / "index.json"
+        for report in read_report_index(index_path):
+            if str(report.get("report_id") or "") == target:
+                return report
+        return None
 
     @staticmethod
     def _latest_report_for_kind(reports: list[dict[str, Any]], kind: str) -> dict[str, Any] | None:

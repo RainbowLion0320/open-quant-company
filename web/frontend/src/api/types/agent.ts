@@ -182,6 +182,41 @@ export interface AgentReportResponse {
   report: AgentReport;
 }
 
+export interface AgentReportNotificationChannel {
+  channel: string;
+  status: string;
+  configured: boolean;
+  required_env: string[];
+  missing_env: string[];
+  error: string;
+  status_code: number | null;
+  provider_message_id?: string;
+}
+
+export interface AgentReportNotification {
+  status: string;
+  notification_id: string;
+  report_id: string;
+  session_id: string;
+  report_kind: string;
+  report_title: string;
+  report_path: string;
+  report_evidence_id: string;
+  dry_run: boolean;
+  checked_at: string;
+  sent_count: number;
+  failed_count: number;
+  blocked_count: number;
+  channels: AgentReportNotificationChannel[];
+  message_preview: Record<string, unknown>;
+  path: string;
+  evidence: EvidenceRef;
+}
+
+export interface AgentReportNotificationResponse {
+  notification: AgentReportNotification;
+}
+
 export interface AgentReportRhythmItem {
   kind: string;
   title: string;
@@ -204,8 +239,11 @@ export interface AgentReportRhythm {
   force: boolean;
   generated_count: number;
   skipped_count: number;
+  notification_count: number;
+  notification_failed_count: number;
   items: AgentReportRhythmItem[];
   reports: AgentReport[];
+  notifications: AgentReportNotification[];
   path: string;
   evidence: EvidenceRef;
 }
@@ -219,6 +257,8 @@ export interface AgentScheduledReportRhythmSession {
   status: string;
   generated_count: number;
   skipped_count: number;
+  notification_count: number;
+  notification_failed_count: number;
   rhythm_run_id: string;
   path: string;
   evidence_id: string;
@@ -234,6 +274,8 @@ export interface AgentScheduledReportRhythm {
   session_count: number;
   generated_count: number;
   skipped_count: number;
+  notification_count: number;
+  notification_failed_count: number;
   failed_count: number;
   sessions: AgentScheduledReportRhythmSession[];
   path: string;

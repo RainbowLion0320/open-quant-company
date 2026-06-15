@@ -10,6 +10,7 @@ import type {
   AgentHandoffsResponse,
   AgentLiveReadinessResponse,
   AgentPaperCancelResponse,
+  AgentReportNotificationResponse,
   AgentPaperSubmitResponse,
   AgentReportRhythmResponse,
   AgentReportResponse,
@@ -54,6 +55,8 @@ export const agentApi = {
   agentReports: (sessionId = "") =>
     get<AgentReportsResponse>(`/api/agent/reports${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
   agentGenerateReport: (payload: { kind: string; session_id: string }) => post<AgentReportResponse>("/api/agent/reports", payload),
+  agentNotifyReport: (reportId: string, payload: { channels?: string[]; dry_run?: boolean } = {}) =>
+    post<AgentReportNotificationResponse>(`/api/agent/reports/${encodeURIComponent(reportId)}/notify`, payload),
   agentRunReportRhythm: (payload: { session_id: string; force?: boolean }) =>
     post<AgentReportRhythmResponse>("/api/agent/reports/rhythm", payload),
   agentRunScheduledReportRhythm: (payload: { force?: boolean } = {}) =>

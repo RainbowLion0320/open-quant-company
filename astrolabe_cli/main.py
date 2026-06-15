@@ -22,6 +22,7 @@ from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
 from astrolabe_cli.commands.agent import memory_export as agent_memory_export
 from astrolabe_cli.commands.agent import memory_prune as agent_memory_prune
 from astrolabe_cli.commands.agent import memory_summary as agent_memory_summary
+from astrolabe_cli.commands.agent import notify_report as agent_notify_report
 from astrolabe_cli.commands.agent import paper_cancel as agent_paper_cancel
 from astrolabe_cli.commands.agent import paper_propose as agent_paper_propose
 from astrolabe_cli.commands.agent import paper_submit as agent_paper_submit
@@ -168,13 +169,38 @@ def build_parser() -> argparse.ArgumentParser:
     agent_rhythm_target.add_argument("--session")
     agent_rhythm_target.add_argument("--all-active", action="store_true")
     agent_rhythm_cmd.add_argument("--force", action="store_true")
+    agent_rhythm_cmd.add_argument("--notify", action="store_true", help="Notify generated reports after writing artifacts")
+    agent_rhythm_cmd.add_argument("--notification-channel", action="append", dest="notification_channels", default=None)
+    agent_rhythm_cmd.add_argument("--dry-run-notify", action="store_true", help="Record notification plan without sending provider requests")
     add_common_flags(agent_rhythm_cmd)
     agent_rhythm_cmd.set_defaults(
         handler=lambda args: (
-            agent_run_scheduled_report_rhythm(force=args.force)
+            agent_run_scheduled_report_rhythm(
+                force=args.force,
+                notify=args.notify,
+                notification_channels=args.notification_channels,
+                dry_run_notifications=args.dry_run_notify,
+            )
             if args.all_active
-            else agent_run_report_rhythm(args.session, force=args.force)
+            else agent_run_report_rhythm(
+                args.session,
+                force=args.force,
+                notify=args.notify,
+                notification_channels=args.notification_channels,
+                dry_run_notifications=args.dry_run_notify,
+            )
         )
+    )
+
+    agent_notify_cmd = agent_sub.add_parser("notify", help="Send or dry-run Agent Company OS notifications")
+    agent_notify_sub = agent_notify_cmd.add_subparsers(dest="agent_notify_command", required=True)
+    agent_notify_report_cmd = agent_notify_sub.add_parser("report", help="Notify a generated report")
+    agent_notify_report_cmd.add_argument("report_id")
+    agent_notify_report_cmd.add_argument("--channel", action="append", dest="channels", default=None)
+    agent_notify_report_cmd.add_argument("--dry-run", action="store_true")
+    add_common_flags(agent_notify_report_cmd)
+    agent_notify_report_cmd.set_defaults(
+        handler=lambda args: agent_notify_report(args.report_id, channels=args.channels, dry_run=args.dry_run)
     )
 
     agent_handoffs_cmd = agent_sub.add_parser("handoffs", help="List cross-desk handoffs")

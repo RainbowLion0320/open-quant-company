@@ -128,9 +128,22 @@ def generate_report(kind: str, session_id: str) -> CliResult:
     )
 
 
-def run_report_rhythm(session_id: str, *, force: bool = False) -> CliResult:
+def run_report_rhythm(
+    session_id: str,
+    *,
+    force: bool = False,
+    notify: bool = False,
+    notification_channels: list[str] | None = None,
+    dry_run_notifications: bool = False,
+) -> CliResult:
     try:
-        rhythm = AgentRuntime().run_report_rhythm(session_id=session_id, force=force)
+        rhythm = AgentRuntime().run_report_rhythm(
+            session_id=session_id,
+            force=force,
+            notify=notify,
+            notification_channels=notification_channels,
+            dry_run_notifications=dry_run_notifications,
+        )
     except KeyError as exc:
         return CliResult(False, "agent rhythm", {"session_id": session_id}, "Agent session missing", [str(exc)])
     return CliResult(
@@ -141,8 +154,19 @@ def run_report_rhythm(session_id: str, *, force: bool = False) -> CliResult:
     )
 
 
-def run_scheduled_report_rhythm(*, force: bool = False) -> CliResult:
-    schedule = AgentRuntime().run_scheduled_report_rhythm(force=force)
+def run_scheduled_report_rhythm(
+    *,
+    force: bool = False,
+    notify: bool = False,
+    notification_channels: list[str] | None = None,
+    dry_run_notifications: bool = False,
+) -> CliResult:
+    schedule = AgentRuntime().run_scheduled_report_rhythm(
+        force=force,
+        notify=notify,
+        notification_channels=notification_channels,
+        dry_run_notifications=dry_run_notifications,
+    )
     return CliResult(
         ok=schedule["status"] == "ready",
         command="agent rhythm",
@@ -152,6 +176,23 @@ def run_scheduled_report_rhythm(*, force: bool = False) -> CliResult:
         ),
         data={"schedule": schedule},
         errors=[] if schedule["status"] == "ready" else [f"failed_sessions:{schedule['failed_count']}"],
+    )
+
+
+def notify_report(report_id: str, *, channels: list[str] | None = None, dry_run: bool = False) -> CliResult:
+    try:
+        notification = AgentRuntime().notify_report(report_id, channels=channels, dry_run=dry_run)
+    except KeyError as exc:
+        return CliResult(False, "agent notify report", {"report_id": report_id}, "Agent report missing", [str(exc)])
+    except ValueError as exc:
+        return CliResult(False, "agent notify report", {"report_id": report_id}, "Agent notification invalid", [str(exc)])
+    ok = notification["status"] in {"sent", "dry_run", "partial"}
+    return CliResult(
+        ok=ok,
+        command="agent notify report",
+        message=f"Report notification {notification['status']}",
+        data={"notification": notification},
+        errors=[] if ok else [f"notification_status:{notification['status']}"],
     )
 
 

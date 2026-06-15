@@ -193,9 +193,20 @@
             <strong>
               {{ t("ceoOffice.sessionCount") }} {{ scheduledRhythmResult.session_count }} ·
               {{ t("ceoOffice.generated") }} {{ scheduledRhythmResult.generated_count }} ·
-              {{ t("ceoOffice.skipped") }} {{ scheduledRhythmResult.skipped_count }}
+              {{ t("ceoOffice.skipped") }} {{ scheduledRhythmResult.skipped_count }} ·
+              {{ t("ceoOffice.sent") }} {{ scheduledRhythmResult.notification_count }}
             </strong>
             <small>{{ scheduledRhythmResult.checked_at }} · {{ t("ceoOffice.failed") }} {{ scheduledRhythmResult.failed_count }}</small>
+          </div>
+          <div v-if="notificationResult" class="rhythm-status">
+            <span>{{ t("ceoOffice.notificationStatus") }}</span>
+            <strong>
+              {{ statusLabel(notificationResult.status) }} ·
+              {{ t("ceoOffice.sent") }} {{ notificationResult.sent_count }} ·
+              {{ t("ceoOffice.blocked") }} {{ notificationResult.blocked_count }} ·
+              {{ t("ceoOffice.failed") }} {{ notificationResult.failed_count }}
+            </strong>
+            <small>{{ notificationResult.checked_at }}</small>
           </div>
           <div v-if="!reports.length" class="ceo-empty">{{ t("ceoOffice.noReports") }}</div>
           <div v-else class="report-list">
@@ -209,6 +220,14 @@
               <div class="approval-buttons">
                 <button class="btn btn-xs" type="button" @click="loadEvidence(report.evidence_id)">
                   {{ t("ceoOffice.openEvidence") }}
+                </button>
+                <button
+                  class="btn btn-xs btn-ghost"
+                  type="button"
+                  :disabled="notifyingReport === report.report_id"
+                  @click="notifyReport(report.report_id)"
+                >
+                  {{ t("ceoOffice.notifyReport") }}
                 </button>
               </div>
             </div>
@@ -447,7 +466,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveReadiness, type AgentMessage, type AgentReport, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveReadiness, type AgentMessage, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -460,6 +479,7 @@ const handoffs = ref<AgentHandoff[]>([]);
 const reports = ref<AgentReport[]>([]);
 const rhythmResult = ref<AgentReportRhythm | null>(null);
 const scheduledRhythmResult = ref<AgentScheduledReportRhythm | null>(null);
+const notificationResult = ref<AgentReportNotification | null>(null);
 const liveReadiness = ref<AgentLiveReadiness | null>(null);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
@@ -475,6 +495,7 @@ const resolvingHandoff = ref("");
 const generatingReport = ref(false);
 const runningRhythm = ref(false);
 const runningScheduledRhythm = ref(false);
+const notifyingReport = ref("");
 const selectedReportKind = ref("daily_brief");
 const draft = ref("");
 const sending = ref(false);
@@ -547,6 +568,10 @@ function statusLabel(status: string) {
   if (status === "active") return t("ceoOffice.active");
   if (status === "open") return t("ceoOffice.open");
   if (status === "resolved") return t("ceoOffice.resolved");
+  if (status === "sent") return t("ceoOffice.sent");
+  if (status === "dry_run") return t("ceoOffice.dryRun");
+  if (status === "partial") return t("ceoOffice.partial");
+  if (status === "missing_secret") return t("ceoOffice.missingSecret");
   return status;
 }
 
@@ -799,6 +824,20 @@ async function runScheduledReportRhythm() {
     error.value = `${t("ceoOffice.rhythmFailed")}: ${err?.message || err}`;
   } finally {
     runningScheduledRhythm.value = false;
+  }
+}
+
+async function notifyReport(reportId: string) {
+  notifyingReport.value = reportId;
+  error.value = "";
+  try {
+    const payload = await api.agentNotifyReport(reportId);
+    notificationResult.value = payload.notification;
+    await loadEvidence(payload.notification.evidence.evidence_id);
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.notificationFailed")}: ${err?.message || err}`;
+  } finally {
+    notifyingReport.value = "";
   }
 }
 

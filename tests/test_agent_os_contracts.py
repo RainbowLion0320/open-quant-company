@@ -1041,6 +1041,98 @@ def test_agent_reports_generate_artifacts_and_cite_evidence(tmp_path, monkeypatc
     reset_datahub()
 
 
+def test_agent_report_notification_env_only_writes_audit_artifact(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "secret-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "secret-chat")
+    monkeypatch.delenv("FEISHU_WEBHOOK_URL", raising=False)
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    sent: list[tuple[str, dict]] = []
+
+    def fake_sender(channel: str, payload: dict) -> dict:
+        sent.append((channel, payload))
+        return {"ok": True, "status_code": 200, "provider_message_id": "fake-message"}
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Notify CEO", default_desk="reporting")
+    runtime.add_message(session.session_id, role="desk_agent", desk="reporting", content="需要 CEO 注意。")
+    report = runtime.generate_report(session_id=session.session_id, kind="daily_brief")
+
+    notification = runtime.notify_report(report["report_id"], channels=["telegram"], sender=fake_sender)
+    blocked = runtime.notify_report(report["report_id"], channels=["feishu"], sender=fake_sender)
+
+    assert notification["status"] == "sent"
+    assert notification["report_id"] == report["report_id"]
+    assert notification["sent_count"] == 1
+    assert notification["failed_count"] == 0
+    assert notification["channels"][0]["channel"] == "telegram"
+    assert notification["channels"][0]["status"] == "sent"
+    assert notification["channels"][0]["missing_env"] == []
+    assert sent == [("telegram", sent[0][1])]
+    assert sent[0][1]["title"] == "Daily CEO Brief"
+    assert report["summary"] in sent[0][1]["body"]
+    assert notification["evidence"]["label"] == "Agent report notification"
+    assert Path(notification["path"]).exists()
+    audit_text = Path(notification["path"]).read_text(encoding="utf-8")
+    assert "secret-token" not in audit_text
+    assert "secret-chat" not in audit_text
+    assert "TELEGRAM_BOT_TOKEN" in audit_text
+    assert blocked["status"] == "blocked"
+    assert blocked["channels"][0]["status"] == "missing_secret"
+    assert blocked["channels"][0]["missing_env"] == ["FEISHU_WEBHOOK_URL"]
+    assert len(sent) == 1
+    reset_datahub()
+
+
+def test_agent_report_notification_cli_and_api_dry_run(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Notify CLI/API", default_desk="reporting")
+    report = runtime.generate_report(session_id=session.session_id, kind="daily_brief")
+
+    cli_code = run_cli(
+        [
+            "agent",
+            "notify",
+            "report",
+            report["report_id"],
+            "--channel",
+            "telegram",
+            "--dry-run",
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(
+        f"/api/agent/reports/{report['report_id']}/notify",
+        json={"channels": ["wechat"], "dry_run": True},
+    )
+
+    assert cli_code == 0
+    assert cli_payload["data"]["notification"]["status"] == "dry_run"
+    assert cli_payload["data"]["notification"]["channels"][0]["status"] == "dry_run"
+    assert Path(cli_payload["data"]["notification"]["path"]).exists()
+    assert api_res.status_code == 200
+    assert api_res.json()["notification"]["status"] == "dry_run"
+    assert api_res.json()["notification"]["channels"][0]["channel"] == "wechat"
+    assert Path(api_res.json()["notification"]["path"]).exists()
+    reset_datahub()
+
+
 def test_agent_report_cli_and_api(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
