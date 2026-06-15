@@ -24,6 +24,7 @@ import type {
   AgentSession,
   AgentSessionDetail,
   AgentSessionsResponse,
+  AgentWorkOrdersResponse,
 } from "../types";
 
 export const agentApi = {
@@ -47,6 +48,10 @@ export const agentApi = {
     get<AgentHandoffsResponse>(`/api/agent/handoffs${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
   agentResolveHandoff: (handoffId: string) =>
     post<{ handoff: AgentHandoff }>(`/api/agent/handoffs/${encodeURIComponent(handoffId)}/resolve`),
+  agentWorkOrders: (sessionId = "") =>
+    get<AgentWorkOrdersResponse>(
+      sessionId ? `/api/agent/work-orders?session_id=${encodeURIComponent(sessionId)}` : "/api/agent/work-orders",
+    ),
   agentAction: (actionId: string) => get<AgentActionDetail>(`/api/agent/actions/${encodeURIComponent(actionId)}`),
   agentApproveAction: (actionId: string) => post<{ action: AgentAction }>(`/api/agent/actions/${encodeURIComponent(actionId)}/approve`),
   agentRejectAction: (actionId: string, reason = "") =>

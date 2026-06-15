@@ -98,6 +98,7 @@ def build_report_payload(
     runs: list[dict[str, Any]],
     handoffs: list[dict[str, Any]],
     evidence: list[dict[str, Any]],
+    work_orders: list[dict[str, Any]] | None = None,
     kind: str,
     path: Path,
     markdown_path: Path,
@@ -106,21 +107,25 @@ def build_report_payload(
 ) -> dict[str, Any]:
     normalized_kind = normalize_report_kind(kind)
     artifact_context = artifact_context or empty_report_artifact_context()
+    work_order_rows = list(work_orders or [])
     evidence_by_id = {str(row.get("evidence_id")): row for row in evidence}
     evidence_refs = _ordered_unique(
         [
             *[ref for row in messages for ref in row.get("evidence_refs", [])],
             *[ref for row in actions for ref in row.get("evidence_refs", [])],
             *[ref for row in handoffs for ref in row.get("evidence_refs", [])],
+            *[ref for row in work_order_rows for ref in row.get("evidence_refs", [])],
             *[ref for row in runs for ref in row.get("artifact_refs", [])],
         ]
     )
     missing_evidence = [ref for ref in evidence_refs if ref not in evidence_by_id]
     recent_messages = messages[-5:]
     open_handoffs = [row for row in handoffs if row.get("status") == "open"]
+    open_work_orders = [row for row in work_order_rows if row.get("status") == "open"]
     active_actions = [row for row in actions if row.get("status") in {"proposed", "approval_required", "approved", "running"}]
     summary = (
         f"{len(recent_messages)} recent message(s), {len(active_actions)} active action(s), "
+        f"{len(open_work_orders)} open work order(s), "
         f"{len(open_handoffs)} open handoff(s), {len(evidence_refs)} evidence reference(s)."
     )
     sections = [
@@ -139,11 +144,12 @@ def build_report_payload(
         {
             "section_id": "open_work",
             "title": "Open Work",
-            "body": _open_work_body(active_actions, open_handoffs),
+            "body": _open_work_body(active_actions, open_handoffs, open_work_orders),
             "evidence_refs": _ordered_unique(
                 [
                     *[ref for row in active_actions for ref in row.get("evidence_refs", [])],
                     *[ref for row in open_handoffs for ref in row.get("evidence_refs", [])],
+                    *[ref for row in open_work_orders for ref in row.get("evidence_refs", [])],
                 ]
             ),
         },
@@ -167,6 +173,7 @@ def build_report_payload(
             actions=actions,
             runs=runs,
             handoffs=handoffs,
+            work_orders=work_order_rows,
             evidence=evidence,
             evidence_refs=evidence_refs,
         )
@@ -417,7 +424,11 @@ def _message_line(row: dict[str, Any]) -> str:
     return f"- {row.get('desk')} / {row.get('role')}: {content}"
 
 
-def _open_work_body(actions: list[dict[str, Any]], handoffs: list[dict[str, Any]]) -> str:
+def _open_work_body(
+    actions: list[dict[str, Any]],
+    handoffs: list[dict[str, Any]],
+    work_orders: list[dict[str, Any]],
+) -> str:
     lines: list[str] = []
     for action in actions:
         lines.append(f"- Action {action.get('action_id')}: {action.get('status')} - {action.get('summary')}")
@@ -425,7 +436,9 @@ def _open_work_body(actions: list[dict[str, Any]], handoffs: list[dict[str, Any]
         lines.append(
             f"- Handoff {handoff.get('handoff_id')}: {handoff.get('source_desk')} -> {handoff.get('target_desk')} - {handoff.get('reason')}"
         )
-    return "\n".join(lines) if lines else "No open actions or handoffs."
+    for work_order in work_orders:
+        lines.append(f"- Work Order {work_order.get('work_order_id')}: {work_order.get('status')} - {work_order.get('title')}")
+    return "\n".join(lines) if lines else "No open actions, handoffs, or work orders."
 
 
 def _operating_rhythm_sections(
@@ -435,6 +448,7 @@ def _operating_rhythm_sections(
     actions: list[dict[str, Any]],
     runs: list[dict[str, Any]],
     handoffs: list[dict[str, Any]],
+    work_orders: list[dict[str, Any]],
     evidence: list[dict[str, Any]],
     evidence_refs: list[str],
 ) -> list[dict[str, Any]]:
@@ -509,6 +523,7 @@ def _operating_rhythm_sections(
                 "title": "Engineering Work Orders",
                 "body": _rows_body(
                     [
+                        *_filter_rows(work_orders, "engineering", "codegraph", "architecture", "work_order"),
                         *_filter_rows(actions, "engineering", "codegraph", "architecture", "work_order"),
                         *_filter_rows(runs, "engineering", "codegraph", "ast", "test design"),
                         *_filter_rows(handoffs, "engineering", "codegraph", "architecture"),

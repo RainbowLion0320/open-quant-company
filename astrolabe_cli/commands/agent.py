@@ -231,6 +231,48 @@ def handoffs(session_id: str = "") -> CliResult:
     )
 
 
+def work_orders(session_id: str = "") -> CliResult:
+    result = AgentRuntime().list_work_orders(session_id or None)
+    return CliResult(
+        ok=True,
+        command="agent work-orders",
+        message=f"{result['total']} engineering work order(s)",
+        data=result,
+    )
+
+
+def create_work_order(
+    *,
+    session_id: str,
+    title: str,
+    summary: str,
+    impact: str,
+    affected_files: list[str] | None = None,
+    suggested_verification: list[str] | None = None,
+    evidence_refs: list[str] | None = None,
+) -> CliResult:
+    try:
+        work_order = AgentRuntime().create_work_order(
+            session_id=session_id,
+            title=title,
+            summary=summary,
+            impact=impact,
+            affected_files=affected_files,
+            suggested_verification=suggested_verification,
+            evidence_refs=evidence_refs,
+        )
+    except KeyError as exc:
+        return CliResult(False, "agent work-order create", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    except ValueError as exc:
+        return CliResult(False, "agent work-order create", {"session_id": session_id}, "Agent work order invalid", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent work-order create",
+        message=f"Created engineering work order {work_order['work_order_id']}",
+        data={"work_order": work_order},
+    )
+
+
 def resolve_handoff(handoff_id: str) -> CliResult:
     try:
         handoff = AgentRuntime().resolve_handoff(handoff_id)

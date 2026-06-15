@@ -112,6 +112,8 @@ The CEO Office should consume the Agent Runtime API defined in [07-agent-company
 - `POST /api/agent/actions/{action_id}/cancel`
 - `GET /api/agent/evidence/{evidence_id}`
 - `GET /api/agent/desks`
+- `GET /api/agent/work-orders`
+- `POST /api/agent/work-orders`
 
 WebSocket or server-sent events may be added for streaming message and action updates after the basic API contract is stable.
 
@@ -127,6 +129,7 @@ The page must handle:
 - Evidence missing
 - Stale artifact
 - Broker live mode disabled
+- Open Engineering Desk work orders
 - Desk unavailable
 - API unavailable
 

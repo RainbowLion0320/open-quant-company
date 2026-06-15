@@ -135,6 +135,22 @@ class AgentLedger:
                     created_at TEXT NOT NULL,
                     resolved_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS work_orders (
+                    work_order_id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    desk TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    impact TEXT NOT NULL,
+                    affected_files TEXT NOT NULL,
+                    suggested_verification TEXT NOT NULL,
+                    evidence_refs TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_by TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
             self._ensure_column(conn, "actions", "expires_at", "TEXT NOT NULL DEFAULT ''")
@@ -294,6 +310,28 @@ class AgentLedger:
                 payload,
             )
 
+    def insert_work_order(self, row: dict[str, Any]) -> None:
+        payload = {
+            **row,
+            "affected_files": _json_dumps(row.get("affected_files", [])),
+            "suggested_verification": _json_dumps(row.get("suggested_verification", [])),
+            "evidence_refs": _json_dumps(row.get("evidence_refs", [])),
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO work_orders(
+                    work_order_id, session_id, desk, title, summary, impact, affected_files,
+                    suggested_verification, evidence_refs, status, created_by, created_at, updated_at
+                )
+                VALUES(
+                    :work_order_id, :session_id, :desk, :title, :summary, :impact, :affected_files,
+                    :suggested_verification, :evidence_refs, :status, :created_by, :created_at, :updated_at
+                )
+                """,
+                payload,
+            )
+
     def list_sessions(self) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM sessions ORDER BY created_at DESC, session_id DESC").fetchall()
@@ -314,12 +352,13 @@ class AgentLedger:
                 "run_events": int(conn.execute("SELECT COUNT(*) FROM run_events").fetchone()[0]),
                 "evidence": int(conn.execute("SELECT COUNT(*) FROM evidence").fetchone()[0]),
                 "handoffs": int(conn.execute("SELECT COUNT(*) FROM handoffs").fetchone()[0]),
+                "work_orders": int(conn.execute("SELECT COUNT(*) FROM work_orders").fetchone()[0]),
             }
 
     def delete_sessions(self, session_ids: list[str], *, dry_run: bool = False) -> dict[str, int]:
         ids = [str(session_id) for session_id in session_ids if str(session_id)]
         if not ids:
-            return {"sessions": 0, "messages": 0, "actions": 0, "runs": 0, "run_events": 0, "evidence": 0, "handoffs": 0}
+            return {"sessions": 0, "messages": 0, "actions": 0, "runs": 0, "run_events": 0, "evidence": 0, "handoffs": 0, "work_orders": 0}
         placeholders = _placeholders(ids)
         with self._connect() as conn:
             action_rows = conn.execute(
@@ -359,6 +398,7 @@ class AgentLedger:
                 ),
                 "evidence": len(evidence_to_delete),
                 "handoffs": int(conn.execute(f"SELECT COUNT(*) FROM handoffs WHERE session_id IN ({placeholders})", ids).fetchone()[0]),
+                "work_orders": int(conn.execute(f"SELECT COUNT(*) FROM work_orders WHERE session_id IN ({placeholders})", ids).fetchone()[0]),
             }
             if dry_run:
                 return counts
@@ -367,6 +407,7 @@ class AgentLedger:
                 conn.execute(f"DELETE FROM runs WHERE action_id IN ({action_placeholders})", action_ids)
                 conn.execute(f"DELETE FROM actions WHERE action_id IN ({action_placeholders})", action_ids)
             conn.execute(f"DELETE FROM handoffs WHERE session_id IN ({placeholders})", ids)
+            conn.execute(f"DELETE FROM work_orders WHERE session_id IN ({placeholders})", ids)
             conn.execute(f"DELETE FROM messages WHERE session_id IN ({placeholders})", ids)
             conn.execute(f"DELETE FROM sessions WHERE session_id IN ({placeholders})", ids)
             if evidence_to_delete:
@@ -379,7 +420,7 @@ class AgentLedger:
         if dry_run:
             return counts
         with self._connect() as conn:
-            for table in ("run_events", "runs", "handoffs", "actions", "messages", "evidence", "sessions"):
+            for table in ("run_events", "runs", "handoffs", "work_orders", "actions", "messages", "evidence", "sessions"):
                 conn.execute(f"DELETE FROM {table}")
         return counts
 
@@ -476,6 +517,22 @@ class AgentLedger:
                 (status, resolved_at, handoff_id),
             )
 
+    def list_work_orders(self, session_id: str | None = None) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            if session_id:
+                rows = conn.execute(
+                    "SELECT * FROM work_orders WHERE session_id = ? ORDER BY created_at DESC, work_order_id DESC",
+                    (session_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM work_orders ORDER BY created_at DESC, work_order_id DESC").fetchall()
+        return [self._work_order_row(row) for row in rows]
+
+    def get_work_order(self, work_order_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM work_orders WHERE work_order_id = ?", (work_order_id,)).fetchone()
+        return self._work_order_row(row) if row else None
+
     @staticmethod
     def _collect_json_refs(rows: list[sqlite3.Row], column: str) -> set[str]:
         refs: set[str] = set()
@@ -498,6 +555,12 @@ class AgentLedger:
         refs.update(
             self._collect_json_refs(
                 conn.execute(f"SELECT evidence_refs FROM handoffs WHERE session_id IN ({placeholders})", session_ids).fetchall(),
+                "evidence_refs",
+            )
+        )
+        refs.update(
+            self._collect_json_refs(
+                conn.execute(f"SELECT evidence_refs FROM work_orders WHERE session_id IN ({placeholders})", session_ids).fetchall(),
                 "evidence_refs",
             )
         )
@@ -526,6 +589,12 @@ class AgentLedger:
         refs.update(
             self._collect_json_refs(
                 conn.execute(f"SELECT evidence_refs FROM handoffs WHERE session_id NOT IN ({placeholders})", session_ids).fetchall(),
+                "evidence_refs",
+            )
+        )
+        refs.update(
+            self._collect_json_refs(
+                conn.execute(f"SELECT evidence_refs FROM work_orders WHERE session_id NOT IN ({placeholders})", session_ids).fetchall(),
                 "evidence_refs",
             )
         )
@@ -579,5 +648,13 @@ class AgentLedger:
     @staticmethod
     def _handoff_row(row: sqlite3.Row) -> dict[str, Any]:
         data = dict(row)
+        data["evidence_refs"] = _json_loads(data.get("evidence_refs"), [])
+        return data
+
+    @staticmethod
+    def _work_order_row(row: sqlite3.Row) -> dict[str, Any]:
+        data = dict(row)
+        data["affected_files"] = _json_loads(data.get("affected_files"), [])
+        data["suggested_verification"] = _json_loads(data.get("suggested_verification"), [])
         data["evidence_refs"] = _json_loads(data.get("evidence_refs"), [])
         return data

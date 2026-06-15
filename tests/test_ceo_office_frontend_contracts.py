@@ -108,6 +108,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "handoffs" in view
     assert "api.agentHandoffs" in view
     assert "api.agentResolveHandoff" in view
+    assert "api.agentWorkOrders" in view
+    assert "workOrders" in view
+    assert "ceoOffice.workOrders" in view
+    assert "ceoOffice.noWorkOrders" in view
+    assert "ceoOffice.affectedFiles" in view
+    assert "ceoOffice.suggestedVerification" in view
     assert "resolveHandoff" in view
     assert "api.agentReports" in view
     assert "api.agentGenerateReport" in view
@@ -196,8 +202,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "归档会话" in zh_ceo
     assert "Archive Session" in en_ceo
     assert "交接事项" in zh_ceo
+    assert "工程工单" in zh_ceo
+    assert "暂无工程工单" in zh_ceo
+    assert "影响文件" in zh_ceo
+    assert "建议验证" in zh_ceo
     assert "标记完成" in zh_ceo
     assert "Handoffs" in en_ceo
+    assert "Engineering Work Orders" in en_ceo
+    assert "No engineering work orders" in en_ceo
+    assert "Affected Files" in en_ceo
+    assert "Suggested Verification" in en_ceo
     assert "Resolve" in en_ceo
     assert "取消行动" in zh_ceo
     assert "已取消" in zh_ceo
@@ -319,6 +333,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "/api/agent/paper/actions" in agent_api
     assert "agentHandoffs" in agent_api
     assert "agentResolveHandoff" in agent_api
+    assert "agentWorkOrders" in agent_api
+    assert '"/api/agent/work-orders' in agent_api
     assert "agentReports" in agent_api
     assert "agentGenerateReport" in agent_api
     assert "agentRunReportRhythm" in agent_api
@@ -360,6 +376,9 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "paper_reconciliations: AgentPaperReconciliation[]" in agent_types
     assert "export interface AgentPaperReconciliation" in agent_types
     assert "export interface AgentHandoff" in agent_types
+    assert "export interface AgentWorkOrder" in agent_types
+    assert "export interface AgentWorkOrdersResponse" in agent_types
+    assert "work_orders: AgentWorkOrder[]" in agent_types
     assert "export interface AgentDeskResponse" in agent_types
     assert "export interface AgentAddMessageResponse" in agent_types
     assert "export interface AgentPaperSubmitResponse" in agent_types

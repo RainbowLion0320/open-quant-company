@@ -32,6 +32,7 @@ from agent_os.schemas import (
     AgentRun,
     AgentRunEvent,
     AgentSession,
+    AgentWorkOrder,
     DeskResponse,
     EvidenceRef,
 )
@@ -176,6 +177,7 @@ class AgentRuntime:
             "actions": self.ledger.list_actions(session_id),
             "runs": self._session_runs(session_id),
             "handoffs": self.ledger.list_handoffs(session_id),
+            "work_orders": self.ledger.list_work_orders(session_id),
         }
 
     def add_message(
@@ -701,6 +703,52 @@ class AgentRuntime:
         if handoff is None:
             raise KeyError(f"Agent handoff not found after update: {handoff_id}")
         return handoff
+
+    def create_work_order(
+        self,
+        *,
+        session_id: str,
+        title: str,
+        summary: str,
+        impact: str,
+        affected_files: list[str] | None = None,
+        suggested_verification: list[str] | None = None,
+        evidence_refs: list[str] | None = None,
+        created_by: str = "engineering_desk",
+    ) -> dict[str, Any]:
+        if not self.ledger.get_session(session_id):
+            raise KeyError(f"Agent session not found: {session_id}")
+        clean_title = title.strip()
+        if not clean_title:
+            raise ValueError("Agent work order title cannot be empty")
+        timestamp = _now()
+        work_order = AgentWorkOrder(
+            work_order_id=_id("wo"),
+            session_id=session_id,
+            desk="engineering",
+            title=clean_title,
+            summary=summary.strip(),
+            impact=impact.strip(),
+            affected_files=[str(path).strip() for path in (affected_files or []) if str(path).strip()],
+            suggested_verification=[
+                str(command).strip() for command in (suggested_verification or []) if str(command).strip()
+            ],
+            evidence_refs=[str(evidence_id).strip() for evidence_id in (evidence_refs or []) if str(evidence_id).strip()],
+            status="open",
+            created_by=created_by.strip() or "engineering_desk",
+            created_at=timestamp,
+            updated_at=timestamp,
+        )
+        self.ledger.insert_work_order(work_order.to_dict())
+        return work_order.to_dict()
+
+    def list_work_orders(self, session_id: str | None = None) -> dict[str, Any]:
+        rows = self.ledger.list_work_orders(session_id)
+        return {
+            "status": "ready",
+            "work_orders": rows,
+            "total": len(rows),
+        }
 
     def respond_as_desk(
         self,
@@ -1377,6 +1425,7 @@ class AgentRuntime:
             actions=self.ledger.list_actions(session_id),
             runs=self._session_runs(session_id),
             handoffs=self.ledger.list_handoffs(session_id),
+            work_orders=self.ledger.list_work_orders(session_id),
             evidence=self.ledger.list_evidence(),
             kind=normalized_kind,
             path=path,
@@ -2146,6 +2195,7 @@ class AgentRuntime:
         run_events = self.ledger.list_run_events()
         evidence = self.ledger.list_evidence()
         handoffs = self.ledger.list_handoffs()
+        work_orders = self.ledger.list_work_orders()
         summary = {
             "session_count": len(sessions),
             "message_count": len(messages),
@@ -2154,6 +2204,7 @@ class AgentRuntime:
             "run_event_count": len(run_events),
             "evidence_count": len(evidence),
             "handoff_count": len(handoffs),
+            "work_order_count": len(work_orders),
         }
         return {
             "status": "ready",
@@ -2167,6 +2218,7 @@ class AgentRuntime:
                 "run_events": run_events,
                 "evidence": evidence,
                 "handoffs": handoffs,
+                "work_orders": work_orders,
             },
         }
 

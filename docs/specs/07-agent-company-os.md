@@ -38,6 +38,8 @@ All endpoints are planned under `/api/agent/*`.
 | `GET` | `/api/agent/actions` | List actions with filters for session and future status/desk/risk filters. | Implemented |
 | `GET` | `/api/agent/handoffs` | List cross-desk handoff ledger rows, optionally scoped to a session. | Implemented |
 | `POST` | `/api/agent/handoffs/{handoff_id}/resolve` | Mark a cross-desk handoff as resolved and write `resolved_at`. | Implemented |
+| `GET` | `/api/agent/work-orders` | List Engineering Desk work orders, optionally scoped to a session. | Implemented |
+| `POST` | `/api/agent/work-orders` | Create an Engineering Desk work order with impact, affected files, suggested verification, and evidence refs. | Implemented |
 | `GET` | `/api/agent/actions/{action_id}` | Read an action and approval state. | Implemented |
 | `POST` | `/api/agent/actions/{action_id}/approve` | Approve a pending action. | Implemented |
 | `POST` | `/api/agent/actions/{action_id}/reject` | Reject a pending action with reason. | Implemented |
@@ -83,6 +85,8 @@ All commands must support `--json`.
 | `astroq agent actions --session SESSION_ID --json` | List session actions. | Implemented |
 | `astroq agent handoffs --session SESSION_ID --json` | List cross-desk handoffs. | Implemented |
 | `astroq agent handoff resolve HANDOFF_ID --json` | Mark a cross-desk handoff as resolved. | Implemented |
+| `astroq agent work-orders --session SESSION_ID --json` | List Engineering Desk work orders. | Implemented |
+| `astroq agent work-order create --session SESSION_ID --title TITLE --summary SUMMARY --impact IMPACT --file PATH --verify COMMAND --evidence EVIDENCE_ID --json` | Create an auditable Engineering Desk work order without editing repository files from the Web runtime. | Implemented |
 | `astroq agent action show ACTION_ID --json` | Show action details. | Implemented |
 | `astroq agent run ACTION_ID --json` | Dispatch a safe or approved action through the fixed tool registry. | Implemented for bounded fixed commands |
 | `astroq agent approve ACTION_ID --json` | Approve an action. | Implemented |
@@ -215,7 +219,39 @@ Allowed statuses:
 - `expired`
 - `canceled`
 
-### 5.4 AgentRun
+### 5.4 AgentWorkOrder
+
+```json
+{
+  "work_order_id": "wo_...",
+  "session_id": "agt_sess_...",
+  "desk": "engineering",
+  "title": "Investigate CodeGraph architecture finding",
+  "summary": "The Engineering Desk found a likely coupling issue.",
+  "impact": "May block future agent workflow extension.",
+  "affected_files": ["agent_os/runtime.py"],
+  "suggested_verification": [".venv/bin/python -m pytest tests/test_agent_os_contracts.py -q"],
+  "evidence_refs": ["ev_..."],
+  "status": "open",
+  "created_by": "engineering_desk",
+  "created_at": "2026-06-15T09:08:00+08:00",
+  "updated_at": "2026-06-15T09:08:00+08:00"
+}
+```
+
+Engineering work orders are the only Web-runtime path for code/design
+follow-up. The Web UI may create and display them, but repository edits remain
+outside the Web runtime and must be handled by Codex, Claude, or a human
+maintainer.
+
+Allowed statuses:
+
+- `open`
+- `in_progress`
+- `resolved`
+- `canceled`
+
+### 5.5 AgentRun
 
 ```json
 {
@@ -233,7 +269,7 @@ Allowed statuses:
 }
 ```
 
-### 5.5 EvidenceRef
+### 5.6 EvidenceRef
 
 ```json
 {
@@ -759,12 +795,12 @@ Implementation must include:
 
 ## 15. Current Status
 
-As of 2026-06-14:
+As of 2026-06-15:
 
 - Foundation runtime is partially implemented in `agent_os/`.
-- The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and open/resolved cross-desk handoffs under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session create/session show/session update/session run-readonly/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/reports/report/notify report/rhythm (--session or --all-active)/paper propose/paper submit/paper cancel/live readiness/live preview/live propose/live submit/live reconcile/live kill-switch status/live kill-switch activate/live kill-switch deactivate/evidence/desks/policies/memory show/memory export/memory prune/memory clear --json` is available.
-- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/sessions/{session_id}/run-readonly`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/policies`, `/api/agent/paper/proposals`, `/api/agent/paper/actions/{action_id}/submit`, `/api/agent/paper/actions/{action_id}/cancel`, `/api/agent/live/readiness`, `/api/agent/live/preview`, `/api/agent/live/proposals`, `/api/agent/live/actions/{action_id}/submit`, `/api/agent/live/reconciliation`, `/api/agent/live/kill-switch`, `/api/agent/live/kill-switch/activate`, `/api/agent/live/kill-switch/deactivate`, `/api/agent/reports`, `/api/agent/reports/{report_id}/notify`, `/api/agent/reports/rhythm`, `/api/agent/reports/rhythm/scheduled`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
+- The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, open/resolved cross-desk handoffs, and Engineering Desk work orders under `var/db/agent_os.sqlite`.
+- `astroq agent sessions/session create/session show/session update/session run-readonly/message/actions/handoffs/handoff resolve/work-orders/work-order create/action show/run/approve/reject/cancel/expire/reports/report/notify report/rhythm (--session or --all-active)/paper propose/paper submit/paper cancel/live readiness/live preview/live propose/live submit/live reconcile/live kill-switch status/live kill-switch activate/live kill-switch deactivate/evidence/desks/policies/memory show/memory export/memory prune/memory clear --json` is available.
+- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/sessions/{session_id}/run-readonly`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/work-orders`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/policies`, `/api/agent/paper/proposals`, `/api/agent/paper/actions/{action_id}/submit`, `/api/agent/paper/actions/{action_id}/cancel`, `/api/agent/live/readiness`, `/api/agent/live/preview`, `/api/agent/live/proposals`, `/api/agent/live/actions/{action_id}/submit`, `/api/agent/live/reconciliation`, `/api/agent/live/kill-switch`, `/api/agent/live/kill-switch/activate`, `/api/agent/live/kill-switch/deactivate`, `/api/agent/reports`, `/api/agent/reports/{report_id}/notify`, `/api/agent/reports/rhythm`, `/api/agent/reports/rhythm/scheduled`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; approved fixed-registry templated commands bind only tool-declared safe parameters.
 - Fixed command dispatch records ordered run events for queued/running/stdout/stderr/terminal state. `/api/agent/runs/{run_id}` and scoped action detail include the event timeline, while session summaries keep runs compact.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.

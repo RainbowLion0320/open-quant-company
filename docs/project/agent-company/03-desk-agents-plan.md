@@ -147,11 +147,14 @@ Allowed tools:
 - `astroq docs check --json`
 - CodeGraph read APIs
 - Work-order creation
+- `astroq agent work-orders --json`
+- `astroq agent work-order create ... --json`
 
 Hard rules:
 
 - The Web Engineering Desk does not edit repo files.
 - It can create an engineering work order with evidence, impact, affected files, and suggested verification.
+- Engineering work orders are auditable through runtime, CLI, API, memory snapshot, CEO Office, and engineering digest reports.
 - Codex, Claude, or a human handles code changes outside the Web runtime.
 
 ## 8. Reporting Desk

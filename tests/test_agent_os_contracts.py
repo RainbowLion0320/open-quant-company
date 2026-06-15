@@ -178,6 +178,100 @@ def test_agent_approval_policies_are_explicit_runtime_cli_api_contracts(tmp_path
     reset_datahub()
 
 
+def test_engineering_work_orders_are_auditable_runtime_cli_api_contracts(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Engineering review", default_desk="engineering")
+    evidence = runtime.create_evidence(
+        kind="web_route",
+        label="AST diagnostics",
+        uri="/system?tab=ast",
+        summary="AST duplicate implementation diagnostics.",
+    )
+    work_order = runtime.create_work_order(
+        session_id=session.session_id,
+        title="Deduplicate strategy scoring helpers",
+        summary="AST diagnostics found repeated scoring helper shape.",
+        impact="Reduces duplicate implementation risk without Web runtime code edits.",
+        affected_files=["research/strategy_scoring.py", "tests/test_strategy_scoring.py"],
+        suggested_verification=[
+            ".venv/bin/python -m pytest tests/test_strategy_scoring.py -q",
+            ".venv/bin/astroq architecture ast --json",
+        ],
+        evidence_refs=[evidence.evidence_id],
+    )
+
+    assert work_order["work_order_id"].startswith("wo_")
+    assert work_order["status"] == "open"
+    assert work_order["desk"] == "engineering"
+    assert work_order["affected_files"] == ["research/strategy_scoring.py", "tests/test_strategy_scoring.py"]
+    assert work_order["suggested_verification"][0].endswith("tests/test_strategy_scoring.py -q")
+    assert work_order["evidence_refs"] == [evidence.evidence_id]
+    assert work_order["created_by"] == "engineering_desk"
+    assert runtime.list_work_orders(session.session_id)["total"] == 1
+    assert runtime.memory_snapshot()["summary"]["work_order_count"] == 1
+
+    cli_code = run_cli(
+        [
+            "agent",
+            "work-order",
+            "create",
+            "--session",
+            session.session_id,
+            "--title",
+            "CLI work order",
+            "--summary",
+            "Create a CLI-visible engineering task.",
+            "--impact",
+            "Keeps repo edits outside Web runtime.",
+            "--file",
+            "agent_os/runtime.py",
+            "--verify",
+            ".venv/bin/python -m pytest tests/test_agent_os_contracts.py -q",
+            "--evidence",
+            evidence.evidence_id,
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    list_code = run_cli(["agent", "work-orders", "--session", session.session_id, "--json"])
+    list_payload = json.loads(capsys.readouterr().out)
+
+    api_res = TestClient(create_app()).post(
+        "/api/agent/work-orders",
+        json={
+            "session_id": session.session_id,
+            "title": "API work order",
+            "summary": "Create an API-visible engineering task.",
+            "impact": "Codex or a human handles source edits outside the Web runtime.",
+            "affected_files": ["web/frontend/src/views/CEOOffice.vue"],
+            "suggested_verification": ["npm run typecheck"],
+            "evidence_refs": [evidence.evidence_id],
+        },
+    )
+    api_list = TestClient(create_app()).get(f"/api/agent/work-orders?session_id={session.session_id}")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["work_order"]["title"] == "CLI work order"
+    assert cli_payload["data"]["work_order"]["status"] == "open"
+    assert list_code == 0
+    assert list_payload["data"]["total"] == 2
+    assert api_res.status_code == 200
+    assert api_res.json()["work_order"]["title"] == "API work order"
+    assert api_list.status_code == 200
+    assert api_list.json()["total"] == 3
+    reset_datahub()
+
+
 def test_agent_live_readiness_defaults_disabled_and_never_falls_back_to_paper(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
@@ -1967,6 +2061,15 @@ def test_agent_reports_support_dedicated_operating_rhythm_templates(tmp_path, mo
         stderr_summary="",
         artifact_refs=[codegraph.evidence_id],
     )
+    runtime.create_work_order(
+        session_id=session.session_id,
+        title="Investigate CodeGraph architecture finding",
+        summary="Engineering Desk captured a concrete follow-up task.",
+        impact="Keeps repository edits outside the Web runtime.",
+        affected_files=["agent_os/runtime.py"],
+        suggested_verification=[".venv/bin/python -m pytest tests/test_agent_os_contracts.py -q"],
+        evidence_refs=[codegraph.evidence_id],
+    )
 
     expected_sections = {
         "data_quality_review": "data_quality_evidence",
@@ -1986,6 +2089,7 @@ def test_agent_reports_support_dedicated_operating_rhythm_templates(tmp_path, mo
         assert report["evidence_refs"]
         assert Path(report["path"]).exists()
         assert section_id in Path(report["path"]).read_text(encoding="utf-8")
+    assert "Investigate CodeGraph architecture finding" in Path(generated["engineering_digest"]["path"]).read_text(encoding="utf-8")
 
     reset_datahub()
 

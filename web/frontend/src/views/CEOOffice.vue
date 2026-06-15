@@ -59,6 +59,10 @@
         <strong>{{ handoffs.length }}</strong>
       </article>
       <article class="ceo-metric">
+        <span>{{ t("ceoOffice.workOrders") }}</span>
+        <strong>{{ workOrders.length }}</strong>
+      </article>
+      <article class="ceo-metric">
         <span>{{ t("ceoOffice.evidence") }}</span>
         <strong>{{ evidenceCount }}</strong>
       </article>
@@ -223,6 +227,47 @@
               </div>
               <small>{{ t("ceoOffice.policyReason") }}</small>
               <p>{{ policy.reason }}</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="ceo-panel">
+          <header class="panel-head">
+            <span>{{ t("ceoOffice.workOrders") }}</span>
+            <small>{{ workOrders.length }}</small>
+          </header>
+          <div v-if="!workOrders.length" class="ceo-empty">{{ t("ceoOffice.noWorkOrders") }}</div>
+          <div v-else class="work-order-list">
+            <div v-for="workOrder in workOrders" :key="workOrder.work_order_id" class="work-order-row">
+              <div class="action-title">
+                <strong>{{ workOrder.title }}</strong>
+                <span :class="['action-status', workOrder.status]">{{ statusLabel(workOrder.status) }}</span>
+              </div>
+              <p>{{ workOrder.summary }}</p>
+              <small>{{ workOrder.impact }}</small>
+              <div v-if="workOrder.affected_files.length" class="desk-chip-section">
+                <small>{{ t("ceoOffice.affectedFiles") }}</small>
+                <div class="desk-chip-list">
+                  <code v-for="file in workOrder.affected_files" :key="`${workOrder.work_order_id}-${file}`">{{ file }}</code>
+                </div>
+              </div>
+              <div v-if="workOrder.suggested_verification.length" class="desk-chip-section">
+                <small>{{ t("ceoOffice.suggestedVerification") }}</small>
+                <div class="desk-chip-list">
+                  <code v-for="command in workOrder.suggested_verification" :key="`${workOrder.work_order_id}-${command}`">{{ command }}</code>
+                </div>
+              </div>
+              <div v-if="workOrder.evidence_refs.length" class="approval-buttons">
+                <button
+                  v-for="evidenceId in workOrder.evidence_refs"
+                  :key="`${workOrder.work_order_id}-${evidenceId}`"
+                  class="btn btn-xs"
+                  type="button"
+                  @click="loadEvidence(evidenceId)"
+                >
+                  {{ t("ceoOffice.openEvidence") }}
+                </button>
+              </div>
             </div>
           </div>
         </article>
@@ -648,7 +693,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -658,6 +703,7 @@ const activeSession = ref<AgentSession | null>(null);
 const messages = ref<AgentMessage[]>([]);
 const actions = ref<AgentAction[]>([]);
 const handoffs = ref<AgentHandoff[]>([]);
+const workOrders = ref<AgentWorkOrder[]>([]);
 const reports = ref<AgentReport[]>([]);
 const rhythmResult = ref<AgentReportRhythm | null>(null);
 const scheduledRhythmResult = ref<AgentScheduledReportRhythm | null>(null);
@@ -834,18 +880,20 @@ async function loadSession(sessionId: string) {
   messages.value = detail.messages || [];
   actions.value = detail.actions || [];
   handoffs.value = detail.handoffs || [];
+  workOrders.value = detail.work_orders || [];
   reports.value = reportPayload.reports || [];
 }
 
 async function load() {
   error.value = "";
   try {
-    const [sessionPayload, deskPayload, policyPayload, actionPayload, handoffPayload, livePayload, killSwitchPayload] = await Promise.all([
+    const [sessionPayload, deskPayload, policyPayload, actionPayload, handoffPayload, workOrderPayload, livePayload, killSwitchPayload] = await Promise.all([
       api.agentSessions(),
       api.agentDesks(),
       api.agentApprovalPolicies(),
       api.agentActions(),
       api.agentHandoffs(),
+      api.agentWorkOrders(),
       api.agentLiveReadiness(),
       api.agentLiveKillSwitch(),
     ]);
@@ -857,6 +905,7 @@ async function load() {
     }
     actions.value = actionPayload.actions || [];
     handoffs.value = handoffPayload.handoffs || [];
+    workOrders.value = workOrderPayload.work_orders || [];
     liveReadiness.value = livePayload.health;
     liveKillSwitch.value = killSwitchPayload.kill_switch || livePayload.health.live_kill_switch || null;
     if (sessions.value.length) {

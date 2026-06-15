@@ -124,6 +124,26 @@ class AgentHandoff:
 
 
 @dataclass(frozen=True)
+class AgentWorkOrder:
+    work_order_id: str
+    session_id: str
+    desk: str
+    title: str
+    summary: str
+    impact: str
+    affected_files: list[str]
+    suggested_verification: list[str]
+    evidence_refs: list[str]
+    status: str
+    created_by: str
+    created_at: str
+    updated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ApprovalPolicy:
     policy_id: str
     risk_level: str

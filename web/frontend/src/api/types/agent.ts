@@ -126,6 +126,22 @@ export interface AgentHandoff {
   resolved_at: string;
 }
 
+export interface AgentWorkOrder {
+  work_order_id: string;
+  session_id: string;
+  desk: string;
+  title: string;
+  summary: string;
+  impact: string;
+  affected_files: string[];
+  suggested_verification: string[];
+  evidence_refs: string[];
+  status: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AgentReport {
   report_id: string;
   session_id: string;
@@ -216,6 +232,7 @@ export interface AgentSessionDetail {
   actions: AgentAction[];
   runs: AgentRun[];
   handoffs: AgentHandoff[];
+  work_orders: AgentWorkOrder[];
 }
 
 export interface AgentReadOnlyWorkflowResponse {
@@ -250,6 +267,12 @@ export interface AgentApprovalPoliciesResponse {
 
 export interface AgentHandoffsResponse {
   handoffs: AgentHandoff[];
+  total: number;
+}
+
+export interface AgentWorkOrdersResponse {
+  status: string;
+  work_orders: AgentWorkOrder[];
   total: number;
 }
 

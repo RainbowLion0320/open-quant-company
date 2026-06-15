@@ -267,6 +267,33 @@ async def list_agent_handoffs(session_id: str = "") -> dict[str, Any]:
     return {"handoffs": handoffs, "total": len(handoffs)}
 
 
+@router.get("/work-orders")
+async def list_agent_work_orders(session_id: str = "") -> dict[str, Any]:
+    return AgentRuntime().list_work_orders(session_id or None)
+
+
+@router.post("/work-orders")
+async def create_agent_work_order(payload: dict[str, Any]) -> dict[str, Any]:
+    session_id = str(payload.get("session_id") or "")
+    if not session_id:
+        raise InvalidParameterError("session_id", session_id, "expected an agent session id")
+    try:
+        work_order = AgentRuntime().create_work_order(
+            session_id=session_id,
+            title=str(payload.get("title") or ""),
+            summary=str(payload.get("summary") or ""),
+            impact=str(payload.get("impact") or ""),
+            affected_files=[str(path) for path in payload.get("affected_files", [])],
+            suggested_verification=[str(command) for command in payload.get("suggested_verification", [])],
+            evidence_refs=[str(evidence_id) for evidence_id in payload.get("evidence_refs", [])],
+        )
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+    except ValueError as exc:
+        raise InvalidParameterError("work_order", session_id, str(exc))
+    return {"work_order": work_order}
+
+
 @router.post("/handoffs/{handoff_id}/resolve")
 async def resolve_agent_handoff(handoff_id: str) -> dict[str, Any]:
     try:
