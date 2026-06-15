@@ -1,6 +1,6 @@
 # Agent Company OS Phase 6 - MiniQMT/QMT Live Execution Plan
 
-> Status: readiness and preview foundation implemented; submission/reconciliation planned
+> Status: readiness, preview, and approval-gated submit/reconciliation contract implemented; real SDK submission planned
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Related spec: [04-execution-layer.md](../../specs/04-execution-layer.md)
@@ -247,14 +247,17 @@ Current foundation:
 - `astroq agent live readiness --json` and `GET /api/agent/live/readiness` expose the same readiness state.
 - `broker.live.qmt.MiniQmtLiveBroker.preview_order()` returns a non-submitting live order preview with intent normalization, estimated cash/position impact, fees, readiness blockers, evidence requirement, cash gate, and extended risk snapshot checks for concentration, total exposure, daily order count, tradability, data freshness, and broker account consistency.
 - `astroq agent live preview ... --json` and `POST /api/agent/live/preview` expose the same preview state with `approval_required=true`, `submitted=false`, and `paper_fallback=false`.
+- `astroq agent live propose ... --json` and `POST /api/agent/live/proposals` create approval-required live order action cards only after preview passes.
+- `astroq agent live submit ACTION_ID --json` and `POST /api/agent/live/actions/{action_id}/submit` require CEO approval, re-run preview/risk gates, submit only through the live adapter, and write reconciliation evidence under `var/artifacts/agent/live_reconciliation/`.
+- Default `MiniQmtLiveBroker.submit_order()` fails closed with `live_submission_not_integrated`; no local path fabricates a broker order id or falls back to PaperBroker.
 - CEO Office shows a read-only live readiness card.
 - Blocked readiness always reports `paper_fallback=false`; no live path submits through PaperBroker.
 
 Remaining work:
 
 - Deeper production-grade risk gates beyond the current preview checks, including drawdown state, portfolio VaR/CVaR, sector concentration, intraday limit-state checks, and broker account consistency reconciliation against real MiniQMT/QMT snapshots.
-- CEO-approved live submission.
-- Broker order/trade/position reconciliation.
+- Real MiniQMT/QMT SDK-backed order submission.
+- Scheduled broker order/trade/position reconciliation against real account snapshots.
 - Kill-switch operations beyond readiness reporting.
 
 ## 13. Open Design Questions

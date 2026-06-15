@@ -17,7 +17,9 @@ from astrolabe_cli.commands.agent import expire_actions as agent_expire_actions
 from astrolabe_cli.commands.agent import generate_report as agent_generate_report
 from astrolabe_cli.commands.agent import handoffs as agent_handoffs
 from astrolabe_cli.commands.agent import live_preview as agent_live_preview
+from astrolabe_cli.commands.agent import live_propose as agent_live_propose
 from astrolabe_cli.commands.agent import live_readiness as agent_live_readiness
+from astrolabe_cli.commands.agent import live_submit as agent_live_submit
 from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
 from astrolabe_cli.commands.agent import memory_export as agent_memory_export
 from astrolabe_cli.commands.agent import memory_prune as agent_memory_prune
@@ -278,6 +280,32 @@ def build_parser() -> argparse.ArgumentParser:
             evidence_refs=args.evidence_refs,
         )
     )
+    agent_live_propose_cmd = agent_live_sub.add_parser("propose", help="Preview and propose a live order")
+    agent_live_propose_cmd.add_argument("--session", required=True)
+    agent_live_propose_cmd.add_argument("--symbol", required=True)
+    agent_live_propose_cmd.add_argument("--side", choices=["buy", "sell"], required=True)
+    agent_live_propose_cmd.add_argument("--quantity", type=int, required=True)
+    agent_live_propose_cmd.add_argument("--limit-price", type=float, required=True)
+    agent_live_propose_cmd.add_argument("--strategy", default="manual")
+    agent_live_propose_cmd.add_argument("--reason", default="")
+    agent_live_propose_cmd.add_argument("--evidence", action="append", dest="evidence_refs", default=[])
+    add_common_flags(agent_live_propose_cmd)
+    agent_live_propose_cmd.set_defaults(
+        handler=lambda args: agent_live_propose(
+            session_id=args.session,
+            symbol=args.symbol,
+            side=args.side,
+            quantity=args.quantity,
+            limit_price=args.limit_price,
+            strategy=args.strategy,
+            reason=args.reason,
+            evidence_refs=args.evidence_refs,
+        )
+    )
+    agent_live_submit_cmd = agent_live_sub.add_parser("submit", help="Submit an approved live order action")
+    agent_live_submit_cmd.add_argument("action_id")
+    add_common_flags(agent_live_submit_cmd)
+    agent_live_submit_cmd.set_defaults(handler=lambda args: agent_live_submit(args.action_id))
 
     agent_paper_cmd = agent_sub.add_parser("paper", help="Create approval-gated paper execution proposals")
     agent_paper_sub = agent_paper_cmd.add_subparsers(dest="agent_paper_command", required=True)

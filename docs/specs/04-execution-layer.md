@@ -7,7 +7,7 @@
 执行层负责将信号转化为模拟交易——PaperBroker 本地模拟撮合、RiskManager 5 规则风控、Persistence 层 Parquet 持久化状态和净值。Agent Company OS 可生成 PaperBroker 订单预览和审批卡，并且只能在 CEO 批准后通过专用 submit 路径重新预览、重新风控、写入运行和 reconciliation evidence 后提交 paper 订单。Cron 日频调度：15:30 扫描信号，09:30 执行模拟交易。
 
 **设计原则：**
-- **Facade Pattern** — Broker 抽象接口 → PaperBroker (当前模拟交易) / MiniQMT/QMT readiness + order preview (当前只读、不提交) / MiniQMT/QMT live adapter (后续实盘提交)
+- **Facade Pattern** — Broker 抽象接口 → PaperBroker (当前模拟交易) / MiniQMT/QMT readiness + order preview + approval-gated submit contract (默认 fail-closed) / MiniQMT/QMT live SDK adapter (后续真实实盘提交)
 - **配置驱动风控** — 规则在 `settings.yaml` 中可开关、可调参
 - **状态持久化** — 所有持仓/订单/NAV 写入 Parquet，重启不丢失
 
@@ -169,7 +169,7 @@ class BondExchange:
 
 | 决策 | 选择 | 原因 |
 |------|------|------|
-| Broker 抽象接口 | Facade Pattern | PaperBroker 与 MiniQMT/QMT live adapter 边界分离；当前只实现 default-disabled readiness probe 和不提交订单的 preview gate，实盘提交仍需独立 adapter |
+| Broker 抽象接口 | Facade Pattern | PaperBroker 与 MiniQMT/QMT live adapter 边界分离；当前实现 default-disabled readiness probe、不提交订单的 preview gate、approval-gated live submit/reconciliation contract；真实 MiniQMT/QMT SDK 提交仍需独立 adapter |
 | 风控预检 (pre-trade) | 下单前执行，非下单后 | 阻止违规订单进入执行队列 |
 | 熔断只阻止买入 | 允许卖出不允许买入 | 熔断期间应允许减仓止损 |
 | Parquet 持久化 | 非 SQLite | 与数据层统一格式，DuckDB 可直接查询 |

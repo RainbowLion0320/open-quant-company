@@ -337,6 +337,56 @@ def live_preview(
     )
 
 
+def live_propose(
+    *,
+    session_id: str,
+    symbol: str,
+    side: str,
+    quantity: int,
+    limit_price: float,
+    strategy: str,
+    reason: str,
+    evidence_refs: list[str],
+) -> CliResult:
+    try:
+        proposal = AgentRuntime().propose_live_order(
+            session_id=session_id,
+            intent={
+                "symbol": symbol,
+                "side": side,
+                "quantity": quantity,
+                "order_type": "limit",
+                "limit_price": limit_price,
+                "strategy": strategy,
+                "reason": reason,
+                "evidence_refs": evidence_refs,
+            },
+        )
+    except KeyError as exc:
+        return CliResult(False, "agent live propose", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent live propose",
+        message=f"Live order proposal: {proposal['status']}",
+        data={"proposal": proposal},
+    )
+
+
+def live_submit(action_id: str) -> CliResult:
+    try:
+        submission = AgentRuntime().submit_live_order_action(action_id)
+    except KeyError as exc:
+        return CliResult(False, "agent live submit", {"action_id": action_id}, "Agent action missing", [str(exc)])
+    ok = submission["status"] == "succeeded"
+    return CliResult(
+        ok=ok,
+        command="agent live submit",
+        message=f"Live order submit: {submission['status']}",
+        data={"submission": submission},
+        errors=[] if ok else [submission["run"]["stderr_summary"] or submission["status"]],
+    )
+
+
 def paper_propose(
     *,
     session_id: str,

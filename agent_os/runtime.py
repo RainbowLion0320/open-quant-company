@@ -583,6 +583,155 @@ class AgentRuntime:
     def preview_live_order(self, intent: dict[str, Any]) -> dict[str, Any]:
         return MiniQmtLiveBroker().preview_order(intent)
 
+    def propose_live_order(
+        self,
+        *,
+        session_id: str,
+        intent: dict[str, Any],
+        broker: Any | None = None,
+    ) -> dict[str, Any]:
+        if not self.ledger.get_session(session_id):
+            raise KeyError(f"Agent session not found: {session_id}")
+        live_broker = broker or MiniQmtLiveBroker()
+        preview = live_broker.preview_order(intent)
+        if preview["status"] != "preview_ready":
+            return {
+                "status": "blocked",
+                "preview": preview,
+                "action": None,
+            }
+
+        artifact_path = self._write_live_preview_artifact(session_id, preview)
+        evidence = self.create_evidence(
+            kind="artifact",
+            label="Live order preview",
+            uri=str(artifact_path),
+            summary=f"Live order preview for {preview['intent']['side']} {preview['intent']['symbol']}",
+        )
+        action = self.propose_action(
+            session_id=session_id,
+            desk="execution",
+            action_type="live_order",
+            risk_level="live_order",
+            summary=f"Approve live {preview['intent']['side']} {preview['intent']['symbol']} x{preview['intent']['quantity']}",
+            parameters={
+                "live_order_intent": preview["intent"],
+                "live_order_preview": preview,
+                "preview_artifact": str(artifact_path),
+            },
+            expected_effect=(
+                "Requires CEO approval; approved submit re-runs MiniQMT/QMT preview/risk gates, "
+                "submits only through the live broker adapter, and records live reconciliation evidence."
+            ),
+            evidence_refs=[evidence.evidence_id],
+        )
+        return {
+            "status": action.status,
+            "preview": preview,
+            "action": action.to_dict(),
+            "evidence": evidence.to_dict(),
+        }
+
+    def submit_live_order_action(
+        self,
+        action_id: str,
+        *,
+        broker: Any | None = None,
+    ) -> dict[str, Any]:
+        action = self.ledger.get_action(action_id)
+        if not action:
+            raise KeyError(f"Agent action not found: {action_id}")
+        action = self._refresh_action_expiry(action)
+        if str(action.get("action_type")) != "live_order" or str(action.get("risk_level")) != "live_order":
+            return self._record_live_submission_block(
+                action,
+                broker=broker,
+                reason="action is not a live_order",
+                update_action_status=True,
+            )
+        if action.get("status") != "approved":
+            return self._record_live_submission_block(
+                action,
+                broker=broker,
+                reason=f"approval required before live submit: {action.get('status')}",
+                preview=dict((action.get("parameters") or {}).get("live_order_preview") or {}),
+                update_action_status=False,
+            )
+
+        live_broker = broker or MiniQmtLiveBroker()
+        intent = dict((action.get("parameters") or {}).get("live_order_intent") or {})
+        preview = live_broker.preview_order(intent)
+        if preview.get("status") != "preview_ready":
+            return self._record_live_submission_block(
+                action,
+                broker=live_broker,
+                reason="live preview blocked before submission",
+                preview=preview,
+                update_action_status=True,
+            )
+
+        ack = dict(live_broker.submit_order(preview["intent"], approval_id=action_id))
+        submitted = bool(ack.get("submitted")) and bool(ack.get("broker_order_id"))
+        if not submitted:
+            reconciliation = self._live_reconciliation_payload(
+                action=action,
+                status="failed",
+                preview=preview,
+                ack=ack,
+                broker_reconciliation={},
+                error=str(ack.get("error") or ack.get("status") or "live submission failed"),
+            )
+            evidence = self._write_live_reconciliation_evidence(action, reconciliation)
+            self.ledger.update_action_status(action_id, "failed", _now())
+            run = self.record_run(
+                action_id=action_id,
+                tool_name="live.live_order.submit",
+                command=["live_order_submit", action_id],
+                status="failed",
+                return_code=1,
+                stdout_summary="",
+                stderr_summary=str(reconciliation["error"]),
+                artifact_refs=[evidence.evidence_id],
+            )
+            return {
+                "status": "failed",
+                "preview": preview,
+                "ack": ack,
+                "run": run.to_dict(),
+                "reconciliation": reconciliation,
+                "evidence": evidence.to_dict(),
+            }
+
+        broker_reconciliation = dict(live_broker.reconcile(ack))
+        reconciliation = self._live_reconciliation_payload(
+            action=action,
+            status="submitted",
+            preview=preview,
+            ack=ack,
+            broker_reconciliation=broker_reconciliation,
+            error="",
+        )
+        evidence = self._write_live_reconciliation_evidence(action, reconciliation)
+        self.ledger.update_action_status(action_id, "succeeded", _now())
+        run = self.record_run(
+            action_id=action_id,
+            tool_name="live.live_order.submit",
+            command=["live_order_submit", action_id],
+            status="succeeded",
+            return_code=0,
+            stdout_summary=f"live order submitted: {ack['broker_order_id']}",
+            stderr_summary="",
+            artifact_refs=[evidence.evidence_id],
+        )
+        return {
+            "status": "succeeded",
+            "preview": preview,
+            "ack": ack,
+            "run": run.to_dict(),
+            "reconciliation": reconciliation,
+            "evidence": evidence.to_dict(),
+        }
+
     def propose_paper_order(
         self,
         *,
@@ -1205,6 +1354,63 @@ class AgentRuntime:
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
         return path
 
+    def _write_live_preview_artifact(self, session_id: str, preview: dict[str, Any]) -> Path:
+        root = get_datahub().artifact_dir("agent") / "live_previews"
+        root.mkdir(parents=True, exist_ok=True)
+        preview_id = _id("live_preview")
+        path = root / f"{preview_id}.json"
+        payload = {
+            "preview_id": preview_id,
+            "session_id": session_id,
+            "preview": preview,
+            "generated_at": _now(),
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return path
+
+    def _record_live_submission_block(
+        self,
+        action: dict[str, Any],
+        *,
+        broker: Any | None,
+        reason: str,
+        preview: dict[str, Any] | None = None,
+        update_action_status: bool,
+    ) -> dict[str, Any]:
+        action_id = str(action["action_id"])
+        live_broker = broker or MiniQmtLiveBroker()
+        resolved_preview = preview or {}
+        if not resolved_preview and action.get("parameters", {}).get("live_order_intent"):
+            resolved_preview = live_broker.preview_order(dict(action.get("parameters", {}).get("live_order_intent") or {}))
+        reconciliation = self._live_reconciliation_payload(
+            action=action,
+            status="blocked",
+            preview=resolved_preview,
+            ack={},
+            broker_reconciliation={},
+            error=reason,
+        )
+        evidence = self._write_live_reconciliation_evidence(action, reconciliation)
+        if update_action_status:
+            self.ledger.update_action_status(action_id, "blocked", _now())
+        run = self.record_run(
+            action_id=action_id,
+            tool_name="live.live_order.submit",
+            command=["live_order_submit", action_id],
+            status="blocked",
+            return_code=None,
+            stdout_summary="",
+            stderr_summary=reason,
+            artifact_refs=[evidence.evidence_id],
+        )
+        return {
+            "status": "blocked",
+            "preview": resolved_preview,
+            "run": run.to_dict(),
+            "reconciliation": reconciliation,
+            "evidence": evidence.to_dict(),
+        }
+
     def _record_paper_submission_block(
         self,
         action: dict[str, Any],
@@ -1327,6 +1533,41 @@ class AgentRuntime:
             label="Paper order reconciliation",
             uri=str(path),
             summary=f"Paper order reconciliation {reconciliation['status']} for {action['action_id']}",
+        )
+
+    def _live_reconciliation_payload(
+        self,
+        *,
+        action: dict[str, Any],
+        status: str,
+        preview: dict[str, Any],
+        ack: dict[str, Any],
+        broker_reconciliation: dict[str, Any],
+        error: str,
+    ) -> dict[str, Any]:
+        return {
+            "action_id": str(action["action_id"]),
+            "session_id": str(action["session_id"]),
+            "status": status,
+            "order_id": str(ack.get("broker_order_id") or ""),
+            "error": error,
+            "preview": preview,
+            "ack": ack,
+            "broker_reconciliation": broker_reconciliation,
+            "paper_fallback": False,
+            "generated_at": _now(),
+        }
+
+    def _write_live_reconciliation_evidence(self, action: dict[str, Any], reconciliation: dict[str, Any]) -> EvidenceRef:
+        root = get_datahub().artifact_dir("agent") / "live_reconciliation"
+        root.mkdir(parents=True, exist_ok=True)
+        path = root / f"live_reconciliation-{action['action_id']}-{uuid.uuid4().hex[:8]}.json"
+        path.write_text(json.dumps(reconciliation, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return self.create_evidence(
+            kind="artifact",
+            label="Live order reconciliation",
+            uri=str(path),
+            summary=f"Live order reconciliation {reconciliation['status']} for {action['action_id']}",
         )
 
     def _load_default_paper_broker(self) -> PaperBroker:

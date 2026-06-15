@@ -149,6 +149,33 @@ class MiniQmtLiveBroker:
             "created_at": _now(),
         }
 
+    def submit_order(self, intent: dict[str, Any], *, approval_id: str) -> dict[str, Any]:
+        """Fail closed until a real MiniQMT/QMT submit adapter is configured."""
+        return {
+            "status": "blocked",
+            "submitted": False,
+            "broker_order_id": "",
+            "submitted_at": "",
+            "broker_status": "not_integrated",
+            "raw_response_hash": "",
+            "ledger_id": approval_id,
+            "error": "live_submission_not_integrated",
+            "paper_fallback": False,
+            "intent": self._normalize_intent(intent),
+        }
+
+    def reconcile(self, ack: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "status": "not_integrated",
+            "as_of": _now(),
+            "positions_matched": False,
+            "cash_matched": False,
+            "open_orders": [],
+            "fills": [],
+            "mismatches": [{"reason": "live_reconciliation_not_integrated", "ack": dict(ack)}],
+            "recommended_actions": ["connect_miniqmt_adapter"],
+        }
+
     def _normalize_intent(self, intent: dict[str, Any]) -> dict[str, Any]:
         side = str(intent.get("side") or "").strip().lower()
         return {

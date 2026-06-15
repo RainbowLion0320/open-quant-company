@@ -439,6 +439,243 @@ def test_agent_live_preview_cli_and_api(tmp_path, monkeypatch, capsys):
     reset_datahub()
 
 
+def test_agent_live_order_submission_requires_approval_reruns_preview_and_reconciles(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    class FakeLiveBroker:
+        def __init__(self):
+            self.preview_calls = 0
+            self.submit_calls = 0
+            self.reconcile_calls = 0
+
+        def preview_order(self, intent):
+            self.preview_calls += 1
+            normalized = {
+                "symbol": str(intent["symbol"]).upper(),
+                "side": intent["side"],
+                "quantity": int(intent["quantity"]),
+                "order_type": "limit",
+                "limit_price": float(intent["limit_price"]),
+                "strategy": intent.get("strategy", "manual"),
+                "reason": intent.get("reason", ""),
+                "evidence_refs": list(intent.get("evidence_refs", [])),
+                "risk_snapshot": dict(intent.get("risk_snapshot", {})),
+            }
+            return {
+                "status": "preview_ready",
+                "broker": "miniqmt",
+                "intent": normalized,
+                "approval_required": True,
+                "paper_fallback": False,
+                "submitted": False,
+                "risk_gate": {"passed": True, "blockers": [], "checks": [{"name": "fake_live_ready", "passed": True}]},
+                "health": {"mode": "live_ready", "paper_fallback": False},
+                "account_snapshot": {"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+            }
+
+        def submit_order(self, intent, approval_id):
+            self.submit_calls += 1
+            return {
+                "status": "submitted",
+                "broker_order_id": "LIVE_0001",
+                "submitted_at": "2026-06-15T00:00:00Z",
+                "broker_status": "accepted",
+                "raw_response_hash": "sha256:demo",
+                "ledger_id": approval_id,
+                "submitted": True,
+            }
+
+        def reconcile(self, ack):
+            self.reconcile_calls += 1
+            return {
+                "status": "matched",
+                "as_of": "2026-06-15T00:00:01Z",
+                "positions_matched": True,
+                "cash_matched": True,
+                "open_orders": [{"broker_order_id": ack["broker_order_id"], "status": "accepted"}],
+                "fills": [],
+                "mismatches": [],
+                "recommended_actions": [],
+            }
+
+    broker = FakeLiveBroker()
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Live submit control", default_desk="execution")
+    intent = {
+        "symbol": "600000.SH",
+        "side": "buy",
+        "quantity": 100,
+        "order_type": "limit",
+        "limit_price": 10.0,
+        "strategy": "manual",
+        "reason": "approved live submit",
+        "evidence_refs": ["ev_demo"],
+        "risk_snapshot": {
+            "current_symbol_notional": 0.0,
+            "max_position_pct": 0.2,
+            "max_total_exposure_pct": 0.7,
+            "daily_order_count": 1,
+            "max_daily_orders": 5,
+            "tradable": True,
+            "data_freshness_status": "fresh",
+            "broker_account_consistent": True,
+        },
+    }
+    proposal = runtime.propose_live_order(session_id=session.session_id, intent=intent, broker=broker)
+
+    assert proposal["status"] == "approval_required"
+    assert proposal["preview"]["paper_fallback"] is False
+    assert proposal["action"]["action_type"] == "live_order"
+    assert proposal["action"]["risk_level"] == "live_order"
+    assert proposal["action"]["status"] == "approval_required"
+    assert Path(proposal["evidence"]["uri"]).exists()
+
+    blocked_submission = runtime.submit_live_order_action(proposal["action"]["action_id"], broker=broker)
+    assert blocked_submission["status"] == "blocked"
+    assert "approval required" in blocked_submission["run"]["stderr_summary"]
+    assert broker.submit_calls == 0
+
+    runtime.approve_action(proposal["action"]["action_id"], decided_by="ceo")
+    submitted = runtime.submit_live_order_action(proposal["action"]["action_id"], broker=broker)
+
+    assert broker.preview_calls == 2
+    assert broker.submit_calls == 1
+    assert broker.reconcile_calls == 1
+    assert submitted["status"] == "succeeded"
+    assert submitted["ack"]["broker_order_id"] == "LIVE_0001"
+    assert submitted["run"]["tool_name"] == "live.live_order.submit"
+    assert submitted["run"]["artifact_refs"]
+    assert submitted["reconciliation"]["status"] == "submitted"
+    assert submitted["reconciliation"]["broker_reconciliation"]["status"] == "matched"
+    assert submitted["reconciliation"]["paper_fallback"] is False
+    assert submitted["evidence"]["label"] == "Live order reconciliation"
+    assert Path(submitted["evidence"]["uri"]).exists()
+    assert runtime.get_action(proposal["action"]["action_id"])["status"] == "succeeded"
+    reset_datahub()
+
+
+def test_agent_live_order_proposal_and_submit_cli_api_fail_closed_by_default(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Live CLI/API", default_desk="execution")
+    cli_propose_code = run_cli(
+        [
+            "agent",
+            "live",
+            "propose",
+            "--session",
+            session.session_id,
+            "--symbol",
+            "600000.SH",
+            "--side",
+            "buy",
+            "--quantity",
+            "100",
+            "--limit-price",
+            "10",
+            "--strategy",
+            "manual",
+            "--reason",
+            "default disabled",
+            "--evidence",
+            "ev_demo",
+            "--json",
+        ]
+    )
+    cli_proposal = json.loads(capsys.readouterr().out)
+    api_proposal_res = TestClient(create_app()).post(
+        "/api/agent/live/proposals",
+        json={
+            "session_id": session.session_id,
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "default disabled",
+            "evidence_refs": ["ev_demo"],
+        },
+    )
+    cli_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="execution",
+        action_type="live_order",
+        risk_level="live_order",
+        summary="CLI live submit should fail closed",
+        parameters={
+            "live_order_intent": {
+                "symbol": "600000.SH",
+                "side": "buy",
+                "quantity": 100,
+                "order_type": "limit",
+                "limit_price": 10.0,
+                "strategy": "manual",
+                "reason": "default disabled",
+                "evidence_refs": ["ev_demo"],
+            }
+        },
+        expected_effect="Would submit only through MiniQMT/QMT if readiness and risk gates pass.",
+        evidence_refs=["ev_demo"],
+    )
+    api_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="execution",
+        action_type="live_order",
+        risk_level="live_order",
+        summary="API live submit should fail closed",
+        parameters={
+            "live_order_intent": {
+                "symbol": "600001.SH",
+                "side": "buy",
+                "quantity": 100,
+                "order_type": "limit",
+                "limit_price": 10.0,
+                "strategy": "manual",
+                "reason": "default disabled",
+                "evidence_refs": ["ev_demo"],
+            }
+        },
+        expected_effect="Would submit only through MiniQMT/QMT if readiness and risk gates pass.",
+        evidence_refs=["ev_demo"],
+    )
+    runtime.approve_action(cli_action.action_id, decided_by="ceo")
+    runtime.approve_action(api_action.action_id, decided_by="ceo")
+
+    cli_submit_code = run_cli(["agent", "live", "submit", cli_action.action_id, "--json"])
+    cli_submit = json.loads(capsys.readouterr().out)
+    api_submit_res = TestClient(create_app()).post(f"/api/agent/live/actions/{api_action.action_id}/submit")
+
+    assert cli_propose_code == 0
+    assert cli_proposal["data"]["proposal"]["status"] == "blocked"
+    assert cli_proposal["data"]["proposal"]["action"] is None
+    assert cli_proposal["data"]["proposal"]["preview"]["paper_fallback"] is False
+    assert api_proposal_res.status_code == 200
+    assert api_proposal_res.json()["proposal"]["status"] == "blocked"
+    assert api_proposal_res.json()["proposal"]["preview"]["risk_gate"]["passed"] is False
+    assert cli_submit_code == 1
+    assert cli_submit["data"]["submission"]["status"] == "blocked"
+    assert cli_submit["data"]["submission"]["run"]["tool_name"] == "live.live_order.submit"
+    assert cli_submit["data"]["submission"]["reconciliation"]["paper_fallback"] is False
+    assert api_submit_res.status_code == 200
+    assert api_submit_res.json()["submission"]["status"] == "blocked"
+    assert api_submit_res.json()["submission"]["reconciliation"]["paper_fallback"] is False
+    reset_datahub()
+
+
 def test_paper_order_preview_does_not_submit_or_mutate_broker_state():
     from broker import PaperBroker
 
