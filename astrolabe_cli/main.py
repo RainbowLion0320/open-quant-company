@@ -34,6 +34,7 @@ from astrolabe_cli.commands.agent import paper_cancel as agent_paper_cancel
 from astrolabe_cli.commands.agent import paper_propose as agent_paper_propose
 from astrolabe_cli.commands.agent import paper_submit as agent_paper_submit
 from astrolabe_cli.commands.agent import policies as agent_policies
+from astrolabe_cli.commands.agent import plan as agent_plan
 from astrolabe_cli.commands.agent import reject as agent_reject
 from astrolabe_cli.commands.agent import reports as agent_reports
 from astrolabe_cli.commands.agent import resolve_handoff as agent_resolve_handoff
@@ -140,6 +141,12 @@ def build_parser() -> argparse.ArgumentParser:
     agent_message_cmd.add_argument("--text", required=True)
     add_common_flags(agent_message_cmd)
     agent_message_cmd.set_defaults(handler=lambda args: agent_add_message(args.session, args.desk, args.text))
+
+    agent_plan_cmd = agent_sub.add_parser("plan", help="Preview an agent workflow without ledger writes")
+    agent_plan_cmd.add_argument("--desk", default="reporting")
+    agent_plan_cmd.add_argument("--text", required=True)
+    add_common_flags(agent_plan_cmd)
+    agent_plan_cmd.set_defaults(handler=lambda args: agent_plan(args.desk, args.text))
 
     agent_actions_cmd = agent_sub.add_parser("actions", help="List agent actions")
     agent_actions_cmd.add_argument("--session", default="")

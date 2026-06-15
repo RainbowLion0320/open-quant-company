@@ -106,6 +106,19 @@ def add_message(session_id: str, desk: str, text: str) -> CliResult:
     )
 
 
+def plan(desk: str, text: str) -> CliResult:
+    try:
+        workflow_plan = AgentRuntime().preview_workflow_plan(desk=desk, content=text)
+    except ValueError as exc:
+        return CliResult(False, "agent plan", {"desk": desk}, "Agent workflow plan invalid", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent plan",
+        message=f"Planned {len(workflow_plan['actions'])} agent action(s)",
+        data={"plan": workflow_plan},
+    )
+
+
 def actions(session_id: str = "", status: str = "", desk: str = "", risk_level: str = "") -> CliResult:
     runtime = AgentRuntime()
     rows = runtime.list_actions(

@@ -221,6 +221,43 @@ class AgentRuntime:
         )
         return {"message": message, "desk_response": desk_response}
 
+    def preview_workflow_plan(self, *, desk: str, content: str) -> dict[str, Any]:
+        plan = build_desk_workflow_plan(desk=desk, content=content)
+        actions: list[dict[str, Any]] = []
+        for action_spec in plan.actions:
+            approval_required = approval_required_for_risk(action_spec.risk_level)
+            actions.append(
+                {
+                    "desk": action_spec.desk,
+                    "action_type": action_spec.action_type,
+                    "tool_id": action_spec.tool_id,
+                    "risk_level": action_spec.risk_level,
+                    "status_preview": "approval_required" if approval_required else "proposed",
+                    "approval_required": approval_required,
+                    "summary": action_spec.summary,
+                    "expected_effect": action_spec.expected_effect,
+                    "parameters": {"tool_id": action_spec.tool_id, **action_spec.parameters},
+                    "evidence": asdict(action_spec.evidence),
+                }
+            )
+        return {
+            "status": "ready",
+            "desk": plan.desk,
+            "answer": plan.answer,
+            "confidence": plan.confidence,
+            "actions": actions,
+            "handoffs": list(plan.handoffs),
+            "work_orders": [asdict(work_order) for work_order in plan.work_orders],
+            "blockers": list(plan.blockers),
+            "side_effects": {
+                "ledger_writes": False,
+                "messages_created": 0,
+                "actions_created": 0,
+                "evidence_created": 0,
+                "work_orders_created": 0,
+            },
+        }
+
     def propose_action(
         self,
         *,

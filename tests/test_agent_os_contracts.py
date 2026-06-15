@@ -2888,6 +2888,59 @@ def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monke
     reset_datahub()
 
 
+def test_agent_workflow_plan_preview_is_side_effect_free_runtime_cli_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    before_summary = runtime.memory_snapshot()["summary"]
+
+    preview = runtime.preview_workflow_plan(
+        desk="data",
+        content="补一下 stock_limit_list 这张表，先演练再等我审批正式写入",
+    )
+    after_summary = runtime.memory_snapshot()["summary"]
+    cli_code = run_cli(
+        [
+            "agent",
+            "plan",
+            "--desk",
+            "data",
+            "--text",
+            "补一下 stock_limit_list 这张表，先演练再等我审批正式写入",
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(
+        "/api/agent/plans",
+        json={"desk": "data", "content": "补一下 stock_limit_list 这张表，先演练再等我审批正式写入"},
+    )
+
+    assert before_summary == after_summary
+    assert preview["status"] == "ready"
+    assert preview["side_effects"]["ledger_writes"] is False
+    assert [action["tool_id"] for action in preview["actions"]] == [
+        "astroq.data.repair.dry_run",
+        "astroq.data.repair",
+    ]
+    assert [action["status_preview"] for action in preview["actions"]] == ["proposed", "approval_required"]
+    assert preview["actions"][1]["approval_required"] is True
+    assert preview["actions"][1]["parameters"]["table"] == "stock_limit_list"
+    assert cli_code == 0
+    assert cli_payload["data"]["plan"]["actions"][1]["status_preview"] == "approval_required"
+    assert api_res.status_code == 200
+    assert api_res.json()["plan"]["actions"][1]["tool_id"] == "astroq.data.repair"
+    reset_datahub()
+
+
 def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

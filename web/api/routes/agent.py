@@ -93,6 +93,19 @@ async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[st
     return {"message": message.to_dict()}
 
 
+@router.post("/plans")
+async def preview_agent_workflow_plan(payload: dict[str, Any]) -> dict[str, Any]:
+    desk = str(payload.get("desk") or "reporting")
+    content = str(payload.get("content") or payload.get("text") or "")
+    if not content.strip():
+        raise InvalidParameterError("content", content, "expected a non-empty CEO message")
+    try:
+        plan = AgentRuntime().preview_workflow_plan(desk=desk, content=content)
+    except ValueError as exc:
+        raise InvalidParameterError("agent_plan", desk, str(exc))
+    return {"plan": plan}
+
+
 @router.get("/actions")
 async def list_agent_actions(
     session_id: str = "",

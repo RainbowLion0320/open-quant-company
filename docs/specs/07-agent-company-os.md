@@ -35,6 +35,7 @@ All endpoints are planned under `/api/agent/*`.
 | `PATCH` | `/api/agent/sessions/{session_id}` | Rename, archive, tag, or update session metadata. | Implemented |
 | `POST` | `/api/agent/sessions/{session_id}/run-readonly` | Dispatch proposed safe `read_only` / `dry_run` actions for one session and skip approval-required, write, and trading actions. | Implemented |
 | `POST` | `/api/agent/sessions/{session_id}/messages` | Add a CEO message, create a deterministic desk response, and link evidence/actions/handoffs. | Implemented |
+| `POST` | `/api/agent/plans` | Preview a deterministic desk workflow plan, action status previews, approvals, handoffs, and work orders without writing the ledger. | Implemented |
 | `GET` | `/api/agent/actions` | List actions with `session_id`, `status`, `desk`, and `risk_level` filters. | Implemented |
 | `GET` | `/api/agent/handoffs` | List cross-desk handoff ledger rows, optionally scoped to a session. | Implemented |
 | `POST` | `/api/agent/handoffs/{handoff_id}/resolve` | Mark a cross-desk handoff as resolved and write `resolved_at`. | Implemented |
@@ -83,6 +84,7 @@ All commands must support `--json`.
 | `astroq agent session update SESSION_ID --title TITLE --status active\|archived\|blocked --tag TAG --json` | Rename, archive, or retag a session. | Implemented |
 | `astroq agent session run-readonly SESSION_ID --json` | Dispatch proposed safe `read_only` / `dry_run` actions for one session and skip approval-required, write, and trading actions. | Implemented |
 | `astroq agent message --session SESSION_ID --desk DESK --text TEXT --json` | Add a CEO message and return the deterministic desk response. | Implemented |
+| `astroq agent plan --desk DESK --text TEXT --json` | Preview a side-effect-free deterministic desk workflow before creating messages, evidence, actions, handoffs, or work orders. | Implemented |
 | `astroq agent actions --session SESSION_ID --status STATUS --desk DESK --risk-level RISK --json` | List actions filtered by session, status, desk, and risk level. | Implemented |
 | `astroq agent handoffs --session SESSION_ID --json` | List cross-desk handoffs. | Implemented |
 | `astroq agent handoff resolve HANDOFF_ID --json` | Mark a cross-desk handoff as resolved. | Implemented |
