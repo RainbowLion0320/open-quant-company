@@ -40,6 +40,17 @@ risk_control:
   max_single_order_amount:
     enabled: true
     max_amount: 500000
+execution:
+  live:
+    enabled: false
+    broker: miniqmt
+    require_manual_approval: true
+    kill_switch: true
+    sdk_modules:
+    - xtquant.xttrader
+    - xtquant.xttype
+    sdk_gateway_factory: ''
+    sdk_gateway_config: {}
 backtest:
   benchmark: sh000001
   benchmark_name: 上证指数

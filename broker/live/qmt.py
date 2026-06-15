@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import importlib.util
 import json
 from dataclasses import asdict, dataclass, field
@@ -27,6 +28,8 @@ class LiveBrokerHealth:
     permissions: list[str]
     kill_switch: bool
     paper_fallback: bool
+    sdk_gateway_configured: bool
+    sdk_gateway_error: str
     last_probe_at: str
     blockers: list[str] = field(default_factory=list)
 
@@ -54,6 +57,8 @@ class MiniQmtLiveBroker:
         account: dict[str, Any] | None = None,
         kill_switch: bool | None = None,
         sdk_gateway: Any | None = None,
+        sdk_gateway_factory: str | None = None,
+        sdk_gateway_config: dict[str, Any] | None = None,
     ):
         cfg = get_section("execution.live", {}) or {}
         self.enabled = bool(cfg.get("enabled", False) if enabled is None else enabled)
@@ -65,7 +70,24 @@ class MiniQmtLiveBroker:
         self.permissions = [str(item) for item in (permissions if permissions is not None else cfg.get("permissions", []) or [])]
         self.account = dict(account if account is not None else cfg.get("account", {}) or {})
         self.kill_switch = bool(cfg.get("kill_switch", True) if kill_switch is None else kill_switch)
-        self.sdk_gateway = sdk_gateway
+        self.sdk_gateway_factory = str(
+            sdk_gateway_factory if sdk_gateway_factory is not None else cfg.get("sdk_gateway_factory", "") or ""
+        ).strip()
+        self.sdk_gateway_config = dict(
+            sdk_gateway_config if sdk_gateway_config is not None else cfg.get("sdk_gateway_config", {}) or {}
+        )
+        self.sdk_gateway_error = ""
+        if sdk_gateway is not None:
+            self.sdk_gateway = sdk_gateway
+        elif self.enabled and self.sdk_gateway_factory:
+            self.sdk_gateway, self.sdk_gateway_error = _build_sdk_gateway(
+                self.sdk_gateway_factory,
+                config=self.sdk_gateway_config,
+                account_id=self.account_id,
+                broker=self.broker,
+            )
+        else:
+            self.sdk_gateway = None
 
     def health(self) -> dict[str, Any]:
         blockers: list[str] = []
@@ -84,6 +106,8 @@ class MiniQmtLiveBroker:
             blockers.extend(f"missing_permission:{item}" for item in missing_permissions)
             if not self.kill_switch:
                 blockers.append("kill_switch_disabled")
+            if self.sdk_gateway_error:
+                blockers.append("sdk_gateway_load_failed")
             mode = "live_ready" if not blockers else "blocked"
 
         return LiveBrokerHealth(
@@ -96,6 +120,8 @@ class MiniQmtLiveBroker:
             permissions=self.permissions,
             kill_switch=self.kill_switch,
             paper_fallback=False,
+            sdk_gateway_configured=self.sdk_gateway is not None,
+            sdk_gateway_error=self.sdk_gateway_error,
             last_probe_at=_now(),
             blockers=blockers,
         ).to_dict()
@@ -156,6 +182,20 @@ class MiniQmtLiveBroker:
     def submit_order(self, intent: dict[str, Any], *, approval_id: str) -> dict[str, Any]:
         """Submit through an explicitly injected SDK gateway, otherwise fail closed."""
         normalized = self._normalize_intent(intent)
+        if self.sdk_gateway_error:
+            return {
+                "status": "blocked",
+                "submitted": False,
+                "broker_order_id": "",
+                "submitted_at": "",
+                "broker_status": "gateway_unavailable",
+                "raw_response_hash": "",
+                "ledger_id": approval_id,
+                "error": "live_sdk_gateway_unavailable",
+                "error_message": self.sdk_gateway_error,
+                "paper_fallback": False,
+                "intent": normalized,
+            }
         if self.sdk_gateway is None:
             return {
                 "status": "blocked",
@@ -607,6 +647,42 @@ def _response_get(response: Any, key: str) -> Any:
     if isinstance(response, dict):
         return response.get(key)
     return getattr(response, key, None)
+
+
+def _build_sdk_gateway(
+    factory_path: str,
+    *,
+    config: dict[str, Any],
+    account_id: str,
+    broker: str,
+) -> tuple[Any | None, str]:
+    try:
+        factory = _load_factory(factory_path)
+        gateway = factory(config=dict(config), account_id=account_id, broker=broker)
+        missing = [name for name in ("submit_order", "reconcile") if not callable(getattr(gateway, name, None))]
+        if missing:
+            return None, f"AttributeError: sdk gateway missing methods {','.join(missing)}"
+        return gateway, ""
+    except Exception as exc:
+        return None, f"{exc.__class__.__name__}: {str(exc)[:240]}"
+
+
+def _load_factory(factory_path: str) -> Callable[..., Any]:
+    path = factory_path.strip()
+    if not path:
+        raise ValueError("sdk gateway factory path is empty")
+    if ":" in path:
+        module_name, attr_path = path.split(":", 1)
+    else:
+        module_name, _, attr_path = path.rpartition(".")
+    if not module_name or not attr_path:
+        raise ValueError("sdk gateway factory must use module:callable or module.callable")
+    obj: Any = importlib.import_module(module_name)
+    for part in attr_path.split("."):
+        obj = getattr(obj, part)
+    if not callable(obj):
+        raise TypeError("sdk gateway factory is not callable")
+    return obj
 
 
 def _extract_broker_order_id(response: Any) -> str:

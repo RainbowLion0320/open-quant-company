@@ -1100,6 +1100,177 @@ def test_miniqmt_live_broker_uses_explicit_sdk_gateway_for_audited_submit_and_re
     assert gateway.reconciliations[0]["account_id"] == "1234567890"
 
 
+def test_miniqmt_live_broker_loads_sdk_gateway_from_settings_factory(tmp_path, monkeypatch):
+    from core.settings import clear_settings_cache
+
+    module_path = tmp_path / "fake_qmt_gateway_config.py"
+    module_path.write_text(
+        """
+class ConfiguredGateway:
+    def __init__(self, *, config, account_id, broker):
+        self.config = dict(config)
+        self.account_id = account_id
+        self.broker = broker
+        self.submitted = []
+        self.reconciled = []
+
+    def submit_order(self, intent, *, approval_id, account_id):
+        self.submitted.append({"intent": intent, "approval_id": approval_id, "account_id": account_id})
+        return {
+            "broker_order_id": "CFG_QMT_0001",
+            "broker_status": "accepted",
+            "account_id": account_id,
+            "client_name": self.config["client_name"],
+        }
+
+    def reconcile(self, ack, *, account_id):
+        self.reconciled.append({"ack": ack, "account_id": account_id})
+        return {
+            "positions_matched": True,
+            "cash_matched": True,
+            "open_orders": [{"broker_order_id": ack["broker_order_id"], "status": "accepted"}],
+            "fills": [],
+            "mismatches": [],
+        }
+
+
+def build_gateway(*, config, account_id, broker):
+    return ConfiguredGateway(config=config, account_id=account_id, broker=broker)
+""",
+        encoding="utf-8",
+    )
+    settings_path = tmp_path / "settings.yaml"
+    settings_path.write_text(
+        """
+execution:
+  live:
+    enabled: true
+    broker: miniqmt
+    logged_in: true
+    account_id: "1234567890"
+    permissions: ["query", "trade"]
+    account:
+      cash: 100000
+      total_asset: 120000
+      market_value: 20000
+    kill_switch: true
+    sdk_gateway_factory: fake_qmt_gateway_config:build_gateway
+    sdk_gateway_config:
+      client_name: ci-qmt
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ASTROLABE_SETTINGS", str(settings_path))
+    monkeypatch.syspath_prepend(str(tmp_path))
+    sys.modules.pop("fake_qmt_gateway_config", None)
+    clear_settings_cache()
+
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    broker = MiniQmtLiveBroker(import_checker=lambda _name: object())
+    intent = {
+        "symbol": "600000.SH",
+        "side": "buy",
+        "quantity": 100,
+        "order_type": "limit",
+        "limit_price": 10.0,
+        "strategy": "manual",
+        "reason": "configured gateway submit",
+        "evidence_refs": ["ev_demo"],
+        "risk_snapshot": {
+            "current_symbol_notional": 2_000.0,
+            "max_position_pct": 0.2,
+            "max_total_exposure_pct": 0.7,
+            "daily_order_count": 1,
+            "max_daily_orders": 5,
+            "tradable": True,
+            "data_freshness_status": "fresh",
+            "broker_account_consistent": True,
+            "current_drawdown_pct": 0.04,
+            "max_drawdown_pct": 0.12,
+            "portfolio_var_pct": 0.025,
+            "max_portfolio_var_pct": 0.06,
+            "portfolio_cvar_pct": 0.04,
+            "max_portfolio_cvar_pct": 0.09,
+            "current_sector_notional": 8_000.0,
+            "max_sector_exposure_pct": 0.25,
+            "intraday_limit_state": "normal",
+        },
+    }
+
+    health = broker.health()
+    submitted = broker.submit_order(intent, approval_id="approval_config")
+    reconciled = broker.reconcile(submitted)
+
+    assert health["mode"] == "live_ready"
+    assert health["sdk_gateway_configured"] is True
+    assert health["sdk_gateway_error"] == ""
+    assert broker.sdk_gateway.config == {"client_name": "ci-qmt"}
+    assert submitted["status"] == "submitted"
+    assert submitted["broker_order_id"] == "CFG_QMT_0001"
+    assert submitted["raw_response_masked"]["account_id"] == "12******90"
+    assert submitted["raw_response_masked"]["client_name"] == "ci-qmt"
+    assert broker.sdk_gateway.submitted[0]["approval_id"] == "approval_config"
+    assert reconciled["status"] == "matched"
+    assert broker.sdk_gateway.reconciled[0]["account_id"] == "1234567890"
+    clear_settings_cache()
+
+
+def test_miniqmt_live_broker_blocks_when_configured_sdk_gateway_factory_fails(tmp_path, monkeypatch):
+    from core.settings import clear_settings_cache
+
+    settings_path = tmp_path / "settings.yaml"
+    settings_path.write_text(
+        """
+execution:
+  live:
+    enabled: true
+    broker: miniqmt
+    logged_in: true
+    account_id: "1234567890"
+    permissions: ["query", "trade"]
+    account:
+      cash: 100000
+      total_asset: 120000
+      market_value: 20000
+    kill_switch: true
+    sdk_gateway_factory: missing_qmt_gateway:build_gateway
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ASTROLABE_SETTINGS", str(settings_path))
+    clear_settings_cache()
+
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    broker = MiniQmtLiveBroker(import_checker=lambda _name: object())
+    health = broker.health()
+    submitted = broker.submit_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "factory failure blocks",
+            "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {},
+        },
+        approval_id="approval_config_failure",
+    )
+
+    assert health["mode"] == "blocked"
+    assert "sdk_gateway_load_failed" in health["blockers"]
+    assert health["sdk_gateway_configured"] is False
+    assert health["sdk_gateway_error"].startswith("ModuleNotFoundError:")
+    assert submitted["status"] == "blocked"
+    assert submitted["error"] == "live_sdk_gateway_unavailable"
+    assert submitted["broker_status"] == "gateway_unavailable"
+    assert submitted["paper_fallback"] is False
+    clear_settings_cache()
+
+
 def test_agent_live_preview_cli_and_api(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
