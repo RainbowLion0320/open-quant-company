@@ -2204,12 +2204,18 @@ def test_agent_reports_aggregate_system_artifact_context(tmp_path, monkeypatch):
 
     assert "artifact_readiness" in sections
     assert "artifact_findings" in sections
+    assert "semantic_synthesis" in sections
     assert context["available_count"] == 5
     assert context["missing_count"] >= 1
+    assert context["synthesis"]["status"] == "blocked"
+    assert context["synthesis"]["root_cause_count"] >= 2
     assert any(item["key"] == "lifecycle" and item["status"] == "available" for item in context["items"])
     assert any(item["key"] == "codegraph" and item["status"] == "missing" for item in context["items"])
     assert "macro_gdp" in sections["artifact_findings"]["body"]
     assert "source_not_updated" in sections["artifact_findings"]["body"]
+    assert "macro_gdp" in sections["semantic_synthesis"]["body"]
+    assert "strategy_evidence_blocked" in sections["semantic_synthesis"]["body"]
+    assert "data_source_gap" in sections["semantic_synthesis"]["body"]
     assert "strategy_competition" in sections["artifact_readiness"]["body"]
     assert "data-sources/latest.json" in sections["artifact_readiness"]["body"]
     assert "codegraph" in sections["artifact_readiness"]["body"]

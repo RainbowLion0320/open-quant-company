@@ -165,6 +165,12 @@ def build_report_payload(
             "body": _artifact_findings_body(artifact_context),
             "evidence_refs": [],
         },
+        {
+            "section_id": "semantic_synthesis",
+            "title": "Semantic Synthesis",
+            "body": _semantic_synthesis_body(artifact_context),
+            "evidence_refs": [],
+        },
     ]
     sections.extend(
         _operating_rhythm_sections(
@@ -210,6 +216,13 @@ def empty_report_artifact_context() -> dict[str, Any]:
         "available_count": 0,
         "missing_count": len(REPORT_ARTIFACT_SOURCES),
         "invalid_count": 0,
+        "synthesis": {
+            "status": "missing",
+            "root_cause_count": 0,
+            "root_causes": [],
+            "impacts": [],
+            "next_actions": ["Generate lifecycle, data-source, strategy, architecture, test-design, and CodeGraph artifacts."],
+        },
         "items": [
             {
                 "key": source.key,
@@ -239,12 +252,14 @@ def collect_report_artifact_context(artifact_root: Path | None = None) -> dict[s
 
         root = get_datahub().artifact_dir("lifecycle").parent
     items = [_collect_artifact_item(root, source) for source in REPORT_ARTIFACT_SOURCES]
-    return {
+    context = {
         "available_count": sum(1 for item in items if item["status"] == "available"),
         "missing_count": sum(1 for item in items if item["status"] == "missing"),
         "invalid_count": sum(1 for item in items if item["status"] == "invalid"),
         "items": items,
     }
+    context["synthesis"] = _artifact_semantic_synthesis(context)
+    return context
 
 
 def _collect_artifact_item(root: Path, source: ReportArtifactSource) -> dict[str, Any]:
@@ -360,6 +375,141 @@ def _artifact_findings_body(artifact_context: dict[str, Any]) -> str:
         for finding in findings[:5]:
             lines.append(f"- {item.get('key')}: {_compact_json(finding)}")
     return "\n".join(lines) if lines else "No blocker, issue, risk, failure, or warning findings were available in local artifacts."
+
+
+def _artifact_semantic_synthesis(artifact_context: dict[str, Any]) -> dict[str, Any]:
+    items = [item for item in artifact_context.get("items", []) if isinstance(item, dict)]
+    by_key = {str(item.get("key") or ""): item for item in items}
+    root_causes: list[dict[str, str]] = []
+    impacts: list[str] = []
+    next_actions: list[str] = []
+
+    lifecycle = by_key.get("lifecycle")
+    if lifecycle and lifecycle.get("status") == "available":
+        for finding in lifecycle.get("findings", [])[:3]:
+            if not isinstance(finding, dict):
+                continue
+            if str(finding.get("kind") or "") != "blockers":
+                continue
+            evidence = _compact_json(finding.get("evidence"), limit=240)
+            root_causes.append(
+                {
+                    "cause": "lifecycle_blocker",
+                    "evidence": evidence,
+                    "recommendation": "Resolve lifecycle blockers before promoting strategies, trading, or treating reports as ready.",
+                }
+            )
+            next_actions.append("Run the lifecycle blocker repair path and regenerate `astroq lifecycle check --json`.")
+
+    data_sources = by_key.get("data_sources")
+    if data_sources and data_sources.get("status") == "available":
+        summary = data_sources.get("summary") if isinstance(data_sources.get("summary"), dict) else {}
+        capability_count = _int_value(summary.get("capability_count"))
+        integrated_count = _int_value(summary.get("project_integrated_count"))
+        unmapped_count = _int_value(summary.get("capability_unmapped_count"))
+        if capability_count > integrated_count or unmapped_count > 0:
+            root_causes.append(
+                {
+                    "cause": "data_source_gap",
+                    "evidence": f"{integrated_count}/{capability_count} capabilities integrated; {unmapped_count} unmapped.",
+                    "recommendation": "Review Source Capability Registry diff before claiming data coverage is complete.",
+                }
+            )
+            next_actions.append("Run `astroq data sources diff-registry --json` and prioritize unmapped production dimensions.")
+
+    strategy = by_key.get("strategy_competition")
+    if strategy and strategy.get("status") == "available":
+        summary = strategy.get("summary") if isinstance(strategy.get("summary"), dict) else {}
+        blocked = _int_value(summary.get("blocked")) + _int_value(summary.get("invalid_count")) + _int_value(summary.get("error_count"))
+        if blocked > 0:
+            root_causes.append(
+                {
+                    "cause": "strategy_evidence_blocked",
+                    "evidence": _compact_json(summary, limit=240),
+                    "recommendation": "Do not promote strategy layers until missing alpha/OOS/backtest evidence is regenerated.",
+                }
+            )
+            impacts.append(f"{blocked} strategy evidence item(s) are blocked or invalid.")
+            next_actions.append("Regenerate strategy competition evidence after data and lifecycle blockers are closed.")
+
+    ast_item = by_key.get("ast_intelligence")
+    if ast_item and ast_item.get("status") == "available":
+        summary = ast_item.get("summary") if isinstance(ast_item.get("summary"), dict) else {}
+        issue_count = _int_value(summary.get("issue_count"))
+        if issue_count > 0:
+            root_causes.append(
+                {
+                    "cause": "engineering_quality_risk",
+                    "evidence": _compact_json(summary, limit=240),
+                    "recommendation": "Open Engineering Desk work orders for real architecture or duplicate-implementation risks.",
+                }
+            )
+
+    test_design = by_key.get("test_design")
+    if test_design and test_design.get("status") == "available":
+        summary = test_design.get("summary") if isinstance(test_design.get("summary"), dict) else {}
+        design_risk_count = _int_value(summary.get("design_risk_count")) + _int_value(summary.get("smell_count"))
+        if design_risk_count > 0:
+            root_causes.append(
+                {
+                    "cause": "test_design_risk",
+                    "evidence": _compact_json(summary, limit=240),
+                    "recommendation": "Review high-severity test design risks before relying on green test runs alone.",
+                }
+            )
+
+    missing_count = _int_value(artifact_context.get("missing_count"))
+    invalid_count = _int_value(artifact_context.get("invalid_count"))
+    if missing_count or invalid_count:
+        impacts.append(f"{missing_count} evidence artifact(s) are missing and {invalid_count} are invalid.")
+        next_actions.append("Regenerate missing local intelligence artifacts before distributing the report.")
+
+    if any(row["cause"] in {"lifecycle_blocker", "strategy_evidence_blocked"} for row in root_causes):
+        status = "blocked"
+    elif root_causes or invalid_count:
+        status = "attention"
+    elif missing_count:
+        status = "partial"
+    else:
+        status = "ready"
+
+    return {
+        "status": status,
+        "root_cause_count": len(root_causes),
+        "root_causes": root_causes[:8],
+        "impacts": _ordered_unique(impacts)[:8],
+        "next_actions": _ordered_unique(next_actions)[:8],
+    }
+
+
+def _semantic_synthesis_body(artifact_context: dict[str, Any]) -> str:
+    synthesis = artifact_context.get("synthesis")
+    if not isinstance(synthesis, dict):
+        synthesis = _artifact_semantic_synthesis(artifact_context)
+    lines = [
+        f"- Synthesis status: {synthesis.get('status', 'unknown')}",
+        f"- Root causes: {synthesis.get('root_cause_count', 0)}",
+    ]
+    for root_cause in synthesis.get("root_causes", [])[:8]:
+        if not isinstance(root_cause, dict):
+            continue
+        lines.append(
+            "- "
+            f"{root_cause.get('cause')}: {root_cause.get('evidence')} "
+            f"-> {root_cause.get('recommendation')}"
+        )
+    for impact in synthesis.get("impacts", [])[:5]:
+        lines.append(f"- Impact: {impact}")
+    for action in synthesis.get("next_actions", [])[:5]:
+        lines.append(f"- Next action: {action}")
+    return "\n".join(lines)
+
+
+def _int_value(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _compact_json(value: Any, *, limit: int = 500) -> str:
