@@ -88,8 +88,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "reportKindOptions" in view
     assert "kind: selectedReportKind.value" in view
     assert "api.agentLiveReadiness" in view
+    assert "api.agentLiveKillSwitch" in view
+    assert "api.agentLiveKillSwitchActivate" in view
+    assert "api.agentLiveKillSwitchDeactivate" in view
     assert "liveReadiness" in view
+    assert "liveKillSwitch" in view
+    assert "operateLiveKillSwitch" in view
     assert "ceoOffice.liveReadiness" in view
+    assert "ceoOffice.liveKillSwitch" in view
+    assert "ceoOffice.activateKillSwitch" in view
+    assert "ceoOffice.deactivateKillSwitch" in view
     assert "reports" in view
     assert "generateReport" in view
     assert "ceoOffice.reportKind" in view
@@ -199,7 +207,13 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Risk Gate" in en_ceo
     assert "Run Evidence" in en_ceo
     assert "实盘就绪" in zh_ceo
+    assert "实盘红灯" in zh_ceo
+    assert "激活红灯" in zh_ceo
+    assert "解除红灯" in zh_ceo
     assert "Live Readiness" in en_ceo
+    assert "Live Kill Switch" in en_ceo
+    assert "Activate Kill Switch" in en_ceo
+    assert "Deactivate Kill Switch" in en_ceo
 
 
 def test_frontend_agent_api_module_exports_runtime_types_and_calls():
@@ -233,6 +247,10 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "/api/agent/reports/rhythm/scheduled" in agent_api
     assert "/api/agent/reports/${encodeURIComponent(reportId)}/notify" in agent_api
     assert "agentLiveReadiness" in agent_api
+    assert "agentLiveKillSwitch" in agent_api
+    assert "agentLiveKillSwitchActivate" in agent_api
+    assert "agentLiveKillSwitchDeactivate" in agent_api
+    assert "/api/agent/live/kill-switch" in agent_api
     assert "export interface AgentSession" in agent_types
     assert "export interface AgentReport" in agent_types
     assert "export interface AgentReportRhythm" in agent_types
@@ -242,6 +260,9 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentReportNotification" in agent_types
     assert "export interface AgentReportNotificationResponse" in agent_types
     assert "export interface AgentLiveReadiness" in agent_types
+    assert "export interface AgentLiveKillSwitch" in agent_types
+    assert "export interface AgentLiveKillSwitchResponse" in agent_types
+    assert "live_kill_switch?: AgentLiveKillSwitch" in agent_types
     assert "export interface AgentAction" in agent_types
     assert "expires_at: string" in agent_types
     assert "export interface AgentActionDetail" in agent_types

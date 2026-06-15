@@ -53,6 +53,11 @@
         <strong>{{ statusLabel(liveReadiness?.mode || "unknown") }}</strong>
         <small>{{ liveReadiness?.paper_fallback === false ? t("ceoOffice.noPaperFallback") : "—" }}</small>
       </article>
+      <article class="ceo-metric">
+        <span>{{ t("ceoOffice.liveKillSwitch") }}</span>
+        <strong>{{ statusLabel(liveKillSwitch?.status || "inactive") }}</strong>
+        <small>{{ liveKillSwitch?.active ? t("ceoOffice.killSwitchBlocking") : t("ceoOffice.killSwitchClear") }}</small>
+      </article>
     </section>
 
     <section class="ceo-grid">
@@ -142,6 +147,33 @@
             <div class="detail-row">
               <span>{{ t("ceoOffice.noPaperFallback") }}</span>
               <code>{{ String(liveReadiness.paper_fallback === false) }}</code>
+            </div>
+            <div class="detail-row">
+              <span>{{ t("ceoOffice.liveKillSwitch") }}</span>
+              <div class="kill-switch-state" :class="{ active: liveKillSwitch?.active, invalid: liveKillSwitch?.status === 'invalid' }">
+                <code>{{ statusLabel(liveKillSwitch?.status || "inactive") }}</code>
+                <small>{{ liveKillSwitch?.reason || t("ceoOffice.killSwitchClear") }}</small>
+              </div>
+            </div>
+            <div class="approval-buttons">
+              <button
+                v-if="!liveKillSwitch?.active"
+                class="btn btn-xs btn-danger"
+                type="button"
+                :disabled="operatingLiveKillSwitch === 'activate'"
+                @click="operateLiveKillSwitch('activate')"
+              >
+                {{ t("ceoOffice.activateKillSwitch") }}
+              </button>
+              <button
+                v-else
+                class="btn btn-xs btn-ghost"
+                type="button"
+                :disabled="operatingLiveKillSwitch === 'deactivate'"
+                @click="operateLiveKillSwitch('deactivate')"
+              >
+                {{ t("ceoOffice.deactivateKillSwitch") }}
+              </button>
             </div>
             <div class="detail-row">
               <span>{{ t("ceoOffice.blockers") }}</span>
@@ -466,7 +498,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveReadiness, type AgentMessage, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentMessage, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -481,6 +513,7 @@ const rhythmResult = ref<AgentReportRhythm | null>(null);
 const scheduledRhythmResult = ref<AgentScheduledReportRhythm | null>(null);
 const notificationResult = ref<AgentReportNotification | null>(null);
 const liveReadiness = ref<AgentLiveReadiness | null>(null);
+const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
@@ -496,6 +529,7 @@ const generatingReport = ref(false);
 const runningRhythm = ref(false);
 const runningScheduledRhythm = ref(false);
 const notifyingReport = ref("");
+const operatingLiveKillSwitch = ref<"activate" | "deactivate" | "">("");
 const selectedReportKind = ref("daily_brief");
 const draft = ref("");
 const sending = ref(false);
@@ -572,6 +606,8 @@ function statusLabel(status: string) {
   if (status === "dry_run") return t("ceoOffice.dryRun");
   if (status === "partial") return t("ceoOffice.partial");
   if (status === "missing_secret") return t("ceoOffice.missingSecret");
+  if (status === "inactive") return t("ceoOffice.inactive");
+  if (status === "invalid") return t("ceoOffice.invalid");
   return status;
 }
 
@@ -626,18 +662,20 @@ async function loadSession(sessionId: string) {
 async function load() {
   error.value = "";
   try {
-    const [sessionPayload, deskPayload, actionPayload, handoffPayload, livePayload] = await Promise.all([
+    const [sessionPayload, deskPayload, actionPayload, handoffPayload, livePayload, killSwitchPayload] = await Promise.all([
       api.agentSessions(),
       api.agentDesks(),
       api.agentActions(),
       api.agentHandoffs(),
       api.agentLiveReadiness(),
+      api.agentLiveKillSwitch(),
     ]);
     sessions.value = sessionPayload.sessions || [];
     desks.value = deskPayload.desks || [];
     actions.value = actionPayload.actions || [];
     handoffs.value = handoffPayload.handoffs || [];
     liveReadiness.value = livePayload.health;
+    liveKillSwitch.value = killSwitchPayload.kill_switch || livePayload.health.live_kill_switch || null;
     if (sessions.value.length) {
       await loadSession(activeSession.value?.session_id || sessions.value[0].session_id);
     }
@@ -838,6 +876,25 @@ async function notifyReport(reportId: string) {
     error.value = `${t("ceoOffice.notificationFailed")}: ${err?.message || err}`;
   } finally {
     notifyingReport.value = "";
+  }
+}
+
+async function operateLiveKillSwitch(nextState: "activate" | "deactivate") {
+  operatingLiveKillSwitch.value = nextState;
+  error.value = "";
+  try {
+    const reason = nextState === "activate"
+      ? t("ceoOffice.killSwitchActivateReason")
+      : t("ceoOffice.killSwitchDeactivateReason");
+    const payload = nextState === "activate"
+      ? await api.agentLiveKillSwitchActivate(reason)
+      : await api.agentLiveKillSwitchDeactivate(reason);
+    liveKillSwitch.value = payload.kill_switch;
+    await load();
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.killSwitchFailed")}: ${err?.message || err}`;
+  } finally {
+    operatingLiveKillSwitch.value = "";
   }
 }
 

@@ -370,6 +370,35 @@
   background: rgba(255, 255, 255, 0.025);
 }
 
+.kill-switch-state {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.kill-switch-state.active {
+  border-color: rgba(239, 68, 68, 0.36);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.kill-switch-state.invalid {
+  border-color: rgba(245, 158, 11, 0.38);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.kill-switch-state code {
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.kill-switch-state small {
+  color: var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+
 .paper-preview-cell {
   display: grid;
   gap: 4px;

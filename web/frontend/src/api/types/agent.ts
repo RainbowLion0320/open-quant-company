@@ -117,6 +117,23 @@ export interface AgentLiveReadiness {
   paper_fallback: boolean;
   last_probe_at: string;
   blockers: string[];
+  live_kill_switch?: AgentLiveKillSwitch;
+}
+
+export interface AgentLiveKillSwitch {
+  status: string;
+  active: boolean;
+  reason: string;
+  activated_at: string;
+  deactivated_at: string;
+  updated_at: string;
+  paper_fallback: boolean;
+  state_path?: string;
+  artifact_path?: string;
+  canceled_count?: number;
+  canceled_actions?: AgentAction[];
+  read_error?: string;
+  evidence?: EvidenceRef;
 }
 
 export interface AgentDeskResponse {
@@ -289,6 +306,10 @@ export interface AgentScheduledReportRhythmResponse {
 
 export interface AgentLiveReadinessResponse {
   health: AgentLiveReadiness;
+}
+
+export interface AgentLiveKillSwitchResponse {
+  kill_switch: AgentLiveKillSwitch;
 }
 
 export interface AgentEvidenceResponse {

@@ -8,6 +8,7 @@ import type {
   AgentEvidenceResponse,
   AgentHandoff,
   AgentHandoffsResponse,
+  AgentLiveKillSwitchResponse,
   AgentLiveReadinessResponse,
   AgentPaperCancelResponse,
   AgentReportNotificationResponse,
@@ -62,6 +63,11 @@ export const agentApi = {
   agentRunScheduledReportRhythm: (payload: { force?: boolean } = {}) =>
     post<AgentScheduledReportRhythmResponse>("/api/agent/reports/rhythm/scheduled", payload),
   agentLiveReadiness: () => get<AgentLiveReadinessResponse>("/api/agent/live/readiness"),
+  agentLiveKillSwitch: () => get<AgentLiveKillSwitchResponse>("/api/agent/live/kill-switch"),
+  agentLiveKillSwitchActivate: (reason = "") =>
+    post<AgentLiveKillSwitchResponse>("/api/agent/live/kill-switch/activate", { reason }),
+  agentLiveKillSwitchDeactivate: (reason = "") =>
+    post<AgentLiveKillSwitchResponse>("/api/agent/live/kill-switch/deactivate", { reason }),
   agentEvidence: (evidenceId: string) => get<AgentEvidenceResponse>(`/api/agent/evidence/${encodeURIComponent(evidenceId)}`),
   agentDesks: () => get<AgentDesksResponse>("/api/agent/desks"),
 };
