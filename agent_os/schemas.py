@@ -135,6 +135,8 @@ class AgentWorkOrder:
     suggested_verification: list[str]
     evidence_refs: list[str]
     status: str
+    resolution: str
+    resolved_at: str | None
     created_by: str
     created_at: str
     updated_at: str

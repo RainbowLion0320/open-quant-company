@@ -245,6 +245,7 @@
               </div>
               <p>{{ workOrder.summary }}</p>
               <small>{{ workOrder.impact }}</small>
+              <p v-if="workOrder.resolution" class="muted-line">{{ t("ceoOffice.resolution") }}: {{ workOrder.resolution }}</p>
               <div v-if="workOrder.affected_files.length" class="desk-chip-section">
                 <small>{{ t("ceoOffice.affectedFiles") }}</small>
                 <div class="desk-chip-list">
@@ -266,6 +267,33 @@
                   @click="loadEvidence(evidenceId)"
                 >
                   {{ t("ceoOffice.openEvidence") }}
+                </button>
+              </div>
+              <div v-if="workOrder.status !== 'resolved' && workOrder.status !== 'canceled'" class="approval-buttons">
+                <button
+                  v-if="workOrder.status === 'open'"
+                  class="btn btn-xs"
+                  type="button"
+                  :disabled="updatingWorkOrder === workOrder.work_order_id"
+                  @click="updateWorkOrder(workOrder.work_order_id, 'in_progress', 'Accepted from CEO Office')"
+                >
+                  {{ t("ceoOffice.startWorkOrder") }}
+                </button>
+                <button
+                  class="btn btn-xs"
+                  type="button"
+                  :disabled="updatingWorkOrder === workOrder.work_order_id"
+                  @click="updateWorkOrder(workOrder.work_order_id, 'resolved', 'Resolved from CEO Office')"
+                >
+                  {{ t("ceoOffice.resolveHandoff") }}
+                </button>
+                <button
+                  class="btn btn-xs danger"
+                  type="button"
+                  :disabled="updatingWorkOrder === workOrder.work_order_id"
+                  @click="updateWorkOrder(workOrder.work_order_id, 'canceled', 'Canceled from CEO Office')"
+                >
+                  {{ t("ceoOffice.cancelWorkOrder") }}
                 </button>
               </div>
             </div>
@@ -725,6 +753,7 @@ const cancelingAction = ref("");
 const archivingSession = ref(false);
 const runningReadOnlyWorkflow = ref(false);
 const resolvingHandoff = ref("");
+const updatingWorkOrder = ref("");
 const generatingReport = ref(false);
 const runningRhythm = ref(false);
 const runningScheduledRhythm = ref(false);
@@ -815,6 +844,7 @@ function statusLabel(status: string) {
   if (status === "archived") return t("ceoOffice.archived");
   if (status === "active") return t("ceoOffice.active");
   if (status === "open") return t("ceoOffice.open");
+  if (status === "in_progress") return t("ceoOffice.inProgress");
   if (status === "resolved") return t("ceoOffice.resolved");
   if (status === "sent") return t("ceoOffice.sent");
   if (status === "dry_run") return t("ceoOffice.dryRun");
@@ -1190,6 +1220,19 @@ async function resolveHandoff(handoffId: string) {
     error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;
   } finally {
     resolvingHandoff.value = "";
+  }
+}
+
+async function updateWorkOrder(workOrderId: string, status: string, resolution: string) {
+  updatingWorkOrder.value = workOrderId;
+  error.value = "";
+  try {
+    await api.agentUpdateWorkOrder(workOrderId, { status, resolution });
+    await load();
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.updateWorkOrderFailed")}: ${err?.message || err}`;
+  } finally {
+    updatingWorkOrder.value = "";
   }
 }
 

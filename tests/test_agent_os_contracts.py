@@ -220,6 +220,16 @@ def test_engineering_work_orders_are_auditable_runtime_cli_api_contracts(tmp_pat
     assert runtime.list_work_orders(session.session_id)["total"] == 1
     assert runtime.memory_snapshot()["summary"]["work_order_count"] == 1
 
+    updated_work_order = runtime.update_work_order_status(
+        work_order["work_order_id"],
+        status="resolved",
+        resolution="Deduplication was moved to a Codex implementation task.",
+    )
+
+    assert updated_work_order["status"] == "resolved"
+    assert updated_work_order["resolution"] == "Deduplication was moved to a Codex implementation task."
+    assert updated_work_order["resolved_at"]
+
     cli_code = run_cli(
         [
             "agent",
@@ -243,8 +253,23 @@ def test_engineering_work_orders_are_auditable_runtime_cli_api_contracts(tmp_pat
         ]
     )
     cli_payload = json.loads(capsys.readouterr().out)
+    cli_work_order_id = cli_payload["data"]["work_order"]["work_order_id"]
     list_code = run_cli(["agent", "work-orders", "--session", session.session_id, "--json"])
     list_payload = json.loads(capsys.readouterr().out)
+    update_cli_code = run_cli(
+        [
+            "agent",
+            "work-order",
+            "update",
+            cli_work_order_id,
+            "--status",
+            "in_progress",
+            "--resolution",
+            "Accepted by Codex.",
+            "--json",
+        ]
+    )
+    update_cli_payload = json.loads(capsys.readouterr().out)
 
     api_res = TestClient(create_app()).post(
         "/api/agent/work-orders",
@@ -258,6 +283,11 @@ def test_engineering_work_orders_are_auditable_runtime_cli_api_contracts(tmp_pat
             "evidence_refs": [evidence.evidence_id],
         },
     )
+    api_work_order_id = api_res.json()["work_order"]["work_order_id"]
+    api_update = TestClient(create_app()).patch(
+        f"/api/agent/work-orders/{api_work_order_id}",
+        json={"status": "canceled", "resolution": "Merged into another work order."},
+    )
     api_list = TestClient(create_app()).get(f"/api/agent/work-orders?session_id={session.session_id}")
 
     assert cli_code == 0
@@ -265,8 +295,15 @@ def test_engineering_work_orders_are_auditable_runtime_cli_api_contracts(tmp_pat
     assert cli_payload["data"]["work_order"]["status"] == "open"
     assert list_code == 0
     assert list_payload["data"]["total"] == 2
+    assert update_cli_code == 0
+    assert update_cli_payload["data"]["work_order"]["status"] == "in_progress"
+    assert update_cli_payload["data"]["work_order"]["resolution"] == "Accepted by Codex."
+    assert update_cli_payload["data"]["work_order"]["resolved_at"] is None
     assert api_res.status_code == 200
     assert api_res.json()["work_order"]["title"] == "API work order"
+    assert api_update.status_code == 200
+    assert api_update.json()["work_order"]["status"] == "canceled"
+    assert api_update.json()["work_order"]["resolved_at"]
     assert api_list.status_code == 200
     assert api_list.json()["total"] == 3
     reset_datahub()

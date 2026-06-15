@@ -24,6 +24,7 @@ import type {
   AgentSession,
   AgentSessionDetail,
   AgentSessionsResponse,
+  AgentWorkOrderResponse,
   AgentWorkOrdersResponse,
 } from "../types";
 
@@ -52,6 +53,8 @@ export const agentApi = {
     get<AgentWorkOrdersResponse>(
       sessionId ? `/api/agent/work-orders?session_id=${encodeURIComponent(sessionId)}` : "/api/agent/work-orders",
     ),
+  agentUpdateWorkOrder: (workOrderId: string, payload: { status: string; resolution?: string }) =>
+    patch<AgentWorkOrderResponse>(`/api/agent/work-orders/${encodeURIComponent(workOrderId)}`, payload),
   agentAction: (actionId: string) => get<AgentActionDetail>(`/api/agent/actions/${encodeURIComponent(actionId)}`),
   agentApproveAction: (actionId: string) => post<{ action: AgentAction }>(`/api/agent/actions/${encodeURIComponent(actionId)}/approve`),
   agentRejectAction: (actionId: string, reason = "") =>

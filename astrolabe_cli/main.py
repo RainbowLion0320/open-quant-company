@@ -45,6 +45,7 @@ from astrolabe_cli.commands.agent import sessions as agent_sessions
 from astrolabe_cli.commands.agent import show_action as agent_show_action
 from astrolabe_cli.commands.agent import show_session as agent_show_session
 from astrolabe_cli.commands.agent import update_session as agent_update_session
+from astrolabe_cli.commands.agent import update_work_order as agent_update_work_order
 from astrolabe_cli.commands.agent import work_orders as agent_work_orders
 from astrolabe_cli.commands.backtest import check as backtest_check
 from astrolabe_cli.commands.backtest import run_backtest
@@ -250,6 +251,18 @@ def build_parser() -> argparse.ArgumentParser:
             affected_files=args.affected_files,
             suggested_verification=args.suggested_verification,
             evidence_refs=args.evidence_refs,
+        )
+    )
+    agent_work_order_update = agent_work_order_sub.add_parser("update", help="Update one engineering work order status")
+    agent_work_order_update.add_argument("work_order_id")
+    agent_work_order_update.add_argument("--status", required=True, choices=["open", "in_progress", "resolved", "canceled"])
+    agent_work_order_update.add_argument("--resolution", default="")
+    add_common_flags(agent_work_order_update)
+    agent_work_order_update.set_defaults(
+        handler=lambda args: agent_update_work_order(
+            args.work_order_id,
+            status=args.status,
+            resolution=args.resolution,
         )
     )
 

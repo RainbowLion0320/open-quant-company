@@ -137,6 +137,8 @@ export interface AgentWorkOrder {
   suggested_verification: string[];
   evidence_refs: string[];
   status: string;
+  resolution: string;
+  resolved_at: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -274,6 +276,10 @@ export interface AgentWorkOrdersResponse {
   status: string;
   work_orders: AgentWorkOrder[];
   total: number;
+}
+
+export interface AgentWorkOrderResponse {
+  work_order: AgentWorkOrder;
 }
 
 export interface AgentReportsResponse {

@@ -273,6 +273,37 @@ def create_work_order(
     )
 
 
+def update_work_order(work_order_id: str, *, status: str, resolution: str = "") -> CliResult:
+    try:
+        work_order = AgentRuntime().update_work_order_status(
+            work_order_id,
+            status=status,
+            resolution=resolution,
+        )
+    except KeyError as exc:
+        return CliResult(
+            False,
+            "agent work-order update",
+            {"work_order_id": work_order_id},
+            "Agent work order missing",
+            [str(exc)],
+        )
+    except ValueError as exc:
+        return CliResult(
+            False,
+            "agent work-order update",
+            {"work_order_id": work_order_id, "status": status},
+            "Agent work order update invalid",
+            [str(exc)],
+        )
+    return CliResult(
+        ok=True,
+        command="agent work-order update",
+        message=f"Updated engineering work order {work_order['work_order_id']}",
+        data={"work_order": work_order},
+    )
+
+
 def resolve_handoff(handoff_id: str) -> CliResult:
     try:
         handoff = AgentRuntime().resolve_handoff(handoff_id)

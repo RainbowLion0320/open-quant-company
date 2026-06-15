@@ -206,12 +206,18 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "暂无工程工单" in zh_ceo
     assert "影响文件" in zh_ceo
     assert "建议验证" in zh_ceo
+    assert "更新工单失败" in zh_ceo
+    assert "处理工单" in zh_ceo
+    assert "取消工单" in zh_ceo
     assert "标记完成" in zh_ceo
     assert "Handoffs" in en_ceo
     assert "Engineering Work Orders" in en_ceo
     assert "No engineering work orders" in en_ceo
     assert "Affected Files" in en_ceo
     assert "Suggested Verification" in en_ceo
+    assert "Failed to update work order" in en_ceo
+    assert "Start Work" in en_ceo
+    assert "Cancel Work" in en_ceo
     assert "Resolve" in en_ceo
     assert "取消行动" in zh_ceo
     assert "已取消" in zh_ceo
@@ -334,7 +340,9 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentHandoffs" in agent_api
     assert "agentResolveHandoff" in agent_api
     assert "agentWorkOrders" in agent_api
+    assert "agentUpdateWorkOrder" in agent_api
     assert '"/api/agent/work-orders' in agent_api
+    assert "/api/agent/work-orders/${encodeURIComponent(workOrderId)}" in agent_api
     assert "agentReports" in agent_api
     assert "agentGenerateReport" in agent_api
     assert "agentRunReportRhythm" in agent_api
@@ -377,6 +385,9 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentPaperReconciliation" in agent_types
     assert "export interface AgentHandoff" in agent_types
     assert "export interface AgentWorkOrder" in agent_types
+    assert "resolution: string" in agent_types
+    assert "resolved_at: string | null" in agent_types
+    assert "export interface AgentWorkOrderResponse" in agent_types
     assert "export interface AgentWorkOrdersResponse" in agent_types
     assert "work_orders: AgentWorkOrder[]" in agent_types
     assert "export interface AgentDeskResponse" in agent_types

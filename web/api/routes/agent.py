@@ -294,6 +294,21 @@ async def create_agent_work_order(payload: dict[str, Any]) -> dict[str, Any]:
     return {"work_order": work_order}
 
 
+@router.patch("/work-orders/{work_order_id}")
+async def update_agent_work_order(work_order_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        work_order = AgentRuntime().update_work_order_status(
+            work_order_id,
+            status=str(payload.get("status") or ""),
+            resolution=str(payload.get("resolution") or ""),
+        )
+    except KeyError:
+        raise DataNotFoundError("agent work order", work_order_id)
+    except ValueError as exc:
+        raise InvalidParameterError("work_order", work_order_id, str(exc))
+    return {"work_order": work_order}
+
+
 @router.post("/handoffs/{handoff_id}/resolve")
 async def resolve_agent_handoff(handoff_id: str) -> dict[str, Any]:
     try:

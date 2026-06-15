@@ -735,6 +735,8 @@ class AgentRuntime:
             ],
             evidence_refs=[str(evidence_id).strip() for evidence_id in (evidence_refs or []) if str(evidence_id).strip()],
             status="open",
+            resolution="",
+            resolved_at=None,
             created_by=created_by.strip() or "engineering_desk",
             created_at=timestamp,
             updated_at=timestamp,
@@ -749,6 +751,28 @@ class AgentRuntime:
             "work_orders": rows,
             "total": len(rows),
         }
+
+    def update_work_order_status(self, work_order_id: str, *, status: str, resolution: str = "") -> dict[str, Any]:
+        allowed_statuses = {"open", "in_progress", "resolved", "canceled"}
+        clean_status = status.strip()
+        if clean_status not in allowed_statuses:
+            raise ValueError(f"Invalid agent work order status: {status}")
+        row = self.ledger.get_work_order(work_order_id)
+        if row is None:
+            raise KeyError(f"Agent work order not found: {work_order_id}")
+        timestamp = _now()
+        terminal = clean_status in {"resolved", "canceled"}
+        self.ledger.update_work_order_status(
+            work_order_id,
+            status=clean_status,
+            resolution=resolution.strip(),
+            resolved_at=timestamp if terminal else None,
+            updated_at=timestamp,
+        )
+        updated = self.ledger.get_work_order(work_order_id)
+        if updated is None:
+            raise KeyError(f"Agent work order not found after update: {work_order_id}")
+        return updated
 
     def respond_as_desk(
         self,

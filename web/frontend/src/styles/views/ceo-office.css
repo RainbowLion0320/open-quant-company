@@ -355,6 +355,16 @@
   line-height: 1.45;
 }
 
+.work-order-row .muted-line {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.approval-buttons .danger {
+  border-color: rgba(239, 68, 68, 0.34);
+  color: #fecaca;
+}
+
 .status-dot {
   width: 8px;
   height: 8px;

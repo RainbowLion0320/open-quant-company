@@ -147,6 +147,8 @@ class AgentLedger:
                     suggested_verification TEXT NOT NULL,
                     evidence_refs TEXT NOT NULL,
                     status TEXT NOT NULL,
+                    resolution TEXT NOT NULL DEFAULT '',
+                    resolved_at TEXT,
                     created_by TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
@@ -155,6 +157,8 @@ class AgentLedger:
             )
             self._ensure_column(conn, "actions", "expires_at", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(conn, "evidence", "snapshot_uri", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "work_orders", "resolution", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "work_orders", "resolved_at", "TEXT")
 
     def insert_session(self, row: dict[str, Any]) -> None:
         payload = {**row, "tags": _json_dumps(row.get("tags", []))}
@@ -322,11 +326,13 @@ class AgentLedger:
                 """
                 INSERT INTO work_orders(
                     work_order_id, session_id, desk, title, summary, impact, affected_files,
-                    suggested_verification, evidence_refs, status, created_by, created_at, updated_at
+                    suggested_verification, evidence_refs, status, resolution, resolved_at,
+                    created_by, created_at, updated_at
                 )
                 VALUES(
                     :work_order_id, :session_id, :desk, :title, :summary, :impact, :affected_files,
-                    :suggested_verification, :evidence_refs, :status, :created_by, :created_at, :updated_at
+                    :suggested_verification, :evidence_refs, :status, :resolution, :resolved_at,
+                    :created_by, :created_at, :updated_at
                 )
                 """,
                 payload,
@@ -532,6 +538,25 @@ class AgentLedger:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM work_orders WHERE work_order_id = ?", (work_order_id,)).fetchone()
         return self._work_order_row(row) if row else None
+
+    def update_work_order_status(
+        self,
+        work_order_id: str,
+        *,
+        status: str,
+        resolution: str,
+        resolved_at: str | None,
+        updated_at: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE work_orders
+                SET status = ?, resolution = ?, resolved_at = ?, updated_at = ?
+                WHERE work_order_id = ?
+                """,
+                (status, resolution, resolved_at, updated_at, work_order_id),
+            )
 
     @staticmethod
     def _collect_json_refs(rows: list[sqlite3.Row], column: str) -> set[str]:
