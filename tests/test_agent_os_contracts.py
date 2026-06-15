@@ -661,6 +661,96 @@ def test_agent_live_readiness_cli_and_api(tmp_path, monkeypatch, capsys):
     reset_datahub()
 
 
+def test_agent_live_smoke_cli_and_api_fail_closed_without_submission(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    cli_code = run_cli(["agent", "live", "smoke", "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post("/api/agent/live/smoke")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["smoke"]["status"] == "blocked"
+    assert cli_payload["data"]["smoke"]["health"]["mode"] == "live_disabled"
+    assert cli_payload["data"]["smoke"]["submitted"] is False
+    assert cli_payload["data"]["smoke"]["paper_fallback"] is False
+    assert cli_payload["data"]["smoke"]["broker_reconciliation"] == {}
+    assert Path(cli_payload["data"]["smoke"]["evidence"]["uri"]).exists()
+    assert api_res.status_code == 200
+    assert api_res.json()["smoke"]["status"] == "blocked"
+    assert api_res.json()["smoke"]["submitted"] is False
+    assert api_res.json()["smoke"]["paper_fallback"] is False
+    reset_datahub()
+
+
+def test_agent_live_smoke_ready_broker_reads_reconciliation_without_submit(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    class FakeLiveBroker:
+        def __init__(self):
+            self.reconcile_calls = 0
+            self.submit_calls = 0
+            self.reconcile_acks = []
+
+        def health(self):
+            return {
+                "broker": "miniqmt",
+                "mode": "live_ready",
+                "enabled": True,
+                "sdk_available": True,
+                "logged_in": True,
+                "account_id_masked": "****1234",
+                "permissions": ["query", "trade"],
+                "blockers": [],
+                "paper_fallback": False,
+            }
+
+        def reconcile(self, ack):
+            self.reconcile_calls += 1
+            self.reconcile_acks.append(dict(ack))
+            return {
+                "status": "needs_review",
+                "as_of": "2026-06-16T00:00:00Z",
+                "positions_matched": False,
+                "cash_matched": True,
+                "open_orders": [],
+                "fills": [],
+                "mismatches": [{"reason": "project_ledger_comparison_not_configured"}],
+                "recommended_actions": ["review_live_reconciliation_mismatches"],
+                "paper_fallback": False,
+            }
+
+        def submit_order(self, *args, **kwargs):
+            self.submit_calls += 1
+            raise AssertionError("live smoke must not submit orders")
+
+    broker = FakeLiveBroker()
+    smoke = AgentRuntime().run_live_smoke(broker=broker)
+
+    assert smoke["status"] == "ready"
+    assert smoke["submitted"] is False
+    assert smoke["paper_fallback"] is False
+    assert smoke["broker_reconciliation"]["status"] == "needs_review"
+    assert smoke["broker_reconciliation_status"] == "needs_review"
+    assert broker.reconcile_calls == 1
+    assert broker.submit_calls == 0
+    assert broker.reconcile_acks == [{"smoke_test": True, "broker_order_id": ""}]
+    assert Path(smoke["artifact_path"]).exists()
+    assert Path(smoke["evidence"]["uri"]).exists()
+    reset_datahub()
+
+
 def test_agent_live_order_preview_blocks_when_readiness_not_ready(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

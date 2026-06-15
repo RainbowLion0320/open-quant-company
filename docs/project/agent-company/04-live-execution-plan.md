@@ -256,6 +256,7 @@ Current foundation:
 
 - `broker.live.qmt.MiniQmtLiveBroker.health()` reports default-disabled readiness.
 - `astroq agent live readiness --json` and `GET /api/agent/live/readiness` expose the same readiness state.
+- `astroq agent live smoke --json` and `POST /api/agent/live/smoke` run a no-submit smoke test: blocked readiness stops before broker reconciliation, live-ready brokers receive only a read-only `reconcile({"smoke_test": true, "broker_order_id": ""})` probe, and the result is written under `var/artifacts/agent/live_smoke/`.
 - `broker.live.qmt.MiniQmtLiveBroker.preview_order()` returns a non-submitting live order preview with intent normalization, estimated cash/position impact, fees, readiness blockers, evidence requirement, cash gate, and extended risk snapshot checks for concentration, total exposure, daily order count, tradability, data freshness, broker account consistency, drawdown state, portfolio VaR/CVaR, sector concentration, and intraday limit-state.
 - `astroq agent live preview ... --json` and `POST /api/agent/live/preview` expose the same preview state with `approval_required=true`, `submitted=false`, and `paper_fallback=false`.
 - `astroq agent live propose ... --json` and `POST /api/agent/live/proposals` create approval-required live order action cards only after preview passes.
@@ -272,7 +273,7 @@ Current foundation:
 Remaining work:
 
 - Broker account consistency reconciliation against real MiniQMT/QMT snapshots after SDK integration.
-- Validate `broker.live.xtquant_gateway` against the user's real MiniQMT/QMT terminal, userdata path, account id, connection/session object, and order API.
+- Run the no-submit smoke harness and gateway path against the user's real MiniQMT/QMT terminal, userdata path, account id, connection/session object, and order API.
 - Real-account scheduled broker order/trade/position reconciliation through the configured gateway.
 - Broker-side kill-switch operations for canceling already submitted real MiniQMT/QMT orders after SDK integration.
 

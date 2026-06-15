@@ -443,6 +443,18 @@ def live_readiness() -> CliResult:
     )
 
 
+def live_smoke() -> CliResult:
+    smoke = AgentRuntime().run_live_smoke()
+    ok = smoke["status"] in {"ready", "blocked"}
+    return CliResult(
+        ok=ok,
+        command="agent live smoke",
+        message=f"Live broker smoke: {smoke['status']}",
+        data={"smoke": smoke},
+        errors=[] if ok else [str(smoke.get("error") or smoke["status"])],
+    )
+
+
 def live_preview(
     *,
     symbol: str,

@@ -169,7 +169,7 @@ class BondExchange:
 
 | 决策 | 选择 | 原因 |
 |------|------|------|
-| Broker 抽象接口 | Facade Pattern | PaperBroker 与 MiniQMT/QMT live adapter 边界分离；当前实现 default-disabled readiness probe、不提交订单的 preview gate、approval-gated live submit/reconciliation contract、runtime project snapshot wiring 和显式 xtquant SDK gateway；真实账户使用仍需本地 QMT 环境 smoke test |
+| Broker 抽象接口 | Facade Pattern | PaperBroker 与 MiniQMT/QMT live adapter 边界分离；当前实现 default-disabled readiness probe、不下单 smoke test、不提交订单的 preview gate、approval-gated live submit/reconciliation contract、runtime project snapshot wiring 和显式 xtquant SDK gateway；真实账户仍需在用户本地 QMT 环境验证 |
 | 风控预检 (pre-trade) | 下单前执行，非下单后 | 阻止违规订单进入执行队列 |
 | 熔断只阻止买入 | 允许卖出不允许买入 | 熔断期间应允许减仓止损 |
 | Parquet 持久化 | 非 SQLite | 与数据层统一格式，DuckDB 可直接查询 |
@@ -228,6 +228,6 @@ rm.check_portfolio(portfolio) → list[RiskCheckResult]
 - **无日内成交模型：** 全部以收盘价成交，未考虑日内价格波动
 - **无部分成交：** 模拟全额成交，实盘中限价单可能部分成交
 - **风控无组合层面：** 未计算组合 VaR/CVaR 作为动态风控阈值
-- **MiniQMT/QMT readiness + live foundation：** `broker.live.qmt.MiniQmtLiveBroker` 只读探测 default-disabled / missing SDK / login / permission / kill-switch 状态，`paper_fallback=false`；`preview_order()` 只计算 intent、fees、现金/持仓影响和扩展 preview risk gate（现金、单票集中度、总敞口、日订单数、可交易性、数据新鲜度、券商账户一致性、回撤、VaR/CVaR、行业集中度、日内状态），始终 `submitted=false`；approved live submit 只走显式 live adapter，并在 reconciliation 前附加 project ledger snapshot，缺项进入 `needs_review`
+- **MiniQMT/QMT readiness + live foundation：** `broker.live.qmt.MiniQmtLiveBroker` 只读探测 default-disabled / missing SDK / login / permission / kill-switch 状态，`paper_fallback=false`；`astroq agent live smoke --json` / `/api/agent/live/smoke` 只做 no-submit readiness + read-only reconciliation probe 并写 smoke evidence；`preview_order()` 只计算 intent、fees、现金/持仓影响和扩展 preview risk gate（现金、单票集中度、总敞口、日订单数、可交易性、数据新鲜度、券商账户一致性、回撤、VaR/CVaR、行业集中度、日内状态），始终 `submitted=false`；approved live submit 只走显式 live adapter，并在 reconciliation 前附加 project ledger snapshot，缺项进入 `needs_review`
 - **Agent paper execution foundation：** `PaperBroker.preview_order()`、`AgentRuntime.propose_paper_order()` 和 `AgentRuntime.submit_paper_order_action()` 已形成 preview → approval → re-preview → submit/reconciliation 的受控路径；CEO Office 可显示 paper preview/risk 摘要并提交已批准 action，仍需要更完整的对账视图和已提交订单取消语义。
-- **未来方向：** 完成真实 MiniQMT/QMT 账号 smoke test、真实部分成交/撤单语义、broker-side kill switch 和更完整对账视图；不得回退到 PaperBroker
+- **未来方向：** 在用户真实 MiniQMT/QMT 终端环境跑通 no-submit smoke harness 与 gateway validation、真实部分成交/撤单语义、broker-side kill switch 和更完整对账视图；不得回退到 PaperBroker

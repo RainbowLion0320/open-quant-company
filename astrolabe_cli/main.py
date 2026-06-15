@@ -24,6 +24,7 @@ from astrolabe_cli.commands.agent import live_preview as agent_live_preview
 from astrolabe_cli.commands.agent import live_propose as agent_live_propose
 from astrolabe_cli.commands.agent import live_readiness as agent_live_readiness
 from astrolabe_cli.commands.agent import live_reconcile as agent_live_reconcile
+from astrolabe_cli.commands.agent import live_smoke as agent_live_smoke
 from astrolabe_cli.commands.agent import live_submit as agent_live_submit
 from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
 from astrolabe_cli.commands.agent import memory_export as agent_memory_export
@@ -332,6 +333,12 @@ def build_parser() -> argparse.ArgumentParser:
     agent_live_readiness_cmd = agent_live_sub.add_parser("readiness", help="Check MiniQMT/QMT live readiness")
     add_common_flags(agent_live_readiness_cmd)
     agent_live_readiness_cmd.set_defaults(handler=lambda args: agent_live_readiness())
+    agent_live_smoke_cmd = agent_live_sub.add_parser(
+        "smoke",
+        help="Run a no-submit MiniQMT/QMT live broker smoke test",
+    )
+    add_common_flags(agent_live_smoke_cmd)
+    agent_live_smoke_cmd.set_defaults(handler=lambda args: agent_live_smoke())
     agent_live_preview_cmd = agent_live_sub.add_parser("preview", help="Preview a live order without submitting it")
     agent_live_preview_cmd.add_argument("--symbol", required=True)
     agent_live_preview_cmd.add_argument("--side", choices=["buy", "sell"], required=True)

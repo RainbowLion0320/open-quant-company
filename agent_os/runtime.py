@@ -1490,6 +1490,78 @@ class AgentRuntime:
         )
         return {**payload, "path": str(path), "evidence": evidence.to_dict()}
 
+    def run_live_smoke(self, *, broker: Any | None = None) -> dict[str, Any]:
+        live_broker = broker or MiniQmtLiveBroker()
+        checked_at = _now()
+        health: dict[str, Any]
+        broker_reconciliation: dict[str, Any] = {}
+        broker_reconciliation_status = ""
+        error = ""
+        submitted = False
+        paper_fallback = False
+
+        try:
+            health = dict(live_broker.health())
+        except Exception as exc:  # pragma: no cover - defensive adapter boundary
+            health = {
+                "broker": "miniqmt",
+                "mode": "blocked",
+                "blockers": ["live_health_probe_failed"],
+                "paper_fallback": False,
+                "error_class": exc.__class__.__name__,
+                "error_message": str(exc)[:300],
+            }
+            status = "failed"
+            error = str(exc)
+        else:
+            status = "blocked"
+            if str(health.get("mode") or "") == "live_ready":
+                try:
+                    broker_reconciliation = dict(
+                        live_broker.reconcile({"smoke_test": True, "broker_order_id": ""})
+                    )
+                except Exception as exc:  # pragma: no cover - defensive adapter boundary
+                    broker_reconciliation = {
+                        "status": "blocked",
+                        "mismatches": [
+                            {
+                                "reason": "live_smoke_reconciliation_failed",
+                                "error_class": exc.__class__.__name__,
+                                "error_message": str(exc)[:300],
+                            }
+                        ],
+                        "paper_fallback": False,
+                    }
+                    broker_reconciliation_status = "blocked"
+                    status = "failed"
+                    error = str(exc)
+                else:
+                    broker_reconciliation_status = str(broker_reconciliation.get("status") or "")
+                    status = (
+                        "blocked"
+                        if broker_reconciliation_status in {"blocked", "failed", "error", "not_integrated"}
+                        else "ready"
+                    )
+
+        payload = {
+            "status": status,
+            "checked_at": checked_at,
+            "health": health,
+            "broker_reconciliation": broker_reconciliation,
+            "broker_reconciliation_status": broker_reconciliation_status,
+            "submitted": submitted,
+            "paper_fallback": paper_fallback,
+            "error": error,
+        }
+        path = self._write_live_smoke_artifact(payload)
+        evidence = self.create_evidence(
+            kind="artifact",
+            label="Live broker smoke test",
+            uri=str(path),
+            summary=f"Live broker smoke test {payload['status']}.",
+        )
+        return {**payload, "artifact_path": str(path), "evidence": evidence.to_dict()}
+
     def propose_paper_order(
         self,
         *,
@@ -2492,6 +2564,14 @@ class AgentRuntime:
 
     def _write_live_scheduled_reconciliation_artifact(self, payload: dict[str, Any]) -> Path:
         root = get_datahub().artifact_dir("agent") / "live_reconciliation" / "scheduled"
+        root.mkdir(parents=True, exist_ok=True)
+        checked_at = str(payload["checked_at"]).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
+        path = root / f"{checked_at}-{uuid.uuid4().hex[:8]}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return path
+
+    def _write_live_smoke_artifact(self, payload: dict[str, Any]) -> Path:
+        root = get_datahub().artifact_dir("agent") / "live_smoke"
         root.mkdir(parents=True, exist_ok=True)
         checked_at = str(payload["checked_at"]).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
         path = root / f"{checked_at}-{uuid.uuid4().hex[:8]}.json"

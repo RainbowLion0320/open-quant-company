@@ -9,7 +9,7 @@
 
 Agent Company OS is the planned local-first operating layer for Open Quant Company. It lets the human user act as CEO while desk agents coordinate data, research, risk, execution, engineering, and reporting work.
 
-This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, run event timelines, session snapshot SSE streaming, run event snapshot SSE streaming, active subprocess stdout/stderr chunk event recording, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, fixed cross-artifact report context aggregation, deterministic semantic report synthesis, deterministic cross-session report trend synthesis, deterministic causal-chain report synthesis with recurring-chain escalation, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, env-only report notification triggers, paper order preview/proposal/approved-submit/cancel cards with inline paper reconciliation summaries, default-disabled live readiness probing, live order preview risk gating, approval-gated live submit/reconciliation contracts, runtime project-ledger snapshot wiring for live reconciliation, explicit MiniQMT/QMT SDK gateway bridge with config-based factory loading, desk-declared fixed tool registry coverage, deterministic intent-to-tool routing, deterministic multi-intent workflow planning, artifact-aware deterministic priority planning from local evidence, bounded session-backlog adaptive planning, bounded artifact-plus-session adaptive planning, Data Desk repair dry-run plus approval workflow, Research strategy-blocker cross-desk diagnosis, Engineering Desk code/bug work-order triage, daily-brief cross-desk orchestration, and portfolio review cross-desk orchestration are implemented first; real-account xtquant gateway smoke tests, continuous live reconciliation, and open-ended adaptive cross-tool planning beyond bounded deterministic modes remain planned until their phase lands.
+This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, run event timelines, session snapshot SSE streaming, run event snapshot SSE streaming, active subprocess stdout/stderr chunk event recording, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, fixed cross-artifact report context aggregation, deterministic semantic report synthesis, deterministic cross-session report trend synthesis, deterministic causal-chain report synthesis with recurring-chain escalation, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, env-only report notification triggers, paper order preview/proposal/approved-submit/cancel cards with inline paper reconciliation summaries, default-disabled live readiness probing, no-submit live broker smoke tests, live order preview risk gating, approval-gated live submit/reconciliation contracts, runtime project-ledger snapshot wiring for live reconciliation, explicit MiniQMT/QMT SDK gateway bridge with config-based factory loading, desk-declared fixed tool registry coverage, deterministic intent-to-tool routing, deterministic multi-intent workflow planning, artifact-aware deterministic priority planning from local evidence, bounded session-backlog adaptive planning, bounded artifact-plus-session adaptive planning, Data Desk repair dry-run plus approval workflow, Research strategy-blocker cross-desk diagnosis, Engineering Desk code/bug work-order triage, daily-brief cross-desk orchestration, and portfolio review cross-desk orchestration are implemented first; user-environment validation against a real xtquant terminal/account, continuous live reconciliation, and open-ended adaptive cross-tool planning beyond bounded deterministic modes remain planned until their phase lands.
 
 ## 2. Product Contract
 
@@ -21,7 +21,7 @@ Agent Company OS must provide:
 - Approval-gated state-changing actions.
 - Evidence references for agent claims.
 - Transparent local memory that can be inspected, exported, pruned, and cleared.
-- MiniQMT/QMT live execution as a default-disabled, approval-gated capability; the current foundation includes readiness, non-submitting order preview, live proposal cards, a fail-closed approved-submit/reconciliation contract, and an explicit SDK gateway bridge that only runs when injected/configured through `execution.live.sdk_gateway_factory`. SDK submission remains disabled by default and requires explicit live enablement, installed xtquant modules, account configuration, and a valid userdata path.
+- MiniQMT/QMT live execution as a default-disabled, approval-gated capability; the current foundation includes readiness, no-submit smoke tests, non-submitting order preview, live proposal cards, a fail-closed approved-submit/reconciliation contract, and an explicit SDK gateway bridge that only runs when injected/configured through `execution.live.sdk_gateway_factory`. SDK submission remains disabled by default and requires explicit live enablement, installed xtquant modules, account configuration, and a valid userdata path.
 
 ## 3. API Surface
 
@@ -57,6 +57,7 @@ All endpoints are planned under `/api/agent/*`.
 | `POST` | `/api/agent/paper/actions/{action_id}/submit` | Submit an approved PaperBroker order action after re-running preview/risk gates and writing reconciliation evidence. | Implemented approved submit gate |
 | `POST` | `/api/agent/paper/actions/{action_id}/cancel` | Cancel a queued paper approval request or a submitted PaperBroker order when broker state still permits cancellation. | Implemented cancellation gate |
 | `GET` | `/api/agent/live/readiness` | Report MiniQMT/QMT live readiness without submitting orders. | Implemented readiness probe |
+| `POST` | `/api/agent/live/smoke` | Run a no-submit MiniQMT/QMT live smoke test that records readiness and, when live-ready, a read-only reconciliation probe. | Implemented smoke probe |
 | `POST` | `/api/agent/live/preview` | Preview a MiniQMT/QMT live order with readiness, extended risk gate, broker impact, and `submitted=false`. | Implemented preview gate |
 | `POST` | `/api/agent/live/proposals` | Create an approval-required live order action only after live preview passes. | Implemented proposal gate |
 | `POST` | `/api/agent/live/actions/{action_id}/submit` | Submit an approved live order action through the live broker adapter and write reconciliation evidence; default MiniQMT adapter fails closed unless an explicit SDK gateway is injected/configured. | Implemented contract and gateway bridge |
@@ -109,6 +110,7 @@ All commands must support `--json`.
 | `astroq agent paper submit ACTION_ID --json` | Submit an approved PaperBroker order action after re-running preview/risk gates and writing reconciliation evidence. | Implemented approved submit gate |
 | `astroq agent paper cancel ACTION_ID --reason REASON --json` | Cancel a queued paper approval request or a submitted PaperBroker order when broker state still permits cancellation. | Implemented cancellation gate |
 | `astroq agent live readiness --json` | Report MiniQMT/QMT live readiness and blockers without PaperBroker fallback. | Implemented readiness probe |
+| `astroq agent live smoke --json` | Run a no-submit MiniQMT/QMT smoke test; live-ready brokers only receive a read-only reconciliation probe and evidence artifact. | Implemented smoke probe |
 | `astroq agent live preview --symbol SYMBOL --side buy\|sell --quantity N --limit-price PRICE --evidence EVIDENCE_ID --json` | Preview a live limit order without submission, including approval requirement, readiness blockers, extended risk gate, and estimated broker impact. | Implemented preview gate |
 | `astroq agent live propose --session SESSION_ID --symbol SYMBOL --side buy\|sell --quantity N --limit-price PRICE --evidence EVIDENCE_ID --json` | Create an approval-required live order proposal when live preview passes. | Implemented proposal gate |
 | `astroq agent live submit ACTION_ID --json` | Submit an approved live order action through the live adapter, re-running preview/risk gates and writing reconciliation evidence. | Implemented contract and gateway bridge |
@@ -626,7 +628,30 @@ state stored under `var/artifacts/agent/live_kill_switch/state.json`.
 local block for future live paths. Deactivation does not resurrect canceled
 or blocked actions; users must create a fresh approval card after the incident.
 
-### 5.16 LiveScheduledReconciliation
+### 5.16 LiveBrokerSmoke
+
+`POST /api/agent/live/smoke` and `astroq agent live smoke --json` run an
+operator-triggered, no-submit live broker smoke test.
+
+The smoke test:
+
+- calls the live broker readiness probe first;
+- returns `status=blocked` when readiness is not `live_ready`;
+- never calls `submit_order()`;
+- never falls back to PaperBroker;
+- when readiness is `live_ready`, calls only
+  `reconcile({"smoke_test": true, "broker_order_id": ""})` on the live adapter;
+- treats `not_integrated`, `blocked`, `failed`, or `error` reconciliation
+  statuses as blocked smoke results;
+- writes a JSON artifact under `var/artifacts/agent/live_smoke/`;
+- registers `EvidenceRef.label="Live broker smoke test"`.
+
+A `needs_review` reconciliation result may still produce a `ready` smoke result
+because it proves the configured live broker read path responded without
+submitting an order. It does not prove production reconciliation is matched;
+real terminal/account validation remains an operator-environment task.
+
+### 5.17 LiveScheduledReconciliation
 
 `POST /api/agent/live/reconciliation` and
 `astroq agent live reconcile --json` scan local `live_order` actions and write
@@ -659,7 +684,7 @@ quantity is available, and the submitted broker order id. Missing pieces are
 listed in `project_snapshot.missing`; incomplete or absent snapshots must remain
 `needs_review` instead of fabricating a matched state.
 
-### 5.17 PaperOrderProposal and Submission
+### 5.18 PaperOrderProposal and Submission
 
 `POST /api/agent/paper/proposals` and
 `astroq agent paper propose ... --json` create approval cards only after a
@@ -865,7 +890,7 @@ As of 2026-06-15:
 
 - Foundation runtime is partially implemented in `agent_os/`.
 - The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, open/resolved cross-desk handoffs, and Engineering Desk work orders under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session create/session show/session update/session run-readonly/message/actions/handoffs/handoff resolve/work-orders/work-order create/work-order update/action show/run/approve/reject/cancel/expire/reports/report/notify report/rhythm (--session or --all-active)/paper propose/paper submit/paper cancel/live readiness/live preview/live propose/live submit/live reconcile/live kill-switch status/live kill-switch activate/live kill-switch deactivate/evidence/desks/policies/memory show/memory export/memory prune/memory clear --json` is available.
+- `astroq agent sessions/session create/session show/session update/session run-readonly/message/actions/handoffs/handoff resolve/work-orders/work-order create/work-order update/action show/run/approve/reject/cancel/expire/reports/report/notify report/rhythm (--session or --all-active)/paper propose/paper submit/paper cancel/live readiness/live smoke/live preview/live propose/live submit/live reconcile/live kill-switch status/live kill-switch activate/live kill-switch deactivate/evidence/desks/policies/memory show/memory export/memory prune/memory clear --json` is available.
 - `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/sessions/{session_id}/stream`, `/api/agent/sessions/{session_id}/run-readonly`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/work-orders`, `/api/agent/work-orders/{work_order_id}`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/runs/{run_id}/stream`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/policies`, `/api/agent/paper/proposals`, `/api/agent/paper/actions/{action_id}/submit`, `/api/agent/paper/actions/{action_id}/cancel`, `/api/agent/live/readiness`, `/api/agent/live/preview`, `/api/agent/live/proposals`, `/api/agent/live/actions/{action_id}/submit`, `/api/agent/live/reconciliation`, `/api/agent/live/kill-switch`, `/api/agent/live/kill-switch/activate`, `/api/agent/live/kill-switch/deactivate`, `/api/agent/reports`, `/api/agent/reports/{report_id}/notify`, `/api/agent/reports/rhythm`, `/api/agent/reports/rhythm/scheduled`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; approved fixed-registry templated commands bind only tool-declared safe parameters.
 - Fixed command dispatch records ordered run events for queued/running/stdout/stderr/terminal state. Real subprocess dispatch records stdout/stderr line chunks as they arrive and then writes the terminal event. `/api/agent/runs/{run_id}`, `/api/agent/runs/{run_id}/stream`, and scoped action detail expose the event timeline, while session summaries keep runs compact.
@@ -877,9 +902,9 @@ As of 2026-06-15:
 - CEO reports can be generated as JSON/Markdown artifacts, registered as report evidence, listed through CLI/API, and shown as CEO Office report cards. Dedicated templates cover daily, weekly, audit, data quality, risk, execution reconciliation, engineering digest, and release audit reports; each report includes fixed allowlist artifact context for lifecycle, data-sources, strategy competition, AST intelligence, test design intelligence, and CodeGraph readiness. Reports include deterministic semantic synthesis that maps artifact findings into root causes, impacts, and next actions, deterministic trend synthesis that compares current root causes with prior local report artifacts and surfaces repeated blockers, and deterministic causal-chain synthesis that links related root causes into owner desks and next actions. Repeated causal chains are marked with history metadata, counted in `recurring_chain_count`, and escalated to standing owner review. CEO Office can generate a selected template, run due templates through the explicit operating-rhythm runner, trigger the scheduled active-session rhythm tick, or send/dry-run report notifications. Scheduled ticks write audit artifacts under `var/artifacts/agent/reports/scheduled/`; notifications write audit artifacts under `var/artifacts/agent/reports/notifications/` and read only system environment variables.
 - PaperBroker order proposal, approved submission, and cancellation are available through CLI/API. Proposal writes preview artifact evidence and creates an approval-required `paper_order` action only when the non-mutating preview passes; submission requires approval, re-runs preview/risk gates, blocks stale previews, writes run/reconciliation evidence, persists default PaperBroker state on success, and exposes paper reconciliation summaries on action detail. Cancellation writes dedicated `paper.paper_order.cancel` runs and reconciliation evidence for queued approval requests or broker-confirmed active order cancellations.
 - MiniQMT/QMT readiness probing is available and defaults to `live_disabled`; missing SDK, login, permission, or disabled kill switch returns `blocked`, and `paper_fallback` is always false.
-- MiniQMT/QMT live order preview, proposal, approved-submit contract, scheduled reconciliation scan, explicit SDK gateway bridge, config-based gateway factory loading, xtquant project snapshot comparison, and local kill switch operations are available through CLI/API. The path never falls back to PaperBroker, always requires approval, re-runs preview/risk gates before submit, writes live reconciliation evidence, blocks before broker calls when kill switch is active, and defaults to `live_submission_not_integrated` / `not_integrated` unless a gateway is explicitly injected/configured. Preview risk gates now include cash, position concentration, total exposure, daily order count, tradability, data freshness, broker account consistency, drawdown, VaR, CVaR, sector concentration, and intraday limit-state checks.
+- MiniQMT/QMT live no-submit smoke tests, order preview, proposal, approved-submit contract, scheduled reconciliation scan, explicit SDK gateway bridge, config-based gateway factory loading, xtquant project snapshot comparison, and local kill switch operations are available through CLI/API. The path never falls back to PaperBroker, always requires approval for submit, re-runs preview/risk gates before submit, writes live smoke/reconciliation evidence, blocks before broker calls when kill switch is active, and defaults to `live_submission_not_integrated` / `not_integrated` unless a gateway is explicitly injected/configured. Preview risk gates now include cash, position concentration, total exposure, daily order count, tradability, data freshness, broker account consistency, drawdown, VaR, CVaR, sector concentration, and intraday limit-state checks.
 - Runtime live submit and scheduled reconciliation attach preview-derived project ledger snapshots to ack payloads before adapter reconciliation. Missing cash, position quantity, position delta, symbol, or broker order id is preserved as structured `project_snapshot.missing`, and the xtquant gateway treats incomplete snapshots as `needs_review`.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, target desk selection for CEO messages, message entry, session safe workflow runner, desk status, desk drill-down for mandates/tools/evidence requirements/related work, explicit approval policy display, approval queue display, action detail, and run event timeline display; `/market` carries the market overview.
-- Open-ended adaptive desk reasoning beyond bounded deterministic/artifact-aware/session-backlog/hybrid modes, open-ended adaptive cross-tool workflow planning, and real-account xtquant gateway smoke tests are not yet implemented.
+- Open-ended adaptive desk reasoning beyond bounded deterministic/artifact-aware/session-backlog/hybrid modes, open-ended adaptive cross-tool workflow planning, and user-environment xtquant terminal/account validation are not yet implemented.
