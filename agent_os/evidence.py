@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import shlex
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -95,6 +96,10 @@ def _navigation_for_evidence(evidence: dict[str, Any]) -> dict[str, str] | None:
             "href": uri,
             "label": str(evidence.get("label") or uri),
         }
+    if kind == "api_endpoint":
+        return _api_navigation_for_evidence(evidence)
+    if kind == "cli_command":
+        return _cli_navigation_for_evidence(evidence)
     if kind in FILE_EVIDENCE_KINDS:
         return _file_navigation_for_evidence(evidence)
     return None
@@ -143,6 +148,43 @@ def _file_navigation_for_evidence(evidence: dict[str, Any]) -> dict[str, str] | 
         result["line"] = line
         result["href"] = f"{href}&line={line}"
     return result
+
+
+def _api_navigation_for_evidence(evidence: dict[str, Any]) -> dict[str, str] | None:
+    uri = str(evidence.get("uri") or "").strip()
+    if not uri.startswith("/api/") or not _is_safe_local_route(uri):
+        return None
+    return {
+        "kind": "api_endpoint",
+        "method": "GET",
+        "href": uri,
+        "label": str(evidence.get("label") or uri),
+    }
+
+
+def _cli_navigation_for_evidence(evidence: dict[str, Any]) -> dict[str, Any] | None:
+    command = str(evidence.get("uri") or "").strip()
+    if not command or _has_shell_syntax(command):
+        return None
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return None
+    if not argv or Path(argv[0]).name != "astroq":
+        return None
+    if argv[0] not in {"astroq", ".venv/bin/astroq"}:
+        return None
+    return {
+        "kind": "cli_command",
+        "command": " ".join(argv),
+        "argv": argv,
+        "label": str(evidence.get("label") or command),
+    }
+
+
+def _has_shell_syntax(command: str) -> bool:
+    shell_tokens = {";", "&&", "||", "|", "`", "$", ">", "<", "\n", "\r"}
+    return any(token in command for token in shell_tokens)
 
 
 def _safe_project_relative_path(path_text: str) -> str | None:

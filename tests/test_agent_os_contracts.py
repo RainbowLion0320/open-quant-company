@@ -2446,6 +2446,81 @@ def test_agent_evidence_resolver_returns_safe_file_and_code_navigation(tmp_path,
     reset_datahub()
 
 
+def test_agent_evidence_resolver_returns_safe_cli_and_api_navigation(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.evidence import EvidenceResolver
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    cli = runtime.create_evidence(
+        kind="cli_command",
+        label="Lifecycle CLI",
+        uri="astroq lifecycle check --json",
+        summary="CLI command that reproduces lifecycle readiness evidence.",
+    )
+    local_venv_cli = runtime.create_evidence(
+        kind="cli_command",
+        label="Local astroq CLI",
+        uri=".venv/bin/astroq docs check --json",
+        summary="Local virtualenv astroq command.",
+    )
+    local_api = runtime.create_evidence(
+        kind="api_endpoint",
+        label="Agent desks API",
+        uri="/api/agent/desks",
+        summary="Local API endpoint for desk registry evidence.",
+    )
+    unsafe_cli = runtime.create_evidence(
+        kind="cli_command",
+        label="Unsafe CLI",
+        uri="astroq lifecycle check --json; rm -rf var",
+        summary="Shell syntax must not become a runnable command.",
+    )
+    unsafe_path_cli = runtime.create_evidence(
+        kind="cli_command",
+        label="Unsafe path CLI",
+        uri="/tmp/astroq docs check --json",
+        summary="Unexpected astroq executable paths must not become runnable commands.",
+    )
+    external_api = runtime.create_evidence(
+        kind="api_endpoint",
+        label="External API",
+        uri="https://example.com/api/agent/desks",
+        summary="External URLs must not become local API navigation.",
+    )
+
+    resolved_cli = EvidenceResolver().resolve(cli.evidence_id)
+    resolved_local_venv_cli = EvidenceResolver().resolve(local_venv_cli.evidence_id)
+    resolved_api = EvidenceResolver().resolve(local_api.evidence_id)
+    resolved_unsafe_cli = EvidenceResolver().resolve(unsafe_cli.evidence_id)
+    resolved_unsafe_path_cli = EvidenceResolver().resolve(unsafe_path_cli.evidence_id)
+    resolved_external_api = EvidenceResolver().resolve(external_api.evidence_id)
+
+    assert resolved_cli["status"] == "fresh"
+    assert resolved_cli["navigation"] == {
+        "kind": "cli_command",
+        "command": "astroq lifecycle check --json",
+        "argv": ["astroq", "lifecycle", "check", "--json"],
+        "label": "Lifecycle CLI",
+    }
+    assert resolved_local_venv_cli["navigation"]["argv"] == [".venv/bin/astroq", "docs", "check", "--json"]
+    assert resolved_api["status"] == "fresh"
+    assert resolved_api["navigation"] == {
+        "kind": "api_endpoint",
+        "method": "GET",
+        "href": "/api/agent/desks",
+        "label": "Agent desks API",
+    }
+    assert resolved_unsafe_cli["navigation"] is None
+    assert resolved_unsafe_path_cli["navigation"] is None
+    assert resolved_external_api["navigation"] is None
+    reset_datahub()
+
+
 def test_agent_cli_creates_and_lists_sessions(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
