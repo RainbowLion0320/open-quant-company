@@ -783,6 +783,37 @@ class AgentRuntime:
         run = self.ledger.get_run(run_id)
         return self._run_with_events(run) if run else None
 
+    def run_stream_snapshot(self, run_id: str) -> dict[str, Any]:
+        run = self.get_run(run_id)
+        if run is None:
+            raise KeyError(f"Agent run not found: {run_id}")
+        events = list(run.get("events") or [])
+        latest = {
+            "event_id": str(events[-1]["event_id"]) if events else "",
+            "event_type": str(events[-1]["event_type"]) if events else "",
+            "event_status": str(events[-1]["status"]) if events else "",
+        }
+        counts = {"events": len(events)}
+        signature = "|".join(
+            [
+                str(run.get("finished_at") or ""),
+                str(run.get("status") or ""),
+                f"events:{counts['events']}",
+                *(f"{key}:{latest[key]}" for key in sorted(latest)),
+            ]
+        )
+        return {
+            "status": "ready",
+            "run_id": run_id,
+            "action_id": str(run.get("action_id") or ""),
+            "generated_at": _now(),
+            "run": run,
+            "counts": counts,
+            "latest": latest,
+            "events": events,
+            "signature": signature,
+        }
+
     def list_runs(self, action_id: str | None = None, *, include_events: bool = False) -> list[dict[str, Any]]:
         runs = self.ledger.list_runs(action_id)
         if include_events:

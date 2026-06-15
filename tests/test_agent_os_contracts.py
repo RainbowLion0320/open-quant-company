@@ -253,6 +253,66 @@ def test_agent_session_stream_snapshot_and_sse_once_api(tmp_path, monkeypatch):
     reset_datahub()
 
 
+def test_agent_run_stream_snapshot_and_sse_once_api(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Run stream")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Health",
+        parameters={"tool_id": "astroq.health"},
+    )
+    run = runtime.record_run(
+        action_id=action.action_id,
+        tool_name="astroq.health",
+        command=["astroq", "health", "--json"],
+        status="succeeded",
+        return_code=0,
+        stdout_summary="ok",
+        stderr_summary="",
+    )
+    runtime.record_run_event(
+        run.run_id,
+        action_id=action.action_id,
+        event_type="artifact",
+        status="succeeded",
+        message="Artifact written",
+        payload={"artifact": "health"},
+    )
+
+    snapshot = runtime.run_stream_snapshot(run.run_id)
+
+    assert snapshot["status"] == "ready"
+    assert snapshot["run_id"] == run.run_id
+    assert snapshot["action_id"] == action.action_id
+    assert snapshot["counts"]["events"] >= 2
+    assert snapshot["latest"]["event_type"] == "artifact"
+    assert snapshot["latest"]["event_id"]
+    assert snapshot["signature"]
+
+    with TestClient(create_app()).stream("GET", f"/api/agent/runs/{run.run_id}/stream?once=true") as response:
+        body = response.read().decode("utf-8")
+
+    event_payload = json.loads(body.split("data: ", 1)[1].strip())
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "event: run_snapshot" in body
+    assert event_payload["run_id"] == run.run_id
+    assert event_payload["counts"]["events"] >= 2
+    reset_datahub()
+
+
 def test_agent_approval_policy_blocks_state_changing_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

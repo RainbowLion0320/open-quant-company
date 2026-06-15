@@ -283,6 +283,24 @@ export interface AgentSessionStreamSnapshot {
   signature: string;
 }
 
+export interface AgentRunStreamSnapshot {
+  status: string;
+  run_id: string;
+  action_id: string;
+  generated_at: string;
+  run: AgentRun;
+  counts: {
+    events: number;
+  };
+  latest: {
+    event_id: string;
+    event_type: string;
+    event_status: string;
+  };
+  events: AgentRunEvent[];
+  signature: string;
+}
+
 export interface AgentReadOnlyWorkflowResponse {
   workflow: AgentReadOnlyWorkflow;
 }

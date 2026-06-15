@@ -447,6 +447,31 @@ async def get_agent_run(run_id: str) -> dict[str, Any]:
     return {"run": run}
 
 
+@router.get("/runs/{run_id}/stream")
+async def stream_agent_run(run_id: str, once: bool = False, poll_seconds: float = 1.0) -> StreamingResponse:
+    if AgentRuntime().get_run(run_id) is None:
+        raise DataNotFoundError("agent run", run_id)
+
+    async def event_stream():
+        last_signature = ""
+        interval = min(max(float(poll_seconds), 0.2), 10.0)
+        while True:
+            try:
+                snapshot = AgentRuntime().run_stream_snapshot(run_id)
+            except KeyError:
+                missing = {"status": "missing", "run_id": run_id}
+                yield f"event: run_missing\ndata: {json.dumps(missing, ensure_ascii=False)}\n\n"
+                break
+            if snapshot["signature"] != last_signature:
+                last_signature = str(snapshot["signature"])
+                yield f"event: run_snapshot\ndata: {json.dumps(snapshot, ensure_ascii=False)}\n\n"
+                if once:
+                    break
+            await asyncio.sleep(interval)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
 @router.get("/desks")
 async def list_agent_desks() -> dict[str, Any]:
     desks = AgentRuntime().list_desks()

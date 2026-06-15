@@ -111,13 +111,14 @@ The CEO Office should consume the Agent Runtime API defined in [07-agent-company
 - `POST /api/agent/actions/{action_id}/approve`
 - `POST /api/agent/actions/{action_id}/reject`
 - `POST /api/agent/actions/{action_id}/cancel`
+- `GET /api/agent/runs/{run_id}/stream`
 - `GET /api/agent/evidence/{evidence_id}`
 - `GET /api/agent/desks`
 - `GET /api/agent/work-orders`
 - `POST /api/agent/work-orders`
 - `PATCH /api/agent/work-orders/{work_order_id}`
 
-WebSocket or server-sent events may be added for streaming message and action updates after the basic API contract is stable.
+Session and run-event updates use server-sent events. The Web client must use the shared authenticated fetch-SSE helper rather than browser `EventSource`, because local deployments may require `ASTROLABE_API_KEY` bearer headers.
 
 ## 8. UX States
 
@@ -158,6 +159,7 @@ Chinese and English strings must be maintained together. The Chinese wording sho
 - A new session can be created from the Web UI.
 - The current session can be archived from the Web UI without deleting ledger history.
 - The current session subscribes to a session snapshot SSE stream and refreshes when message/action/run counts change.
+- The selected action subscribes to the latest run's event snapshot SSE stream and updates the run timeline without reloading the whole page.
 - A user message appears in the timeline and is persisted.
 - The user can choose the target desk for a CEO message from the registered desk list.
 - The user can run proposed read-only checks for the active session from the CEO Office, with run/skipped/failed counts visible.

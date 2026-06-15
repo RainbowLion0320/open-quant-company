@@ -670,6 +670,9 @@
             </div>
             <div class="detail-row">
               <span>{{ t("ceoOffice.runHistory") }}</span>
+              <small v-if="selectedAction.runs.length">
+                {{ t("ceoOffice.runStream") }} {{ statusLabel(runStreamStatus) }}
+              </small>
               <div v-if="!selectedAction.runs.length" class="ceo-empty compact">
                 {{ t("ceoOffice.noRuns") }}
               </div>
@@ -775,6 +778,10 @@ const sessionStream = ref<AbortController | null>(null);
 const sessionStreamId = ref("");
 const sessionStreamStatus = ref("inactive");
 const lastStreamSignature = ref("");
+const runStream = ref<AbortController | null>(null);
+const runStreamId = ref("");
+const runStreamStatus = ref("inactive");
+const lastRunStreamSignature = ref("");
 const desks = ref<AgentDesk[]>([]);
 const approvalPolicies = ref<AgentApprovalPolicy[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
@@ -947,6 +954,14 @@ function closeSessionStream() {
   lastStreamSignature.value = "";
 }
 
+function closeRunStream() {
+  runStream.value?.abort();
+  runStream.value = null;
+  runStreamId.value = "";
+  runStreamStatus.value = "inactive";
+  lastRunStreamSignature.value = "";
+}
+
 function connectSessionStream(sessionId: string) {
   if (sessionStream.value && sessionStreamId.value === sessionId) return;
   closeSessionStream();
@@ -974,6 +989,45 @@ function connectSessionStream(sessionId: string) {
     const name = err instanceof Error ? err.name : "";
     if (name === "AbortError") return;
     sessionStreamStatus.value = "blocked";
+  });
+}
+
+function connectRunStream(runId: string) {
+  if (runStream.value && runStreamId.value === runId) return;
+  closeRunStream();
+  const controller = new AbortController();
+  runStream.value = controller;
+  runStreamId.value = runId;
+  runStreamStatus.value = "connecting";
+  void api.agentRunStream(
+    runId,
+    {
+      onSnapshot: snapshot => {
+        if (snapshot.signature === lastRunStreamSignature.value) return;
+        lastRunStreamSignature.value = snapshot.signature;
+        runStreamStatus.value = "connected";
+        if (!selectedAction.value || selectedAction.value.action.action_id !== snapshot.action_id) return;
+        const nextRun = { ...snapshot.run, events: snapshot.events };
+        const currentRuns = selectedAction.value.runs || [];
+        const hasRun = currentRuns.some(run => run.run_id === snapshot.run_id);
+        selectedAction.value = {
+          ...selectedAction.value,
+          runs: hasRun
+            ? currentRuns.map(run => run.run_id === snapshot.run_id ? nextRun : run)
+            : [nextRun, ...currentRuns],
+        };
+      },
+      onMissing: () => {
+        closeRunStream();
+        runStreamStatus.value = "blocked";
+      },
+    },
+    { signal: controller.signal },
+  ).catch(err => {
+    if (controller.signal.aborted) return;
+    const name = err instanceof Error ? err.name : "";
+    if (name === "AbortError") return;
+    runStreamStatus.value = "blocked";
   });
 }
 
@@ -1159,6 +1213,12 @@ async function selectAction(actionId: string) {
   error.value = "";
   try {
     selectedAction.value = await api.agentAction(actionId);
+    const latestRun = selectedAction.value.runs?.[0];
+    if (latestRun) {
+      connectRunStream(latestRun.run_id);
+    } else {
+      closeRunStream();
+    }
   } catch (err: any) {
     error.value = `${t("ceoOffice.loadFailed")}: ${err?.message || err}`;
   }
@@ -1336,6 +1396,7 @@ async function updateWorkOrder(workOrderId: string, status: string, resolution: 
 
 onMounted(load);
 onBeforeUnmount(closeSessionStream);
+onBeforeUnmount(closeRunStream);
 </script>
 
 <style scoped src="../styles/views/ceo-office.css"></style>

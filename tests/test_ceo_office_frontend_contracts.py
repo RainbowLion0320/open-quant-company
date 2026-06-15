@@ -52,6 +52,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "sessionStreamStatus" in view
     assert "closeSessionStream" in view
     assert "onBeforeUnmount(closeSessionStream)" in view
+    assert "runStreamStatus" in view
+    assert "connectRunStream" in view
+    assert "api.agentRunStream" in view
+    assert "closeRunStream" in view
+    assert "onBeforeUnmount(closeRunStream)" in view
     assert "previewWorkflowPlan" in view
     assert "workflowPlan" in view
     assert "planningWorkflow" in view
@@ -366,6 +371,10 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentSessionStream" in agent_api
     assert "streamSse" in agent_api
     assert '`/api/agent/sessions/${encodeURIComponent(sessionId)}/stream`' in agent_api
+    assert "AgentRunStreamSnapshot" in agent_types
+    assert "agentRunStream" in agent_api
+    assert "run_snapshot" in agent_api
+    assert '`/api/agent/runs/${encodeURIComponent(runId)}/stream`' in agent_api
     assert "agentActions" in agent_api
     assert "filters: AgentActionFilters = {}" in agent_api
     assert "URLSearchParams" in agent_api

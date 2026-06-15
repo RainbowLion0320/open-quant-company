@@ -92,6 +92,7 @@ export const ceoOffice = {
       parameters: "Parameters",
       evidenceRefs: "Evidence Refs",
       runEvidence: "Run Evidence",
+      runStream: "Run Stream",
       runTimeline: "Run Timeline",
       sourceDesk: "Source",
       targetDesk: "Target",

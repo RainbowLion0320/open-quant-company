@@ -20,6 +20,7 @@ import type {
   AgentReportRhythmResponse,
   AgentReportResponse,
   AgentReportsResponse,
+  AgentRunStreamSnapshot,
   AgentRunActionResponse,
   AgentScheduledReportRhythmResponse,
   AgentSession,
@@ -49,6 +50,21 @@ export const agentApi = {
     {
       session_snapshot: data => handlers.onSnapshot(JSON.parse(data) as AgentSessionStreamSnapshot),
       session_missing: data => handlers.onMissing?.(JSON.parse(data) as { status: string; session_id: string }),
+    },
+    options,
+  ),
+  agentRunStream: (
+    runId: string,
+    handlers: {
+      onSnapshot: (snapshot: AgentRunStreamSnapshot) => void;
+      onMissing?: (payload: { status: string; run_id: string }) => void;
+    },
+    options: { signal?: AbortSignal } = {},
+  ) => streamSse(
+    `/api/agent/runs/${encodeURIComponent(runId)}/stream`,
+    {
+      run_snapshot: data => handlers.onSnapshot(JSON.parse(data) as AgentRunStreamSnapshot),
+      run_missing: data => handlers.onMissing?.(JSON.parse(data) as { status: string; run_id: string }),
     },
     options,
   ),
