@@ -299,7 +299,11 @@ def build_desk_workflow_plan(
     if artifact_plan is not None:
         return artifact_plan
 
-    dynamic_plan = _dynamic_multi_intent_plan(desk=desk, content=content)
+    dynamic_plan = _dynamic_multi_intent_plan(
+        desk=desk,
+        content=content,
+        artifact_context=artifact_context or {},
+    )
     if dynamic_plan is not None:
         return dynamic_plan
 
@@ -790,7 +794,12 @@ def _artifact_actions_for_causes(root_causes: list[str]) -> list[WorkflowActionS
     return _dedupe_actions(actions)
 
 
-def _dynamic_multi_intent_plan(*, desk: str, content: str) -> DeskWorkflowPlan | None:
+def _dynamic_multi_intent_plan(
+    *,
+    desk: str,
+    content: str,
+    artifact_context: dict[str, Any],
+) -> DeskWorkflowPlan | None:
     normalized = content.lower()
     if desk != "reporting" or _is_daily_brief_request(normalized) or _is_portfolio_review_request(normalized):
         return None
@@ -807,22 +816,34 @@ def _dynamic_multi_intent_plan(*, desk: str, content: str) -> DeskWorkflowPlan |
         }
         for target_desk in target_desks
     ]
+    reasoning = _reasoning_for_plan(
+        source_desk=desk,
+        planning_mode="dynamic_multi_intent",
+        actions=actions,
+        handoffs=handoffs,
+        work_orders=[],
+    )
+    evidence_summary = _artifact_evidence_summary(artifact_context)
+    if evidence_summary:
+        reasoning.append(
+            _artifact_context_reasoning(
+                artifact_context=artifact_context,
+                root_causes=_artifact_root_causes(artifact_context),
+                evidence_summary=evidence_summary,
+            )
+        )
+    summary_suffix = f" 当前证据摘要：{'；'.join(evidence_summary[:5])}。" if evidence_summary else ""
     return DeskWorkflowPlan(
         desk=desk,
         answer=(
             "Reporting Desk 已生成 dynamic multi-intent / 多意图计划：按 Data、Research、Risk、"
             "Execution 和 Engineering 证据链拆分安全动作，再由 CEO Office 汇总结果。"
+            f"{summary_suffix}"
         ),
         confidence=0.72,
         actions=actions,
         planning_mode="dynamic_multi_intent",
-        reasoning=_reasoning_for_plan(
-            source_desk=desk,
-            planning_mode="dynamic_multi_intent",
-            actions=actions,
-            handoffs=handoffs,
-            work_orders=[],
-        ),
+        reasoning=reasoning,
         handoffs=handoffs,
     )
 

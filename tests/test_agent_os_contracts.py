@@ -4445,11 +4445,34 @@ def test_agent_workflow_plan_preview_is_side_effect_free_runtime_cli_api(tmp_pat
 
 def test_agent_dynamic_workflow_plan_orchestrates_mixed_ceo_request(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
-    from data.storage.datahub import reset_datahub
+    from data.storage.datahub import get_datahub, reset_datahub
 
     reset_datahub()
 
     from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 1},
+            "blockers": [{"dimension": "stock_limit_list", "reason": "rate_limited"}],
+        },
+        "data-sources/latest.json": {
+            "summary": {"capability_unmapped_count": 7},
+        },
+        "tournaments/strategy_competition_latest.json": {
+            "summary": {"total": 12, "blocked": 6},
+        },
+        "tests/design/latest.json": {
+            "summary": {"design_risk_count": 2},
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
 
     runtime = AgentRuntime()
     before_summary = runtime.memory_snapshot()["summary"]
@@ -4490,6 +4513,17 @@ def test_agent_dynamic_workflow_plan_orchestrates_mixed_ceo_request(tmp_path, mo
         "engineering",
     }
     assert "dynamic" in preview["answer"].lower() or "多意图" in preview["answer"]
+    assert "stock_limit_list" in preview["answer"]
+    assert "rate_limited" in preview["answer"]
+    assert "7" in preview["answer"]
+    assert "6/12" in preview["answer"]
+    reasoning_by_kind = {row["kind"]: row for row in preview["reasoning"]}
+    assert reasoning_by_kind["artifact_context"]["evidence_summary"][:4] == [
+        "lifecycle: stock_limit_list rate_limited",
+        "data: 7 unmapped source capabilities",
+        "research: 6/12 strategies blocked",
+        "testing: 2 test design risk(s)",
+    ]
     reset_datahub()
 
 
