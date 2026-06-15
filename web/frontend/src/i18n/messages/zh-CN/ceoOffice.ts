@@ -15,6 +15,7 @@ export const ceoOffice = {
       previewPlan: "预览计划",
       workflowPlan: "工作流计划",
       semanticDraft: "语义草案",
+      providerSemantic: "Provider 规划",
       semanticDraftPlaceholder: "粘贴外部 planner 输出的 JSON 草案；服务端只会保留安全 fixed-registry 行动",
       semanticDraftInvalid: "语义草案必须是合法 JSON 对象",
       noLedgerWrites: "不会写入 ledger",

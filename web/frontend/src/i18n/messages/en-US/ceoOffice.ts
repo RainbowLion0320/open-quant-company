@@ -15,6 +15,7 @@ export const ceoOffice = {
       previewPlan: "Preview Plan",
       workflowPlan: "Workflow Plan",
       semanticDraft: "Semantic Draft",
+      providerSemantic: "Provider Planner",
       semanticDraftPlaceholder: "Paste an external planner JSON draft; the server keeps only safe fixed-registry actions",
       semanticDraftInvalid: "Semantic draft must be a valid JSON object",
       noLedgerWrites: "No ledger writes",

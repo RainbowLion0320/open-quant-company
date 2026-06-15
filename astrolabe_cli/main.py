@@ -147,9 +147,24 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="JSON semantic planner draft to filter through the fixed agent tool registry",
     )
+    agent_message_cmd.add_argument(
+        "--provider-semantic",
+        action="store_true",
+        help="Ask the configured LLM provider to draft a semantic plan, then server-filter it",
+    )
+    agent_message_cmd.add_argument("--planner-provider", default="")
+    agent_message_cmd.add_argument("--planner-model", default="")
     add_common_flags(agent_message_cmd)
     agent_message_cmd.set_defaults(
-        handler=lambda args: agent_add_message(args.session, args.desk, args.text, args.semantic_draft_file)
+        handler=lambda args: agent_add_message(
+            args.session,
+            args.desk,
+            args.text,
+            args.semantic_draft_file,
+            provider_semantic=args.provider_semantic,
+            planner_provider=args.planner_provider,
+            planner_model=args.planner_model,
+        )
     )
 
     agent_plan_cmd = agent_sub.add_parser("plan", help="Preview an agent workflow without ledger writes")
@@ -160,8 +175,24 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="JSON semantic planner draft to filter through the fixed agent tool registry",
     )
+    agent_plan_cmd.add_argument(
+        "--provider-semantic",
+        action="store_true",
+        help="Ask the configured LLM provider to draft a semantic plan, then server-filter it",
+    )
+    agent_plan_cmd.add_argument("--planner-provider", default="")
+    agent_plan_cmd.add_argument("--planner-model", default="")
     add_common_flags(agent_plan_cmd)
-    agent_plan_cmd.set_defaults(handler=lambda args: agent_plan(args.desk, args.text, args.semantic_draft_file))
+    agent_plan_cmd.set_defaults(
+        handler=lambda args: agent_plan(
+            args.desk,
+            args.text,
+            args.semantic_draft_file,
+            provider_semantic=args.provider_semantic,
+            planner_provider=args.planner_provider,
+            planner_model=args.planner_model,
+        )
+    )
 
     agent_actions_cmd = agent_sub.add_parser("actions", help="List agent actions")
     agent_actions_cmd.add_argument("--session", default="")

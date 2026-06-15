@@ -25,6 +25,7 @@ DEFAULT_LLM_CONFIG: dict[str, Any] = {
     "default_provider": DEFAULT_PROVIDER,
     "use_cases": {
         "factor_hypothesis": {"provider": DEFAULT_PROVIDER, "model": "deepseek-v4-pro"},
+        "agent_planning": {"provider": DEFAULT_PROVIDER, "model": "deepseek-v4-pro"},
     },
     "providers": {
         "deepseek": {

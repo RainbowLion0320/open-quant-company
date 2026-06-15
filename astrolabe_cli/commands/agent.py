@@ -3,7 +3,7 @@ from __future__ import annotations
 from astrolabe_cli.results import CliResult
 from agent_os.evidence import EvidenceResolver
 from agent_os.runtime import AgentRuntime
-from agent_os.semantic_planner import semantic_planner_from_file
+from agent_os.semantic_planner import semantic_planner_from_cli
 
 
 def sessions() -> CliResult:
@@ -90,13 +90,27 @@ def run_session_read_only_actions(session_id: str) -> CliResult:
     )
 
 
-def add_message(session_id: str, desk: str, text: str, semantic_draft_file: str = "") -> CliResult:
+def add_message(
+    session_id: str,
+    desk: str,
+    text: str,
+    semantic_draft_file: str = "",
+    *,
+    provider_semantic: bool = False,
+    planner_provider: str = "",
+    planner_model: str = "",
+) -> CliResult:
     try:
         routed = AgentRuntime().submit_ceo_message(
             session_id,
             desk=desk,
             content=text,
-            semantic_planner=semantic_planner_from_file(semantic_draft_file),
+            semantic_planner=semantic_planner_from_cli(
+                semantic_draft_file=semantic_draft_file,
+                provider_semantic=provider_semantic,
+                planner_provider=planner_provider,
+                planner_model=planner_model,
+            ),
         )
     except KeyError as exc:
         return CliResult(False, "agent message", {"session_id": session_id}, "Agent session missing", [str(exc)])
@@ -112,12 +126,25 @@ def add_message(session_id: str, desk: str, text: str, semantic_draft_file: str 
     )
 
 
-def plan(desk: str, text: str, semantic_draft_file: str = "") -> CliResult:
+def plan(
+    desk: str,
+    text: str,
+    semantic_draft_file: str = "",
+    *,
+    provider_semantic: bool = False,
+    planner_provider: str = "",
+    planner_model: str = "",
+) -> CliResult:
     try:
         workflow_plan = AgentRuntime().preview_workflow_plan(
             desk=desk,
             content=text,
-            semantic_planner=semantic_planner_from_file(semantic_draft_file),
+            semantic_planner=semantic_planner_from_cli(
+                semantic_draft_file=semantic_draft_file,
+                provider_semantic=provider_semantic,
+                planner_provider=planner_provider,
+                planner_model=planner_model,
+            ),
         )
     except ValueError as exc:
         return CliResult(False, "agent plan", {"desk": desk}, "Agent workflow plan invalid", [str(exc)])

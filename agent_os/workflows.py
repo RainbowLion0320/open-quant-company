@@ -272,6 +272,16 @@ def build_desk_workflow_plan(
     session_context: dict[str, Any] | None = None,
     semantic_planner: Any | None = None,
 ) -> DeskWorkflowPlan:
+    semantic_plan = _semantic_assisted_plan(
+        desk=desk,
+        content=content,
+        artifact_context=artifact_context or {},
+        session_context=session_context or {},
+        semantic_planner=semantic_planner,
+    )
+    if semantic_plan is not None:
+        return semantic_plan
+
     hybrid_plan = _adaptive_artifact_plan(
         desk=desk,
         content=content,
@@ -296,16 +306,6 @@ def build_desk_workflow_plan(
     open_plan = _open_ended_adaptive_plan(desk=desk, content=content)
     if open_plan is not None:
         return open_plan
-
-    semantic_plan = _semantic_assisted_plan(
-        desk=desk,
-        content=content,
-        artifact_context=artifact_context or {},
-        session_context=session_context or {},
-        semantic_planner=semantic_planner,
-    )
-    if semantic_plan is not None:
-        return semantic_plan
 
     profile = _profile_for(desk, content)
     if profile is None:
@@ -1060,7 +1060,8 @@ def _semantic_assisted_plan(
     )
     normalized = _normalize_semantic_draft(draft)
     actions, rejected = _safe_semantic_actions(normalized.actions)
-    if not actions:
+    has_semantic_state = bool(normalized.blockers or normalized.reasoning or rejected)
+    if not actions and not has_semantic_state:
         return None
 
     target_desks = _ordered_unique([action.desk for action in actions])

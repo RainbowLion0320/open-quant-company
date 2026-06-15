@@ -4961,6 +4961,192 @@ def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_p
     reset_datahub()
 
 
+def test_agent_provider_semantic_planner_fails_closed_without_secret(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import ProviderSemanticPlanner
+
+    def forbidden_transport(*_args, **_kwargs):
+        raise AssertionError("provider planner must not call transport without a secret")
+
+    runtime = AgentRuntime()
+    before_summary = runtime.memory_snapshot()["summary"]
+    preview = runtime.preview_workflow_plan(
+        desk="reporting",
+        content="请用 provider planner 理解当前公司优先级",
+        semantic_planner=ProviderSemanticPlanner(transport=forbidden_transport),
+    )
+    after_summary = runtime.memory_snapshot()["summary"]
+    reasoning_by_kind = {row["kind"]: row for row in preview["reasoning"]}
+
+    assert before_summary == after_summary
+    assert preview["planning_mode"] == "semantic_assisted"
+    assert preview["actions"] == []
+    assert preview["side_effects"]["ledger_writes"] is False
+    assert "semantic_provider_missing_secret" in preview["blockers"]
+    assert reasoning_by_kind["semantic_planner"]["accepted_action_count"] == 0
+    assert reasoning_by_kind["semantic_provider"]["status"] == "missing_secret"
+    assert reasoning_by_kind["semantic_provider"]["credential_env"] == "DEEPSEEK_API_KEY"
+    reset_datahub()
+
+
+def test_agent_provider_semantic_planner_uses_transport_then_filters_safe_actions(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "semantic-secret")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import ProviderSemanticPlanner
+
+    calls: list[dict[str, object]] = []
+
+    def fake_transport(request: dict[str, object]) -> dict[str, object]:
+        calls.append(request)
+        assert request["api_key"] == "semantic-secret"
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "answer": "Provider drafted a safe evidence plan.",
+                                "confidence": 0.82,
+                                "actions": [
+                                    {
+                                        "desk": "data",
+                                        "tool_id": "astroq.data.status",
+                                        "summary": "Inspect data health.",
+                                    },
+                                    {
+                                        "desk": "data",
+                                        "tool_id": "astroq.data.repair",
+                                        "summary": "Unsafe write must be filtered.",
+                                        "parameters": {"table": "stock_limit_list"},
+                                    },
+                                    {
+                                        "desk": "risk",
+                                        "tool_id": "astroq.lifecycle.check",
+                                        "summary": "Inspect lifecycle blockers.",
+                                    },
+                                ],
+                                "reasoning": [{"kind": "provider_goal", "goal": "company_priority"}],
+                            }
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+        }
+
+    runtime = AgentRuntime()
+    preview = runtime.preview_workflow_plan(
+        desk="reporting",
+        content="请用 provider planner 判断公司优先级",
+        semantic_planner=ProviderSemanticPlanner(transport=fake_transport),
+    )
+    reasoning_by_kind = {row["kind"]: row for row in preview["reasoning"]}
+
+    assert calls
+    assert calls[0]["use_case"] == "agent_planning"
+    assert "allowed_tools" in calls[0]
+    assert "api_key" not in reasoning_by_kind["semantic_provider"]
+    assert preview["planning_mode"] == "semantic_assisted"
+    assert [action["tool_id"] for action in preview["actions"]] == [
+        "astroq.data.status",
+        "astroq.lifecycle.check",
+    ]
+    assert preview["blockers"] == [
+        "semantic_plan_requires_manual_review",
+        "unsafe_semantic_actions_filtered",
+    ]
+    assert reasoning_by_kind["semantic_provider"]["status"] == "ok"
+    assert reasoning_by_kind["semantic_provider"]["provider"] == "deepseek"
+    assert reasoning_by_kind["semantic_provider"]["usage"]["total_tokens"] == 30
+    assert reasoning_by_kind["semantic_planner"]["accepted_action_count"] == 2
+    assert reasoning_by_kind["semantic_planner"]["rejected_action_count"] == 1
+    reset_datahub()
+
+
+def test_agent_provider_semantic_planner_api_and_cli_are_explicit_opt_in(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+    import agent_os.semantic_planner as semantic_planner
+
+    cli_code = run_cli(
+        [
+            "agent",
+            "plan",
+            "--desk",
+            "reporting",
+            "--text",
+            "请用 provider semantic planner 判断公司优先级",
+            "--provider-semantic",
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+
+    assert cli_code == 0
+    assert cli_payload["data"]["plan"]["planning_mode"] == "semantic_assisted"
+    assert cli_payload["data"]["plan"]["actions"] == []
+    assert "semantic_provider_missing_secret" in cli_payload["data"]["plan"]["blockers"]
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "api-semantic-secret")
+
+    def fake_transport(request: dict[str, object]) -> dict[str, object]:
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "answer": "API provider plan.",
+                                "confidence": 0.77,
+                                "actions": [
+                                    {"desk": "data", "tool_id": "astroq.data.status"},
+                                    {"desk": "data", "tool_id": "astroq.data.repair", "parameters": {"table": "daily"}},
+                                ],
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+
+    monkeypatch.setattr(semantic_planner, "_openai_compatible_chat_completion", fake_transport)
+    api_res = TestClient(create_app()).post(
+        "/api/agent/plans",
+        json={
+            "desk": "reporting",
+            "content": "请用 provider semantic planner 判断公司优先级",
+            "planner_mode": "provider_semantic",
+        },
+    )
+    api_plan = api_res.json()["plan"]
+
+    assert api_res.status_code == 200
+    assert api_plan["planning_mode"] == "semantic_assisted"
+    assert [action["tool_id"] for action in api_plan["actions"]] == ["astroq.data.status"]
+    assert api_plan["blockers"] == [
+        "semantic_plan_requires_manual_review",
+        "unsafe_semantic_actions_filtered",
+    ]
+    reset_datahub()
+
+
 def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

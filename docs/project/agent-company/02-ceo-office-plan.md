@@ -163,6 +163,8 @@ Chinese and English strings must be maintained together. The Chinese wording sho
 - A user message appears in the timeline and is persisted.
 - The user can choose the target desk for a CEO message from the registered desk list.
 - The user can explicitly paste a semantic planner JSON draft, preview or send it through the same CEO message path, and see invalid JSON rejected before any API call.
+- The user can explicitly enable Provider Planner for one preview or message; the UI must hide local JSON draft entry in that mode, the API payload must use `planner_mode=provider_semantic`, and missing provider credentials must appear as a blocked semantic-assisted plan rather than falling back to a fake deterministic success.
+- Provider Planner output is shown only after server-side fixed-registry filtering; unsafe, write, trading, unknown, or desk-out-of-scope actions must be rejected before they become action cards.
 - The user can run proposed read-only checks for the active session from the CEO Office, with run/skipped/failed counts visible.
 - The desk rail supports drill-down: selecting a desk shows its mandate, allowed tools, forbidden actions, evidence requirements, related actions, and related handoffs.
 - The CEO Office shows explicit approval policy rows so users can inspect which risk levels auto-run, require approval, or require engineering work orders.

@@ -323,6 +323,9 @@ llm:
     factor_hypothesis:
       provider: deepseek
       model: deepseek-v4-pro
+    agent_planning:
+      provider: deepseek
+      model: deepseek-v4-pro
   providers:
     deepseek:
       enabled: true

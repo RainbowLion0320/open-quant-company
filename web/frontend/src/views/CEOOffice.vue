@@ -123,7 +123,11 @@
             <input v-model="semanticDraftEnabled" type="checkbox" />
             <span>{{ t("ceoOffice.semanticDraft") }}</span>
           </label>
-          <div v-if="semanticDraftEnabled" class="semantic-draft-control">
+          <label class="semantic-draft-toggle">
+            <input v-model="providerSemanticEnabled" type="checkbox" />
+            <span>{{ t("ceoOffice.providerSemantic") }}</span>
+          </label>
+          <div v-if="semanticDraftEnabled && !providerSemanticEnabled" class="semantic-draft-control">
             <textarea
               v-model="semanticDraftText"
               :placeholder="t('ceoOffice.semanticDraftPlaceholder')"
@@ -876,6 +880,7 @@ const selectedDraftDesk = ref("reporting");
 const selectedDeskId = ref("reporting");
 const draft = ref("");
 const semanticDraftEnabled = ref(false);
+const providerSemanticEnabled = ref(false);
 const semanticDraftText = ref("");
 const semanticDraftError = ref("");
 const sending = ref(false);
@@ -1083,7 +1088,7 @@ function formatNumber(value: unknown) {
 
 function parseSemanticDraft(): Record<string, unknown> | null {
   semanticDraftError.value = "";
-  if (!semanticDraftEnabled.value) return null;
+  if (providerSemanticEnabled.value || !semanticDraftEnabled.value) return null;
   try {
     const parsed = JSON.parse(semanticDraftText.value.trim());
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -1098,10 +1103,17 @@ function parseSemanticDraft(): Record<string, unknown> | null {
 }
 
 function semanticPayload(semanticDraft: Record<string, unknown> | null) {
+  if (providerSemanticEnabled.value) return providerSemanticPayload();
   if (!semanticDraftEnabled.value || !semanticDraft) return {};
   return {
     planner_mode: "semantic_draft" as const,
     semantic_draft: semanticDraft,
+  };
+}
+
+function providerSemanticPayload() {
+  return {
+    planner_mode: "provider_semantic" as const,
   };
 }
 
@@ -1304,7 +1316,7 @@ async function previewWorkflowPlan() {
   const text = draft.value.trim();
   if (!text) return;
   const semanticDraft = parseSemanticDraft();
-  if (semanticDraftEnabled.value && !semanticDraft) return;
+  if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
   planningWorkflow.value = true;
   error.value = "";
   try {
@@ -1325,7 +1337,7 @@ async function sendMessage() {
   const text = draft.value.trim();
   if (!text) return;
   const semanticDraft = parseSemanticDraft();
-  if (semanticDraftEnabled.value && !semanticDraft) return;
+  if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
   sending.value = true;
   error.value = "";
   try {

@@ -61,13 +61,17 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "workflowPlan" in view
     assert "planningWorkflow" in view
     assert "semanticDraftEnabled" in view
+    assert "providerSemanticEnabled" in view
     assert "semanticDraftText" in view
     assert "semanticDraftError" in view
     assert "parseSemanticDraft" in view
     assert "semanticPayload" in view
+    assert "providerSemanticPayload" in view
     assert "planner_mode: \"semantic_draft\"" in view
+    assert "planner_mode: \"provider_semantic\"" in view
     assert "semantic_draft: semanticDraft" in view
     assert 'v-model="semanticDraftEnabled"' in view
+    assert 'v-model="providerSemanticEnabled"' in view
     assert 'v-model="semanticDraftText"' in view
     assert "api.agentRunSessionReadOnlyActions" in view
     assert "runSessionReadOnlyActions" in view
@@ -92,6 +96,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.previewPlan" in view
     assert "ceoOffice.workflowPlan" in view
     assert "ceoOffice.semanticDraft" in view
+    assert "ceoOffice.providerSemantic" in view
     assert "ceoOffice.semanticDraftPlaceholder" in view
     assert "ceoOffice.semanticDraftInvalid" in view
     assert "ceoOffice.noLedgerWrites" in view
@@ -211,9 +216,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "报告要点" in zh_ceo
     assert "实盘监控" in zh_ceo
     assert "语义草案" in zh_ceo
+    assert "Provider 规划" in zh_ceo
     assert "Report Sections" in en_ceo
     assert "Run Live Monitor" in en_ceo
     assert "Semantic Draft" in en_ceo
+    assert "Provider Planner" in en_ceo
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
     assert "ceoOffice.paperReconciliation" in view
