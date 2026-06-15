@@ -331,7 +331,9 @@ def build_desk_workflow_plan(
         handoffs=handoffs,
         work_orders=work_orders,
     )
-    if desk == "reporting" and (_is_daily_brief_request(normalized) or _is_portfolio_review_request(normalized)):
+    if (desk == "reporting" and (_is_daily_brief_request(normalized) or _is_portfolio_review_request(normalized))) or (
+        desk == "research" and _is_strategy_blocker_request(normalized)
+    ):
         evidence_summary = _artifact_evidence_summary(artifact_context or {})
         if evidence_summary:
             answer = f"{answer} 当前证据摘要：{'；'.join(evidence_summary[:5])}。"

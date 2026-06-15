@@ -5595,11 +5595,31 @@ def test_safe_workflow_runs_data_repair_dry_run_and_skips_write_action(tmp_path,
 
 def test_research_strategy_blocker_review_orchestrates_research_data_risk_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
-    from data.storage.datahub import reset_datahub
+    from data.storage.datahub import get_datahub, reset_datahub
 
     reset_datahub()
 
     from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 2},
+            "blockers": [{"dimension": "daily_raw", "reason": "stale"}],
+        },
+        "data-sources/latest.json": {
+            "summary": {"capability_unmapped_count": 9},
+        },
+        "tournaments/strategy_competition_latest.json": {
+            "summary": {"total": 12, "blocked": 12, "insufficient_alpha_evidence": 8},
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
 
     runtime = AgentRuntime()
     session = runtime.create_session(title="Strategy blocker diagnosis", default_desk="research")
@@ -5623,6 +5643,16 @@ def test_research_strategy_blocker_review_orchestrates_research_data_risk_action
     assert len(response.evidence_refs) == 3
     assert {handoff["target_desk"] for handoff in response.handoffs} == {"data", "risk"}
     assert "blocked" in response.answer.lower() or "阻断" in response.answer
+    assert "daily_raw" in response.answer
+    assert "stale" in response.answer
+    assert "9" in response.answer
+    assert "12/12" in response.answer
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+    assert reasoning_by_kind["artifact_context"]["evidence_summary"][:3] == [
+        "lifecycle: daily_raw stale",
+        "data: 9 unmapped source capabilities",
+        "research: 12/12 strategies blocked",
+    ]
     reset_datahub()
 
 
