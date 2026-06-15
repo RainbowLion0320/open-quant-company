@@ -154,16 +154,21 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "reportKindOptions" in view
     assert "kind: selectedReportKind.value" in view
     assert "api.agentLiveReadiness" in view
+    assert "api.agentLiveEnvironment" in view
     assert "api.agentLiveKillSwitch" in view
     assert "api.agentLiveKillSwitchActivate" in view
     assert "api.agentLiveKillSwitchDeactivate" in view
     assert "api.agentLiveReconciliation" in view
     assert "liveReadiness" in view
+    assert "liveEnvironment" in view
+    assert "liveEnvironmentChecks" in view
     assert "liveKillSwitch" in view
     assert "liveReconciliation" in view
     assert "operateLiveKillSwitch" in view
     assert "runLiveReconciliation" in view
     assert "ceoOffice.liveReadiness" in view
+    assert "ceoOffice.liveEnvironment" in view
+    assert "ceoOffice.environmentChecks" in view
     assert "ceoOffice.liveKillSwitch" in view
     assert "ceoOffice.activateKillSwitch" in view
     assert "ceoOffice.deactivateKillSwitch" in view
@@ -407,10 +412,12 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "/api/agent/reports/rhythm/scheduled" in agent_api
     assert "/api/agent/reports/${encodeURIComponent(reportId)}/notify" in agent_api
     assert "agentLiveReadiness" in agent_api
+    assert "agentLiveEnvironment" in agent_api
     assert "agentLiveKillSwitch" in agent_api
     assert "agentLiveKillSwitchActivate" in agent_api
     assert "agentLiveKillSwitchDeactivate" in agent_api
     assert "agentLiveReconciliation" in agent_api
+    assert "/api/agent/live/environment" in agent_api
     assert "/api/agent/live/kill-switch" in agent_api
     assert "/api/agent/live/reconciliation" in agent_api
     assert "export interface AgentSession" in agent_types
@@ -426,6 +433,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentReportNotification" in agent_types
     assert "export interface AgentReportNotificationResponse" in agent_types
     assert "export interface AgentLiveReadiness" in agent_types
+    assert "export interface AgentLiveEnvironment" in agent_types
+    assert "export interface AgentLiveEnvironmentResponse" in agent_types
     assert "export interface AgentLiveKillSwitch" in agent_types
     assert "export interface AgentLiveKillSwitchResponse" in agent_types
     assert "export interface AgentLiveReconciliation" in agent_types

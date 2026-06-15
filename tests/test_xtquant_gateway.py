@@ -240,3 +240,30 @@ def test_xtquant_gateway_requires_userdata_path(monkeypatch):
 
     with pytest.raises(ValueError, match="userdata_path"):
         build_gateway(config={}, account_id="1234567890", broker="miniqmt")
+
+
+def test_xtquant_gateway_validates_terminal_environment_without_submitting(monkeypatch):
+    fake_trader_cls = _install_fake_xtquant(monkeypatch)
+
+    from broker.live.xtquant_gateway import build_gateway
+
+    gateway = build_gateway(
+        config={"userdata_path": "/tmp/qmt-userdata", "session_id": 77},
+        account_id="1234567890",
+        broker="miniqmt",
+    )
+
+    validation = gateway.validate_environment(account_id="1234567890")
+
+    trader = fake_trader_cls.instances[0]
+    assert trader.started is True
+    assert trader.connected is True
+    assert trader.subscribed[0].account_id == "1234567890"
+    assert trader.orders == []
+    assert validation["status"] == "validated"
+    assert validation["broker"] == "miniqmt"
+    assert validation["account_id"] == "1234567890"
+    assert validation["account_snapshot"]["cash"] == 100000.0
+    assert validation["position_count"] == 1
+    assert validation["open_order_count"] == 1
+    assert validation["trade_count"] == 1

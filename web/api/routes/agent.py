@@ -175,6 +175,11 @@ async def get_agent_live_readiness() -> dict[str, Any]:
     return {"health": AgentRuntime().live_readiness()}
 
 
+@router.get("/live/environment")
+async def get_agent_live_environment() -> dict[str, Any]:
+    return {"environment": AgentRuntime().live_environment()}
+
+
 @router.post("/live/smoke")
 async def run_agent_live_smoke() -> dict[str, Any]:
     return {"smoke": AgentRuntime().run_live_smoke()}

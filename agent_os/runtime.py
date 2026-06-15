@@ -1138,6 +1138,24 @@ class AgentRuntime:
             health = {**health, "live_kill_switch": kill_switch}
         return health
 
+    def live_environment(self) -> dict[str, Any]:
+        validation = MiniQmtLiveBroker().validate_environment()
+        kill_switch = self.live_kill_switch_status()
+        if kill_switch["active"]:
+            blockers = list(validation.get("blockers") or [])
+            if "live_kill_switch_active" not in blockers:
+                blockers.append("live_kill_switch_active")
+            validation = {
+                **validation,
+                "status": "blocked",
+                "blockers": blockers,
+                "live_kill_switch": kill_switch,
+                "paper_fallback": False,
+            }
+        else:
+            validation = {**validation, "live_kill_switch": kill_switch}
+        return validation
+
     def preview_live_order(self, intent: dict[str, Any]) -> dict[str, Any]:
         kill_switch = self.live_kill_switch_status()
         if kill_switch["active"]:

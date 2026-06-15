@@ -175,6 +175,20 @@ export interface AgentLiveReadiness {
   live_kill_switch?: AgentLiveKillSwitch;
 }
 
+export interface AgentLiveEnvironment {
+  status: string;
+  broker: string;
+  mode: string;
+  enabled: boolean;
+  paper_fallback: boolean;
+  account_id_masked: string;
+  checked_at: string;
+  blockers: string[];
+  checks: Record<string, Record<string, unknown>>;
+  terminal_probe: Record<string, unknown>;
+  live_kill_switch?: AgentLiveKillSwitch;
+}
+
 export interface AgentLiveKillSwitch {
   status: string;
   active: boolean;
@@ -478,6 +492,10 @@ export interface AgentScheduledReportRhythmResponse {
 
 export interface AgentLiveReadinessResponse {
   health: AgentLiveReadiness;
+}
+
+export interface AgentLiveEnvironmentResponse {
+  environment: AgentLiveEnvironment;
 }
 
 export interface AgentLiveKillSwitchResponse {

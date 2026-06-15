@@ -126,11 +126,125 @@ class MiniQmtLiveBroker:
             blockers=blockers,
         ).to_dict()
 
+    def validate_environment(self) -> dict[str, Any]:
+        """Validate the local MiniQMT/QMT environment without submitting orders."""
+        health = self.health()
+        checks = {
+            "enabled": _validation_check(
+                passed=self.enabled,
+                blocker="live_disabled",
+                details={"enabled": self.enabled},
+            ),
+            "sdk_modules": _validation_check(
+                passed=bool(health.get("sdk_available")),
+                blocker="missing_sdk",
+                details={"modules": list(self.sdk_modules)},
+            ),
+            "account": _validation_check(
+                passed=bool(self.logged_in and self.account_id),
+                blocker="not_logged_in" if not self.logged_in else "missing_account_id",
+                details={"logged_in": self.logged_in, "account_id_masked": _mask_account(self.account_id)},
+            ),
+            "permissions": _validation_check(
+                passed=all(item in set(self.permissions) for item in REQUIRED_PERMISSIONS),
+                blocker="missing_permission",
+                details={
+                    "required": list(REQUIRED_PERMISSIONS),
+                    "configured": list(self.permissions),
+                    "missing": [item for item in REQUIRED_PERMISSIONS if item not in set(self.permissions)],
+                },
+            ),
+            "kill_switch": _validation_check(
+                passed=self.kill_switch,
+                blocker="kill_switch_disabled",
+                details={"kill_switch": self.kill_switch},
+            ),
+            "gateway": _validation_check(
+                passed=self.sdk_gateway is not None and not self.sdk_gateway_error,
+                blocker="sdk_gateway_load_failed" if self.sdk_gateway_error else "sdk_gateway_not_configured",
+                details={
+                    "configured": self.sdk_gateway is not None,
+                    "factory": self.sdk_gateway_factory,
+                    "error": self.sdk_gateway_error,
+                },
+            ),
+            "userdata_path": _validation_check(
+                passed=bool(str(self.sdk_gateway_config.get("userdata_path") or "").strip()),
+                blocker="missing_userdata_path",
+                details={"configured": bool(str(self.sdk_gateway_config.get("userdata_path") or "").strip())},
+            ),
+        }
+        terminal_result = self._validate_terminal_session()
+        checks["terminal_session"] = terminal_result["check"]
+        blockers = list(dict.fromkeys([
+            *[str(item) for item in health.get("blockers", [])],
+            *[
+                str(check["blocker"])
+                for check in checks.values()
+                if check.get("status") != "passed" and str(check.get("blocker") or "")
+            ],
+        ]))
+        status = "validated" if not blockers else "blocked"
+        return {
+            "status": status,
+            "broker": self.broker,
+            "mode": health.get("mode"),
+            "enabled": self.enabled,
+            "paper_fallback": False,
+            "account_id_masked": _mask_account(self.account_id),
+            "checked_at": _now(),
+            "blockers": blockers,
+            "checks": checks,
+            "terminal_probe": terminal_result["probe"],
+        }
+
     def _module_available(self, name: str) -> bool:
         try:
             return self.import_checker(name) is not None
         except Exception:
             return False
+
+    def _validate_terminal_session(self) -> dict[str, Any]:
+        if self.sdk_gateway is None:
+            return {
+                "check": _validation_check(
+                    passed=False,
+                    blocker="sdk_gateway_not_configured",
+                    details={"configured": False},
+                ),
+                "probe": {},
+            }
+        validate = getattr(self.sdk_gateway, "validate_environment", None)
+        if not callable(validate):
+            return {
+                "check": _validation_check(
+                    passed=False,
+                    blocker="gateway_validation_not_supported",
+                    details={"configured": True},
+                ),
+                "probe": {},
+            }
+        try:
+            probe = _safe_payload(validate(account_id=self.account_id))
+        except Exception as exc:
+            return {
+                "check": _validation_check(
+                    passed=False,
+                    blocker="terminal_validation_failed",
+                    details={"error_class": exc.__class__.__name__, "error_message": str(exc)[:300]},
+                ),
+                "probe": {},
+            }
+        probe_status = str(_response_get(probe, "status") or "").strip().lower()
+        passed = probe_status in {"validated", "ready", "ok", "matched"}
+        return {
+            "check": _validation_check(
+                passed=passed,
+                blocker="terminal_validation_failed",
+                details={"status": probe_status or "unknown"},
+            ),
+            "probe": probe,
+        }
 
     def preview_order(self, intent: dict[str, Any]) -> dict[str, Any]:
         """Return a live order preview without submitting anything."""
@@ -598,6 +712,15 @@ class MiniQmtLiveBroker:
         )
 
         return checks, blockers
+
+
+def _validation_check(*, passed: bool, blocker: str, details: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "status": "passed" if passed else "blocked",
+        "passed": passed,
+        "blocker": "" if passed else blocker,
+        "details": _safe_payload(details),
+    }
 
 
 def _now() -> str:

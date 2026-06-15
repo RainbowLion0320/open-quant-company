@@ -381,6 +381,22 @@
               <code>{{ String(liveReadiness.paper_fallback === false) }}</code>
             </div>
             <div class="detail-row">
+              <span>{{ t("ceoOffice.liveEnvironment") }}</span>
+              <code>{{ liveEnvironment?.status || "unknown" }}</code>
+            </div>
+            <div class="detail-row">
+              <span>{{ t("ceoOffice.environmentChecks") }}</span>
+              <div v-if="!liveEnvironmentChecks.length" class="ceo-empty compact">
+                {{ t("ceoOffice.noEnvironmentChecks") }}
+              </div>
+              <div v-else class="run-list">
+                <div v-for="check in liveEnvironmentChecks" :key="check.name" class="run-row">
+                  <strong>{{ check.name }}</strong>
+                  <small>{{ check.status }}{{ check.blocker ? ` · ${check.blocker}` : "" }}</small>
+                </div>
+              </div>
+            </div>
+            <div class="detail-row">
               <span>{{ t("ceoOffice.liveKillSwitch") }}</span>
               <div class="kill-switch-state" :class="{ active: liveKillSwitch?.active, invalid: liveKillSwitch?.status === 'invalid' }">
                 <code>{{ statusLabel(liveKillSwitch?.status || "inactive") }}</code>
@@ -772,7 +788,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -788,6 +804,7 @@ const rhythmResult = ref<AgentReportRhythm | null>(null);
 const scheduledRhythmResult = ref<AgentScheduledReportRhythm | null>(null);
 const notificationResult = ref<AgentReportNotification | null>(null);
 const liveReadiness = ref<AgentLiveReadiness | null>(null);
+const liveEnvironment = ref<AgentLiveEnvironment | null>(null);
 const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
 const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
@@ -837,6 +854,14 @@ const paperOrderPreview = computed(() => objectParam(selectedAction.value?.actio
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
 const paperRiskGatePassed = computed(() => Boolean(paperRiskGate.value?.passed));
 const paperRiskBlockers = computed(() => arrayParam(paperRiskGate.value?.blockers));
+const liveEnvironmentChecks = computed(() => Object.entries(liveEnvironment.value?.checks || {}).slice(0, 6).map(([name, check]) => {
+  const row = objectParam(check);
+  return {
+    name,
+    status: String(row.status || "unknown"),
+    blocker: String(row.blocker || ""),
+  };
+}));
 const selectedDesk = computed(() => desks.value.find(desk => desk.desk_id === selectedDeskId.value) || desks.value[0] || null);
 const deskScopedMessages = computed(() => messages.value.filter(message => message.desk === selectedDeskId.value));
 const deskScopedActions = computed(() => actions.value.filter(action => action.desk === selectedDeskId.value));
@@ -1123,7 +1148,7 @@ async function loadSession(sessionId: string, options: { connectStream?: boolean
 async function load() {
   error.value = "";
   try {
-    const [sessionPayload, deskPayload, policyPayload, actionPayload, handoffPayload, workOrderPayload, livePayload, killSwitchPayload] = await Promise.all([
+    const [sessionPayload, deskPayload, policyPayload, actionPayload, handoffPayload, workOrderPayload, livePayload, environmentPayload, killSwitchPayload] = await Promise.all([
       api.agentSessions(),
       api.agentDesks(),
       api.agentApprovalPolicies(),
@@ -1131,6 +1156,7 @@ async function load() {
       api.agentHandoffs(),
       api.agentWorkOrders(),
       api.agentLiveReadiness(),
+      api.agentLiveEnvironment(),
       api.agentLiveKillSwitch(),
     ]);
     sessions.value = sessionPayload.sessions || [];
@@ -1143,7 +1169,8 @@ async function load() {
     handoffs.value = handoffPayload.handoffs || [];
     workOrders.value = workOrderPayload.work_orders || [];
     liveReadiness.value = livePayload.health;
-    liveKillSwitch.value = killSwitchPayload.kill_switch || livePayload.health.live_kill_switch || null;
+    liveEnvironment.value = environmentPayload.environment;
+    liveKillSwitch.value = killSwitchPayload.kill_switch || livePayload.health.live_kill_switch || environmentPayload.environment.live_kill_switch || null;
     if (sessions.value.length) {
       await loadSession(activeSession.value?.session_id || sessions.value[0].session_id);
     }

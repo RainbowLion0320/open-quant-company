@@ -638,6 +638,44 @@ def test_agent_live_readiness_enabled_missing_sdk_blocks_without_import_crash():
     assert any(reason.startswith("missing_sdk") for reason in health["blockers"])
 
 
+def test_agent_live_environment_validation_reports_terminal_and_account_checks():
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    class ValidatingGateway:
+        def validate_environment(self, *, account_id: str) -> dict[str, object]:
+            return {
+                "status": "validated",
+                "account_id": account_id,
+                "account_snapshot": {"cash": 100000.0},
+                "position_count": 1,
+                "open_order_count": 0,
+                "trade_count": 0,
+            }
+
+    broker = MiniQmtLiveBroker(
+        enabled=True,
+        import_checker=lambda _name: object(),
+        logged_in=True,
+        account_id="1234567890",
+        permissions=["query", "trade"],
+        kill_switch=True,
+        sdk_gateway=ValidatingGateway(),
+        sdk_gateway_config={"userdata_path": "/tmp/qmt-userdata", "session_id": 42},
+    )
+
+    validation = broker.validate_environment()
+
+    assert validation["status"] == "validated"
+    assert validation["broker"] == "miniqmt"
+    assert validation["paper_fallback"] is False
+    assert validation["checks"]["sdk_modules"]["status"] == "passed"
+    assert validation["checks"]["account"]["status"] == "passed"
+    assert validation["checks"]["userdata_path"]["status"] == "passed"
+    assert validation["checks"]["gateway"]["status"] == "passed"
+    assert validation["checks"]["terminal_session"]["status"] == "passed"
+    assert validation["account_id_masked"] == "12******90"
+
+
 def test_agent_live_readiness_cli_and_api(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
@@ -658,6 +696,30 @@ def test_agent_live_readiness_cli_and_api(tmp_path, monkeypatch, capsys):
     assert api_res.status_code == 200
     assert api_res.json()["health"]["mode"] == "live_disabled"
     assert api_res.json()["health"]["paper_fallback"] is False
+    reset_datahub()
+
+
+def test_agent_live_environment_validation_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    cli_code = run_cli(["agent", "live", "environment", "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).get("/api/agent/live/environment")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["environment"]["status"] == "blocked"
+    assert cli_payload["data"]["environment"]["paper_fallback"] is False
+    assert "live_disabled" in cli_payload["data"]["environment"]["blockers"]
+    assert api_res.status_code == 200
+    assert api_res.json()["environment"]["status"] == "blocked"
+    assert api_res.json()["environment"]["paper_fallback"] is False
     reset_datahub()
 
 

@@ -237,9 +237,10 @@ Minimum requirements:
 
 Current foundation:
 
-- Default-disabled MiniQMT/QMT readiness probe is implemented and visible through CLI/API/CEO Office.
+- Default-disabled MiniQMT/QMT readiness and environment validation are implemented and visible through CLI/API/CEO Office.
 - Missing SDK/login/permissions/kill switch readiness blockers are explicit.
 - `paper_fallback=false` is part of the readiness contract.
+- `astroq agent live environment --json` / `GET /api/agent/live/environment` validate SDK modules, account flags, permissions, userdata-path configuration, gateway load, and read-only terminal query support without submitting an order.
 - `astroq agent live smoke --json` and `POST /api/agent/live/smoke` run a no-submit smoke test that records readiness and, when live-ready, a read-only reconciliation probe under `var/artifacts/agent/live_smoke/`.
 - Non-submitting live order preview includes extended risk checks for cash, concentration, total exposure, daily order count, tradability, data freshness, and broker account consistency.
 - `astroq agent live propose/submit` and `/api/agent/live/proposals` / `/api/agent/live/actions/{action_id}/submit` implement the approval-gated live submit/reconciliation contract. The default MiniQMT/QMT adapter fails closed with `live_submission_not_integrated`; an explicit SDK gateway bridge can submit/reconcile only when injected or loaded through `execution.live.sdk_gateway_factory`; the default factory is `broker.live.xtquant_gateway:build_gateway`, with masked/hashed audit responses.

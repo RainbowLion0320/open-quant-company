@@ -443,6 +443,16 @@ def live_readiness() -> CliResult:
     )
 
 
+def live_environment() -> CliResult:
+    environment = AgentRuntime().live_environment()
+    return CliResult(
+        ok=True,
+        command="agent live environment",
+        message=f"Live broker environment: {environment['status']}",
+        data={"environment": environment},
+    )
+
+
 def live_smoke() -> CliResult:
     smoke = AgentRuntime().run_live_smoke()
     ok = smoke["status"] in {"ready", "blocked"}

@@ -1,6 +1,6 @@
 # Agent Company OS Phase 6 - MiniQMT/QMT Live Execution Plan
 
-> Status: readiness, preview, approval-gated submit/reconciliation contract, explicit SDK gateway bridge, config-based gateway factory loading, xtquant gateway module, and runtime project snapshot wiring implemented; real-account smoke tests planned
+> Status: readiness, environment validation, preview, approval-gated submit/reconciliation contract, explicit SDK gateway bridge, config-based gateway factory loading, xtquant gateway module, and runtime project snapshot wiring implemented; operator must still run environment/smoke checks against the real account before enabling live submissions
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Related spec: [04-execution-layer.md](../../specs/04-execution-layer.md)
@@ -256,6 +256,7 @@ Current foundation:
 
 - `broker.live.qmt.MiniQmtLiveBroker.health()` reports default-disabled readiness.
 - `astroq agent live readiness --json` and `GET /api/agent/live/readiness` expose the same readiness state.
+- `astroq agent live environment --json` and `GET /api/agent/live/environment` validate SDK modules, account flags, permissions, userdata-path configuration, gateway load, and read-only terminal query support without submitting an order.
 - `astroq agent live smoke --json` and `POST /api/agent/live/smoke` run a no-submit smoke test: blocked readiness stops before broker reconciliation, live-ready brokers receive only a read-only `reconcile({"smoke_test": true, "broker_order_id": ""})` probe, and the result is written under `var/artifacts/agent/live_smoke/`.
 - `broker.live.qmt.MiniQmtLiveBroker.preview_order()` returns a non-submitting live order preview with intent normalization, estimated cash/position impact, fees, readiness blockers, evidence requirement, cash gate, and extended risk snapshot checks for concentration, total exposure, daily order count, tradability, data freshness, broker account consistency, drawdown state, portfolio VaR/CVaR, sector concentration, and intraday limit-state.
 - `astroq agent live preview ... --json` and `POST /api/agent/live/preview` expose the same preview state with `approval_required=true`, `submitted=false`, and `paper_fallback=false`.
@@ -267,13 +268,13 @@ Current foundation:
 - `broker.live.xtquant_gateway` provides the default xtquant-backed gateway factory. It calls `XtQuantTrader.order_stock()` for live submit and reads asset, position, order, and trade snapshots for reconciliation. When an ack or gateway config includes `project_snapshot`, the gateway compares broker cash, positions, and order ids against that project ledger snapshot. Without a project snapshot, reconciliation remains `needs_review` with `project_ledger_comparison_not_configured` instead of fake matched status.
 - `AgentRuntime` attaches a preview-derived `project_snapshot` to live submit and scheduled reconciliation ack payloads before calling the live adapter. The snapshot includes cash after the previewed cash effect, symbol position after the previewed quantity delta when current quantity is available, and the submitted broker order id. Missing pieces are recorded in `project_snapshot.missing`; incomplete snapshots remain reviewable rather than being treated as fake matches.
 - `astroq agent live kill-switch status/activate/deactivate --json` and `/api/agent/live/kill-switch` expose a local kill switch. Activation cancels queued `live_order` actions, writes state/event artifacts under `var/artifacts/agent/live_kill_switch/`, and blocks live preview/propose/submit before broker calls.
-- CEO Office shows a read-only live readiness card.
+- CEO Office shows read-only live readiness and environment validation status.
 - Blocked readiness always reports `paper_fallback=false`; no live path submits through PaperBroker.
 
 Remaining work:
 
-- Broker account consistency reconciliation against real MiniQMT/QMT snapshots after SDK integration.
-- Run the no-submit smoke harness and gateway path against the user's real MiniQMT/QMT terminal, userdata path, account id, connection/session object, and order API.
+- Broader broker account consistency reconciliation against real MiniQMT/QMT snapshots after SDK integration.
+- Operator should run `astroq agent live environment --json` and the no-submit smoke harness against the real MiniQMT/QMT terminal before enabling live submissions.
 - Real-account scheduled broker order/trade/position reconciliation through the configured gateway.
 - Broker-side kill-switch operations for canceling already submitted real MiniQMT/QMT orders after SDK integration.
 

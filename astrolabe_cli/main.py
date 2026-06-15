@@ -20,6 +20,7 @@ from astrolabe_cli.commands.agent import handoffs as agent_handoffs
 from astrolabe_cli.commands.agent import live_kill_switch_activate as agent_live_kill_switch_activate
 from astrolabe_cli.commands.agent import live_kill_switch_deactivate as agent_live_kill_switch_deactivate
 from astrolabe_cli.commands.agent import live_kill_switch_status as agent_live_kill_switch_status
+from astrolabe_cli.commands.agent import live_environment as agent_live_environment
 from astrolabe_cli.commands.agent import live_preview as agent_live_preview
 from astrolabe_cli.commands.agent import live_propose as agent_live_propose
 from astrolabe_cli.commands.agent import live_readiness as agent_live_readiness
@@ -333,6 +334,12 @@ def build_parser() -> argparse.ArgumentParser:
     agent_live_readiness_cmd = agent_live_sub.add_parser("readiness", help="Check MiniQMT/QMT live readiness")
     add_common_flags(agent_live_readiness_cmd)
     agent_live_readiness_cmd.set_defaults(handler=lambda args: agent_live_readiness())
+    agent_live_environment_cmd = agent_live_sub.add_parser(
+        "environment",
+        help="Validate local MiniQMT/QMT SDK, account, and terminal environment without submitting orders",
+    )
+    add_common_flags(agent_live_environment_cmd)
+    agent_live_environment_cmd.set_defaults(handler=lambda args: agent_live_environment())
     agent_live_smoke_cmd = agent_live_sub.add_parser(
         "smoke",
         help="Run a no-submit MiniQMT/QMT live broker smoke test",

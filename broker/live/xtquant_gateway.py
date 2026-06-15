@@ -45,6 +45,27 @@ class XtQuantGateway:
         self.constants = constants
         self._connected = False
 
+    def validate_environment(self, *, account_id: str) -> dict[str, Any]:
+        """Validate the configured xtquant terminal/session using read-only calls."""
+        self._require_account(account_id)
+        self._ensure_connected()
+        account_snapshot = _to_mapping(self.trader.query_stock_asset(self.account))
+        positions = _records(self.trader.query_stock_positions(self.account))
+        orders = _records(self.trader.query_stock_orders(self.account))
+        trades = _records(self.trader.query_stock_trades(self.account))
+        return {
+            "status": "validated",
+            "broker": self.broker,
+            "account_id": self.account_id,
+            "userdata_path_configured": bool(self.userdata_path),
+            "session_id": self.session_id,
+            "account_type": self.account_type,
+            "account_snapshot": account_snapshot,
+            "position_count": len(positions),
+            "open_order_count": len(orders),
+            "trade_count": len(trades),
+        }
+
     def submit_order(self, intent: dict[str, Any], *, approval_id: str, account_id: str) -> dict[str, Any]:
         self._require_account(account_id)
         self._ensure_connected()
