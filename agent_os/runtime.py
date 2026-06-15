@@ -280,6 +280,34 @@ class AgentRuntime:
                 )
         return reconciliations
 
+    def live_reconciliations_for_action(self, action_id: str) -> list[dict[str, Any]]:
+        if not self.ledger.get_action(action_id):
+            raise KeyError(f"Agent action not found: {action_id}")
+        reconciliations: list[dict[str, Any]] = []
+        for run in self.ledger.list_runs(action_id):
+            for evidence_id in run.get("artifact_refs", []) or []:
+                evidence = self.ledger.get_evidence(str(evidence_id))
+                if not evidence:
+                    continue
+                if str(evidence.get("label") or "") != "Live order reconciliation":
+                    continue
+                path = Path(str(evidence.get("uri") or ""))
+                if "live_reconciliation" not in str(path) or not path.exists():
+                    continue
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(payload, dict) or str(payload.get("action_id") or "") != action_id:
+                    continue
+                reconciliations.append(
+                    {
+                        **payload,
+                        "evidence_id": str(evidence["evidence_id"]),
+                        "path": str(path),
+                        "run_id": str(run["run_id"]),
+                        "freshness_status": str(evidence.get("freshness_status") or ""),
+                    }
+                )
+        return reconciliations
+
     def list_actions(self, session_id: str | None = None) -> list[dict[str, Any]]:
         return self.ledger.list_actions(session_id)
 
@@ -846,6 +874,103 @@ class AgentRuntime:
             "reconciliation": reconciliation,
             "evidence": evidence.to_dict(),
         }
+
+    def run_live_reconciliation(self, *, session_id: str | None = None, broker: Any | None = None) -> dict[str, Any]:
+        live_broker = broker or MiniQmtLiveBroker()
+        checked_at = _now()
+        actions = [
+            action
+            for action in reversed(self.ledger.list_actions(session_id))
+            if str(action.get("action_type")) == "live_order" and str(action.get("risk_level")) == "live_order"
+        ]
+        items: list[dict[str, Any]] = []
+        reconciled_count = 0
+        skipped_count = 0
+        blocked_count = 0
+        failed_count = 0
+
+        for action in actions:
+            action_id = str(action["action_id"])
+            submitted_reconciliations = [
+                reconciliation
+                for reconciliation in self.live_reconciliations_for_action(action_id)
+                if str(reconciliation.get("status") or "") == "submitted" and str(reconciliation.get("order_id") or "")
+            ]
+            if not submitted_reconciliations:
+                skipped_count += 1
+                items.append(
+                    {
+                        "action_id": action_id,
+                        "status": "skipped",
+                        "reason": "no_submitted_live_order",
+                        "order_id": "",
+                        "broker_reconciliation": {},
+                    }
+                )
+                continue
+
+            latest = submitted_reconciliations[0]
+            ack = dict(latest.get("ack") or {})
+            try:
+                broker_reconciliation = dict(live_broker.reconcile(ack))
+            except Exception as exc:  # pragma: no cover - defensive adapter boundary
+                failed_count += 1
+                items.append(
+                    {
+                        "action_id": action_id,
+                        "status": "failed",
+                        "reason": str(exc),
+                        "order_id": str(latest.get("order_id") or ack.get("broker_order_id") or ""),
+                        "ack": ack,
+                        "broker_reconciliation": {},
+                        "source_reconciliation": latest,
+                    }
+                )
+                continue
+
+            broker_status = str(broker_reconciliation.get("status") or "")
+            item_status = "reconciled" if broker_status in {"matched", "ok", "ready"} else "blocked"
+            if item_status == "reconciled":
+                reconciled_count += 1
+            else:
+                blocked_count += 1
+            items.append(
+                {
+                    "action_id": action_id,
+                    "status": item_status,
+                    "reason": "" if item_status == "reconciled" else broker_status,
+                    "order_id": str(latest.get("order_id") or ack.get("broker_order_id") or ""),
+                    "ack": ack,
+                    "broker_reconciliation": broker_reconciliation,
+                    "source_reconciliation": latest,
+                }
+            )
+
+        status = "ready" if blocked_count == 0 and failed_count == 0 else "partial"
+        payload = {
+            "status": status,
+            "checked_at": checked_at,
+            "session_id": session_id or "",
+            "action_count": len(actions),
+            "reconciled_count": reconciled_count,
+            "skipped_count": skipped_count,
+            "blocked_count": blocked_count,
+            "failed_count": failed_count,
+            "items": items,
+            "paper_fallback": False,
+        }
+        path = self._write_live_scheduled_reconciliation_artifact(payload)
+        evidence = self.create_evidence(
+            kind="artifact",
+            label="Live scheduled reconciliation",
+            uri=str(path),
+            summary=(
+                f"Live reconciliation scanned {payload['action_count']} action(s), "
+                f"reconciled {payload['reconciled_count']}, skipped {payload['skipped_count']}, "
+                f"blocked {payload['blocked_count']}, failed {payload['failed_count']}."
+            ),
+        )
+        return {**payload, "path": str(path), "evidence": evidence.to_dict()}
 
     def propose_paper_order(
         self,
@@ -1783,6 +1908,14 @@ class AgentRuntime:
             uri=str(path),
             summary=f"Live order reconciliation {reconciliation['status']} for {action['action_id']}",
         )
+
+    def _write_live_scheduled_reconciliation_artifact(self, payload: dict[str, Any]) -> Path:
+        root = get_datahub().artifact_dir("agent") / "live_reconciliation" / "scheduled"
+        root.mkdir(parents=True, exist_ok=True)
+        checked_at = str(payload["checked_at"]).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
+        path = root / f"{checked_at}-{uuid.uuid4().hex[:8]}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return path
 
     def _load_default_paper_broker(self) -> PaperBroker:
         from broker.persistence import load_state

@@ -52,6 +52,7 @@ All endpoints are planned under `/api/agent/*`.
 | `POST` | `/api/agent/live/preview` | Preview a MiniQMT/QMT live order with readiness, extended risk gate, broker impact, and `submitted=false`. | Implemented preview gate |
 | `POST` | `/api/agent/live/proposals` | Create an approval-required live order action only after live preview passes. | Implemented proposal gate |
 | `POST` | `/api/agent/live/actions/{action_id}/submit` | Submit an approved live order action through the live broker adapter and write reconciliation evidence; default MiniQMT adapter fails closed until real SDK submission is wired. | Implemented contract, real adapter pending |
+| `POST` | `/api/agent/live/reconciliation` | Scan submitted live order evidence, call live adapter reconciliation, and write a scheduled reconciliation artifact. | Implemented scheduled scan |
 | `GET` | `/api/agent/live/kill-switch` | Read the local live kill switch state. | Implemented |
 | `POST` | `/api/agent/live/kill-switch/activate` | Activate the local live kill switch, cancel queued live actions, and block future live paths before broker calls. | Implemented |
 | `POST` | `/api/agent/live/kill-switch/deactivate` | Deactivate the local live kill switch for future live previews/proposals/submits. | Implemented |
@@ -98,6 +99,7 @@ All commands must support `--json`.
 | `astroq agent live preview --symbol SYMBOL --side buy\|sell --quantity N --limit-price PRICE --evidence EVIDENCE_ID --json` | Preview a live limit order without submission, including approval requirement, readiness blockers, extended risk gate, and estimated broker impact. | Implemented preview gate |
 | `astroq agent live propose --session SESSION_ID --symbol SYMBOL --side buy\|sell --quantity N --limit-price PRICE --evidence EVIDENCE_ID --json` | Create an approval-required live order proposal when live preview passes. | Implemented proposal gate |
 | `astroq agent live submit ACTION_ID --json` | Submit an approved live order action through the live adapter, re-running preview/risk gates and writing reconciliation evidence. | Implemented contract, real adapter pending |
+| `astroq agent live reconcile --session SESSION_ID --json` | Scan submitted live order evidence and write scheduled reconciliation evidence. | Implemented scheduled scan |
 | `astroq agent live kill-switch status --json` | Read the local live kill switch state. | Implemented |
 | `astroq agent live kill-switch activate --reason REASON --json` | Activate the local live kill switch and cancel queued live actions. | Implemented |
 | `astroq agent live kill-switch deactivate --reason REASON --json` | Deactivate the local live kill switch. | Implemented |
@@ -521,7 +523,29 @@ state stored under `var/artifacts/agent/live_kill_switch/state.json`.
 local block for future live paths. Deactivation does not resurrect canceled
 or blocked actions; users must create a fresh approval card after the incident.
 
-### 5.16 PaperOrderProposal and Submission
+### 5.16 LiveScheduledReconciliation
+
+`POST /api/agent/live/reconciliation` and
+`astroq agent live reconcile --json` scan local `live_order` actions and write
+a scheduled reconciliation artifact under
+`var/artifacts/agent/live_reconciliation/scheduled/`.
+
+The scan:
+
+- only attempts broker reconciliation for actions with prior submitted live
+  reconciliation evidence and a broker order id;
+- skips approval cards or blocked actions without a submitted broker order with
+  `reason=no_submitted_live_order`;
+- calls the live adapter `reconcile()` method for submitted live orders;
+- writes `EvidenceRef.label="Live scheduled reconciliation"`;
+- always keeps `paper_fallback=false`;
+- returns `ready` when all attempted reconciliations are matched or skipped,
+  and `partial` when a broker reconciliation is blocked or failed.
+
+The default MiniQMT/QMT adapter still returns `not_integrated` for real account
+reconciliation until the actual SDK bridge is wired.
+
+### 5.17 PaperOrderProposal and Submission
 
 `POST /api/agent/paper/proposals` and
 `astroq agent paper propose ... --json` create approval cards only after a
@@ -727,8 +751,8 @@ As of 2026-06-14:
 
 - Foundation runtime is partially implemented in `agent_os/`.
 - The local SQLite ledger stores sessions, messages, actions, evidence, run table schema, and open/resolved cross-desk handoffs under `var/db/agent_os.sqlite`.
-- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/reports/report/notify report/rhythm (--session or --all-active)/paper propose/paper submit/paper cancel/live readiness/live preview/live propose/live submit/live kill-switch status/live kill-switch activate/live kill-switch deactivate/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
-- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/paper/proposals`, `/api/agent/paper/actions/{action_id}/submit`, `/api/agent/paper/actions/{action_id}/cancel`, `/api/agent/live/readiness`, `/api/agent/live/preview`, `/api/agent/live/proposals`, `/api/agent/live/actions/{action_id}/submit`, `/api/agent/live/kill-switch`, `/api/agent/live/kill-switch/activate`, `/api/agent/live/kill-switch/deactivate`, `/api/agent/reports`, `/api/agent/reports/{report_id}/notify`, `/api/agent/reports/rhythm`, `/api/agent/reports/rhythm/scheduled`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
+- `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/reports/report/notify report/rhythm (--session or --all-active)/paper propose/paper submit/paper cancel/live readiness/live preview/live propose/live submit/live reconcile/live kill-switch status/live kill-switch activate/live kill-switch deactivate/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
+- `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/paper/proposals`, `/api/agent/paper/actions/{action_id}/submit`, `/api/agent/paper/actions/{action_id}/cancel`, `/api/agent/live/readiness`, `/api/agent/live/preview`, `/api/agent/live/proposals`, `/api/agent/live/actions/{action_id}/submit`, `/api/agent/live/reconciliation`, `/api/agent/live/kill-switch`, `/api/agent/live/kill-switch/activate`, `/api/agent/live/kill-switch/deactivate`, `/api/agent/reports`, `/api/agent/reports/{report_id}/notify`, `/api/agent/reports/rhythm`, `/api/agent/reports/rhythm/scheduled`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; approved fixed-registry templated commands bind only tool-declared safe parameters.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
@@ -736,8 +760,8 @@ As of 2026-06-14:
 - CEO reports can be generated as JSON/Markdown artifacts, registered as report evidence, listed through CLI/API, and shown as CEO Office report cards. Dedicated templates cover daily, weekly, audit, data quality, risk, execution reconciliation, engineering digest, and release audit reports; each report includes fixed allowlist artifact context for lifecycle, data-sources, strategy competition, AST intelligence, test design intelligence, and CodeGraph readiness. CEO Office can generate a selected template, run due templates through the explicit operating-rhythm runner, trigger the scheduled active-session rhythm tick, or send/dry-run report notifications. Scheduled ticks write audit artifacts under `var/artifacts/agent/reports/scheduled/`; notifications write audit artifacts under `var/artifacts/agent/reports/notifications/` and read only system environment variables.
 - PaperBroker order proposal, approved submission, and cancellation are available through CLI/API. Proposal writes preview artifact evidence and creates an approval-required `paper_order` action only when the non-mutating preview passes; submission requires approval, re-runs preview/risk gates, blocks stale previews, writes run/reconciliation evidence, persists default PaperBroker state on success, and exposes paper reconciliation summaries on action detail. Cancellation writes dedicated `paper.paper_order.cancel` runs and reconciliation evidence for queued approval requests or broker-confirmed active order cancellations.
 - MiniQMT/QMT readiness probing is available and defaults to `live_disabled`; missing SDK, login, permission, or disabled kill switch returns `blocked`, and `paper_fallback` is always false.
-- MiniQMT/QMT live order preview, proposal, approved-submit contract, and local kill switch operations are available through CLI/API. The path never falls back to PaperBroker, always requires approval, re-runs preview/risk gates before submit, writes live reconciliation evidence, blocks before broker calls when kill switch is active, and defaults to `live_submission_not_integrated` until a real MiniQMT/QMT submit adapter is wired.
+- MiniQMT/QMT live order preview, proposal, approved-submit contract, scheduled reconciliation scan, and local kill switch operations are available through CLI/API. The path never falls back to PaperBroker, always requires approval, re-runs preview/risk gates before submit, writes live reconciliation evidence, blocks before broker calls when kill switch is active, and defaults to `live_submission_not_integrated` / `not_integrated` until a real MiniQMT/QMT submit/reconcile adapter is wired.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
-- Actual advanced desk reasoning, broad tool execution, streaming updates, advanced semantic report synthesis, real MiniQMT/QMT SDK submission, and scheduled live reconciliation are not yet implemented.
+- Actual advanced desk reasoning, broad tool execution, streaming updates, advanced semantic report synthesis, and real MiniQMT/QMT SDK submission/reconciliation are not yet implemented.

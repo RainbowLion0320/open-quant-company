@@ -417,6 +417,22 @@ def live_kill_switch_deactivate(reason: str) -> CliResult:
     )
 
 
+def live_reconcile(session_id: str = "") -> CliResult:
+    reconciliation = AgentRuntime().run_live_reconciliation(session_id=session_id or None)
+    ok = reconciliation["status"] in {"ready", "partial"}
+    return CliResult(
+        ok=ok,
+        command="agent live reconcile",
+        message=(
+            f"Live reconciliation {reconciliation['status']}: "
+            f"{reconciliation['reconciled_count']} reconciled, "
+            f"{reconciliation['skipped_count']} skipped"
+        ),
+        data={"reconciliation": reconciliation},
+        errors=[] if ok else [str(reconciliation["status"])],
+    )
+
+
 def paper_propose(
     *,
     session_id: str,

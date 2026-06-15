@@ -149,6 +149,13 @@ async def deactivate_agent_live_kill_switch(payload: dict[str, Any] | None = Non
     return {"kill_switch": kill_switch}
 
 
+@router.post("/live/reconciliation")
+async def run_agent_live_reconciliation(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    session_id = str((payload or {}).get("session_id") or "") or None
+    reconciliation = AgentRuntime().run_live_reconciliation(session_id=session_id)
+    return {"reconciliation": reconciliation}
+
+
 @router.post("/paper/proposals")
 async def propose_agent_paper_order(payload: dict[str, Any]) -> dict[str, Any]:
     session_id = str(payload.get("session_id") or "")

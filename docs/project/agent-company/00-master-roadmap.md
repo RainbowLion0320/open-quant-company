@@ -232,6 +232,7 @@ Current foundation:
 - `paper_fallback=false` is part of the readiness contract.
 - Non-submitting live order preview includes extended risk checks for cash, concentration, total exposure, daily order count, tradability, data freshness, and broker account consistency.
 - `astroq agent live propose/submit` and `/api/agent/live/proposals` / `/api/agent/live/actions/{action_id}/submit` implement the approval-gated live submit/reconciliation contract. The default MiniQMT/QMT adapter fails closed with `live_submission_not_integrated`; real SDK submission remains future work.
+- `astroq agent live reconcile` and `/api/agent/live/reconciliation` scan submitted live order evidence, call adapter reconciliation, and write scheduled reconciliation artifacts.
 - `astroq agent live kill-switch status/activate/deactivate` and `/api/agent/live/kill-switch` implement a local kill switch. Activation cancels queued live actions, writes auditable artifacts, and blocks live preview/propose/submit before broker calls.
 
 ### Phase 7 - Reporting and Operating Rhythm

@@ -22,6 +22,7 @@ from astrolabe_cli.commands.agent import live_kill_switch_status as agent_live_k
 from astrolabe_cli.commands.agent import live_preview as agent_live_preview
 from astrolabe_cli.commands.agent import live_propose as agent_live_propose
 from astrolabe_cli.commands.agent import live_readiness as agent_live_readiness
+from astrolabe_cli.commands.agent import live_reconcile as agent_live_reconcile
 from astrolabe_cli.commands.agent import live_submit as agent_live_submit
 from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
 from astrolabe_cli.commands.agent import memory_export as agent_memory_export
@@ -309,6 +310,10 @@ def build_parser() -> argparse.ArgumentParser:
     agent_live_submit_cmd.add_argument("action_id")
     add_common_flags(agent_live_submit_cmd)
     agent_live_submit_cmd.set_defaults(handler=lambda args: agent_live_submit(args.action_id))
+    agent_live_reconcile_cmd = agent_live_sub.add_parser("reconcile", help="Run live order reconciliation scan")
+    agent_live_reconcile_cmd.add_argument("--session", default="")
+    add_common_flags(agent_live_reconcile_cmd)
+    agent_live_reconcile_cmd.set_defaults(handler=lambda args: agent_live_reconcile(args.session))
     agent_live_kill_switch_cmd = agent_live_sub.add_parser("kill-switch", help="Inspect or change the live kill switch")
     agent_live_kill_switch_sub = agent_live_kill_switch_cmd.add_subparsers(
         dest="agent_live_kill_switch_command",

@@ -867,6 +867,131 @@ def test_agent_live_kill_switch_cli_and_api(tmp_path, monkeypatch, capsys):
     reset_datahub()
 
 
+def test_agent_live_reconciliation_runner_scans_submitted_live_orders(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    class FakeLiveBroker:
+        def __init__(self):
+            self.preview_calls = 0
+            self.submit_calls = 0
+            self.reconcile_calls = 0
+
+        def preview_order(self, intent):
+            self.preview_calls += 1
+            normalized = {
+                "symbol": str(intent["symbol"]).upper(),
+                "side": intent["side"],
+                "quantity": int(intent["quantity"]),
+                "order_type": "limit",
+                "limit_price": float(intent["limit_price"]),
+                "strategy": intent.get("strategy", "manual"),
+                "reason": intent.get("reason", ""),
+                "evidence_refs": list(intent.get("evidence_refs", [])),
+            }
+            return {
+                "status": "preview_ready",
+                "broker": "miniqmt",
+                "intent": normalized,
+                "approval_required": True,
+                "paper_fallback": False,
+                "submitted": False,
+                "risk_gate": {"passed": True, "blockers": [], "checks": [{"name": "fake_live_ready", "passed": True}]},
+                "health": {"mode": "live_ready", "paper_fallback": False},
+            }
+
+        def submit_order(self, intent, approval_id):
+            self.submit_calls += 1
+            return {
+                "status": "submitted",
+                "broker_order_id": "LIVE_RECON_0001",
+                "broker_status": "accepted",
+                "submitted": True,
+                "ledger_id": approval_id,
+            }
+
+        def reconcile(self, ack):
+            self.reconcile_calls += 1
+            return {
+                "status": "matched",
+                "as_of": "2026-06-15T00:00:02Z",
+                "open_orders": [{"broker_order_id": ack["broker_order_id"], "status": "accepted"}],
+                "fills": [],
+                "mismatches": [],
+                "recommended_actions": [],
+            }
+
+    broker = FakeLiveBroker()
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Live reconciliation", default_desk="execution")
+    intent = {
+        "symbol": "600000.SH",
+        "side": "buy",
+        "quantity": 100,
+        "order_type": "limit",
+        "limit_price": 10.0,
+        "strategy": "manual",
+        "reason": "reconciliation coverage",
+        "evidence_refs": ["ev_demo"],
+    }
+    proposal = runtime.propose_live_order(session_id=session.session_id, intent=intent, broker=broker)
+    runtime.approve_action(proposal["action"]["action_id"], decided_by="ceo")
+    submitted = runtime.submit_live_order_action(proposal["action"]["action_id"], broker=broker)
+    pending = runtime.propose_action(
+        session_id=session.session_id,
+        desk="execution",
+        action_type="live_order",
+        risk_level="live_order",
+        summary="Unsubmitted live order should be skipped",
+        parameters={"live_order_intent": intent},
+        expected_effect="Would submit only after approval.",
+    )
+
+    reconciliation = runtime.run_live_reconciliation(session_id=session.session_id, broker=broker)
+
+    assert submitted["status"] == "succeeded"
+    assert broker.reconcile_calls == 2
+    assert reconciliation["status"] == "ready"
+    assert reconciliation["action_count"] == 2
+    assert reconciliation["reconciled_count"] == 1
+    assert reconciliation["skipped_count"] == 1
+    assert reconciliation["items"][0]["action_id"] == proposal["action"]["action_id"]
+    assert reconciliation["items"][0]["broker_reconciliation"]["status"] == "matched"
+    assert reconciliation["items"][1]["action_id"] == pending.action_id
+    assert reconciliation["items"][1]["status"] == "skipped"
+    assert reconciliation["items"][1]["reason"] == "no_submitted_live_order"
+    assert reconciliation["evidence"]["label"] == "Live scheduled reconciliation"
+    assert Path(reconciliation["path"]).exists()
+    reset_datahub()
+
+
+def test_agent_live_reconciliation_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    cli_code = run_cli(["agent", "live", "reconcile", "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post("/api/agent/live/reconciliation")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["reconciliation"]["status"] == "ready"
+    assert cli_payload["data"]["reconciliation"]["action_count"] == 0
+    assert api_res.status_code == 200
+    assert api_res.json()["reconciliation"]["status"] == "ready"
+    assert api_res.json()["reconciliation"]["action_count"] == 0
+    reset_datahub()
+
+
 def test_paper_order_preview_does_not_submit_or_mutate_broker_state():
     from broker import PaperBroker
 

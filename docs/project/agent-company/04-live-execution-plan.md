@@ -249,6 +249,7 @@ Current foundation:
 - `astroq agent live preview ... --json` and `POST /api/agent/live/preview` expose the same preview state with `approval_required=true`, `submitted=false`, and `paper_fallback=false`.
 - `astroq agent live propose ... --json` and `POST /api/agent/live/proposals` create approval-required live order action cards only after preview passes.
 - `astroq agent live submit ACTION_ID --json` and `POST /api/agent/live/actions/{action_id}/submit` require CEO approval, re-run preview/risk gates, submit only through the live adapter, and write reconciliation evidence under `var/artifacts/agent/live_reconciliation/`.
+- `astroq agent live reconcile --json` and `POST /api/agent/live/reconciliation` scan submitted live order evidence, call the live adapter reconciliation method, skip unsubmitted approval cards with `no_submitted_live_order`, and write scheduled reconciliation evidence under `var/artifacts/agent/live_reconciliation/scheduled/`.
 - Default `MiniQmtLiveBroker.submit_order()` fails closed with `live_submission_not_integrated`; no local path fabricates a broker order id or falls back to PaperBroker.
 - `astroq agent live kill-switch status/activate/deactivate --json` and `/api/agent/live/kill-switch` expose a local kill switch. Activation cancels queued `live_order` actions, writes state/event artifacts under `var/artifacts/agent/live_kill_switch/`, and blocks live preview/propose/submit before broker calls.
 - CEO Office shows a read-only live readiness card.
@@ -258,7 +259,7 @@ Remaining work:
 
 - Deeper production-grade risk gates beyond the current preview checks, including drawdown state, portfolio VaR/CVaR, sector concentration, intraday limit-state checks, and broker account consistency reconciliation against real MiniQMT/QMT snapshots.
 - Real MiniQMT/QMT SDK-backed order submission.
-- Scheduled broker order/trade/position reconciliation against real account snapshots.
+- Real-account scheduled broker order/trade/position reconciliation after SDK integration.
 - Broker-side kill-switch operations for canceling already submitted real MiniQMT/QMT orders after SDK integration.
 
 ## 13. Open Design Questions
