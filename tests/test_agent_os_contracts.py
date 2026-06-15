@@ -4021,6 +4021,117 @@ def test_agent_workflow_plan_uses_artifact_context_for_broad_ceo_priority_reques
     reset_datahub()
 
 
+def test_agent_workflow_plan_combines_artifact_context_with_session_backlog(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import get_datahub, reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 1},
+            "blockers": [{"dimension": "risk_free_curve", "reason": "missing_data"}],
+        },
+        "data-sources/latest.json": {
+            "summary": {"capability_unmapped_count": 5, "source_count": 8},
+        },
+        "tournaments/strategy_competition_latest.json": {
+            "summary": {"total": 12, "blocked": 4, "insufficient_alpha_evidence": 3},
+        },
+        "architecture/ast/latest.json": {
+            "summary": {"issue_count": 1, "severity_counts": {"P1": 1}},
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Hybrid CEO planning", default_desk="reporting")
+    evidence = runtime.create_evidence(
+        kind="web_route",
+        label="Open repair evidence",
+        uri="/datahub",
+        summary="Existing repair evidence.",
+    )
+    runtime.propose_action(
+        session_id=session.session_id,
+        desk="data",
+        action_type="data_repair",
+        risk_level="write_data",
+        summary="Repair stock_valuation after CEO approval.",
+        parameters={"tool_id": "astroq.data.repair", "table": "stock_valuation"},
+        expected_effect="Writes repaired partitions only after explicit approval.",
+        evidence_refs=[evidence.evidence_id],
+    )
+    source = runtime.add_message(
+        session.session_id,
+        role="ceo",
+        desk="reporting",
+        content="Risk handoff 还没关。",
+    )
+    runtime.respond_as_desk(
+        session_id=session.session_id,
+        source_message_id=source.message_id,
+        desk="reporting",
+        answer="需要 Risk Desk 跟进。",
+        handoffs=[{"target_desk": "risk", "reason": "Open risk handoff."}],
+        evidence_refs=[evidence.evidence_id],
+    )
+    runtime.create_work_order(
+        session_id=session.session_id,
+        title="Close architecture risk",
+        summary="Existing engineering work.",
+        impact="Should stay visible in hybrid planning.",
+        affected_files=["agent_os/workflows.py"],
+        suggested_verification=["pytest tests/test_agent_os_contracts.py"],
+        evidence_refs=[evidence.evidence_id],
+    )
+
+    content = "继续推进当前公司优先级，根据当前证据和未完成事项安排下一步"
+    before_summary = runtime.memory_snapshot()["summary"]
+    preview = runtime.preview_workflow_plan(desk="reporting", content=content, session_id=session.session_id)
+    after_summary = runtime.memory_snapshot()["summary"]
+    routed = runtime.submit_ceo_message(session.session_id, desk="reporting", content=content)
+    response = routed["desk_response"]
+    response_actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+    preview_tools = [action["tool_id"] for action in preview["actions"]]
+    response_tools = [action["parameters"]["tool_id"] for action in response_actions]
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+
+    assert before_summary == after_summary
+    assert preview["planning_mode"] == "adaptive_artifact"
+    assert preview["side_effects"]["ledger_writes"] is False
+    assert preview_tools == response_tools
+    assert preview_tools == [
+        "astroq.data.repair.dry_run",
+        "astroq.lifecycle.check",
+        "astroq.architecture.ast",
+        "astroq.test.design",
+        "astroq.data.sources.diff_registry",
+        "astroq.strategy.compete",
+    ]
+    assert reasoning_by_kind["intent_match"]["planning_mode"] == "adaptive_artifact"
+    assert reasoning_by_kind["session_backlog"]["approval_required_count"] >= 1
+    assert reasoning_by_kind["artifact_context"]["root_causes"] == [
+        "lifecycle_blocker",
+        "data_source_gap",
+        "strategy_evidence_blocked",
+        "engineering_quality_risk",
+    ]
+    assert reasoning_by_kind["context_fusion"]["source_count"] == 2
+    assert all(action["risk_level"] in {"read_only", "dry_run"} for action in response_actions)
+    assert any(handoff["target_desk"] == "data" for handoff in response.handoffs)
+    assert any(handoff["target_desk"] == "risk" for handoff in response.handoffs)
+    reset_datahub()
+
+
 def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

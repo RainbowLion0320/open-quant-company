@@ -260,6 +260,15 @@ def build_desk_workflow_plan(
     artifact_context: dict[str, Any] | None = None,
     session_context: dict[str, Any] | None = None,
 ) -> DeskWorkflowPlan:
+    hybrid_plan = _adaptive_artifact_plan(
+        desk=desk,
+        content=content,
+        artifact_context=artifact_context or {},
+        session_context=session_context or {},
+    )
+    if hybrid_plan is not None:
+        return hybrid_plan
+
     adaptive_plan = _adaptive_session_plan(desk=desk, content=content, session_context=session_context or {})
     if adaptive_plan is not None:
         return adaptive_plan
@@ -295,6 +304,83 @@ def build_desk_workflow_plan(
         ),
         handoffs=handoffs,
         work_orders=work_orders,
+    )
+
+
+def _adaptive_artifact_plan(
+    *,
+    desk: str,
+    content: str,
+    artifact_context: dict[str, Any],
+    session_context: dict[str, Any],
+) -> DeskWorkflowPlan | None:
+    normalized = content.lower()
+    if desk != "reporting":
+        return None
+    if not _is_session_follow_up_request(normalized) or not _is_artifact_priority_request(normalized):
+        return None
+
+    active_actions = [row for row in session_context.get("active_actions", []) if isinstance(row, dict)]
+    open_handoffs = [row for row in session_context.get("open_handoffs", []) if isinstance(row, dict)]
+    open_work_orders = [row for row in session_context.get("open_work_orders", []) if isinstance(row, dict)]
+    if not active_actions and not open_handoffs and not open_work_orders:
+        return None
+
+    root_causes = _artifact_root_causes(artifact_context)
+    if not root_causes:
+        return None
+
+    session_actions = _adaptive_actions_for_session(active_actions, open_handoffs, open_work_orders)
+    artifact_actions = _artifact_actions_for_causes(root_causes)
+    actions = _dedupe_actions([*session_actions, *artifact_actions])
+    if len(actions) < 2:
+        return None
+
+    target_desks = _ordered_unique([action.desk for action in actions])
+    handoffs = [
+        {
+            "target_desk": target_desk,
+            "reason": f"Adaptive artifact plan needs {target_desk.title()} Desk evidence and backlog follow-up.",
+        }
+        for target_desk in target_desks
+        if target_desk != desk
+    ]
+    reasoning = _reasoning_for_plan(
+        source_desk=desk,
+        planning_mode="adaptive_artifact",
+        actions=actions,
+        handoffs=handoffs,
+        work_orders=[],
+    )
+    reasoning.append(
+        _session_backlog_reasoning(
+            active_actions=active_actions,
+            open_handoffs=open_handoffs,
+            open_work_orders=open_work_orders,
+        )
+    )
+    reasoning.append(_artifact_context_reasoning(artifact_context=artifact_context, root_causes=root_causes))
+    reasoning.append(
+        {
+            "kind": "context_fusion",
+            "source_count": 2,
+            "sources": ["session_backlog", "artifact_context"],
+            "session_action_count": len(session_actions),
+            "artifact_action_count": len(artifact_actions),
+            "deduped_action_count": len(actions),
+        }
+    )
+    return DeskWorkflowPlan(
+        desk=desk,
+        answer=(
+            "Reporting Desk 已生成 adaptive artifact / 会话与证据融合计划："
+            "先处理当前 session 未完成事项，再补齐本地 artifact 暴露的数据、策略、风险和工程证据缺口。"
+        ),
+        confidence=0.82,
+        actions=actions,
+        planning_mode="adaptive_artifact",
+        reasoning=reasoning,
+        handoffs=handoffs,
     )
 
 
