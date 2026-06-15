@@ -108,6 +108,7 @@ def build_report_payload(
 ) -> dict[str, Any]:
     normalized_kind = normalize_report_kind(kind)
     artifact_context = dict(artifact_context or empty_report_artifact_context())
+    artifact_context["domain_scorecard"] = _domain_scorecard_synthesis(artifact_context)
     artifact_context["trend_synthesis"] = _report_trend_synthesis(artifact_context, report_history or [])
     artifact_context["causal_chain_synthesis"] = _report_causal_chain_synthesis(artifact_context)
     work_order_rows = list(work_orders or [])
@@ -172,6 +173,12 @@ def build_report_payload(
             "section_id": "semantic_synthesis",
             "title": "Semantic Synthesis",
             "body": _semantic_synthesis_body(artifact_context),
+            "evidence_refs": [],
+        },
+        {
+            "section_id": "domain_scorecard",
+            "title": "Domain Scorecard",
+            "body": _domain_scorecard_body(artifact_context),
             "evidence_refs": [],
         },
         {
@@ -245,6 +252,11 @@ def empty_report_artifact_context() -> dict[str, Any]:
             "recurring_root_causes": [],
             "next_actions": ["Generate at least one prior CEO report before evaluating cross-session trends."],
         },
+        "domain_scorecard": {
+            "overall_status": "missing",
+            "desks": [],
+            "next_actions": ["Generate local intelligence artifacts before building a desk-level scorecard."],
+        },
         "causal_chain_synthesis": {
             "status": "no_evidence",
             "chain_count": 0,
@@ -288,6 +300,7 @@ def collect_report_artifact_context(artifact_root: Path | None = None) -> dict[s
         "items": items,
     }
     context["synthesis"] = _artifact_semantic_synthesis(context)
+    context["domain_scorecard"] = _domain_scorecard_synthesis(context)
     return context
 
 
@@ -530,6 +543,128 @@ def _semantic_synthesis_body(artifact_context: dict[str, Any]) -> str:
     for impact in synthesis.get("impacts", [])[:5]:
         lines.append(f"- Impact: {impact}")
     for action in synthesis.get("next_actions", [])[:5]:
+        lines.append(f"- Next action: {action}")
+    return "\n".join(lines)
+
+
+def _domain_scorecard_synthesis(artifact_context: dict[str, Any]) -> dict[str, Any]:
+    root_causes = set(_root_cause_names(artifact_context))
+    missing_count = _int_value(artifact_context.get("missing_count"))
+    invalid_count = _int_value(artifact_context.get("invalid_count"))
+
+    def row(
+        *,
+        desk: str,
+        status: str,
+        root_cause_names: list[str],
+        recommended_command: str,
+        rationale: str,
+    ) -> dict[str, Any]:
+        return {
+            "desk": desk,
+            "status": status,
+            "root_causes": list(root_cause_names),
+            "recommended_command": recommended_command,
+            "rationale": rationale,
+        }
+
+    data_status = "attention" if "data_source_gap" in root_causes else "ready"
+    research_status = "blocked" if "strategy_evidence_blocked" in root_causes else "ready"
+    risk_status = "blocked" if "lifecycle_blocker" in root_causes else "ready"
+    execution_status = "blocked" if "lifecycle_blocker" in root_causes else "ready"
+    engineering_roots = [
+        cause for cause in ("engineering_quality_risk", "test_design_risk") if cause in root_causes
+    ]
+    engineering_status = "attention" if engineering_roots else "ready"
+    reporting_status = "blocked" if "blocked" in {research_status, risk_status, execution_status} else (
+        "attention" if "attention" in {data_status, engineering_status} or missing_count or invalid_count else "ready"
+    )
+
+    desks = [
+        row(
+            desk="data",
+            status=data_status,
+            root_cause_names=["data_source_gap"] if "data_source_gap" in root_causes else [],
+            recommended_command="astroq data sources diff-registry --json",
+            rationale="Source capability and project registry alignment determines whether downstream evidence is complete.",
+        ),
+        row(
+            desk="research",
+            status=research_status,
+            root_cause_names=["strategy_evidence_blocked"] if "strategy_evidence_blocked" in root_causes else [],
+            recommended_command="astroq strategy compete --json",
+            rationale="Strategy promotion depends on complete OOS, IC/ICIR, and backtest evidence.",
+        ),
+        row(
+            desk="risk",
+            status=risk_status,
+            root_cause_names=["lifecycle_blocker"] if "lifecycle_blocker" in root_causes else [],
+            recommended_command="astroq lifecycle check --json",
+            rationale="Risk and lifecycle gates decide whether the system can proceed without hidden missing-data assumptions.",
+        ),
+        row(
+            desk="execution",
+            status=execution_status,
+            root_cause_names=["lifecycle_blocker"] if "lifecycle_blocker" in root_causes else [],
+            recommended_command="astroq execution dry-run --json",
+            rationale="Execution should remain dry-run until lifecycle blockers and broker readiness are explicit.",
+        ),
+        row(
+            desk="engineering",
+            status=engineering_status,
+            root_cause_names=engineering_roots,
+            recommended_command="astroq architecture ast --json",
+            rationale="Engineering diagnostics determine whether architecture or test-design risks undermine release confidence.",
+        ),
+        row(
+            desk="reporting",
+            status=reporting_status,
+            root_cause_names=_ordered_unique(list(root_causes))[:8],
+            recommended_command="astroq agent report daily --session <session_id> --json",
+            rationale="Reporting should summarize only evidence-backed desk status and escalate blocked or recurring chains.",
+        ),
+    ]
+
+    if any(item["status"] == "blocked" for item in desks):
+        overall_status = "blocked"
+    elif any(item["status"] == "attention" for item in desks):
+        overall_status = "attention"
+    elif missing_count or invalid_count:
+        overall_status = "partial"
+    else:
+        overall_status = "ready"
+
+    next_actions = [
+        item["recommended_command"]
+        for item in desks
+        if item["status"] in {"blocked", "attention"}
+    ]
+    if not next_actions and (missing_count or invalid_count):
+        next_actions.append("astroq agent report daily --session <session_id> --json")
+
+    return {
+        "overall_status": overall_status,
+        "missing_artifact_count": missing_count,
+        "invalid_artifact_count": invalid_count,
+        "desks": desks,
+        "next_actions": _ordered_unique(next_actions),
+    }
+
+
+def _domain_scorecard_body(artifact_context: dict[str, Any]) -> str:
+    scorecard = artifact_context.get("domain_scorecard")
+    if not isinstance(scorecard, dict):
+        scorecard = _domain_scorecard_synthesis(artifact_context)
+    lines = [f"- Overall: {scorecard.get('overall_status', 'unknown')}"]
+    for row in scorecard.get("desks", [])[:8]:
+        if not isinstance(row, dict):
+            continue
+        desk = str(row.get("desk") or "unknown").title()
+        status = str(row.get("status") or "unknown")
+        command = str(row.get("recommended_command") or "")
+        causes = ", ".join(str(cause) for cause in row.get("root_causes", []) if cause) or "none"
+        lines.append(f"- {desk}: {status} - causes={causes} - next={command}")
+    for action in scorecard.get("next_actions", [])[:6]:
         lines.append(f"- Next action: {action}")
     return "\n".join(lines)
 

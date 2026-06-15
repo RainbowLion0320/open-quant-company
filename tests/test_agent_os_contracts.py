@@ -2800,10 +2800,20 @@ def test_agent_reports_aggregate_system_artifact_context(tmp_path, monkeypatch):
     assert "artifact_readiness" in sections
     assert "artifact_findings" in sections
     assert "semantic_synthesis" in sections
+    assert "domain_scorecard" in sections
     assert context["available_count"] == 5
     assert context["missing_count"] >= 1
     assert context["synthesis"]["status"] == "blocked"
     assert context["synthesis"]["root_cause_count"] >= 2
+    scorecard = context["domain_scorecard"]
+    scorecard_by_desk = {row["desk"]: row for row in scorecard["desks"]}
+    assert scorecard["overall_status"] == "blocked"
+    assert list(scorecard_by_desk) == ["data", "research", "risk", "execution", "engineering", "reporting"]
+    assert scorecard_by_desk["risk"]["status"] == "blocked"
+    assert scorecard_by_desk["risk"]["recommended_command"] == "astroq lifecycle check --json"
+    assert scorecard_by_desk["data"]["recommended_command"] == "astroq data sources diff-registry --json"
+    assert scorecard_by_desk["execution"]["status"] == "blocked"
+    assert "lifecycle_blocker" in scorecard_by_desk["execution"]["root_causes"]
     assert any(item["key"] == "lifecycle" and item["status"] == "available" for item in context["items"])
     assert any(item["key"] == "codegraph" and item["status"] == "missing" for item in context["items"])
     assert "macro_gdp" in sections["artifact_findings"]["body"]
@@ -2812,6 +2822,7 @@ def test_agent_reports_aggregate_system_artifact_context(tmp_path, monkeypatch):
     assert "strategy_evidence_blocked" in sections["semantic_synthesis"]["body"]
     assert "data_source_gap" in sections["semantic_synthesis"]["body"]
     assert "strategy_competition" in sections["artifact_readiness"]["body"]
+    assert "Risk: blocked" in sections["domain_scorecard"]["body"]
     assert "data-sources/latest.json" in sections["artifact_readiness"]["body"]
     assert "codegraph" in sections["artifact_readiness"]["body"]
     assert "artifact_context" in payload
