@@ -94,9 +94,28 @@ async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[st
 
 
 @router.get("/actions")
-async def list_agent_actions(session_id: str = "") -> dict[str, Any]:
-    actions = AgentRuntime().list_actions(session_id or None)
-    return {"actions": actions, "total": len(actions)}
+async def list_agent_actions(
+    session_id: str = "",
+    status: str = "",
+    desk: str = "",
+    risk_level: str = "",
+) -> dict[str, Any]:
+    actions = AgentRuntime().list_actions(
+        session_id or None,
+        status=status or None,
+        desk=desk or None,
+        risk_level=risk_level or None,
+    )
+    return {
+        "actions": actions,
+        "total": len(actions),
+        "filters": {
+            "session_id": session_id,
+            "status": status,
+            "desk": desk,
+            "risk_level": risk_level,
+        },
+    }
 
 
 @router.post("/actions/expire")

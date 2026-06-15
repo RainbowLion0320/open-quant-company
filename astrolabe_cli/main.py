@@ -143,8 +143,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     agent_actions_cmd = agent_sub.add_parser("actions", help="List agent actions")
     agent_actions_cmd.add_argument("--session", default="")
+    agent_actions_cmd.add_argument("--status", default="")
+    agent_actions_cmd.add_argument("--desk", default="")
+    agent_actions_cmd.add_argument("--risk-level", default="")
     add_common_flags(agent_actions_cmd)
-    agent_actions_cmd.set_defaults(handler=lambda args: agent_actions(args.session))
+    agent_actions_cmd.set_defaults(
+        handler=lambda args: agent_actions(args.session, args.status, args.desk, args.risk_level)
+    )
 
     agent_expire_cmd = agent_sub.add_parser("expire", help="Mark expired queued agent actions")
     agent_expire_cmd.add_argument("--session", default="")

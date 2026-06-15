@@ -320,8 +320,25 @@ class AgentRuntime:
                 )
         return reconciliations
 
-    def list_actions(self, session_id: str | None = None) -> list[dict[str, Any]]:
-        return self.ledger.list_actions(session_id)
+    def list_actions(
+        self,
+        session_id: str | None = None,
+        *,
+        status: str | None = None,
+        desk: str | None = None,
+        risk_level: str | None = None,
+    ) -> list[dict[str, Any]]:
+        actions = self.ledger.list_actions(session_id)
+        filters = {
+            "status": status,
+            "desk": desk,
+            "risk_level": risk_level,
+        }
+        return [
+            action
+            for action in actions
+            if all(not expected or str(action.get(field) or "") == expected for field, expected in filters.items())
+        ]
 
     def expire_actions(self, *, session_id: str | None = None) -> dict[str, Any]:
         expired: list[dict[str, Any]] = []

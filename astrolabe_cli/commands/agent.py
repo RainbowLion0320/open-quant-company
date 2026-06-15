@@ -106,14 +106,28 @@ def add_message(session_id: str, desk: str, text: str) -> CliResult:
     )
 
 
-def actions(session_id: str = "") -> CliResult:
+def actions(session_id: str = "", status: str = "", desk: str = "", risk_level: str = "") -> CliResult:
     runtime = AgentRuntime()
-    rows = runtime.list_actions(session_id or None)
+    rows = runtime.list_actions(
+        session_id or None,
+        status=status or None,
+        desk=desk or None,
+        risk_level=risk_level or None,
+    )
     return CliResult(
         ok=True,
         command="agent actions",
         message=f"{len(rows)} agent action(s)",
-        data={"actions": rows, "total": len(rows)},
+        data={
+            "actions": rows,
+            "total": len(rows),
+            "filters": {
+                "session_id": session_id,
+                "status": status,
+                "desk": desk,
+                "risk_level": risk_level,
+            },
+        },
     )
 
 

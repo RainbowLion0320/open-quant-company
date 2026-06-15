@@ -44,6 +44,95 @@ def test_agent_runtime_creates_session_message_and_action(tmp_path, monkeypatch)
     reset_datahub()
 
 
+def test_agent_actions_support_session_status_desk_and_risk_filters(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    target_session = runtime.create_session(title="Filtered actions")
+    other_session = runtime.create_session(title="Other actions")
+    runtime.propose_action(
+        session_id=target_session.session_id,
+        desk="data",
+        action_type="data_status",
+        risk_level="read_only",
+        summary="Inspect data status",
+        parameters={"tool_id": "astroq.data.status"},
+    )
+    write_action = runtime.propose_action(
+        session_id=target_session.session_id,
+        desk="data",
+        action_type="data_repair",
+        risk_level="write_data",
+        summary="Repair missing data",
+        parameters={"tool_id": "astroq.data.repair", "dimension": "stock_limit_list"},
+    )
+    runtime.propose_action(
+        session_id=target_session.session_id,
+        desk="research",
+        action_type="strategy_catalog",
+        risk_level="read_only",
+        summary="Inspect strategies",
+        parameters={"tool_id": "astroq.strategy.catalog"},
+    )
+    runtime.propose_action(
+        session_id=other_session.session_id,
+        desk="data",
+        action_type="data_repair",
+        risk_level="write_data",
+        summary="Other repair",
+        parameters={"tool_id": "astroq.data.repair", "dimension": "stock_valuation"},
+    )
+
+    runtime_filtered = runtime.list_actions(
+        session_id=target_session.session_id,
+        status="approval_required",
+        desk="data",
+        risk_level="write_data",
+    )
+    cli_code = run_cli(
+        [
+            "agent",
+            "actions",
+            "--session",
+            target_session.session_id,
+            "--status",
+            "approval_required",
+            "--desk",
+            "data",
+            "--risk-level",
+            "write_data",
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).get(
+        "/api/agent/actions",
+        params={
+            "session_id": target_session.session_id,
+            "status": "approval_required",
+            "desk": "data",
+            "risk_level": "write_data",
+        },
+    )
+
+    assert [row["action_id"] for row in runtime_filtered] == [write_action.action_id]
+    assert cli_code == 0
+    assert cli_payload["data"]["total"] == 1
+    assert cli_payload["data"]["actions"][0]["action_id"] == write_action.action_id
+    assert api_res.status_code == 200
+    assert api_res.json()["total"] == 1
+    assert api_res.json()["actions"][0]["action_id"] == write_action.action_id
+    reset_datahub()
+
+
 def test_agent_runtime_cli_and_api_update_session_metadata(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
