@@ -1113,16 +1113,49 @@ def _semantic_assisted_plan(
 
 def _normalize_semantic_draft(value: Any) -> SemanticWorkflowDraft:
     if isinstance(value, SemanticWorkflowDraft):
-        return value
+        confidence, confidence_blockers = _semantic_confidence(value.confidence)
+        return SemanticWorkflowDraft(
+            answer=str(value.answer or ""),
+            confidence=confidence,
+            actions=_semantic_dict_rows(value.actions),
+            reasoning=_semantic_dict_rows(value.reasoning),
+            blockers=_ordered_unique([*_semantic_string_rows(value.blockers), *confidence_blockers]),
+        )
     if isinstance(value, dict):
+        confidence, confidence_blockers = _semantic_confidence(value.get("confidence"))
         return SemanticWorkflowDraft(
             answer=str(value.get("answer") or ""),
-            confidence=float(value.get("confidence") or 0.5),
-            actions=[dict(row) for row in value.get("actions", []) if isinstance(row, dict)],
-            reasoning=[dict(row) for row in value.get("reasoning", []) if isinstance(row, dict)],
-            blockers=[str(row) for row in value.get("blockers", []) if str(row).strip()],
+            confidence=confidence,
+            actions=_semantic_dict_rows(value.get("actions")),
+            reasoning=_semantic_dict_rows(value.get("reasoning")),
+            blockers=_ordered_unique([*_semantic_string_rows(value.get("blockers")), *confidence_blockers]),
         )
     return SemanticWorkflowDraft(answer="", confidence=0.5, actions=[])
+
+
+def _semantic_confidence(value: Any) -> tuple[float, list[str]]:
+    if value in (None, ""):
+        return 0.5, []
+    try:
+        return float(value), []
+    except (TypeError, ValueError):
+        return 0.5, ["semantic_draft_invalid_confidence"]
+
+
+def _semantic_dict_rows(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, dict):
+        return [dict(value)]
+    if isinstance(value, list):
+        return [dict(row) for row in value if isinstance(row, dict)]
+    return []
+
+
+def _semantic_string_rows(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    if isinstance(value, list):
+        return [str(row).strip() for row in value if str(row).strip()]
+    return [str(value).strip()] if value is not None and str(value).strip() else []
 
 
 def _safe_semantic_actions(rows: list[dict[str, Any]]) -> tuple[list[WorkflowActionSpec], list[dict[str, str]]]:

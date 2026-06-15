@@ -160,6 +160,9 @@ Semantic action parameters must also be reduced to the selected tool's declared
 parameter patterns. Missing or pattern-invalid templated parameters reject the
 action before preview or persistence; undeclared extra parameters are not
 propagated into action cards.
+Malformed semantic draft metadata, such as non-numeric confidence or scalar
+reasoning/blocker fields, must normalize into a reviewable blocked plan instead
+of raising an API/CLI/runtime exception.
 
 ## 5. Data Model
 

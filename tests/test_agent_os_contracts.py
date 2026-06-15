@@ -4941,6 +4941,49 @@ def test_agent_semantic_planner_rejects_invalid_fixed_tool_parameters(tmp_path, 
     reset_datahub()
 
 
+def test_agent_semantic_draft_malformed_metadata_returns_blocked_plan(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import SemanticDraftPlanner
+
+    malformed_draft = {
+        "answer": "Malformed metadata should not crash the semantic planning path.",
+        "confidence": "certain",
+        "actions": {
+            "desk": "engineering",
+            "tool_id": "astroq.test.design",
+            "summary": "A single action object should still be filtered safely.",
+        },
+        "blockers": "external_planner_untrusted",
+        "reasoning": {"kind": "semantic_goal", "goal": "metadata_resilience"},
+    }
+
+    preview = AgentRuntime().preview_workflow_plan(
+        desk="reporting",
+        content="外部 planner 元数据格式不稳定时也不能让系统崩溃",
+        semantic_planner=SemanticDraftPlanner(malformed_draft),
+    )
+    reasoning_by_kind = {row["kind"]: row for row in preview["reasoning"]}
+
+    assert preview["planning_mode"] == "semantic_assisted"
+    assert preview["confidence"] == 0.5
+    assert [(action["desk"], action["tool_id"]) for action in preview["actions"]] == [
+        ("engineering", "astroq.test.design")
+    ]
+    assert preview["blockers"] == [
+        "external_planner_untrusted",
+        "semantic_draft_invalid_confidence",
+        "semantic_plan_requires_manual_review",
+    ]
+    assert reasoning_by_kind["semantic_planner"]["accepted_action_count"] == 1
+    assert reasoning_by_kind["semantic_goal"]["goal"] == "metadata_resilience"
+    reset_datahub()
+
+
 def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
