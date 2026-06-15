@@ -156,6 +156,10 @@ Semantic-assisted plans are still filtered through the fixed tool registry. A
 deskless semantic action may be accepted only when the selected safe tool has
 exactly one declared desk scope; ambiguous multi-desk tools require an explicit
 matching desk and are rejected with a structured reason.
+Semantic action parameters must also be reduced to the selected tool's declared
+parameter patterns. Missing or pattern-invalid templated parameters reject the
+action before preview or persistence; undeclared extra parameters are not
+propagated into action cards.
 
 ## 5. Data Model
 

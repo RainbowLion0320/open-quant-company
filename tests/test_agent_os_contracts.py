@@ -4884,6 +4884,63 @@ def test_agent_semantic_planner_infers_single_scope_desk_but_rejects_ambiguous_m
     reset_datahub()
 
 
+def test_agent_semantic_planner_rejects_invalid_fixed_tool_parameters(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.workflows import SemanticWorkflowDraft
+
+    class ParameterSemanticPlanner:
+        def plan(self, *, desk: str, content: str, artifact_context: dict, session_context: dict) -> SemanticWorkflowDraft:
+            return SemanticWorkflowDraft(
+                answer="Semantic planner proposed repair dry-runs with mixed parameter quality.",
+                confidence=0.83,
+                actions=[
+                    {
+                        "desk": "data",
+                        "tool_id": "astroq.data.repair.dry_run",
+                        "summary": "Valid dry-run repair preview.",
+                        "parameters": {"table": "stock_limit_list", "extra": "ignored"},
+                    },
+                    {
+                        "desk": "data",
+                        "tool_id": "astroq.data.repair.dry_run",
+                        "summary": "Invalid table name must be rejected.",
+                        "parameters": {"table": "stock-limit;rm"},
+                    },
+                    {
+                        "desk": "data",
+                        "tool_id": "astroq.data.repair.dry_run",
+                        "summary": "Missing table parameter must be rejected.",
+                    },
+                ],
+            )
+
+    preview = AgentRuntime().preview_workflow_plan(
+        desk="reporting",
+        content="planner 需要提出补数据 dry-run，但参数必须走 fixed registry 校验",
+        semantic_planner=ParameterSemanticPlanner(),
+    )
+    reasoning_by_kind = {row["kind"]: row for row in preview["reasoning"]}
+
+    assert preview["planning_mode"] == "semantic_assisted"
+    assert len(preview["actions"]) == 1
+    assert preview["actions"][0]["tool_id"] == "astroq.data.repair.dry_run"
+    assert preview["actions"][0]["parameters"] == {
+        "table": "stock_limit_list",
+        "tool_id": "astroq.data.repair.dry_run",
+    }
+    assert reasoning_by_kind["semantic_planner"]["accepted_action_count"] == 1
+    assert reasoning_by_kind["semantic_planner"]["rejected"] == [
+        {"tool_id": "astroq.data.repair.dry_run", "desk": "data", "reason": "invalid_tool_parameter:table"},
+        {"tool_id": "astroq.data.repair.dry_run", "desk": "data", "reason": "missing_tool_parameter:table"},
+    ]
+    reset_datahub()
+
+
 def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
@@ -4967,7 +5024,7 @@ def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_p
         "astroq.test.design",
     ]
     assert api_plan["actions"][0]["parameters"]["tool_id"] == "astroq.data.status"
-    assert api_plan["actions"][0]["parameters"]["table"] == "stock_limit_list"
+    assert "table" not in api_plan["actions"][0]["parameters"]
     assert api_plan["blockers"] == [
         "external_planner_untrusted",
         "semantic_plan_requires_manual_review",
@@ -5003,6 +5060,7 @@ def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_p
         "astroq.data.status",
         "astroq.test.design",
     ]
+    assert all("table" not in action["parameters"] for action in persisted_actions)
     assert all(action["risk_level"] == "read_only" for action in persisted_actions)
     response_evidence = [runtime.ledger.get_evidence(evidence_id) for evidence_id in response["evidence_refs"]]
     audit_evidence = [row for row in response_evidence if row and row["label"] == "Semantic planner audit"]

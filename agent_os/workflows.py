@@ -1147,6 +1147,10 @@ def _safe_semantic_actions(rows: list[dict[str, Any]]) -> tuple[list[WorkflowAct
         if requested_desk not in descriptor.desk_scopes:
             rejected.append({"tool_id": tool_id, "desk": requested_desk, "reason": "desk_scope_mismatch"})
             continue
+        parameters, parameter_error = _semantic_action_parameters(row.get("parameters"), descriptor.parameter_patterns)
+        if parameter_error:
+            rejected.append({"tool_id": tool_id, "desk": requested_desk, "reason": parameter_error})
+            continue
         evidence = _SEMANTIC_EVIDENCE_BY_TOOL.get(
             tool_id,
             WorkflowEvidenceSpec(
@@ -1165,7 +1169,7 @@ def _safe_semantic_actions(rows: list[dict[str, Any]]) -> tuple[list[WorkflowAct
                 expected_effect=str(row.get("expected_effect") or "").strip()
                 or "Runs a semantic-planner selected safe diagnostic tool without writes or trading.",
                 evidence=evidence,
-                parameters=_semantic_action_parameters(row.get("parameters")),
+                parameters=parameters,
             )
         )
     return _dedupe_actions(actions), rejected
@@ -1178,11 +1182,20 @@ def _infer_single_scope_desk(desk_scopes: list[str]) -> str | None:
     return None
 
 
-def _semantic_action_parameters(value: Any) -> dict[str, Any]:
+def _semantic_action_parameters(value: Any, parameter_patterns: dict[str, str]) -> tuple[dict[str, Any], str]:
+    if not parameter_patterns:
+        return {}, ""
     if not isinstance(value, dict):
-        return {}
-    blocked = {"tool_id", "command", "argv", "shell", "action_id", "risk_level", "status"}
-    return {str(key): item for key, item in value.items() if str(key) not in blocked}
+        value = {}
+    parameters: dict[str, Any] = {}
+    for name, pattern in parameter_patterns.items():
+        raw_value = str(value.get(name) or "").strip()
+        if not raw_value:
+            return {}, f"missing_tool_parameter:{name}"
+        if not pattern or not re.fullmatch(pattern, raw_value):
+            return {}, f"invalid_tool_parameter:{name}"
+        parameters[name] = raw_value
+    return parameters, ""
 
 
 def _semantic_action_type(tool_id: str) -> str:
