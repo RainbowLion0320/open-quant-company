@@ -303,7 +303,11 @@ def build_desk_workflow_plan(
     if dynamic_plan is not None:
         return dynamic_plan
 
-    open_plan = _open_ended_adaptive_plan(desk=desk, content=content)
+    open_plan = _open_ended_adaptive_plan(
+        desk=desk,
+        content=content,
+        artifact_context=artifact_context or {},
+    )
     if open_plan is not None:
         return open_plan
 
@@ -931,7 +935,12 @@ def _dynamic_actions_for_content(normalized: str) -> list[WorkflowActionSpec]:
     return _dedupe_actions(actions)
 
 
-def _open_ended_adaptive_plan(*, desk: str, content: str) -> DeskWorkflowPlan | None:
+def _open_ended_adaptive_plan(
+    *,
+    desk: str,
+    content: str,
+    artifact_context: dict[str, Any],
+) -> DeskWorkflowPlan | None:
     normalized = content.lower()
     if desk != "reporting" or not _is_open_ended_company_request(normalized):
         return None
@@ -966,12 +975,23 @@ def _open_ended_adaptive_plan(*, desk: str, content: str) -> DeskWorkflowPlan | 
             "write_or_trade_actions_blocked": True,
         }
     )
+    evidence_summary = _artifact_evidence_summary(artifact_context)
+    if evidence_summary:
+        reasoning.append(
+            _artifact_context_reasoning(
+                artifact_context=artifact_context,
+                root_causes=_artifact_root_causes(artifact_context),
+                evidence_summary=evidence_summary,
+            )
+        )
+    summary_suffix = f" 当前证据摘要：{'；'.join(evidence_summary[:5])}。" if evidence_summary else ""
     return DeskWorkflowPlan(
         desk=desk,
         answer=(
             "Reporting Desk 已生成 open-ended adaptive / 开放式公司运营计划："
             "先让 Data、Research、Risk、Execution 和 Engineering Desk 读取各自证据，"
             "只产出诊断和 dry-run，不直接写数据或交易。"
+            f"{summary_suffix}"
         ),
         confidence=0.7,
         actions=actions,

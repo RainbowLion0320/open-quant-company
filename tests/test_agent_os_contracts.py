@@ -4712,11 +4712,34 @@ def test_agent_workflow_plan_combines_artifact_context_with_session_backlog(tmp_
 
 def test_agent_open_ended_ceo_request_gets_safe_company_wide_plan(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
-    from data.storage.datahub import reset_datahub
+    from data.storage.datahub import get_datahub, reset_datahub
 
     reset_datahub()
 
     from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 1},
+            "blockers": [{"dimension": "risk_free_curve", "reason": "missing_data"}],
+        },
+        "data-sources/latest.json": {
+            "summary": {"capability_count": 120, "project_integrated_count": 40, "capability_unmapped_count": 12},
+        },
+        "tournaments/strategy_competition_latest.json": {
+            "summary": {"total": 12, "blocked": 5},
+        },
+        "tests/design/latest.json": {
+            "summary": {"design_risk_count": 2},
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
 
     runtime = AgentRuntime()
     session = runtime.create_session(title="Open ended CEO planning", default_desk="reporting")
@@ -4759,6 +4782,17 @@ def test_agent_open_ended_ceo_request_gets_safe_company_wide_plan(tmp_path, monk
     assert reasoning_by_kind["safety"]["approval_required_count"] == 0
     assert all(action["risk_level"] in {"read_only", "dry_run"} for action in response_actions)
     assert response.blockers == ["open_ended_plan_is_diagnostic_only"]
+    assert "risk_free_curve" in response.answer
+    assert "missing_data" in response.answer
+    assert "12" in response.answer
+    assert "5/12" in response.answer
+    assert "2 test design" in response.answer
+    assert reasoning_by_kind["artifact_context"]["evidence_summary"][:4] == [
+        "lifecycle: risk_free_curve missing_data",
+        "data: 12 unmapped source capabilities",
+        "research: 5/12 strategies blocked",
+        "testing: 2 test design risk(s)",
+    ]
     reset_datahub()
 
 
