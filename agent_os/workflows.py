@@ -258,7 +258,12 @@ def build_desk_workflow_plan(
     desk: str,
     content: str,
     artifact_context: dict[str, Any] | None = None,
+    session_context: dict[str, Any] | None = None,
 ) -> DeskWorkflowPlan:
+    adaptive_plan = _adaptive_session_plan(desk=desk, content=content, session_context=session_context or {})
+    if adaptive_plan is not None:
+        return adaptive_plan
+
     artifact_plan = _artifact_aware_plan(desk=desk, content=content, artifact_context=artifact_context or {})
     if artifact_plan is not None:
         return artifact_plan
@@ -291,6 +296,221 @@ def build_desk_workflow_plan(
         handoffs=handoffs,
         work_orders=work_orders,
     )
+
+
+def _adaptive_session_plan(
+    *,
+    desk: str,
+    content: str,
+    session_context: dict[str, Any],
+) -> DeskWorkflowPlan | None:
+    normalized = content.lower()
+    if desk != "reporting" or not _is_session_follow_up_request(normalized):
+        return None
+
+    active_actions = [row for row in session_context.get("active_actions", []) if isinstance(row, dict)]
+    open_handoffs = [row for row in session_context.get("open_handoffs", []) if isinstance(row, dict)]
+    open_work_orders = [row for row in session_context.get("open_work_orders", []) if isinstance(row, dict)]
+    if not active_actions and not open_handoffs and not open_work_orders:
+        return None
+
+    actions = _adaptive_actions_for_session(active_actions, open_handoffs, open_work_orders)
+    if not actions:
+        return None
+
+    target_desks = _ordered_unique([action.desk for action in actions])
+    handoffs = [
+        {
+            "target_desk": target_desk,
+            "reason": f"Adaptive session follow-up needs {target_desk.title()} Desk to close existing open work.",
+        }
+        for target_desk in target_desks
+        if target_desk != desk
+    ]
+    reasoning = _reasoning_for_plan(
+        source_desk=desk,
+        planning_mode="adaptive_session",
+        actions=actions,
+        handoffs=handoffs,
+        work_orders=[],
+    )
+    reasoning.append(
+        _session_backlog_reasoning(
+            active_actions=active_actions,
+            open_handoffs=open_handoffs,
+            open_work_orders=open_work_orders,
+        )
+    )
+    return DeskWorkflowPlan(
+        desk=desk,
+        answer=(
+            "Reporting Desk 已根据当前 session 未完成事项生成 adaptive session plan："
+            "先复核待审批动作、跟进 open handoff 和工程工单，再把安全证据汇总给 CEO。"
+        ),
+        confidence=0.76,
+        actions=actions,
+        planning_mode="adaptive_session",
+        reasoning=reasoning,
+        handoffs=handoffs,
+    )
+
+
+def _adaptive_actions_for_session(
+    active_actions: list[dict[str, Any]],
+    open_handoffs: list[dict[str, Any]],
+    open_work_orders: list[dict[str, Any]],
+) -> list[WorkflowActionSpec]:
+    actions: list[WorkflowActionSpec] = []
+    for action in active_actions[:8]:
+        action_type = str(action.get("action_type") or "")
+        risk_level = str(action.get("risk_level") or "")
+        params = action.get("parameters") if isinstance(action.get("parameters"), dict) else {}
+        tool_id = str(params.get("tool_id") or "")
+        if action_type == "data_repair" or tool_id == "astroq.data.repair":
+            table = str(params.get("table") or "").strip()
+            actions.append(_data_repair_recheck_action(table))
+        elif risk_level in {"paper_order", "live_order"} or action_type in {"paper_order", "live_order"}:
+            actions.append(_execution_followup_action())
+        elif risk_level == "code_change" or action_type == "engineering_work_order":
+            actions.extend(_engineering_followup_actions())
+        elif str(action.get("desk") or "") == "risk":
+            actions.append(_risk_followup_action())
+
+    for handoff in open_handoffs[:8]:
+        actions.extend(_handoff_followup_actions(str(handoff.get("target_desk") or "")))
+
+    if open_work_orders:
+        actions.extend(_engineering_followup_actions())
+
+    return _dedupe_actions(actions)
+
+
+def _data_repair_recheck_action(table: str) -> WorkflowActionSpec:
+    if _valid_table_name(table):
+        return WorkflowActionSpec(
+            desk="data",
+            action_type="data_repair_dry_run",
+            tool_id="astroq.data.repair.dry_run",
+            risk_level="dry_run",
+            summary=f"Re-check pending Data Desk repair for {table} before CEO approval.",
+            expected_effect="Runs a non-writing repair preview so the CEO can decide whether the existing write action is still valid.",
+            parameters={"table": table},
+            evidence=WorkflowEvidenceSpec(
+                label="Data repair dry-run",
+                uri="/datahub",
+                summary="Open DataHub health and repair preview context.",
+            ),
+        )
+    return _data_status_followup_action()
+
+
+def _handoff_followup_actions(target_desk: str) -> list[WorkflowActionSpec]:
+    if target_desk == "data":
+        return [_data_status_followup_action()]
+    if target_desk == "research":
+        return [_strategy_followup_action()]
+    if target_desk == "risk":
+        return [_risk_followup_action()]
+    if target_desk == "execution":
+        return [_execution_followup_action()]
+    if target_desk == "engineering":
+        return _engineering_followup_actions()
+    return []
+
+
+def _data_status_followup_action() -> WorkflowActionSpec:
+    return WorkflowActionSpec(
+        desk="data",
+        action_type="data_status",
+        tool_id="astroq.data.status",
+        risk_level="read_only",
+        summary="Refresh Data Desk status for open session follow-up.",
+        expected_effect="Records current data health without writing data.",
+        evidence=WorkflowEvidenceSpec(
+            label="DataHub status view",
+            uri="/datahub",
+            summary="Open DataHub health and source capability details.",
+        ),
+    )
+
+
+def _strategy_followup_action() -> WorkflowActionSpec:
+    return WorkflowActionSpec(
+        desk="research",
+        action_type="strategy_competition",
+        tool_id="astroq.strategy.compete",
+        risk_level="read_only",
+        summary="Refresh Research Desk strategy evidence for open session follow-up.",
+        expected_effect="Records OOS, IC/ICIR, sample-size, and strategy blocker evidence.",
+        evidence=WorkflowEvidenceSpec(
+            label="Strategy competition evidence",
+            uri="/strategy-lab",
+            summary="Open strategy competition and promotion evidence views.",
+        ),
+    )
+
+
+def _risk_followup_action() -> WorkflowActionSpec:
+    return WorkflowActionSpec(
+        desk="risk",
+        action_type="lifecycle_check",
+        tool_id="astroq.lifecycle.check",
+        risk_level="read_only",
+        summary="Refresh lifecycle gates for open session follow-up.",
+        expected_effect="Records lifecycle readiness and blocker evidence without changing system state.",
+        evidence=WorkflowEvidenceSpec(
+            label="Lifecycle readiness",
+            uri="/system?tab=lifecycle",
+            summary="Open lifecycle readiness and blocker details.",
+        ),
+    )
+
+
+def _execution_followup_action() -> WorkflowActionSpec:
+    return WorkflowActionSpec(
+        desk="execution",
+        action_type="execution_dry_run",
+        tool_id="astroq.execution.dry_run",
+        risk_level="dry_run",
+        summary="Refresh execution dry-run readiness for open session follow-up.",
+        expected_effect="Produces execution readiness preview without submitting paper or live orders.",
+        evidence=WorkflowEvidenceSpec(
+            label="Execution readiness",
+            uri="/portfolio",
+            summary="Open portfolio and execution readiness views.",
+        ),
+    )
+
+
+def _engineering_followup_actions() -> list[WorkflowActionSpec]:
+    return [
+        WorkflowActionSpec(
+            desk="engineering",
+            action_type="architecture_ast",
+            tool_id="astroq.architecture.ast",
+            risk_level="read_only",
+            summary="Refresh AST diagnostics for open Engineering Desk work.",
+            expected_effect="Records duplicate implementation and architecture risk evidence without editing source files.",
+            evidence=WorkflowEvidenceSpec(
+                label="AST Intelligence",
+                uri="/system?tab=ast",
+                summary="Open AST duplicate implementation diagnostics.",
+            ),
+        ),
+        WorkflowActionSpec(
+            desk="engineering",
+            action_type="test_design",
+            tool_id="astroq.test.design",
+            risk_level="read_only",
+            summary="Refresh test design diagnostics for open Engineering Desk work.",
+            expected_effect="Records test design risk evidence without changing source files.",
+            evidence=WorkflowEvidenceSpec(
+                label="Test design intelligence",
+                uri="/system?tab=tests",
+                summary="Open test design intelligence diagnostics.",
+            ),
+        ),
+    ]
 
 
 def _artifact_aware_plan(
@@ -911,6 +1131,44 @@ def _is_artifact_priority_request(normalized: str) -> bool:
     )
 
 
+def _is_session_follow_up_request(normalized: str) -> bool:
+    tokens = (
+        "继续",
+        "下一步",
+        "未完成",
+        "待处理",
+        "推进",
+        "跟进",
+        "open work",
+        "follow up",
+        "next step",
+        "what next",
+        "pending",
+        "backlog",
+    )
+    return any(token in normalized for token in tokens)
+
+
+def _session_backlog_reasoning(
+    *,
+    active_actions: list[dict[str, Any]],
+    open_handoffs: list[dict[str, Any]],
+    open_work_orders: list[dict[str, Any]],
+) -> dict[str, Any]:
+    approval_required = [
+        row for row in active_actions if str(row.get("status") or "") in {"approval_required", "approved"}
+    ]
+    return {
+        "kind": "session_backlog",
+        "active_action_count": len(active_actions),
+        "approval_required_count": len(approval_required),
+        "open_handoff_count": len(open_handoffs),
+        "open_work_order_count": len(open_work_orders),
+        "action_types": _ordered_unique([str(row.get("action_type") or "") for row in active_actions])[:8],
+        "target_desks": _ordered_unique([str(row.get("target_desk") or "") for row in open_handoffs])[:8],
+    }
+
+
 def _artifact_root_causes(artifact_context: dict[str, Any]) -> list[str]:
     synthesis = artifact_context.get("synthesis")
     if not isinstance(synthesis, dict):
@@ -977,6 +1235,10 @@ def _dedupe_actions(actions: list[WorkflowActionSpec]) -> list[WorkflowActionSpe
         seen.add(key)
         deduped.append(action)
     return deduped
+
+
+def _valid_table_name(value: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", value.strip()))
 
 
 def _ordered_unique(values: list[str]) -> list[str]:

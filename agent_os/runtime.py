@@ -271,8 +271,14 @@ class AgentRuntime:
         )
         return {"message": message, "desk_response": desk_response}
 
-    def preview_workflow_plan(self, *, desk: str, content: str) -> dict[str, Any]:
-        plan = build_desk_workflow_plan(desk=desk, content=content, artifact_context=collect_report_artifact_context())
+    def preview_workflow_plan(self, *, desk: str, content: str, session_id: str | None = None) -> dict[str, Any]:
+        session_context = self._workflow_session_context(session_id) if session_id else None
+        plan = build_desk_workflow_plan(
+            desk=desk,
+            content=content,
+            artifact_context=collect_report_artifact_context(),
+            session_context=session_context,
+        )
         actions: list[dict[str, Any]] = []
         for action_spec in plan.actions:
             approval_required = approval_required_for_risk(action_spec.risk_level)
@@ -2444,7 +2450,12 @@ class AgentRuntime:
         )
 
     def _route_ceo_message(self, *, session_id: str, source_message_id: str, desk: str, content: str) -> DeskResponse:
-        plan = build_desk_workflow_plan(desk=desk, content=content, artifact_context=collect_report_artifact_context())
+        plan = build_desk_workflow_plan(
+            desk=desk,
+            content=content,
+            artifact_context=collect_report_artifact_context(),
+            session_context=self._workflow_session_context(session_id),
+        )
         evidence_refs: list[str] = []
         proposed_actions: list[str] = []
         for action_spec in plan.actions:
@@ -2490,24 +2501,36 @@ class AgentRuntime:
         )
 
     def _session_context_reasoning(self, session_id: str) -> dict[str, Any]:
-        actions = self.ledger.list_actions(session_id)
-        handoffs = self.ledger.list_handoffs(session_id)
-        work_orders = self.ledger.list_work_orders(session_id)
-        active_statuses = {"proposed", "approval_required", "approved", "running"}
-        open_handoffs = [handoff for handoff in handoffs if str(handoff.get("status") or "") == "open"]
-        open_work_orders = [order for order in work_orders if str(order.get("status") or "") in {"open", "in_progress"}]
+        context = self._workflow_session_context(session_id)
+        active_actions = context["active_actions"]
+        open_handoffs = context["open_handoffs"]
+        open_work_orders = context["open_work_orders"]
         return {
             "kind": "session_context",
-            "active_action_count": sum(1 for action in actions if str(action.get("status") or "") in active_statuses),
+            "active_action_count": len(active_actions),
             "open_handoff_count": len(open_handoffs),
             "open_work_order_count": len(open_work_orders),
             "evidence_ref_count": len(
                 {
                     ref
-                    for row in [*actions, *handoffs, *work_orders]
+                    for row in [*active_actions, *open_handoffs, *open_work_orders]
                     for ref in row.get("evidence_refs", []) or []
                 }
             ),
+        }
+
+    def _workflow_session_context(self, session_id: str) -> dict[str, Any]:
+        actions = self.ledger.list_actions(session_id)
+        handoffs = self.ledger.list_handoffs(session_id)
+        work_orders = self.ledger.list_work_orders(session_id)
+        active_statuses = {"proposed", "approval_required", "approved", "running"}
+        active_actions = [action for action in actions if str(action.get("status") or "") in active_statuses]
+        open_handoffs = [handoff for handoff in handoffs if str(handoff.get("status") or "") == "open"]
+        open_work_orders = [order for order in work_orders if str(order.get("status") or "") in {"open", "in_progress"}]
+        return {
+            "active_actions": active_actions,
+            "open_handoffs": open_handoffs,
+            "open_work_orders": open_work_orders,
         }
 
     def memory_snapshot(self) -> dict[str, Any]:

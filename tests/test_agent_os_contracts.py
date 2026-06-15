@@ -3218,6 +3218,83 @@ def test_agent_desk_response_exposes_structured_reasoning_context(tmp_path, monk
     reset_datahub()
 
 
+def test_agent_follow_up_uses_session_state_for_adaptive_workflow(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Adaptive CEO follow-up", default_desk="reporting")
+    evidence = runtime.create_evidence(
+        kind="web_route",
+        label="Existing data repair evidence",
+        uri="/datahub",
+        summary="Existing Data Desk repair evidence.",
+    )
+    runtime.propose_action(
+        session_id=session.session_id,
+        desk="data",
+        action_type="data_repair",
+        risk_level="write_data",
+        summary="Repair stock_limit_list after CEO approval.",
+        parameters={"tool_id": "astroq.data.repair", "table": "stock_limit_list"},
+        expected_effect="Writes repaired partitions only after explicit approval.",
+        evidence_refs=[evidence.evidence_id],
+    )
+    source = runtime.add_message(
+        session.session_id,
+        role="ceo",
+        desk="reporting",
+        content="已有 Data handoff 需要继续跟进。",
+    )
+    runtime.respond_as_desk(
+        session_id=session.session_id,
+        source_message_id=source.message_id,
+        desk="reporting",
+        answer="需要 Data Desk 跟进。",
+        handoffs=[{"target_desk": "data", "reason": "Open data repair handoff."}],
+        evidence_refs=[evidence.evidence_id],
+    )
+    runtime.create_work_order(
+        session_id=session.session_id,
+        title="Review live risk docs",
+        summary="Existing engineering follow-up.",
+        impact="Shows adaptive planning can see open Engineering Desk work.",
+        affected_files=["broker/live/qmt.py"],
+        suggested_verification=["pytest tests/test_agent_os_contracts.py"],
+        evidence_refs=[evidence.evidence_id],
+    )
+
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        desk="reporting",
+        content="继续推进这些未完成事项，下一步先做什么？",
+    )
+    response = routed["desk_response"]
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+    tool_ids = [action["parameters"]["tool_id"] for action in actions]
+
+    assert reasoning_by_kind["intent_match"]["planning_mode"] == "adaptive_session"
+    assert reasoning_by_kind["session_backlog"]["approval_required_count"] >= 1
+    assert reasoning_by_kind["session_backlog"]["open_handoff_count"] >= 1
+    assert reasoning_by_kind["session_backlog"]["open_work_order_count"] >= 1
+    assert set(tool_ids) >= {
+        "astroq.data.repair.dry_run",
+        "astroq.architecture.ast",
+        "astroq.test.design",
+    }
+    assert all(action["risk_level"] in {"read_only", "dry_run"} for action in actions)
+    assert all(action["status"] == "proposed" for action in actions)
+    assert any(handoff["target_desk"] == "data" for handoff in response.handoffs)
+    assert any(handoff["target_desk"] == "engineering" for handoff in response.handoffs)
+    assert "session" in response.answer.lower() or "未完成" in response.answer
+    reset_datahub()
+
+
 def test_agent_cli_and_api_message_return_desk_response(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")

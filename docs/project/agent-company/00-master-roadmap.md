@@ -174,9 +174,10 @@ Required desks:
 
 Current foundation:
 
-- Common desk intents, bounded multi-intent CEO review requests, and broad CEO priority questions can be converted into fixed-registry safe actions without arbitrary shell command construction.
+- Common desk intents, bounded multi-intent CEO review requests, broad CEO priority questions, and session follow-up requests can be converted into fixed-registry safe actions without arbitrary shell command construction.
 - Artifact-aware priority planning reads only the fixed local report artifact context and maps current root causes to owner desks, including data source gaps, lifecycle blockers, strategy evidence blockers, AST risks, and test design risks.
-- Workflow previews and desk responses include structured reasoning rows for intent match, tool plan, safety, evidence plan, artifact context, and session context.
+- Bounded session-backlog adaptive planning reads current approval-required actions, open handoffs, and open Engineering work orders, then maps them to safe re-check actions and owner-desk handoffs without approving writes or trades.
+- Workflow previews and desk responses include structured reasoning rows for intent match, tool plan, safety, evidence plan, artifact context, session backlog, and session context.
 
 ### Phase 4 - Evidence and Governance Closure
 
