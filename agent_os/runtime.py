@@ -264,7 +264,14 @@ class AgentRuntime:
         self.ledger.insert_message(message.to_dict())
         return message
 
-    def submit_ceo_message(self, session_id: str, *, desk: str, content: str) -> dict[str, AgentMessage | DeskResponse]:
+    def submit_ceo_message(
+        self,
+        session_id: str,
+        *,
+        desk: str,
+        content: str,
+        semantic_planner: Any | None = None,
+    ) -> dict[str, AgentMessage | DeskResponse]:
         session = self.ledger.get_session(session_id)
         if not session:
             raise KeyError(f"Agent session not found: {session_id}")
@@ -277,16 +284,25 @@ class AgentRuntime:
             source_message_id=message.message_id,
             desk=target_desk,
             content=content,
+            semantic_planner=semantic_planner,
         )
         return {"message": message, "desk_response": desk_response}
 
-    def preview_workflow_plan(self, *, desk: str, content: str, session_id: str | None = None) -> dict[str, Any]:
+    def preview_workflow_plan(
+        self,
+        *,
+        desk: str,
+        content: str,
+        session_id: str | None = None,
+        semantic_planner: Any | None = None,
+    ) -> dict[str, Any]:
         session_context = self._workflow_session_context(session_id) if session_id else None
         plan = build_desk_workflow_plan(
             desk=desk,
             content=content,
             artifact_context=collect_report_artifact_context(),
             session_context=session_context,
+            semantic_planner=semantic_planner,
         )
         actions: list[dict[str, Any]] = []
         for action_spec in plan.actions:
@@ -301,7 +317,7 @@ class AgentRuntime:
                     "approval_required": approval_required,
                     "summary": action_spec.summary,
                     "expected_effect": action_spec.expected_effect,
-                    "parameters": {"tool_id": action_spec.tool_id, **action_spec.parameters},
+                    "parameters": {**action_spec.parameters, "tool_id": action_spec.tool_id},
                     "evidence": asdict(action_spec.evidence),
                 }
             )
@@ -2786,12 +2802,21 @@ class AgentRuntime:
             str(intent.get("strategy") or ""),
         )
 
-    def _route_ceo_message(self, *, session_id: str, source_message_id: str, desk: str, content: str) -> DeskResponse:
+    def _route_ceo_message(
+        self,
+        *,
+        session_id: str,
+        source_message_id: str,
+        desk: str,
+        content: str,
+        semantic_planner: Any | None = None,
+    ) -> DeskResponse:
         plan = build_desk_workflow_plan(
             desk=desk,
             content=content,
             artifact_context=collect_report_artifact_context(),
             session_context=self._workflow_session_context(session_id),
+            semantic_planner=semantic_planner,
         )
         evidence_refs: list[str] = []
         proposed_actions: list[str] = []
@@ -2808,7 +2833,7 @@ class AgentRuntime:
                 action_type=action_spec.action_type,
                 risk_level=action_spec.risk_level,
                 summary=action_spec.summary,
-                parameters={"tool_id": action_spec.tool_id, **action_spec.parameters},
+                parameters={**action_spec.parameters, "tool_id": action_spec.tool_id},
                 expected_effect=action_spec.expected_effect,
                 evidence_refs=[evidence.evidence_id],
             )

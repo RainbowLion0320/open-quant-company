@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from agent_os.tools import DEFAULT_TOOLS
+
 
 @dataclass(frozen=True)
 class WorkflowEvidenceSpec:
@@ -44,6 +46,15 @@ class DeskWorkflowPlan:
     blockers: list[str] = field(default_factory=list)
     handoffs: list[dict[str, Any]] = field(default_factory=list)
     work_orders: list[WorkflowWorkOrderSpec] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class SemanticWorkflowDraft:
+    answer: str
+    confidence: float
+    actions: list[dict[str, Any]]
+    reasoning: list[dict[str, Any]] = field(default_factory=list)
+    blockers: list[str] = field(default_factory=list)
 
 
 _DESK_PROFILES: dict[str, dict[str, str]] = {
@@ -259,6 +270,7 @@ def build_desk_workflow_plan(
     content: str,
     artifact_context: dict[str, Any] | None = None,
     session_context: dict[str, Any] | None = None,
+    semantic_planner: Any | None = None,
 ) -> DeskWorkflowPlan:
     hybrid_plan = _adaptive_artifact_plan(
         desk=desk,
@@ -284,6 +296,16 @@ def build_desk_workflow_plan(
     open_plan = _open_ended_adaptive_plan(desk=desk, content=content)
     if open_plan is not None:
         return open_plan
+
+    semantic_plan = _semantic_assisted_plan(
+        desk=desk,
+        content=content,
+        artifact_context=artifact_context or {},
+        session_context=session_context or {},
+        semantic_planner=semantic_planner,
+    )
+    if semantic_plan is not None:
+        return semantic_plan
 
     profile = _profile_for(desk, content)
     if profile is None:
@@ -944,6 +966,213 @@ def _strategy_catalog_action() -> WorkflowActionSpec:
             summary="Open strategy catalog and evidence views.",
         ),
     )
+
+
+_SEMANTIC_EVIDENCE_BY_TOOL: dict[str, WorkflowEvidenceSpec] = {
+    "astroq.health": WorkflowEvidenceSpec(
+        label="Project health",
+        uri="/system",
+        summary="Open system health and runtime status.",
+    ),
+    "astroq.lifecycle.check": WorkflowEvidenceSpec(
+        label="Lifecycle readiness",
+        uri="/system?tab=lifecycle",
+        summary="Open lifecycle readiness and blocker details.",
+    ),
+    "astroq.execution.dry_run": WorkflowEvidenceSpec(
+        label="Execution readiness",
+        uri="/portfolio",
+        summary="Open portfolio and execution readiness views.",
+    ),
+    "astroq.architecture.ast": WorkflowEvidenceSpec(
+        label="AST Intelligence",
+        uri="/system?tab=ast",
+        summary="Open AST duplicate implementation diagnostics.",
+    ),
+    "astroq.test.design": WorkflowEvidenceSpec(
+        label="Test design intelligence",
+        uri="/system?tab=tests",
+        summary="Open test design intelligence diagnostics.",
+    ),
+    "astroq.docs.check": WorkflowEvidenceSpec(
+        label="Documentation hygiene",
+        uri="/system?tab=tests",
+        summary="Open documentation hygiene evidence.",
+    ),
+    "astroq.data.status": WorkflowEvidenceSpec(
+        label="DataHub status view",
+        uri="/datahub",
+        summary="Open DataHub health and source capability details.",
+    ),
+    "astroq.data.sources": WorkflowEvidenceSpec(
+        label="Data source capabilities",
+        uri="/datahub?tab=sources",
+        summary="Open data source capability matrix.",
+    ),
+    "astroq.data.sources.diff_registry": WorkflowEvidenceSpec(
+        label="Data source capability matrix",
+        uri="/datahub?tab=sources",
+        summary="Open data source capability matrix and registry diff.",
+    ),
+    "astroq.strategy.catalog": WorkflowEvidenceSpec(
+        label="Strategy Lab",
+        uri="/strategy-lab",
+        summary="Open strategy catalog and evidence views.",
+    ),
+    "astroq.strategy.compete": WorkflowEvidenceSpec(
+        label="Strategy competition evidence",
+        uri="/strategy-lab",
+        summary="Open strategy competition and promotion evidence views.",
+    ),
+    "astroq.backtest.run.dry_run": WorkflowEvidenceSpec(
+        label="Backtest evidence",
+        uri="/research",
+        summary="Open research and backtest evidence views.",
+    ),
+    "astroq.data.repair.dry_run": WorkflowEvidenceSpec(
+        label="Data repair dry-run",
+        uri="/datahub",
+        summary="Open DataHub health and repair preview context.",
+    ),
+}
+
+
+def _semantic_assisted_plan(
+    *,
+    desk: str,
+    content: str,
+    artifact_context: dict[str, Any],
+    session_context: dict[str, Any],
+    semantic_planner: Any | None,
+) -> DeskWorkflowPlan | None:
+    if semantic_planner is None:
+        return None
+
+    plan_method = getattr(semantic_planner, "plan", None)
+    if not callable(plan_method):
+        return None
+
+    draft = plan_method(
+        desk=desk,
+        content=content,
+        artifact_context=dict(artifact_context),
+        session_context=dict(session_context),
+    )
+    normalized = _normalize_semantic_draft(draft)
+    actions, rejected = _safe_semantic_actions(normalized.actions)
+    if not actions:
+        return None
+
+    target_desks = _ordered_unique([action.desk for action in actions])
+    handoffs = [
+        {
+            "target_desk": target_desk,
+            "reason": f"Semantic-assisted CEO plan needs {target_desk.title()} Desk safe evidence.",
+        }
+        for target_desk in target_desks
+        if target_desk != desk
+    ]
+    reasoning = _reasoning_for_plan(
+        source_desk=desk,
+        planning_mode="semantic_assisted",
+        actions=actions,
+        handoffs=handoffs,
+        work_orders=[],
+    )
+    reasoning.append(
+        {
+            "kind": "semantic_planner",
+            "mode": "opt_in",
+            "accepted_action_count": len(actions),
+            "rejected_action_count": len(rejected),
+            "accepted_tool_ids": [action.tool_id for action in actions],
+            "rejected": rejected,
+            "manual_review_required": True,
+        }
+    )
+    reasoning.extend(dict(row) for row in normalized.reasoning if isinstance(row, dict))
+    blockers = _ordered_unique(
+        [
+            *[str(blocker) for blocker in normalized.blockers if str(blocker).strip()],
+            "semantic_plan_requires_manual_review",
+            *(["unsafe_semantic_actions_filtered"] if rejected else []),
+        ]
+    )
+    return DeskWorkflowPlan(
+        desk=desk,
+        answer=normalized.answer or "Semantic planner proposed a safe diagnostic plan for CEO review.",
+        confidence=max(0.0, min(float(normalized.confidence), 0.95)),
+        actions=actions,
+        planning_mode="semantic_assisted",
+        reasoning=reasoning,
+        blockers=blockers,
+        handoffs=handoffs,
+    )
+
+
+def _normalize_semantic_draft(value: Any) -> SemanticWorkflowDraft:
+    if isinstance(value, SemanticWorkflowDraft):
+        return value
+    if isinstance(value, dict):
+        return SemanticWorkflowDraft(
+            answer=str(value.get("answer") or ""),
+            confidence=float(value.get("confidence") or 0.5),
+            actions=[dict(row) for row in value.get("actions", []) if isinstance(row, dict)],
+            reasoning=[dict(row) for row in value.get("reasoning", []) if isinstance(row, dict)],
+            blockers=[str(row) for row in value.get("blockers", []) if str(row).strip()],
+        )
+    return SemanticWorkflowDraft(answer="", confidence=0.5, actions=[])
+
+
+def _safe_semantic_actions(rows: list[dict[str, Any]]) -> tuple[list[WorkflowActionSpec], list[dict[str, str]]]:
+    actions: list[WorkflowActionSpec] = []
+    rejected: list[dict[str, str]] = []
+    for row in rows[:12]:
+        tool_id = str(row.get("tool_id") or "").strip()
+        requested_desk = str(row.get("desk") or "").strip()
+        descriptor = DEFAULT_TOOLS.get(tool_id)
+        if descriptor is None:
+            rejected.append({"tool_id": tool_id, "desk": requested_desk, "reason": "unknown_tool"})
+            continue
+        if descriptor.risk_level not in {"read_only", "dry_run"}:
+            rejected.append({"tool_id": tool_id, "desk": requested_desk, "reason": "unsafe_risk_level"})
+            continue
+        if requested_desk not in descriptor.desk_scopes:
+            rejected.append({"tool_id": tool_id, "desk": requested_desk, "reason": "desk_scope_mismatch"})
+            continue
+        evidence = _SEMANTIC_EVIDENCE_BY_TOOL.get(
+            tool_id,
+            WorkflowEvidenceSpec(
+                label=descriptor.label,
+                uri="/system",
+                summary="Open system evidence for semantic-assisted plan.",
+            ),
+        )
+        actions.append(
+            WorkflowActionSpec(
+                desk=requested_desk,
+                action_type=_semantic_action_type(tool_id),
+                tool_id=tool_id,
+                risk_level=descriptor.risk_level,
+                summary=str(row.get("summary") or descriptor.label).strip() or descriptor.label,
+                expected_effect=str(row.get("expected_effect") or "").strip()
+                or "Runs a semantic-planner selected safe diagnostic tool without writes or trading.",
+                evidence=evidence,
+                parameters=_semantic_action_parameters(row.get("parameters")),
+            )
+        )
+    return _dedupe_actions(actions), rejected
+
+
+def _semantic_action_parameters(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    blocked = {"tool_id", "command", "argv", "shell", "action_id", "risk_level", "status"}
+    return {str(key): item for key, item in value.items() if str(key) not in blocked}
+
+
+def _semantic_action_type(tool_id: str) -> str:
+    return tool_id.removeprefix("astroq.").replace(".", "_").replace("-", "_")
 
 
 def _profile_for(desk: str, content: str) -> dict[str, str] | None:

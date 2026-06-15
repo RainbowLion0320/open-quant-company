@@ -4740,6 +4740,105 @@ def test_agent_open_ended_ceo_request_gets_safe_company_wide_plan(tmp_path, monk
     reset_datahub()
 
 
+def test_agent_semantic_planner_is_opt_in_and_filtered_to_safe_known_tools(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.workflows import SemanticWorkflowDraft
+
+    captured: list[dict[str, object]] = []
+
+    class FakeSemanticPlanner:
+        def plan(self, *, desk: str, content: str, artifact_context: dict, session_context: dict) -> SemanticWorkflowDraft:
+            captured.append(
+                {
+                    "desk": desk,
+                    "content": content,
+                    "artifact_context_seen": bool(artifact_context),
+                    "session_context_seen": bool(session_context),
+                }
+            )
+            return SemanticWorkflowDraft(
+                answer="Semantic planner proposed a CEO review plan.",
+                confidence=0.91,
+                actions=[
+                    {
+                        "desk": "data",
+                        "tool_id": "astroq.data.status",
+                        "summary": "Refresh data readiness for ambiguous CEO request.",
+                        "parameters": {"tool_id": "astroq.data.repair"},
+                    },
+                    {
+                        "desk": "data",
+                        "tool_id": "astroq.data.repair",
+                        "summary": "Unsafe write should be filtered.",
+                    },
+                    {
+                        "desk": "execution",
+                        "tool_id": "astroq.agent.live.submit",
+                        "summary": "Unknown live submit should be filtered.",
+                    },
+                    {
+                        "desk": "engineering",
+                        "tool_id": "astroq.architecture.ast",
+                        "summary": "Refresh architecture diagnostics.",
+                    },
+                ],
+                reasoning=[{"kind": "semantic_goal", "goal": "ambiguous_cross_desk_review"}],
+            )
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Semantic planner safety", default_desk="reporting")
+    deterministic = runtime.preview_workflow_plan(
+        desk="reporting",
+        content="请从经营质量角度理解这段模糊要求，但先不要写数据也不要交易",
+        session_id=session.session_id,
+    )
+
+    assert deterministic["planning_mode"] != "semantic_assisted"
+    assert captured == []
+
+    semantic = runtime.preview_workflow_plan(
+        desk="reporting",
+        content="请从经营质量角度理解这段模糊要求，但先不要写数据也不要交易",
+        session_id=session.session_id,
+        semantic_planner=FakeSemanticPlanner(),
+    )
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        desk="reporting",
+        content="请从经营质量角度理解这段模糊要求，但先不要写数据也不要交易",
+        semantic_planner=FakeSemanticPlanner(),
+    )
+    response = routed["desk_response"]
+    response_actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+
+    assert captured
+    assert semantic["planning_mode"] == "semantic_assisted"
+    assert semantic["side_effects"]["ledger_writes"] is False
+    assert [action["tool_id"] for action in semantic["actions"]] == [
+        "astroq.data.status",
+        "astroq.architecture.ast",
+    ]
+    assert semantic["actions"][0]["parameters"]["tool_id"] == "astroq.data.status"
+    assert all(action["risk_level"] in {"read_only", "dry_run"} for action in semantic["actions"])
+    assert "semantic_plan_requires_manual_review" in semantic["blockers"]
+    assert "unsafe_semantic_actions_filtered" in semantic["blockers"]
+    reasoning_by_kind = {row["kind"]: row for row in semantic["reasoning"]}
+    assert reasoning_by_kind["semantic_planner"]["accepted_action_count"] == 2
+    assert reasoning_by_kind["semantic_planner"]["rejected_action_count"] == 2
+    assert [action["parameters"]["tool_id"] for action in response_actions] == [
+        "astroq.data.status",
+        "astroq.architecture.ast",
+    ]
+    assert all(action["risk_level"] in {"read_only", "dry_run"} for action in response_actions)
+    assert response.blockers == semantic["blockers"]
+    reset_datahub()
+
+
 def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
