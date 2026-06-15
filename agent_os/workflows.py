@@ -5,18 +5,29 @@ from typing import Any
 
 
 @dataclass(frozen=True)
+class WorkflowEvidenceSpec:
+    label: str
+    uri: str
+    summary: str
+
+
+@dataclass(frozen=True)
+class WorkflowActionSpec:
+    desk: str
+    action_type: str
+    tool_id: str
+    risk_level: str
+    summary: str
+    expected_effect: str
+    evidence: WorkflowEvidenceSpec
+
+
+@dataclass(frozen=True)
 class DeskWorkflowPlan:
     desk: str
     answer: str
     confidence: float
-    evidence_label: str
-    evidence_uri: str
-    evidence_summary: str
-    action_type: str
-    tool_id: str
-    risk_level: str
-    action_summary: str
-    expected_effect: str
+    actions: list[WorkflowActionSpec]
     blockers: list[str] = field(default_factory=list)
     handoffs: list[dict[str, Any]] = field(default_factory=list)
 
@@ -174,18 +185,13 @@ def build_desk_workflow_plan(*, desk: str, content: str) -> DeskWorkflowPlan:
     profile = _profile_for(desk, content)
     if profile is None:
         raise ValueError(f"Unknown desk workflow: {desk}")
+    normalized = content.lower()
+    actions = _actions_for_profile(desk=desk, profile=profile, normalized_content=normalized)
     return DeskWorkflowPlan(
         desk=desk,
         answer=profile["answer"],
         confidence=_confidence_for(desk),
-        evidence_label=profile["evidence_label"],
-        evidence_uri=profile["evidence_uri"],
-        evidence_summary=profile["evidence_summary"],
-        action_type=profile["action_type"],
-        tool_id=profile["tool_id"],
-        risk_level=profile["risk_level"],
-        action_summary=profile["action_summary"],
-        expected_effect=profile["expected_effect"],
+        actions=actions,
         handoffs=_handoffs_for(desk, content),
     )
 
@@ -200,6 +206,68 @@ def _profile_for(desk: str, content: str) -> dict[str, str] | None:
 
 def _confidence_for(desk: str) -> float:
     return 0.68 if desk == "reporting" else 0.64
+
+
+def _actions_for_profile(*, desk: str, profile: dict[str, str], normalized_content: str) -> list[WorkflowActionSpec]:
+    if desk == "reporting" and _is_daily_brief_request(normalized_content):
+        return [
+            WorkflowActionSpec(
+                desk="data",
+                action_type="data_status",
+                tool_id="astroq.data.status",
+                risk_level="read_only",
+                summary="Read Data Desk health for the CEO daily brief.",
+                expected_effect="Records data health and blocker evidence without writing data.",
+                evidence=WorkflowEvidenceSpec(
+                    label="DataHub status view",
+                    uri="/datahub",
+                    summary="Open DataHub health and source capability details.",
+                ),
+            ),
+            WorkflowActionSpec(
+                desk="research",
+                action_type="strategy_catalog",
+                tool_id="astroq.strategy.catalog",
+                risk_level="read_only",
+                summary="Read Research Desk strategy catalog for the CEO daily brief.",
+                expected_effect="Records strategy layer and promotion status without running backtests.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Strategy Lab",
+                    uri="/strategy-lab",
+                    summary="Open strategy catalog and evidence views.",
+                ),
+            ),
+            WorkflowActionSpec(
+                desk="risk",
+                action_type="lifecycle_check",
+                tool_id="astroq.lifecycle.check",
+                risk_level="read_only",
+                summary="Read Risk Desk lifecycle gates for the CEO daily brief.",
+                expected_effect="Records lifecycle readiness and blocker evidence without changing system state.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Lifecycle readiness",
+                    uri="/system?tab=lifecycle",
+                    summary="Open lifecycle readiness and blocker details.",
+                ),
+            ),
+        ]
+    return [_action_for_profile(desk=desk, profile=profile)]
+
+
+def _action_for_profile(*, desk: str, profile: dict[str, str]) -> WorkflowActionSpec:
+    return WorkflowActionSpec(
+        desk=desk,
+        action_type=profile["action_type"],
+        tool_id=profile["tool_id"],
+        risk_level=profile["risk_level"],
+        summary=profile["action_summary"],
+        expected_effect=profile["expected_effect"],
+        evidence=WorkflowEvidenceSpec(
+            label=profile["evidence_label"],
+            uri=profile["evidence_uri"],
+            summary=profile["evidence_summary"],
+        ),
+    )
 
 
 def _handoffs_for(desk: str, content: str) -> list[dict[str, Any]]:

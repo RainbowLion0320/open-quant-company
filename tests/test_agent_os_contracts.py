@@ -2191,8 +2191,8 @@ def test_agent_runtime_routes_ceo_message_to_deterministic_desk_response(tmp_pat
     ceo_message = routed["message"]
     desk_response = routed["desk_response"]
     loaded = runtime.get_session(session.session_id)
-    action = runtime.get_action(desk_response.proposed_actions[0])
-    evidence = runtime.ledger.get_evidence(desk_response.evidence_refs[0])
+    actions = [runtime.get_action(action_id) for action_id in desk_response.proposed_actions]
+    evidence_rows = [runtime.ledger.get_evidence(evidence_id) for evidence_id in desk_response.evidence_refs]
     handoff_targets = {handoff["target_desk"] for handoff in desk_response.handoffs}
 
     assert ceo_message.role == "ceo"
@@ -2200,15 +2200,21 @@ def test_agent_runtime_routes_ceo_message_to_deterministic_desk_response(tmp_pat
     assert desk_response.message.desk == "reporting"
     assert "Reporting Desk" in desk_response.answer
     assert desk_response.confidence >= 0.6
-    assert action["risk_level"] == "read_only"
-    assert action["parameters"]["tool_id"] == "astroq.lifecycle.check"
-    assert action["status"] == "proposed"
-    assert evidence["kind"] == "web_route"
-    assert evidence["uri"] == "/system?tab=lifecycle"
+    assert len(actions) == 3
+    assert {action["risk_level"] for action in actions} == {"read_only"}
+    assert {action["parameters"]["tool_id"] for action in actions} == {
+        "astroq.data.status",
+        "astroq.strategy.catalog",
+        "astroq.lifecycle.check",
+    }
+    assert {action["desk"] for action in actions} == {"data", "research", "risk"}
+    assert {action["status"] for action in actions} == {"proposed"}
+    assert {evidence["kind"] for evidence in evidence_rows} == {"web_route"}
+    assert {evidence["uri"] for evidence in evidence_rows} == {"/datahub", "/strategy-lab", "/system?tab=lifecycle"}
     assert handoff_targets >= {"data", "research", "risk"}
     assert loaded["messages"][0]["message_id"] == ceo_message.message_id
     assert loaded["messages"][1]["message_id"] == desk_response.message.message_id
-    assert loaded["actions"][0]["action_id"] == action["action_id"]
+    assert {action["action_id"] for action in loaded["actions"]} >= set(desk_response.proposed_actions)
     assert {handoff["target_desk"] for handoff in loaded["handoffs"]} >= {"data", "research", "risk"}
     reset_datahub()
 
@@ -2391,6 +2397,39 @@ def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monke
     assert "IC/ICIR" in research_result["desk_response"].answer
     assert "test design" in engineering_result["desk_response"].answer.lower()
     assert "docs check" in docs_result["desk_response"].answer.lower()
+    reset_datahub()
+
+
+def test_reporting_daily_brief_orchestrates_multiple_desk_actions(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Daily operating rhythm")
+
+    result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="reporting",
+        content="今天系统该做什么，给我 CEO 简报",
+    )
+    response = result["desk_response"]
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+
+    assert len(actions) == 3
+    assert {action["desk"] for action in actions} == {"data", "research", "risk"}
+    assert {action["parameters"]["tool_id"] for action in actions} == {
+        "astroq.data.status",
+        "astroq.strategy.catalog",
+        "astroq.lifecycle.check",
+    }
+    assert all(action["risk_level"] == "read_only" for action in actions)
+    assert len(response.evidence_refs) == 3
+    assert {handoff["target_desk"] for handoff in response.handoffs} == {"data", "research", "risk"}
+    assert "daily" in response.answer.lower() or "简报" in response.answer
     reset_datahub()
 
 

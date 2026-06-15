@@ -2035,30 +2035,35 @@ class AgentRuntime:
 
     def _route_ceo_message(self, *, session_id: str, source_message_id: str, desk: str, content: str) -> DeskResponse:
         plan = build_desk_workflow_plan(desk=desk, content=content)
-        evidence = self.create_evidence(
-            kind="web_route",
-            label=plan.evidence_label,
-            uri=plan.evidence_uri,
-            summary=plan.evidence_summary,
-        )
-        action = self.propose_action(
-            session_id=session_id,
-            desk=plan.desk,
-            action_type=plan.action_type,
-            risk_level=plan.risk_level,
-            summary=plan.action_summary,
-            parameters={"tool_id": plan.tool_id},
-            expected_effect=plan.expected_effect,
-            evidence_refs=[evidence.evidence_id],
-        )
+        evidence_refs: list[str] = []
+        proposed_actions: list[str] = []
+        for action_spec in plan.actions:
+            evidence = self.create_evidence(
+                kind="web_route",
+                label=action_spec.evidence.label,
+                uri=action_spec.evidence.uri,
+                summary=action_spec.evidence.summary,
+            )
+            action = self.propose_action(
+                session_id=session_id,
+                desk=action_spec.desk,
+                action_type=action_spec.action_type,
+                risk_level=action_spec.risk_level,
+                summary=action_spec.summary,
+                parameters={"tool_id": action_spec.tool_id},
+                expected_effect=action_spec.expected_effect,
+                evidence_refs=[evidence.evidence_id],
+            )
+            evidence_refs.append(evidence.evidence_id)
+            proposed_actions.append(action.action_id)
         return self.respond_as_desk(
             session_id=session_id,
             source_message_id=source_message_id,
             desk=plan.desk,
             answer=plan.answer,
             confidence=plan.confidence,
-            evidence_refs=[evidence.evidence_id],
-            proposed_actions=[action.action_id],
+            evidence_refs=evidence_refs,
+            proposed_actions=proposed_actions,
             blockers=plan.blockers,
             handoffs=plan.handoffs,
         )
