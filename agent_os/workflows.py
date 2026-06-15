@@ -261,6 +261,22 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
             },
         ),
     ],
+    "execution": [
+        (
+            ("miniqmt", "qmt", "live readiness", "broker readiness", "kill switch", "实盘", "券商", "终端"),
+            {
+                "answer": "Execution Desk 已识别到 MiniQMT/QMT live readiness 问题。下一步只读取 live readiness、broker readiness 和 kill switch 状态；不会提交 paper/live order。",
+                "evidence_label": "MiniQMT/QMT live readiness",
+                "evidence_uri": "/portfolio",
+                "evidence_summary": "Open broker readiness, live execution, and kill switch context.",
+                "action_type": "live_readiness",
+                "tool_id": "astroq.agent.live.readiness",
+                "risk_level": "read_only",
+                "action_summary": "Read MiniQMT/QMT live readiness and kill-switch status.",
+                "expected_effect": "Records live readiness blockers without submitting paper or live orders.",
+            },
+        ),
+    ],
 }
 
 
@@ -1074,6 +1090,11 @@ _SEMANTIC_EVIDENCE_BY_TOOL: dict[str, WorkflowEvidenceSpec] = {
         label="Execution readiness",
         uri="/portfolio",
         summary="Open portfolio and execution readiness views.",
+    ),
+    "astroq.agent.live.readiness": WorkflowEvidenceSpec(
+        label="MiniQMT/QMT live readiness",
+        uri="/portfolio",
+        summary="Open broker readiness, live execution, and kill switch context.",
     ),
     "astroq.architecture.ast": WorkflowEvidenceSpec(
         label="AST Intelligence",

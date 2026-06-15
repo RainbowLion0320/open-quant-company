@@ -57,6 +57,13 @@ DEFAULT_TOOLS: dict[str, ToolDescriptor] = {
         risk_level="dry_run",
         desk_scopes=["execution", "risk"],
     ),
+    "astroq.agent.live.readiness": ToolDescriptor(
+        tool_id="astroq.agent.live.readiness",
+        label="MiniQMT/QMT live readiness",
+        command=_astroq_command("agent", "live", "readiness", "--json"),
+        risk_level="read_only",
+        desk_scopes=["execution"],
+    ),
     "astroq.architecture.ast": ToolDescriptor(
         tool_id="astroq.architecture.ast",
         label="AST intelligence",

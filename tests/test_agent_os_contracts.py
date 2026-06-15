@@ -4330,6 +4330,7 @@ def test_agent_tool_registry_covers_all_declared_desk_tools():
     repair_dry_run = registry.command_for("astroq.data.repair.dry_run", {"table": "stock_limit_list"})
     compete_command = registry.command_for("astroq.strategy.compete")
     backtest_dry_run = registry.command_for("astroq.backtest.run.dry_run")
+    live_readiness_command = registry.command_for("astroq.agent.live.readiness")
     test_design_command = registry.command_for("astroq.test.design")
     docs_command = registry.command_for("astroq.docs.check")
 
@@ -4338,6 +4339,7 @@ def test_agent_tool_registry_covers_all_declared_desk_tools():
     assert repair_dry_run[1:] == ["data", "repair", "stock_limit_list", "--dry-run", "--json"]
     assert compete_command[1:] == ["strategy", "compete", "--json"]
     assert backtest_dry_run[1:] == ["backtest", "run", "--dry-run", "--json"]
+    assert live_readiness_command[1:] == ["agent", "live", "readiness", "--json"]
     assert test_design_command[1:] == ["test", "design", "--json"]
     assert docs_command[1:] == ["docs", "check", "--json"]
 
@@ -5793,6 +5795,34 @@ def test_execution_dry_run_review_cites_current_lifecycle_blockers(tmp_path, mon
         "lifecycle: raw_price missing_execution_price",
         "data: 2 unmapped source capabilities",
     ]
+    reset_datahub()
+
+
+def test_execution_live_readiness_review_routes_to_read_only_live_tool(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Live readiness", default_desk="execution")
+
+    result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="execution",
+        content="检查 MiniQMT/QMT live readiness 和 kill switch，先不要下单",
+    )
+    response = result["desk_response"]
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+
+    assert len(actions) == 1
+    assert actions[0]["desk"] == "execution"
+    assert actions[0]["risk_level"] == "read_only"
+    assert actions[0]["parameters"]["tool_id"] == "astroq.agent.live.readiness"
+    assert "live readiness" in response.answer
+    assert "不会提交" in response.answer
     reset_datahub()
 
 

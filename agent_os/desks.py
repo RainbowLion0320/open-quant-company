@@ -51,7 +51,7 @@ DESKS: list[dict[str, Any]] = [
         "desk_id": "execution",
         "display_name": "Execution Desk",
         "mandate": "Paper orders, broker readiness, live proposals, reconciliation, and kill switch state.",
-        "allowed_tools": ["astroq.execution.dry_run"],
+        "allowed_tools": ["astroq.execution.dry_run", "astroq.agent.live.readiness"],
         "forbidden_actions": ["code_change"],
         "evidence_required": ["execution_preview", "broker_readiness", "risk_gate"],
         "handoff_targets": ["risk", "reporting"],
