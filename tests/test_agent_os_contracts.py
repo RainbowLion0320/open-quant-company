@@ -4684,6 +4684,11 @@ def test_agent_workflow_plan_combines_artifact_context_with_session_backlog(tmp_
         "astroq.data.sources.diff_registry",
         "astroq.strategy.compete",
     ]
+    assert "risk_free_curve" in response.answer
+    assert "missing_data" in response.answer
+    assert "5" in response.answer
+    assert "4/12" in response.answer
+    assert "P1" in response.answer
     assert reasoning_by_kind["intent_match"]["planning_mode"] == "adaptive_artifact"
     assert reasoning_by_kind["session_backlog"]["approval_required_count"] >= 1
     assert reasoning_by_kind["artifact_context"]["root_causes"] == [
@@ -4691,6 +4696,12 @@ def test_agent_workflow_plan_combines_artifact_context_with_session_backlog(tmp_
         "data_source_gap",
         "strategy_evidence_blocked",
         "engineering_quality_risk",
+    ]
+    assert reasoning_by_kind["artifact_context"]["evidence_summary"][:4] == [
+        "lifecycle: risk_free_curve missing_data",
+        "data: 5 unmapped source capabilities",
+        "research: 4/12 strategies blocked",
+        "engineering: 1 AST issue(s), P1=1",
     ]
     assert reasoning_by_kind["context_fusion"]["source_count"] == 2
     assert all(action["risk_level"] in {"read_only", "dry_run"} for action in response_actions)

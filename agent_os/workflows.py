@@ -385,7 +385,14 @@ def _adaptive_artifact_plan(
             open_work_orders=open_work_orders,
         )
     )
-    reasoning.append(_artifact_context_reasoning(artifact_context=artifact_context, root_causes=root_causes))
+    evidence_summary = _artifact_evidence_summary(artifact_context)
+    reasoning.append(
+        _artifact_context_reasoning(
+            artifact_context=artifact_context,
+            root_causes=root_causes,
+            evidence_summary=evidence_summary,
+        )
+    )
     reasoning.append(
         {
             "kind": "context_fusion",
@@ -400,6 +407,7 @@ def _adaptive_artifact_plan(
         desk=desk,
         answer=(
             "Reporting Desk 已生成 adaptive artifact / 会话与证据融合计划："
+            f"当前证据摘要：{'；'.join(evidence_summary[:5])}。"
             "先处理当前 session 未完成事项，再补齐本地 artifact 暴露的数据、策略、风险和工程证据缺口。"
         ),
         confidence=0.82,
