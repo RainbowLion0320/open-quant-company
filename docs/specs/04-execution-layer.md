@@ -228,6 +228,6 @@ rm.check_portfolio(portfolio) → list[RiskCheckResult]
 - **无日内成交模型：** 全部以收盘价成交，未考虑日内价格波动
 - **无部分成交：** 模拟全额成交，实盘中限价单可能部分成交
 - **风控无组合层面：** 未计算组合 VaR/CVaR 作为动态风控阈值
-- **MiniQMT/QMT readiness + preview foundation：** `broker.live.qmt.MiniQmtLiveBroker` 只读探测 default-disabled / missing SDK / login / permission / kill-switch 状态，`paper_fallback=false`；`preview_order()` 只计算 intent、fees、现金/持仓影响和基础 risk gate，始终 `submitted=false`
+- **MiniQMT/QMT readiness + preview foundation：** `broker.live.qmt.MiniQmtLiveBroker` 只读探测 default-disabled / missing SDK / login / permission / kill-switch 状态，`paper_fallback=false`；`preview_order()` 只计算 intent、fees、现金/持仓影响和扩展 preview risk gate（现金、单票集中度、总敞口、日订单数、可交易性、数据新鲜度、券商账户一致性），始终 `submitted=false`
 - **Agent paper execution foundation：** `PaperBroker.preview_order()`、`AgentRuntime.propose_paper_order()` 和 `AgentRuntime.submit_paper_order_action()` 已形成 preview → approval → re-preview → submit/reconciliation 的受控路径；CEO Office 可显示 paper preview/risk 摘要并提交已批准 action，仍需要更完整的对账视图和已提交订单取消语义。
-- **未来方向：** 完成 MiniQMT/QMT production-grade risk gate、CEO approval、submission、reconciliation 和 kill switch 操作；不得回退到 PaperBroker
+- **未来方向：** 完成 MiniQMT/QMT drawdown/portfolio VaR 等更深风控、CEO approval、submission、reconciliation 和 kill switch 操作；不得回退到 PaperBroker

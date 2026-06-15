@@ -196,6 +196,13 @@ class MiniQmtLiveBroker:
                     "estimated_cost": estimated_cost,
                 }
             )
+        extended_checks, extended_blockers = self._extended_risk_checks(
+            health=health,
+            intent=intent,
+            notional=notional,
+        )
+        checks.extend(extended_checks)
+        blockers.extend(extended_blockers)
 
         unique_blockers = list(dict.fromkeys(blockers))
         return {
@@ -203,6 +210,113 @@ class MiniQmtLiveBroker:
             "blockers": unique_blockers,
             "checks": checks,
         }
+
+    def _extended_risk_checks(
+        self,
+        *,
+        health: dict[str, Any],
+        intent: dict[str, Any],
+        notional: float,
+    ) -> tuple[list[dict[str, Any]], list[str]]:
+        snapshot = dict(intent.get("risk_snapshot") or {})
+        blockers: list[str] = []
+        checks: list[dict[str, Any]] = []
+        live_ready = health.get("mode") == "live_ready"
+        required = {
+            "max_position_pct",
+            "max_total_exposure_pct",
+            "daily_order_count",
+            "max_daily_orders",
+            "tradable",
+            "data_freshness_status",
+            "broker_account_consistent",
+        }
+        missing = sorted(name for name in required if name not in snapshot)
+        if live_ready and missing:
+            blockers.append("missing_risk_snapshot")
+        total_asset = _as_float(self.account.get("total_asset"))
+        market_value = _as_float(self.account.get("market_value"))
+        current_symbol_notional = max(_as_float(snapshot.get("current_symbol_notional")), 0.0)
+        position_after = max(current_symbol_notional + (notional if intent["side"] == "buy" else -notional), 0.0)
+        exposure_after = max(market_value + (notional if intent["side"] == "buy" else -notional), 0.0)
+        max_position_pct = _as_float(snapshot.get("max_position_pct"))
+        max_total_exposure_pct = _as_float(snapshot.get("max_total_exposure_pct"))
+        position_pct = position_after / total_asset if total_asset > 0 else 0.0
+        exposure_pct = exposure_after / total_asset if total_asset > 0 else 0.0
+
+        concentration_passed = total_asset > 0 and max_position_pct > 0 and position_pct <= max_position_pct
+        if live_ready and not concentration_passed:
+            blockers.append(
+                "position_concentration_limit"
+                if total_asset > 0 and max_position_pct > 0
+                else "missing_position_concentration_limit"
+            )
+        checks.append(
+            {
+                "name": "position_concentration",
+                "passed": concentration_passed,
+                "position_pct": position_pct,
+                "limit": max_position_pct,
+                "position_after": position_after,
+                "total_asset": total_asset,
+            }
+        )
+
+        exposure_passed = total_asset > 0 and max_total_exposure_pct > 0 and exposure_pct <= max_total_exposure_pct
+        if live_ready and not exposure_passed:
+            blockers.append(
+                "total_exposure_limit"
+                if total_asset > 0 and max_total_exposure_pct > 0
+                else "missing_total_exposure_limit"
+            )
+        checks.append(
+            {
+                "name": "total_exposure",
+                "passed": exposure_passed,
+                "exposure_pct": exposure_pct,
+                "limit": max_total_exposure_pct,
+                "exposure_after": exposure_after,
+                "total_asset": total_asset,
+            }
+        )
+
+        daily_order_count = _as_int(snapshot.get("daily_order_count"))
+        max_daily_orders = _as_int(snapshot.get("max_daily_orders"))
+        daily_order_passed = max_daily_orders > 0 and daily_order_count < max_daily_orders
+        if live_ready and not daily_order_passed:
+            blockers.append("daily_order_limit" if max_daily_orders > 0 else "missing_daily_order_limit")
+        checks.append(
+            {
+                "name": "daily_order_count",
+                "passed": daily_order_passed,
+                "current_count": daily_order_count,
+                "limit": max_daily_orders,
+            }
+        )
+
+        tradable = _as_bool(snapshot.get("tradable"))
+        if live_ready and not tradable:
+            blockers.append("not_tradable")
+        checks.append({"name": "tradability", "passed": tradable, "tradable": tradable})
+
+        freshness = str(snapshot.get("data_freshness_status") or "").strip().lower()
+        freshness_passed = freshness in {"fresh", "ready", "ok"}
+        if live_ready and not freshness_passed:
+            blockers.append("data_freshness_stale" if freshness else "missing_data_freshness")
+        checks.append({"name": "data_freshness", "passed": freshness_passed, "status": freshness})
+
+        account_consistent = _as_bool(snapshot.get("broker_account_consistent"))
+        if live_ready and not account_consistent:
+            blockers.append("broker_account_inconsistent")
+        checks.append(
+            {
+                "name": "broker_account_consistency",
+                "passed": account_consistent,
+                "consistent": account_consistent,
+            }
+        )
+
+        return checks, blockers
 
 
 def _now() -> str:
@@ -230,6 +344,16 @@ def _as_int(value: Any) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "ok", "ready", "fresh"}
+    return False
 
 
 def _estimate_fees(notional: float) -> float:

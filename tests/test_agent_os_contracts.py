@@ -216,6 +216,16 @@ def test_agent_live_order_preview_blocks_when_readiness_not_ready(tmp_path, monk
             "strategy": "manual",
             "reason": "CEO preview only",
             "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {
+                "current_symbol_notional": 0.0,
+                "max_position_pct": 0.2,
+                "max_total_exposure_pct": 0.7,
+                "daily_order_count": 1,
+                "max_daily_orders": 5,
+                "tradable": True,
+                "data_freshness_status": "fresh",
+                "broker_account_consistent": True,
+            },
         }
     )
 
@@ -249,6 +259,16 @@ def test_agent_live_order_preview_passes_with_ready_fake_broker_and_cash_gate():
             "strategy": "manual",
             "reason": "CEO preview only",
             "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {
+                "current_symbol_notional": 0.0,
+                "max_position_pct": 0.2,
+                "max_total_exposure_pct": 0.7,
+                "daily_order_count": 1,
+                "max_daily_orders": 5,
+                "tradable": True,
+                "data_freshness_status": "fresh",
+                "broker_account_consistent": True,
+            },
         }
     )
     blocked = broker.preview_order(
@@ -261,6 +281,16 @@ def test_agent_live_order_preview_passes_with_ready_fake_broker_and_cash_gate():
             "strategy": "manual",
             "reason": "Too large",
             "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {
+                "current_symbol_notional": 0.0,
+                "max_position_pct": 0.9,
+                "max_total_exposure_pct": 1.0,
+                "daily_order_count": 1,
+                "max_daily_orders": 5,
+                "tradable": True,
+                "data_freshness_status": "fresh",
+                "broker_account_consistent": True,
+            },
         }
     )
 
@@ -276,6 +306,81 @@ def test_agent_live_order_preview_passes_with_ready_fake_broker_and_cash_gate():
     assert blocked["status"] == "blocked"
     assert blocked["risk_gate"]["passed"] is False
     assert "insufficient_cash" in blocked["risk_gate"]["blockers"]
+
+
+def test_agent_live_order_preview_enforces_extended_risk_snapshot():
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    broker = MiniQmtLiveBroker(
+        enabled=True,
+        import_checker=lambda _name: object(),
+        logged_in=True,
+        permissions=["query", "trade"],
+        account_id="1234567890",
+        account={"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+    )
+    preview = broker.preview_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "full risk snapshot",
+            "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {
+                "current_symbol_notional": 2_000.0,
+                "max_position_pct": 0.2,
+                "max_total_exposure_pct": 0.7,
+                "daily_order_count": 1,
+                "max_daily_orders": 5,
+                "tradable": True,
+                "data_freshness_status": "fresh",
+                "broker_account_consistent": True,
+            },
+        }
+    )
+    blocked = broker.preview_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 2_000,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "violates extended risk",
+            "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {
+                "current_symbol_notional": 15_000.0,
+                "max_position_pct": 0.2,
+                "max_total_exposure_pct": 0.3,
+                "daily_order_count": 5,
+                "max_daily_orders": 5,
+                "tradable": False,
+                "data_freshness_status": "stale",
+                "broker_account_consistent": False,
+            },
+        }
+    )
+
+    check_names = {check["name"] for check in preview["risk_gate"]["checks"]}
+    assert {
+        "position_concentration",
+        "total_exposure",
+        "daily_order_count",
+        "tradability",
+        "data_freshness",
+        "broker_account_consistency",
+    } <= check_names
+    assert preview["risk_gate"]["passed"] is True
+    assert blocked["risk_gate"]["passed"] is False
+    assert "position_concentration_limit" in blocked["risk_gate"]["blockers"]
+    assert "total_exposure_limit" in blocked["risk_gate"]["blockers"]
+    assert "daily_order_limit" in blocked["risk_gate"]["blockers"]
+    assert "not_tradable" in blocked["risk_gate"]["blockers"]
+    assert "data_freshness_stale" in blocked["risk_gate"]["blockers"]
+    assert "broker_account_inconsistent" in blocked["risk_gate"]["blockers"]
 
 
 def test_agent_live_preview_cli_and_api(tmp_path, monkeypatch, capsys):

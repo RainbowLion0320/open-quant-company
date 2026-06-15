@@ -49,7 +49,7 @@ All endpoints are planned under `/api/agent/*`.
 | `POST` | `/api/agent/paper/actions/{action_id}/submit` | Submit an approved PaperBroker order action after re-running preview/risk gates and writing reconciliation evidence. | Implemented approved submit gate |
 | `POST` | `/api/agent/paper/actions/{action_id}/cancel` | Cancel a queued paper approval request or a submitted PaperBroker order when broker state still permits cancellation. | Implemented cancellation gate |
 | `GET` | `/api/agent/live/readiness` | Report MiniQMT/QMT live readiness without submitting orders. | Implemented readiness probe |
-| `POST` | `/api/agent/live/preview` | Preview a MiniQMT/QMT live order with readiness, cash gate, broker impact, and `submitted=false`. | Implemented preview gate |
+| `POST` | `/api/agent/live/preview` | Preview a MiniQMT/QMT live order with readiness, extended risk gate, broker impact, and `submitted=false`. | Implemented preview gate |
 | `GET` | `/api/agent/reports` | List generated CEO reports, optionally scoped to a session. | Implemented |
 | `POST` | `/api/agent/reports` | Generate a CEO report artifact and register report evidence. | Implemented |
 | `POST` | `/api/agent/reports/{report_id}/notify` | Send or dry-run a report notification through env-configured channels and write notification audit evidence. | Implemented |
@@ -90,7 +90,7 @@ All commands must support `--json`.
 | `astroq agent paper submit ACTION_ID --json` | Submit an approved PaperBroker order action after re-running preview/risk gates and writing reconciliation evidence. | Implemented approved submit gate |
 | `astroq agent paper cancel ACTION_ID --reason REASON --json` | Cancel a queued paper approval request or a submitted PaperBroker order when broker state still permits cancellation. | Implemented cancellation gate |
 | `astroq agent live readiness --json` | Report MiniQMT/QMT live readiness and blockers without PaperBroker fallback. | Implemented readiness probe |
-| `astroq agent live preview --symbol SYMBOL --side buy\|sell --quantity N --limit-price PRICE --evidence EVIDENCE_ID --json` | Preview a live limit order without submission, including approval requirement, readiness blockers, cash gate, and estimated broker impact. | Implemented preview gate |
+| `astroq agent live preview --symbol SYMBOL --side buy\|sell --quantity N --limit-price PRICE --evidence EVIDENCE_ID --json` | Preview a live limit order without submission, including approval requirement, readiness blockers, extended risk gate, and estimated broker impact. | Implemented preview gate |
 | `astroq agent evidence EVIDENCE_ID --json` | Resolve evidence. | Implemented |
 | `astroq agent desks --json` | List desk registry and health. | Implemented |
 | `astroq agent memory show --json` | Inspect local transparent memory. | Implemented |
@@ -438,7 +438,16 @@ return a preview object. The preview is never an order submission.
   "risk_gate": {
     "passed": false,
     "blockers": ["live_disabled"],
-    "checks": [{"name": "live_readiness", "passed": false}]
+    "checks": [
+      {"name": "live_readiness", "passed": false},
+      {"name": "cash", "passed": false},
+      {"name": "position_concentration", "passed": false},
+      {"name": "total_exposure", "passed": false},
+      {"name": "daily_order_count", "passed": false},
+      {"name": "tradability", "passed": false},
+      {"name": "data_freshness", "passed": false},
+      {"name": "broker_account_consistency", "passed": false}
+    ]
   },
   "estimated_cash_effect": -1005.0,
   "estimated_position_effect": {"symbol": "600000.SH", "quantity_delta": 100}
@@ -449,6 +458,8 @@ Current preview rules:
 
 - Live readiness blockers become preview blockers.
 - Buy orders require account cash to cover notional plus estimated fees.
+- `risk_snapshot` drives extended preview checks: single-position concentration, total exposure, daily order count, tradability, data freshness, and broker account consistency.
+- When live readiness is `live_ready`, missing or failing extended risk snapshot fields block preview instead of allowing an order to proceed with fake assumptions.
 - Missing symbol, side, positive quantity, limit price, or evidence reference blocks preview.
 - The response must always keep `approval_required=true`, `submitted=false`, and `paper_fallback=false`.
 
@@ -667,7 +678,7 @@ As of 2026-06-14:
 - CEO reports can be generated as JSON/Markdown artifacts, registered as report evidence, listed through CLI/API, and shown as CEO Office report cards. Dedicated templates cover daily, weekly, audit, data quality, risk, execution reconciliation, engineering digest, and release audit reports; each report includes fixed allowlist artifact context for lifecycle, data-sources, strategy competition, AST intelligence, test design intelligence, and CodeGraph readiness. CEO Office can generate a selected template, run due templates through the explicit operating-rhythm runner, trigger the scheduled active-session rhythm tick, or send/dry-run report notifications. Scheduled ticks write audit artifacts under `var/artifacts/agent/reports/scheduled/`; notifications write audit artifacts under `var/artifacts/agent/reports/notifications/` and read only system environment variables.
 - PaperBroker order proposal, approved submission, and cancellation are available through CLI/API. Proposal writes preview artifact evidence and creates an approval-required `paper_order` action only when the non-mutating preview passes; submission requires approval, re-runs preview/risk gates, blocks stale previews, writes run/reconciliation evidence, persists default PaperBroker state on success, and exposes paper reconciliation summaries on action detail. Cancellation writes dedicated `paper.paper_order.cancel` runs and reconciliation evidence for queued approval requests or broker-confirmed active order cancellations.
 - MiniQMT/QMT readiness probing is available and defaults to `live_disabled`; missing SDK, login, permission, or disabled kill switch returns `blocked`, and `paper_fallback` is always false.
-- MiniQMT/QMT live order preview is available through CLI/API. It never submits, never falls back to PaperBroker, always requires approval, and blocks on readiness, invalid intent, missing evidence, or insufficient cash.
+- MiniQMT/QMT live order preview is available through CLI/API. It never submits, never falls back to PaperBroker, always requires approval, and blocks on readiness, invalid intent, missing evidence, insufficient cash, concentration, exposure, daily order count, tradability, data freshness, or broker account consistency failures.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.

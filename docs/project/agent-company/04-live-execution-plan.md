@@ -245,14 +245,14 @@ Current foundation:
 
 - `broker.live.qmt.MiniQmtLiveBroker.health()` reports default-disabled readiness.
 - `astroq agent live readiness --json` and `GET /api/agent/live/readiness` expose the same readiness state.
-- `broker.live.qmt.MiniQmtLiveBroker.preview_order()` returns a non-submitting live order preview with intent normalization, estimated cash/position impact, fees, readiness blockers, evidence requirement, and a basic cash gate.
+- `broker.live.qmt.MiniQmtLiveBroker.preview_order()` returns a non-submitting live order preview with intent normalization, estimated cash/position impact, fees, readiness blockers, evidence requirement, cash gate, and extended risk snapshot checks for concentration, total exposure, daily order count, tradability, data freshness, and broker account consistency.
 - `astroq agent live preview ... --json` and `POST /api/agent/live/preview` expose the same preview state with `approval_required=true`, `submitted=false`, and `paper_fallback=false`.
 - CEO Office shows a read-only live readiness card.
 - Blocked readiness always reports `paper_fallback=false`; no live path submits through PaperBroker.
 
 Remaining work:
 
-- Production-grade risk gates beyond readiness/evidence/cash, including concentration, exposure, tradability, data freshness, drawdown, daily order count, and broker account consistency.
+- Deeper production-grade risk gates beyond the current preview checks, including drawdown state, portfolio VaR/CVaR, sector concentration, intraday limit-state checks, and broker account consistency reconciliation against real MiniQMT/QMT snapshots.
 - CEO-approved live submission.
 - Broker order/trade/position reconciliation.
 - Kill-switch operations beyond readiness reporting.
