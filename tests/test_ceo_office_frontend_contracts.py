@@ -85,11 +85,24 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "runningReadOnlyWorkflow" in view
     assert "api.agentAutonomyStep" in view
     assert "runAutonomyStep" in view
+    assert "api.agentAutonomyRun" in view
+    assert "runAutonomyRun" in view
     assert "autonomyStepResult" in view
+    assert "autonomyRunResult" in view
     assert "runningAutonomyStep" in view
+    assert "runningAutonomyRun" in view
+    assert "autonomyRunMaxSteps" in view
+    assert 'v-model.number="autonomyRunMaxSteps"' in view
     assert "autonomyStepResult.actions" in view
     assert "autonomyStepResult.runs" in view
     assert "autonomyStepResult.skipped" in view
+    assert "autonomyRunResult.steps" in view
+    assert "autonomyRunResult.stop_reason" in view
+    assert "ceoOffice.runAutonomyRun" in view
+    assert "ceoOffice.autonomyRunStatus" in view
+    assert "ceoOffice.autonomyRunSteps" in view
+    assert "ceoOffice.autonomyRunMaxSteps" in view
+    assert "ceoOffice.stopReason" in view
     assert "ceoOffice.runAutonomyStep" in view
     assert "ceoOffice.autonomyStepStatus" in view
     assert "ceoOffice.autonomyStepActions" in view
@@ -458,8 +471,13 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert '`/api/agent/runs/${encodeURIComponent(runId)}/stream`' in agent_api
     assert "AgentAutonomyStep" in agent_types
     assert "AgentAutonomyStepResponse" in agent_types
+    assert "AgentAutonomyRun" in agent_types
+    assert "AgentAutonomyRunResponse" in agent_types
     assert "agentAutonomyStep" in agent_api
     assert "/api/agent/sessions/${encodeURIComponent(sessionId)}/autonomy-step" in agent_api
+    assert "agentAutonomyRun" in agent_api
+    assert "/api/agent/sessions/${encodeURIComponent(sessionId)}/autonomy-run" in agent_api
+    assert "max_steps?: number" in agent_api
     assert "planner_mode?: string" in agent_api
     assert "semantic_draft?: Record<string, unknown>" in agent_api
     assert "planning_mode: string" in agent_types

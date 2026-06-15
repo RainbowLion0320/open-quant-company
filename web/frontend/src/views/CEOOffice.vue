@@ -49,6 +49,16 @@
         {{ t("ceoOffice.blocked") }} {{ autonomyStepResult.blocked_count }}
       </span>
     </section>
+    <section v-if="autonomyRunResult" class="ceo-alert info">
+      <strong>{{ t("ceoOffice.autonomyRunStatus") }}</strong>
+      <span>
+        {{ statusLabel(autonomyRunResult.status) }} ·
+        {{ t("ceoOffice.autonomyRunSteps") }} {{ autonomyRunResult.step_count }} ·
+        {{ t("ceoOffice.ran") }} {{ autonomyRunResult.run_count }} ·
+        {{ t("ceoOffice.skipped") }} {{ autonomyRunResult.skipped_count }} ·
+        {{ t("ceoOffice.stopReason") }} {{ autonomyRunResult.stop_reason }}
+      </span>
+    </section>
     <section v-if="autonomyStepResult" class="ceo-panel autonomy-step-detail">
       <header class="panel-head">
         <span>{{ t("ceoOffice.autonomyStepStatus") }}</span>
@@ -93,6 +103,54 @@
               <strong>{{ String(skipped.reason || skipped.status || "skipped") }}</strong>
               <small>{{ String(skipped.action_id || skipped.desk || skipped.risk_level || "") }}</small>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section v-if="autonomyRunResult" class="ceo-panel autonomy-step-detail">
+      <header class="panel-head">
+        <span>{{ t("ceoOffice.autonomyRunStatus") }}</span>
+        <small>{{ autonomyRunResult.mode }} · {{ t("ceoOffice.stopReason") }} {{ autonomyRunResult.stop_reason }}</small>
+      </header>
+      <div class="autonomy-step-grid">
+        <div>
+          <small>{{ t("ceoOffice.autonomyRunSteps") }}</small>
+          <div v-if="!autonomyRunResult.steps.length" class="ceo-empty compact">{{ t("ceoOffice.noRuns") }}</div>
+          <div v-else class="run-list">
+            <div v-for="step in autonomyRunResult.steps" :key="`autonomy-step-${step.step_index}`" class="run-row">
+              <strong>{{ t("ceoOffice.autonomyRunSteps") }} {{ step.step_index }}</strong>
+              <small>
+                {{ statusLabel(step.status) }} ·
+                {{ t("ceoOffice.ran") }} {{ step.run_count }} ·
+                {{ t("ceoOffice.skipped") }} {{ step.skipped_count }}
+              </small>
+            </div>
+          </div>
+        </div>
+        <div>
+          <small>{{ t("ceoOffice.autonomyStepRuns") }}</small>
+          <div v-if="!autonomyRunResult.steps.some(step => step.runs.length)" class="ceo-empty compact">{{ t("ceoOffice.noRuns") }}</div>
+          <div v-else class="run-list">
+            <div v-for="run in autonomyRunResult.steps.flatMap(step => step.runs)" :key="run.run_id" class="run-row">
+              <strong>{{ run.tool_name }}</strong>
+              <small>{{ statusLabel(run.status) }} · {{ run.stdout_summary || run.stderr_summary || run.run_id }}</small>
+            </div>
+          </div>
+        </div>
+        <div>
+          <small>{{ t("ceoOffice.autonomyStepSkipped") }}</small>
+          <div v-if="!autonomyRunResult.steps.some(step => step.skipped.length)" class="ceo-empty compact">{{ t("ceoOffice.skipped") }} 0</div>
+          <div v-else class="run-list">
+            <template v-for="step in autonomyRunResult.steps" :key="`skipped-step-${step.step_index}`">
+              <div
+                v-for="(skipped, index) in step.skipped"
+                :key="`skipped-${step.step_index}-${autonomySkippedKey(skipped, index)}`"
+                class="run-row"
+              >
+                <strong>{{ String(skipped.reason || skipped.status || "skipped") }}</strong>
+                <small>{{ t("ceoOffice.autonomyRunSteps") }} {{ step.step_index }} · {{ String(skipped.action_id || skipped.desk || skipped.risk_level || "") }}</small>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -180,6 +238,13 @@
           <button class="btn btn-ghost" type="button" :disabled="runningAutonomyStep" @click="runAutonomyStep">
             {{ t("ceoOffice.runAutonomyStep") }}
           </button>
+          <button class="btn btn-ghost" type="button" :disabled="runningAutonomyRun" @click="runAutonomyRun">
+            {{ t("ceoOffice.runAutonomyRun") }}
+          </button>
+          <label class="autonomy-run-control">
+            <span>{{ t("ceoOffice.autonomyRunMaxSteps") }}</span>
+            <input v-model.number="autonomyRunMaxSteps" type="number" min="1" max="5" />
+          </label>
           <label class="semantic-draft-toggle">
             <input v-model="semanticDraftEnabled" type="checkbox" />
             <span>{{ t("ceoOffice.semanticDraft") }}</span>
@@ -904,7 +969,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentAutonomyStep, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentAutonomyRun, type AgentAutonomyStep, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -926,6 +991,7 @@ const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
 const liveMonitor = ref<AgentLiveMonitor | null>(null);
 const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
 const autonomyStepResult = ref<AgentAutonomyStep | null>(null);
+const autonomyRunResult = ref<AgentAutonomyRun | null>(null);
 const workflowPlan = ref<AgentWorkflowPlan | null>(null);
 const sessionStream = ref<AbortController | null>(null);
 const sessionStreamId = ref("");
@@ -948,6 +1014,7 @@ const cancelingAction = ref("");
 const archivingSession = ref(false);
 const runningReadOnlyWorkflow = ref(false);
 const runningAutonomyStep = ref(false);
+const runningAutonomyRun = ref(false);
 const resolvingHandoff = ref("");
 const updatingWorkOrder = ref("");
 const generatingReport = ref(false);
@@ -960,6 +1027,7 @@ const runningLiveMonitor = ref(false);
 const selectedReportKind = ref("daily_brief");
 const selectedDraftDesk = ref("reporting");
 const selectedDeskId = ref("reporting");
+const autonomyRunMaxSteps = ref(2);
 const draft = ref("");
 const semanticDraftEnabled = ref(false);
 const providerSemanticEnabled = ref(false);
@@ -1410,6 +1478,29 @@ async function runAutonomyStep() {
     error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
   } finally {
     runningAutonomyStep.value = false;
+  }
+}
+
+async function runAutonomyRun() {
+  const semanticDraft = parseSemanticDraft();
+  if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
+  runningAutonomyRun.value = true;
+  error.value = "";
+  try {
+    const session = await ensureSession();
+    const payload = await api.agentAutonomyRun(session.session_id, {
+      desk: selectedDraftDesk.value,
+      content: draft.value.trim(),
+      max_steps: autonomyRunMaxSteps.value,
+      ...semanticPayload(semanticDraft),
+    });
+    autonomyRunResult.value = payload.run;
+    workflowPlan.value = null;
+    await loadSession(session.session_id);
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
+  } finally {
+    runningAutonomyRun.value = false;
   }
 }
 

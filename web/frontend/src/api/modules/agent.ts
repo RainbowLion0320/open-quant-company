@@ -4,6 +4,7 @@ import type {
   AgentActionDetail,
   AgentActionFilters,
   AgentAddMessageResponse,
+  AgentAutonomyRunResponse,
   AgentAutonomyStepResponse,
   AgentActionsResponse,
   AgentApprovalPoliciesResponse,
@@ -91,6 +92,23 @@ export const agentApi = {
   ) =>
     post<AgentAutonomyStepResponse>(
       `/api/agent/sessions/${encodeURIComponent(sessionId)}/autonomy-step`,
+      payload,
+    ),
+  agentAutonomyRun: (
+    sessionId: string,
+    payload: {
+      content?: string;
+      text?: string;
+      desk?: string;
+      max_steps?: number;
+      planner_mode?: string;
+      semantic_draft?: Record<string, unknown>;
+      planner_provider?: string;
+      planner_model?: string;
+    } = {},
+  ) =>
+    post<AgentAutonomyRunResponse>(
+      `/api/agent/sessions/${encodeURIComponent(sessionId)}/autonomy-run`,
       payload,
     ),
   agentAddMessage: (

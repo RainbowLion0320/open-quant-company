@@ -122,6 +122,24 @@ export interface AgentAutonomyStep {
   boundary: Record<string, unknown>;
 }
 
+export interface AgentAutonomyRun {
+  status: string;
+  mode: string;
+  session_id: string;
+  desk: string;
+  checked_at: string;
+  max_steps: number;
+  step_count: number;
+  stop_reason: string;
+  action_count: number;
+  run_count: number;
+  failed_count: number;
+  blocked_count: number;
+  skipped_count: number;
+  steps: Array<AgentAutonomyStep & { step_index: number }>;
+  boundary: Record<string, unknown>;
+}
+
 export interface AgentApprovalPolicy {
   policy_id: string;
   risk_level: string;
@@ -364,6 +382,10 @@ export interface AgentReadOnlyWorkflowResponse {
 
 export interface AgentAutonomyStepResponse {
   step: AgentAutonomyStep;
+}
+
+export interface AgentAutonomyRunResponse {
+  run: AgentAutonomyRun;
 }
 
 export interface AgentActionDetail {
