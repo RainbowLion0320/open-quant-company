@@ -235,6 +235,13 @@ async def run_agent_live_reconciliation(payload: dict[str, Any] | None = None) -
     return {"reconciliation": reconciliation}
 
 
+@router.post("/live/monitor")
+async def run_agent_live_monitor(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    session_id = str((payload or {}).get("session_id") or "") or None
+    monitor = AgentRuntime().run_live_monitor(session_id=session_id)
+    return {"monitor": monitor}
+
+
 @router.post("/paper/proposals")
 async def propose_agent_paper_order(payload: dict[str, Any]) -> dict[str, Any]:
     session_id = str(payload.get("session_id") or "")

@@ -1595,6 +1595,78 @@ class AgentRuntime:
         )
         return {**payload, "path": str(path), "evidence": evidence.to_dict()}
 
+    def run_live_monitor(self, *, session_id: str | None = None, broker: Any | None = None) -> dict[str, Any]:
+        live_broker = broker or MiniQmtLiveBroker()
+        checked_at = _now()
+        kill_switch = self.live_kill_switch_status()
+        try:
+            readiness = dict(live_broker.health())
+        except Exception as exc:  # pragma: no cover - defensive adapter boundary
+            readiness = {
+                "broker": "miniqmt",
+                "mode": "blocked",
+                "blockers": ["live_health_probe_failed"],
+                "paper_fallback": False,
+                "error_class": exc.__class__.__name__,
+                "error_message": str(exc)[:300],
+            }
+        if kill_switch.get("active"):
+            blockers = list(readiness.get("blockers") or [])
+            if "live_kill_switch_active" not in blockers:
+                blockers.append("live_kill_switch_active")
+            readiness = {**readiness, "mode": "blocked", "blockers": blockers, "live_kill_switch": kill_switch}
+        else:
+            readiness = {**readiness, "live_kill_switch": kill_switch}
+
+        try:
+            reconciliation = self.run_live_reconciliation(session_id=session_id, broker=live_broker)
+        except Exception as exc:  # pragma: no cover - defensive adapter boundary
+            reconciliation = {
+                "status": "failed",
+                "checked_at": _now(),
+                "session_id": session_id or "",
+                "action_count": 0,
+                "reconciled_count": 0,
+                "skipped_count": 0,
+                "blocked_count": 0,
+                "failed_count": 1,
+                "items": [],
+                "error_class": exc.__class__.__name__,
+                "error_message": str(exc)[:300],
+                "paper_fallback": False,
+            }
+
+        readiness_mode = str(readiness.get("mode") or "")
+        reconciliation_status = str(reconciliation.get("status") or "")
+        if reconciliation_status == "failed":
+            status = "failed"
+        elif reconciliation_status == "partial":
+            status = "partial"
+        elif readiness_mode != "live_ready":
+            status = "blocked"
+        else:
+            status = "ready"
+        payload = {
+            "status": status,
+            "checked_at": checked_at,
+            "session_id": session_id or "",
+            "readiness": readiness,
+            "kill_switch": kill_switch,
+            "reconciliation": reconciliation,
+            "paper_fallback": False,
+        }
+        path = self._write_live_monitor_artifact(payload)
+        evidence = self.create_evidence(
+            kind="artifact",
+            label="Live monitor tick",
+            uri=str(path),
+            summary=(
+                f"Live monitor {status}: readiness={readiness_mode or 'unknown'}, "
+                f"reconciliation={reconciliation_status or 'unknown'}."
+            ),
+        )
+        return {**payload, "path": str(path), "evidence": evidence.to_dict()}
+
     def run_live_smoke(self, *, broker: Any | None = None) -> dict[str, Any]:
         live_broker = broker or MiniQmtLiveBroker()
         checked_at = _now()
@@ -2669,6 +2741,14 @@ class AgentRuntime:
 
     def _write_live_scheduled_reconciliation_artifact(self, payload: dict[str, Any]) -> Path:
         root = get_datahub().artifact_dir("agent") / "live_reconciliation" / "scheduled"
+        root.mkdir(parents=True, exist_ok=True)
+        checked_at = str(payload["checked_at"]).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
+        path = root / f"{checked_at}-{uuid.uuid4().hex[:8]}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return path
+
+    def _write_live_monitor_artifact(self, payload: dict[str, Any]) -> Path:
+        root = get_datahub().artifact_dir("agent") / "live_monitor"
         root.mkdir(parents=True, exist_ok=True)
         checked_at = str(payload["checked_at"]).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
         path = root / f"{checked_at}-{uuid.uuid4().hex[:8]}.json"

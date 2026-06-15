@@ -591,6 +591,22 @@ def live_reconcile(session_id: str = "") -> CliResult:
     )
 
 
+def live_monitor(session_id: str = "") -> CliResult:
+    monitor = AgentRuntime().run_live_monitor(session_id=session_id or None)
+    ok = monitor["status"] in {"ready", "partial", "blocked"}
+    return CliResult(
+        ok=ok,
+        command="agent live monitor",
+        message=(
+            f"Live monitor {monitor['status']}: "
+            f"readiness={monitor['readiness'].get('mode', 'unknown')}, "
+            f"reconciliation={monitor['reconciliation'].get('status', 'unknown')}"
+        ),
+        data={"monitor": monitor},
+        errors=[] if ok else [str(monitor["status"])],
+    )
+
+
 def paper_propose(
     *,
     session_id: str,

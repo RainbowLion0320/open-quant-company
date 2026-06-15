@@ -2266,6 +2266,115 @@ def test_agent_live_reconciliation_runner_scans_submitted_live_orders(tmp_path, 
     reset_datahub()
 
 
+def test_agent_live_monitor_tick_writes_readiness_and_reconciliation_artifact(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    class FakeLiveBroker:
+        def __init__(self):
+            self.reconcile_acks = []
+
+        def health(self):
+            return {
+                "broker": "miniqmt",
+                "mode": "live_ready",
+                "enabled": True,
+                "sdk_available": True,
+                "logged_in": True,
+                "account_id_masked": "****1234",
+                "permissions": ["query", "trade"],
+                "blockers": [],
+                "paper_fallback": False,
+            }
+
+        def preview_order(self, intent):
+            normalized = {
+                "symbol": str(intent["symbol"]).upper(),
+                "side": intent["side"],
+                "quantity": int(intent["quantity"]),
+                "order_type": "limit",
+                "limit_price": float(intent["limit_price"]),
+                "strategy": intent.get("strategy", "manual"),
+                "reason": intent.get("reason", ""),
+                "evidence_refs": list(intent.get("evidence_refs", [])),
+                "risk_snapshot": dict(intent.get("risk_snapshot", {})),
+            }
+            return {
+                "status": "preview_ready",
+                "broker": "miniqmt",
+                "intent": normalized,
+                "approval_required": True,
+                "paper_fallback": False,
+                "submitted": False,
+                "risk_gate": {"passed": True, "blockers": [], "checks": []},
+                "health": {"mode": "live_ready", "paper_fallback": False},
+                "account_snapshot": {"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+            }
+
+        def submit_order(self, intent, approval_id):
+            return {
+                "status": "submitted",
+                "broker_order_id": "LIVE_MONITOR_0001",
+                "broker_status": "accepted",
+                "submitted": True,
+                "ledger_id": approval_id,
+            }
+
+        def reconcile(self, ack):
+            self.reconcile_acks.append(dict(ack))
+            return {
+                "status": "matched",
+                "positions_matched": True,
+                "cash_matched": True,
+                "open_orders": [{"broker_order_id": ack["broker_order_id"], "status": "accepted"}],
+                "fills": [],
+                "mismatches": [],
+                "recommended_actions": [],
+                "paper_fallback": False,
+            }
+
+    broker = FakeLiveBroker()
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Live monitor", default_desk="execution")
+    proposal = runtime.propose_live_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "monitor reconciliation",
+            "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {"tradable": True, "data_freshness_status": "fresh", "broker_account_consistent": True},
+        },
+        broker=broker,
+    )
+    runtime.approve_action(proposal["action"]["action_id"], decided_by="ceo")
+    runtime.submit_live_order_action(proposal["action"]["action_id"], broker=broker)
+
+    monitor = runtime.run_live_monitor(session_id=session.session_id, broker=broker)
+
+    assert monitor["status"] == "ready"
+    assert monitor["readiness"]["mode"] == "live_ready"
+    assert monitor["kill_switch"]["active"] is False
+    assert monitor["reconciliation"]["reconciled_count"] == 1
+    assert monitor["reconciliation"]["items"][0]["order_id"] == "LIVE_MONITOR_0001"
+    assert monitor["paper_fallback"] is False
+    assert broker.reconcile_acks[-1]["broker_order_id"] == "LIVE_MONITOR_0001"
+    assert Path(monitor["path"]).exists()
+    assert monitor["evidence"]["label"] == "Live monitor tick"
+    artifact = json.loads(Path(monitor["path"]).read_text(encoding="utf-8"))
+    assert artifact["reconciliation"]["path"] == monitor["reconciliation"]["path"]
+    assert artifact["readiness"]["mode"] == "live_ready"
+    reset_datahub()
+
+
 def test_agent_live_reconciliation_cli_and_api(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
@@ -2286,6 +2395,33 @@ def test_agent_live_reconciliation_cli_and_api(tmp_path, monkeypatch, capsys):
     assert api_res.status_code == 200
     assert api_res.json()["reconciliation"]["status"] == "ready"
     assert api_res.json()["reconciliation"]["action_count"] == 0
+    reset_datahub()
+
+
+def test_agent_live_monitor_cli_and_api_are_cron_callable(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    cli_code = run_cli(["agent", "live", "monitor", "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post("/api/agent/live/monitor")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["monitor"]["status"] == "blocked"
+    assert cli_payload["data"]["monitor"]["readiness"]["mode"] == "live_disabled"
+    assert cli_payload["data"]["monitor"]["reconciliation"]["action_count"] == 0
+    assert cli_payload["data"]["monitor"]["paper_fallback"] is False
+    assert Path(cli_payload["data"]["monitor"]["path"]).exists()
+    assert api_res.status_code == 200
+    assert api_res.json()["monitor"]["status"] == "blocked"
+    assert api_res.json()["monitor"]["readiness"]["mode"] == "live_disabled"
+    assert api_res.json()["monitor"]["paper_fallback"] is False
     reset_datahub()
 
 

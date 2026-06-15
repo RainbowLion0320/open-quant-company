@@ -12,6 +12,7 @@ import type {
   AgentHandoffsResponse,
   AgentLiveEnvironmentResponse,
   AgentLiveKillSwitchResponse,
+  AgentLiveMonitorResponse,
   AgentLiveReconciliationResponse,
   AgentLiveReadinessResponse,
   AgentPaperCancelResponse,
@@ -128,6 +129,8 @@ export const agentApi = {
     post<AgentLiveKillSwitchResponse>("/api/agent/live/kill-switch/deactivate", { reason }),
   agentLiveReconciliation: (payload: { session_id?: string } = {}) =>
     post<AgentLiveReconciliationResponse>("/api/agent/live/reconciliation", payload),
+  agentLiveMonitor: (payload: { session_id?: string } = {}) =>
+    post<AgentLiveMonitorResponse>("/api/agent/live/monitor", payload),
   agentEvidence: (evidenceId: string) => get<AgentEvidenceResponse>(`/api/agent/evidence/${encodeURIComponent(evidenceId)}`),
   agentDesks: () => get<AgentDesksResponse>("/api/agent/desks"),
   agentApprovalPolicies: () => get<AgentApprovalPoliciesResponse>("/api/agent/policies"),
