@@ -315,19 +315,32 @@ def build_desk_workflow_plan(
     handoffs = _handoffs_for(desk, content)
     work_orders = _work_orders_for(desk, content)
     planning_mode = "fixed_intent" if len(actions) > 1 else "single_intent"
+    answer = profile["answer"]
+    reasoning = _reasoning_for_plan(
+        source_desk=desk,
+        planning_mode=planning_mode,
+        actions=actions,
+        handoffs=handoffs,
+        work_orders=work_orders,
+    )
+    if desk == "reporting" and (_is_daily_brief_request(normalized) or _is_portfolio_review_request(normalized)):
+        evidence_summary = _artifact_evidence_summary(artifact_context or {})
+        if evidence_summary:
+            answer = f"{answer} 当前证据摘要：{'；'.join(evidence_summary[:5])}。"
+            reasoning.append(
+                _artifact_context_reasoning(
+                    artifact_context=artifact_context or {},
+                    root_causes=_artifact_root_causes(artifact_context or {}),
+                    evidence_summary=evidence_summary,
+                )
+            )
     return DeskWorkflowPlan(
         desk=desk,
-        answer=profile["answer"],
+        answer=answer,
         confidence=_confidence_for(desk),
         actions=actions,
         planning_mode=planning_mode,
-        reasoning=_reasoning_for_plan(
-            source_desk=desk,
-            planning_mode=planning_mode,
-            actions=actions,
-            handoffs=handoffs,
-            work_orders=work_orders,
-        ),
+        reasoning=reasoning,
         handoffs=handoffs,
         work_orders=work_orders,
     )

@@ -5596,11 +5596,31 @@ def test_safe_workflow_runs_strategy_blocker_review_actions(tmp_path, monkeypatc
 
 def test_reporting_daily_brief_orchestrates_multiple_desk_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
-    from data.storage.datahub import reset_datahub
+    from data.storage.datahub import get_datahub, reset_datahub
 
     reset_datahub()
 
     from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 1},
+            "blockers": [{"dimension": "macro_gdp", "reason": "source_not_updated"}],
+        },
+        "data-sources/latest.json": {
+            "summary": {"capability_count": 300, "project_integrated_count": 42, "capability_unmapped_count": 21},
+        },
+        "tournaments/strategy_competition_latest.json": {
+            "summary": {"total": 12, "blocked": 9},
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
 
     runtime = AgentRuntime()
     session = runtime.create_session(title="Daily operating rhythm")
@@ -5624,6 +5644,16 @@ def test_reporting_daily_brief_orchestrates_multiple_desk_actions(tmp_path, monk
     assert len(response.evidence_refs) == 3
     assert {handoff["target_desk"] for handoff in response.handoffs} == {"data", "research", "risk"}
     assert "daily" in response.answer.lower() or "简报" in response.answer
+    assert "macro_gdp" in response.answer
+    assert "source_not_updated" in response.answer
+    assert "21" in response.answer
+    assert "9/12" in response.answer
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+    assert reasoning_by_kind["artifact_context"]["evidence_summary"][:3] == [
+        "lifecycle: macro_gdp source_not_updated",
+        "data: 21 unmapped source capabilities",
+        "research: 9/12 strategies blocked",
+    ]
     reset_datahub()
 
 
