@@ -4331,6 +4331,11 @@ def test_agent_tool_registry_covers_all_declared_desk_tools():
     compete_command = registry.command_for("astroq.strategy.compete")
     backtest_dry_run = registry.command_for("astroq.backtest.run.dry_run")
     live_readiness_command = registry.command_for("astroq.agent.live.readiness")
+    report_daily_command = registry.command_for(
+        "astroq.agent.report.daily",
+        {"session_id": "ses_123abc"},
+        approved=True,
+    )
     test_design_command = registry.command_for("astroq.test.design")
     docs_command = registry.command_for("astroq.docs.check")
 
@@ -4340,6 +4345,7 @@ def test_agent_tool_registry_covers_all_declared_desk_tools():
     assert compete_command[1:] == ["strategy", "compete", "--json"]
     assert backtest_dry_run[1:] == ["backtest", "run", "--dry-run", "--json"]
     assert live_readiness_command[1:] == ["agent", "live", "readiness", "--json"]
+    assert report_daily_command[1:] == ["agent", "report", "daily", "--session", "ses_123abc", "--json"]
     assert test_design_command[1:] == ["test", "design", "--json"]
     assert docs_command[1:] == ["docs", "check", "--json"]
 
@@ -4564,6 +4570,41 @@ def test_agent_dynamic_workflow_plan_orchestrates_mixed_ceo_request(tmp_path, mo
         "research: 6/12 strategies blocked",
         "testing: 2 test design risk(s)",
     ]
+    reset_datahub()
+
+
+def test_reporting_daily_report_request_creates_approval_required_report_action(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Report workflow", default_desk="reporting")
+
+    result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="reporting",
+        content="请生成 daily CEO brief report artifact，先进入审批，不要自动写报告",
+    )
+    response = result["desk_response"]
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+
+    assert len(actions) == 1
+    assert actions[0]["desk"] == "reporting"
+    assert actions[0]["action_type"] == "agent_report_daily"
+    assert actions[0]["risk_level"] == "write_artifact"
+    assert actions[0]["status"] == "approval_required"
+    assert actions[0]["parameters"] == {
+        "session_id": session.session_id,
+        "tool_id": "astroq.agent.report.daily",
+    }
+    assert "report artifact" in response.answer
+    assert "审批" in response.answer
+    assert reasoning_by_kind["tool_plan"]["tool_ids"] == ["astroq.agent.report.daily"]
     reset_datahub()
 
 

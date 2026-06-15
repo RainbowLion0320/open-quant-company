@@ -86,7 +86,7 @@ Required fields:
 - `session_id`
 - `desk`
 - `action_type`
-- `risk_level`: `read_only`, `dry_run`, `write_config`, `write_data`, `run_backtest`, `paper_order`, `live_order`, `code_change`
+- `risk_level`: `read_only`, `dry_run`, `write_config`, `write_data`, `write_artifact`, `run_backtest`, `paper_order`, `live_order`, `code_change`
 - `status`: `proposed`, `approval_required`, `approved`, `rejected`, `running`, `succeeded`, `failed`, `blocked`, `expired`, `canceled`
 - `summary`
 - `parameters`
@@ -200,6 +200,7 @@ Initial tool families:
 | `dry_run` | Can run automatically if it does not mutate production data or broker state. |
 | `write_data` | Requires CEO approval. |
 | `write_config` | Requires CEO approval and config diff evidence. |
+| `write_artifact` | Requires CEO approval before writing local report or audit evidence artifacts. |
 | `run_backtest` | Requires approval when long-running or writing official evidence. |
 | `paper_order` | Requires CEO approval and risk gate pass. |
 | `live_order` | Requires CEO approval, live mode enabled, broker readiness, risk gate pass, and kill switch availability. |

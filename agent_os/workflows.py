@@ -129,6 +129,20 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
 _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
     "reporting": [
         (
+            ("generate report", "report artifact", "生成报告", "生成 daily", "生成 ceo 简报", "生成简报"),
+            {
+                "answer": "Reporting Desk 已识别到 daily CEO brief report artifact 生成请求。下一步会创建写本地 report artifact 的审批动作；未获 CEO 审批前不会自动写报告。",
+                "evidence_label": "CEO report artifacts",
+                "evidence_uri": "/",
+                "evidence_summary": "Open CEO Office report cards and artifact evidence.",
+                "action_type": "agent_report_daily",
+                "tool_id": "astroq.agent.report.daily",
+                "risk_level": "write_artifact",
+                "action_summary": "Generate a daily CEO brief report artifact after CEO approval.",
+                "expected_effect": "Writes a local evidence-cited CEO report artifact only after explicit approval.",
+            },
+        ),
+        (
             ("组合", "portfolio", "持仓", "风险复盘", "执行复盘", "execution review"),
             {
                 "answer": "Reporting Desk 已识别到 portfolio operating review。下一步会并行读取 Research 策略证据、Risk 生命周期门禁和 Execution dry-run 预览，再汇总组合层面的 CEO 复盘。",
@@ -335,7 +349,12 @@ def build_desk_workflow_plan(
     if profile is None:
         raise ValueError(f"Unknown desk workflow: {desk}")
     normalized = content.lower()
-    actions = _actions_for_profile(desk=desk, profile=profile, normalized_content=normalized)
+    actions = _actions_for_profile(
+        desk=desk,
+        profile=profile,
+        normalized_content=normalized,
+        session_context=session_context or {},
+    )
     handoffs = _handoffs_for(desk, content)
     work_orders = _work_orders_for(desk, content)
     planning_mode = "fixed_intent" if len(actions) > 1 else "single_intent"
@@ -1141,6 +1160,11 @@ _SEMANTIC_EVIDENCE_BY_TOOL: dict[str, WorkflowEvidenceSpec] = {
         uri="/research",
         summary="Open research and backtest evidence views.",
     ),
+    "astroq.agent.report.daily": WorkflowEvidenceSpec(
+        label="CEO report artifacts",
+        uri="/",
+        summary="Open CEO Office report cards and artifact evidence.",
+    ),
     "astroq.data.repair.dry_run": WorkflowEvidenceSpec(
         label="Data repair dry-run",
         uri="/datahub",
@@ -1359,7 +1383,33 @@ def _confidence_for(desk: str) -> float:
     return 0.68 if desk == "reporting" else 0.64
 
 
-def _actions_for_profile(*, desk: str, profile: dict[str, str], normalized_content: str) -> list[WorkflowActionSpec]:
+def _actions_for_profile(
+    *,
+    desk: str,
+    profile: dict[str, str],
+    normalized_content: str,
+    session_context: dict[str, Any],
+) -> list[WorkflowActionSpec]:
+    if desk == "reporting" and profile.get("action_type") == "agent_report_daily":
+        session_id = str(session_context.get("session_id") or "").strip()
+        if not session_id:
+            return []
+        return [
+            WorkflowActionSpec(
+                desk="reporting",
+                action_type="agent_report_daily",
+                tool_id="astroq.agent.report.daily",
+                risk_level="write_artifact",
+                summary="Generate a daily CEO brief report artifact after CEO approval.",
+                expected_effect="Writes a local evidence-cited CEO report artifact only after explicit approval.",
+                parameters={"session_id": session_id},
+                evidence=WorkflowEvidenceSpec(
+                    label="CEO report artifacts",
+                    uri="/",
+                    summary="Open CEO Office report cards and artifact evidence.",
+                ),
+            )
+        ]
     if desk == "data" and _is_data_repair_request(normalized_content):
         table = _extract_repair_table(normalized_content)
         if table:

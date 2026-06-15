@@ -497,8 +497,8 @@ Notification rules:
 
 `GET /api/agent/policies`, `astroq agent policies --json`, and CEO Office
 render the same policy rows. `read_only` and `dry_run` default to `auto_run`.
-`write_data`, `write_config`, `run_backtest`, `paper_order`, and `live_order`
-default to `approval_required`. `code_change` defaults to
+`write_data`, `write_config`, `write_artifact`, `run_backtest`,
+`paper_order`, and `live_order` default to `approval_required`. `code_change` defaults to
 `work_order_required`, because the Web runtime may create engineering work
 orders but must not edit the repository directly.
 
@@ -878,8 +878,9 @@ Paper cancel rules:
 | --- | --- | --- |
 | `read_only` | Health check, data status, source diff, strategy catalog. | Auto-run. |
 | `dry_run` | Repair dry-run, execution dry-run, backtest dry-run. | Auto-run if bounded and non-mutating. |
-| `write_data` | Backfill, repair, artifact regeneration that updates official evidence. | Approval required. |
+| `write_data` | Backfill and DataHub repair writes. | Approval required. |
 | `write_config` | Settings updates, strategy parameter changes. | Approval required with diff evidence. |
+| `write_artifact` | Agent-generated CEO report or audit artifact writes. | Approval required before writing local evidence. |
 | `run_backtest` | Full strategy competition or official evidence generation. | Approval required when long-running or official. |
 | `paper_order` | PaperBroker order submission. | Approval required with risk gate pass. |
 | `live_order` | MiniQMT/QMT order submission. | Approval required, live enabled, broker ready, risk gate pass, kill switch available. |

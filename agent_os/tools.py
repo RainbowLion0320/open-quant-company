@@ -127,6 +127,15 @@ DEFAULT_TOOLS: dict[str, ToolDescriptor] = {
         risk_level="dry_run",
         desk_scopes=["research"],
     ),
+    "astroq.agent.report.daily": ToolDescriptor(
+        tool_id="astroq.agent.report.daily",
+        label="Daily CEO report",
+        command=_astroq_command("agent", "report", "daily", "--session", "{session_id}", "--json"),
+        risk_level="write_artifact",
+        desk_scopes=["reporting"],
+        requires_approved_action=True,
+        parameter_patterns={"session_id": r"^ses_[A-Za-z0-9]+$"},
+    ),
     "astroq.data.repair": ToolDescriptor(
         tool_id="astroq.data.repair",
         label="Data repair",

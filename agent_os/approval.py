@@ -8,6 +8,7 @@ AUTO_RUN_RISK_LEVELS = {"read_only", "dry_run"}
 APPROVAL_RISK_LEVELS = {
     "write_data",
     "write_config",
+    "write_artifact",
     "run_backtest",
     "paper_order",
     "live_order",
@@ -19,6 +20,7 @@ RISK_LEVEL_ORDER = [
     "dry_run",
     "write_data",
     "write_config",
+    "write_artifact",
     "run_backtest",
     "paper_order",
     "live_order",
@@ -61,6 +63,15 @@ APPROVAL_POLICIES: dict[str, ApprovalPolicy] = {
         required_role="ceo",
         expires_after_seconds=ACTION_EXPIRES_AFTER_SECONDS,
         reason="Configuration changes require CEO approval and diff evidence.",
+        approval_required=True,
+    ),
+    "write_artifact": ApprovalPolicy(
+        policy_id="agent_policy.write_artifact",
+        risk_level="write_artifact",
+        default_decision="approval_required",
+        required_role="ceo",
+        expires_after_seconds=ACTION_EXPIRES_AFTER_SECONDS,
+        reason="Agent-generated report or audit artifacts require CEO approval before writing local evidence.",
         approval_required=True,
     ),
     "run_backtest": ApprovalPolicy(

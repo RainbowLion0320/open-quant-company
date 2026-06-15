@@ -2979,6 +2979,7 @@ class AgentRuntime:
         open_handoffs = [handoff for handoff in handoffs if str(handoff.get("status") or "") == "open"]
         open_work_orders = [order for order in work_orders if str(order.get("status") or "") in {"open", "in_progress"}]
         return {
+            "session_id": session_id,
             "active_actions": active_actions,
             "open_handoffs": open_handoffs,
             "open_work_orders": open_work_orders,

@@ -77,6 +77,7 @@ DESKS: list[dict[str, Any]] = [
             "astroq.lifecycle.check",
             "astroq.data.status",
             "astroq.strategy.catalog",
+            "astroq.agent.report.daily",
         ],
         "forbidden_actions": ["write_config", "write_data", "paper_order", "live_order", "code_change"],
         "evidence_required": ["lifecycle_readiness", "data_status", "strategy_catalog"],
