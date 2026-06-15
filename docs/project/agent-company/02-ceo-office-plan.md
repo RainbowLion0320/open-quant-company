@@ -162,6 +162,7 @@ Chinese and English strings must be maintained together. The Chinese wording sho
 - The selected action subscribes to the latest run's event snapshot SSE stream and updates the run timeline without reloading the whole page.
 - A user message appears in the timeline and is persisted.
 - The user can choose the target desk for a CEO message from the registered desk list.
+- The user can explicitly paste a semantic planner JSON draft, preview or send it through the same CEO message path, and see invalid JSON rejected before any API call.
 - The user can run proposed read-only checks for the active session from the CEO Office, with run/skipped/failed counts visible.
 - The desk rail supports drill-down: selecting a desk shows its mandate, allowed tools, forbidden actions, evidence requirements, related actions, and related handoffs.
 - The CEO Office shows explicit approval policy rows so users can inspect which risk levels auto-run, require approval, or require engineering work orders.

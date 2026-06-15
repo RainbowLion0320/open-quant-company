@@ -119,6 +119,18 @@
           <button class="btn btn-ghost" type="button" :disabled="planningWorkflow || !draft.trim()" @click="previewWorkflowPlan">
             {{ t("ceoOffice.previewPlan") }}
           </button>
+          <label class="semantic-draft-toggle">
+            <input v-model="semanticDraftEnabled" type="checkbox" />
+            <span>{{ t("ceoOffice.semanticDraft") }}</span>
+          </label>
+          <div v-if="semanticDraftEnabled" class="semantic-draft-control">
+            <textarea
+              v-model="semanticDraftText"
+              :placeholder="t('ceoOffice.semanticDraftPlaceholder')"
+              rows="5"
+            />
+            <small v-if="semanticDraftError">{{ semanticDraftError }}</small>
+          </div>
         </form>
         <div v-if="workflowPlan" class="workflow-plan">
           <header>
@@ -863,6 +875,9 @@ const selectedReportKind = ref("daily_brief");
 const selectedDraftDesk = ref("reporting");
 const selectedDeskId = ref("reporting");
 const draft = ref("");
+const semanticDraftEnabled = ref(false);
+const semanticDraftText = ref("");
+const semanticDraftError = ref("");
 const sending = ref(false);
 const planningWorkflow = ref(false);
 const error = ref("");
@@ -1066,6 +1081,30 @@ function formatNumber(value: unknown) {
   return numeric.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+function parseSemanticDraft(): Record<string, unknown> | null {
+  semanticDraftError.value = "";
+  if (!semanticDraftEnabled.value) return null;
+  try {
+    const parsed = JSON.parse(semanticDraftText.value.trim());
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      semanticDraftError.value = t("ceoOffice.semanticDraftInvalid");
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    semanticDraftError.value = t("ceoOffice.semanticDraftInvalid");
+    return null;
+  }
+}
+
+function semanticPayload(semanticDraft: Record<string, unknown> | null) {
+  if (!semanticDraftEnabled.value || !semanticDraft) return {};
+  return {
+    planner_mode: "semantic_draft" as const,
+    semantic_draft: semanticDraft,
+  };
+}
+
 function closeSessionStream() {
   sessionStream.value?.abort();
   sessionStream.value = null;
@@ -1264,12 +1303,15 @@ async function ensureSession(): Promise<AgentSession> {
 async function previewWorkflowPlan() {
   const text = draft.value.trim();
   if (!text) return;
+  const semanticDraft = parseSemanticDraft();
+  if (semanticDraftEnabled.value && !semanticDraft) return;
   planningWorkflow.value = true;
   error.value = "";
   try {
     const payload = await api.agentPlan({
       desk: selectedDraftDesk.value,
       content: text,
+      ...semanticPayload(semanticDraft),
     });
     workflowPlan.value = payload.plan;
   } catch (err: any) {
@@ -1282,6 +1324,8 @@ async function previewWorkflowPlan() {
 async function sendMessage() {
   const text = draft.value.trim();
   if (!text) return;
+  const semanticDraft = parseSemanticDraft();
+  if (semanticDraftEnabled.value && !semanticDraft) return;
   sending.value = true;
   error.value = "";
   try {
@@ -1290,6 +1334,7 @@ async function sendMessage() {
       role: "ceo",
       desk: selectedDraftDesk.value,
       content: text,
+      ...semanticPayload(semanticDraft),
     });
     draft.value = "";
     workflowPlan.value = null;

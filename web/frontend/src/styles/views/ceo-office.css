@@ -154,14 +154,54 @@
 
 .message-composer {
   display: grid;
-  grid-template-columns: minmax(140px, 0.28fr) minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(140px, 0.26fr) minmax(0, 1fr) auto auto auto;
   align-items: end;
   gap: 10px;
 }
 
 .message-composer input,
-.message-composer select {
+.message-composer select,
+.message-composer textarea {
   width: 100%;
+}
+
+.semantic-draft-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.semantic-draft-toggle input {
+  width: 14px;
+  height: 14px;
+}
+
+.semantic-draft-control {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 6px;
+}
+
+.semantic-draft-control textarea {
+  min-height: 118px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 9px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.semantic-draft-control small {
+  color: #f87171;
+  font-size: 11px;
 }
 
 .desk-target-control {
