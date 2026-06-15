@@ -159,13 +159,17 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentLiveKillSwitchActivate" in view
     assert "api.agentLiveKillSwitchDeactivate" in view
     assert "api.agentLiveReconciliation" in view
+    assert "api.agentLiveMonitor" in view
     assert "liveReadiness" in view
     assert "liveEnvironment" in view
     assert "liveEnvironmentChecks" in view
     assert "liveKillSwitch" in view
     assert "liveReconciliation" in view
+    assert "liveMonitor" in view
     assert "operateLiveKillSwitch" in view
     assert "runLiveReconciliation" in view
+    assert "runLiveMonitor" in view
+    assert "runningLiveMonitor" in view
     assert "ceoOffice.liveReadiness" in view
     assert "ceoOffice.liveEnvironment" in view
     assert "ceoOffice.environmentChecks" in view
@@ -174,6 +178,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.deactivateKillSwitch" in view
     assert "ceoOffice.runLiveReconciliation" in view
     assert "ceoOffice.liveReconciliation" in view
+    assert "ceoOffice.runLiveMonitor" in view
+    assert "ceoOffice.liveMonitor" in view
+    assert "ceoOffice.liveMonitorFailed" in view
     assert "reports" in view
     assert "reportSectionPreview" in view
     assert "report.sections" in view
@@ -190,7 +197,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.sessionCount" in view
     assert "ceoOffice.reports" in view
     assert "报告要点" in zh_ceo
+    assert "实盘监控" in zh_ceo
     assert "Report Sections" in en_ceo
+    assert "Run Live Monitor" in en_ceo
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
     assert "ceoOffice.paperReconciliation" in view
@@ -417,9 +426,11 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentLiveKillSwitchActivate" in agent_api
     assert "agentLiveKillSwitchDeactivate" in agent_api
     assert "agentLiveReconciliation" in agent_api
+    assert "agentLiveMonitor" in agent_api
     assert "/api/agent/live/environment" in agent_api
     assert "/api/agent/live/kill-switch" in agent_api
     assert "/api/agent/live/reconciliation" in agent_api
+    assert "/api/agent/live/monitor" in agent_api
     assert "export interface AgentSession" in agent_types
     assert "export interface AgentReadOnlyWorkflow" in agent_types
     assert "export interface AgentReadOnlyWorkflowResponse" in agent_types
@@ -439,6 +450,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentLiveKillSwitchResponse" in agent_types
     assert "export interface AgentLiveReconciliation" in agent_types
     assert "export interface AgentLiveReconciliationResponse" in agent_types
+    assert "export interface AgentLiveMonitor" in agent_types
+    assert "export interface AgentLiveMonitorResponse" in agent_types
     assert "live_kill_switch?: AgentLiveKillSwitch" in agent_types
     assert "export interface AgentAction" in agent_types
     assert "export interface AgentRunEvent" in agent_types

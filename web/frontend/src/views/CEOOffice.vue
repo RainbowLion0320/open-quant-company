@@ -385,6 +385,10 @@
               <code>{{ liveEnvironment?.status || "unknown" }}</code>
             </div>
             <div class="detail-row">
+              <span>{{ t("ceoOffice.liveMonitor") }}</span>
+              <code>{{ liveMonitor?.status || t("ceoOffice.unknown") }}</code>
+            </div>
+            <div class="detail-row">
               <span>{{ t("ceoOffice.environmentChecks") }}</span>
               <div v-if="!liveEnvironmentChecks.length" class="ceo-empty compact">
                 {{ t("ceoOffice.noEnvironmentChecks") }}
@@ -425,6 +429,14 @@
               <button
                 class="btn btn-xs"
                 type="button"
+                :disabled="runningLiveMonitor"
+                @click="runLiveMonitor"
+              >
+                {{ t("ceoOffice.runLiveMonitor") }}
+              </button>
+              <button
+                class="btn btn-xs"
+                type="button"
                 :disabled="runningLiveReconciliation"
                 @click="runLiveReconciliation"
               >
@@ -440,6 +452,14 @@
                 {{ t("ceoOffice.blocked") }} {{ liveReconciliation.blocked_count }}
               </strong>
               <small>{{ liveReconciliation.checked_at }}</small>
+            </div>
+            <div v-if="liveMonitor" class="rhythm-status">
+              <span>{{ t("ceoOffice.liveMonitor") }}</span>
+              <strong>
+                {{ statusLabel(liveMonitor.status) }} ·
+                {{ t("ceoOffice.liveReconciliation") }} {{ statusLabel(liveMonitor.reconciliation.status) }}
+              </strong>
+              <small>{{ liveMonitor.checked_at }}</small>
             </div>
             <div class="detail-row">
               <span>{{ t("ceoOffice.blockers") }}</span>
@@ -788,7 +808,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -807,6 +827,7 @@ const liveReadiness = ref<AgentLiveReadiness | null>(null);
 const liveEnvironment = ref<AgentLiveEnvironment | null>(null);
 const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
+const liveMonitor = ref<AgentLiveMonitor | null>(null);
 const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
 const workflowPlan = ref<AgentWorkflowPlan | null>(null);
 const sessionStream = ref<AbortController | null>(null);
@@ -837,6 +858,7 @@ const runningScheduledRhythm = ref(false);
 const notifyingReport = ref("");
 const operatingLiveKillSwitch = ref<"activate" | "deactivate" | "">("");
 const runningLiveReconciliation = ref(false);
+const runningLiveMonitor = ref(false);
 const selectedReportKind = ref("daily_brief");
 const selectedDraftDesk = ref("reporting");
 const selectedDeskId = ref("reporting");
@@ -1449,6 +1471,26 @@ async function runLiveReconciliation() {
     error.value = `${t("ceoOffice.liveReconciliationFailed")}: ${err?.message || err}`;
   } finally {
     runningLiveReconciliation.value = false;
+  }
+}
+
+async function runLiveMonitor() {
+  runningLiveMonitor.value = true;
+  error.value = "";
+  try {
+    const payload = await api.agentLiveMonitor({
+      session_id: activeSession.value?.session_id || undefined,
+    });
+    liveMonitor.value = payload.monitor;
+    liveKillSwitch.value = payload.monitor.kill_switch || liveKillSwitch.value;
+    liveReconciliation.value = payload.monitor.reconciliation;
+    if (payload.monitor.evidence?.evidence_id) {
+      await loadEvidence(payload.monitor.evidence.evidence_id);
+    }
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.liveMonitorFailed")}: ${err?.message || err}`;
+  } finally {
+    runningLiveMonitor.value = false;
   }
 }
 
