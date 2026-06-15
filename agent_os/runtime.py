@@ -90,6 +90,30 @@ def _dataclass_to_dict(value: Any) -> dict[str, Any]:
     return dict(getattr(value, "__dict__", {}))
 
 
+def _safe_agent_payload(value: Any, *, depth: int = 0) -> Any:
+    if depth > 5:
+        return "<truncated>"
+    if is_dataclass(value):
+        return _safe_agent_payload(asdict(value), depth=depth + 1)
+    if isinstance(value, dict):
+        return {
+            str(key): _safe_agent_field(str(key), item, depth=depth + 1)
+            for key, item in sorted(value.items(), key=lambda entry: str(entry[0]))
+        }
+    if isinstance(value, (list, tuple)):
+        return [_safe_agent_payload(item, depth=depth + 1) for item in list(value)[:50]]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _safe_agent_field(key: str, value: Any, *, depth: int) -> Any:
+    normalized = key.lower()
+    if any(token in normalized for token in ("secret", "token", "password", "api_key", "apikey", "authorization")):
+        return "***"
+    return _safe_agent_payload(value, depth=depth)
+
+
 def _optional_float(value: Any) -> float | None:
     if value is None or value == "":
         return None
@@ -2820,6 +2844,14 @@ class AgentRuntime:
         )
         evidence_refs: list[str] = []
         proposed_actions: list[str] = []
+        semantic_audit = self._write_semantic_planner_audit_evidence(
+            session_id=session_id,
+            source_message_id=source_message_id,
+            content=content,
+            plan=plan,
+        )
+        if semantic_audit is not None:
+            evidence_refs.append(semantic_audit.evidence_id)
         for action_spec in plan.actions:
             evidence = self.create_evidence(
                 kind="web_route",
@@ -2860,6 +2892,63 @@ class AgentRuntime:
             blockers=plan.blockers,
             handoffs=plan.handoffs,
             reasoning=[*plan.reasoning, self._session_context_reasoning(session_id)],
+        )
+
+    def _write_semantic_planner_audit_evidence(
+        self,
+        *,
+        session_id: str,
+        source_message_id: str,
+        content: str,
+        plan: Any,
+    ) -> EvidenceRef | None:
+        if str(getattr(plan, "planning_mode", "")) != "semantic_assisted":
+            return None
+        reasoning = list(getattr(plan, "reasoning", []) or [])
+        semantic_row = next(
+            (row for row in reasoning if isinstance(row, dict) and row.get("kind") == "semantic_planner"),
+            {},
+        )
+        actions = list(getattr(plan, "actions", []) or [])
+        payload = {
+            "generated_at": _now(),
+            "session_id": session_id,
+            "source_message_id": source_message_id,
+            "desk": str(getattr(plan, "desk", "")),
+            "planning_mode": str(getattr(plan, "planning_mode", "")),
+            "confidence": float(getattr(plan, "confidence", 0.0) or 0.0),
+            "content_length": len(content),
+            "accepted_action_count": int(semantic_row.get("accepted_action_count") or len(actions)),
+            "rejected_action_count": int(semantic_row.get("rejected_action_count") or 0),
+            "blockers": _safe_agent_payload(list(getattr(plan, "blockers", []) or [])),
+            "reasoning": _safe_agent_payload(reasoning),
+            "actions": _safe_agent_payload(
+                [
+                    {
+                        "desk": getattr(action, "desk", ""),
+                        "tool_id": getattr(action, "tool_id", ""),
+                        "risk_level": getattr(action, "risk_level", ""),
+                        "action_type": getattr(action, "action_type", ""),
+                        "summary": getattr(action, "summary", ""),
+                        "parameters": getattr(action, "parameters", {}),
+                    }
+                    for action in actions
+                ]
+            ),
+        }
+        root = get_datahub().artifact_dir("agent") / "semantic_plans"
+        root.mkdir(parents=True, exist_ok=True)
+        filename_ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        path = root / f"semantic_plan-{filename_ts}-{uuid.uuid4().hex[:8]}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return self.create_evidence(
+            kind="artifact",
+            label="Semantic planner audit",
+            uri=str(path),
+            summary=(
+                f"Semantic planner accepted {payload['accepted_action_count']} action(s) "
+                f"and rejected {payload['rejected_action_count']} action(s)."
+            ),
         )
 
     def _session_context_reasoning(self, session_id: str) -> dict[str, Any]:

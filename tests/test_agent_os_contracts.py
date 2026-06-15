@@ -4911,18 +4911,8 @@ def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_p
         ]
     )
     cli_payload = json.loads(capsys.readouterr().out)
-    message_res = client.post(
-        f"/api/agent/sessions/{session.session_id}/messages",
-        json={
-            "role": "ceo",
-            "desk": "reporting",
-            "content": "按这个外部 planner 草案创建安全行动卡",
-            "planner_mode": "semantic_draft",
-            "semantic_draft": semantic_draft,
-        },
-    )
-
     assert before_summary == after_summary
+    assert runtime.ledger.list_evidence() == []
     assert api_res.status_code == 200
     api_plan = api_res.json()["plan"]
     assert api_plan["planning_mode"] == "semantic_assisted"
@@ -4949,6 +4939,17 @@ def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_p
         "astroq.test.design",
     ]
 
+    message_res = client.post(
+        f"/api/agent/sessions/{session.session_id}/messages",
+        json={
+            "role": "ceo",
+            "desk": "reporting",
+            "content": "按这个外部 planner 草案创建安全行动卡",
+            "planner_mode": "semantic_draft",
+            "semantic_draft": semantic_draft,
+        },
+    )
+
     assert message_res.status_code == 200
     response = message_res.json()["desk_response"]
     assert response["blockers"] == api_plan["blockers"]
@@ -4958,6 +4959,19 @@ def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_p
         "astroq.test.design",
     ]
     assert all(action["risk_level"] == "read_only" for action in persisted_actions)
+    response_evidence = [runtime.ledger.get_evidence(evidence_id) for evidence_id in response["evidence_refs"]]
+    audit_evidence = [row for row in response_evidence if row and row["label"] == "Semantic planner audit"]
+    assert len(audit_evidence) == 1
+    audit_path = Path(audit_evidence[0]["uri"])
+    audit_payload = json.loads(audit_path.read_text(encoding="utf-8"))
+    assert audit_evidence[0]["kind"] == "artifact"
+    assert Path(audit_evidence[0]["snapshot_uri"]).exists()
+    assert audit_payload["planning_mode"] == "semantic_assisted"
+    assert audit_payload["desk"] == "reporting"
+    assert audit_payload["accepted_action_count"] == 2
+    assert audit_payload["rejected_action_count"] == 2
+    assert audit_payload["blockers"] == api_plan["blockers"]
+    assert "api_key" not in json.dumps(audit_payload, ensure_ascii=False)
     reset_datahub()
 
 
