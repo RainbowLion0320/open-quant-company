@@ -337,6 +337,14 @@ def build_desk_workflow_plan(
         desk == "data" and (_mentions_data_source_gap(normalized) or _is_data_repair_request(normalized))
     ) or (
         desk == "risk" and _mentions_lifecycle(normalized)
+    ) or (
+        desk == "engineering"
+        and (
+            _mentions_test_design(normalized)
+            or _mentions_ast_diagnostics(normalized)
+            or _is_engineering_code_request(normalized)
+            or any(token in normalized for token in ("docs", "doc", "文档", "stale"))
+        )
     ):
         evidence_summary = _artifact_evidence_summary(artifact_context or {})
         if evidence_summary:

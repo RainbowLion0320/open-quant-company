@@ -4361,6 +4361,12 @@ def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monke
             "summary": {"blocked": 1},
             "blockers": [{"dimension": "stock_limit_list", "reason": "rate_limited"}],
         },
+        "architecture/ast/latest.json": {
+            "summary": {"issue_count": 2, "severity_counts": {"P1": 1, "P2": 1}},
+        },
+        "tests/design/latest.json": {
+            "summary": {"design_risk_count": 4},
+        },
     }
     for relative, payload in payloads.items():
         path = artifact_root / relative
@@ -4410,6 +4416,14 @@ def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monke
     ]
     assert "IC/ICIR" in research_result["desk_response"].answer
     assert "test design" in engineering_result["desk_response"].answer.lower()
+    assert "2 AST" in engineering_result["desk_response"].answer
+    assert "P1=1" in engineering_result["desk_response"].answer
+    assert "4 test design" in engineering_result["desk_response"].answer
+    engineering_reasoning = {row["kind"]: row for row in engineering_result["desk_response"].reasoning}
+    assert "engineering: 2 AST issue(s), P1=1, P2=1" in engineering_reasoning["artifact_context"][
+        "evidence_summary"
+    ]
+    assert "testing: 4 test design risk(s)" in engineering_reasoning["artifact_context"]["evidence_summary"]
     assert "docs check" in docs_result["desk_response"].answer.lower()
     reset_datahub()
 
