@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import queue
 import shutil
 import subprocess
+import threading
+import time
 import uuid
 from dataclasses import asdict, is_dataclass
 from datetime import date
@@ -497,6 +500,7 @@ class AgentRuntime:
         artifact_refs: list[str] | None = None,
         run_id: str | None = None,
         started_at: str | None = None,
+        record_output_events: bool = True,
     ) -> AgentRun:
         if not self.ledger.get_action(action_id):
             raise KeyError(f"Agent action not found: {action_id}")
@@ -515,7 +519,7 @@ class AgentRuntime:
             artifact_refs=list(artifact_refs or []),
         )
         self.ledger.insert_run(run.to_dict())
-        if stdout_summary:
+        if record_output_events and stdout_summary:
             self.record_run_event(
                 run.run_id,
                 action_id=action_id,
@@ -524,7 +528,7 @@ class AgentRuntime:
                 message=stdout_summary,
                 payload={"stream": "stdout", "length": len(stdout_summary)},
             )
-        if stderr_summary:
+        if record_output_events and stderr_summary:
             self.record_run_event(
                 run.run_id,
                 action_id=action_id,
@@ -665,7 +669,17 @@ class AgentRuntime:
             message="Tool command started.",
             payload={"tool_name": tool_name, "timeout_seconds": timeout_seconds},
         )
-        run_callable = runner or subprocess.run
+        if runner is None:
+            return self._dispatch_subprocess_action(
+                action_id=action_id,
+                tool_name=tool_name,
+                command=command,
+                run_id=run_id,
+                started_at=started_at,
+                timeout_seconds=timeout_seconds,
+            )
+
+        run_callable = runner
         try:
             result = run_callable(
                 command,
@@ -712,6 +726,122 @@ class AgentRuntime:
                 stderr_summary=str(exc),
                 run_id=run_id,
                 started_at=started_at,
+            )
+
+    def _dispatch_subprocess_action(
+        self,
+        *,
+        action_id: str,
+        tool_name: str,
+        command: list[str],
+        run_id: str,
+        started_at: str,
+        timeout_seconds: int,
+    ) -> AgentRun:
+        output_queue: queue.Queue[tuple[str, str]] = queue.Queue()
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
+
+        def read_stream(stream_name: str, stream: Any) -> None:
+            try:
+                for line in iter(stream.readline, ""):
+                    if line == "":
+                        break
+                    output_queue.put((stream_name, line.rstrip("\r\n")))
+            finally:
+                stream.close()
+
+        def drain_output() -> None:
+            while True:
+                try:
+                    stream_name, message = output_queue.get_nowait()
+                except queue.Empty:
+                    return
+                if stream_name == "stdout":
+                    stdout_chunks.append(message)
+                else:
+                    stderr_chunks.append(message)
+                self.record_run_event(
+                    run_id,
+                    action_id=action_id,
+                    event_type=stream_name,
+                    status="running",
+                    message=message,
+                    payload={"stream": stream_name, "length": len(message), "chunk": True},
+                )
+
+        try:
+            process = subprocess.Popen(  # noqa: S603 - command comes from fixed AgentToolRegistry arrays.
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+            )
+            threads = [
+                threading.Thread(target=read_stream, args=("stdout", process.stdout), daemon=True),
+                threading.Thread(target=read_stream, args=("stderr", process.stderr), daemon=True),
+            ]
+            for thread in threads:
+                thread.start()
+
+            deadline = time.monotonic() + timeout_seconds
+            timed_out = False
+            while process.poll() is None:
+                drain_output()
+                if time.monotonic() > deadline:
+                    timed_out = True
+                    process.kill()
+                    break
+                time.sleep(0.02)
+
+            return_code = process.wait(timeout=1)
+            for thread in threads:
+                thread.join(timeout=1)
+            drain_output()
+
+            if timed_out:
+                self.ledger.update_action_status(action_id, "failed", _now())
+                return self.record_run(
+                    action_id=action_id,
+                    tool_name=tool_name,
+                    command=command,
+                    status="failed",
+                    return_code=None,
+                    stdout_summary=_summary("\n".join(stdout_chunks)),
+                    stderr_summary=f"timeout after {timeout_seconds}s",
+                    run_id=run_id,
+                    started_at=started_at,
+                    record_output_events=False,
+                )
+
+            status = "succeeded" if return_code == 0 else "failed"
+            self.ledger.update_action_status(action_id, status, _now())
+            return self.record_run(
+                action_id=action_id,
+                tool_name=tool_name,
+                command=command,
+                status=status,
+                return_code=return_code,
+                stdout_summary=_summary("\n".join(stdout_chunks)),
+                stderr_summary=_summary("\n".join(stderr_chunks)),
+                run_id=run_id,
+                started_at=started_at,
+                record_output_events=False,
+            )
+        except Exception as exc:
+            self.ledger.update_action_status(action_id, "failed", _now())
+            return self.record_run(
+                action_id=action_id,
+                tool_name=tool_name,
+                command=command,
+                status="failed",
+                return_code=None,
+                stdout_summary=_summary("\n".join(stdout_chunks)),
+                stderr_summary=str(exc),
+                run_id=run_id,
+                started_at=started_at,
+                record_output_events=False,
             )
 
     def run_session_read_only_actions(

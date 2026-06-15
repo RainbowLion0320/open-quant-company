@@ -1,4 +1,5 @@
 import json
+import sys
 from subprocess import CompletedProcess
 from pathlib import Path
 
@@ -3478,6 +3479,64 @@ def test_agent_dispatch_records_run_event_timeline(tmp_path, monkeypatch):
     reset_datahub()
 
 
+def test_agent_dispatch_streams_real_subprocess_output_as_run_events(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.tools import AgentToolRegistry, ToolDescriptor
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Streaming subprocess output")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="streaming_check",
+        risk_level="read_only",
+        summary="Run a streaming subprocess",
+        parameters={"tool_id": "astroq.health"},
+    )
+    registry = AgentToolRegistry(
+        {
+            "astroq.health": ToolDescriptor(
+                tool_id="astroq.health",
+                label="Streaming subprocess",
+                command=[
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys,time;"
+                        "print('alpha', flush=True);"
+                        "print('warn', file=sys.stderr, flush=True);"
+                        "time.sleep(0.05);"
+                        "print('omega', flush=True)"
+                    ),
+                ],
+                risk_level="read_only",
+                desk_scopes=["engineering"],
+            )
+        }
+    )
+
+    run = runtime.dispatch_action(action.action_id, tool_registry=registry, timeout_seconds=5)
+    loaded = runtime.get_run(run.run_id)
+
+    assert run.status == "succeeded"
+    assert run.stdout_summary.strip() == "alpha\nomega"
+    assert run.stderr_summary.strip() == "warn"
+    event_types = [event["event_type"] for event in loaded["events"]]
+    assert event_types[:2] == ["queued", "running"]
+    assert event_types[-1] == "succeeded"
+    assert event_types.count("stdout") == 2
+    assert event_types.count("stderr") == 1
+    assert [event["message"] for event in loaded["events"] if event["event_type"] == "stdout"] == ["alpha", "omega"]
+    assert [event["message"] for event in loaded["events"] if event["event_type"] == "stderr"] == ["warn"]
+    assert loaded["events"][-1]["payload"]["return_code"] == 0
+    reset_datahub()
+
+
 def test_agent_run_events_are_exposed_by_api_and_action_cli(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
@@ -3856,30 +3915,41 @@ def test_agent_cli_and_api_run_session_read_only_actions(tmp_path, monkeypatch, 
     from astrolabe_cli.main import run_cli
     from web.api.app import create_app
 
-    def fake_run(command, **kwargs):
-        return CompletedProcess(command, 0, stdout='{"batch": true}', stderr="")
-
-    monkeypatch.setattr("agent_os.runtime.subprocess.run", fake_run)
-
     runtime = AgentRuntime()
     cli_session = runtime.create_session(title="CLI readonly workflow")
-    runtime.submit_ceo_message(cli_session.session_id, desk="reporting", content="今天系统该做什么，给我 CEO 简报")
+    runtime.propose_action(
+        session_id=cli_session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Run CLI health check",
+        parameters={"tool_id": "astroq.health"},
+    )
 
     cli_code = run_cli(["agent", "session", "run-readonly", cli_session.session_id, "--json"])
     cli_payload = json.loads(capsys.readouterr().out)
 
     api_session = runtime.create_session(title="API readonly workflow")
-    runtime.submit_ceo_message(api_session.session_id, desk="reporting", content="今天系统该做什么，给我 CEO 简报")
+    runtime.propose_action(
+        session_id=api_session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Run API health check",
+        parameters={"tool_id": "astroq.health"},
+    )
     api_res = TestClient(create_app()).post(f"/api/agent/sessions/{api_session.session_id}/run-readonly")
 
     assert cli_code == 0
     assert cli_payload["data"]["workflow"]["status"] == "ready"
-    assert cli_payload["data"]["workflow"]["run_count"] == 3
-    assert cli_payload["data"]["workflow"]["succeeded_count"] == 3
+    assert cli_payload["data"]["workflow"]["run_count"] == 1
+    assert cli_payload["data"]["workflow"]["succeeded_count"] == 1
+    assert cli_payload["data"]["workflow"]["runs"][0]["events"][2]["event_type"] == "stdout"
     assert api_res.status_code == 200
     assert api_res.json()["workflow"]["status"] == "ready"
-    assert api_res.json()["workflow"]["run_count"] == 3
-    assert api_res.json()["workflow"]["succeeded_count"] == 3
+    assert api_res.json()["workflow"]["run_count"] == 1
+    assert api_res.json()["workflow"]["succeeded_count"] == 1
+    assert api_res.json()["workflow"]["runs"][0]["events"][2]["event_type"] == "stdout"
     reset_datahub()
 
 
