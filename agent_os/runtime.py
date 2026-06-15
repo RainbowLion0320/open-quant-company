@@ -1080,6 +1080,81 @@ class AgentRuntime:
             },
         }
 
+    def run_autonomy_loop(
+        self,
+        session_id: str,
+        *,
+        content: str = "",
+        desk: str = "reporting",
+        max_steps: int = 2,
+        semantic_planner: Any | None = None,
+        runner: Any | None = None,
+        timeout_seconds: int = 120,
+        tool_registry: AgentToolRegistry | None = None,
+    ) -> dict[str, Any]:
+        """Run a bounded multi-step autonomy loop within fixed-registry limits."""
+        if not self.ledger.get_session(session_id):
+            raise KeyError(f"Agent session not found: {session_id}")
+        try:
+            step_limit = int(max_steps)
+        except (TypeError, ValueError):
+            raise ValueError("max_steps must be an integer")
+        if step_limit < 1:
+            raise ValueError("max_steps must be at least 1")
+        step_limit = min(step_limit, 5)
+
+        steps: list[dict[str, Any]] = []
+        stop_reason = "max_steps_reached"
+        for step_index in range(1, step_limit + 1):
+            step = self.run_autonomy_step(
+                session_id,
+                content=content,
+                desk=desk,
+                semantic_planner=semantic_planner,
+                runner=runner,
+                timeout_seconds=timeout_seconds,
+                tool_registry=tool_registry,
+            )
+            step["step_index"] = step_index
+            steps.append(step)
+            if step["failed_count"] or step["blocked_count"]:
+                stop_reason = "step_not_ready"
+                break
+            if step["run_count"] == 0:
+                stop_reason = "no_runnable_actions"
+                break
+
+        failed_count = sum(int(step.get("failed_count") or 0) for step in steps)
+        blocked_count = sum(int(step.get("blocked_count") or 0) for step in steps)
+        run_count = sum(int(step.get("run_count") or 0) for step in steps)
+        skipped_count = sum(int(step.get("skipped_count") or 0) for step in steps)
+        action_count = sum(int(step.get("action_count") or 0) for step in steps)
+        status = "ready" if failed_count == 0 and blocked_count == 0 else "partial"
+        semantic = any(str(step.get("mode") or "") == "bounded_semantic_fixed_registry" for step in steps)
+        return {
+            "status": status,
+            "mode": "bounded_semantic_fixed_registry_loop" if semantic else "bounded_fixed_registry_loop",
+            "session_id": session_id,
+            "desk": desk,
+            "checked_at": _now(),
+            "max_steps": step_limit,
+            "step_count": len(steps),
+            "stop_reason": stop_reason,
+            "action_count": action_count,
+            "run_count": run_count,
+            "failed_count": failed_count,
+            "blocked_count": blocked_count,
+            "skipped_count": skipped_count,
+            "steps": steps,
+            "boundary": {
+                "allowed_risk_levels": ["read_only", "dry_run"],
+                "fixed_registry_only": True,
+                "approval_required_actions_skipped": True,
+                "writes_and_trades_skipped": True,
+                "max_steps_cap": 5,
+            },
+        }
+
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         run = self.ledger.get_run(run_id)
         return self._run_with_events(run) if run else None

@@ -129,6 +129,54 @@ def autonomy_step(
     )
 
 
+def autonomy_run(
+    session_id: str,
+    text: str,
+    desk: str = "reporting",
+    semantic_draft_file: str = "",
+    *,
+    max_steps: int = 2,
+    provider_semantic: bool = False,
+    planner_provider: str = "",
+    planner_model: str = "",
+) -> CliResult:
+    try:
+        run = AgentRuntime().run_autonomy_loop(
+            session_id,
+            content=text,
+            desk=desk,
+            max_steps=max_steps,
+            semantic_planner=semantic_planner_from_cli(
+                semantic_draft_file=semantic_draft_file,
+                provider_semantic=provider_semantic,
+                planner_provider=planner_provider,
+                planner_model=planner_model,
+            ),
+        )
+    except KeyError as exc:
+        return CliResult(False, "agent autonomy run", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    except ValueError as exc:
+        return CliResult(
+            False,
+            "agent autonomy run",
+            {"session_id": session_id, "desk": desk, "max_steps": max_steps},
+            "Agent autonomy run invalid",
+            [str(exc)],
+        )
+    ok = run["status"] in {"ready", "partial"}
+    return CliResult(
+        ok=ok,
+        command="agent autonomy run",
+        message=(
+            f"Bounded autonomy run {run['status']}: "
+            f"{run['step_count']} step(s), ran {run['run_count']} action(s), "
+            f"stop={run['stop_reason']}"
+        ),
+        data={"run": run},
+        errors=[] if ok else [str(run["status"])],
+    )
+
+
 def add_message(
     session_id: str,
     desk: str,

@@ -469,6 +469,138 @@ def test_agent_autonomy_step_accepts_semantic_draft_then_runs_only_filtered_safe
     reset_datahub()
 
 
+def test_agent_autonomy_run_repeats_bounded_steps_until_max_steps(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Bounded autonomy loop", default_desk="reporting")
+
+    run = runtime.run_autonomy_loop(
+        session.session_id,
+        content="检查数据源、策略 OOS、lifecycle gate、execution dry-run 和测试设计；自动跑安全项",
+        max_steps=2,
+        runner=fake_run,
+    )
+
+    assert run["status"] == "ready"
+    assert run["mode"] == "bounded_fixed_registry_loop"
+    assert run["stop_reason"] == "max_steps_reached"
+    assert run["step_count"] == 2
+    assert run["run_count"] == 10
+    assert run["skipped_count"] == 0
+    assert [step["step_index"] for step in run["steps"]] == [1, 2]
+    assert [step["run_count"] for step in run["steps"]] == [5, 5]
+    assert [command[1:] for command in calls] == [
+        ["data", "sources", "diff-registry", "--json"],
+        ["strategy", "compete", "--json"],
+        ["lifecycle", "check", "--json"],
+        ["execution", "dry-run", "--json"],
+        ["test", "design", "--json"],
+        ["data", "sources", "diff-registry", "--json"],
+        ["strategy", "compete", "--json"],
+        ["lifecycle", "check", "--json"],
+        ["execution", "dry-run", "--json"],
+        ["test", "design", "--json"],
+    ]
+    reset_datahub()
+
+
+def test_agent_autonomy_run_stops_when_no_runnable_actions_and_surfaces_cli_api(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import SemanticDraftPlanner
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    unsafe_draft = {
+        "answer": "Only write or unknown actions are proposed.",
+        "confidence": 0.73,
+        "actions": [
+            {
+                "desk": "data",
+                "tool_id": "astroq.data.repair",
+                "summary": "Unsafe write must stay queued.",
+                "parameters": {"table": "stock_valuation"},
+            },
+            {"desk": "risk", "tool_id": "astroq.unknown.tool"},
+        ],
+    }
+    draft_path = tmp_path / "semantic-autonomy-run.json"
+    draft_path.write_text(json.dumps(unsafe_draft, ensure_ascii=False), encoding="utf-8")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Blocked autonomy loop", default_desk="reporting")
+    run = runtime.run_autonomy_loop(
+        session.session_id,
+        content="尝试自主推进，但不能自动写数据或运行未知工具",
+        max_steps=3,
+        semantic_planner=SemanticDraftPlanner(unsafe_draft),
+    )
+
+    assert run["status"] == "ready"
+    assert run["mode"] == "bounded_semantic_fixed_registry_loop"
+    assert run["stop_reason"] == "no_runnable_actions"
+    assert run["step_count"] == 1
+    assert run["run_count"] == 0
+    assert run["steps"][0]["desk_response"]["planning_mode"] == "semantic_assisted"
+    assert "unsafe_semantic_actions_filtered" in run["steps"][0]["desk_response"]["blockers"]
+
+    cli_code = run_cli(
+        [
+            "agent",
+            "autonomy",
+            "run",
+            "--session",
+            session.session_id,
+            "--text",
+            "尝试自主推进，但不能自动写数据或运行未知工具",
+            "--max-steps",
+            "3",
+            "--semantic-draft-file",
+            str(draft_path),
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(
+        f"/api/agent/sessions/{session.session_id}/autonomy-run",
+        json={
+            "content": "尝试自主推进，但不能自动写数据或运行未知工具",
+            "max_steps": 3,
+            "planner_mode": "semantic_draft",
+            "semantic_draft": unsafe_draft,
+        },
+    )
+
+    assert cli_code == 0
+    assert cli_payload["data"]["run"]["stop_reason"] == "no_runnable_actions"
+    assert cli_payload["data"]["run"]["run_count"] == 0
+    assert api_res.status_code == 200
+    assert api_res.json()["run"]["stop_reason"] == "no_runnable_actions"
+    assert api_res.json()["run"]["run_count"] == 0
+    reset_datahub()
+
+
 def test_agent_run_stream_snapshot_and_sse_once_api(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")

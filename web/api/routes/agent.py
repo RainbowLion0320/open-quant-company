@@ -112,6 +112,24 @@ async def run_agent_autonomy_step(session_id: str, payload: dict[str, Any] | Non
     return {"step": step}
 
 
+@router.post("/sessions/{session_id}/autonomy-run")
+async def run_agent_autonomy_run(session_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    body = payload or {}
+    try:
+        run = AgentRuntime().run_autonomy_loop(
+            session_id,
+            content=str(body.get("content") or body.get("text") or ""),
+            desk=str(body.get("desk") or "reporting"),
+            max_steps=int(body.get("max_steps") or 2),
+            semantic_planner=semantic_planner_from_payload(body),
+        )
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+    except ValueError as exc:
+        raise InvalidParameterError("agent_autonomy_run", session_id, str(exc))
+    return {"run": run}
+
+
 @router.post("/sessions/{session_id}/messages")
 async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     role = str(payload.get("role") or "ceo")

@@ -8,6 +8,7 @@ from astrolabe_cli.commands.config import env_status
 from astrolabe_cli.commands.config import validate_config
 from astrolabe_cli.commands.agent import actions as agent_actions
 from astrolabe_cli.commands.agent import add_message as agent_add_message
+from astrolabe_cli.commands.agent import autonomy_run as agent_autonomy_run
 from astrolabe_cli.commands.agent import autonomy_step as agent_autonomy_step
 from astrolabe_cli.commands.agent import approve as agent_approve
 from astrolabe_cli.commands.agent import cancel as agent_cancel
@@ -167,6 +168,39 @@ def build_parser() -> argparse.ArgumentParser:
             args.text,
             args.desk,
             args.semantic_draft_file,
+            provider_semantic=args.provider_semantic,
+            planner_provider=args.planner_provider,
+            planner_model=args.planner_model,
+        )
+    )
+    agent_autonomy_run_cmd = agent_autonomy_sub.add_parser(
+        "run",
+        help="Run multiple bounded autonomy steps up to a fixed max step limit",
+    )
+    agent_autonomy_run_cmd.add_argument("--session", required=True)
+    agent_autonomy_run_cmd.add_argument("--desk", default="reporting")
+    agent_autonomy_run_cmd.add_argument("--text", default="")
+    agent_autonomy_run_cmd.add_argument("--max-steps", type=int, default=2)
+    agent_autonomy_run_cmd.add_argument(
+        "--semantic-draft-file",
+        default="",
+        help="JSON semantic planner draft to filter through bounded autonomy",
+    )
+    agent_autonomy_run_cmd.add_argument(
+        "--provider-semantic",
+        action="store_true",
+        help="Ask the configured LLM provider to draft bounded autonomy plans, then server-filter them",
+    )
+    agent_autonomy_run_cmd.add_argument("--planner-provider", default="")
+    agent_autonomy_run_cmd.add_argument("--planner-model", default="")
+    add_common_flags(agent_autonomy_run_cmd)
+    agent_autonomy_run_cmd.set_defaults(
+        handler=lambda args: agent_autonomy_run(
+            args.session,
+            args.text,
+            args.desk,
+            args.semantic_draft_file,
+            max_steps=args.max_steps,
             provider_semantic=args.provider_semantic,
             planner_provider=args.planner_provider,
             planner_model=args.planner_model,
