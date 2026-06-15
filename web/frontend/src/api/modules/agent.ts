@@ -86,6 +86,8 @@ export const agentApi = {
       action_refs?: string[];
       planner_mode?: "deterministic" | "semantic_draft" | "provider_semantic";
       semantic_draft?: Record<string, unknown>;
+      planner_provider?: string;
+      planner_model?: string;
     },
   ) => post<AgentAddMessageResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/messages`, payload),
   agentPlan: (payload: {
@@ -93,6 +95,8 @@ export const agentApi = {
     content: string;
     planner_mode?: "deterministic" | "semantic_draft" | "provider_semantic";
     semantic_draft?: Record<string, unknown>;
+    planner_provider?: string;
+    planner_model?: string;
   }) => post<AgentWorkflowPlanResponse>("/api/agent/plans", payload),
   agentActions: (filters: AgentActionFilters = {}) => {
     const params = new URLSearchParams();

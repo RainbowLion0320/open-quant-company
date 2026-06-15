@@ -127,6 +127,24 @@
             <input v-model="providerSemanticEnabled" type="checkbox" />
             <span>{{ t("ceoOffice.providerSemantic") }}</span>
           </label>
+          <div v-if="providerSemanticEnabled" class="provider-semantic-control">
+            <label>
+              <span>{{ t("ceoOffice.providerPlannerProvider") }}</span>
+              <input
+                v-model="providerPlannerProvider"
+                type="text"
+                :placeholder="t('ceoOffice.providerPlannerProviderPlaceholder')"
+              />
+            </label>
+            <label>
+              <span>{{ t("ceoOffice.providerPlannerModel") }}</span>
+              <input
+                v-model="providerPlannerModel"
+                type="text"
+                :placeholder="t('ceoOffice.providerPlannerModelPlaceholder')"
+              />
+            </label>
+          </div>
           <div v-if="semanticDraftEnabled && !providerSemanticEnabled" class="semantic-draft-control">
             <textarea
               v-model="semanticDraftText"
@@ -881,6 +899,8 @@ const selectedDeskId = ref("reporting");
 const draft = ref("");
 const semanticDraftEnabled = ref(false);
 const providerSemanticEnabled = ref(false);
+const providerPlannerProvider = ref("");
+const providerPlannerModel = ref("");
 const semanticDraftText = ref("");
 const semanticDraftError = ref("");
 const sending = ref(false);
@@ -1114,6 +1134,8 @@ function semanticPayload(semanticDraft: Record<string, unknown> | null) {
 function providerSemanticPayload() {
   return {
     planner_mode: "provider_semantic" as const,
+    planner_provider: providerPlannerProvider.value.trim(),
+    planner_model: providerPlannerModel.value.trim(),
   };
 }
 

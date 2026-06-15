@@ -49,8 +49,8 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq agent session create --title "Daily CEO Brief" --json` | 创建 CEO Office / desk agent 会话 |
 | `astroq agent session update <session_id> --title "..." --tag daily --json` | 重命名、归档或更新本地 agent 会话标签 |
 | `astroq agent session run-readonly <session_id> --json` | 批量运行该会话中 proposed read_only/dry_run 安全行动，跳过审批、写入和交易行动 |
-| `astroq agent message --session <session_id> --desk reporting --text "..." --json` | 写入 CEO 消息并生成 desk response；可加 `--semantic-draft-file draft.json` 或 `--provider-semantic` 让语义草案进入安全过滤 |
-| `astroq agent plan --desk reporting --text "..." --json` | 只预览 workflow plan，不写 ledger；可加 `--semantic-draft-file draft.json` 或 `--provider-semantic` 预览安全过滤后的语义计划 |
+| `astroq agent message --session <session_id> --desk reporting --text "..." --json` | 写入 CEO 消息并生成 desk response；可加 `--semantic-draft-file draft.json` 或 `--provider-semantic --planner-provider deepseek --planner-model deepseek-v4-pro` 让语义草案进入安全过滤 |
+| `astroq agent plan --desk reporting --text "..." --json` | 只预览 workflow plan，不写 ledger；可加 `--semantic-draft-file draft.json` 或 `--provider-semantic --planner-provider deepseek --planner-model deepseek-v4-pro` 预览安全过滤后的语义计划 |
 | `astroq agent run <action_id> --json` | Dispatch 安全或已批准 agent action 并写入 run ledger |
 | `astroq agent cancel <action_id> --reason "..." --json` | 取消尚未完成的 agent action |
 | `astroq agent expire --session <session_id> --json` | 标记已过期的 queued agent action，防止继续审批或执行 |
