@@ -7,6 +7,7 @@ from typing import Any
 
 DEFAULT_ACCOUNT_TYPE = "STOCK"
 DEFAULT_STRATEGY_NAME = "open_quant_company"
+DEFAULT_CASH_TOLERANCE = 0.01
 
 
 class XtQuantGateway:
@@ -94,15 +95,34 @@ class XtQuantGateway:
         orders = _records(self.trader.query_stock_orders(self.account))
         trades = _records(self.trader.query_stock_trades(self.account))
         broker_order_id = str(ack.get("broker_order_id") or "").strip()
-        mismatches = [{"reason": "project_ledger_comparison_not_configured"}]
+        project_snapshot = dict(ack.get("project_snapshot") or self.config.get("project_snapshot") or {})
+        comparison = _compare_project_snapshot(
+            project_snapshot=project_snapshot,
+            broker_account=account_snapshot,
+            broker_positions=positions,
+            broker_orders=orders,
+            broker_trades=trades,
+            broker_order_id=broker_order_id,
+            cash_tolerance=float(self.config.get("cash_tolerance") or DEFAULT_CASH_TOLERANCE),
+        )
+        mismatches = list(comparison["mismatches"])
         if broker_order_id and not _contains_order_id([*orders, *trades], broker_order_id):
             mismatches.append({"reason": "broker_order_not_found", "broker_order_id": broker_order_id})
+        matched = (
+            bool(comparison["cash_matched"])
+            and bool(comparison["positions_matched"])
+            and bool(comparison["orders_matched"])
+            and not mismatches
+        )
         return {
+            "status": "matched" if matched else "needs_review",
             "broker": self.broker,
             "account_id": self.account_id,
-            "positions_matched": False,
-            "cash_matched": False,
+            "positions_matched": bool(comparison["positions_matched"]),
+            "cash_matched": bool(comparison["cash_matched"]),
+            "orders_matched": bool(comparison["orders_matched"]),
             "account_snapshot": account_snapshot,
+            "project_snapshot": project_snapshot,
             "positions": positions,
             "open_orders": orders,
             "fills": trades,
@@ -212,3 +232,98 @@ def _contains_order_id(records: list[dict[str, Any]], broker_order_id: str) -> b
             if str(record.get(key) or "").strip() == broker_order_id:
                 return True
     return False
+
+
+def _compare_project_snapshot(
+    *,
+    project_snapshot: dict[str, Any],
+    broker_account: dict[str, Any],
+    broker_positions: list[dict[str, Any]],
+    broker_orders: list[dict[str, Any]],
+    broker_trades: list[dict[str, Any]],
+    broker_order_id: str,
+    cash_tolerance: float,
+) -> dict[str, Any]:
+    if not project_snapshot:
+        return {
+            "cash_matched": False,
+            "positions_matched": False,
+            "orders_matched": False,
+            "mismatches": [{"reason": "project_ledger_comparison_not_configured"}],
+        }
+
+    mismatches: list[dict[str, Any]] = []
+    cash_matched = True
+    if "cash" in project_snapshot:
+        expected_cash = _as_float(project_snapshot.get("cash"))
+        broker_cash = _as_float(broker_account.get("cash"))
+        cash_matched = abs(expected_cash - broker_cash) <= cash_tolerance
+        if not cash_matched:
+            mismatches.append(
+                {
+                    "reason": "cash_mismatch",
+                    "project_cash": expected_cash,
+                    "broker_cash": broker_cash,
+                    "tolerance": cash_tolerance,
+                }
+            )
+
+    broker_position_map = _position_map(broker_positions)
+    positions_matched = True
+    for item in _records(project_snapshot.get("positions") or []):
+        symbol = _position_symbol(item)
+        if not symbol:
+            continue
+        expected_qty = _position_quantity(item)
+        broker_qty = broker_position_map.get(symbol, 0.0)
+        if expected_qty != broker_qty:
+            positions_matched = False
+            mismatches.append(
+                {
+                    "reason": "position_mismatch",
+                    "symbol": symbol,
+                    "project_quantity": expected_qty,
+                    "broker_quantity": broker_qty,
+                }
+            )
+
+    project_orders = _records(project_snapshot.get("orders") or [])
+    order_ids = [str(item.get("broker_order_id") or item.get("order_id") or "").strip() for item in project_orders]
+    if not order_ids and broker_order_id:
+        order_ids = [broker_order_id]
+    orders_matched = True
+    for order_id in [item for item in order_ids if item]:
+        if not _contains_order_id([*broker_orders, *broker_trades], order_id):
+            orders_matched = False
+            mismatches.append({"reason": "project_order_not_found_at_broker", "broker_order_id": order_id})
+
+    return {
+        "cash_matched": cash_matched,
+        "positions_matched": positions_matched,
+        "orders_matched": orders_matched,
+        "mismatches": mismatches,
+    }
+
+
+def _position_map(rows: list[dict[str, Any]]) -> dict[str, float]:
+    result: dict[str, float] = {}
+    for row in rows:
+        symbol = _position_symbol(row)
+        if symbol:
+            result[symbol] = result.get(symbol, 0.0) + _position_quantity(row)
+    return result
+
+
+def _position_symbol(row: dict[str, Any]) -> str:
+    return str(row.get("symbol") or row.get("stock_code") or row.get("code") or "").strip().upper()
+
+
+def _position_quantity(row: dict[str, Any]) -> float:
+    return _as_float(row.get("quantity") if "quantity" in row else row.get("volume"))
+
+
+def _as_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0

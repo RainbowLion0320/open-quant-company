@@ -144,6 +144,66 @@ def test_xtquant_gateway_reconcile_returns_snapshot_without_fake_match(monkeypat
     assert report["broker"] == "miniqmt"
 
 
+def test_xtquant_gateway_reconcile_matches_project_ledger_snapshot(monkeypatch):
+    _install_fake_xtquant(monkeypatch)
+
+    from broker.live.xtquant_gateway import build_gateway
+
+    gateway = build_gateway(
+        config={"userdata_path": "/tmp/qmt-userdata", "session_id": 44},
+        account_id="1234567890",
+        broker="miniqmt",
+    )
+    report = gateway.reconcile(
+        {
+            "broker_order_id": "8848",
+            "project_snapshot": {
+                "cash": 100000.0,
+                "positions": [{"symbol": "600000.SH", "quantity": 100}],
+                "orders": [{"broker_order_id": "8848"}],
+            },
+        },
+        account_id="1234567890",
+    )
+
+    assert report["status"] == "matched"
+    assert report["positions_matched"] is True
+    assert report["cash_matched"] is True
+    assert report["orders_matched"] is True
+    assert report["mismatches"] == []
+    assert report["project_snapshot"]["cash"] == 100000.0
+
+
+def test_xtquant_gateway_reconcile_reports_project_ledger_mismatches(monkeypatch):
+    _install_fake_xtquant(monkeypatch)
+
+    from broker.live.xtquant_gateway import build_gateway
+
+    gateway = build_gateway(
+        config={"userdata_path": "/tmp/qmt-userdata", "session_id": 45},
+        account_id="1234567890",
+        broker="miniqmt",
+    )
+    report = gateway.reconcile(
+        {
+            "broker_order_id": "8848",
+            "project_snapshot": {
+                "cash": 90000.0,
+                "positions": [{"symbol": "600000.SH", "quantity": 80}],
+                "orders": [{"broker_order_id": "MISSING"}],
+            },
+        },
+        account_id="1234567890",
+    )
+
+    reasons = {item["reason"] for item in report["mismatches"]}
+    assert report["status"] == "needs_review"
+    assert report["positions_matched"] is False
+    assert report["cash_matched"] is False
+    assert report["orders_matched"] is False
+    assert {"cash_mismatch", "position_mismatch", "project_order_not_found_at_broker"} <= reasons
+
+
 def test_xtquant_gateway_requires_userdata_path(monkeypatch):
     _install_fake_xtquant(monkeypatch)
 

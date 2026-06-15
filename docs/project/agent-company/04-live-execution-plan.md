@@ -263,7 +263,7 @@ Current foundation:
 - `astroq agent live reconcile --json` and `POST /api/agent/live/reconciliation` scan submitted live order evidence, call the live adapter reconciliation method, skip unsubmitted approval cards with `no_submitted_live_order`, and write scheduled reconciliation evidence under `var/artifacts/agent/live_reconciliation/scheduled/`.
 - Default `MiniQmtLiveBroker.submit_order()` fails closed with `live_submission_not_integrated`; no local path fabricates a broker order id or falls back to PaperBroker.
 - `MiniQmtLiveBroker` accepts an explicit SDK gateway injection or `execution.live.sdk_gateway_factory` configuration for audited submit/reconcile. The gateway path still re-runs preview/risk gates, requires a broker order id, masks and hashes raw responses, keeps `paper_fallback=false`, and returns blocked status on unknown or failed gateway responses. A configured factory that cannot load becomes a readiness blocker instead of a silent fallback.
-- `broker.live.xtquant_gateway` provides the default xtquant-backed gateway factory. It calls `XtQuantTrader.order_stock()` for live submit and reads asset, position, order, and trade snapshots for reconciliation. Until project-ledger comparison is wired, reconciliation remains `needs_review` with `project_ledger_comparison_not_configured` instead of fake matched status.
+- `broker.live.xtquant_gateway` provides the default xtquant-backed gateway factory. It calls `XtQuantTrader.order_stock()` for live submit and reads asset, position, order, and trade snapshots for reconciliation. When an ack or gateway config includes `project_snapshot`, the gateway compares broker cash, positions, and order ids against that project ledger snapshot. Without a project snapshot, reconciliation remains `needs_review` with `project_ledger_comparison_not_configured` instead of fake matched status.
 - `astroq agent live kill-switch status/activate/deactivate --json` and `/api/agent/live/kill-switch` expose a local kill switch. Activation cancels queued `live_order` actions, writes state/event artifacts under `var/artifacts/agent/live_kill_switch/`, and blocks live preview/propose/submit before broker calls.
 - CEO Office shows a read-only live readiness card.
 - Blocked readiness always reports `paper_fallback=false`; no live path submits through PaperBroker.
@@ -272,7 +272,7 @@ Remaining work:
 
 - Broker account consistency reconciliation against real MiniQMT/QMT snapshots after SDK integration.
 - Validate `broker.live.xtquant_gateway` against the user's real MiniQMT/QMT terminal, userdata path, account id, connection/session object, and order API.
-- Implement project-ledger comparison for cash, positions, orders, and trades using the xtquant snapshots.
+- Wire `AgentRuntime` to attach a real project ledger snapshot to live submit/scheduled reconciliation ack payloads.
 - Real-account scheduled broker order/trade/position reconciliation through the configured gateway.
 - Broker-side kill-switch operations for canceling already submitted real MiniQMT/QMT orders after SDK integration.
 
