@@ -655,11 +655,20 @@ def _artifact_aware_plan(
         handoffs=handoffs,
         work_orders=[],
     )
-    reasoning.append(_artifact_context_reasoning(artifact_context=artifact_context, root_causes=root_causes))
+    evidence_summary = _artifact_evidence_summary(artifact_context)
+    reasoning.append(
+        _artifact_context_reasoning(
+            artifact_context=artifact_context,
+            root_causes=root_causes,
+            evidence_summary=evidence_summary,
+        )
+    )
+    summary_text = "；".join(evidence_summary[:5])
     return DeskWorkflowPlan(
         desk=desk,
         answer=(
             "Reporting Desk 已根据当前本地 artifact evidence 生成 artifact-aware / 证据感知优先级计划："
+            f"当前证据摘要：{summary_text}。"
             "先处理数据源、生命周期、策略证据和工程质量链路，再汇总给 CEO。"
         ),
         confidence=0.78,
@@ -1640,7 +1649,12 @@ def _artifact_root_causes(artifact_context: dict[str, Any]) -> list[str]:
     return causes
 
 
-def _artifact_context_reasoning(*, artifact_context: dict[str, Any], root_causes: list[str]) -> dict[str, Any]:
+def _artifact_context_reasoning(
+    *,
+    artifact_context: dict[str, Any],
+    root_causes: list[str],
+    evidence_summary: list[str] | None = None,
+) -> dict[str, Any]:
     synthesis = artifact_context.get("synthesis") if isinstance(artifact_context.get("synthesis"), dict) else {}
     return {
         "kind": "artifact_context",
@@ -1649,7 +1663,85 @@ def _artifact_context_reasoning(*, artifact_context: dict[str, Any], root_causes
         "missing_count": int(artifact_context.get("missing_count") or 0),
         "invalid_count": int(artifact_context.get("invalid_count") or 0),
         "root_causes": list(root_causes),
+        "evidence_summary": list(evidence_summary or _artifact_evidence_summary(artifact_context)),
     }
+
+
+def _artifact_evidence_summary(artifact_context: dict[str, Any]) -> list[str]:
+    items = [item for item in artifact_context.get("items", []) if isinstance(item, dict)]
+    by_key = {str(item.get("key") or ""): item for item in items}
+    rows: list[str] = []
+
+    lifecycle = by_key.get("lifecycle")
+    if lifecycle:
+        for finding in lifecycle.get("findings", []) or []:
+            if not isinstance(finding, dict) or str(finding.get("kind") or "") != "blockers":
+                continue
+            evidence = finding.get("evidence")
+            if isinstance(evidence, dict):
+                dimension = str(evidence.get("dimension") or evidence.get("table") or "").strip()
+                reason = str(evidence.get("reason") or evidence.get("status") or "").strip()
+                if dimension or reason:
+                    rows.append(" ".join(part for part in ("lifecycle:", dimension, reason) if part))
+                    break
+
+    data_sources = by_key.get("data_sources")
+    if data_sources:
+        summary = data_sources.get("summary") if isinstance(data_sources.get("summary"), dict) else {}
+        unmapped = _int_from_mapping(summary, "capability_unmapped_count")
+        if unmapped > 0:
+            rows.append(f"data: {unmapped} unmapped source capabilities")
+
+    strategy = by_key.get("strategy_competition")
+    if strategy:
+        summary = strategy.get("summary") if isinstance(strategy.get("summary"), dict) else {}
+        total = _int_from_mapping(summary, "total")
+        blocked = _int_from_mapping(summary, "blocked")
+        if blocked > 0 and total > 0:
+            rows.append(f"research: {blocked}/{total} strategies blocked")
+        elif blocked > 0:
+            rows.append(f"research: {blocked} strategies blocked")
+
+    ast_item = by_key.get("ast_intelligence")
+    if ast_item:
+        summary = ast_item.get("summary") if isinstance(ast_item.get("summary"), dict) else {}
+        issue_count = _int_from_mapping(summary, "issue_count")
+        if issue_count > 0:
+            severity = summary.get("severity_counts")
+            severity_text = ""
+            if isinstance(severity, dict):
+                severity_rows = [
+                    f"{key}={int(value)}"
+                    for key, value in sorted(severity.items())
+                    if _int_like(value) > 0
+                ]
+                severity_text = f", {', '.join(severity_rows[:3])}" if severity_rows else ""
+            rows.append(f"engineering: {issue_count} AST issue(s){severity_text}")
+
+    test_design = by_key.get("test_design")
+    if test_design:
+        summary = test_design.get("summary") if isinstance(test_design.get("summary"), dict) else {}
+        risk_count = _int_from_mapping(summary, "design_risk_count") + _int_from_mapping(summary, "smell_count")
+        if risk_count > 0:
+            rows.append(f"testing: {risk_count} test design risk(s)")
+
+    missing_count = _int_like(artifact_context.get("missing_count"))
+    invalid_count = _int_like(artifact_context.get("invalid_count"))
+    if missing_count or invalid_count:
+        rows.append(f"artifacts: {missing_count} missing, {invalid_count} invalid")
+
+    return rows[:8]
+
+
+def _int_from_mapping(mapping: dict[str, Any], key: str) -> int:
+    return _int_like(mapping.get(key))
+
+
+def _int_like(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _mentions_data_source_gap(normalized: str) -> bool:

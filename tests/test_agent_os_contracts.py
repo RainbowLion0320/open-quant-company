@@ -4572,6 +4572,17 @@ def test_agent_workflow_plan_uses_artifact_context_for_broad_ceo_priority_reques
         "engineering_quality_risk",
         "test_design_risk",
     ]
+    assert "macro_gdp" in response.answer
+    assert "source_not_updated" in response.answer
+    assert "21" in response.answer
+    assert "9/12" in response.answer
+    assert "P1" in response.answer
+    assert reasoning_by_kind["artifact_context"]["evidence_summary"][:4] == [
+        "lifecycle: macro_gdp source_not_updated",
+        "data: 21 unmapped source capabilities",
+        "research: 9/12 strategies blocked",
+        "engineering: 2 AST issue(s), P1=1, P2=1",
+    ]
     assert reasoning_by_kind["artifact_context"]["missing_count"] >= 1
     assert "artifact" in preview["answer"].lower() or "证据" in preview["answer"]
     reset_datahub()
