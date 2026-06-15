@@ -245,7 +245,7 @@ Current foundation:
 
 - `broker.live.qmt.MiniQmtLiveBroker.health()` reports default-disabled readiness.
 - `astroq agent live readiness --json` and `GET /api/agent/live/readiness` expose the same readiness state.
-- `broker.live.qmt.MiniQmtLiveBroker.preview_order()` returns a non-submitting live order preview with intent normalization, estimated cash/position impact, fees, readiness blockers, evidence requirement, cash gate, and extended risk snapshot checks for concentration, total exposure, daily order count, tradability, data freshness, and broker account consistency.
+- `broker.live.qmt.MiniQmtLiveBroker.preview_order()` returns a non-submitting live order preview with intent normalization, estimated cash/position impact, fees, readiness blockers, evidence requirement, cash gate, and extended risk snapshot checks for concentration, total exposure, daily order count, tradability, data freshness, broker account consistency, drawdown state, portfolio VaR/CVaR, sector concentration, and intraday limit-state.
 - `astroq agent live preview ... --json` and `POST /api/agent/live/preview` expose the same preview state with `approval_required=true`, `submitted=false`, and `paper_fallback=false`.
 - `astroq agent live propose ... --json` and `POST /api/agent/live/proposals` create approval-required live order action cards only after preview passes.
 - `astroq agent live submit ACTION_ID --json` and `POST /api/agent/live/actions/{action_id}/submit` require CEO approval, re-run preview/risk gates, submit only through the live adapter, and write reconciliation evidence under `var/artifacts/agent/live_reconciliation/`.
@@ -257,7 +257,7 @@ Current foundation:
 
 Remaining work:
 
-- Deeper production-grade risk gates beyond the current preview checks, including drawdown state, portfolio VaR/CVaR, sector concentration, intraday limit-state checks, and broker account consistency reconciliation against real MiniQMT/QMT snapshots.
+- Broker account consistency reconciliation against real MiniQMT/QMT snapshots after SDK integration.
 - Real MiniQMT/QMT SDK-backed order submission.
 - Real-account scheduled broker order/trade/position reconciliation after SDK integration.
 - Broker-side kill-switch operations for canceling already submitted real MiniQMT/QMT orders after SDK integration.

@@ -258,9 +258,23 @@ class MiniQmtLiveBroker:
             "data_freshness_status",
             "broker_account_consistent",
         }
+        portfolio_required = {
+            "current_drawdown_pct",
+            "max_drawdown_pct",
+            "portfolio_var_pct",
+            "max_portfolio_var_pct",
+            "portfolio_cvar_pct",
+            "max_portfolio_cvar_pct",
+            "current_sector_notional",
+            "max_sector_exposure_pct",
+            "intraday_limit_state",
+        }
         missing = sorted(name for name in required if name not in snapshot)
         if live_ready and missing:
             blockers.append("missing_risk_snapshot")
+        missing_portfolio = sorted(name for name in portfolio_required if name not in snapshot)
+        if live_ready and missing_portfolio:
+            blockers.append("missing_portfolio_risk_snapshot")
         total_asset = _as_float(self.account.get("total_asset"))
         market_value = _as_float(self.account.get("market_value"))
         current_symbol_notional = max(_as_float(snapshot.get("current_symbol_notional")), 0.0)
@@ -340,6 +354,82 @@ class MiniQmtLiveBroker:
                 "name": "broker_account_consistency",
                 "passed": account_consistent,
                 "consistent": account_consistent,
+            }
+        )
+
+        current_drawdown_pct = _as_float(snapshot.get("current_drawdown_pct"))
+        max_drawdown_pct = _as_float(snapshot.get("max_drawdown_pct"))
+        drawdown_passed = max_drawdown_pct > 0 and 0 <= current_drawdown_pct <= max_drawdown_pct
+        if live_ready and not missing_portfolio and not drawdown_passed:
+            blockers.append("drawdown_limit" if max_drawdown_pct > 0 else "missing_drawdown_limit")
+        checks.append(
+            {
+                "name": "drawdown_state",
+                "passed": drawdown_passed,
+                "current_drawdown_pct": current_drawdown_pct,
+                "limit": max_drawdown_pct,
+            }
+        )
+
+        portfolio_var_pct = _as_float(snapshot.get("portfolio_var_pct"))
+        max_portfolio_var_pct = _as_float(snapshot.get("max_portfolio_var_pct"))
+        var_passed = max_portfolio_var_pct > 0 and 0 <= portfolio_var_pct <= max_portfolio_var_pct
+        if live_ready and not missing_portfolio and not var_passed:
+            blockers.append("portfolio_var_limit" if max_portfolio_var_pct > 0 else "missing_portfolio_var_limit")
+        checks.append(
+            {
+                "name": "portfolio_var",
+                "passed": var_passed,
+                "portfolio_var_pct": portfolio_var_pct,
+                "limit": max_portfolio_var_pct,
+            }
+        )
+
+        portfolio_cvar_pct = _as_float(snapshot.get("portfolio_cvar_pct"))
+        max_portfolio_cvar_pct = _as_float(snapshot.get("max_portfolio_cvar_pct"))
+        cvar_passed = max_portfolio_cvar_pct > 0 and 0 <= portfolio_cvar_pct <= max_portfolio_cvar_pct
+        if live_ready and not missing_portfolio and not cvar_passed:
+            blockers.append("portfolio_cvar_limit" if max_portfolio_cvar_pct > 0 else "missing_portfolio_cvar_limit")
+        checks.append(
+            {
+                "name": "portfolio_cvar",
+                "passed": cvar_passed,
+                "portfolio_cvar_pct": portfolio_cvar_pct,
+                "limit": max_portfolio_cvar_pct,
+            }
+        )
+
+        current_sector_notional = max(_as_float(snapshot.get("current_sector_notional")), 0.0)
+        sector_after = max(current_sector_notional + (notional if intent["side"] == "buy" else -notional), 0.0)
+        max_sector_exposure_pct = _as_float(snapshot.get("max_sector_exposure_pct"))
+        sector_pct = sector_after / total_asset if total_asset > 0 else 0.0
+        sector_passed = total_asset > 0 and max_sector_exposure_pct > 0 and sector_pct <= max_sector_exposure_pct
+        if live_ready and not missing_portfolio and not sector_passed:
+            blockers.append(
+                "sector_concentration_limit"
+                if total_asset > 0 and max_sector_exposure_pct > 0
+                else "missing_sector_concentration_limit"
+            )
+        checks.append(
+            {
+                "name": "sector_concentration",
+                "passed": sector_passed,
+                "sector_pct": sector_pct,
+                "limit": max_sector_exposure_pct,
+                "sector_after": sector_after,
+                "total_asset": total_asset,
+            }
+        )
+
+        intraday_state = str(snapshot.get("intraday_limit_state") or "").strip().lower()
+        intraday_passed = intraday_state in {"normal", "open", "continuous", "ready"}
+        if live_ready and not missing_portfolio and not intraday_passed:
+            blockers.append("intraday_limit_state_blocked" if intraday_state else "missing_intraday_limit_state")
+        checks.append(
+            {
+                "name": "intraday_limit_state",
+                "passed": intraday_passed,
+                "state": intraday_state,
             }
         )
 

@@ -687,6 +687,15 @@ def test_agent_live_order_preview_blocks_when_readiness_not_ready(tmp_path, monk
                 "tradable": True,
                 "data_freshness_status": "fresh",
                 "broker_account_consistent": True,
+                "current_drawdown_pct": 0.04,
+                "max_drawdown_pct": 0.12,
+                "portfolio_var_pct": 0.025,
+                "max_portfolio_var_pct": 0.06,
+                "portfolio_cvar_pct": 0.04,
+                "max_portfolio_cvar_pct": 0.09,
+                "current_sector_notional": 8_000.0,
+                "max_sector_exposure_pct": 0.25,
+                "intraday_limit_state": "normal",
             },
         }
     )
@@ -730,6 +739,15 @@ def test_agent_live_order_preview_passes_with_ready_fake_broker_and_cash_gate():
                 "tradable": True,
                 "data_freshness_status": "fresh",
                 "broker_account_consistent": True,
+                "current_drawdown_pct": 0.04,
+                "max_drawdown_pct": 0.12,
+                "portfolio_var_pct": 0.025,
+                "max_portfolio_var_pct": 0.06,
+                "portfolio_cvar_pct": 0.04,
+                "max_portfolio_cvar_pct": 0.09,
+                "current_sector_notional": 8_000.0,
+                "max_sector_exposure_pct": 0.9,
+                "intraday_limit_state": "normal",
             },
         }
     )
@@ -752,6 +770,15 @@ def test_agent_live_order_preview_passes_with_ready_fake_broker_and_cash_gate():
                 "tradable": True,
                 "data_freshness_status": "fresh",
                 "broker_account_consistent": True,
+                "current_drawdown_pct": 0.04,
+                "max_drawdown_pct": 0.12,
+                "portfolio_var_pct": 0.025,
+                "max_portfolio_var_pct": 0.06,
+                "portfolio_cvar_pct": 0.04,
+                "max_portfolio_cvar_pct": 0.09,
+                "current_sector_notional": 8_000.0,
+                "max_sector_exposure_pct": 0.25,
+                "intraday_limit_state": "normal",
             },
         }
     )
@@ -800,6 +827,15 @@ def test_agent_live_order_preview_enforces_extended_risk_snapshot():
                 "tradable": True,
                 "data_freshness_status": "fresh",
                 "broker_account_consistent": True,
+                "current_drawdown_pct": 0.04,
+                "max_drawdown_pct": 0.12,
+                "portfolio_var_pct": 0.025,
+                "max_portfolio_var_pct": 0.06,
+                "portfolio_cvar_pct": 0.04,
+                "max_portfolio_cvar_pct": 0.09,
+                "current_sector_notional": 8_000.0,
+                "max_sector_exposure_pct": 0.25,
+                "intraday_limit_state": "normal",
             },
         }
     )
@@ -822,6 +858,15 @@ def test_agent_live_order_preview_enforces_extended_risk_snapshot():
                 "tradable": False,
                 "data_freshness_status": "stale",
                 "broker_account_consistent": False,
+                "current_drawdown_pct": 0.04,
+                "max_drawdown_pct": 0.12,
+                "portfolio_var_pct": 0.025,
+                "max_portfolio_var_pct": 0.06,
+                "portfolio_cvar_pct": 0.04,
+                "max_portfolio_cvar_pct": 0.09,
+                "current_sector_notional": 8_000.0,
+                "max_sector_exposure_pct": 0.25,
+                "intraday_limit_state": "normal",
             },
         }
     )
@@ -843,6 +888,108 @@ def test_agent_live_order_preview_enforces_extended_risk_snapshot():
     assert "not_tradable" in blocked["risk_gate"]["blockers"]
     assert "data_freshness_stale" in blocked["risk_gate"]["blockers"]
     assert "broker_account_inconsistent" in blocked["risk_gate"]["blockers"]
+
+
+def test_agent_live_order_preview_enforces_portfolio_grade_risk_snapshot():
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    broker = MiniQmtLiveBroker(
+        enabled=True,
+        import_checker=lambda _name: object(),
+        logged_in=True,
+        permissions=["query", "trade"],
+        account_id="1234567890",
+        account={"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+    )
+    base_snapshot = {
+        "current_symbol_notional": 2_000.0,
+        "max_position_pct": 0.2,
+        "max_total_exposure_pct": 0.7,
+        "daily_order_count": 1,
+        "max_daily_orders": 5,
+        "tradable": True,
+        "data_freshness_status": "fresh",
+        "broker_account_consistent": True,
+    }
+    preview = broker.preview_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "portfolio-grade live risk snapshot",
+            "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {
+                **base_snapshot,
+                "current_drawdown_pct": 0.04,
+                "max_drawdown_pct": 0.12,
+                "portfolio_var_pct": 0.025,
+                "max_portfolio_var_pct": 0.06,
+                "portfolio_cvar_pct": 0.04,
+                "max_portfolio_cvar_pct": 0.09,
+                "current_sector_notional": 8_000.0,
+                "max_sector_exposure_pct": 0.25,
+                "intraday_limit_state": "normal",
+            },
+        }
+    )
+    blocked = broker.preview_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "portfolio-grade live risk breach",
+            "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {
+                **base_snapshot,
+                "current_drawdown_pct": 0.15,
+                "max_drawdown_pct": 0.12,
+                "portfolio_var_pct": 0.08,
+                "max_portfolio_var_pct": 0.06,
+                "portfolio_cvar_pct": 0.11,
+                "max_portfolio_cvar_pct": 0.09,
+                "current_sector_notional": 35_000.0,
+                "max_sector_exposure_pct": 0.25,
+                "intraday_limit_state": "limit_up",
+            },
+        }
+    )
+    missing = broker.preview_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "missing portfolio-grade live risk snapshot",
+            "evidence_refs": ["ev_demo"],
+            "risk_snapshot": base_snapshot,
+        }
+    )
+
+    check_names = {check["name"] for check in preview["risk_gate"]["checks"]}
+    assert {
+        "drawdown_state",
+        "portfolio_var",
+        "portfolio_cvar",
+        "sector_concentration",
+        "intraday_limit_state",
+    } <= check_names
+    assert preview["risk_gate"]["passed"] is True
+    assert blocked["risk_gate"]["passed"] is False
+    assert "drawdown_limit" in blocked["risk_gate"]["blockers"]
+    assert "portfolio_var_limit" in blocked["risk_gate"]["blockers"]
+    assert "portfolio_cvar_limit" in blocked["risk_gate"]["blockers"]
+    assert "sector_concentration_limit" in blocked["risk_gate"]["blockers"]
+    assert "intraday_limit_state_blocked" in blocked["risk_gate"]["blockers"]
+    assert missing["risk_gate"]["passed"] is False
+    assert "missing_portfolio_risk_snapshot" in missing["risk_gate"]["blockers"]
 
 
 def test_agent_live_preview_cli_and_api(tmp_path, monkeypatch, capsys):
