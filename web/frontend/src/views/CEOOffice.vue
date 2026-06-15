@@ -174,6 +174,24 @@
               >
                 {{ t("ceoOffice.deactivateKillSwitch") }}
               </button>
+              <button
+                class="btn btn-xs"
+                type="button"
+                :disabled="runningLiveReconciliation"
+                @click="runLiveReconciliation"
+              >
+                {{ t("ceoOffice.runLiveReconciliation") }}
+              </button>
+            </div>
+            <div v-if="liveReconciliation" class="rhythm-status">
+              <span>{{ t("ceoOffice.liveReconciliation") }}</span>
+              <strong>
+                {{ statusLabel(liveReconciliation.status) }} ·
+                {{ t("ceoOffice.reconciled") }} {{ liveReconciliation.reconciled_count }} ·
+                {{ t("ceoOffice.skipped") }} {{ liveReconciliation.skipped_count }} ·
+                {{ t("ceoOffice.blocked") }} {{ liveReconciliation.blocked_count }}
+              </strong>
+              <small>{{ liveReconciliation.checked_at }}</small>
             </div>
             <div class="detail-row">
               <span>{{ t("ceoOffice.blockers") }}</span>
@@ -498,7 +516,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentMessage, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -514,6 +532,7 @@ const scheduledRhythmResult = ref<AgentScheduledReportRhythm | null>(null);
 const notificationResult = ref<AgentReportNotification | null>(null);
 const liveReadiness = ref<AgentLiveReadiness | null>(null);
 const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
+const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
@@ -530,6 +549,7 @@ const runningRhythm = ref(false);
 const runningScheduledRhythm = ref(false);
 const notifyingReport = ref("");
 const operatingLiveKillSwitch = ref<"activate" | "deactivate" | "">("");
+const runningLiveReconciliation = ref(false);
 const selectedReportKind = ref("daily_brief");
 const draft = ref("");
 const sending = ref(false);
@@ -895,6 +915,24 @@ async function operateLiveKillSwitch(nextState: "activate" | "deactivate") {
     error.value = `${t("ceoOffice.killSwitchFailed")}: ${err?.message || err}`;
   } finally {
     operatingLiveKillSwitch.value = "";
+  }
+}
+
+async function runLiveReconciliation() {
+  runningLiveReconciliation.value = true;
+  error.value = "";
+  try {
+    const payload = await api.agentLiveReconciliation({
+      session_id: activeSession.value?.session_id || undefined,
+    });
+    liveReconciliation.value = payload.reconciliation;
+    if (payload.reconciliation.evidence?.evidence_id) {
+      await loadEvidence(payload.reconciliation.evidence.evidence_id);
+    }
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.liveReconciliationFailed")}: ${err?.message || err}`;
+  } finally {
+    runningLiveReconciliation.value = false;
   }
 }
 

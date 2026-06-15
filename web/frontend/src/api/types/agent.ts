@@ -136,6 +136,21 @@ export interface AgentLiveKillSwitch {
   evidence?: EvidenceRef;
 }
 
+export interface AgentLiveReconciliation {
+  status: string;
+  checked_at: string;
+  session_id: string;
+  action_count: number;
+  reconciled_count: number;
+  skipped_count: number;
+  blocked_count: number;
+  failed_count: number;
+  paper_fallback: boolean;
+  items: Array<Record<string, unknown>>;
+  path?: string;
+  evidence?: EvidenceRef;
+}
+
 export interface AgentDeskResponse {
   message: AgentMessage;
   answer: string;
@@ -310,6 +325,10 @@ export interface AgentLiveReadinessResponse {
 
 export interface AgentLiveKillSwitchResponse {
   kill_switch: AgentLiveKillSwitch;
+}
+
+export interface AgentLiveReconciliationResponse {
+  reconciliation: AgentLiveReconciliation;
 }
 
 export interface AgentEvidenceResponse {
