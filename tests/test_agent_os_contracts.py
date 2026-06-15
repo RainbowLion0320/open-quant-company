@@ -2224,6 +2224,55 @@ def test_agent_reports_aggregate_system_artifact_context(tmp_path, monkeypatch):
     reset_datahub()
 
 
+def test_agent_reports_synthesize_cross_session_trends_from_history(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import get_datahub, reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 1},
+            "blockers": [{"dimension": "macro_gdp", "reason": "source_not_updated"}],
+        },
+        "tournaments/strategy_competition_latest.json": {
+            "summary": {"total": 12, "blocked": 9},
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+
+    runtime = AgentRuntime()
+    first = runtime.create_session(title="First CEO brief", default_desk="reporting")
+    second = runtime.create_session(title="Second CEO brief", default_desk="reporting")
+    runtime.generate_report(session_id=first.session_id, kind="daily_brief")
+    report = runtime.generate_report(session_id=second.session_id, kind="daily_brief")
+
+    payload = json.loads(Path(report["path"]).read_text(encoding="utf-8"))
+    sections = {section["section_id"]: section for section in payload["sections"]}
+    trend = payload["artifact_context"]["trend_synthesis"]
+
+    assert "trend_synthesis" in sections
+    assert trend["status"] == "attention"
+    assert trend["history_report_count"] == 1
+    assert trend["recurring_root_cause_count"] >= 2
+    assert {row["cause"] for row in trend["recurring_root_causes"]} >= {
+        "lifecycle_blocker",
+        "strategy_evidence_blocked",
+    }
+    assert all(row["total_count"] >= 2 for row in trend["recurring_root_causes"])
+    assert "lifecycle_blocker" in sections["trend_synthesis"]["body"]
+    assert "Repeated root cause" in sections["trend_synthesis"]["body"]
+    reset_datahub()
+
+
 def test_agent_report_notification_env_only_writes_audit_artifact(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "secret-token")

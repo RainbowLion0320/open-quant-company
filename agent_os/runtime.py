@@ -1703,6 +1703,8 @@ class AgentRuntime:
         generated_at = _now()
         report_dir = get_datahub().artifact_dir("agent") / "reports"
         report_dir.mkdir(parents=True, exist_ok=True)
+        index_path = report_dir / "index.json"
+        report_history = read_report_index(index_path)
         stem = f"{normalized_kind}-{generated_at.replace(':', '').replace('-', '').replace('T', '-')}-{report_id}"
         path = report_dir / f"{stem}.json"
         markdown_path = report_dir / f"{stem}.md"
@@ -1720,6 +1722,7 @@ class AgentRuntime:
             markdown_path=markdown_path,
             generated_at=generated_at,
             artifact_context=collect_report_artifact_context(),
+            report_history=report_history,
         )
         path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
         markdown_path.write_text(render_report_markdown(report), encoding="utf-8")
@@ -1730,8 +1733,7 @@ class AgentRuntime:
             summary=str(report["summary"]),
         )
         report = {**report, "evidence_id": evidence.evidence_id}
-        index_path = report_dir / "index.json"
-        reports = [report, *[row for row in read_report_index(index_path) if row.get("report_id") != report_id]]
+        reports = [report, *[row for row in report_history if row.get("report_id") != report_id]]
         write_report_index(index_path, reports)
         return AgentReport(**report).to_dict()
 

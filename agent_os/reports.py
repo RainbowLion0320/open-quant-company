@@ -104,9 +104,11 @@ def build_report_payload(
     markdown_path: Path,
     generated_at: str,
     artifact_context: dict[str, Any] | None = None,
+    report_history: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     normalized_kind = normalize_report_kind(kind)
-    artifact_context = artifact_context or empty_report_artifact_context()
+    artifact_context = dict(artifact_context or empty_report_artifact_context())
+    artifact_context["trend_synthesis"] = _report_trend_synthesis(artifact_context, report_history or [])
     work_order_rows = list(work_orders or [])
     evidence_by_id = {str(row.get("evidence_id")): row for row in evidence}
     evidence_refs = _ordered_unique(
@@ -171,6 +173,12 @@ def build_report_payload(
             "body": _semantic_synthesis_body(artifact_context),
             "evidence_refs": [],
         },
+        {
+            "section_id": "trend_synthesis",
+            "title": "Trend Synthesis",
+            "body": _trend_synthesis_body(artifact_context),
+            "evidence_refs": [],
+        },
     ]
     sections.extend(
         _operating_rhythm_sections(
@@ -222,6 +230,13 @@ def empty_report_artifact_context() -> dict[str, Any]:
             "root_causes": [],
             "impacts": [],
             "next_actions": ["Generate lifecycle, data-source, strategy, architecture, test-design, and CodeGraph artifacts."],
+        },
+        "trend_synthesis": {
+            "status": "no_history",
+            "history_report_count": 0,
+            "recurring_root_cause_count": 0,
+            "recurring_root_causes": [],
+            "next_actions": ["Generate at least one prior CEO report before evaluating cross-session trends."],
         },
         "items": [
             {
@@ -503,6 +518,109 @@ def _semantic_synthesis_body(artifact_context: dict[str, Any]) -> str:
     for action in synthesis.get("next_actions", [])[:5]:
         lines.append(f"- Next action: {action}")
     return "\n".join(lines)
+
+
+def _report_trend_synthesis(
+    artifact_context: dict[str, Any],
+    report_history: list[dict[str, Any]],
+) -> dict[str, Any]:
+    history = [report for report in report_history if isinstance(report, dict)]
+    current_causes = _root_cause_names(artifact_context)
+    if not history:
+        return {
+            "status": "no_history",
+            "history_report_count": 0,
+            "recurring_root_cause_count": 0,
+            "recurring_root_causes": [],
+            "next_actions": ["Generate at least one prior CEO report before evaluating cross-session trends."],
+        }
+
+    previous: dict[str, dict[str, Any]] = {}
+    for report in history[:20]:
+        context = report.get("artifact_context") if isinstance(report.get("artifact_context"), dict) else {}
+        for cause in _root_cause_names(context):
+            row = previous.setdefault(
+                cause,
+                {
+                    "cause": cause,
+                    "previous_count": 0,
+                    "latest_report_id": str(report.get("report_id") or ""),
+                    "latest_generated_at": str(report.get("generated_at") or ""),
+                    "kinds": [],
+                },
+            )
+            row["previous_count"] += 1
+            kind = str(report.get("kind") or "")
+            if kind and kind not in row["kinds"]:
+                row["kinds"].append(kind)
+
+    recurring: list[dict[str, Any]] = []
+    for cause in current_causes:
+        row = previous.get(cause)
+        if not row:
+            continue
+        previous_count = int(row["previous_count"])
+        recurring.append(
+            {
+                "cause": cause,
+                "previous_count": previous_count,
+                "total_count": previous_count + 1,
+                "latest_report_id": row["latest_report_id"],
+                "latest_generated_at": row["latest_generated_at"],
+                "kinds": row["kinds"][:5],
+                "recommendation": "Escalate repeated root causes into an owner-specific desk action or work order.",
+            }
+        )
+
+    status = "attention" if recurring else "ready"
+    next_actions = [
+        "Open recurring blockers as Data/Research/Risk/Engineering desk actions instead of repeating report-only observations."
+    ] if recurring else ["No repeated root causes were found in recent report history."]
+    return {
+        "status": status,
+        "history_report_count": len(history),
+        "current_root_cause_count": len(current_causes),
+        "recurring_root_cause_count": len(recurring),
+        "recurring_root_causes": recurring[:8],
+        "next_actions": next_actions,
+    }
+
+
+def _trend_synthesis_body(artifact_context: dict[str, Any]) -> str:
+    trend = artifact_context.get("trend_synthesis")
+    if not isinstance(trend, dict):
+        trend = _report_trend_synthesis(artifact_context, [])
+    lines = [
+        f"- Trend status: {trend.get('status', 'unknown')}",
+        f"- History reports: {trend.get('history_report_count', 0)}",
+        f"- Recurring root causes: {trend.get('recurring_root_cause_count', 0)}",
+    ]
+    for recurring in trend.get("recurring_root_causes", [])[:8]:
+        if not isinstance(recurring, dict):
+            continue
+        lines.append(
+            "- "
+            f"Repeated root cause: {recurring.get('cause')} appeared in "
+            f"{recurring.get('total_count')} report(s); latest={recurring.get('latest_report_id')} "
+            f"-> {recurring.get('recommendation')}"
+        )
+    for action in trend.get("next_actions", [])[:5]:
+        lines.append(f"- Next action: {action}")
+    return "\n".join(lines)
+
+
+def _root_cause_names(artifact_context: dict[str, Any]) -> list[str]:
+    synthesis = artifact_context.get("synthesis")
+    if not isinstance(synthesis, dict):
+        return []
+    names: list[str] = []
+    for row in synthesis.get("root_causes", []) or []:
+        if not isinstance(row, dict):
+            continue
+        cause = str(row.get("cause") or "").strip()
+        if cause and cause not in names:
+            names.append(cause)
+    return names
 
 
 def _int_value(value: Any) -> int:
