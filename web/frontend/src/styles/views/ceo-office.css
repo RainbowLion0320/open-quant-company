@@ -188,6 +188,111 @@
   grid-template-columns: 10px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.desk-row:hover,
+.desk-row.selected {
+  border-color: var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.desk-detail {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.desk-chip-section {
+  display: grid;
+  gap: 6px;
+}
+
+.desk-chip-section small,
+.desk-activity-grid span,
+.desk-related-list > small {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.desk-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.desk-chip-list code {
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.desk-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.desk-activity-grid div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.desk-activity-grid strong {
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.desk-related-list {
+  display: grid;
+  gap: 6px;
+}
+
+.desk-related-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  text-align: left;
+}
+
+.desk-related-row:not(.passive) {
+  cursor: pointer;
+}
+
+.desk-related-row strong {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-related-row span {
+  color: var(--text-tertiary);
+  font-size: 10px;
 }
 
 .status-dot {

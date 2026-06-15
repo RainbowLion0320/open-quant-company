@@ -180,7 +180,9 @@ export interface AgentDesk {
   mandate: string;
   allowed_tools: string[];
   forbidden_actions: string[];
+  evidence_required: string[];
   handoff_targets: string[];
+  default_policy: string;
   status: string;
 }
 

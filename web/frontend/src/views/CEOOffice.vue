@@ -82,7 +82,7 @@
         <form class="message-composer" @submit.prevent="sendMessage">
           <label class="desk-target-control">
             <span>{{ t("ceoOffice.messageDesk") }}</span>
-            <select v-model="selectedDraftDesk">
+            <select v-model="selectedDraftDesk" @change="selectDesk(selectedDraftDesk)">
               <option v-for="desk in desks" :key="desk.desk_id" :value="desk.desk_id">
                 {{ deskLabel(desk.desk_id) }}
               </option>
@@ -102,11 +102,80 @@
             <small>{{ desks.length }}</small>
           </header>
           <div class="desk-list">
-            <div v-for="desk in desks" :key="desk.desk_id" class="desk-row">
+            <button
+              v-for="desk in desks"
+              :key="desk.desk_id"
+              class="desk-row"
+              :class="{ selected: selectedDeskId === desk.desk_id }"
+              type="button"
+              @click="selectDesk(desk.desk_id)"
+            >
               <span class="status-dot" :class="desk.status"></span>
               <div>
                 <strong>{{ deskLabel(desk.desk_id) }}</strong>
                 <small>{{ desk.allowed_tools.length }} tools</small>
+              </div>
+            </button>
+          </div>
+          <div v-if="selectedDesk" class="desk-detail">
+            <div class="detail-row">
+              <span>{{ t("ceoOffice.deskMandate") }}</span>
+              <p>{{ selectedDesk.mandate }}</p>
+            </div>
+            <div class="detail-row">
+              <span>{{ t("ceoOffice.defaultPolicy") }}</span>
+              <code>{{ selectedDesk.default_policy }}</code>
+            </div>
+            <div class="desk-chip-section">
+              <small>{{ t("ceoOffice.allowedTools") }}</small>
+              <div class="desk-chip-list">
+                <code v-for="tool in selectedDesk.allowed_tools" :key="tool">{{ tool }}</code>
+              </div>
+            </div>
+            <div class="desk-chip-section">
+              <small>{{ t("ceoOffice.forbiddenActions") }}</small>
+              <div class="desk-chip-list">
+                <code v-for="actionType in selectedDesk.forbidden_actions" :key="actionType">{{ actionType }}</code>
+              </div>
+            </div>
+            <div class="desk-chip-section">
+              <small>{{ t("ceoOffice.evidenceRequired") }}</small>
+              <div class="desk-chip-list">
+                <code v-for="evidenceKind in selectedDesk.evidence_required" :key="evidenceKind">{{ evidenceKind }}</code>
+              </div>
+            </div>
+            <div class="desk-activity-grid">
+              <div>
+                <span>{{ t("ceoOffice.relatedMessages") }}</span>
+                <strong>{{ deskScopedMessages.length }}</strong>
+              </div>
+              <div>
+                <span>{{ t("ceoOffice.relatedActions") }}</span>
+                <strong>{{ deskScopedActions.length }}</strong>
+              </div>
+              <div>
+                <span>{{ t("ceoOffice.relatedHandoffs") }}</span>
+                <strong>{{ deskScopedHandoffs.length }}</strong>
+              </div>
+            </div>
+            <div v-if="deskScopedActions.length" class="desk-related-list">
+              <small>{{ t("ceoOffice.relatedActions") }}</small>
+              <button
+                v-for="action in deskScopedActions.slice(0, 3)"
+                :key="action.action_id"
+                class="desk-related-row"
+                type="button"
+                @click="selectAction(action.action_id)"
+              >
+                <strong>{{ action.summary }}</strong>
+                <span>{{ statusLabel(action.status) }}</span>
+              </button>
+            </div>
+            <div v-if="deskScopedHandoffs.length" class="desk-related-list">
+              <small>{{ t("ceoOffice.relatedHandoffs") }}</small>
+              <div v-for="handoff in deskScopedHandoffs.slice(0, 3)" :key="handoff.handoff_id" class="desk-related-row passive">
+                <strong>{{ deskLabel(handoff.source_desk) }} → {{ deskLabel(handoff.target_desk) }}</strong>
+                <span>{{ statusLabel(handoff.status) }}</span>
               </div>
             </div>
           </div>
@@ -569,6 +638,7 @@ const operatingLiveKillSwitch = ref<"activate" | "deactivate" | "">("");
 const runningLiveReconciliation = ref(false);
 const selectedReportKind = ref("daily_brief");
 const selectedDraftDesk = ref("reporting");
+const selectedDeskId = ref("reporting");
 const draft = ref("");
 const sending = ref(false);
 const error = ref("");
@@ -582,6 +652,12 @@ const paperOrderPreview = computed(() => objectParam(selectedAction.value?.actio
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
 const paperRiskGatePassed = computed(() => Boolean(paperRiskGate.value?.passed));
 const paperRiskBlockers = computed(() => arrayParam(paperRiskGate.value?.blockers));
+const selectedDesk = computed(() => desks.value.find(desk => desk.desk_id === selectedDeskId.value) || desks.value[0] || null);
+const deskScopedMessages = computed(() => messages.value.filter(message => message.desk === selectedDeskId.value));
+const deskScopedActions = computed(() => actions.value.filter(action => action.desk === selectedDeskId.value));
+const deskScopedHandoffs = computed(() => handoffs.value.filter(
+  handoff => handoff.source_desk === selectedDeskId.value || handoff.target_desk === selectedDeskId.value,
+));
 const paperReconciliation = computed(() => selectedAction.value?.paper_reconciliations?.[0] || null);
 const paperReconciliationSummary = computed(() => {
   const reconciliation = paperReconciliation.value;
@@ -617,6 +693,11 @@ const deskNames = computed<Record<string, string>>(() => ({
 
 function deskLabel(desk: string) {
   return deskNames.value[desk] || desk;
+}
+
+function selectDesk(deskId: string) {
+  selectedDeskId.value = deskId;
+  selectedDraftDesk.value = deskId;
 }
 
 function statusLabel(status: string) {
@@ -713,6 +794,9 @@ async function load() {
     ]);
     sessions.value = sessionPayload.sessions || [];
     desks.value = deskPayload.desks || [];
+    if (!desks.value.some(desk => desk.desk_id === selectedDeskId.value)) {
+      selectedDeskId.value = activeSession.value?.default_desk || desks.value[0]?.desk_id || "reporting";
+    }
     actions.value = actionPayload.actions || [];
     handoffs.value = handoffPayload.handoffs || [];
     liveReadiness.value = livePayload.health;

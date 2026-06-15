@@ -42,10 +42,25 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentUpdateSession" in view
     assert "api.agentAddMessage" in view
     assert "selectedDraftDesk" in view
+    assert "selectedDeskId" in view
+    assert "selectedDesk" in view
+    assert "deskScopedMessages" in view
+    assert "deskScopedActions" in view
+    assert "deskScopedHandoffs" in view
+    assert "selectDesk" in view
     assert 'v-model="selectedDraftDesk"' in view
     assert 'v-for="desk in desks"' in view
+    assert '@click="selectDesk(desk.desk_id)"' in view
+    assert 'selected: selectedDeskId === desk.desk_id' in view
     assert 'desk: selectedDraftDesk.value' in view
     assert "ceoOffice.messageDesk" in view
+    assert "ceoOffice.deskMandate" in view
+    assert "ceoOffice.allowedTools" in view
+    assert "ceoOffice.forbiddenActions" in view
+    assert "ceoOffice.evidenceRequired" in view
+    assert "ceoOffice.relatedMessages" in view
+    assert "ceoOffice.relatedActions" in view
+    assert "ceoOffice.relatedHandoffs" in view
     assert "api.agentAction" in view
     assert "api.agentRunAction" in view
     assert "api.agentPaperSubmitAction" in view
@@ -137,8 +152,22 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
     assert "目标 Desk" in zh_ceo
+    assert "Desk 职责" in zh_ceo
+    assert "允许工具" in zh_ceo
+    assert "禁止行动" in zh_ceo
+    assert "证据要求" in zh_ceo
+    assert "相关消息" in zh_ceo
+    assert "相关行动" in zh_ceo
+    assert "相关交接" in zh_ceo
     assert "Action Queue" in en_ceo
     assert "Target Desk" in en_ceo
+    assert "Desk Mandate" in en_ceo
+    assert "Allowed Tools" in en_ceo
+    assert "Forbidden Actions" in en_ceo
+    assert "Evidence Required" in en_ceo
+    assert "Related Messages" in en_ceo
+    assert "Related Actions" in en_ceo
+    assert "Related Handoffs" in en_ceo
     assert "归档会话" in zh_ceo
     assert "Archive Session" in en_ceo
     assert "交接事项" in zh_ceo
