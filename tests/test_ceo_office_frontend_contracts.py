@@ -30,6 +30,7 @@ def test_app_shell_nav_exposes_ceo_office_and_market_separately():
 
 def test_ceo_office_view_uses_agent_api_and_i18n():
     view = read_frontend("views/CEOOffice.vue")
+    api_client = read_frontend("api/client.ts")
     zh_index = read_frontend("i18n/messages/zh-CN/index.ts")
     en_index = read_frontend("i18n/messages/en-US/index.ts")
     zh_ceo = read_frontend("i18n/messages/zh-CN/ceoOffice.ts")
@@ -43,9 +44,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentUpdateSession" in view
     assert "api.agentAddMessage" in view
     assert "api.agentPlan" in view
-    assert "api.agentSessionStreamUrl" in view
-    assert "EventSource" in view
-    assert 'addEventListener("session_snapshot"' in view
+    assert "api.agentSessionStream" in view
+    assert "AbortController" in view
+    assert "EventSource" not in view
+    assert "streamSse" in api_client
+    assert "authHeaders()" in api_client
     assert "sessionStreamStatus" in view
     assert "closeSessionStream" in view
     assert "onBeforeUnmount(closeSessionStream)" in view
@@ -360,7 +363,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentPlan" in agent_api
     assert '"/api/agent/plans"' in agent_api
     assert "AgentSessionStreamSnapshot" in agent_types
-    assert "agentSessionStreamUrl" in agent_api
+    assert "agentSessionStream" in agent_api
+    assert "streamSse" in agent_api
     assert '`/api/agent/sessions/${encodeURIComponent(sessionId)}/stream`' in agent_api
     assert "agentActions" in agent_api
     assert "filters: AgentActionFilters = {}" in agent_api

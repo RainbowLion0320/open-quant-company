@@ -751,7 +751,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentSessionStreamSnapshot, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -771,7 +771,7 @@ const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
 const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
 const workflowPlan = ref<AgentWorkflowPlan | null>(null);
-const sessionStream = ref<EventSource | null>(null);
+const sessionStream = ref<AbortController | null>(null);
 const sessionStreamId = ref("");
 const sessionStreamStatus = ref("inactive");
 const lastStreamSignature = ref("");
@@ -940,7 +940,7 @@ function formatNumber(value: unknown) {
 }
 
 function closeSessionStream() {
-  sessionStream.value?.close();
+  sessionStream.value?.abort();
   sessionStream.value = null;
   sessionStreamId.value = "";
   sessionStreamStatus.value = "inactive";
@@ -950,32 +950,31 @@ function closeSessionStream() {
 function connectSessionStream(sessionId: string) {
   if (sessionStream.value && sessionStreamId.value === sessionId) return;
   closeSessionStream();
-  if (typeof EventSource === "undefined") {
-    sessionStreamStatus.value = "blocked";
-    return;
-  }
-  const source = new EventSource(api.agentSessionStreamUrl(sessionId));
-  sessionStream.value = source;
+  const controller = new AbortController();
+  sessionStream.value = controller;
   sessionStreamId.value = sessionId;
   sessionStreamStatus.value = "connecting";
-  source.addEventListener("session_snapshot", event => {
-    try {
-      const snapshot = JSON.parse((event as MessageEvent).data) as AgentSessionStreamSnapshot;
-      if (snapshot.signature === lastStreamSignature.value) return;
-      lastStreamSignature.value = snapshot.signature;
-      sessionStreamStatus.value = "connected";
-      void loadSession(snapshot.session_id, { connectStream: false });
-    } catch {
-      sessionStreamStatus.value = "blocked";
-    }
-  });
-  source.addEventListener("session_missing", () => {
-    closeSessionStream();
+  void api.agentSessionStream(
+    sessionId,
+    {
+      onSnapshot: snapshot => {
+        if (snapshot.signature === lastStreamSignature.value) return;
+        lastStreamSignature.value = snapshot.signature;
+        sessionStreamStatus.value = "connected";
+        void loadSession(snapshot.session_id, { connectStream: false });
+      },
+      onMissing: () => {
+        closeSessionStream();
+        sessionStreamStatus.value = "blocked";
+      },
+    },
+    { signal: controller.signal },
+  ).catch(err => {
+    if (controller.signal.aborted) return;
+    const name = err instanceof Error ? err.name : "";
+    if (name === "AbortError") return;
     sessionStreamStatus.value = "blocked";
   });
-  source.onerror = () => {
-    sessionStreamStatus.value = "blocked";
-  };
 }
 
 async function loadSession(sessionId: string, options: { connectStream?: boolean } = {}) {

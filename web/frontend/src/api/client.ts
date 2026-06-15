@@ -56,3 +56,58 @@ export function put<T>(url: string, body?: unknown): Promise<T> {
 export function patch<T>(url: string, body?: unknown): Promise<T> {
   return req<T>(url, { method: "PATCH", body: body ? JSON.stringify(body) : undefined });
 }
+
+export type SseHandlers = Record<string, (data: string) => void>;
+
+function dispatchSseBlock(block: string, handlers: SseHandlers) {
+  let event = "message";
+  const data: string[] = [];
+  for (const line of block.split("\n")) {
+    if (line.startsWith("event:")) {
+      event = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      data.push(line.slice(5).trimStart());
+    }
+  }
+  const handler = handlers[event];
+  if (handler) handler(data.join("\n"));
+}
+
+export async function streamSse(
+  url: string,
+  handlers: SseHandlers,
+  options: { signal?: AbortSignal } = {},
+): Promise<void> {
+  const res = await fetch(BASE + url, {
+    headers: authHeaders(),
+    signal: options.signal,
+  });
+  const contentType = res.headers.get("content-type") || "";
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    throw new Error(`[${res.status}] ${bodyText || "Unknown error"}`);
+  }
+  if (!contentType.includes("text/event-stream")) {
+    throw new Error(`接口未返回事件流: ${url}`);
+  }
+  if (!res.body) {
+    throw new Error(`接口不支持流式读取: ${url}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let splitIndex = buffer.indexOf("\n\n");
+    while (splitIndex >= 0) {
+      const block = buffer.slice(0, splitIndex).trim();
+      buffer = buffer.slice(splitIndex + 2);
+      if (block) dispatchSseBlock(block, handlers);
+      splitIndex = buffer.indexOf("\n\n");
+    }
+  }
+  const tail = buffer.trim();
+  if (tail) dispatchSseBlock(tail, handlers);
+}

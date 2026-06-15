@@ -1,4 +1,4 @@
-import { get, patch, post } from "../client";
+import { get, patch, post, streamSse } from "../client";
 import type {
   AgentAction,
   AgentActionDetail,
@@ -24,6 +24,7 @@ import type {
   AgentScheduledReportRhythmResponse,
   AgentSession,
   AgentSessionDetail,
+  AgentSessionStreamSnapshot,
   AgentWorkflowPlanResponse,
   AgentSessionsResponse,
   AgentWorkOrderResponse,
@@ -36,6 +37,21 @@ export const agentApi = {
     post<{ session: AgentSession }>("/api/agent/sessions", payload),
   agentSession: (sessionId: string) => get<AgentSessionDetail>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`),
   agentSessionStreamUrl: (sessionId: string) => `/api/agent/sessions/${encodeURIComponent(sessionId)}/stream`,
+  agentSessionStream: (
+    sessionId: string,
+    handlers: {
+      onSnapshot: (snapshot: AgentSessionStreamSnapshot) => void;
+      onMissing?: (payload: { status: string; session_id: string }) => void;
+    },
+    options: { signal?: AbortSignal } = {},
+  ) => streamSse(
+    `/api/agent/sessions/${encodeURIComponent(sessionId)}/stream`,
+    {
+      session_snapshot: data => handlers.onSnapshot(JSON.parse(data) as AgentSessionStreamSnapshot),
+      session_missing: data => handlers.onMissing?.(JSON.parse(data) as { status: string; session_id: string }),
+    },
+    options,
+  ),
   agentUpdateSession: (
     sessionId: string,
     payload: { title?: string; status?: string; default_desk?: string; tags?: string[] },
