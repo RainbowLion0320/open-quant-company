@@ -1138,6 +1138,12 @@ def _safe_semantic_actions(rows: list[dict[str, Any]]) -> tuple[list[WorkflowAct
         if descriptor.risk_level not in {"read_only", "dry_run"}:
             rejected.append({"tool_id": tool_id, "desk": requested_desk, "reason": "unsafe_risk_level"})
             continue
+        if not requested_desk:
+            inferred_desk = _infer_single_scope_desk(descriptor.desk_scopes)
+            if inferred_desk is None:
+                rejected.append({"tool_id": tool_id, "desk": requested_desk, "reason": "missing_or_ambiguous_desk"})
+                continue
+            requested_desk = inferred_desk
         if requested_desk not in descriptor.desk_scopes:
             rejected.append({"tool_id": tool_id, "desk": requested_desk, "reason": "desk_scope_mismatch"})
             continue
@@ -1163,6 +1169,13 @@ def _safe_semantic_actions(rows: list[dict[str, Any]]) -> tuple[list[WorkflowAct
             )
         )
     return _dedupe_actions(actions), rejected
+
+
+def _infer_single_scope_desk(desk_scopes: list[str]) -> str | None:
+    unique_scopes = _ordered_unique([scope for scope in desk_scopes if scope])
+    if len(unique_scopes) == 1:
+        return unique_scopes[0]
+    return None
 
 
 def _semantic_action_parameters(value: Any) -> dict[str, Any]:

@@ -4839,6 +4839,51 @@ def test_agent_semantic_planner_is_opt_in_and_filtered_to_safe_known_tools(tmp_p
     reset_datahub()
 
 
+def test_agent_semantic_planner_infers_single_scope_desk_but_rejects_ambiguous_missing_desk(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.workflows import SemanticWorkflowDraft
+
+    class DesklessSemanticPlanner:
+        def plan(self, *, desk: str, content: str, artifact_context: dict, session_context: dict) -> SemanticWorkflowDraft:
+            return SemanticWorkflowDraft(
+                answer="Deskless semantic plan should keep unambiguous safe diagnostics only.",
+                confidence=0.8,
+                actions=[
+                    {
+                        "tool_id": "astroq.architecture.ast",
+                        "summary": "Inspect architecture duplicate implementation risks.",
+                    },
+                    {
+                        "tool_id": "astroq.lifecycle.check",
+                        "summary": "Ambiguous deskless lifecycle check should be rejected.",
+                    },
+                ],
+            )
+
+    preview = AgentRuntime().preview_workflow_plan(
+        desk="reporting",
+        content="请做一次安全诊断，但 planner 没给 desk 字段",
+        semantic_planner=DesklessSemanticPlanner(),
+    )
+    reasoning_by_kind = {row["kind"]: row for row in preview["reasoning"]}
+
+    assert preview["planning_mode"] == "semantic_assisted"
+    assert [(action["desk"], action["tool_id"]) for action in preview["actions"]] == [
+        ("engineering", "astroq.architecture.ast")
+    ]
+    assert "unsafe_semantic_actions_filtered" in preview["blockers"]
+    assert reasoning_by_kind["semantic_planner"]["accepted_action_count"] == 1
+    assert reasoning_by_kind["semantic_planner"]["rejected"] == [
+        {"tool_id": "astroq.lifecycle.check", "desk": "", "reason": "missing_or_ambiguous_desk"}
+    ]
+    reset_datahub()
+
+
 def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

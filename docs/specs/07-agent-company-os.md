@@ -152,6 +152,11 @@ The first implementation is deterministic: it does not call an LLM. It creates
 safe local evidence references, proposes only desk-scoped fixed-registry actions,
 and records any required cross-desk handoffs in the ledger.
 
+Semantic-assisted plans are still filtered through the fixed tool registry. A
+deskless semantic action may be accepted only when the selected safe tool has
+exactly one declared desk scope; ambiguous multi-desk tools require an explicit
+matching desk and are rejected with a structured reason.
+
 ## 5. Data Model
 
 ### 5.1 AgentSession
