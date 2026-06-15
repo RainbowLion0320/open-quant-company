@@ -766,5 +766,5 @@ As of 2026-06-14:
 - MiniQMT/QMT live order preview, proposal, approved-submit contract, scheduled reconciliation scan, and local kill switch operations are available through CLI/API. The path never falls back to PaperBroker, always requires approval, re-runs preview/risk gates before submit, writes live reconciliation evidence, blocks before broker calls when kill switch is active, and defaults to `live_submission_not_integrated` / `not_integrated` until a real MiniQMT/QMT submit/reconcile adapter is wired.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
-- CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
+- CEO Office is implemented as the default `/` route with session creation, message entry, desk status, approval queue display, action detail, and run event timeline display; `/market` carries the market overview.
 - Actual advanced desk reasoning, cross-tool workflow orchestration, realtime Web streaming, advanced semantic report synthesis, and real MiniQMT/QMT SDK submission/reconciliation are not yet implemented.

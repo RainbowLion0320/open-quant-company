@@ -66,6 +66,7 @@ export const ceoOffice = {
       parameters: "Parameters",
       evidenceRefs: "Evidence Refs",
       runEvidence: "Run Evidence",
+      runTimeline: "Run Timeline",
       sourceDesk: "Source",
       targetDesk: "Target",
       noEvidence: "No evidence",

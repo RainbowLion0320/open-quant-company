@@ -66,6 +66,7 @@ export const ceoOffice = {
       parameters: "参数",
       evidenceRefs: "证据引用",
       runEvidence: "运行证据",
+      runTimeline: "运行时间线",
       sourceDesk: "来源",
       targetDesk: "目标",
       noEvidence: "暂无证据",

@@ -56,6 +56,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "paper_reconciliations" in view
     assert "run.artifact_refs" in view
     assert "ceoOffice.runEvidence" in view
+    assert "run.events" in view
+    assert "ceoOffice.runTimeline" in view
+    assert "event.sequence" in view
+    assert "event.event_type" in view
+    assert "event.message" in view
     assert "cancelAction" in view
     assert "canCancelAction" in view
     assert "selectedAction.action.expires_at" in view
@@ -180,6 +185,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "审批请求已取消" in zh_ceo
     assert "风控门" in zh_ceo
     assert "运行证据" in zh_ceo
+    assert "运行时间线" in zh_ceo
     assert "Reports" in en_ceo
     assert "Report Type" in en_ceo
     assert "Generate Report" in en_ceo
@@ -211,6 +217,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Approval Request Canceled" in en_ceo
     assert "Risk Gate" in en_ceo
     assert "Run Evidence" in en_ceo
+    assert "Run Timeline" in en_ceo
     assert "实盘就绪" in zh_ceo
     assert "实盘红灯" in zh_ceo
     assert "激活红灯" in zh_ceo
@@ -277,6 +284,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentLiveReconciliationResponse" in agent_types
     assert "live_kill_switch?: AgentLiveKillSwitch" in agent_types
     assert "export interface AgentAction" in agent_types
+    assert "export interface AgentRunEvent" in agent_types
+    assert "events?: AgentRunEvent[]" in agent_types
     assert "expires_at: string" in agent_types
     assert "export interface AgentActionDetail" in agent_types
     assert "paper_reconciliations: AgentPaperReconciliation[]" in agent_types

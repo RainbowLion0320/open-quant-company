@@ -62,6 +62,18 @@ export interface EvidenceNavigation {
   label: string;
 }
 
+export interface AgentRunEvent {
+  event_id: string;
+  run_id: string;
+  action_id: string;
+  sequence: number;
+  event_type: string;
+  status: string;
+  message: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface AgentRun {
   run_id: string;
   action_id: string;
@@ -74,6 +86,7 @@ export interface AgentRun {
   stdout_summary: string;
   stderr_summary: string;
   artifact_refs: string[];
+  events?: AgentRunEvent[];
 }
 
 export interface AgentHandoff {

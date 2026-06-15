@@ -454,6 +454,15 @@
                   <code>{{ run.command.join(" ") }}</code>
                   <p v-if="run.stdout_summary">{{ t("ceoOffice.stdout") }}: {{ run.stdout_summary }}</p>
                   <p v-if="run.stderr_summary">{{ t("ceoOffice.stderr") }}: {{ run.stderr_summary }}</p>
+                  <div v-if="run.events?.length" class="run-timeline">
+                    <small>{{ t("ceoOffice.runTimeline") }}</small>
+                    <div v-for="event in run.events" :key="event.event_id" class="run-event-row">
+                      <code>#{{ event.sequence }}</code>
+                      <strong>{{ statusLabel(event.event_type) }}</strong>
+                      <span>{{ statusLabel(event.status) }}</span>
+                      <p>{{ event.message }}</p>
+                    </div>
+                  </div>
                   <div v-if="run.artifact_refs.length" class="run-evidence-list">
                     <small>{{ t("ceoOffice.runEvidence") }}</small>
                     <button
