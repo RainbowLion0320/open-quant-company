@@ -345,6 +345,12 @@ def build_desk_workflow_plan(
             or _is_engineering_code_request(normalized)
             or any(token in normalized for token in ("docs", "doc", "文档", "stale"))
         )
+    ) or (
+        desk == "execution"
+        and (
+            _mentions_execution_dry_run(normalized)
+            or any(token in normalized for token in ("paper", "live", "order", "下单", "执行", "交易"))
+        )
     ):
         evidence_summary = _artifact_evidence_summary(artifact_context or {})
         if evidence_summary:
