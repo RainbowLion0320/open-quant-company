@@ -102,6 +102,22 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
 }
 
 _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
+    "reporting": [
+        (
+            ("组合", "portfolio", "持仓", "风险复盘", "执行复盘", "execution review"),
+            {
+                "answer": "Reporting Desk 已识别到 portfolio operating review。下一步会并行读取 Research 策略证据、Risk 生命周期门禁和 Execution dry-run 预览，再汇总组合层面的 CEO 复盘。",
+                "evidence_label": "Portfolio operating review",
+                "evidence_uri": "/portfolio",
+                "evidence_summary": "Open portfolio, risk, and execution review context.",
+                "action_type": "portfolio_review",
+                "tool_id": "astroq.lifecycle.check",
+                "risk_level": "read_only",
+                "action_summary": "Read lifecycle readiness for portfolio review.",
+                "expected_effect": "Records portfolio review blockers without changing data, strategy, or orders.",
+            },
+        ),
+    ],
     "data": [
         (
             ("数据源", "source", "capability", "registry", "能力", "diff", "差异"),
@@ -251,6 +267,48 @@ def _actions_for_profile(*, desk: str, profile: dict[str, str], normalized_conte
                 ),
             ),
         ]
+    if desk == "reporting" and _is_portfolio_review_request(normalized_content):
+        return [
+            WorkflowActionSpec(
+                desk="research",
+                action_type="strategy_competition",
+                tool_id="astroq.strategy.compete",
+                risk_level="read_only",
+                summary="Read Research Desk strategy competition evidence for portfolio review.",
+                expected_effect="Records current strategy evidence, OOS, IC/ICIR, and blockers without changing strategy state.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Strategy competition evidence",
+                    uri="/strategy-lab",
+                    summary="Open strategy competition and promotion evidence views.",
+                ),
+            ),
+            WorkflowActionSpec(
+                desk="risk",
+                action_type="lifecycle_check",
+                tool_id="astroq.lifecycle.check",
+                risk_level="read_only",
+                summary="Read Risk Desk lifecycle gates for portfolio review.",
+                expected_effect="Records lifecycle readiness and blocker evidence without changing system state.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Lifecycle readiness",
+                    uri="/system?tab=lifecycle",
+                    summary="Open lifecycle readiness and blocker details.",
+                ),
+            ),
+            WorkflowActionSpec(
+                desk="execution",
+                action_type="execution_dry_run",
+                tool_id="astroq.execution.dry_run",
+                risk_level="dry_run",
+                summary="Run Execution Desk dry-run readiness for portfolio review.",
+                expected_effect="Produces execution readiness preview without submitting paper or live orders.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Execution readiness",
+                    uri="/portfolio",
+                    summary="Open portfolio and execution readiness views.",
+                ),
+            ),
+        ]
     return [_action_for_profile(desk=desk, profile=profile)]
 
 
@@ -278,6 +336,12 @@ def _handoffs_for(desk: str, content: str) -> list[dict[str, Any]]:
             {"target_desk": "research", "reason": "CEO daily brief needs strategy evidence and promotion status."},
             {"target_desk": "risk", "reason": "CEO daily brief needs lifecycle and execution gate interpretation."},
         ]
+    if desk == "reporting" and _is_portfolio_review_request(normalized):
+        return [
+            {"target_desk": "research", "reason": "Portfolio review needs current strategy competition evidence."},
+            {"target_desk": "risk", "reason": "Portfolio review needs lifecycle and risk gate interpretation."},
+            {"target_desk": "execution", "reason": "Portfolio review needs execution dry-run readiness."},
+        ]
     if desk == "research" and any(token in normalized for token in ("数据", "data", "coverage", "缺")):
         return [{"target_desk": "data", "reason": "Research answer depends on data coverage or missing-data evidence."}]
     if desk == "risk" and any(token in normalized for token in ("下单", "order", "执行", "execution")):
@@ -289,4 +353,9 @@ def _handoffs_for(desk: str, content: str) -> list[dict[str, Any]]:
 
 def _is_daily_brief_request(normalized: str) -> bool:
     tokens = ("今天", "日常", "简报", "daily", "brief", "should do", "what should")
+    return any(token in normalized for token in tokens)
+
+
+def _is_portfolio_review_request(normalized: str) -> bool:
+    tokens = ("组合", "portfolio", "持仓", "风险复盘", "执行复盘", "execution review")
     return any(token in normalized for token in tokens)

@@ -132,6 +132,7 @@ The page must handle:
 - Broker live mode disabled
 - Open Engineering Desk work orders
 - Engineering work order status changes
+- Safe workflow results for proposed read-only and dry-run actions
 - Desk unavailable
 - API unavailable
 

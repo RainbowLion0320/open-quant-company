@@ -213,7 +213,7 @@ Phase 1 should add JSON-readable commands:
 | --- | --- |
 | `astroq agent sessions --json` | List local agent sessions. |
 | `astroq agent session create --title ... --json` | Create a session. |
-| `astroq agent session run-readonly <session_id> --json` | Run proposed read-only actions for one session and skip write/trading actions. |
+| `astroq agent session run-readonly <session_id> --json` | Run proposed safe read-only/dry-run actions for one session and skip approval-required write/trading actions. |
 | `astroq agent message --session <id> --desk <desk> --text ... --json` | Add a CEO message and route it. |
 | `astroq agent actions --session <id> --json` | List proposed and running actions. |
 | `astroq agent approve <action_id> --json` | Approve an action. |
@@ -227,7 +227,7 @@ Phase 1 should add JSON-readable commands:
 - Creating a session writes a durable local record.
 - Adding a message writes a durable message and produces deterministic desk routing metadata.
 - Read-only tools can run through fixed command arrays.
-- Session-level read-only workflow runs dispatch only proposed/read_only actions and report skipped write/trading actions.
+- Session-level safe workflow runs dispatch only proposed `read_only` / `dry_run` actions and report skipped approval-required write/trading actions.
 - State-changing actions are queued as `approval_required`.
 - Approval policies are explicit runtime/CLI/API contracts, not hidden conditionals.
 - Approval and rejection decisions are persisted.

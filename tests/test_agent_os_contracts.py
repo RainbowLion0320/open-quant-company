@@ -2612,6 +2612,76 @@ def test_reporting_daily_brief_orchestrates_multiple_desk_actions(tmp_path, monk
     reset_datahub()
 
 
+def test_reporting_portfolio_review_orchestrates_research_risk_execution_actions(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Portfolio operating review")
+
+    result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="reporting",
+        content="帮我做一次组合风险和执行复盘，看看策略证据、生命周期门禁和执行 dry-run",
+    )
+    response = result["desk_response"]
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+
+    assert len(actions) == 3
+    assert {action["desk"] for action in actions} == {"research", "risk", "execution"}
+    assert {action["parameters"]["tool_id"] for action in actions} == {
+        "astroq.strategy.compete",
+        "astroq.lifecycle.check",
+        "astroq.execution.dry_run",
+    }
+    assert {action["risk_level"] for action in actions} == {"read_only", "dry_run"}
+    assert len(response.evidence_refs) == 3
+    assert {handoff["target_desk"] for handoff in response.handoffs} == {"research", "risk", "execution"}
+    assert "portfolio" in response.answer.lower() or "组合" in response.answer
+    reset_datahub()
+
+
+def test_agent_runtime_runs_safe_portfolio_review_workflow_actions(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Portfolio safe workflow")
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        desk="reporting",
+        content="组合风险和执行复盘，需要 strategy evidence、lifecycle 和 execution dry-run",
+    )
+
+    result = runtime.run_session_read_only_actions(session.session_id, runner=fake_run)
+
+    assert result["status"] == "ready"
+    assert result["run_count"] == 3
+    assert result["skipped_count"] == 0
+    assert {run["status"] for run in result["runs"]} == {"succeeded"}
+    assert {run["action_id"] for run in result["runs"]} == set(routed["desk_response"].proposed_actions)
+    assert {tuple(command[1:]) for command in calls} == {
+        ("strategy", "compete", "--json"),
+        ("lifecycle", "check", "--json"),
+        ("execution", "dry-run", "--json"),
+    }
+    reset_datahub()
+
+
 def test_agent_runtime_runs_session_read_only_workflow_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
@@ -2653,7 +2723,7 @@ def test_agent_runtime_runs_session_read_only_workflow_actions(tmp_path, monkeyp
     assert result["blocked_count"] == 0
     assert result["skipped_count"] == 1
     assert result["skipped"][0]["action_id"] == write_action.action_id
-    assert result["skipped"][0]["reason"] == "not_read_only"
+    assert result["skipped"][0]["reason"] == "not_safe_workflow_action"
     assert {run["status"] for run in result["runs"]} == {"succeeded"}
     assert {run["action_id"] for run in result["runs"]} == set(routed["desk_response"].proposed_actions)
     assert len(calls) == 3

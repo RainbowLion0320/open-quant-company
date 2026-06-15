@@ -171,8 +171,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
     assert "目标 Desk" in zh_ceo
-    assert "运行只读检查" in zh_ceo
-    assert "只读检查状态" in zh_ceo
+    assert "运行安全工作流" in zh_ceo
+    assert "安全工作流状态" in zh_ceo
     assert "Desk 职责" in zh_ceo
     assert "允许工具" in zh_ceo
     assert "审批策略" in zh_ceo
@@ -186,8 +186,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "相关交接" in zh_ceo
     assert "Action Queue" in en_ceo
     assert "Target Desk" in en_ceo
-    assert "Run Read-only Checks" in en_ceo
-    assert "Read-only Check Status" in en_ceo
+    assert "Run Safe Workflow" in en_ceo
+    assert "Safe Workflow Status" in en_ceo
     assert "Desk Mandate" in en_ceo
     assert "Allowed Tools" in en_ceo
     assert "Approval Policies" in en_ceo

@@ -629,14 +629,14 @@ class AgentRuntime:
             action_id = str(action["action_id"])
             risk_level = str(action.get("risk_level") or "")
             status = str(action.get("status") or "")
-            if risk_level != "read_only" or bool(action.get("approval_required")):
+            if risk_level not in {"read_only", "dry_run"} or bool(action.get("approval_required")):
                 skipped.append(
                     {
                         "action_id": action_id,
                         "desk": str(action.get("desk") or ""),
                         "risk_level": risk_level,
                         "status": status,
-                        "reason": "not_read_only",
+                        "reason": "not_safe_workflow_action",
                     }
                 )
                 continue
