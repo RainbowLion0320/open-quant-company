@@ -5294,6 +5294,72 @@ def test_agent_provider_semantic_planner_uses_transport_then_filters_safe_action
     reset_datahub()
 
 
+def test_agent_provider_semantic_planner_redacts_secret_like_context_before_transport(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "provider-secret")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.semantic_planner import ProviderSemanticPlanner
+
+    captured_messages: list[dict[str, str]] = []
+
+    def fake_transport(request: dict[str, object]) -> dict[str, object]:
+        captured_messages.extend(request["messages"])  # type: ignore[arg-type]
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "answer": "Provider received redacted context.",
+                                "confidence": 0.7,
+                                "actions": [],
+                                "reasoning": [{"kind": "provider_goal", "goal": "redaction"}],
+                            }
+                        )
+                    }
+                }
+            ],
+            "usage": {"total_tokens": 1},
+        }
+
+    draft = ProviderSemanticPlanner(transport=fake_transport).plan(
+        desk="reporting",
+        content="请根据本地上下文做安全规划",
+        artifact_context={
+            "api_key": "artifact-secret",
+            "nested": {"authorization": "Bearer artifact-auth-secret"},
+            "items": [{"token": "artifact-token-secret"}],
+            "safe_status": "blocked",
+        },
+        session_context={
+            "active_actions": [
+                {
+                    "parameters": {
+                        "password": "broker-password-secret",
+                        "table": "stock_limit_list",
+                    }
+                }
+            ],
+            "credential_env": "DEEPSEEK_API_KEY",
+        },
+    )
+    messages_text = json.dumps(captured_messages, ensure_ascii=False)
+
+    assert draft["answer"] == "Provider received redacted context."
+    assert "artifact-secret" not in messages_text
+    assert "artifact-auth-secret" not in messages_text
+    assert "artifact-token-secret" not in messages_text
+    assert "broker-password-secret" not in messages_text
+    assert "provider-secret" not in messages_text
+    assert "stock_limit_list" in messages_text
+    assert "safe_status" in messages_text
+    assert "***REDACTED***" in messages_text
+    reset_datahub()
+
+
 def test_agent_provider_semantic_planner_api_and_cli_are_explicit_opt_in(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)

@@ -163,6 +163,10 @@ propagated into action cards.
 Malformed semantic draft metadata, such as non-numeric confidence or scalar
 reasoning/blocker fields, must normalize into a reviewable blocked plan instead
 of raising an API/CLI/runtime exception.
+Provider semantic planning may send bounded local artifact/session context to
+the configured external LLM provider, but secret-like context keys such as
+`api_key`, `token`, `password`, `authorization`, `credential`, or `secret` must
+be recursively redacted before transport.
 
 ## 5. Data Model
 

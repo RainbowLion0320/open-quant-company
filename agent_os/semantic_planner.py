@@ -232,8 +232,8 @@ def _semantic_provider_messages(
     safe_context = {
         "desk": desk,
         "content": content,
-        "artifact_context": artifact_context,
-        "session_context": session_context,
+        "artifact_context": _redact_provider_context(artifact_context),
+        "session_context": _redact_provider_context(session_context),
         "allowed_tools": _safe_tool_contracts(),
     }
     return [
@@ -251,6 +251,29 @@ def _semantic_provider_messages(
             "content": json.dumps(safe_context, ensure_ascii=False, sort_keys=True),
         },
     ]
+
+
+def _redact_provider_context(value: Any) -> Any:
+    if isinstance(value, dict):
+        redacted: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if _is_secret_like_key(key_text):
+                redacted[key_text] = "***REDACTED***"
+            else:
+                redacted[key_text] = _redact_provider_context(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_provider_context(item) for item in value]
+    if isinstance(value, tuple):
+        return [_redact_provider_context(item) for item in value]
+    return value
+
+
+def _is_secret_like_key(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    secret_tokens = ("secret", "token", "password", "api_key", "apikey", "authorization", "credential")
+    return any(token in normalized for token in secret_tokens)
 
 
 def _openai_compatible_chat_completion(request: dict[str, Any]) -> dict[str, Any]:
