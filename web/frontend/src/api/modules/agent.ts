@@ -24,6 +24,7 @@ import type {
   AgentScheduledReportRhythmResponse,
   AgentSession,
   AgentSessionDetail,
+  AgentWorkflowPlanResponse,
   AgentSessionsResponse,
   AgentWorkOrderResponse,
   AgentWorkOrdersResponse,
@@ -44,6 +45,7 @@ export const agentApi = {
     sessionId: string,
     payload: { role?: string; desk?: string; content: string; evidence_refs?: string[]; action_refs?: string[] },
   ) => post<AgentAddMessageResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/messages`, payload),
+  agentPlan: (payload: { desk: string; content: string }) => post<AgentWorkflowPlanResponse>("/api/agent/plans", payload),
   agentActions: (filters: AgentActionFilters = {}) => {
     const params = new URLSearchParams();
     if (filters.session_id) params.set("session_id", filters.session_id);

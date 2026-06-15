@@ -42,6 +42,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentCreateSession" in view
     assert "api.agentUpdateSession" in view
     assert "api.agentAddMessage" in view
+    assert "api.agentPlan" in view
+    assert "previewWorkflowPlan" in view
+    assert "workflowPlan" in view
+    assert "planningWorkflow" in view
     assert "api.agentRunSessionReadOnlyActions" in view
     assert "runSessionReadOnlyActions" in view
     assert "readOnlyWorkflowResult" in view
@@ -61,6 +65,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'selected: selectedDeskId === desk.desk_id' in view
     assert 'desk: selectedDraftDesk.value' in view
     assert "ceoOffice.messageDesk" in view
+    assert "ceoOffice.previewPlan" in view
+    assert "ceoOffice.workflowPlan" in view
+    assert "ceoOffice.noLedgerWrites" in view
     assert "ceoOffice.runReadOnlyWorkflow" in view
     assert "ceoOffice.readOnlyWorkflowStatus" in view
     assert "ceoOffice.deskMandate" in view
@@ -171,6 +178,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
     assert "目标 Desk" in zh_ceo
+    assert "预览计划" in zh_ceo
+    assert "工作流计划" in zh_ceo
+    assert "不会写入 ledger" in zh_ceo
     assert "运行安全工作流" in zh_ceo
     assert "安全工作流状态" in zh_ceo
     assert "Desk 职责" in zh_ceo
@@ -186,6 +196,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "相关交接" in zh_ceo
     assert "Action Queue" in en_ceo
     assert "Target Desk" in en_ceo
+    assert "Preview Plan" in en_ceo
+    assert "Workflow Plan" in en_ceo
+    assert "No ledger writes" in en_ceo
     assert "Run Safe Workflow" in en_ceo
     assert "Safe Workflow Status" in en_ceo
     assert "Desk Mandate" in en_ceo
@@ -330,6 +343,9 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentApprovalPolicies" in agent_api
     assert '"/api/agent/policies"' in agent_api
     assert "AgentAddMessageResponse" in agent_api
+    assert "AgentWorkflowPlanResponse" in agent_api
+    assert "agentPlan" in agent_api
+    assert '"/api/agent/plans"' in agent_api
     assert "agentActions" in agent_api
     assert "filters: AgentActionFilters = {}" in agent_api
     assert "URLSearchParams" in agent_api

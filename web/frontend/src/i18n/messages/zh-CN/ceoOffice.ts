@@ -11,6 +11,10 @@ export const ceoOffice = {
       refresh: "刷新",
       messagePlaceholder: "输入要交给 desk agents 的问题或任务",
       send: "发送",
+      previewPlan: "预览计划",
+      workflowPlan: "工作流计划",
+      noLedgerWrites: "不会写入 ledger",
+      plannedHandoffs: "计划交接",
       deskStatus: "Desk 状态",
       actionQueue: "行动队列",
       handoffs: "交接事项",
@@ -165,4 +169,5 @@ export const ceoOffice = {
       defaultSessionTitle: "CEO 日常主控",
       loadFailed: "CEO Office 加载失败",
       writeFailed: "写入会话失败",
+      planPreviewFailed: "预览计划失败",
     } as const;

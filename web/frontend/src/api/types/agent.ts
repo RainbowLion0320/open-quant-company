@@ -216,6 +216,35 @@ export interface AgentDeskResponse {
   handoffs: AgentHandoff[];
 }
 
+export interface AgentWorkflowPlanAction {
+  desk: string;
+  action_type: string;
+  tool_id: string;
+  risk_level: string;
+  status_preview: string;
+  approval_required: boolean;
+  summary: string;
+  expected_effect: string;
+  parameters: Record<string, unknown>;
+  evidence: {
+    label: string;
+    uri: string;
+    summary: string;
+  };
+}
+
+export interface AgentWorkflowPlan {
+  status: string;
+  desk: string;
+  answer: string;
+  confidence: number;
+  actions: AgentWorkflowPlanAction[];
+  handoffs: Array<Record<string, unknown>>;
+  work_orders: Array<Record<string, unknown>>;
+  blockers: string[];
+  side_effects: Record<string, unknown>;
+}
+
 export interface AgentDesk {
   desk_id: string;
   display_name: string;
@@ -472,4 +501,8 @@ export interface AgentPaperCancelResponse {
 export interface AgentAddMessageResponse {
   message: AgentMessage;
   desk_response?: AgentDeskResponse;
+}
+
+export interface AgentWorkflowPlanResponse {
+  plan: AgentWorkflowPlan;
 }

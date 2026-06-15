@@ -154,7 +154,7 @@
 
 .message-composer {
   display: grid;
-  grid-template-columns: minmax(140px, 0.28fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(140px, 0.28fr) minmax(0, 1fr) auto auto;
   align-items: end;
   gap: 10px;
 }
@@ -181,6 +181,63 @@
   padding: 0 8px;
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
+}
+
+.workflow-plan {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.workflow-plan header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workflow-plan header div,
+.workflow-plan-list {
+  display: grid;
+  gap: 6px;
+}
+
+.workflow-plan header span,
+.workflow-plan small {
+  color: var(--text-tertiary);
+}
+
+.workflow-plan p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.workflow-plan-action {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.workflow-plan-action div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.workflow-plan-handoffs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .desk-row {

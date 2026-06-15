@@ -114,7 +114,35 @@
           <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
             {{ t("ceoOffice.send") }}
           </button>
+          <button class="btn btn-ghost" type="button" :disabled="planningWorkflow || !draft.trim()" @click="previewWorkflowPlan">
+            {{ t("ceoOffice.previewPlan") }}
+          </button>
         </form>
+        <div v-if="workflowPlan" class="workflow-plan">
+          <header>
+            <div>
+              <strong>{{ t("ceoOffice.workflowPlan") }}</strong>
+              <small>{{ deskLabel(workflowPlan.desk) }} · {{ Math.round(workflowPlan.confidence * 100) }}%</small>
+            </div>
+            <span>{{ t("ceoOffice.noLedgerWrites") }}</span>
+          </header>
+          <p>{{ workflowPlan.answer }}</p>
+          <div class="workflow-plan-list">
+            <div v-for="action in workflowPlan.actions" :key="`${action.tool_id}-${action.summary}`" class="workflow-plan-action">
+              <span class="action-status" :class="action.status_preview">{{ statusLabel(action.status_preview) }}</span>
+              <div>
+                <strong>{{ deskLabel(action.desk) }} · {{ action.tool_id }}</strong>
+                <small>{{ action.summary }}</small>
+              </div>
+            </div>
+          </div>
+          <div v-if="workflowPlan.handoffs.length" class="workflow-plan-handoffs">
+            <small>{{ t("ceoOffice.plannedHandoffs") }}</small>
+            <code v-for="handoff in workflowPlan.handoffs" :key="String(handoff.target_desk || handoff.reason)">
+              {{ String(handoff.target_desk || "") }}
+            </code>
+          </div>
+        </div>
       </article>
 
       <aside class="ceo-side">
@@ -721,7 +749,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -740,6 +768,7 @@ const liveReadiness = ref<AgentLiveReadiness | null>(null);
 const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
 const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
+const workflowPlan = ref<AgentWorkflowPlan | null>(null);
 const desks = ref<AgentDesk[]>([]);
 const approvalPolicies = ref<AgentApprovalPolicy[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
@@ -765,6 +794,7 @@ const selectedDraftDesk = ref("reporting");
 const selectedDeskId = ref("reporting");
 const draft = ref("");
 const sending = ref(false);
+const planningWorkflow = ref(false);
 const error = ref("");
 
 const pendingActions = computed(() => actions.value.filter(action => action.status === "approval_required"));
@@ -1006,6 +1036,24 @@ async function ensureSession(): Promise<AgentSession> {
   return payload.session;
 }
 
+async function previewWorkflowPlan() {
+  const text = draft.value.trim();
+  if (!text) return;
+  planningWorkflow.value = true;
+  error.value = "";
+  try {
+    const payload = await api.agentPlan({
+      desk: selectedDraftDesk.value,
+      content: text,
+    });
+    workflowPlan.value = payload.plan;
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.planPreviewFailed")}: ${err?.message || err}`;
+  } finally {
+    planningWorkflow.value = false;
+  }
+}
+
 async function sendMessage() {
   const text = draft.value.trim();
   if (!text) return;
@@ -1019,6 +1067,7 @@ async function sendMessage() {
       content: text,
     });
     draft.value = "";
+    workflowPlan.value = null;
     await loadSession(session.session_id);
   } catch (err: any) {
     error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;

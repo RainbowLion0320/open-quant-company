@@ -11,6 +11,10 @@ export const ceoOffice = {
       refresh: "Refresh",
       messagePlaceholder: "Ask the desk agents a question or task",
       send: "Send",
+      previewPlan: "Preview Plan",
+      workflowPlan: "Workflow Plan",
+      noLedgerWrites: "No ledger writes",
+      plannedHandoffs: "Planned Handoffs",
       deskStatus: "Desk Status",
       actionQueue: "Action Queue",
       handoffs: "Handoffs",
@@ -165,4 +169,5 @@ export const ceoOffice = {
       defaultSessionTitle: "Daily CEO Control",
       loadFailed: "CEO Office failed to load",
       writeFailed: "Session write failed",
+      planPreviewFailed: "Plan preview failed",
     } as const;
