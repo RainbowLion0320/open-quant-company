@@ -300,6 +300,7 @@ class AgentRuntime:
             "handoffs": list(plan.handoffs),
             "work_orders": [asdict(work_order) for work_order in plan.work_orders],
             "blockers": list(plan.blockers),
+            "reasoning": [dict(row) for row in plan.reasoning],
             "side_effects": {
                 "ledger_writes": False,
                 "messages_created": 0,
@@ -1050,6 +1051,7 @@ class AgentRuntime:
         proposed_actions: list[str] | None = None,
         blockers: list[str] | None = None,
         handoffs: list[dict[str, Any]] | None = None,
+        reasoning: list[dict[str, Any]] | None = None,
     ) -> DeskResponse:
         if not self.ledger.get_session(session_id):
             raise KeyError(f"Agent session not found: {session_id}")
@@ -1094,6 +1096,7 @@ class AgentRuntime:
             proposed_actions=action_refs,
             blockers=list(blockers or []),
             handoffs=handoff_rows,
+            reasoning=[dict(row) for row in reasoning or []],
         )
 
     def list_desks(self) -> list[dict[str, Any]]:
@@ -2483,7 +2486,29 @@ class AgentRuntime:
             proposed_actions=proposed_actions,
             blockers=plan.blockers,
             handoffs=plan.handoffs,
+            reasoning=[*plan.reasoning, self._session_context_reasoning(session_id)],
         )
+
+    def _session_context_reasoning(self, session_id: str) -> dict[str, Any]:
+        actions = self.ledger.list_actions(session_id)
+        handoffs = self.ledger.list_handoffs(session_id)
+        work_orders = self.ledger.list_work_orders(session_id)
+        active_statuses = {"proposed", "approval_required", "approved", "running"}
+        open_handoffs = [handoff for handoff in handoffs if str(handoff.get("status") or "") == "open"]
+        open_work_orders = [order for order in work_orders if str(order.get("status") or "") in {"open", "in_progress"}]
+        return {
+            "kind": "session_context",
+            "active_action_count": sum(1 for action in actions if str(action.get("status") or "") in active_statuses),
+            "open_handoff_count": len(open_handoffs),
+            "open_work_order_count": len(open_work_orders),
+            "evidence_ref_count": len(
+                {
+                    ref
+                    for row in [*actions, *handoffs, *work_orders]
+                    for ref in row.get("evidence_refs", []) or []
+                }
+            ),
+        }
 
     def memory_snapshot(self) -> dict[str, Any]:
         sessions = self.ledger.list_sessions()

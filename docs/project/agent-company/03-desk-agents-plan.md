@@ -34,6 +34,11 @@ Each desk response must include:
 - `proposed_actions`
 - `blockers`
 - `handoffs`
+- `reasoning`
+
+Current foundation:
+
+- Workflow previews and persisted desk responses include deterministic reasoning rows for intent match, tool plan, safety, evidence plan, and current session context. These rows explain why fixed tools and handoffs were proposed without relying on an LLM.
 
 ## 3. Data Desk
 

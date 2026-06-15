@@ -214,6 +214,12 @@ export interface AgentDeskResponse {
   proposed_actions: string[];
   blockers: string[];
   handoffs: AgentHandoff[];
+  reasoning: AgentReasoningRow[];
+}
+
+export interface AgentReasoningRow {
+  kind: string;
+  [key: string]: unknown;
 }
 
 export interface AgentWorkflowPlanAction {
@@ -238,10 +244,12 @@ export interface AgentWorkflowPlan {
   desk: string;
   answer: string;
   confidence: number;
+  planning_mode: string;
   actions: AgentWorkflowPlanAction[];
   handoffs: Array<Record<string, unknown>>;
   work_orders: Array<Record<string, unknown>>;
   blockers: string[];
+  reasoning: AgentReasoningRow[];
   side_effects: Record<string, unknown>;
 }
 

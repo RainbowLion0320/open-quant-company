@@ -16,6 +16,7 @@ export const ceoOffice = {
       workflowPlan: "工作流计划",
       noLedgerWrites: "不会写入 ledger",
       plannedHandoffs: "计划交接",
+      reasoning: "推理依据",
       deskStatus: "Desk 状态",
       actionQueue: "行动队列",
       handoffs: "交接事项",

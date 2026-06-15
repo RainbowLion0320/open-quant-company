@@ -2883,6 +2883,62 @@ def test_agent_runtime_routes_ceo_message_to_deterministic_desk_response(tmp_pat
     reset_datahub()
 
 
+def test_agent_desk_response_exposes_structured_reasoning_context(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Reasoned CEO review", default_desk="reporting")
+    existing_evidence = runtime.create_evidence(
+        kind="web_route",
+        label="Existing system context",
+        uri="/system?tab=lifecycle",
+        summary="Existing lifecycle evidence before the CEO asks a new question.",
+    )
+    runtime.propose_action(
+        session_id=session.session_id,
+        desk="risk",
+        action_type="lifecycle_check",
+        risk_level="read_only",
+        summary="Existing lifecycle read",
+        parameters={"tool_id": "astroq.lifecycle.check"},
+        expected_effect="Existing safe read.",
+        evidence_refs=[existing_evidence.evidence_id],
+    )
+    runtime.create_work_order(
+        session_id=session.session_id,
+        title="Existing data issue",
+        summary="Existing work order before the CEO asks a new question.",
+        impact="Shows the desk response can cite open work context.",
+        evidence_refs=[existing_evidence.evidence_id],
+    )
+
+    preview = runtime.preview_workflow_plan(
+        desk="reporting",
+        content="查数据源 registry diff，策略 OOS IC/ICIR，lifecycle gate 和 execution dry-run",
+    )
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        desk="reporting",
+        content="查数据源 registry diff，策略 OOS IC/ICIR，lifecycle gate 和 execution dry-run",
+    )
+    response = routed["desk_response"]
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+
+    assert preview["reasoning"]
+    assert {row["kind"] for row in preview["reasoning"]} >= {"intent_match", "tool_plan", "safety"}
+    assert reasoning_by_kind["intent_match"]["planning_mode"] == "dynamic_multi_intent"
+    assert reasoning_by_kind["tool_plan"]["tool_count"] >= 4
+    assert reasoning_by_kind["safety"]["approval_required_count"] == 0
+    assert reasoning_by_kind["session_context"]["open_work_order_count"] >= 1
+    assert reasoning_by_kind["session_context"]["active_action_count"] >= 1
+    reset_datahub()
+
+
 def test_agent_cli_and_api_message_return_desk_response(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")

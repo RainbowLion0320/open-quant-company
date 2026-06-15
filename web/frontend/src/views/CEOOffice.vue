@@ -129,6 +129,12 @@
             <span>{{ t("ceoOffice.noLedgerWrites") }}</span>
           </header>
           <p>{{ workflowPlan.answer }}</p>
+          <div v-if="workflowPlan.reasoning?.length" class="workflow-plan-reasoning">
+            <small>{{ t("ceoOffice.reasoning") }}</small>
+            <code v-for="row in workflowPlan.reasoning" :key="reasoningKey(row)">
+              {{ reasoningSummary(row) }}
+            </code>
+          </div>
           <div class="workflow-plan-list">
             <div v-for="action in workflowPlan.actions" :key="`${action.tool_id}-${action.summary}`" class="workflow-plan-action">
               <span class="action-status" :class="action.status_preview">{{ statusLabel(action.status_preview) }}</span>
@@ -865,6 +871,30 @@ function deskLabel(desk: string) {
 function selectDesk(deskId: string) {
   selectedDeskId.value = deskId;
   selectedDraftDesk.value = deskId;
+}
+
+function reasoningKey(row: Record<string, unknown>) {
+  return `${String(row.kind || "reasoning")}-${JSON.stringify(row)}`;
+}
+
+function reasoningSummary(row: Record<string, unknown>) {
+  const kind = String(row.kind || "reasoning");
+  if (kind === "intent_match") {
+    return `${kind}: ${String(row.planning_mode || "")}`;
+  }
+  if (kind === "tool_plan") {
+    return `${kind}: ${Number(row.tool_count || 0)} tools / ${Number(row.desk_count || 0)} desks`;
+  }
+  if (kind === "safety") {
+    return `${kind}: ${Number(row.approval_required_count || 0)} approvals`;
+  }
+  if (kind === "session_context") {
+    return `${kind}: ${Number(row.active_action_count || 0)} active / ${Number(row.open_work_order_count || 0)} work orders`;
+  }
+  if (kind === "evidence_plan") {
+    return `${kind}: ${Number(row.handoff_count || 0)} handoffs`;
+  }
+  return kind;
 }
 
 function statusLabel(status: string) {

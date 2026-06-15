@@ -40,6 +40,7 @@ class DeskWorkflowPlan:
     confidence: float
     actions: list[WorkflowActionSpec]
     planning_mode: str = "single_intent"
+    reasoning: list[dict[str, Any]] = field(default_factory=list)
     blockers: list[str] = field(default_factory=list)
     handoffs: list[dict[str, Any]] = field(default_factory=list)
     work_orders: list[WorkflowWorkOrderSpec] = field(default_factory=list)
@@ -262,14 +263,24 @@ def build_desk_workflow_plan(*, desk: str, content: str) -> DeskWorkflowPlan:
         raise ValueError(f"Unknown desk workflow: {desk}")
     normalized = content.lower()
     actions = _actions_for_profile(desk=desk, profile=profile, normalized_content=normalized)
+    handoffs = _handoffs_for(desk, content)
+    work_orders = _work_orders_for(desk, content)
+    planning_mode = "fixed_intent" if len(actions) > 1 else "single_intent"
     return DeskWorkflowPlan(
         desk=desk,
         answer=profile["answer"],
         confidence=_confidence_for(desk),
         actions=actions,
-        planning_mode="fixed_intent" if len(actions) > 1 else "single_intent",
-        handoffs=_handoffs_for(desk, content),
-        work_orders=_work_orders_for(desk, content),
+        planning_mode=planning_mode,
+        reasoning=_reasoning_for_plan(
+            source_desk=desk,
+            planning_mode=planning_mode,
+            actions=actions,
+            handoffs=handoffs,
+            work_orders=work_orders,
+        ),
+        handoffs=handoffs,
+        work_orders=work_orders,
     )
 
 
@@ -299,6 +310,13 @@ def _dynamic_multi_intent_plan(*, desk: str, content: str) -> DeskWorkflowPlan |
         confidence=0.72,
         actions=actions,
         planning_mode="dynamic_multi_intent",
+        reasoning=_reasoning_for_plan(
+            source_desk=desk,
+            planning_mode="dynamic_multi_intent",
+            actions=actions,
+            handoffs=handoffs,
+            work_orders=[],
+        ),
         handoffs=handoffs,
     )
 
@@ -629,6 +647,46 @@ def _action_for_profile(*, desk: str, profile: dict[str, str]) -> WorkflowAction
             summary=profile["evidence_summary"],
         ),
     )
+
+
+def _reasoning_for_plan(
+    *,
+    source_desk: str,
+    planning_mode: str,
+    actions: list[WorkflowActionSpec],
+    handoffs: list[dict[str, Any]],
+    work_orders: list[WorkflowWorkOrderSpec],
+) -> list[dict[str, Any]]:
+    tool_ids = _ordered_unique([action.tool_id for action in actions])
+    target_desks = _ordered_unique([action.desk for action in actions])
+    approval_required_count = sum(1 for action in actions if action.risk_level not in {"read_only", "dry_run"})
+    return [
+        {
+            "kind": "intent_match",
+            "source_desk": source_desk,
+            "planning_mode": planning_mode,
+            "target_desks": target_desks,
+        },
+        {
+            "kind": "tool_plan",
+            "tool_count": len(tool_ids),
+            "tool_ids": tool_ids,
+            "desk_count": len(target_desks),
+            "risk_levels": _ordered_unique([action.risk_level for action in actions]),
+        },
+        {
+            "kind": "safety",
+            "approval_required_count": approval_required_count,
+            "auto_runnable_count": len(actions) - approval_required_count,
+            "writes_blocked_by_policy": approval_required_count > 0,
+        },
+        {
+            "kind": "evidence_plan",
+            "evidence_routes": _ordered_unique([action.evidence.uri for action in actions]),
+            "handoff_count": len(handoffs),
+            "work_order_count": len(work_orders),
+        },
+    ]
 
 
 def _handoffs_for(desk: str, content: str) -> list[dict[str, Any]]:

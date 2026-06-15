@@ -233,11 +233,21 @@
   min-width: 0;
 }
 
+.workflow-plan-reasoning,
 .workflow-plan-handoffs {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.workflow-plan-reasoning code {
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 3px 7px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
 }
 
 .desk-row {

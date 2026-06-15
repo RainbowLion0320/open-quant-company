@@ -16,6 +16,7 @@ export const ceoOffice = {
       workflowPlan: "Workflow Plan",
       noLedgerWrites: "No ledger writes",
       plannedHandoffs: "Planned Handoffs",
+      reasoning: "Reasoning",
       deskStatus: "Desk Status",
       actionQueue: "Action Queue",
       handoffs: "Handoffs",
