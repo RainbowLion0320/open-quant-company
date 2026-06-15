@@ -180,6 +180,53 @@ class AgentRuntime:
             "work_orders": self.ledger.list_work_orders(session_id),
         }
 
+    def session_stream_snapshot(self, session_id: str) -> dict[str, Any]:
+        payload = self.get_session(session_id)
+        if payload is None:
+            raise KeyError(f"Agent session not found: {session_id}")
+        messages = list(payload["messages"])
+        actions = list(payload["actions"])
+        runs = list(payload["runs"])
+        handoffs = list(payload["handoffs"])
+        work_orders = list(payload["work_orders"])
+        run_events = [
+            event
+            for run in runs
+            for event in self.ledger.list_run_events(str(run.get("run_id") or ""))
+        ]
+        latest = {
+            "message_id": str(messages[-1]["message_id"]) if messages else "",
+            "action_id": str(actions[0]["action_id"]) if actions else "",
+            "run_id": str(runs[0]["run_id"]) if runs else "",
+            "run_event_id": str(run_events[-1]["event_id"]) if run_events else "",
+            "handoff_id": str(handoffs[0]["handoff_id"]) if handoffs else "",
+            "work_order_id": str(work_orders[0]["work_order_id"]) if work_orders else "",
+        }
+        counts = {
+            "messages": len(messages),
+            "actions": len(actions),
+            "runs": len(runs),
+            "run_events": len(run_events),
+            "handoffs": len(handoffs),
+            "work_orders": len(work_orders),
+        }
+        signature = "|".join(
+            [
+                str(payload["session"].get("updated_at") or ""),
+                *(f"{key}:{counts[key]}" for key in sorted(counts)),
+                *(f"{key}:{latest[key]}" for key in sorted(latest)),
+            ]
+        )
+        return {
+            "status": "ready",
+            "session_id": session_id,
+            "generated_at": _now(),
+            "session": payload["session"],
+            "counts": counts,
+            "latest": latest,
+            "signature": signature,
+        }
+
     def add_message(
         self,
         session_id: str,

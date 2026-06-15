@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 from typing import Any
 
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from agent_os.evidence import EvidenceResolver
 from agent_os.runtime import AgentRuntime
@@ -35,6 +38,31 @@ async def get_agent_session(session_id: str) -> dict[str, Any]:
     if payload is None:
         raise DataNotFoundError("agent session", session_id)
     return payload
+
+
+@router.get("/sessions/{session_id}/stream")
+async def stream_agent_session(session_id: str, once: bool = False, poll_seconds: float = 1.0) -> StreamingResponse:
+    if AgentRuntime().get_session(session_id) is None:
+        raise DataNotFoundError("agent session", session_id)
+
+    async def event_stream():
+        last_signature = ""
+        interval = min(max(float(poll_seconds), 0.2), 10.0)
+        while True:
+            try:
+                snapshot = AgentRuntime().session_stream_snapshot(session_id)
+            except KeyError:
+                missing = {"status": "missing", "session_id": session_id}
+                yield f"event: session_missing\ndata: {json.dumps(missing, ensure_ascii=False)}\n\n"
+                break
+            if snapshot["signature"] != last_signature:
+                last_signature = str(snapshot["signature"])
+                yield f"event: session_snapshot\ndata: {json.dumps(snapshot, ensure_ascii=False)}\n\n"
+                if once:
+                    break
+            await asyncio.sleep(interval)
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @router.patch("/sessions/{session_id}")

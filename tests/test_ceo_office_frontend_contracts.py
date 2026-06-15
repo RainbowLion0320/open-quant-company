@@ -43,6 +43,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentUpdateSession" in view
     assert "api.agentAddMessage" in view
     assert "api.agentPlan" in view
+    assert "api.agentSessionStreamUrl" in view
+    assert "EventSource" in view
+    assert 'addEventListener("session_snapshot"' in view
+    assert "sessionStreamStatus" in view
+    assert "closeSessionStream" in view
+    assert "onBeforeUnmount(closeSessionStream)" in view
     assert "previewWorkflowPlan" in view
     assert "workflowPlan" in view
     assert "planningWorkflow" in view
@@ -65,6 +71,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'selected: selectedDeskId === desk.desk_id' in view
     assert 'desk: selectedDraftDesk.value' in view
     assert "ceoOffice.messageDesk" in view
+    assert "ceoOffice.stream" in view
     assert "ceoOffice.previewPlan" in view
     assert "ceoOffice.workflowPlan" in view
     assert "ceoOffice.noLedgerWrites" in view
@@ -178,6 +185,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
     assert "目标 Desk" in zh_ceo
+    assert "实时流" in zh_ceo
+    assert "已连接" in zh_ceo
+    assert "连接中" in zh_ceo
     assert "预览计划" in zh_ceo
     assert "工作流计划" in zh_ceo
     assert "不会写入 ledger" in zh_ceo
@@ -196,6 +206,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "相关交接" in zh_ceo
     assert "Action Queue" in en_ceo
     assert "Target Desk" in en_ceo
+    assert "Stream" in en_ceo
+    assert "Connected" in en_ceo
+    assert "Connecting" in en_ceo
     assert "Preview Plan" in en_ceo
     assert "Workflow Plan" in en_ceo
     assert "No ledger writes" in en_ceo
@@ -346,6 +359,9 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "AgentWorkflowPlanResponse" in agent_api
     assert "agentPlan" in agent_api
     assert '"/api/agent/plans"' in agent_api
+    assert "AgentSessionStreamSnapshot" in agent_types
+    assert "agentSessionStreamUrl" in agent_api
+    assert '`/api/agent/sessions/${encodeURIComponent(sessionId)}/stream`' in agent_api
     assert "agentActions" in agent_api
     assert "filters: AgentActionFilters = {}" in agent_api
     assert "URLSearchParams" in agent_api

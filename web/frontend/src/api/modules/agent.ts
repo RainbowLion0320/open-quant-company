@@ -35,6 +35,7 @@ export const agentApi = {
   agentCreateSession: (payload: { title: string; default_desk?: string; tags?: string[] }) =>
     post<{ session: AgentSession }>("/api/agent/sessions", payload),
   agentSession: (sessionId: string) => get<AgentSessionDetail>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`),
+  agentSessionStreamUrl: (sessionId: string) => `/api/agent/sessions/${encodeURIComponent(sessionId)}/stream`,
   agentUpdateSession: (
     sessionId: string,
     payload: { title?: string; status?: string; default_desk?: string; tags?: string[] },

@@ -193,6 +193,66 @@ def test_agent_runtime_cli_and_api_update_session_metadata(tmp_path, monkeypatch
     reset_datahub()
 
 
+def test_agent_session_stream_snapshot_and_sse_once_api(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Streaming session")
+    message = runtime.add_message(
+        session.session_id,
+        role="ceo",
+        desk="reporting",
+        content="给我一个实时状态",
+    )
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="reporting",
+        action_type="lifecycle_check",
+        risk_level="read_only",
+        summary="Read lifecycle",
+        parameters={"tool_id": "astroq.lifecycle.check"},
+    )
+    run = runtime.record_run(
+        action_id=action.action_id,
+        tool_name="astroq.lifecycle.check",
+        command=["astroq", "lifecycle", "check", "--json"],
+        status="succeeded",
+        return_code=0,
+        stdout_summary="ok",
+        stderr_summary="",
+    )
+
+    snapshot = runtime.session_stream_snapshot(session.session_id)
+
+    assert snapshot["status"] == "ready"
+    assert snapshot["session_id"] == session.session_id
+    assert snapshot["counts"]["messages"] == 1
+    assert snapshot["counts"]["actions"] == 1
+    assert snapshot["counts"]["runs"] == 1
+    assert snapshot["latest"]["message_id"] == message.message_id
+    assert snapshot["latest"]["action_id"] == action.action_id
+    assert snapshot["latest"]["run_id"] == run.run_id
+    assert snapshot["signature"]
+
+    with TestClient(create_app()).stream("GET", f"/api/agent/sessions/{session.session_id}/stream?once=true") as response:
+        body = response.read().decode("utf-8")
+
+    event_payload = json.loads(body.split("data: ", 1)[1].strip())
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "event: session_snapshot" in body
+    assert event_payload["session_id"] == session.session_id
+    assert event_payload["counts"]["actions"] == 1
+    reset_datahub()
+
+
 def test_agent_approval_policy_blocks_state_changing_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

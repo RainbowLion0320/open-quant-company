@@ -105,6 +105,7 @@ The CEO Office should consume the Agent Runtime API defined in [07-agent-company
 - `GET /api/agent/sessions`
 - `POST /api/agent/sessions`
 - `GET /api/agent/sessions/{session_id}`
+- `GET /api/agent/sessions/{session_id}/stream`
 - `POST /api/agent/sessions/{session_id}/messages`
 - `GET /api/agent/actions`
 - `POST /api/agent/actions/{action_id}/approve`
@@ -156,6 +157,7 @@ Chinese and English strings must be maintained together. The Chinese wording sho
 - `/market` renders the former market overview.
 - A new session can be created from the Web UI.
 - The current session can be archived from the Web UI without deleting ledger history.
+- The current session subscribes to a session snapshot SSE stream and refreshes when message/action/run counts change.
 - A user message appears in the timeline and is persisted.
 - The user can choose the target desk for a CEO message from the registered desk list.
 - The user can run proposed read-only checks for the active session from the CEO Office, with run/skipped/failed counts visible.

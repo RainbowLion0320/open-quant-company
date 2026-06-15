@@ -44,7 +44,9 @@
       <article class="ceo-metric">
         <span>{{ t("ceoOffice.session") }}</span>
         <strong>{{ activeSession?.title || t("ceoOffice.noSession") }}</strong>
-        <small v-if="activeSession">{{ statusLabel(activeSession.status) }}</small>
+        <small v-if="activeSession">
+          {{ statusLabel(activeSession.status) }} · {{ t("ceoOffice.stream") }} {{ statusLabel(sessionStreamStatus) }}
+        </small>
       </article>
       <article class="ceo-metric">
         <span>{{ t("ceoOffice.deskStatus") }}</span>
@@ -748,8 +750,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentSessionStreamSnapshot, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -769,6 +771,10 @@ const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
 const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
 const workflowPlan = ref<AgentWorkflowPlan | null>(null);
+const sessionStream = ref<EventSource | null>(null);
+const sessionStreamId = ref("");
+const sessionStreamStatus = ref("inactive");
+const lastStreamSignature = ref("");
 const desks = ref<AgentDesk[]>([]);
 const approvalPolicies = ref<AgentApprovalPolicy[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
@@ -881,6 +887,8 @@ function statusLabel(status: string) {
   if (status === "partial") return t("ceoOffice.partial");
   if (status === "missing_secret") return t("ceoOffice.missingSecret");
   if (status === "inactive") return t("ceoOffice.inactive");
+  if (status === "connected") return t("ceoOffice.connected");
+  if (status === "connecting") return t("ceoOffice.connecting");
   if (status === "invalid") return t("ceoOffice.invalid");
   return status;
 }
@@ -931,7 +939,46 @@ function formatNumber(value: unknown) {
   return numeric.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-async function loadSession(sessionId: string) {
+function closeSessionStream() {
+  sessionStream.value?.close();
+  sessionStream.value = null;
+  sessionStreamId.value = "";
+  sessionStreamStatus.value = "inactive";
+  lastStreamSignature.value = "";
+}
+
+function connectSessionStream(sessionId: string) {
+  if (sessionStream.value && sessionStreamId.value === sessionId) return;
+  closeSessionStream();
+  if (typeof EventSource === "undefined") {
+    sessionStreamStatus.value = "blocked";
+    return;
+  }
+  const source = new EventSource(api.agentSessionStreamUrl(sessionId));
+  sessionStream.value = source;
+  sessionStreamId.value = sessionId;
+  sessionStreamStatus.value = "connecting";
+  source.addEventListener("session_snapshot", event => {
+    try {
+      const snapshot = JSON.parse((event as MessageEvent).data) as AgentSessionStreamSnapshot;
+      if (snapshot.signature === lastStreamSignature.value) return;
+      lastStreamSignature.value = snapshot.signature;
+      sessionStreamStatus.value = "connected";
+      void loadSession(snapshot.session_id, { connectStream: false });
+    } catch {
+      sessionStreamStatus.value = "blocked";
+    }
+  });
+  source.addEventListener("session_missing", () => {
+    closeSessionStream();
+    sessionStreamStatus.value = "blocked";
+  });
+  source.onerror = () => {
+    sessionStreamStatus.value = "blocked";
+  };
+}
+
+async function loadSession(sessionId: string, options: { connectStream?: boolean } = {}) {
   const [detail, reportPayload] = await Promise.all([api.agentSession(sessionId), api.agentReports(sessionId)]);
   activeSession.value = detail.session;
   if (!desks.value.some(desk => desk.desk_id === selectedDraftDesk.value)) {
@@ -942,6 +989,9 @@ async function loadSession(sessionId: string) {
   handoffs.value = detail.handoffs || [];
   workOrders.value = detail.work_orders || [];
   reports.value = reportPayload.reports || [];
+  if (options.connectStream !== false) {
+    connectSessionStream(sessionId);
+  }
 }
 
 async function load() {
@@ -1286,6 +1336,7 @@ async function updateWorkOrder(workOrderId: string, status: string, resolution: 
 }
 
 onMounted(load);
+onBeforeUnmount(closeSessionStream);
 </script>
 
 <style scoped src="../styles/views/ceo-office.css"></style>

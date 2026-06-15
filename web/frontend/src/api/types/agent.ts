@@ -266,6 +266,23 @@ export interface AgentSessionDetail {
   work_orders: AgentWorkOrder[];
 }
 
+export interface AgentSessionStreamSnapshot {
+  status: string;
+  session_id: string;
+  generated_at: string;
+  session: AgentSession;
+  counts: {
+    messages: number;
+    actions: number;
+    runs: number;
+    run_events: number;
+    handoffs: number;
+    work_orders: number;
+  };
+  latest: Record<string, string>;
+  signature: string;
+}
+
 export interface AgentReadOnlyWorkflowResponse {
   workflow: AgentReadOnlyWorkflow;
 }
