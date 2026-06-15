@@ -91,6 +91,22 @@ class AgentRun:
 
 
 @dataclass(frozen=True)
+class AgentRunEvent:
+    event_id: str
+    run_id: str
+    action_id: str
+    sequence: int
+    event_type: str
+    status: str
+    message: str
+    payload: dict[str, Any]
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class AgentHandoff:
     handoff_id: str
     session_id: str

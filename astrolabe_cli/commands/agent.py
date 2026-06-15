@@ -225,7 +225,7 @@ def show_action(action_id: str) -> CliResult:
     action = runtime.get_action(action_id)
     if action is None:
         return CliResult(False, "agent action show", {"action_id": action_id}, "Agent action missing", [f"missing_action:{action_id}"])
-    runs = runtime.list_runs(action_id)
+    runs = runtime.list_runs(action_id, include_events=True)
     return CliResult(
         ok=True,
         command="agent action show",
@@ -235,16 +235,18 @@ def show_action(action_id: str) -> CliResult:
 
 
 def run_action(action_id: str) -> CliResult:
+    runtime = AgentRuntime()
     try:
-        run = AgentRuntime().dispatch_action(action_id)
+        run = runtime.dispatch_action(action_id)
     except KeyError as exc:
         return CliResult(False, "agent run", {"action_id": action_id}, "Agent action missing", [str(exc)])
     ok = run.status == "succeeded"
+    run_payload = runtime.get_run(run.run_id) or run.to_dict()
     return CliResult(
         ok=ok,
         command="agent run",
         message=f"Agent run {run.status}",
-        data={"run": run.to_dict()},
+        data={"run": run_payload},
         errors=[] if ok else [run.stderr_summary or run.status],
     )
 

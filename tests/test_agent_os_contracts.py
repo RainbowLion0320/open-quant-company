@@ -2471,6 +2471,88 @@ def test_agent_dispatch_runs_read_only_tool_and_updates_ledger(tmp_path, monkeyp
     reset_datahub()
 
 
+def test_agent_dispatch_records_run_event_timeline(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    def fake_run(command, **kwargs):
+        return CompletedProcess(command, 0, stdout='{"ok": true, "step": "done"}', stderr="minor warning")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Run event timeline")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Run health check",
+        parameters={"tool_id": "astroq.health"},
+        expected_effect="Records health status in the run ledger.",
+    )
+
+    run = runtime.dispatch_action(action.action_id, runner=fake_run)
+    loaded = runtime.get_run(run.run_id)
+
+    assert loaded["status"] == "succeeded"
+    assert [event["sequence"] for event in loaded["events"]] == [1, 2, 3, 4, 5]
+    assert [event["event_type"] for event in loaded["events"]] == [
+        "queued",
+        "running",
+        "stdout",
+        "stderr",
+        "succeeded",
+    ]
+    assert loaded["events"][0]["status"] == "queued"
+    assert loaded["events"][2]["message"] == '{"ok": true, "step": "done"}'
+    assert loaded["events"][3]["message"] == "minor warning"
+    assert loaded["events"][-1]["payload"]["return_code"] == 0
+    assert runtime.memory_snapshot()["summary"]["run_event_count"] == 5
+    reset_datahub()
+
+
+def test_agent_run_events_are_exposed_by_api_and_action_cli(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    def fake_run(command, **kwargs):
+        return CompletedProcess(command, 1, stdout="partial output", stderr="provider failed")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Run event API")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Run health check",
+        parameters={"tool_id": "astroq.health"},
+    )
+    run = runtime.dispatch_action(action.action_id, runner=fake_run)
+
+    client = TestClient(create_app())
+    api_payload = client.get(f"/api/agent/runs/{run.run_id}").json()
+    cli_code = run_cli(["agent", "action", "show", action.action_id, "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+
+    assert api_payload["run"]["events"][-1]["event_type"] == "failed"
+    assert api_payload["run"]["events"][-1]["payload"]["return_code"] == 1
+    assert cli_code == 0
+    assert cli_payload["data"]["runs"][0]["events"][-1]["event_type"] == "failed"
+    assert cli_payload["data"]["runs"][0]["events"][2]["message"] == "partial output"
+    reset_datahub()
+
+
 def test_agent_dispatch_blocks_unapproved_state_changing_action_without_running(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

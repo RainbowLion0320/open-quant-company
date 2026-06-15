@@ -24,7 +24,17 @@ from agent_os.reports import (
     report_rhythm_templates,
     write_report_index,
 )
-from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentReport, AgentRun, AgentSession, DeskResponse, EvidenceRef
+from agent_os.schemas import (
+    AgentAction,
+    AgentHandoff,
+    AgentMessage,
+    AgentReport,
+    AgentRun,
+    AgentRunEvent,
+    AgentSession,
+    DeskResponse,
+    EvidenceRef,
+)
 from agent_os.tools import AgentToolRegistry
 from agent_os.workflows import build_desk_workflow_plan
 from broker import PaperBroker
@@ -381,16 +391,18 @@ class AgentRuntime:
         stdout_summary: str,
         stderr_summary: str,
         artifact_refs: list[str] | None = None,
+        run_id: str | None = None,
+        started_at: str | None = None,
     ) -> AgentRun:
         if not self.ledger.get_action(action_id):
             raise KeyError(f"Agent action not found: {action_id}")
         timestamp = _now()
         run = AgentRun(
-            run_id=_id("run"),
+            run_id=run_id or _id("run"),
             action_id=action_id,
             tool_name=tool_name,
             command=list(command),
-            started_at=timestamp,
+            started_at=started_at or timestamp,
             finished_at=timestamp,
             status=status,
             return_code=return_code,
@@ -399,7 +411,57 @@ class AgentRuntime:
             artifact_refs=list(artifact_refs or []),
         )
         self.ledger.insert_run(run.to_dict())
+        if stdout_summary:
+            self.record_run_event(
+                run.run_id,
+                action_id=action_id,
+                event_type="stdout",
+                status="running" if status not in {"blocked"} else status,
+                message=stdout_summary,
+                payload={"stream": "stdout", "length": len(stdout_summary)},
+            )
+        if stderr_summary:
+            self.record_run_event(
+                run.run_id,
+                action_id=action_id,
+                event_type="stderr",
+                status="running" if status not in {"blocked"} else status,
+                message=stderr_summary,
+                payload={"stream": "stderr", "length": len(stderr_summary)},
+            )
+        self.record_run_event(
+            run.run_id,
+            action_id=action_id,
+            event_type=status,
+            status=status,
+            message=f"Run {status}",
+            payload={"return_code": return_code, "tool_name": tool_name},
+        )
         return run
+
+    def record_run_event(
+        self,
+        run_id: str,
+        *,
+        action_id: str,
+        event_type: str,
+        status: str,
+        message: str,
+        payload: dict[str, Any] | None = None,
+    ) -> AgentRunEvent:
+        event = AgentRunEvent(
+            event_id=_id("event"),
+            run_id=run_id,
+            action_id=action_id,
+            sequence=self.ledger.next_run_event_sequence(run_id),
+            event_type=event_type,
+            status=status,
+            message=message,
+            payload=dict(payload or {}),
+            created_at=_now(),
+        )
+        self.ledger.insert_run_event(event.to_dict())
+        return event
 
     def dispatch_action(
         self,
@@ -480,7 +542,25 @@ class AgentRuntime:
                 stderr_summary=str(exc),
             )
 
+        run_id = _id("run")
+        started_at = _now()
+        self.record_run_event(
+            run_id,
+            action_id=action_id,
+            event_type="queued",
+            status="queued",
+            message="Run queued for fixed registry dispatch.",
+            payload={"tool_name": tool_name, "command": command},
+        )
         self.ledger.update_action_status(action_id, "running", _now())
+        self.record_run_event(
+            run_id,
+            action_id=action_id,
+            event_type="running",
+            status="running",
+            message="Tool command started.",
+            payload={"tool_name": tool_name, "timeout_seconds": timeout_seconds},
+        )
         run_callable = runner or subprocess.run
         try:
             result = run_callable(
@@ -500,6 +580,8 @@ class AgentRuntime:
                 return_code=result.returncode,
                 stdout_summary=_summary(result.stdout or ""),
                 stderr_summary=_summary(result.stderr or ""),
+                run_id=run_id,
+                started_at=started_at,
             )
         except subprocess.TimeoutExpired as exc:
             self.ledger.update_action_status(action_id, "failed", _now())
@@ -511,6 +593,8 @@ class AgentRuntime:
                 return_code=None,
                 stdout_summary=_summary(str(exc.stdout or "")),
                 stderr_summary=f"timeout after {timeout_seconds}s",
+                run_id=run_id,
+                started_at=started_at,
             )
         except Exception as exc:
             self.ledger.update_action_status(action_id, "failed", _now())
@@ -522,13 +606,22 @@ class AgentRuntime:
                 return_code=None,
                 stdout_summary="",
                 stderr_summary=str(exc),
+                run_id=run_id,
+                started_at=started_at,
             )
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
-        return self.ledger.get_run(run_id)
+        run = self.ledger.get_run(run_id)
+        return self._run_with_events(run) if run else None
 
-    def list_runs(self, action_id: str | None = None) -> list[dict[str, Any]]:
-        return self.ledger.list_runs(action_id)
+    def list_runs(self, action_id: str | None = None, *, include_events: bool = False) -> list[dict[str, Any]]:
+        runs = self.ledger.list_runs(action_id)
+        if include_events:
+            return [self._run_with_events(run) for run in runs]
+        return runs
+
+    def list_run_events(self, run_id: str | None = None) -> list[dict[str, Any]]:
+        return self.ledger.list_run_events(run_id)
 
     def list_handoffs(self, session_id: str | None = None) -> list[dict[str, Any]]:
         return self.ledger.list_handoffs(session_id)
@@ -1977,6 +2070,7 @@ class AgentRuntime:
             messages.extend(self.ledger.list_messages(str(session["session_id"])))
         actions = self.ledger.list_actions()
         runs = self.ledger.list_runs()
+        run_events = self.ledger.list_run_events()
         evidence = self.ledger.list_evidence()
         handoffs = self.ledger.list_handoffs()
         summary = {
@@ -1984,6 +2078,7 @@ class AgentRuntime:
             "message_count": len(messages),
             "action_count": len(actions),
             "run_count": len(runs),
+            "run_event_count": len(run_events),
             "evidence_count": len(evidence),
             "handoff_count": len(handoffs),
         }
@@ -1996,6 +2091,7 @@ class AgentRuntime:
                 "messages": messages,
                 "actions": actions,
                 "runs": runs,
+                "run_events": run_events,
                 "evidence": evidence,
                 "handoffs": handoffs,
             },
@@ -2081,6 +2177,12 @@ class AgentRuntime:
         for action in self.ledger.list_actions(session_id):
             runs.extend(self.ledger.list_runs(str(action["action_id"])))
         return runs
+
+    def _run_with_events(self, run: dict[str, Any]) -> dict[str, Any]:
+        return {
+            **run,
+            "events": self.ledger.list_run_events(str(run["run_id"])),
+        }
 
     @staticmethod
     def _find_report(report_id: str) -> dict[str, Any] | None:

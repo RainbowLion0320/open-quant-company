@@ -16,7 +16,7 @@ The runtime is not a general-purpose autonomous agent framework. It is a determi
 In scope:
 
 - Runtime package and schemas
-- Session, message, action, run, approval, and evidence ledgers
+- Session, message, action, run, run event, approval, and evidence ledgers
 - Tool registry with risk classification
 - Approval policy engine
 - Evidence resolver
@@ -36,8 +36,8 @@ Future implementation may use a top-level package such as `agent_os/` or another
 
 | Area | Responsibility |
 | --- | --- |
-| `schemas` | Pydantic or dataclass contracts for sessions, messages, actions, runs, evidence, policies, and desks. |
-| `ledger` | Local persistence for sessions, messages, actions, approvals, and run outcomes. |
+| `schemas` | Pydantic or dataclass contracts for sessions, messages, actions, runs, run events, evidence, policies, and desks. |
+| `ledger` | Local persistence for sessions, messages, actions, approvals, run outcomes, and run event timelines. |
 | `tools` | Registry for CLI/API/backtest/data/system tools with risk level and allowed desk scopes. |
 | `approval` | Policy evaluation, approval request creation, expiry, and decision recording. |
 | `evidence` | Resolve `EvidenceRef` into Web links, CLI commands, files, code locations, and artifact summaries. |
@@ -132,6 +132,22 @@ Required fields:
 - `stderr_summary`
 - `artifact_refs`
 
+### AgentRunEvent
+
+Represents a status, stdout/stderr, or terminal event emitted by a tool execution.
+
+Required fields:
+
+- `event_id`
+- `run_id`
+- `action_id`
+- `sequence`
+- `event_type`: `queued`, `running`, `stdout`, `stderr`, `succeeded`, `failed`, `blocked`
+- `status`
+- `message`
+- `payload`
+- `created_at`
+
 ### ApprovalPolicy
 
 Defines whether an action can run automatically or must wait for CEO approval.
@@ -151,7 +167,7 @@ Target local paths:
 
 | Path | Purpose |
 | --- | --- |
-| `var/db/agent_os.sqlite` | Sessions, messages, actions, approvals, run ledger, desk registry snapshots. |
+| `var/db/agent_os.sqlite` | Sessions, messages, actions, approvals, run ledger, run event timeline, desk registry snapshots. |
 | `var/artifacts/agent/runs/` | Per-run outputs and summaries. |
 | `var/artifacts/agent/evidence/` | Evidence snapshots that should survive source mutation. |
 | `var/artifacts/agent/reports/` | Generated CEO briefs and audit packs. |

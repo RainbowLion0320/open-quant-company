@@ -275,7 +275,7 @@ async def get_agent_action(action_id: str) -> dict[str, Any]:
         raise DataNotFoundError("agent action", action_id)
     return {
         "action": action,
-        "runs": runtime.list_runs(action_id),
+        "runs": runtime.list_runs(action_id, include_events=True),
         "paper_reconciliations": runtime.paper_reconciliations_for_action(action_id),
     }
 
@@ -315,11 +315,12 @@ async def cancel_agent_action(action_id: str, payload: dict[str, Any] | None = N
 
 @router.post("/actions/{action_id}/run")
 async def run_agent_action(action_id: str) -> dict[str, Any]:
+    runtime = AgentRuntime()
     try:
-        run = AgentRuntime().dispatch_action(action_id)
+        run = runtime.dispatch_action(action_id)
     except KeyError:
         raise DataNotFoundError("agent action", action_id)
-    return {"run": run.to_dict()}
+    return {"run": runtime.get_run(run.run_id) or run.to_dict()}
 
 
 @router.get("/evidence/{evidence_id}")

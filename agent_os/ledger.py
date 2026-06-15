@@ -111,6 +111,18 @@ class AgentLedger:
                     artifact_refs TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS run_events (
+                    event_id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    action_id TEXT NOT NULL,
+                    sequence INTEGER NOT NULL,
+                    event_type TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS handoffs (
                     handoff_id TEXT PRIMARY KEY,
                     session_id TEXT NOT NULL,
@@ -245,6 +257,26 @@ class AgentLedger:
                 payload,
             )
 
+    def insert_run_event(self, row: dict[str, Any]) -> None:
+        payload = {**row, "payload": _json_dumps(row.get("payload", {}))}
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO run_events(
+                    event_id, run_id, action_id, sequence, event_type, status, message, payload, created_at
+                )
+                VALUES(
+                    :event_id, :run_id, :action_id, :sequence, :event_type, :status, :message, :payload, :created_at
+                )
+                """,
+                payload,
+            )
+
+    def next_run_event_sequence(self, run_id: str) -> int:
+        with self._connect() as conn:
+            row = conn.execute("SELECT COALESCE(MAX(sequence), 0) + 1 FROM run_events WHERE run_id = ?", (run_id,)).fetchone()
+        return int(row[0])
+
     def insert_handoff(self, row: dict[str, Any]) -> None:
         payload = {**row, "evidence_refs": _json_dumps(row.get("evidence_refs", []))}
         with self._connect() as conn:
@@ -279,6 +311,7 @@ class AgentLedger:
                 "messages": int(conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]),
                 "actions": int(conn.execute("SELECT COUNT(*) FROM actions").fetchone()[0]),
                 "runs": int(conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]),
+                "run_events": int(conn.execute("SELECT COUNT(*) FROM run_events").fetchone()[0]),
                 "evidence": int(conn.execute("SELECT COUNT(*) FROM evidence").fetchone()[0]),
                 "handoffs": int(conn.execute("SELECT COUNT(*) FROM handoffs").fetchone()[0]),
             }
@@ -286,7 +319,7 @@ class AgentLedger:
     def delete_sessions(self, session_ids: list[str], *, dry_run: bool = False) -> dict[str, int]:
         ids = [str(session_id) for session_id in session_ids if str(session_id)]
         if not ids:
-            return {"sessions": 0, "messages": 0, "actions": 0, "runs": 0, "evidence": 0, "handoffs": 0}
+            return {"sessions": 0, "messages": 0, "actions": 0, "runs": 0, "run_events": 0, "evidence": 0, "handoffs": 0}
         placeholders = _placeholders(ids)
         with self._connect() as conn:
             action_rows = conn.execute(
@@ -295,6 +328,17 @@ class AgentLedger:
             ).fetchall()
             action_ids = [str(row["action_id"]) for row in action_rows]
             action_placeholders = _placeholders(action_ids)
+            run_ids = [
+                str(row["run_id"])
+                for row in (
+                    conn.execute(
+                        f"SELECT run_id FROM runs WHERE action_id IN ({action_placeholders})",
+                        action_ids,
+                    ).fetchall()
+                    if action_ids
+                    else []
+                )
+            ]
             candidate_evidence = self._session_evidence_refs(conn, ids, action_ids)
             outside_evidence = self._outside_session_evidence_refs(conn, ids, action_ids)
             evidence_to_delete = sorted(candidate_evidence - outside_evidence)
@@ -303,8 +347,11 @@ class AgentLedger:
                 "messages": int(conn.execute(f"SELECT COUNT(*) FROM messages WHERE session_id IN ({placeholders})", ids).fetchone()[0]),
                 "actions": len(action_ids),
                 "runs": int(
+                    len(run_ids)
+                ),
+                "run_events": int(
                     conn.execute(
-                        f"SELECT COUNT(*) FROM runs WHERE action_id IN ({action_placeholders})",
+                        f"SELECT COUNT(*) FROM run_events WHERE action_id IN ({action_placeholders})",
                         action_ids,
                     ).fetchone()[0]
                     if action_ids
@@ -316,6 +363,7 @@ class AgentLedger:
             if dry_run:
                 return counts
             if action_ids:
+                conn.execute(f"DELETE FROM run_events WHERE action_id IN ({action_placeholders})", action_ids)
                 conn.execute(f"DELETE FROM runs WHERE action_id IN ({action_placeholders})", action_ids)
                 conn.execute(f"DELETE FROM actions WHERE action_id IN ({action_placeholders})", action_ids)
             conn.execute(f"DELETE FROM handoffs WHERE session_id IN ({placeholders})", ids)
@@ -331,7 +379,7 @@ class AgentLedger:
         if dry_run:
             return counts
         with self._connect() as conn:
-            for table in ("runs", "handoffs", "actions", "messages", "evidence", "sessions"):
+            for table in ("run_events", "runs", "handoffs", "actions", "messages", "evidence", "sessions"):
                 conn.execute(f"DELETE FROM {table}")
         return counts
 
@@ -389,6 +437,17 @@ class AgentLedger:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         return self._run_row(row) if row else None
+
+    def list_run_events(self, run_id: str | None = None) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            if run_id:
+                rows = conn.execute(
+                    "SELECT * FROM run_events WHERE run_id = ? ORDER BY sequence ASC, rowid ASC",
+                    (run_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM run_events ORDER BY created_at ASC, rowid ASC").fetchall()
+        return [self._run_event_row(row) for row in rows]
 
     def list_handoffs(self, session_id: str | None = None) -> list[dict[str, Any]]:
         with self._connect() as conn:
@@ -509,6 +568,12 @@ class AgentLedger:
         data = dict(row)
         data["command"] = _json_loads(data.get("command"), [])
         data["artifact_refs"] = _json_loads(data.get("artifact_refs"), [])
+        return data
+
+    @staticmethod
+    def _run_event_row(row: sqlite3.Row) -> dict[str, Any]:
+        data = dict(row)
+        data["payload"] = _json_loads(data.get("payload"), {})
         return data
 
     @staticmethod

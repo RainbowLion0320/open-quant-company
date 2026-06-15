@@ -9,7 +9,7 @@
 
 Agent Company OS is the planned local-first operating layer for Open Quant Company. It lets the human user act as CEO while desk agents coordinate data, research, risk, execution, engineering, and reporting work.
 
-This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, fixed cross-artifact report context aggregation, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, env-only report notification triggers, paper order preview/proposal/approved-submit/cancel cards with inline paper reconciliation summaries, default-disabled live readiness probing, live order preview risk gating, approval-gated live submit/reconciliation contracts, desk-declared fixed tool registry coverage, and deterministic intent-to-tool routing are implemented first; streaming, advanced semantic report synthesis, advanced desk reasoning, real MiniQMT/QMT SDK submission, and continuous live reconciliation remain planned until their phase lands.
+This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, run event timelines, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, fixed cross-artifact report context aggregation, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, env-only report notification triggers, paper order preview/proposal/approved-submit/cancel cards with inline paper reconciliation summaries, default-disabled live readiness probing, live order preview risk gating, approval-gated live submit/reconciliation contracts, desk-declared fixed tool registry coverage, and deterministic intent-to-tool routing are implemented first; realtime streaming, advanced semantic report synthesis, advanced desk reasoning, real MiniQMT/QMT SDK submission, and continuous live reconciliation remain planned until their phase lands.
 
 ## 2. Product Contract
 
@@ -40,9 +40,9 @@ All endpoints are planned under `/api/agent/*`.
 | `GET` | `/api/agent/actions/{action_id}` | Read an action and approval state. | Implemented |
 | `POST` | `/api/agent/actions/{action_id}/approve` | Approve a pending action. | Implemented |
 | `POST` | `/api/agent/actions/{action_id}/reject` | Reject a pending action with reason. | Implemented |
-| `POST` | `/api/agent/actions/{action_id}/run` | Dispatch a safe or approved fixed-registry action and write a run ledger row. | Implemented for bounded fixed commands |
+| `POST` | `/api/agent/actions/{action_id}/run` | Dispatch a safe or approved fixed-registry action and write a run ledger row plus run event timeline. | Implemented for bounded fixed commands |
 | `POST` | `/api/agent/actions/{action_id}/cancel` | Cancel a proposed, approval-pending, or approved action before dispatch reaches a terminal status. | Implemented |
-| `GET` | `/api/agent/runs/{run_id}` | Read a tool or workflow run. | Implemented |
+| `GET` | `/api/agent/runs/{run_id}` | Read a tool or workflow run with ordered run events. | Implemented |
 | `GET` | `/api/agent/evidence/{evidence_id}` | Resolve an evidence reference. | Implemented |
 | `GET` | `/api/agent/desks` | List desk agents, health, allowed tools, and current blockers. | Implemented |
 | `POST` | `/api/agent/paper/proposals` | Preview and propose a PaperBroker order as an approval-required action without submitting it. | Implemented proposal gate |
@@ -666,7 +666,7 @@ Memory must not store:
 - Tools must be invoked through fixed command arrays or internal callables.
 - User-provided text must not become shell command text.
 - Tool outputs must be summarized and linked as `AgentRun` and `EvidenceRef`.
-- Long-running tools must report status through run ledger updates.
+- Long-running tools must report status through ordered run events attached to run ledger rows.
 - Failed tools must produce `failed` or `blocked` actions, not disappear from the session.
 
 ## 10. Desk Routing Rules
@@ -722,7 +722,7 @@ Planned paths:
 
 | Path | Purpose |
 | --- | --- |
-| `var/db/agent_os.sqlite` | Sessions, messages, actions, approvals, runs, and desk registry snapshots. |
+| `var/db/agent_os.sqlite` | Sessions, messages, actions, approvals, runs, run events, and desk registry snapshots. |
 | `var/artifacts/agent/runs/` | Run outputs. |
 | `var/artifacts/agent/evidence/` | Evidence snapshots. |
 | `var/artifacts/agent/memory/` | Transparent memory exports. |
@@ -754,6 +754,7 @@ As of 2026-06-14:
 - `astroq agent sessions/session create/session show/session update/message/actions/handoffs/handoff resolve/action show/run/approve/reject/cancel/expire/reports/report/notify report/rhythm (--session or --all-active)/paper propose/paper submit/paper cancel/live readiness/live preview/live propose/live submit/live reconcile/live kill-switch status/live kill-switch activate/live kill-switch deactivate/evidence/desks/memory show/memory export/memory prune/memory clear --json` is available.
 - `/api/agent/sessions`, `/api/agent/sessions/{session_id}` `GET/PATCH`, `/api/agent/actions`, `/api/agent/actions/expire`, `/api/agent/handoffs`, `/api/agent/handoffs/{handoff_id}/resolve`, `/api/agent/actions/{action_id}/run`, `/api/agent/actions/{action_id}/cancel`, `/api/agent/runs/{run_id}`, `/api/agent/evidence/{evidence_id}`, `/api/agent/desks`, `/api/agent/paper/proposals`, `/api/agent/paper/actions/{action_id}/submit`, `/api/agent/paper/actions/{action_id}/cancel`, `/api/agent/live/readiness`, `/api/agent/live/preview`, `/api/agent/live/proposals`, `/api/agent/live/actions/{action_id}/submit`, `/api/agent/live/reconciliation`, `/api/agent/live/kill-switch`, `/api/agent/live/kill-switch/activate`, `/api/agent/live/kill-switch/deactivate`, `/api/agent/reports`, `/api/agent/reports/{report_id}/notify`, `/api/agent/reports/rhythm`, `/api/agent/reports/rhythm/scheduled`, `/api/agent/memory`, `/api/agent/memory/export`, `/api/agent/memory/prune`, and `/api/agent/memory/clear` are available.
 - Action dispatch is intentionally bounded to fixed `AgentToolRegistry` command arrays. Read-only actions can run; approval-required actions are blocked until approved; approved fixed-registry templated commands bind only tool-declared safe parameters.
+- Fixed command dispatch records ordered run events for queued/running/stdout/stderr/terminal state. `/api/agent/runs/{run_id}` and scoped action detail include the event timeline, while session summaries keep runs compact.
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - The fixed registry covers all desk-declared tools, including lifecycle checks, data status, data source capability listing and registry diff, data repair dry-run/approved repair, strategy catalog, strategy competition evidence, backtest dry-run, execution dry-run, AST diagnostics, test design intelligence, docs check, and report generation.
 - Deterministic desk workflows route common CEO intents to specific safe tools, including data source registry diff, 12-strategy competition evidence, backtest dry-run, test design intelligence, and documentation hygiene checks.
@@ -766,4 +767,4 @@ As of 2026-06-14:
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
-- Actual advanced desk reasoning, cross-tool workflow orchestration, streaming updates, advanced semantic report synthesis, and real MiniQMT/QMT SDK submission/reconciliation are not yet implemented.
+- Actual advanced desk reasoning, cross-tool workflow orchestration, realtime Web streaming, advanced semantic report synthesis, and real MiniQMT/QMT SDK submission/reconciliation are not yet implemented.
