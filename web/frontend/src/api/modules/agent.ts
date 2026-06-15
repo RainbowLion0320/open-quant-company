@@ -18,6 +18,9 @@ import type {
   AgentLiveReconciliationResponse,
   AgentLiveReadinessResponse,
   AgentPaperCancelResponse,
+  AgentProgramResponse,
+  AgentProgramRunResponse,
+  AgentProgramsResponse,
   AgentReadOnlyWorkflowResponse,
   AgentReportNotificationResponse,
   AgentPaperSubmitResponse,
@@ -133,6 +136,22 @@ export const agentApi = {
     planner_provider?: string;
     planner_model?: string;
   }) => post<AgentWorkflowPlanResponse>("/api/agent/plans", payload),
+  agentPrograms: (sessionId = "") =>
+    get<AgentProgramsResponse>(`/api/agent/programs${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
+  agentCreateProgram: (
+    sessionId: string,
+    payload: {
+      goal: string;
+      desk?: string;
+      max_steps?: number;
+      planner_mode?: "deterministic" | "semantic_draft" | "provider_semantic";
+      semantic_draft?: Record<string, unknown>;
+      planner_provider?: string;
+      planner_model?: string;
+    },
+  ) => post<AgentProgramResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/programs`, payload),
+  agentRunProgram: (programId: string, payload: { dry_run?: boolean } = {}) =>
+    post<AgentProgramRunResponse>(`/api/agent/programs/${encodeURIComponent(programId)}/run`, payload),
   agentActions: (filters: AgentActionFilters = {}) => {
     const params = new URLSearchParams();
     if (filters.session_id) params.set("session_id", filters.session_id);

@@ -93,6 +93,18 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "runningAutonomyRun" in view
     assert "autonomyRunMaxSteps" in view
     assert 'v-model.number="autonomyRunMaxSteps"' in view
+    assert "api.agentPrograms" in view
+    assert "api.agentCreateProgram" in view
+    assert "api.agentRunProgram" in view
+    assert "agentPrograms" in view
+    assert "createAutonomyProgram" in view
+    assert "runAutonomyProgram" in view
+    assert "dryRunAutonomyProgram" in view
+    assert "programRunResult" in view
+    assert "ceoOffice.createAutonomyProgram" in view
+    assert "ceoOffice.autonomyPrograms" in view
+    assert "ceoOffice.programRunStatus" in view
+    assert "ceoOffice.programBlockedItems" in view
     assert "autonomyStepResult.actions" in view
     assert "autonomyStepResult.runs" in view
     assert "autonomyStepResult.skipped" in view
@@ -473,6 +485,10 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "AgentAutonomyStepResponse" in agent_types
     assert "AgentAutonomyRun" in agent_types
     assert "AgentAutonomyRunResponse" in agent_types
+    assert "AgentProgram" in agent_types
+    assert "AgentProgramRun" in agent_types
+    assert "AgentProgramsResponse" in agent_types
+    assert "AgentProgramRunResponse" in agent_types
     assert "agentAutonomyStep" in agent_api
     assert "/api/agent/sessions/${encodeURIComponent(sessionId)}/autonomy-step" in agent_api
     assert "agentAutonomyRun" in agent_api
@@ -481,6 +497,12 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "planner_mode?: string" in agent_api
     assert "semantic_draft?: Record<string, unknown>" in agent_api
     assert "planning_mode: string" in agent_types
+    assert "agentPrograms" in agent_api
+    assert "/api/agent/programs" in agent_api
+    assert "agentCreateProgram" in agent_api
+    assert "/api/agent/sessions/${encodeURIComponent(sessionId)}/programs" in agent_api
+    assert "agentRunProgram" in agent_api
+    assert "/api/agent/programs/${encodeURIComponent(programId)}/run" in agent_api
     assert "agentActions" in agent_api
     assert "filters: AgentActionFilters = {}" in agent_api
     assert "URLSearchParams" in agent_api

@@ -146,6 +146,26 @@ class AgentWorkOrder:
 
 
 @dataclass(frozen=True)
+class AgentProgram:
+    program_id: str
+    session_id: str
+    goal: str
+    desk: str
+    status: str
+    planning_mode: str
+    max_steps: int
+    current_step: int
+    phases: list[dict[str, Any]]
+    blocked_items: list[dict[str, Any]]
+    boundary: dict[str, Any]
+    created_at: str
+    updated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ApprovalPolicy:
     policy_id: str
     risk_level: str

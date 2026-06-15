@@ -59,6 +59,15 @@
         {{ t("ceoOffice.stopReason") }} {{ autonomyRunResult.stop_reason }}
       </span>
     </section>
+    <section v-if="programRunResult" class="ceo-alert info">
+      <strong>{{ t("ceoOffice.programRunStatus") }}</strong>
+      <span>
+        {{ statusLabel(programRunResult.status) }} ·
+        {{ t("ceoOffice.autonomyRunSteps") }} {{ programRunResult.step_count }} ·
+        {{ t("ceoOffice.ran") }} {{ programRunResult.run_count }} ·
+        {{ t("ceoOffice.programBlockedItems") }} {{ programRunResult.blocked_item_count }}
+      </span>
+    </section>
     <section v-if="autonomyStepResult" class="ceo-panel autonomy-step-detail">
       <header class="panel-head">
         <span>{{ t("ceoOffice.autonomyStepStatus") }}</span>
@@ -155,6 +164,51 @@
         </div>
       </div>
     </section>
+    <section class="ceo-panel autonomy-step-detail">
+      <header class="panel-head">
+        <span>{{ t("ceoOffice.autonomyPrograms") }}</span>
+        <small>{{ agentPrograms.length }}</small>
+      </header>
+      <div v-if="!agentPrograms.length" class="ceo-empty compact">{{ t("ceoOffice.noPrograms") }}</div>
+      <div v-else class="run-list">
+        <article v-for="program in agentPrograms" :key="program.program_id" class="run-row">
+          <strong>{{ program.goal }}</strong>
+          <small>
+            {{ statusLabel(program.status) }} · {{ program.planning_mode }} ·
+            {{ program.current_step }}/{{ program.phase_count }} ·
+            {{ t("ceoOffice.programBlockedItems") }} {{ program.blocked_item_count }}
+          </small>
+          <div class="action-inline">
+            <button
+              class="btn btn-ghost compact"
+              type="button"
+              :disabled="dryRunningProgram === program.program_id"
+              @click="dryRunAutonomyProgram(program.program_id)"
+            >
+              {{ t("ceoOffice.programDryRun") }}
+            </button>
+            <button
+              class="btn btn-primary compact"
+              type="button"
+              :disabled="runningProgram === program.program_id || program.status.startsWith('completed')"
+              @click="runAutonomyProgram(program.program_id)"
+            >
+              {{ t("ceoOffice.programRun") }}
+            </button>
+          </div>
+          <div class="mini-list">
+            <span v-for="phase in program.phases.slice(0, 4)" :key="phase.phase_id" class="ceo-chip">
+              {{ deskLabel(phase.desk) }} · {{ phase.tool_id }} · {{ statusLabel(phase.status) }}
+            </span>
+          </div>
+          <div v-if="program.blocked_items.length" class="mini-list">
+            <span v-for="(item, index) in program.blocked_items.slice(0, 4)" :key="`${program.program_id}-blocker-${index}`" class="ceo-chip warning">
+              {{ item.reason }} · {{ item.tool_id || item.desk || "blocked" }}
+            </span>
+          </div>
+        </article>
+      </div>
+    </section>
 
     <section class="ceo-summary">
       <article class="ceo-metric">
@@ -240,6 +294,9 @@
           </button>
           <button class="btn btn-ghost" type="button" :disabled="runningAutonomyRun" @click="runAutonomyRun">
             {{ t("ceoOffice.runAutonomyRun") }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="creatingProgram || !draft.trim()" @click="createAutonomyProgram">
+            {{ t("ceoOffice.createAutonomyProgram") }}
           </button>
           <label class="autonomy-run-control">
             <span>{{ t("ceoOffice.autonomyRunMaxSteps") }}</span>
@@ -969,7 +1026,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentAutonomyRun, type AgentAutonomyStep, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentAutonomyRun, type AgentAutonomyStep, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentProgram, type AgentProgramRun, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -992,6 +1049,8 @@ const liveMonitor = ref<AgentLiveMonitor | null>(null);
 const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
 const autonomyStepResult = ref<AgentAutonomyStep | null>(null);
 const autonomyRunResult = ref<AgentAutonomyRun | null>(null);
+const agentPrograms = ref<AgentProgram[]>([]);
+const programRunResult = ref<AgentProgramRun | null>(null);
 const workflowPlan = ref<AgentWorkflowPlan | null>(null);
 const sessionStream = ref<AbortController | null>(null);
 const sessionStreamId = ref("");
@@ -1015,6 +1074,9 @@ const archivingSession = ref(false);
 const runningReadOnlyWorkflow = ref(false);
 const runningAutonomyStep = ref(false);
 const runningAutonomyRun = ref(false);
+const creatingProgram = ref(false);
+const runningProgram = ref("");
+const dryRunningProgram = ref("");
 const resolvingHandoff = ref("");
 const updatingWorkOrder = ref("");
 const generatingReport = ref(false);
@@ -1361,7 +1423,11 @@ function connectRunStream(runId: string) {
 }
 
 async function loadSession(sessionId: string, options: { connectStream?: boolean } = {}) {
-  const [detail, reportPayload] = await Promise.all([api.agentSession(sessionId), api.agentReports(sessionId)]);
+  const [detail, reportPayload, programPayload] = await Promise.all([
+    api.agentSession(sessionId),
+    api.agentReports(sessionId),
+    api.agentPrograms(sessionId),
+  ]);
   activeSession.value = detail.session;
   if (!desks.value.some(desk => desk.desk_id === selectedDraftDesk.value)) {
     selectedDraftDesk.value = detail.session.default_desk || "reporting";
@@ -1371,6 +1437,7 @@ async function loadSession(sessionId: string, options: { connectStream?: boolean
   handoffs.value = detail.handoffs || [];
   workOrders.value = detail.work_orders || [];
   reports.value = reportPayload.reports || [];
+  agentPrograms.value = programPayload.programs || [];
   if (options.connectStream !== false) {
     connectSessionStream(sessionId);
   }
@@ -1379,13 +1446,14 @@ async function loadSession(sessionId: string, options: { connectStream?: boolean
 async function load() {
   error.value = "";
   try {
-    const [sessionPayload, deskPayload, policyPayload, actionPayload, handoffPayload, workOrderPayload, livePayload, environmentPayload, killSwitchPayload] = await Promise.all([
+    const [sessionPayload, deskPayload, policyPayload, actionPayload, handoffPayload, workOrderPayload, programPayload, livePayload, environmentPayload, killSwitchPayload] = await Promise.all([
       api.agentSessions(),
       api.agentDesks(),
       api.agentApprovalPolicies(),
       api.agentActions(),
       api.agentHandoffs(),
       api.agentWorkOrders(),
+      api.agentPrograms(),
       api.agentLiveReadiness(),
       api.agentLiveEnvironment(),
       api.agentLiveKillSwitch(),
@@ -1399,6 +1467,7 @@ async function load() {
     actions.value = actionPayload.actions || [];
     handoffs.value = handoffPayload.handoffs || [];
     workOrders.value = workOrderPayload.work_orders || [];
+    agentPrograms.value = programPayload.programs || [];
     liveReadiness.value = livePayload.health;
     liveEnvironment.value = environmentPayload.environment;
     liveKillSwitch.value = killSwitchPayload.kill_switch || livePayload.health.live_kill_switch || environmentPayload.environment.live_kill_switch || null;
@@ -1501,6 +1570,65 @@ async function runAutonomyRun() {
     error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
   } finally {
     runningAutonomyRun.value = false;
+  }
+}
+
+async function createAutonomyProgram() {
+  const semanticDraft = parseSemanticDraft();
+  if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
+  creatingProgram.value = true;
+  error.value = "";
+  try {
+    const session = await ensureSession();
+    const payload = await api.agentCreateProgram(session.session_id, {
+      desk: selectedDraftDesk.value,
+      goal: draft.value.trim(),
+      max_steps: autonomyRunMaxSteps.value,
+      ...semanticPayload(semanticDraft),
+    });
+    agentPrograms.value = [
+      payload.program,
+      ...agentPrograms.value.filter(program => program.program_id !== payload.program.program_id),
+    ];
+    programRunResult.value = null;
+    workflowPlan.value = null;
+    await loadSession(session.session_id);
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;
+  } finally {
+    creatingProgram.value = false;
+  }
+}
+
+async function dryRunAutonomyProgram(programId: string) {
+  dryRunningProgram.value = programId;
+  error.value = "";
+  try {
+    const payload = await api.agentRunProgram(programId, { dry_run: true });
+    programRunResult.value = payload.run;
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
+  } finally {
+    dryRunningProgram.value = "";
+  }
+}
+
+async function runAutonomyProgram(programId: string) {
+  runningProgram.value = programId;
+  error.value = "";
+  try {
+    const payload = await api.agentRunProgram(programId);
+    programRunResult.value = payload.run;
+    agentPrograms.value = agentPrograms.value.map(program =>
+      program.program_id === payload.run.program.program_id ? payload.run.program : program,
+    );
+    if (activeSession.value) {
+      await loadSession(activeSession.value.session_id);
+    }
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
+  } finally {
+    runningProgram.value = "";
   }
 }
 

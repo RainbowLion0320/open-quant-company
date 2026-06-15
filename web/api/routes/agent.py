@@ -130,6 +130,49 @@ async def run_agent_autonomy_run(session_id: str, payload: dict[str, Any] | None
     return {"run": run}
 
 
+@router.get("/programs")
+async def list_agent_programs(session_id: str = "") -> dict[str, Any]:
+    return AgentRuntime().list_autonomy_programs(session_id or None)
+
+
+@router.post("/sessions/{session_id}/programs")
+async def create_agent_program(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        program = AgentRuntime().create_autonomy_program(
+            session_id,
+            goal=str(payload.get("goal") or payload.get("content") or payload.get("text") or ""),
+            desk=str(payload.get("desk") or "reporting"),
+            max_steps=int(payload.get("max_steps") or 6),
+            semantic_planner=semantic_planner_from_payload(payload),
+        )
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+    except ValueError as exc:
+        raise InvalidParameterError("agent_program", session_id, str(exc))
+    return {"program": program}
+
+
+@router.get("/programs/{program_id}")
+async def get_agent_program(program_id: str) -> dict[str, Any]:
+    program = AgentRuntime().get_autonomy_program(program_id)
+    if program is None:
+        raise DataNotFoundError("agent autonomy program", program_id)
+    return {"program": program}
+
+
+@router.post("/programs/{program_id}/run")
+async def run_agent_program(program_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    body = payload or {}
+    try:
+        run = AgentRuntime().run_autonomy_program(
+            program_id,
+            dry_run=bool(body.get("dry_run") or False),
+        )
+    except KeyError:
+        raise DataNotFoundError("agent autonomy program", program_id)
+    return {"run": run}
+
+
 @router.post("/sessions/{session_id}/messages")
 async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     role = str(payload.get("role") or "ceo")

@@ -7370,3 +7370,142 @@ def test_agent_memory_prune_and_clear_require_explicit_policy(tmp_path, monkeypa
     assert runtime.memory_snapshot()["summary"]["session_count"] == 0
     assert runtime.memory_snapshot()["summary"]["evidence_count"] == 0
     reset_datahub()
+
+
+def test_agent_autonomy_program_persists_multi_stage_safe_plan_and_surfaces_cli_api(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import SemanticDraftPlanner
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    draft = {
+        "answer": "Create a company-wide operating program.",
+        "confidence": 0.86,
+        "actions": [
+            {"desk": "data", "tool_id": "astroq.data.sources.diff_registry", "summary": "Check source gaps."},
+            {"desk": "research", "tool_id": "astroq.strategy.compete", "summary": "Review strategy evidence."},
+            {"desk": "risk", "tool_id": "astroq.lifecycle.check", "summary": "Review lifecycle blockers."},
+            {"desk": "execution", "tool_id": "astroq.execution.dry_run", "summary": "Preview execution readiness."},
+            {
+                "desk": "data",
+                "tool_id": "astroq.data.repair",
+                "summary": "Unsafe data write must not auto-run.",
+                "parameters": {"table": "stock_valuation"},
+            },
+            {
+                "desk": "engineering",
+                "tool_id": "astroq.unknown.tool",
+                "summary": "Unknown implementation idea becomes a blocker/work order.",
+            },
+        ],
+        "reasoning": [{"kind": "semantic_goal", "goal": "company_operating_program"}],
+    }
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Autonomy program", default_desk="reporting")
+    program = runtime.create_autonomy_program(
+        session.session_id,
+        goal="推进全公司数据、研究、风险和执行证据闭环；能安全运行的先运行，不能安全运行的形成 blocker",
+        desk="reporting",
+        max_steps=4,
+        semantic_planner=SemanticDraftPlanner(draft),
+    )
+    listed = runtime.list_autonomy_programs(session.session_id)
+    run = runtime.run_autonomy_program(program["program_id"], runner=fake_run)
+
+    assert program["program_id"].startswith("prog_")
+    assert program["status"] == "active"
+    assert program["session_id"] == session.session_id
+    assert program["goal"].startswith("推进全公司")
+    assert program["planning_mode"] == "semantic_assisted"
+    assert program["max_steps"] == 4
+    assert program["current_step"] == 0
+    assert program["phase_count"] == 4
+    assert program["safe_action_count"] == 4
+    assert program["blocked_item_count"] == 2
+    assert program["boundary"]["fixed_registry_only"] is True
+    assert program["boundary"]["writes_and_trades_require_approval"] is True
+    assert [phase["desk"] for phase in program["phases"]] == ["data", "research", "risk", "execution"]
+    assert {item["reason"] for item in program["blocked_items"]} == {
+        "approval_required_or_state_changing",
+        "unknown_or_out_of_scope_tool",
+    }
+    assert listed["total"] == 1
+    assert listed["programs"][0]["program_id"] == program["program_id"]
+    assert run["status"] == "ready"
+    assert run["program_id"] == program["program_id"]
+    assert run["stop_reason"] == "completed"
+    assert run["step_count"] == 4
+    assert run["run_count"] == 4
+    assert run["blocked_item_count"] == 2
+    assert run["program"]["status"] == "completed_with_blockers"
+    assert [command[1:] for command in calls] == [
+        ["data", "sources", "diff-registry", "--json"],
+        ["strategy", "compete", "--json"],
+        ["lifecycle", "check", "--json"],
+        ["execution", "dry-run", "--json"],
+    ]
+
+    draft_path = tmp_path / "program-draft.json"
+    draft_path.write_text(json.dumps(draft, ensure_ascii=False), encoding="utf-8")
+    cli_create_code = run_cli(
+        [
+            "agent",
+            "program",
+            "create",
+            "--session",
+            session.session_id,
+            "--goal",
+            "Create an auditable autonomy program",
+            "--max-steps",
+            "4",
+            "--semantic-draft-file",
+            str(draft_path),
+            "--json",
+        ]
+    )
+    cli_create_payload = json.loads(capsys.readouterr().out)
+    cli_program_id = cli_create_payload["data"]["program"]["program_id"]
+    cli_list_code = run_cli(["agent", "programs", "--session", session.session_id, "--json"])
+    cli_list_payload = json.loads(capsys.readouterr().out)
+    api_client = TestClient(create_app())
+    api_create = api_client.post(
+        f"/api/agent/sessions/{session.session_id}/programs",
+        json={
+            "goal": "Create an API-visible autonomy program",
+            "max_steps": 4,
+            "planner_mode": "semantic_draft",
+            "semantic_draft": draft,
+        },
+    )
+    api_program_id = api_create.json()["program"]["program_id"]
+    api_run = api_client.post(f"/api/agent/programs/{api_program_id}/run", json={"dry_run": True})
+
+    assert cli_create_code == 0
+    assert cli_create_payload["data"]["program"]["phase_count"] == 4
+    assert cli_list_code == 0
+    assert cli_list_payload["data"]["total"] == 2
+    assert cli_program_id in {row["program_id"] for row in cli_list_payload["data"]["programs"]}
+    assert api_create.status_code == 200
+    assert api_create.json()["program"]["safe_action_count"] == 4
+    assert api_run.status_code == 200
+    assert api_run.json()["run"]["program_id"] == api_program_id
+    assert api_run.json()["run"]["status"] == "dry_run"
+    assert api_run.json()["run"]["run_count"] == 0
+    reset_datahub()

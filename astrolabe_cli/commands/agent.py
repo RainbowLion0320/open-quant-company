@@ -243,6 +243,81 @@ def plan(
     )
 
 
+def programs(session_id: str = "") -> CliResult:
+    listing = AgentRuntime().list_autonomy_programs(session_id or None)
+    return CliResult(
+        ok=True,
+        command="agent programs",
+        message=f"{listing['total']} autonomy program(s)",
+        data=listing,
+    )
+
+
+def create_program(
+    session_id: str,
+    goal: str,
+    *,
+    desk: str = "reporting",
+    max_steps: int = 6,
+    semantic_draft_file: str = "",
+    provider_semantic: bool = False,
+    planner_provider: str = "",
+    planner_model: str = "",
+) -> CliResult:
+    try:
+        program = AgentRuntime().create_autonomy_program(
+            session_id,
+            goal=goal,
+            desk=desk,
+            max_steps=max_steps,
+            semantic_planner=semantic_planner_from_cli(
+                semantic_draft_file=semantic_draft_file,
+                provider_semantic=provider_semantic,
+                planner_provider=planner_provider,
+                planner_model=planner_model,
+            ),
+        )
+    except KeyError as exc:
+        return CliResult(False, "agent program create", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    except ValueError as exc:
+        return CliResult(False, "agent program create", {"session_id": session_id, "desk": desk}, "Agent program invalid", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent program create",
+        message=f"Created autonomy program {program['program_id']}",
+        data={"program": program},
+    )
+
+
+def show_program(program_id: str) -> CliResult:
+    program = AgentRuntime().get_autonomy_program(program_id)
+    return CliResult(
+        ok=program is not None,
+        command="agent program show",
+        message="Agent autonomy program found" if program else "Agent autonomy program missing",
+        data={"program": program} if program else {"program_id": program_id},
+        errors=[] if program else [f"missing_program:{program_id}"],
+    )
+
+
+def run_program(program_id: str, *, dry_run: bool = False) -> CliResult:
+    try:
+        run = AgentRuntime().run_autonomy_program(program_id, dry_run=dry_run)
+    except KeyError as exc:
+        return CliResult(False, "agent program run", {"program_id": program_id}, "Agent autonomy program missing", [str(exc)])
+    ok = run["status"] in {"ready", "partial", "dry_run"}
+    return CliResult(
+        ok=ok,
+        command="agent program run",
+        message=(
+            f"Autonomy program {run['status']}: "
+            f"ran {run['run_count']} phase(s), blocked items={run['blocked_item_count']}"
+        ),
+        data={"run": run},
+        errors=[] if ok else [str(run["status"])],
+    )
+
+
 def actions(session_id: str = "", status: str = "", desk: str = "", risk_level: str = "") -> CliResult:
     runtime = AgentRuntime()
     rows = runtime.list_actions(

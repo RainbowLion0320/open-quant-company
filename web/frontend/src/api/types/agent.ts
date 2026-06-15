@@ -140,6 +140,68 @@ export interface AgentAutonomyRun {
   boundary: Record<string, unknown>;
 }
 
+export interface AgentProgramPhase {
+  index: number;
+  phase_id: string;
+  status: string;
+  desk: string;
+  action_type: string;
+  tool_id: string;
+  risk_level: string;
+  summary: string;
+  expected_effect: string;
+  parameters: Record<string, unknown>;
+  evidence: AgentWorkflowPlanAction["evidence"];
+  action_id?: string;
+  run_id?: string;
+  evidence_refs?: string[];
+}
+
+export interface AgentProgramBlockedItem {
+  desk: string;
+  tool_id: string;
+  risk_level: string;
+  summary: string;
+  reason: string;
+  raw_reason?: string;
+}
+
+export interface AgentProgram {
+  program_id: string;
+  session_id: string;
+  goal: string;
+  desk: string;
+  status: string;
+  planning_mode: string;
+  max_steps: number;
+  current_step: number;
+  phases: AgentProgramPhase[];
+  blocked_items: AgentProgramBlockedItem[];
+  boundary: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  phase_count: number;
+  safe_action_count: number;
+  blocked_item_count: number;
+}
+
+export interface AgentProgramRun {
+  status: string;
+  program_id: string;
+  session_id: string;
+  checked_at: string;
+  stop_reason?: string;
+  step_count: number;
+  run_count: number;
+  failed_count?: number;
+  blocked_count?: number;
+  blocked_item_count: number;
+  phases?: AgentProgramPhase[];
+  runs?: AgentRun[];
+  program: AgentProgram;
+  boundary: Record<string, unknown>;
+}
+
 export interface AgentApprovalPolicy {
   policy_id: string;
   risk_level: string;
@@ -386,6 +448,21 @@ export interface AgentAutonomyStepResponse {
 
 export interface AgentAutonomyRunResponse {
   run: AgentAutonomyRun;
+}
+
+export interface AgentProgramsResponse {
+  status: string;
+  programs: AgentProgram[];
+  total: number;
+  filters?: Record<string, string>;
+}
+
+export interface AgentProgramResponse {
+  program: AgentProgram;
+}
+
+export interface AgentProgramRunResponse {
+  run: AgentProgramRun;
 }
 
 export interface AgentActionDetail {

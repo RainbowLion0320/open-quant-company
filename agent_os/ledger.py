@@ -153,6 +153,22 @@ class AgentLedger:
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS programs (
+                    program_id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    goal TEXT NOT NULL,
+                    desk TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    planning_mode TEXT NOT NULL,
+                    max_steps INTEGER NOT NULL,
+                    current_step INTEGER NOT NULL,
+                    phases TEXT NOT NULL,
+                    blocked_items TEXT NOT NULL,
+                    boundary TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
             self._ensure_column(conn, "actions", "expires_at", "TEXT NOT NULL DEFAULT ''")
@@ -338,6 +354,46 @@ class AgentLedger:
                 payload,
             )
 
+    def insert_program(self, row: dict[str, Any]) -> None:
+        payload = {
+            **row,
+            "phases": _json_dumps(row.get("phases", [])),
+            "blocked_items": _json_dumps(row.get("blocked_items", [])),
+            "boundary": _json_dumps(row.get("boundary", {})),
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO programs(
+                    program_id, session_id, goal, desk, status, planning_mode, max_steps,
+                    current_step, phases, blocked_items, boundary, created_at, updated_at
+                )
+                VALUES(
+                    :program_id, :session_id, :goal, :desk, :status, :planning_mode, :max_steps,
+                    :current_step, :phases, :blocked_items, :boundary, :created_at, :updated_at
+                )
+                """,
+                payload,
+            )
+
+    def update_program(self, row: dict[str, Any]) -> None:
+        payload = {
+            **row,
+            "phases": _json_dumps(row.get("phases", [])),
+            "blocked_items": _json_dumps(row.get("blocked_items", [])),
+            "boundary": _json_dumps(row.get("boundary", {})),
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE programs
+                SET status = :status, current_step = :current_step, phases = :phases,
+                    blocked_items = :blocked_items, boundary = :boundary, updated_at = :updated_at
+                WHERE program_id = :program_id
+                """,
+                payload,
+            )
+
     def list_sessions(self) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM sessions ORDER BY created_at DESC, session_id DESC").fetchall()
@@ -359,12 +415,13 @@ class AgentLedger:
                 "evidence": int(conn.execute("SELECT COUNT(*) FROM evidence").fetchone()[0]),
                 "handoffs": int(conn.execute("SELECT COUNT(*) FROM handoffs").fetchone()[0]),
                 "work_orders": int(conn.execute("SELECT COUNT(*) FROM work_orders").fetchone()[0]),
+                "programs": int(conn.execute("SELECT COUNT(*) FROM programs").fetchone()[0]),
             }
 
     def delete_sessions(self, session_ids: list[str], *, dry_run: bool = False) -> dict[str, int]:
         ids = [str(session_id) for session_id in session_ids if str(session_id)]
         if not ids:
-            return {"sessions": 0, "messages": 0, "actions": 0, "runs": 0, "run_events": 0, "evidence": 0, "handoffs": 0, "work_orders": 0}
+            return {"sessions": 0, "messages": 0, "actions": 0, "runs": 0, "run_events": 0, "evidence": 0, "handoffs": 0, "work_orders": 0, "programs": 0}
         placeholders = _placeholders(ids)
         with self._connect() as conn:
             action_rows = conn.execute(
@@ -405,6 +462,7 @@ class AgentLedger:
                 "evidence": len(evidence_to_delete),
                 "handoffs": int(conn.execute(f"SELECT COUNT(*) FROM handoffs WHERE session_id IN ({placeholders})", ids).fetchone()[0]),
                 "work_orders": int(conn.execute(f"SELECT COUNT(*) FROM work_orders WHERE session_id IN ({placeholders})", ids).fetchone()[0]),
+                "programs": int(conn.execute(f"SELECT COUNT(*) FROM programs WHERE session_id IN ({placeholders})", ids).fetchone()[0]),
             }
             if dry_run:
                 return counts
@@ -414,6 +472,7 @@ class AgentLedger:
                 conn.execute(f"DELETE FROM actions WHERE action_id IN ({action_placeholders})", action_ids)
             conn.execute(f"DELETE FROM handoffs WHERE session_id IN ({placeholders})", ids)
             conn.execute(f"DELETE FROM work_orders WHERE session_id IN ({placeholders})", ids)
+            conn.execute(f"DELETE FROM programs WHERE session_id IN ({placeholders})", ids)
             conn.execute(f"DELETE FROM messages WHERE session_id IN ({placeholders})", ids)
             conn.execute(f"DELETE FROM sessions WHERE session_id IN ({placeholders})", ids)
             if evidence_to_delete:
@@ -426,7 +485,7 @@ class AgentLedger:
         if dry_run:
             return counts
         with self._connect() as conn:
-            for table in ("run_events", "runs", "handoffs", "work_orders", "actions", "messages", "evidence", "sessions"):
+            for table in ("run_events", "runs", "handoffs", "work_orders", "programs", "actions", "messages", "evidence", "sessions"):
                 conn.execute(f"DELETE FROM {table}")
         return counts
 
@@ -538,6 +597,22 @@ class AgentLedger:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM work_orders WHERE work_order_id = ?", (work_order_id,)).fetchone()
         return self._work_order_row(row) if row else None
+
+    def list_programs(self, session_id: str | None = None) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            if session_id:
+                rows = conn.execute(
+                    "SELECT * FROM programs WHERE session_id = ? ORDER BY created_at DESC, program_id DESC",
+                    (session_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM programs ORDER BY created_at DESC, program_id DESC").fetchall()
+        return [self._program_row(row) for row in rows]
+
+    def get_program(self, program_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM programs WHERE program_id = ?", (program_id,)).fetchone()
+        return self._program_row(row) if row else None
 
     def update_work_order_status(
         self,
@@ -682,4 +757,17 @@ class AgentLedger:
         data["affected_files"] = _json_loads(data.get("affected_files"), [])
         data["suggested_verification"] = _json_loads(data.get("suggested_verification"), [])
         data["evidence_refs"] = _json_loads(data.get("evidence_refs"), [])
+        return data
+
+    @staticmethod
+    def _program_row(row: sqlite3.Row) -> dict[str, Any]:
+        data = dict(row)
+        data["phases"] = _json_loads(data.get("phases"), [])
+        data["blocked_items"] = _json_loads(data.get("blocked_items"), [])
+        data["boundary"] = _json_loads(data.get("boundary"), {})
+        data["max_steps"] = int(data.get("max_steps") or 0)
+        data["current_step"] = int(data.get("current_step") or 0)
+        data["phase_count"] = len(data["phases"])
+        data["safe_action_count"] = sum(1 for phase in data["phases"] if str(phase.get("status") or "") != "blocked")
+        data["blocked_item_count"] = len(data["blocked_items"])
         return data

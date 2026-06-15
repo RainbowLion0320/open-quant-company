@@ -31,6 +31,7 @@ from agent_os.schemas import (
     AgentAction,
     AgentHandoff,
     AgentMessage,
+    AgentProgram,
     AgentReport,
     AgentRun,
     AgentRunEvent,
@@ -1153,6 +1154,205 @@ class AgentRuntime:
                 "writes_and_trades_skipped": True,
                 "max_steps_cap": 5,
             },
+        }
+
+    def create_autonomy_program(
+        self,
+        session_id: str,
+        *,
+        goal: str,
+        desk: str = "reporting",
+        max_steps: int = 6,
+        semantic_planner: Any | None = None,
+    ) -> dict[str, Any]:
+        """Persist a multi-stage autonomous operating program.
+
+        A program can describe open-ended company work, but executable phases
+        remain constrained to fixed-registry read-only/dry-run tools. Unsafe,
+        unknown, write, code, paper, and live items are retained as blockers.
+        """
+        if not self.ledger.get_session(session_id):
+            raise KeyError(f"Agent session not found: {session_id}")
+        normalized_goal = goal.strip()
+        if not normalized_goal:
+            raise ValueError("program goal cannot be empty")
+        try:
+            step_limit = int(max_steps)
+        except (TypeError, ValueError):
+            raise ValueError("max_steps must be an integer")
+        if step_limit < 1:
+            raise ValueError("max_steps must be at least 1")
+        step_limit = min(step_limit, 20)
+
+        plan = build_desk_workflow_plan(
+            desk=desk,
+            content=normalized_goal,
+            artifact_context=collect_report_artifact_context(),
+            session_context=self._workflow_session_context(session_id),
+            semantic_planner=semantic_planner,
+        )
+        registry = AgentToolRegistry()
+        phases: list[dict[str, Any]] = []
+        blocked_items: list[dict[str, Any]] = []
+        for action_spec in plan.actions:
+            block_reason = self._program_action_block_reason(action_spec, registry)
+            if block_reason:
+                blocked_items.append(self._program_blocked_item(action_spec, reason=block_reason))
+                continue
+            if len(phases) >= step_limit:
+                blocked_items.append(self._program_blocked_item(action_spec, reason="max_step_limit_exceeded"))
+                continue
+            phases.append(self._program_phase(action_spec, index=len(phases) + 1))
+        blocked_items.extend(self._program_semantic_rejections(plan.reasoning))
+        for item in blocked_items:
+            if item["reason"] == "unknown_or_out_of_scope_tool":
+                self.create_work_order(
+                    session_id=session_id,
+                    title="Review unsupported autonomy program item",
+                    summary=str(item.get("summary") or "Unsupported autonomy program item needs Engineering review."),
+                    impact="Keeps unsupported autonomous work out of direct execution while preserving CEO-visible follow-up.",
+                    affected_files=[],
+                    suggested_verification=[".venv/bin/python -m pytest tests/test_agent_os_contracts.py -q"],
+                    evidence_refs=[],
+                )
+
+        timestamp = _now()
+        program = AgentProgram(
+            program_id=_id("prog"),
+            session_id=session_id,
+            goal=normalized_goal,
+            desk=desk,
+            status="active" if phases else "blocked",
+            planning_mode=str(plan.planning_mode or "program"),
+            max_steps=step_limit,
+            current_step=0,
+            phases=phases,
+            blocked_items=blocked_items,
+            boundary=self._program_boundary(),
+            created_at=timestamp,
+            updated_at=timestamp,
+        )
+        self.ledger.insert_program(program.to_dict())
+        return self.ledger.get_program(program.program_id) or program.to_dict()
+
+    def list_autonomy_programs(self, session_id: str | None = None) -> dict[str, Any]:
+        programs = self.ledger.list_programs(session_id)
+        return {
+            "status": "ready",
+            "programs": programs,
+            "total": len(programs),
+            "filters": {"session_id": session_id or ""},
+        }
+
+    def get_autonomy_program(self, program_id: str) -> dict[str, Any] | None:
+        return self.ledger.get_program(program_id)
+
+    def run_autonomy_program(
+        self,
+        program_id: str,
+        *,
+        runner: Any | None = None,
+        timeout_seconds: int = 120,
+        tool_registry: AgentToolRegistry | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        program = self.ledger.get_program(program_id)
+        if not program:
+            raise KeyError(f"Agent autonomy program not found: {program_id}")
+        phases = [dict(phase) for phase in program.get("phases", []) if isinstance(phase, dict)]
+        current_step = int(program.get("current_step") or 0)
+        pending = [
+            phase
+            for phase in phases
+            if int(phase.get("index") or 0) > current_step and str(phase.get("status") or "pending") == "pending"
+        ]
+        if dry_run:
+            return {
+                "status": "dry_run",
+                "program_id": program_id,
+                "session_id": str(program["session_id"]),
+                "checked_at": _now(),
+                "step_count": len(pending),
+                "run_count": 0,
+                "blocked_item_count": len(program.get("blocked_items", [])),
+                "phases": pending,
+                "program": program,
+                "boundary": self._program_boundary(),
+            }
+
+        runs: list[dict[str, Any]] = []
+        stop_reason = "completed"
+        registry = tool_registry or AgentToolRegistry()
+        for phase in pending:
+            evidence_spec = phase.get("evidence") if isinstance(phase.get("evidence"), dict) else {}
+            evidence = self.create_evidence(
+                kind="web_route",
+                label=str(evidence_spec.get("label") or phase.get("summary") or "Agent program phase"),
+                uri=str(evidence_spec.get("uri") or "/"),
+                summary=str(evidence_spec.get("summary") or phase.get("expected_effect") or ""),
+            )
+            action = self.propose_action(
+                session_id=str(program["session_id"]),
+                desk=str(phase["desk"]),
+                action_type=str(phase["action_type"]),
+                risk_level=str(phase["risk_level"]),
+                summary=str(phase["summary"]),
+                parameters={**dict(phase.get("parameters") or {}), "tool_id": str(phase["tool_id"])},
+                expected_effect=str(phase.get("expected_effect") or ""),
+                evidence_refs=[evidence.evidence_id],
+            )
+            run = self.dispatch_action(
+                action.action_id,
+                runner=runner,
+                timeout_seconds=timeout_seconds,
+                tool_registry=registry,
+            )
+            run_row = self.get_run(run.run_id) or run.to_dict()
+            runs.append(run_row)
+            phase["status"] = str(run_row.get("status") or "")
+            phase["action_id"] = action.action_id
+            phase["run_id"] = run.run_id
+            phase["evidence_refs"] = [evidence.evidence_id]
+            current_step = int(phase.get("index") or current_step)
+            if run_row.get("status") in {"failed", "blocked"}:
+                stop_reason = "step_not_ready"
+                break
+
+        phase_by_index = {int(phase.get("index") or 0): phase for phase in phases}
+        for phase in pending:
+            phase_by_index[int(phase.get("index") or 0)] = phase
+        updated_phases = [phase_by_index[index] for index in sorted(phase_by_index)]
+        blocked_item_count = len(program.get("blocked_items", []))
+        status = str(program.get("status") or "active")
+        if stop_reason == "step_not_ready":
+            status = "blocked"
+        elif current_step >= len(updated_phases):
+            status = "completed_with_blockers" if blocked_item_count else "completed"
+        updated_program = {
+            **program,
+            "status": status,
+            "current_step": current_step,
+            "phases": updated_phases,
+            "updated_at": _now(),
+        }
+        self.ledger.update_program(updated_program)
+        refreshed = self.ledger.get_program(program_id) or updated_program
+        failed_count = sum(1 for run in runs if run.get("status") == "failed")
+        blocked_count = sum(1 for run in runs if run.get("status") == "blocked")
+        return {
+            "status": "ready" if failed_count == 0 and blocked_count == 0 else "partial",
+            "program_id": program_id,
+            "session_id": str(program["session_id"]),
+            "checked_at": _now(),
+            "stop_reason": stop_reason,
+            "step_count": len(runs),
+            "run_count": len(runs),
+            "failed_count": failed_count,
+            "blocked_count": blocked_count,
+            "blocked_item_count": blocked_item_count,
+            "runs": runs,
+            "program": refreshed,
+            "boundary": self._program_boundary(),
         }
 
     def get_run(self, run_id: str) -> dict[str, Any] | None:
@@ -3323,6 +3523,86 @@ class AgentRuntime:
     def _tool_id_for_action(action_type: str, parameters: dict[str, Any] | None) -> str:
         params = parameters or {}
         return str(params.get("tool_id") or action_type or "")
+
+    @staticmethod
+    def _program_boundary() -> dict[str, Any]:
+        return {
+            "allowed_risk_levels": ["read_only", "dry_run"],
+            "fixed_registry_only": True,
+            "writes_and_trades_require_approval": True,
+            "code_changes_become_work_orders": True,
+            "unknown_tools_blocked": True,
+        }
+
+    @staticmethod
+    def _program_phase(action_spec: Any, *, index: int) -> dict[str, Any]:
+        return {
+            "index": index,
+            "phase_id": f"phase_{index:02d}",
+            "status": "pending",
+            "desk": str(action_spec.desk),
+            "action_type": str(action_spec.action_type),
+            "tool_id": str(action_spec.tool_id),
+            "risk_level": str(action_spec.risk_level),
+            "summary": str(action_spec.summary),
+            "expected_effect": str(action_spec.expected_effect),
+            "parameters": dict(getattr(action_spec, "parameters", {}) or {}),
+            "evidence": asdict(action_spec.evidence),
+        }
+
+    def _program_action_block_reason(self, action_spec: Any, registry: AgentToolRegistry) -> str:
+        tool = registry.get(str(action_spec.tool_id))
+        if tool is None:
+            return "unknown_or_out_of_scope_tool"
+        if str(action_spec.risk_level) not in {"read_only", "dry_run"} or tool.requires_approved_action:
+            return "approval_required_or_state_changing"
+        try:
+            self._validate_desk_action_scope(
+                desk=str(action_spec.desk),
+                action_type=str(action_spec.action_type),
+                risk_level=str(action_spec.risk_level),
+                tool_id=str(action_spec.tool_id),
+                tool_registry=registry,
+            )
+        except (KeyError, PermissionError, ValueError):
+            return "unknown_or_out_of_scope_tool"
+        return ""
+
+    @staticmethod
+    def _program_blocked_item(action_spec: Any, *, reason: str) -> dict[str, Any]:
+        return {
+            "desk": str(getattr(action_spec, "desk", "")),
+            "tool_id": str(getattr(action_spec, "tool_id", "")),
+            "risk_level": str(getattr(action_spec, "risk_level", "")),
+            "summary": str(getattr(action_spec, "summary", "")),
+            "reason": reason,
+        }
+
+    @staticmethod
+    def _program_semantic_rejections(reasoning: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        blocked: list[dict[str, Any]] = []
+        for row in reasoning:
+            if not isinstance(row, dict) or row.get("kind") != "semantic_planner":
+                continue
+            for item in row.get("rejected", []) or []:
+                if not isinstance(item, dict):
+                    continue
+                reason = str(item.get("reason") or "")
+                if reason in {"unsafe_risk_level", "missing_tool_parameter", "invalid_tool_parameter"} or reason.startswith(("missing_tool_parameter:", "invalid_tool_parameter:")):
+                    mapped_reason = "approval_required_or_state_changing"
+                else:
+                    mapped_reason = "unknown_or_out_of_scope_tool"
+                blocked.append(
+                    {
+                        "desk": str(item.get("desk") or ""),
+                        "tool_id": str(item.get("tool_id") or ""),
+                        "risk_level": "",
+                        "summary": "Semantic planner item was not accepted into the fixed safe program.",
+                        "reason": mapped_reason,
+                        "raw_reason": reason,
+                    }
+                )
+        return blocked
 
     def _validate_desk_action_scope(
         self,

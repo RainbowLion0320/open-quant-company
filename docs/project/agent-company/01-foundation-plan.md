@@ -1,6 +1,6 @@
 # Agent Company OS Phase 1 - Foundation Runtime Plan
 
-> Status: planned implementation phase
+> Status: foundation runtime implemented; autonomy program ledger added
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Formal contract: [07-agent-company-os.md](../../specs/07-agent-company-os.md)
@@ -217,6 +217,9 @@ Phase 1 should add JSON-readable commands:
 | `astroq agent session run-readonly <session_id> --json` | Run proposed safe read-only/dry-run actions for one session and skip approval-required write/trading actions. |
 | `astroq agent autonomy step --session <session_id> --text ... [--semantic-draft-file draft.json \| --provider-semantic] --json` | Run one bounded autonomy step: create a CEO message, optionally filter semantic planner input, dispatch only newly proposed read-only/dry-run fixed-registry actions, and skip approval-required write/trading actions. |
 | `astroq agent autonomy run --session <session_id> --text ... --max-steps 2 [--semantic-draft-file draft.json \| --provider-semantic] --json` | Run a capped multi-step bounded autonomy loop that repeats the same safety boundary until max steps, no runnable safe action, or a not-ready step stops the run. |
+| `astroq agent program create --session <session_id> --goal ... --max-steps 6 [--semantic-draft-file draft.json \| --provider-semantic] --json` | Persist an open-ended CEO goal as a multi-stage autonomy program; only safe fixed-registry phases can run. |
+| `astroq agent programs --session <session_id> --json` | List autonomy program ledger rows. |
+| `astroq agent program run <program_id> [--dry-run] --json` | Preview or run pending safe phases in one autonomy program. |
 | `astroq agent message --session <id> --desk <desk> --text ... --semantic-draft-file draft.json --json` | Add a CEO message and route it; optional semantic draft files are filtered through fixed-registry safety before actions are persisted. |
 | `astroq agent plan --desk <desk> --text ... --semantic-draft-file draft.json --json` | Preview deterministic or draft-assisted workflow actions, approvals, handoffs, and work orders without ledger writes. |
 | `astroq agent actions --session <id> --status <status> --desk <desk> --risk-level <risk> --json` | List actions with explicit session/status/desk/risk filters. |
@@ -234,6 +237,7 @@ Phase 1 should add JSON-readable commands:
 - Session-level safe workflow runs dispatch only proposed `read_only` / `dry_run` actions and report skipped approval-required write/trading actions.
 - Bounded autonomy steps dispatch only the newly proposed `read_only` / `dry_run` fixed-registry actions from that step and never auto-run older pending actions, writes, paper orders, live orders, or code changes; semantic draft/provider input is allowed only before the same fixed-registry filtering boundary.
 - Bounded autonomy runs repeat the same step boundary only up to the explicit `max_steps` cap and expose `stop_reason` values such as `max_steps_reached`, `no_runnable_actions`, and `step_not_ready`.
+- Autonomy programs persist larger CEO goals as durable phases and blockers. Unknown tools, writes, code changes, paper orders, and live orders are not executed by the program runner; they remain blockers, approval cards, or work orders.
 - Data Desk repair requests with an explicit dimension create a safe dry-run action and a separate approval-required write action.
 - State-changing actions are queued as `approval_required`.
 - Approval policies are explicit runtime/CLI/API contracts, not hidden conditionals.

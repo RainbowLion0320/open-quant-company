@@ -13,6 +13,7 @@ from astrolabe_cli.commands.agent import autonomy_step as agent_autonomy_step
 from astrolabe_cli.commands.agent import approve as agent_approve
 from astrolabe_cli.commands.agent import cancel as agent_cancel
 from astrolabe_cli.commands.agent import create_session as agent_create_session
+from astrolabe_cli.commands.agent import create_program as agent_create_program
 from astrolabe_cli.commands.agent import create_work_order as agent_create_work_order
 from astrolabe_cli.commands.agent import desks as agent_desks
 from astrolabe_cli.commands.agent import evidence as agent_evidence
@@ -40,15 +41,18 @@ from astrolabe_cli.commands.agent import paper_propose as agent_paper_propose
 from astrolabe_cli.commands.agent import paper_submit as agent_paper_submit
 from astrolabe_cli.commands.agent import policies as agent_policies
 from astrolabe_cli.commands.agent import plan as agent_plan
+from astrolabe_cli.commands.agent import programs as agent_programs
 from astrolabe_cli.commands.agent import reject as agent_reject
 from astrolabe_cli.commands.agent import reports as agent_reports
 from astrolabe_cli.commands.agent import resolve_handoff as agent_resolve_handoff
 from astrolabe_cli.commands.agent import run_report_rhythm as agent_run_report_rhythm
 from astrolabe_cli.commands.agent import run_scheduled_report_rhythm as agent_run_scheduled_report_rhythm
 from astrolabe_cli.commands.agent import run_action as agent_run_action
+from astrolabe_cli.commands.agent import run_program as agent_run_program
 from astrolabe_cli.commands.agent import run_session_read_only_actions as agent_run_session_read_only_actions
 from astrolabe_cli.commands.agent import sessions as agent_sessions
 from astrolabe_cli.commands.agent import show_action as agent_show_action
+from astrolabe_cli.commands.agent import show_program as agent_show_program
 from astrolabe_cli.commands.agent import show_session as agent_show_session
 from astrolabe_cli.commands.agent import update_session as agent_update_session
 from astrolabe_cli.commands.agent import update_work_order as agent_update_work_order
@@ -262,6 +266,53 @@ def build_parser() -> argparse.ArgumentParser:
             planner_model=args.planner_model,
         )
     )
+
+    agent_programs_cmd = agent_sub.add_parser("programs", help="List autonomy programs")
+    agent_programs_cmd.add_argument("--session", default="")
+    add_common_flags(agent_programs_cmd)
+    agent_programs_cmd.set_defaults(handler=lambda args: agent_programs(args.session))
+
+    agent_program_cmd = agent_sub.add_parser("program", help="Create, inspect, or run one autonomy program")
+    agent_program_sub = agent_program_cmd.add_subparsers(dest="agent_program_command", required=True)
+    agent_program_create = agent_program_sub.add_parser("create", help="Create an auditable autonomy program")
+    agent_program_create.add_argument("--session", required=True)
+    agent_program_create.add_argument("--goal", required=True)
+    agent_program_create.add_argument("--desk", default="reporting")
+    agent_program_create.add_argument("--max-steps", type=int, default=6)
+    agent_program_create.add_argument(
+        "--semantic-draft-file",
+        default="",
+        help="JSON semantic planner draft to filter into a program",
+    )
+    agent_program_create.add_argument(
+        "--provider-semantic",
+        action="store_true",
+        help="Ask the configured LLM provider to draft a program, then server-filter it",
+    )
+    agent_program_create.add_argument("--planner-provider", default="")
+    agent_program_create.add_argument("--planner-model", default="")
+    add_common_flags(agent_program_create)
+    agent_program_create.set_defaults(
+        handler=lambda args: agent_create_program(
+            args.session,
+            args.goal,
+            desk=args.desk,
+            max_steps=args.max_steps,
+            semantic_draft_file=args.semantic_draft_file,
+            provider_semantic=args.provider_semantic,
+            planner_provider=args.planner_provider,
+            planner_model=args.planner_model,
+        )
+    )
+    agent_program_show = agent_program_sub.add_parser("show", help="Show one autonomy program")
+    agent_program_show.add_argument("program_id")
+    add_common_flags(agent_program_show)
+    agent_program_show.set_defaults(handler=lambda args: agent_show_program(args.program_id))
+    agent_program_run = agent_program_sub.add_parser("run", help="Run pending safe phases in one autonomy program")
+    agent_program_run.add_argument("program_id")
+    agent_program_run.add_argument("--dry-run", action="store_true")
+    add_common_flags(agent_program_run)
+    agent_program_run.set_defaults(handler=lambda args: agent_run_program(args.program_id, dry_run=args.dry_run))
 
     agent_actions_cmd = agent_sub.add_parser("actions", help="List agent actions")
     agent_actions_cmd.add_argument("--session", default="")

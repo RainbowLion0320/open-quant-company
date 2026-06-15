@@ -1,6 +1,6 @@
 # Agent Company OS Phase 3 - Desk Agents Plan
 
-> Status: planned implementation phase
+> Status: desk workflow foundation implemented; autonomy program blockers/work-order routing added
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Depends on: [01-foundation-plan.md](01-foundation-plan.md) and [02-ceo-office-plan.md](02-ceo-office-plan.md)

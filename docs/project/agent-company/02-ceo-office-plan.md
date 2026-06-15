@@ -1,6 +1,6 @@
 # Agent Company OS Phase 2 - CEO Office Web Plan
 
-> Status: planned implementation phase
+> Status: CEO Office foundation implemented; autonomy program controls added
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Depends on: [01-foundation-plan.md](01-foundation-plan.md)
@@ -167,6 +167,7 @@ Chinese and English strings must be maintained together. The Chinese wording sho
 - Provider Planner output is shown only after server-side fixed-registry filtering; unsafe, write, trading, unknown, or desk-out-of-scope actions must be rejected before they become action cards.
 - The user can run proposed read-only checks for the active session from the CEO Office, with run/skipped/failed counts visible.
 - The user can run one bounded autonomy step or a capped bounded autonomy loop from the CEO Office using the current target desk and planner settings, then inspect proposed actions, actual runs, skipped safety outcomes, step counts, and stop reasons.
+- The user can create an autonomy program from the current CEO goal and planner settings, inspect its safe phases and blockers, dry-run pending phases, and run only fixed-registry read-only/dry-run phases from the CEO Office.
 - The desk rail supports drill-down: selecting a desk shows its mandate, allowed tools, forbidden actions, evidence requirements, related actions, and related handoffs.
 - The CEO Office shows explicit approval policy rows so users can inspect which risk levels auto-run, require approval, or require engineering work orders.
 - A desk response includes evidence references.
