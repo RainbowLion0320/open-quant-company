@@ -109,6 +109,7 @@ def build_report_payload(
     normalized_kind = normalize_report_kind(kind)
     artifact_context = dict(artifact_context or empty_report_artifact_context())
     artifact_context["trend_synthesis"] = _report_trend_synthesis(artifact_context, report_history or [])
+    artifact_context["causal_chain_synthesis"] = _report_causal_chain_synthesis(artifact_context)
     work_order_rows = list(work_orders or [])
     evidence_by_id = {str(row.get("evidence_id")): row for row in evidence}
     evidence_refs = _ordered_unique(
@@ -179,6 +180,12 @@ def build_report_payload(
             "body": _trend_synthesis_body(artifact_context),
             "evidence_refs": [],
         },
+        {
+            "section_id": "causal_chain_synthesis",
+            "title": "Causal Chain Synthesis",
+            "body": _causal_chain_synthesis_body(artifact_context),
+            "evidence_refs": [],
+        },
     ]
     sections.extend(
         _operating_rhythm_sections(
@@ -237,6 +244,12 @@ def empty_report_artifact_context() -> dict[str, Any]:
             "recurring_root_cause_count": 0,
             "recurring_root_causes": [],
             "next_actions": ["Generate at least one prior CEO report before evaluating cross-session trends."],
+        },
+        "causal_chain_synthesis": {
+            "status": "no_evidence",
+            "chain_count": 0,
+            "chains": [],
+            "next_actions": ["Generate report evidence artifacts before building causal chains."],
         },
         "items": [
             {
@@ -609,6 +622,107 @@ def _trend_synthesis_body(artifact_context: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _report_causal_chain_synthesis(artifact_context: dict[str, Any]) -> dict[str, Any]:
+    synthesis = artifact_context.get("synthesis")
+    if not isinstance(synthesis, dict):
+        synthesis = _artifact_semantic_synthesis(artifact_context)
+    root_causes = [row for row in synthesis.get("root_causes", []) or [] if isinstance(row, dict)]
+    cause_names = _root_cause_names({"synthesis": synthesis})
+    cause_set = set(cause_names)
+    chains: list[dict[str, Any]] = []
+
+    if {"lifecycle_blocker", "strategy_evidence_blocked"}.issubset(cause_set):
+        nodes = []
+        if "data_source_gap" in cause_set:
+            nodes.append("data_source_gap")
+        nodes.extend(["lifecycle_blocker", "strategy_evidence_blocked"])
+        chains.append(
+            {
+                "chain_id": "data_readiness_to_strategy_block",
+                "severity": "P0",
+                "status": "blocked",
+                "nodes": nodes,
+                "owner_desks": ["data", "research", "risk"],
+                "evidence": _chain_evidence(root_causes, nodes),
+                "impact": "Strategy promotion, paper execution, and live execution must remain blocked until data readiness and alpha evidence are regenerated.",
+                "next_action": (
+                    "Do not promote or trade affected strategies; run data repair/source-diff checks, "
+                    "then regenerate lifecycle and strategy competition evidence."
+                ),
+            }
+        )
+
+    if "data_source_gap" in cause_set and "lifecycle_blocker" in cause_set:
+        chains.append(
+            {
+                "chain_id": "source_capability_to_lifecycle_block",
+                "severity": "P1",
+                "status": "attention",
+                "nodes": ["data_source_gap", "lifecycle_blocker"],
+                "owner_desks": ["data", "risk"],
+                "evidence": _chain_evidence(root_causes, ["data_source_gap", "lifecycle_blocker"]),
+                "impact": "Local readiness cannot prove completeness while source capabilities remain unmapped or stale.",
+                "next_action": "Resolve source capability diff before relaxing lifecycle gates.",
+            }
+        )
+
+    if "engineering_quality_risk" in cause_set or "test_design_risk" in cause_set:
+        nodes = [node for node in ("engineering_quality_risk", "test_design_risk") if node in cause_set]
+        chains.append(
+            {
+                "chain_id": "engineering_quality_to_release_risk",
+                "severity": "P1",
+                "status": "attention",
+                "nodes": nodes,
+                "owner_desks": ["engineering", "reporting"],
+                "evidence": _chain_evidence(root_causes, nodes),
+                "impact": "Release confidence is reduced when architecture or test-design evidence carries unresolved risks.",
+                "next_action": "Open Engineering Desk work orders and rerun AST/test-design diagnostics after remediation.",
+            }
+        )
+
+    if any(chain["severity"] == "P0" for chain in chains):
+        status = "blocked"
+    elif chains:
+        status = "attention"
+    elif cause_names:
+        status = "ready"
+    else:
+        status = "no_evidence"
+    return {
+        "status": status,
+        "chain_count": len(chains),
+        "chains": chains[:8],
+        "next_actions": _ordered_unique([str(chain["next_action"]) for chain in chains])[:8]
+        or ["No causal chains were found in current local artifacts."],
+    }
+
+
+def _causal_chain_synthesis_body(artifact_context: dict[str, Any]) -> str:
+    causal = artifact_context.get("causal_chain_synthesis")
+    if not isinstance(causal, dict):
+        causal = _report_causal_chain_synthesis(artifact_context)
+    lines = [
+        "- Section: causal_chain_synthesis",
+        f"- Causal status: {causal.get('status', 'unknown')}",
+        f"- Causal chains: {causal.get('chain_count', 0)}",
+    ]
+    for chain in causal.get("chains", [])[:8]:
+        if not isinstance(chain, dict):
+            continue
+        nodes = " -> ".join(str(node) for node in chain.get("nodes", []) if node)
+        owners = ", ".join(str(desk) for desk in chain.get("owner_desks", []) if desk)
+        lines.append(
+            "- "
+            f"{chain.get('chain_id')}: {chain.get('severity')} / {chain.get('status')} "
+            f"({nodes}); owners={owners}; evidence={chain.get('evidence')} "
+            f"-> {chain.get('next_action')}"
+        )
+    for action in causal.get("next_actions", [])[:5]:
+        lines.append(f"- Next action: {action}")
+    return "\n".join(lines)
+
+
 def _root_cause_names(artifact_context: dict[str, Any]) -> list[str]:
     synthesis = artifact_context.get("synthesis")
     if not isinstance(synthesis, dict):
@@ -621,6 +735,15 @@ def _root_cause_names(artifact_context: dict[str, Any]) -> list[str]:
         if cause and cause not in names:
             names.append(cause)
     return names
+
+
+def _chain_evidence(root_causes: list[dict[str, Any]], nodes: list[str]) -> str:
+    evidence = [
+        str(row.get("evidence") or "").strip()
+        for row in root_causes
+        if str(row.get("cause") or "") in set(nodes) and str(row.get("evidence") or "").strip()
+    ]
+    return " | ".join(_ordered_unique(evidence))[:1000] or "No direct evidence text available."
 
 
 def _int_value(value: Any) -> int:

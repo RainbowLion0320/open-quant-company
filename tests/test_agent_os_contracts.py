@@ -2273,6 +2273,75 @@ def test_agent_reports_synthesize_cross_session_trends_from_history(tmp_path, mo
     reset_datahub()
 
 
+def test_agent_reports_build_causal_chain_synthesis_from_evidence(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import get_datahub, reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 2, "ready": 4},
+            "blockers": [
+                {"dimension": "macro_gdp", "reason": "source_not_updated"},
+                {"dimension": "stock_limit_list", "reason": "rate_limited"},
+            ],
+        },
+        "data-sources/latest.json": {
+            "summary": {
+                "source_count": 8,
+                "capability_count": 300,
+                "project_integrated_count": 42,
+                "capability_unmapped_count": 21,
+            },
+        },
+        "tournaments/strategy_competition_latest.json": {
+            "summary": {"total": 12, "blocked": 9, "insufficient_alpha_evidence": 7},
+        },
+        "architecture/ast/latest.json": {
+            "summary": {"issue_count": 2, "severity_counts": {"P1": 1, "P2": 1}},
+        },
+        "tests/design/latest.json": {
+            "summary": {"case_count": 180, "risk_count": 14, "design_risk_count": 3},
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Causal CEO Brief", default_desk="reporting")
+    report = runtime.generate_report(session_id=session.session_id, kind="daily_brief")
+
+    payload = json.loads(Path(report["path"]).read_text(encoding="utf-8"))
+    sections = {section["section_id"]: section for section in payload["sections"]}
+    causal = payload["artifact_context"]["causal_chain_synthesis"]
+
+    assert "causal_chain_synthesis" in sections
+    assert causal["status"] == "blocked"
+    assert causal["chain_count"] >= 2
+    chain_ids = {chain["chain_id"] for chain in causal["chains"]}
+    assert "data_readiness_to_strategy_block" in chain_ids
+    assert "engineering_quality_to_release_risk" in chain_ids
+    strategy_chain = next(chain for chain in causal["chains"] if chain["chain_id"] == "data_readiness_to_strategy_block")
+    assert strategy_chain["severity"] == "P0"
+    assert strategy_chain["owner_desks"] == ["data", "research", "risk"]
+    assert strategy_chain["nodes"] == ["data_source_gap", "lifecycle_blocker", "strategy_evidence_blocked"]
+    assert "macro_gdp" in strategy_chain["evidence"]
+    assert "stock_limit_list" in strategy_chain["evidence"]
+    assert "Do not promote" in strategy_chain["next_action"]
+    assert "data_readiness_to_strategy_block" in sections["causal_chain_synthesis"]["body"]
+    assert "data_source_gap -> lifecycle_blocker -> strategy_evidence_blocked" in sections["causal_chain_synthesis"]["body"]
+    assert "causal_chain_synthesis" in Path(report["markdown_path"]).read_text(encoding="utf-8")
+    reset_datahub()
+
+
 def test_agent_report_notification_env_only_writes_audit_artifact(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "secret-token")
