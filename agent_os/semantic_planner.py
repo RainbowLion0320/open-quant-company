@@ -7,6 +7,7 @@ from typing import Any
 
 from agent_os.tools import DEFAULT_TOOLS
 from data.llm.usage import load_provider_api_key
+from data.llm.usage import record_llm_response_usage
 from data.llm.usage import resolve_llm_use_case
 
 
@@ -122,12 +123,15 @@ class ProviderSemanticPlanner:
                     "error_class": type(exc).__name__,
                 },
             )
+        usage_record = _record_provider_usage(response, provider=provider, model=model)
         draft_reasoning = [row for row in draft.get("reasoning", []) if isinstance(row, dict)]
         draft["reasoning"] = [
             {
                 **provider_reasoning,
                 "status": "ok",
                 "usage": _provider_usage(response),
+                "usage_recorded": bool(usage_record.get("recorded")),
+                **({"usage_error_class": usage_record["error_class"]} if usage_record.get("error_class") else {}),
             },
             *draft_reasoning,
         ]
@@ -313,3 +317,11 @@ def _provider_usage(response: Any) -> dict[str, Any]:
     if not isinstance(usage, dict):
         return {}
     return {str(key): value for key, value in usage.items() if isinstance(value, int | float | str)}
+
+
+def _record_provider_usage(response: Any, *, provider: str, model: str) -> dict[str, Any]:
+    try:
+        row = record_llm_response_usage(response, provider=provider, model=model, source="agent_planning")
+    except Exception as exc:
+        return {"recorded": False, "error_class": type(exc).__name__}
+    return {"recorded": bool(row), "error_class": ""}

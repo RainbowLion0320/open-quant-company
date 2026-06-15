@@ -5018,6 +5018,7 @@ def test_agent_provider_semantic_planner_uses_transport_then_filters_safe_action
 
     from agent_os.runtime import AgentRuntime
     from agent_os.semantic_planner import ProviderSemanticPlanner
+    from data.storage.datahub import get_datahub
 
     calls: list[dict[str, object]] = []
 
@@ -5085,6 +5086,17 @@ def test_agent_provider_semantic_planner_uses_transport_then_filters_safe_action
     assert reasoning_by_kind["semantic_provider"]["usage"]["total_tokens"] == 30
     assert reasoning_by_kind["semantic_planner"]["accepted_action_count"] == 2
     assert reasoning_by_kind["semantic_planner"]["rejected_action_count"] == 1
+    usage_path = get_datahub().llm_project_usage_path()
+    assert usage_path.exists()
+    usage_rows = get_datahub().read_parquet(usage_path).to_dict(orient="records")
+    assert len(usage_rows) == 1
+    usage_row = usage_rows[0]
+    assert usage_row["source"] == "agent_planning"
+    assert usage_row["provider"] == "deepseek"
+    assert usage_row["model"] == "deepseek-v4-pro"
+    assert usage_row["total_tokens"] == 30
+    assert usage_row["request_id"] == ""
+    assert "semantic-secret" not in json.dumps(usage_rows, ensure_ascii=False)
     reset_datahub()
 
 
