@@ -7,6 +7,7 @@ from typing import Any
 
 from agent_os.tools import DEFAULT_TOOLS
 from data.llm.usage import load_provider_api_key
+from data.llm.usage import provider_config
 from data.llm.usage import record_llm_response_usage
 from data.llm.usage import resolve_llm_use_case
 
@@ -75,13 +76,19 @@ class ProviderSemanticPlanner:
         runtime = resolve_llm_use_case("agent_planning", provider=self._provider, model=self._model)
         provider = runtime["provider"]
         model = runtime["model"]
-        key = load_provider_api_key(provider)
         provider_reasoning = {
             "kind": "semantic_provider",
             "provider": provider,
             "model": model,
             "credential_env": runtime["credential_env"],
         }
+        if not provider_config(provider).get("enabled", True):
+            return _provider_blocked_draft(
+                "semantic_provider_disabled",
+                "Semantic provider is disabled in configuration; no provider request was sent.",
+                {**provider_reasoning, "status": "disabled"},
+            )
+        key = load_provider_api_key(provider)
         if not key:
             return _provider_blocked_draft(
                 "semantic_provider_missing_secret",

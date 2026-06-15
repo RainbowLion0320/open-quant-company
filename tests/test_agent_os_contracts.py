@@ -5009,6 +5009,54 @@ def test_agent_provider_semantic_planner_fails_closed_without_secret(tmp_path, m
     reset_datahub()
 
 
+def test_agent_provider_semantic_planner_fails_closed_when_provider_disabled(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "disabled-provider-secret")
+    from data.storage.datahub import reset_datahub
+    import data.llm.usage as llm_usage
+
+    reset_datahub()
+
+    monkeypatch.setattr(
+        llm_usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "default_provider": "deepseek",
+                "use_cases": {"agent_planning": {"provider": "deepseek", "model": "deepseek-v4-pro"}},
+                "providers": {
+                    "deepseek": {
+                        "enabled": False,
+                        "api_key_env": "DEEPSEEK_API_KEY",
+                        "base_url": "https://api.deepseek.com/v1",
+                        "pricing": {"models": {"deepseek-v4-pro": {"total": 1.0}}},
+                    }
+                },
+            }
+        },
+    )
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import ProviderSemanticPlanner
+
+    def forbidden_transport(*_args, **_kwargs):
+        raise AssertionError("disabled provider planner must not call transport")
+
+    preview = AgentRuntime().preview_workflow_plan(
+        desk="reporting",
+        content="provider disabled 时不能调用模型",
+        semantic_planner=ProviderSemanticPlanner(transport=forbidden_transport),
+    )
+    reasoning_by_kind = {row["kind"]: row for row in preview["reasoning"]}
+
+    assert preview["planning_mode"] == "semantic_assisted"
+    assert preview["actions"] == []
+    assert "semantic_provider_disabled" in preview["blockers"]
+    assert reasoning_by_kind["semantic_provider"]["status"] == "disabled"
+    assert reasoning_by_kind["semantic_provider"]["provider"] == "deepseek"
+    reset_datahub()
+
+
 def test_agent_provider_semantic_planner_uses_transport_then_filters_safe_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setenv("DEEPSEEK_API_KEY", "semantic-secret")
