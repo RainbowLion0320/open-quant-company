@@ -110,6 +110,10 @@ def build_report_payload(
     artifact_context = dict(artifact_context or empty_report_artifact_context())
     artifact_context["domain_scorecard"] = _domain_scorecard_synthesis(artifact_context)
     artifact_context["trend_synthesis"] = _report_trend_synthesis(artifact_context, report_history or [])
+    artifact_context["artifact_timeline_synthesis"] = _artifact_timeline_synthesis(
+        artifact_context,
+        report_history or [],
+    )
     artifact_context["causal_chain_synthesis"] = _report_causal_chain_synthesis(artifact_context)
     work_order_rows = list(work_orders or [])
     evidence_by_id = {str(row.get("evidence_id")): row for row in evidence}
@@ -179,6 +183,12 @@ def build_report_payload(
             "section_id": "domain_scorecard",
             "title": "Domain Scorecard",
             "body": _domain_scorecard_body(artifact_context),
+            "evidence_refs": [],
+        },
+        {
+            "section_id": "artifact_timelines",
+            "title": "Artifact Timelines",
+            "body": _artifact_timeline_body(artifact_context),
             "evidence_refs": [],
         },
         {
@@ -256,6 +266,13 @@ def empty_report_artifact_context() -> dict[str, Any]:
             "overall_status": "missing",
             "desks": [],
             "next_actions": ["Generate local intelligence artifacts before building a desk-level scorecard."],
+        },
+        "artifact_timeline_synthesis": {
+            "status": "no_history",
+            "history_report_count": 0,
+            "changed_count": 0,
+            "items": [],
+            "next_actions": ["Generate at least one prior CEO report before comparing artifact timelines."],
         },
         "causal_chain_synthesis": {
             "status": "no_evidence",
@@ -665,6 +682,109 @@ def _domain_scorecard_body(artifact_context: dict[str, Any]) -> str:
         causes = ", ".join(str(cause) for cause in row.get("root_causes", []) if cause) or "none"
         lines.append(f"- {desk}: {status} - causes={causes} - next={command}")
     for action in scorecard.get("next_actions", [])[:6]:
+        lines.append(f"- Next action: {action}")
+    return "\n".join(lines)
+
+
+def _artifact_timeline_synthesis(
+    artifact_context: dict[str, Any],
+    report_history: list[dict[str, Any]],
+) -> dict[str, Any]:
+    current_items = [item for item in artifact_context.get("items", []) if isinstance(item, dict)]
+    history = [report for report in report_history if isinstance(report, dict)]
+    if not history:
+        return {
+            "status": "no_history",
+            "history_report_count": 0,
+            "changed_count": 0,
+            "items": [
+                {
+                    "key": str(item.get("key") or ""),
+                    "current_status": str(item.get("status") or "unknown"),
+                    "previous_status": "",
+                    "changed": False,
+                    "status_changed": False,
+                    "summary_changed": False,
+                    "finding_count_changed": False,
+                    "current_finding_count": len(item.get("findings") or []),
+                    "previous_finding_count": 0,
+                }
+                for item in current_items
+            ],
+            "next_actions": ["Generate at least one prior CEO report before comparing artifact timelines."],
+        }
+
+    previous_context = history[0].get("artifact_context") if isinstance(history[0].get("artifact_context"), dict) else {}
+    previous_items = [
+        item for item in previous_context.get("items", []) if isinstance(item, dict)
+    ]
+    previous_by_key = {str(item.get("key") or ""): item for item in previous_items}
+    timeline_items: list[dict[str, Any]] = []
+    for item in current_items:
+        key = str(item.get("key") or "")
+        previous = previous_by_key.get(key)
+        current_status = str(item.get("status") or "unknown")
+        previous_status = str(previous.get("status") or "missing") if previous else "missing"
+        current_summary = item.get("summary") if isinstance(item.get("summary"), dict) else {}
+        previous_summary = previous.get("summary") if previous and isinstance(previous.get("summary"), dict) else {}
+        current_finding_count = len(item.get("findings") or [])
+        previous_finding_count = len(previous.get("findings") or []) if previous else 0
+        status_changed = current_status != previous_status
+        summary_changed = current_summary != previous_summary
+        finding_count_changed = current_finding_count != previous_finding_count
+        changed = bool(status_changed or summary_changed or finding_count_changed)
+        timeline_items.append(
+            {
+                "key": key,
+                "current_status": current_status,
+                "previous_status": previous_status,
+                "changed": changed,
+                "status_changed": status_changed,
+                "summary_changed": summary_changed,
+                "finding_count_changed": finding_count_changed,
+                "current_finding_count": current_finding_count,
+                "previous_finding_count": previous_finding_count,
+                "latest_report_id": str(history[0].get("report_id") or ""),
+                "latest_generated_at": str(history[0].get("generated_at") or ""),
+            }
+        )
+
+    changed_count = sum(1 for item in timeline_items if item["changed"])
+    status = "changed" if changed_count else "stable"
+    next_actions = (
+        ["Review changed artifact rows before interpreting root-cause trends as persistent."]
+        if changed_count
+        else ["No artifact-level status, summary, or finding-count changes were found since the latest report."]
+    )
+    return {
+        "status": status,
+        "history_report_count": len(history),
+        "changed_count": changed_count,
+        "items": timeline_items,
+        "next_actions": next_actions,
+    }
+
+
+def _artifact_timeline_body(artifact_context: dict[str, Any]) -> str:
+    timeline = artifact_context.get("artifact_timeline_synthesis")
+    if not isinstance(timeline, dict):
+        timeline = _artifact_timeline_synthesis(artifact_context, [])
+    lines = [
+        f"- Timeline status: {timeline.get('status', 'unknown')}",
+        f"- History reports: {timeline.get('history_report_count', 0)}",
+        f"- Changed artifacts: {timeline.get('changed_count', 0)}",
+    ]
+    for row in timeline.get("items", [])[:8]:
+        if not isinstance(row, dict):
+            continue
+        state = "changed" if row.get("changed") else "stable"
+        lines.append(
+            "- "
+            f"{row.get('key')}: {state} - previous={row.get('previous_status')} "
+            f"current={row.get('current_status')} summary_changed={row.get('summary_changed')} "
+            f"findings={row.get('previous_finding_count')}->{row.get('current_finding_count')}"
+        )
+    for action in timeline.get("next_actions", [])[:5]:
         lines.append(f"- Next action: {action}")
     return "\n".join(lines)
 

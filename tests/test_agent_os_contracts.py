@@ -2879,6 +2879,69 @@ def test_agent_reports_synthesize_cross_session_trends_from_history(tmp_path, mo
     reset_datahub()
 
 
+def test_agent_reports_build_artifact_specific_timelines_from_history(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import get_datahub, reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    lifecycle = artifact_root / "lifecycle/latest.json"
+    strategy = artifact_root / "tournaments/strategy_competition_latest.json"
+    lifecycle.parent.mkdir(parents=True, exist_ok=True)
+    strategy.parent.mkdir(parents=True, exist_ok=True)
+    lifecycle.write_text(
+        json.dumps(
+            {
+                "status": "blocked",
+                "summary": {"blocked": 1, "ready": 4},
+                "blockers": [{"dimension": "macro_gdp", "reason": "source_not_updated"}],
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    strategy.write_text(
+        json.dumps({"summary": {"total": 12, "blocked": 5}}, ensure_ascii=False, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    runtime = AgentRuntime()
+    first = runtime.create_session(title="First timeline brief", default_desk="reporting")
+    second = runtime.create_session(title="Second timeline brief", default_desk="reporting")
+    runtime.generate_report(session_id=first.session_id, kind="daily_brief")
+
+    lifecycle.write_text(
+        json.dumps({"status": "ready", "summary": {"blocked": 0, "ready": 6}}, ensure_ascii=False, sort_keys=True),
+        encoding="utf-8",
+    )
+    strategy.write_text(
+        json.dumps({"summary": {"total": 12, "blocked": 0, "production": 4}}, ensure_ascii=False, sort_keys=True),
+        encoding="utf-8",
+    )
+    report = runtime.generate_report(session_id=second.session_id, kind="daily_brief")
+
+    payload = json.loads(Path(report["path"]).read_text(encoding="utf-8"))
+    sections = {section["section_id"]: section for section in payload["sections"]}
+    timelines = payload["artifact_context"]["artifact_timeline_synthesis"]
+    by_key = {row["key"]: row for row in timelines["items"]}
+
+    assert "artifact_timelines" in sections
+    assert timelines["status"] == "changed"
+    assert timelines["history_report_count"] == 1
+    assert by_key["lifecycle"]["changed"] is True
+    assert by_key["lifecycle"]["summary_changed"] is True
+    assert by_key["lifecycle"]["previous_finding_count"] == 1
+    assert by_key["lifecycle"]["current_finding_count"] == 0
+    assert by_key["strategy_competition"]["changed"] is True
+    assert "lifecycle: changed" in sections["artifact_timelines"]["body"]
+    reset_datahub()
+
+
 def test_agent_reports_build_causal_chain_synthesis_from_evidence(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import get_datahub, reset_datahub
