@@ -4344,11 +4344,28 @@ def test_agent_tool_registry_covers_all_declared_desk_tools():
 
 def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
-    from data.storage.datahub import reset_datahub
+    from data.storage.datahub import get_datahub, reset_datahub
 
     reset_datahub()
 
     from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "data-sources/latest.json": {
+            "summary": {"capability_count": 320, "project_integrated_count": 44, "capability_unmapped_count": 17},
+        },
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 1},
+            "blockers": [{"dimension": "stock_limit_list", "reason": "rate_limited"}],
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
 
     runtime = AgentRuntime()
     session = runtime.create_session(title="Desk intent routing")
@@ -4384,6 +4401,13 @@ def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monke
     assert engineering_action["parameters"]["tool_id"] == "astroq.test.design"
     assert docs_action["parameters"]["tool_id"] == "astroq.docs.check"
     assert "source capability" in data_result["desk_response"].answer.lower()
+    assert "17" in data_result["desk_response"].answer
+    assert "stock_limit_list" in data_result["desk_response"].answer
+    data_reasoning = {row["kind"]: row for row in data_result["desk_response"].reasoning}
+    assert data_reasoning["artifact_context"]["evidence_summary"][:2] == [
+        "lifecycle: stock_limit_list rate_limited",
+        "data: 17 unmapped source capabilities",
+    ]
     assert "IC/ICIR" in research_result["desk_response"].answer
     assert "test design" in engineering_result["desk_response"].answer.lower()
     assert "docs check" in docs_result["desk_response"].answer.lower()

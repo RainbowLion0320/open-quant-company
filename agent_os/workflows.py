@@ -333,6 +333,8 @@ def build_desk_workflow_plan(
     )
     if (desk == "reporting" and (_is_daily_brief_request(normalized) or _is_portfolio_review_request(normalized))) or (
         desk == "research" and _is_strategy_blocker_request(normalized)
+    ) or (
+        desk == "data" and (_mentions_data_source_gap(normalized) or _is_data_repair_request(normalized))
     ):
         evidence_summary = _artifact_evidence_summary(artifact_context or {})
         if evidence_summary:
