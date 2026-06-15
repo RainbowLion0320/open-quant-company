@@ -15,7 +15,15 @@ from agent_os.desks import get_desk, list_desks
 from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file
 from agent_os.ledger import AgentLedger
 from agent_os.notifications import NotificationSender, build_report_notification_message, channel_secret_status, send_notification, supported_channels
-from agent_os.reports import build_report_payload, normalize_report_kind, read_report_index, render_report_markdown, report_rhythm_templates, write_report_index
+from agent_os.reports import (
+    build_report_payload,
+    collect_report_artifact_context,
+    normalize_report_kind,
+    read_report_index,
+    render_report_markdown,
+    report_rhythm_templates,
+    write_report_index,
+)
 from agent_os.schemas import AgentAction, AgentHandoff, AgentMessage, AgentReport, AgentRun, AgentSession, DeskResponse, EvidenceRef
 from agent_os.tools import AgentToolRegistry
 from agent_os.workflows import build_desk_workflow_plan
@@ -824,6 +832,7 @@ class AgentRuntime:
             path=path,
             markdown_path=markdown_path,
             generated_at=generated_at,
+            artifact_context=collect_report_artifact_context(),
         )
         path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
         markdown_path.write_text(render_report_markdown(report), encoding="utf-8")

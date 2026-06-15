@@ -100,6 +100,7 @@ export interface AgentReport {
   evidence_id: string;
   evidence_refs: string[];
   missing_evidence: string[];
+  artifact_context?: Record<string, unknown>;
   sections: Array<Record<string, unknown>>;
   generated_at: string;
 }

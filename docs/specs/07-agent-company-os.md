@@ -9,7 +9,7 @@
 
 Agent Company OS is the planned local-first operating layer for Open Quant Company. It lets the human user act as CEO while desk agents coordinate data, research, risk, execution, engineering, and reporting work.
 
-This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, env-only report notification triggers, paper order preview/proposal/approved-submit/cancel cards with inline paper reconciliation summaries, default-disabled live readiness probing, and live order preview risk gating are implemented first; streaming, deeper report aggregation, advanced desk reasoning, and live order submission/reconciliation remain planned until their phase lands.
+This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, fixed cross-artifact report context aggregation, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, env-only report notification triggers, paper order preview/proposal/approved-submit/cancel cards with inline paper reconciliation summaries, default-disabled live readiness probing, and live order preview risk gating are implemented first; streaming, advanced semantic report synthesis, advanced desk reasoning, and live order submission/reconciliation remain planned until their phase lands.
 
 ## 2. Product Contract
 
@@ -269,6 +269,19 @@ returns:
   "evidence_id": "ev_...",
   "evidence_refs": ["ev_..."],
   "missing_evidence": [],
+  "artifact_context": {
+    "available_count": 5,
+    "missing_count": 1,
+    "invalid_count": 0,
+    "items": [
+      {
+        "key": "lifecycle",
+        "status": "available",
+        "relative_path": "lifecycle/latest.json",
+        "summary": {"blocked": 2}
+      }
+    ]
+  },
   "sections": [
     {"section_id": "session_summary", "title": "Session Summary", "evidence_refs": ["ev_..."]}
   ],
@@ -282,6 +295,8 @@ Report artifacts must:
 - be available as both JSON and Markdown;
 - cite `EvidenceRef` ids used by the session, actions, runs, and handoffs;
 - record missing evidence ids explicitly in `missing_evidence`;
+- include a fixed allowlist `artifact_context` for lifecycle, data-sources, strategy competition, AST intelligence, test design intelligence, and CodeGraph readiness;
+- include `artifact_readiness` and `artifact_findings` sections derived from that local artifact context;
 - register the JSON file as `kind=report` evidence so it can be resolved and snapshotted.
 
 ### 5.7 AgentReportNotification
@@ -649,11 +664,11 @@ As of 2026-06-14:
 - Fixed registry tools are checked against desk policy at both action proposal and dispatch time. A stale or externally inserted action with a tool outside the desk scope is marked `blocked` and does not call the runner.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
 - Web-route evidence resolves to safe local navigation metadata, and CEO Office can render an evidence link into the related Web view.
-- CEO reports can be generated as JSON/Markdown artifacts, registered as report evidence, listed through CLI/API, and shown as CEO Office report cards. Dedicated templates cover daily, weekly, audit, data quality, risk, execution reconciliation, engineering digest, and release audit reports; CEO Office can generate a selected template, run due templates through the explicit operating-rhythm runner, trigger the scheduled active-session rhythm tick, or send/dry-run report notifications. Scheduled ticks write audit artifacts under `var/artifacts/agent/reports/scheduled/`; notifications write audit artifacts under `var/artifacts/agent/reports/notifications/` and read only system environment variables.
+- CEO reports can be generated as JSON/Markdown artifacts, registered as report evidence, listed through CLI/API, and shown as CEO Office report cards. Dedicated templates cover daily, weekly, audit, data quality, risk, execution reconciliation, engineering digest, and release audit reports; each report includes fixed allowlist artifact context for lifecycle, data-sources, strategy competition, AST intelligence, test design intelligence, and CodeGraph readiness. CEO Office can generate a selected template, run due templates through the explicit operating-rhythm runner, trigger the scheduled active-session rhythm tick, or send/dry-run report notifications. Scheduled ticks write audit artifacts under `var/artifacts/agent/reports/scheduled/`; notifications write audit artifacts under `var/artifacts/agent/reports/notifications/` and read only system environment variables.
 - PaperBroker order proposal, approved submission, and cancellation are available through CLI/API. Proposal writes preview artifact evidence and creates an approval-required `paper_order` action only when the non-mutating preview passes; submission requires approval, re-runs preview/risk gates, blocks stale previews, writes run/reconciliation evidence, persists default PaperBroker state on success, and exposes paper reconciliation summaries on action detail. Cancellation writes dedicated `paper.paper_order.cancel` runs and reconciliation evidence for queued approval requests or broker-confirmed active order cancellations.
 - MiniQMT/QMT readiness probing is available and defaults to `live_disabled`; missing SDK, login, permission, or disabled kill switch returns `blocked`, and `paper_fallback` is always false.
 - MiniQMT/QMT live order preview is available through CLI/API. It never submits, never falls back to PaperBroker, always requires approval, and blocks on readiness, invalid intent, missing evidence, or insufficient cash.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, message entry, desk status, and approval queue display; `/market` carries the market overview.
-- Actual advanced desk reasoning, broad tool execution, streaming updates, deeper report aggregation, and live submission/reconciliation are not yet implemented.
+- Actual advanced desk reasoning, broad tool execution, streaming updates, advanced semantic report synthesis, and live submission/reconciliation are not yet implemented.

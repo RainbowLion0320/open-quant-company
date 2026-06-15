@@ -1041,6 +1041,64 @@ def test_agent_reports_generate_artifacts_and_cite_evidence(tmp_path, monkeypatc
     reset_datahub()
 
 
+def test_agent_reports_aggregate_system_artifact_context(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import get_datahub, reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    artifact_payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 2, "ready": 4},
+            "blockers": [{"dimension": "macro_gdp", "reason": "source_not_updated"}],
+        },
+        "data-sources/latest.json": {
+            "summary": {"source_count": 8, "capability_count": 300, "project_integrated_count": 42},
+        },
+        "tournaments/strategy_competition_latest.json": {
+            "summary": {"total": 12, "production": 3, "blocked": 9},
+        },
+        "architecture/ast/latest.json": {
+            "summary": {"issue_count": 1, "severity_counts": {"P1": 1}},
+        },
+        "tests/design/latest.json": {
+            "summary": {"case_count": 180, "risk_count": 14, "design_risk_count": 3},
+        },
+    }
+    for relative, payload in artifact_payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Aggregated CEO Brief", default_desk="reporting")
+    report = runtime.generate_report(session_id=session.session_id, kind="daily_brief")
+
+    payload = json.loads(Path(report["path"]).read_text(encoding="utf-8"))
+    sections = {section["section_id"]: section for section in payload["sections"]}
+    context = payload["artifact_context"]
+
+    assert "artifact_readiness" in sections
+    assert "artifact_findings" in sections
+    assert context["available_count"] == 5
+    assert context["missing_count"] >= 1
+    assert any(item["key"] == "lifecycle" and item["status"] == "available" for item in context["items"])
+    assert any(item["key"] == "codegraph" and item["status"] == "missing" for item in context["items"])
+    assert "macro_gdp" in sections["artifact_findings"]["body"]
+    assert "source_not_updated" in sections["artifact_findings"]["body"]
+    assert "strategy_competition" in sections["artifact_readiness"]["body"]
+    assert "data-sources/latest.json" in sections["artifact_readiness"]["body"]
+    assert "codegraph" in sections["artifact_readiness"]["body"]
+    assert "artifact_context" in payload
+    assert "macro_gdp" in Path(report["markdown_path"]).read_text(encoding="utf-8")
+    reset_datahub()
+
+
 def test_agent_report_notification_env_only_writes_audit_artifact(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "secret-token")

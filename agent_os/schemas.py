@@ -119,6 +119,7 @@ class AgentReport:
     evidence_id: str
     evidence_refs: list[str]
     missing_evidence: list[str]
+    artifact_context: dict[str, Any]
     sections: list[dict[str, Any]]
     generated_at: str
 

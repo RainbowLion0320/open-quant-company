@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,23 @@ REPORT_TITLES = {
     "engineering_digest": "Engineering Digest",
     "release_audit": "Release Audit",
 }
+
+
+@dataclass(frozen=True)
+class ReportArtifactSource:
+    key: str
+    title: str
+    relative_path: str
+
+
+REPORT_ARTIFACT_SOURCES = [
+    ReportArtifactSource("lifecycle", "Lifecycle Readiness", "lifecycle/latest.json"),
+    ReportArtifactSource("data_sources", "Data Source Capabilities", "data-sources/latest.json"),
+    ReportArtifactSource("strategy_competition", "Strategy Competition", "tournaments/strategy_competition_latest.json"),
+    ReportArtifactSource("ast_intelligence", "AST Intelligence", "architecture/ast/latest.json"),
+    ReportArtifactSource("test_design", "Test Design Intelligence", "tests/design/latest.json"),
+    ReportArtifactSource("codegraph", "CodeGraph Index", "architecture/codegraph/latest.json"),
+]
 
 
 REPORT_RHYTHM_TEMPLATES = [
@@ -84,8 +102,10 @@ def build_report_payload(
     path: Path,
     markdown_path: Path,
     generated_at: str,
+    artifact_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     normalized_kind = normalize_report_kind(kind)
+    artifact_context = artifact_context or empty_report_artifact_context()
     evidence_by_id = {str(row.get("evidence_id")): row for row in evidence}
     evidence_refs = _ordered_unique(
         [
@@ -127,6 +147,18 @@ def build_report_payload(
                 ]
             ),
         },
+        {
+            "section_id": "artifact_readiness",
+            "title": "Artifact Readiness",
+            "body": _artifact_readiness_body(artifact_context),
+            "evidence_refs": [],
+        },
+        {
+            "section_id": "artifact_findings",
+            "title": "Artifact Findings",
+            "body": _artifact_findings_body(artifact_context),
+            "evidence_refs": [],
+        },
     ]
     sections.extend(
         _operating_rhythm_sections(
@@ -160,9 +192,172 @@ def build_report_payload(
         evidence_id="",
         evidence_refs=evidence_refs,
         missing_evidence=missing_evidence,
+        artifact_context=artifact_context,
         sections=sections,
         generated_at=generated_at,
     ).to_dict()
+
+
+def empty_report_artifact_context() -> dict[str, Any]:
+    return {
+        "available_count": 0,
+        "missing_count": len(REPORT_ARTIFACT_SOURCES),
+        "invalid_count": 0,
+        "items": [
+            {
+                "key": source.key,
+                "title": source.title,
+                "status": "missing",
+                "relative_path": source.relative_path,
+                "path": "",
+                "summary": {},
+                "findings": [],
+            }
+            for source in REPORT_ARTIFACT_SOURCES
+        ],
+    }
+
+
+def collect_report_artifact_context(artifact_root: Path | None = None) -> dict[str, Any]:
+    """Collect a fixed local artifact context for CEO reports.
+
+    The source list is intentionally static. Reports should surface the current
+    system evidence state, but they must not scan arbitrary directories or call
+    provider/network APIs while rendering.
+    """
+
+    root = artifact_root
+    if root is None:
+        from data.storage.datahub import get_datahub
+
+        root = get_datahub().artifact_dir("lifecycle").parent
+    items = [_collect_artifact_item(root, source) for source in REPORT_ARTIFACT_SOURCES]
+    return {
+        "available_count": sum(1 for item in items if item["status"] == "available"),
+        "missing_count": sum(1 for item in items if item["status"] == "missing"),
+        "invalid_count": sum(1 for item in items if item["status"] == "invalid"),
+        "items": items,
+    }
+
+
+def _collect_artifact_item(root: Path, source: ReportArtifactSource) -> dict[str, Any]:
+    path = root / source.relative_path
+    base = {
+        "key": source.key,
+        "title": source.title,
+        "relative_path": source.relative_path,
+        "path": str(path),
+        "summary": {},
+        "findings": [],
+    }
+    if not path.exists():
+        return {
+            **base,
+            "status": "missing",
+        }
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            **base,
+            "status": "invalid",
+            "error": f"{exc.__class__.__name__}: {exc}",
+        }
+    if not isinstance(payload, dict):
+        return {
+            **base,
+            "status": "invalid",
+            "error": "artifact root must be a JSON object",
+        }
+    return {
+        **base,
+        "status": "available",
+        "summary": _artifact_summary(payload),
+        "findings": _artifact_findings(payload),
+    }
+
+
+def _artifact_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    summary = payload.get("summary")
+    if isinstance(summary, dict):
+        return _bounded_mapping(summary, limit=10)
+    selected: dict[str, Any] = {}
+    for key in ("status", "ok", "total", "checked_at", "generated_at", "updated_at"):
+        if key in payload:
+            selected[key] = payload[key]
+    return _bounded_mapping(selected, limit=10)
+
+
+def _artifact_findings(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for key in ("blockers", "issues", "smells", "design_risks", "risks", "failures", "warnings"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            for row in value[:6]:
+                findings.append({"kind": key, "evidence": _bounded_value(row)})
+    return findings[:12]
+
+
+def _bounded_mapping(values: dict[str, Any], *, limit: int) -> dict[str, Any]:
+    bounded: dict[str, Any] = {}
+    for index, (key, value) in enumerate(values.items()):
+        if index >= limit:
+            bounded["omitted_keys"] = max(0, len(values) - limit)
+            break
+        bounded[str(key)] = _bounded_value(value)
+    return bounded
+
+
+def _bounded_value(value: Any, *, limit: int = 400) -> Any:
+    if isinstance(value, dict):
+        return _bounded_mapping(value, limit=8)
+    if isinstance(value, list):
+        return [_bounded_value(item, limit=limit) for item in value[:5]]
+    text = str(value)
+    if isinstance(value, str):
+        return text if len(text) <= limit else text[:limit] + "...[truncated]"
+    return value
+
+
+def _artifact_readiness_body(artifact_context: dict[str, Any]) -> str:
+    lines = [
+        (
+            f"- Artifact coverage: {artifact_context.get('available_count', 0)} available, "
+            f"{artifact_context.get('missing_count', 0)} missing, {artifact_context.get('invalid_count', 0)} invalid."
+        )
+    ]
+    for item in artifact_context.get("items", []):
+        if not isinstance(item, dict):
+            continue
+        status = str(item.get("status") or "unknown")
+        relative_path = str(item.get("relative_path") or "")
+        line = f"- {item.get('key')}: {status} - {relative_path}"
+        summary = item.get("summary")
+        if status == "available" and isinstance(summary, dict) and summary:
+            line += f" - summary={_compact_json(summary)}"
+        error = item.get("error")
+        if error:
+            line += f" - error={error}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _artifact_findings_body(artifact_context: dict[str, Any]) -> str:
+    lines: list[str] = []
+    for item in artifact_context.get("items", []):
+        if not isinstance(item, dict) or item.get("status") != "available":
+            continue
+        findings = item.get("findings") or []
+        if not findings:
+            continue
+        for finding in findings[:5]:
+            lines.append(f"- {item.get('key')}: {_compact_json(finding)}")
+    return "\n".join(lines) if lines else "No blocker, issue, risk, failure, or warning findings were available in local artifacts."
+
+
+def _compact_json(value: Any, *, limit: int = 500) -> str:
+    text = json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return text if len(text) <= limit else text[:limit] + "...[truncated]"
 
 
 def render_report_markdown(report: dict[str, Any]) -> str:
