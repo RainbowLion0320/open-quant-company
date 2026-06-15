@@ -4,6 +4,7 @@ import type {
   AgentActionDetail,
   AgentAddMessageResponse,
   AgentActionsResponse,
+  AgentApprovalPoliciesResponse,
   AgentDesksResponse,
   AgentEvidenceResponse,
   AgentHandoff,
@@ -76,4 +77,5 @@ export const agentApi = {
     post<AgentLiveReconciliationResponse>("/api/agent/live/reconciliation", payload),
   agentEvidence: (evidenceId: string) => get<AgentEvidenceResponse>(`/api/agent/evidence/${encodeURIComponent(evidenceId)}`),
   agentDesks: () => get<AgentDesksResponse>("/api/agent/desks"),
+  agentApprovalPolicies: () => get<AgentApprovalPoliciesResponse>("/api/agent/policies"),
 };

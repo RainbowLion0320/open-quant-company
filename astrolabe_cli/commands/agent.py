@@ -323,6 +323,16 @@ def desks() -> CliResult:
     )
 
 
+def policies() -> CliResult:
+    rows = AgentRuntime().list_approval_policies()
+    return CliResult(
+        ok=True,
+        command="agent policies",
+        message=f"{len(rows)} approval policy row(s)",
+        data={"policies": rows, "total": len(rows)},
+    )
+
+
 def live_readiness() -> CliResult:
     health = AgentRuntime().live_readiness()
     return CliResult(

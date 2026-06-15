@@ -351,6 +351,12 @@ async def list_agent_desks() -> dict[str, Any]:
     return {"desks": desks, "total": len(desks)}
 
 
+@router.get("/policies")
+async def list_agent_approval_policies() -> dict[str, Any]:
+    policies = AgentRuntime().list_approval_policies()
+    return {"policies": policies, "total": len(policies)}
+
+
 @router.get("/memory")
 async def get_agent_memory() -> dict[str, Any]:
     return AgentRuntime().memory_snapshot()

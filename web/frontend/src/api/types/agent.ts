@@ -103,6 +103,16 @@ export interface AgentReadOnlyWorkflow {
   skipped: Array<Record<string, unknown>>;
 }
 
+export interface AgentApprovalPolicy {
+  policy_id: string;
+  risk_level: string;
+  default_decision: string;
+  required_role: string;
+  expires_after_seconds: number;
+  reason: string;
+  approval_required: boolean;
+}
+
 export interface AgentHandoff {
   handoff_id: string;
   session_id: string;
@@ -230,6 +240,11 @@ export interface AgentActionsResponse {
 
 export interface AgentDesksResponse {
   desks: AgentDesk[];
+  total: number;
+}
+
+export interface AgentApprovalPoliciesResponse {
+  policies: AgentApprovalPolicy[];
   total: number;
 }
 

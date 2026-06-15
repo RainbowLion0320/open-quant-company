@@ -32,6 +32,7 @@ from astrolabe_cli.commands.agent import notify_report as agent_notify_report
 from astrolabe_cli.commands.agent import paper_cancel as agent_paper_cancel
 from astrolabe_cli.commands.agent import paper_propose as agent_paper_propose
 from astrolabe_cli.commands.agent import paper_submit as agent_paper_submit
+from astrolabe_cli.commands.agent import policies as agent_policies
 from astrolabe_cli.commands.agent import reject as agent_reject
 from astrolabe_cli.commands.agent import reports as agent_reports
 from astrolabe_cli.commands.agent import resolve_handoff as agent_resolve_handoff
@@ -266,6 +267,10 @@ def build_parser() -> argparse.ArgumentParser:
     agent_desks_cmd = agent_sub.add_parser("desks", help="List desk agents")
     add_common_flags(agent_desks_cmd)
     agent_desks_cmd.set_defaults(handler=lambda args: agent_desks())
+
+    agent_policies_cmd = agent_sub.add_parser("policies", help="List agent approval policies")
+    add_common_flags(agent_policies_cmd)
+    agent_policies_cmd.set_defaults(handler=lambda args: agent_policies())
 
     agent_live_cmd = agent_sub.add_parser("live", help="Inspect live broker readiness")
     agent_live_sub = agent_live_cmd.add_subparsers(dest="agent_live_command", required=True)

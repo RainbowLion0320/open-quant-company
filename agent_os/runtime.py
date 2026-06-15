@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from agent_os.approval import approval_required_for_risk
+from agent_os.approval import approval_required_for_risk, list_approval_policies as approval_policy_rows
 from agent_os.desks import get_desk, list_desks
 from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file
 from agent_os.ledger import AgentLedger
@@ -762,6 +762,9 @@ class AgentRuntime:
 
     def list_desks(self) -> list[dict[str, Any]]:
         return list_desks()
+
+    def list_approval_policies(self) -> list[dict[str, Any]]:
+        return [dict(policy) for policy in approval_policy_rows()]
 
     def live_readiness(self) -> dict[str, Any]:
         health = MiniQmtLiveBroker().health()

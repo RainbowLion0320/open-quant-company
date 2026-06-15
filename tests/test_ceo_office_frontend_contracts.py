@@ -38,6 +38,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "useI18n" in view
     assert "api.agentSessions" in view
     assert "api.agentDesks" in view
+    assert "api.agentApprovalPolicies" in view
     assert "api.agentCreateSession" in view
     assert "api.agentUpdateSession" in view
     assert "api.agentAddMessage" in view
@@ -54,6 +55,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "selectDesk" in view
     assert 'v-model="selectedDraftDesk"' in view
     assert 'v-for="desk in desks"' in view
+    assert "approvalPolicies" in view
+    assert "policyDecisionLabel" in view
     assert '@click="selectDesk(desk.desk_id)"' in view
     assert 'selected: selectedDeskId === desk.desk_id' in view
     assert 'desk: selectedDraftDesk.value' in view
@@ -62,6 +65,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.readOnlyWorkflowStatus" in view
     assert "ceoOffice.deskMandate" in view
     assert "ceoOffice.allowedTools" in view
+    assert "ceoOffice.approvalPolicies" in view
+    assert "ceoOffice.defaultDecision" in view
+    assert "ceoOffice.requiredRole" in view
+    assert "ceoOffice.policyReason" in view
     assert "ceoOffice.forbiddenActions" in view
     assert "ceoOffice.evidenceRequired" in view
     assert "ceoOffice.relatedMessages" in view
@@ -162,6 +169,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "只读检查状态" in zh_ceo
     assert "Desk 职责" in zh_ceo
     assert "允许工具" in zh_ceo
+    assert "审批策略" in zh_ceo
+    assert "默认决策" in zh_ceo
+    assert "要求角色" in zh_ceo
+    assert "策略原因" in zh_ceo
     assert "禁止行动" in zh_ceo
     assert "证据要求" in zh_ceo
     assert "相关消息" in zh_ceo
@@ -173,6 +184,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Read-only Check Status" in en_ceo
     assert "Desk Mandate" in en_ceo
     assert "Allowed Tools" in en_ceo
+    assert "Approval Policies" in en_ceo
+    assert "Default Decision" in en_ceo
+    assert "Required Role" in en_ceo
+    assert "Policy Reason" in en_ceo
     assert "Forbidden Actions" in en_ceo
     assert "Evidence Required" in en_ceo
     assert "Related Messages" in en_ceo
@@ -291,6 +306,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentUpdateSession" in agent_api
     assert "agentRunSessionReadOnlyActions" in agent_api
     assert "/api/agent/sessions/${encodeURIComponent(sessionId)}/run-readonly" in agent_api
+    assert "agentApprovalPolicies" in agent_api
+    assert '"/api/agent/policies"' in agent_api
     assert "AgentAddMessageResponse" in agent_api
     assert "agentActions" in agent_api
     assert "agentApproveAction" in agent_api
@@ -320,6 +337,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "export interface AgentSession" in agent_types
     assert "export interface AgentReadOnlyWorkflow" in agent_types
     assert "export interface AgentReadOnlyWorkflowResponse" in agent_types
+    assert "export interface AgentApprovalPolicy" in agent_types
+    assert "export interface AgentApprovalPoliciesResponse" in agent_types
     assert "export interface AgentReport" in agent_types
     assert "export interface AgentReportRhythm" in agent_types
     assert "export interface AgentReportRhythmResponse" in agent_types

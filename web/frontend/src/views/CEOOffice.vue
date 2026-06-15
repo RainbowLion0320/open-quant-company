@@ -201,6 +201,34 @@
 
         <article class="ceo-panel">
           <header class="panel-head">
+            <span>{{ t("ceoOffice.approvalPolicies") }}</span>
+            <small>{{ approvalPolicies.length }}</small>
+          </header>
+          <div v-if="!approvalPolicies.length" class="ceo-empty">{{ t("ceoOffice.noApprovalPolicies") }}</div>
+          <div v-else class="policy-list">
+            <div v-for="policy in approvalPolicies" :key="policy.policy_id" class="policy-row">
+              <div class="action-title">
+                <strong>{{ policy.risk_level }}</strong>
+                <span :class="['action-status', policy.default_decision]">{{ policyDecisionLabel(policy.default_decision) }}</span>
+              </div>
+              <div class="policy-grid">
+                <div>
+                  <small>{{ t("ceoOffice.defaultDecision") }}</small>
+                  <code>{{ policyDecisionLabel(policy.default_decision) }}</code>
+                </div>
+                <div>
+                  <small>{{ t("ceoOffice.requiredRole") }}</small>
+                  <code>{{ policy.required_role || "—" }}</code>
+                </div>
+              </div>
+              <small>{{ t("ceoOffice.policyReason") }}</small>
+              <p>{{ policy.reason }}</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="ceo-panel">
+          <header class="panel-head">
             <span>{{ t("ceoOffice.handoffs") }}</span>
             <small>{{ handoffs.length }}</small>
           </header>
@@ -620,7 +648,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -639,6 +667,7 @@ const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
 const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
 const desks = ref<AgentDesk[]>([]);
+const approvalPolicies = ref<AgentApprovalPolicy[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
 const selectedEvidenceSnapshot = ref<AgentEvidenceSnapshot | null>(null);
@@ -750,6 +779,13 @@ function statusLabel(status: string) {
   return status;
 }
 
+function policyDecisionLabel(decision: string) {
+  if (decision === "auto_run") return t("ceoOffice.autoRun");
+  if (decision === "approval_required") return t("ceoOffice.approvalRequired");
+  if (decision === "work_order_required") return t("ceoOffice.workOrderRequired");
+  return decision;
+}
+
 function formatJson(value: Record<string, unknown>) {
   return JSON.stringify(value || {}, null, 2);
 }
@@ -804,9 +840,10 @@ async function loadSession(sessionId: string) {
 async function load() {
   error.value = "";
   try {
-    const [sessionPayload, deskPayload, actionPayload, handoffPayload, livePayload, killSwitchPayload] = await Promise.all([
+    const [sessionPayload, deskPayload, policyPayload, actionPayload, handoffPayload, livePayload, killSwitchPayload] = await Promise.all([
       api.agentSessions(),
       api.agentDesks(),
+      api.agentApprovalPolicies(),
       api.agentActions(),
       api.agentHandoffs(),
       api.agentLiveReadiness(),
@@ -814,6 +851,7 @@ async function load() {
     ]);
     sessions.value = sessionPayload.sessions || [];
     desks.value = deskPayload.desks || [];
+    approvalPolicies.value = policyPayload.policies || [];
     if (!desks.value.some(desk => desk.desk_id === selectedDeskId.value)) {
       selectedDeskId.value = activeSession.value?.default_desk || desks.value[0]?.desk_id || "reporting";
     }

@@ -140,6 +140,44 @@ def test_agent_approval_policy_blocks_state_changing_actions(tmp_path, monkeypat
     reset_datahub()
 
 
+def test_agent_approval_policies_are_explicit_runtime_cli_api_contracts(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.approval import ALL_RISK_LEVELS
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime_policies = AgentRuntime().list_approval_policies()
+    by_risk = {policy["risk_level"]: policy for policy in runtime_policies}
+
+    cli_code = run_cli(["agent", "policies", "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).get("/api/agent/policies")
+
+    assert set(by_risk) == ALL_RISK_LEVELS
+    assert by_risk["read_only"]["default_decision"] == "auto_run"
+    assert by_risk["read_only"]["approval_required"] is False
+    assert by_risk["dry_run"]["default_decision"] == "auto_run"
+    assert by_risk["write_data"]["default_decision"] == "approval_required"
+    assert by_risk["write_config"]["required_role"] == "ceo"
+    assert by_risk["run_backtest"]["expires_after_seconds"] > 0
+    assert by_risk["paper_order"]["approval_required"] is True
+    assert by_risk["live_order"]["reason"]
+    assert by_risk["code_change"]["default_decision"] == "work_order_required"
+    assert all(policy["policy_id"] == f"agent_policy.{policy['risk_level']}" for policy in runtime_policies)
+    assert all("reason" in policy and policy["reason"] for policy in runtime_policies)
+    assert cli_code == 0
+    assert cli_payload["data"]["total"] == len(ALL_RISK_LEVELS)
+    assert api_res.status_code == 200
+    assert api_res.json()["total"] == len(ALL_RISK_LEVELS)
+    reset_datahub()
+
+
 def test_agent_live_readiness_defaults_disabled_and_never_falls_back_to_paper(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

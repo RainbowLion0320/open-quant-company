@@ -124,6 +124,20 @@ class AgentHandoff:
 
 
 @dataclass(frozen=True)
+class ApprovalPolicy:
+    policy_id: str
+    risk_level: str
+    default_decision: str
+    required_role: str
+    expires_after_seconds: int
+    reason: str
+    approval_required: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class AgentReport:
     report_id: str
     session_id: str

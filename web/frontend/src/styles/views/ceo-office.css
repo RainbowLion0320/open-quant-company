@@ -295,6 +295,45 @@
   font-size: 10px;
 }
 
+.policy-list {
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.policy-row {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 9px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.policy-row p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.policy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.policy-grid > div {
+  display: grid;
+  gap: 4px;
+}
+
+.policy-grid code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .status-dot {
   width: 8px;
   height: 8px;
@@ -434,6 +473,16 @@
 .action-status.approval_required {
   border-color: rgba(245, 158, 11, 0.32);
   color: var(--warning);
+}
+
+.action-status.auto_run {
+  border-color: rgba(34, 197, 94, 0.28);
+  color: var(--positive);
+}
+
+.action-status.work_order_required {
+  border-color: rgba(6, 182, 212, 0.32);
+  color: var(--accent-primary);
 }
 
 .action-status.approved {

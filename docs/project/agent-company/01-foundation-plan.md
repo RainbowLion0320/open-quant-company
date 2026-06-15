@@ -220,6 +220,7 @@ Phase 1 should add JSON-readable commands:
 | `astroq agent reject <action_id> --reason ... --json` | Reject an action. |
 | `astroq agent evidence <evidence_id> --json` | Resolve evidence. |
 | `astroq agent desks --json` | List desk agents, status, and allowed tools. |
+| `astroq agent policies --json` | List explicit approval policies, default decisions, roles, expiry windows, and reasons. |
 
 ## 9. Acceptance Criteria
 
@@ -228,6 +229,7 @@ Phase 1 should add JSON-readable commands:
 - Read-only tools can run through fixed command arrays.
 - Session-level read-only workflow runs dispatch only proposed/read_only actions and report skipped write/trading actions.
 - State-changing actions are queued as `approval_required`.
+- Approval policies are explicit runtime/CLI/API contracts, not hidden conditionals.
 - Approval and rejection decisions are persisted.
 - Expired queued actions are marked `expired` and cannot be approved or dispatched.
 - Evidence references resolve without requiring a running Web server.
