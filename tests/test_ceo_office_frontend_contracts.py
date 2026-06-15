@@ -107,6 +107,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.providerPlannerModel" in view
     assert "ceoOffice.providerPlannerProviderPlaceholder" in view
     assert "ceoOffice.providerPlannerModelPlaceholder" in view
+    assert "ceoOffice.providerPlannerNotice" in view
     assert "ceoOffice.semanticDraftPlaceholder" in view
     assert "ceoOffice.semanticDraftInvalid" in view
     assert "ceoOffice.noLedgerWrites" in view
@@ -229,12 +230,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Provider 规划" in zh_ceo
     assert "Provider 名称" in zh_ceo
     assert "模型名称" in zh_ceo
+    assert "会调用外部 LLM provider" in zh_ceo
+    assert "token/成本记录" in zh_ceo
     assert "Report Sections" in en_ceo
     assert "Run Live Monitor" in en_ceo
     assert "Semantic Draft" in en_ceo
     assert "Provider Planner" in en_ceo
     assert "Provider Name" in en_ceo
     assert "Model Name" in en_ceo
+    assert "Calls the external LLM provider" in en_ceo
+    assert "token/cost usage" in en_ceo
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
     assert "ceoOffice.paperReconciliation" in view

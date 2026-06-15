@@ -203,6 +203,13 @@
   font-size: 10px;
 }
 
+.provider-semantic-notice {
+  grid-column: 1 / -1;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .semantic-draft-control textarea {
   min-height: 118px;
   border: 1px solid var(--border-subtle);

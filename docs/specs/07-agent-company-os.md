@@ -21,6 +21,7 @@ Agent Company OS must provide:
 - Approval-gated state-changing actions.
 - Evidence references for agent claims.
 - Transparent local memory that can be inspected, exported, pruned, and cleared.
+- CEO Office Provider Planner controls must clearly tell the user before use that the request calls an external LLM provider and that returned token/cost usage is written to the local generic LLM usage ledger when available.
 - MiniQMT/QMT live execution as a default-disabled, approval-gated capability; the current foundation includes readiness, no-submit smoke tests, non-submitting order preview, live proposal cards, a fail-closed approved-submit/reconciliation contract, and an explicit SDK gateway bridge that only runs when injected/configured through `execution.live.sdk_gateway_factory`. SDK submission remains disabled by default and requires explicit live enablement, installed xtquant modules, account configuration, and a valid userdata path.
 
 ## 3. API Surface

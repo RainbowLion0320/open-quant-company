@@ -144,6 +144,7 @@
                 :placeholder="t('ceoOffice.providerPlannerModelPlaceholder')"
               />
             </label>
+            <small class="provider-semantic-notice">{{ t("ceoOffice.providerPlannerNotice") }}</small>
           </div>
           <div v-if="semanticDraftEnabled && !providerSemanticEnabled" class="semantic-draft-control">
             <textarea

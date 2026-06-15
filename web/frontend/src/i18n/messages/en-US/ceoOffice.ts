@@ -20,6 +20,7 @@ export const ceoOffice = {
       providerPlannerModel: "Model Name",
       providerPlannerProviderPlaceholder: "Default deepseek",
       providerPlannerModelPlaceholder: "Default agent_planning model",
+      providerPlannerNotice: "Calls the external LLM provider and records token/cost usage locally; the server still keeps only safe fixed-registry actions.",
       semanticDraftPlaceholder: "Paste an external planner JSON draft; the server keeps only safe fixed-registry actions",
       semanticDraftInvalid: "Semantic draft must be a valid JSON object",
       noLedgerWrites: "No ledger writes",

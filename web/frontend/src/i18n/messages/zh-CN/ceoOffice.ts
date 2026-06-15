@@ -20,6 +20,7 @@ export const ceoOffice = {
       providerPlannerModel: "模型名称",
       providerPlannerProviderPlaceholder: "默认 deepseek",
       providerPlannerModelPlaceholder: "默认 agent_planning 模型",
+      providerPlannerNotice: "会调用外部 LLM provider，并把 token/成本记录到本地 usage ledger；服务端仍只保留安全 fixed-registry 行动。",
       semanticDraftPlaceholder: "粘贴外部 planner 输出的 JSON 草案；服务端只会保留安全 fixed-registry 行动",
       semanticDraftInvalid: "语义草案必须是合法 JSON 对象",
       noLedgerWrites: "不会写入 ledger",
