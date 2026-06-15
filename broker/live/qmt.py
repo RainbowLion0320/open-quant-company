@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -51,6 +53,7 @@ class MiniQmtLiveBroker:
         permissions: list[str] | None = None,
         account: dict[str, Any] | None = None,
         kill_switch: bool | None = None,
+        sdk_gateway: Any | None = None,
     ):
         cfg = get_section("execution.live", {}) or {}
         self.enabled = bool(cfg.get("enabled", False) if enabled is None else enabled)
@@ -62,6 +65,7 @@ class MiniQmtLiveBroker:
         self.permissions = [str(item) for item in (permissions if permissions is not None else cfg.get("permissions", []) or [])]
         self.account = dict(account if account is not None else cfg.get("account", {}) or {})
         self.kill_switch = bool(cfg.get("kill_switch", True) if kill_switch is None else kill_switch)
+        self.sdk_gateway = sdk_gateway
 
     def health(self) -> dict[str, Any]:
         blockers: list[str] = []
@@ -150,21 +154,140 @@ class MiniQmtLiveBroker:
         }
 
     def submit_order(self, intent: dict[str, Any], *, approval_id: str) -> dict[str, Any]:
-        """Fail closed until a real MiniQMT/QMT submit adapter is configured."""
+        """Submit through an explicitly injected SDK gateway, otherwise fail closed."""
+        normalized = self._normalize_intent(intent)
+        if self.sdk_gateway is None:
+            return {
+                "status": "blocked",
+                "submitted": False,
+                "broker_order_id": "",
+                "submitted_at": "",
+                "broker_status": "not_integrated",
+                "raw_response_hash": "",
+                "ledger_id": approval_id,
+                "error": "live_submission_not_integrated",
+                "paper_fallback": False,
+                "intent": normalized,
+            }
+
+        preview = self.preview_order(normalized)
+        if preview["status"] != "preview_ready":
+            return {
+                "status": "blocked",
+                "submitted": False,
+                "broker_order_id": "",
+                "submitted_at": "",
+                "broker_status": "preview_blocked",
+                "raw_response_hash": "",
+                "ledger_id": approval_id,
+                "error": "live_preview_blocked",
+                "paper_fallback": False,
+                "intent": normalized,
+                "preview": preview,
+            }
+
+        try:
+            response = self.sdk_gateway.submit_order(
+                normalized,
+                approval_id=approval_id,
+                account_id=self.account_id,
+            )
+        except Exception as exc:
+            return {
+                "status": "blocked",
+                "submitted": False,
+                "broker_order_id": "",
+                "submitted_at": "",
+                "broker_status": "submit_failed",
+                "raw_response_hash": "",
+                "ledger_id": approval_id,
+                "error": "live_submission_failed",
+                "error_class": exc.__class__.__name__,
+                "error_message": str(exc)[:300],
+                "paper_fallback": False,
+                "intent": normalized,
+                "preview": preview,
+            }
+
+        raw_response_masked = _safe_payload(response)
+        broker_order_id = _extract_broker_order_id(response)
+        if not broker_order_id:
+            return {
+                "status": "blocked",
+                "submitted": False,
+                "broker_order_id": "",
+                "submitted_at": "",
+                "broker_status": "missing_broker_order_id",
+                "raw_response_hash": _payload_hash(raw_response_masked),
+                "raw_response_masked": raw_response_masked,
+                "ledger_id": approval_id,
+                "error": "missing_broker_order_id",
+                "paper_fallback": False,
+                "intent": normalized,
+                "preview": preview,
+            }
+
         return {
-            "status": "blocked",
-            "submitted": False,
-            "broker_order_id": "",
-            "submitted_at": "",
-            "broker_status": "not_integrated",
-            "raw_response_hash": "",
+            "status": "submitted",
+            "submitted": True,
+            "broker_order_id": broker_order_id,
+            "submitted_at": _now(),
+            "broker_status": str(
+                _response_get(response, "broker_status")
+                or _response_get(response, "status")
+                or "submitted"
+            ),
+            "raw_response_hash": _payload_hash(raw_response_masked),
+            "raw_response_masked": raw_response_masked,
             "ledger_id": approval_id,
-            "error": "live_submission_not_integrated",
+            "error": "",
             "paper_fallback": False,
-            "intent": self._normalize_intent(intent),
+            "intent": normalized,
+            "preview": preview,
         }
 
     def reconcile(self, ack: dict[str, Any]) -> dict[str, Any]:
+        if self.sdk_gateway is not None and hasattr(self.sdk_gateway, "reconcile"):
+            try:
+                response = self.sdk_gateway.reconcile(ack, account_id=self.account_id)
+            except Exception as exc:
+                return {
+                    "status": "blocked",
+                    "as_of": _now(),
+                    "positions_matched": False,
+                    "cash_matched": False,
+                    "open_orders": [],
+                    "fills": [],
+                    "mismatches": [
+                        {
+                            "reason": "live_reconciliation_failed",
+                            "error_class": exc.__class__.__name__,
+                            "error_message": str(exc)[:300],
+                        }
+                    ],
+                    "recommended_actions": ["review_live_reconciliation_failure"],
+                    "paper_fallback": False,
+                }
+
+            raw_response_masked = _safe_payload(response)
+            mismatches = _safe_payload(list(_response_get(response, "mismatches") or []))
+            positions_matched = bool(_response_get(response, "positions_matched"))
+            cash_matched = bool(_response_get(response, "cash_matched"))
+            matched = positions_matched and cash_matched and not mismatches
+            return {
+                "status": "matched" if matched else "needs_review",
+                "as_of": _now(),
+                "positions_matched": positions_matched,
+                "cash_matched": cash_matched,
+                "open_orders": _safe_payload(list(_response_get(response, "open_orders") or [])),
+                "fills": _safe_payload(list(_response_get(response, "fills") or [])),
+                "mismatches": mismatches,
+                "recommended_actions": [] if matched else ["review_live_reconciliation_mismatches"],
+                "paper_fallback": False,
+                "raw_response_hash": _payload_hash(raw_response_masked),
+                "raw_response_masked": raw_response_masked,
+            }
+
         return {
             "status": "not_integrated",
             "as_of": _now(),
@@ -174,6 +297,7 @@ class MiniQmtLiveBroker:
             "fills": [],
             "mismatches": [{"reason": "live_reconciliation_not_integrated", "ack": dict(ack)}],
             "recommended_actions": ["connect_miniqmt_adapter"],
+            "paper_fallback": False,
         }
 
     def _normalize_intent(self, intent: dict[str, Any]) -> dict[str, Any]:
@@ -477,3 +601,48 @@ def _estimate_fees(notional: float) -> float:
     if notional <= 0:
         return 0.0
     return max(notional * DEFAULT_COMMISSION_RATE, MIN_COMMISSION)
+
+
+def _response_get(response: Any, key: str) -> Any:
+    if isinstance(response, dict):
+        return response.get(key)
+    return getattr(response, key, None)
+
+
+def _extract_broker_order_id(response: Any) -> str:
+    for key in ("broker_order_id", "order_id", "entrust_no", "order_sysid", "order_ref"):
+        value = _response_get(response, key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return ""
+
+
+def _safe_payload(value: Any, *, depth: int = 0) -> Any:
+    if depth > 4:
+        return "<truncated>"
+    if isinstance(value, dict):
+        return {
+            str(key): _safe_field(str(key), item, depth=depth + 1)
+            for key, item in sorted(value.items(), key=lambda entry: str(entry[0]))
+        }
+    if isinstance(value, (list, tuple)):
+        return [_safe_payload(item, depth=depth + 1) for item in list(value)[:20]]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if hasattr(value, "__dict__"):
+        return _safe_payload(vars(value), depth=depth + 1)
+    return str(value)
+
+
+def _safe_field(key: str, value: Any, *, depth: int) -> Any:
+    normalized = key.lower()
+    if any(token in normalized for token in ("secret", "token", "password", "api_key", "apikey", "key")):
+        return "***"
+    if "account" in normalized and isinstance(value, (str, int)):
+        return _mask_account(str(value))
+    return _safe_payload(value, depth=depth)
+
+
+def _payload_hash(payload: Any) -> str:
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"

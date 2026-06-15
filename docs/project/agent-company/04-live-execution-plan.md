@@ -1,6 +1,6 @@
 # Agent Company OS Phase 6 - MiniQMT/QMT Live Execution Plan
 
-> Status: readiness, preview, and approval-gated submit/reconciliation contract implemented; real SDK submission planned
+> Status: readiness, preview, approval-gated submit/reconciliation contract, and explicit SDK gateway bridge implemented; user-environment SDK wiring planned
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Related spec: [04-execution-layer.md](../../specs/04-execution-layer.md)
@@ -251,6 +251,7 @@ Current foundation:
 - `astroq agent live submit ACTION_ID --json` and `POST /api/agent/live/actions/{action_id}/submit` require CEO approval, re-run preview/risk gates, submit only through the live adapter, and write reconciliation evidence under `var/artifacts/agent/live_reconciliation/`.
 - `astroq agent live reconcile --json` and `POST /api/agent/live/reconciliation` scan submitted live order evidence, call the live adapter reconciliation method, skip unsubmitted approval cards with `no_submitted_live_order`, and write scheduled reconciliation evidence under `var/artifacts/agent/live_reconciliation/scheduled/`.
 - Default `MiniQmtLiveBroker.submit_order()` fails closed with `live_submission_not_integrated`; no local path fabricates a broker order id or falls back to PaperBroker.
+- `MiniQmtLiveBroker` accepts an explicit SDK gateway injection for audited submit/reconcile. The gateway path still re-runs preview/risk gates, requires a broker order id, masks and hashes raw responses, keeps `paper_fallback=false`, and returns blocked status on unknown or failed gateway responses.
 - `astroq agent live kill-switch status/activate/deactivate --json` and `/api/agent/live/kill-switch` expose a local kill switch. Activation cancels queued `live_order` actions, writes state/event artifacts under `var/artifacts/agent/live_kill_switch/`, and blocks live preview/propose/submit before broker calls.
 - CEO Office shows a read-only live readiness card.
 - Blocked readiness always reports `paper_fallback=false`; no live path submits through PaperBroker.
@@ -258,8 +259,8 @@ Current foundation:
 Remaining work:
 
 - Broker account consistency reconciliation against real MiniQMT/QMT snapshots after SDK integration.
-- Real MiniQMT/QMT SDK-backed order submission.
-- Real-account scheduled broker order/trade/position reconciliation after SDK integration.
+- Wire the exact user-environment MiniQMT/QMT SDK package, connection/session object, account id, and order API into the explicit gateway bridge.
+- Real-account scheduled broker order/trade/position reconciliation through the configured gateway.
 - Broker-side kill-switch operations for canceling already submitted real MiniQMT/QMT orders after SDK integration.
 
 ## 13. Open Design Questions

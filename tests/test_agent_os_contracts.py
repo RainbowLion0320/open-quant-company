@@ -992,6 +992,114 @@ def test_agent_live_order_preview_enforces_portfolio_grade_risk_snapshot():
     assert "missing_portfolio_risk_snapshot" in missing["risk_gate"]["blockers"]
 
 
+def test_miniqmt_live_broker_uses_explicit_sdk_gateway_for_audited_submit_and_reconcile():
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    class FakeSdkGateway:
+        def __init__(self):
+            self.submissions = []
+            self.reconciliations = []
+
+        def submit_order(self, intent, *, approval_id, account_id):
+            self.submissions.append({"intent": intent, "approval_id": approval_id, "account_id": account_id})
+            return {
+                "broker_order_id": "QMT_0001",
+                "broker_status": "accepted",
+                "account_id": account_id,
+                "secret_token": "should-not-leak",
+            }
+
+        def reconcile(self, ack, *, account_id):
+            self.reconciliations.append({"ack": ack, "account_id": account_id})
+            return {
+                "positions_matched": True,
+                "cash_matched": True,
+                "open_orders": [
+                    {
+                        "broker_order_id": ack["broker_order_id"],
+                        "status": "accepted",
+                        "account_id": account_id,
+                        "secret_token": "reconcile-secret",
+                    }
+                ],
+                "fills": [
+                    {
+                        "broker_order_id": ack["broker_order_id"],
+                        "quantity": ack["intent"]["quantity"],
+                        "account_id": account_id,
+                    }
+                ],
+                "mismatches": [],
+            }
+
+    gateway = FakeSdkGateway()
+    broker = MiniQmtLiveBroker(
+        enabled=True,
+        import_checker=lambda _name: object(),
+        logged_in=True,
+        permissions=["query", "trade"],
+        account_id="1234567890",
+        account={"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+        sdk_gateway=gateway,
+    )
+    intent = {
+        "symbol": "600000.SH",
+        "side": "buy",
+        "quantity": 100,
+        "order_type": "limit",
+        "limit_price": 10.0,
+        "strategy": "manual",
+        "reason": "approved gateway submit",
+        "evidence_refs": ["ev_demo"],
+        "risk_snapshot": {
+            "current_symbol_notional": 2_000.0,
+            "max_position_pct": 0.2,
+            "max_total_exposure_pct": 0.7,
+            "daily_order_count": 1,
+            "max_daily_orders": 5,
+            "tradable": True,
+            "data_freshness_status": "fresh",
+            "broker_account_consistent": True,
+            "current_drawdown_pct": 0.04,
+            "max_drawdown_pct": 0.12,
+            "portfolio_var_pct": 0.025,
+            "max_portfolio_var_pct": 0.06,
+            "portfolio_cvar_pct": 0.04,
+            "max_portfolio_cvar_pct": 0.09,
+            "current_sector_notional": 8_000.0,
+            "max_sector_exposure_pct": 0.25,
+            "intraday_limit_state": "normal",
+        },
+    }
+
+    submitted = broker.submit_order(intent, approval_id="approval_1")
+    reconciled = broker.reconcile(submitted)
+
+    assert submitted["status"] == "submitted"
+    assert submitted["submitted"] is True
+    assert submitted["broker_order_id"] == "QMT_0001"
+    assert submitted["broker_status"] == "accepted"
+    assert submitted["paper_fallback"] is False
+    assert submitted["ledger_id"] == "approval_1"
+    assert submitted["raw_response_hash"].startswith("sha256:")
+    assert submitted["raw_response_masked"]["account_id"] == "12******90"
+    assert submitted["raw_response_masked"]["secret_token"] == "***"
+    assert "1234567890" not in json.dumps(submitted["raw_response_masked"])
+    assert "should-not-leak" not in json.dumps(submitted["raw_response_masked"])
+    assert gateway.submissions == [
+        {"intent": submitted["intent"], "approval_id": "approval_1", "account_id": "1234567890"}
+    ]
+    assert reconciled["status"] == "matched"
+    assert reconciled["positions_matched"] is True
+    assert reconciled["cash_matched"] is True
+    assert reconciled["paper_fallback"] is False
+    assert reconciled["recommended_actions"] == []
+    assert reconciled["raw_response_hash"].startswith("sha256:")
+    assert "1234567890" not in json.dumps(reconciled)
+    assert "reconcile-secret" not in json.dumps(reconciled)
+    assert gateway.reconciliations[0]["account_id"] == "1234567890"
+
+
 def test_agent_live_preview_cli_and_api(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
