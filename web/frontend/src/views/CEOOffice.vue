@@ -39,6 +39,16 @@
         {{ t("ceoOffice.failed") }} {{ readOnlyWorkflowResult.failed_count }}
       </span>
     </section>
+    <section v-if="autonomyStepResult" class="ceo-alert info">
+      <strong>{{ t("ceoOffice.autonomyStepStatus") }}</strong>
+      <span>
+        {{ statusLabel(autonomyStepResult.status) }} ·
+        {{ t("ceoOffice.ran") }} {{ autonomyStepResult.run_count }} ·
+        {{ t("ceoOffice.skipped") }} {{ autonomyStepResult.skipped_count }} ·
+        {{ t("ceoOffice.failed") }} {{ autonomyStepResult.failed_count }} ·
+        {{ t("ceoOffice.blocked") }} {{ autonomyStepResult.blocked_count }}
+      </span>
+    </section>
 
     <section class="ceo-summary">
       <article class="ceo-metric">
@@ -118,6 +128,9 @@
           </button>
           <button class="btn btn-ghost" type="button" :disabled="planningWorkflow || !draft.trim()" @click="previewWorkflowPlan">
             {{ t("ceoOffice.previewPlan") }}
+          </button>
+          <button class="btn btn-ghost" type="button" :disabled="runningAutonomyStep" @click="runAutonomyStep">
+            {{ t("ceoOffice.runAutonomyStep") }}
           </button>
           <label class="semantic-draft-toggle">
             <input v-model="semanticDraftEnabled" type="checkbox" />
@@ -843,7 +856,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentAutonomyStep, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -864,6 +877,7 @@ const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
 const liveMonitor = ref<AgentLiveMonitor | null>(null);
 const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
+const autonomyStepResult = ref<AgentAutonomyStep | null>(null);
 const workflowPlan = ref<AgentWorkflowPlan | null>(null);
 const sessionStream = ref<AbortController | null>(null);
 const sessionStreamId = ref("");
@@ -885,6 +899,7 @@ const submittingPaperAction = ref("");
 const cancelingAction = ref("");
 const archivingSession = ref(false);
 const runningReadOnlyWorkflow = ref(false);
+const runningAutonomyStep = ref(false);
 const resolvingHandoff = ref("");
 const updatingWorkOrder = ref("");
 const generatingReport = ref(false);
@@ -1321,6 +1336,28 @@ async function runSessionReadOnlyActions() {
     error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
   } finally {
     runningReadOnlyWorkflow.value = false;
+  }
+}
+
+async function runAutonomyStep() {
+  const semanticDraft = parseSemanticDraft();
+  if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
+  runningAutonomyStep.value = true;
+  error.value = "";
+  try {
+    const session = await ensureSession();
+    const payload = await api.agentAutonomyStep(session.session_id, {
+      desk: selectedDraftDesk.value,
+      content: draft.value.trim(),
+      ...semanticPayload(semanticDraft),
+    });
+    autonomyStepResult.value = payload.step;
+    workflowPlan.value = null;
+    await loadSession(session.session_id);
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
+  } finally {
+    runningAutonomyStep.value = false;
   }
 }
 

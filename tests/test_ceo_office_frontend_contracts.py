@@ -83,6 +83,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "runSessionReadOnlyActions" in view
     assert "readOnlyWorkflowResult" in view
     assert "runningReadOnlyWorkflow" in view
+    assert "api.agentAutonomyStep" in view
+    assert "runAutonomyStep" in view
+    assert "autonomyStepResult" in view
+    assert "runningAutonomyStep" in view
+    assert "ceoOffice.runAutonomyStep" in view
+    assert "ceoOffice.autonomyStepStatus" in view
     assert "selectedDraftDesk" in view
     assert "selectedDeskId" in view
     assert "selectedDesk" in view
@@ -232,6 +238,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "模型名称" in zh_ceo
     assert "会调用外部 LLM provider" in zh_ceo
     assert "token/成本记录" in zh_ceo
+    assert "运行自主步骤" in zh_ceo
+    assert "自主步骤状态" in zh_ceo
     assert "Report Sections" in en_ceo
     assert "Run Live Monitor" in en_ceo
     assert "Semantic Draft" in en_ceo
@@ -240,6 +248,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Model Name" in en_ceo
     assert "Calls the external LLM provider" in en_ceo
     assert "token/cost usage" in en_ceo
+    assert "Run Autonomy Step" in en_ceo
+    assert "Autonomy Step Status" in en_ceo
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
     assert "ceoOffice.paperReconciliation" in view
