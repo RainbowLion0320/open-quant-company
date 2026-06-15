@@ -12,7 +12,7 @@ from typing import Any
 
 from agent_os.approval import approval_required_for_risk, list_approval_policies as approval_policy_rows
 from agent_os.desks import get_desk, list_desks
-from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file
+from agent_os.evidence import FILE_EVIDENCE_KINDS, evidence_source_path, hash_file
 from agent_os.ledger import AgentLedger
 from agent_os.notifications import NotificationSender, build_report_notification_message, channel_secret_status, send_notification, supported_channels
 from agent_os.reports import (
@@ -365,9 +365,10 @@ class AgentRuntime:
         evidence_id = _id("ev")
         evidence_hash = ""
         snapshot_uri = ""
-        if kind in FILE_EVIDENCE_KINDS and Path(uri).exists():
-            evidence_hash = hash_file(uri)
-            snapshot_uri = str(self._snapshot_evidence_file(evidence_id, Path(uri)))
+        source_path = evidence_source_path(uri)
+        if kind in FILE_EVIDENCE_KINDS and source_path.exists():
+            evidence_hash = hash_file(source_path)
+            snapshot_uri = str(self._snapshot_evidence_file(evidence_id, source_path))
         evidence = EvidenceRef(
             evidence_id=evidence_id,
             kind=kind,

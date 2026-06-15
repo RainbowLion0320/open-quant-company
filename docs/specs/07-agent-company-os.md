@@ -314,6 +314,12 @@ returns:
 - `missing_evidence` only when no ledger row exists, or an old file-backed row has
   neither source nor snapshot.
 
+`web_route` evidence resolves only safe local routes that start with `/` and do
+not use protocol-relative or backslash paths. Repository-local `file` and `code`
+evidence resolves to safe navigation metadata for the CodeGraph file view;
+`code` URIs may use `path:line`. Existing files outside the repository may be
+snapshotted and hashed, but they do not produce CEO Office navigation links.
+
 ### 5.6 AgentReport
 
 ```json
@@ -814,7 +820,7 @@ As of 2026-06-15:
 - The fixed registry covers all desk-declared tools, including lifecycle checks, data status, data source capability listing and registry diff, data repair dry-run/approved repair, strategy catalog, strategy competition evidence, backtest dry-run, execution dry-run, AST diagnostics, test design intelligence, docs check, and report generation.
 - Deterministic desk workflows route common CEO intents to specific safe tools, including data source registry diff, Data Desk repair dry-run plus approval-required write action, 12-strategy competition evidence, Research strategy-blocker diagnosis across DataHub health and lifecycle gates, Engineering Desk code/bug requests into work orders plus AST/test-design diagnostics, backtest dry-run, test design intelligence, and documentation hygiene checks. Reporting daily-brief intent performs a bounded cross-desk orchestration step by proposing separate Data, Research, and Risk read-only actions with distinct evidence references. Reporting portfolio-review intent proposes Research strategy competition evidence, Risk lifecycle readiness, and Execution dry-run actions. Session-level safe workflow runners can dispatch proposed `read_only` and `dry_run` actions while skipping approval-required write/trading actions.
 - Desk responses can persist structured `answer/confidence/evidence_refs/proposed_actions/blockers/handoffs`; invalid handoff targets are rejected by runtime desk policy; open handoffs can be resolved with an audit timestamp.
-- Web-route evidence resolves to safe local navigation metadata, and CEO Office can render an evidence link into the related Web view.
+- Web-route evidence resolves to safe local navigation metadata, and repository-local file/code evidence resolves to CodeGraph file navigation with optional line numbers. Existing external files can be snapshotted and hashed, but they do not produce CEO Office navigation links.
 - CEO reports can be generated as JSON/Markdown artifacts, registered as report evidence, listed through CLI/API, and shown as CEO Office report cards. Dedicated templates cover daily, weekly, audit, data quality, risk, execution reconciliation, engineering digest, and release audit reports; each report includes fixed allowlist artifact context for lifecycle, data-sources, strategy competition, AST intelligence, test design intelligence, and CodeGraph readiness. CEO Office can generate a selected template, run due templates through the explicit operating-rhythm runner, trigger the scheduled active-session rhythm tick, or send/dry-run report notifications. Scheduled ticks write audit artifacts under `var/artifacts/agent/reports/scheduled/`; notifications write audit artifacts under `var/artifacts/agent/reports/notifications/` and read only system environment variables.
 - PaperBroker order proposal, approved submission, and cancellation are available through CLI/API. Proposal writes preview artifact evidence and creates an approval-required `paper_order` action only when the non-mutating preview passes; submission requires approval, re-runs preview/risk gates, blocks stale previews, writes run/reconciliation evidence, persists default PaperBroker state on success, and exposes paper reconciliation summaries on action detail. Cancellation writes dedicated `paper.paper_order.cancel` runs and reconciliation evidence for queued approval requests or broker-confirmed active order cancellations.
 - MiniQMT/QMT readiness probing is available and defaults to `live_disabled`; missing SDK, login, permission, or disabled kill switch returns `blocked`, and `paper_fallback` is always false.

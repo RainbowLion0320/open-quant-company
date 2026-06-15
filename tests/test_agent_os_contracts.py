@@ -2384,6 +2384,68 @@ def test_agent_evidence_resolver_returns_safe_web_route_navigation(tmp_path, mon
     reset_datahub()
 
 
+def test_agent_evidence_resolver_returns_safe_file_and_code_navigation(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.evidence import EvidenceResolver
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    code = runtime.create_evidence(
+        kind="code",
+        label="Agent runtime route",
+        uri="agent_os/runtime.py:356",
+        summary="Code location for AgentRuntime.create_evidence.",
+    )
+    file_evidence = runtime.create_evidence(
+        kind="file",
+        label="Agent guide",
+        uri="AGENTS.md",
+        summary="Agent operating guide.",
+    )
+    outside_file = tmp_path / "outside-secret.txt"
+    outside_file.write_text("do not navigate outside repo", encoding="utf-8")
+    outside_existing = runtime.create_evidence(
+        kind="file",
+        label="Existing external file",
+        uri=str(outside_file),
+        summary="Existing external files can be snapshotted but not navigated.",
+    )
+    unsafe = runtime.create_evidence(
+        kind="file",
+        label="Unsafe external file",
+        uri="../outside-secret.txt",
+        summary="Should not produce local file navigation.",
+    )
+
+    resolved_code = EvidenceResolver().resolve(code.evidence_id)
+    resolved_file = EvidenceResolver().resolve(file_evidence.evidence_id)
+    resolved_outside_existing = EvidenceResolver().resolve(outside_existing.evidence_id)
+    resolved_unsafe = EvidenceResolver().resolve(unsafe.evidence_id)
+
+    assert resolved_code["status"] == "fresh"
+    assert resolved_code["navigation"] == {
+        "kind": "code",
+        "path": "agent_os/runtime.py",
+        "line": "356",
+        "href": "/system?tab=codegraph&file=agent_os%2Fruntime.py&line=356",
+        "label": "Agent runtime route",
+    }
+    assert resolved_code["evidence"]["hash"].startswith("sha256:")
+    assert resolved_file["status"] == "fresh"
+    assert resolved_file["navigation"]["kind"] == "file"
+    assert resolved_file["navigation"]["path"] == "AGENTS.md"
+    assert resolved_file["navigation"]["href"] == "/system?tab=codegraph&file=AGENTS.md"
+    assert resolved_outside_existing["status"] == "fresh"
+    assert resolved_outside_existing["evidence"]["hash"].startswith("sha256:")
+    assert resolved_outside_existing["navigation"] is None
+    assert resolved_unsafe["navigation"] is None
+    reset_datahub()
+
+
 def test_agent_cli_creates_and_lists_sessions(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
