@@ -248,6 +248,7 @@ def empty_report_artifact_context() -> dict[str, Any]:
         "causal_chain_synthesis": {
             "status": "no_evidence",
             "chain_count": 0,
+            "recurring_chain_count": 0,
             "chains": [],
             "next_actions": ["Generate report evidence artifacts before building causal chains."],
         },
@@ -681,6 +682,8 @@ def _report_causal_chain_synthesis(artifact_context: dict[str, Any]) -> dict[str
             }
         )
 
+    chains, recurring_chain_count = _apply_causal_chain_history(chains, artifact_context)
+
     if any(chain["severity"] == "P0" for chain in chains):
         status = "blocked"
     elif chains:
@@ -692,10 +695,67 @@ def _report_causal_chain_synthesis(artifact_context: dict[str, Any]) -> dict[str
     return {
         "status": status,
         "chain_count": len(chains),
+        "recurring_chain_count": recurring_chain_count,
         "chains": chains[:8],
         "next_actions": _ordered_unique([str(chain["next_action"]) for chain in chains])[:8]
         or ["No causal chains were found in current local artifacts."],
     }
+
+
+def _apply_causal_chain_history(
+    chains: list[dict[str, Any]],
+    artifact_context: dict[str, Any],
+) -> tuple[list[dict[str, Any]], int]:
+    trend = artifact_context.get("trend_synthesis")
+    recurring_rows = trend.get("recurring_root_causes", []) if isinstance(trend, dict) else []
+    recurring_by_cause = {
+        str(row.get("cause") or ""): row
+        for row in recurring_rows
+        if isinstance(row, dict) and str(row.get("cause") or "")
+    }
+    recurring_chain_count = 0
+    updated: list[dict[str, Any]] = []
+    for chain in chains:
+        nodes = [str(node) for node in chain.get("nodes", []) if node]
+        matches = [recurring_by_cause[node] for node in nodes if node in recurring_by_cause]
+        if not matches:
+            updated.append(
+                {
+                    **chain,
+                    "escalation": "current_evidence",
+                    "history": {
+                        "recurring": False,
+                        "recurring_causes": [],
+                        "max_total_count": 1,
+                    },
+                }
+            )
+            continue
+
+        recurring_chain_count += 1
+        max_total_count = max(_int_value(row.get("total_count")) for row in matches)
+        latest = matches[0]
+        escalation = "recurring_blocker" if chain.get("severity") == "P0" or chain.get("status") == "blocked" else "recurring_attention"
+        next_action = (
+            "Escalate recurring causal chain to standing owner review before repeating report-only observations; "
+            f"{chain.get('next_action')}"
+        )
+        updated.append(
+            {
+                **chain,
+                "escalation": escalation,
+                "history": {
+                    "recurring": True,
+                    "recurring_causes": [str(row.get("cause") or "") for row in matches],
+                    "max_total_count": max_total_count,
+                    "latest_report_id": str(latest.get("latest_report_id") or ""),
+                    "latest_generated_at": str(latest.get("latest_generated_at") or ""),
+                    "kinds": _ordered_unique([kind for row in matches for kind in row.get("kinds", [])])[:5],
+                },
+                "next_action": next_action,
+            }
+        )
+    return updated, recurring_chain_count
 
 
 def _causal_chain_synthesis_body(artifact_context: dict[str, Any]) -> str:
@@ -706,6 +766,7 @@ def _causal_chain_synthesis_body(artifact_context: dict[str, Any]) -> str:
         "- Section: causal_chain_synthesis",
         f"- Causal status: {causal.get('status', 'unknown')}",
         f"- Causal chains: {causal.get('chain_count', 0)}",
+        f"- Recurring causal chains: {causal.get('recurring_chain_count', 0)}",
     ]
     for chain in causal.get("chains", [])[:8]:
         if not isinstance(chain, dict):
@@ -718,6 +779,15 @@ def _causal_chain_synthesis_body(artifact_context: dict[str, Any]) -> str:
             f"({nodes}); owners={owners}; evidence={chain.get('evidence')} "
             f"-> {chain.get('next_action')}"
         )
+        history = chain.get("history") if isinstance(chain.get("history"), dict) else {}
+        if history.get("recurring"):
+            causes = ", ".join(str(cause) for cause in history.get("recurring_causes", []) if cause)
+            lines.append(
+                "- "
+                f"Recurring causal chain: {chain.get('chain_id')} repeated via {causes} across "
+                f"{history.get('max_total_count')} report(s); latest={history.get('latest_report_id')}; "
+                f"escalation={chain.get('escalation')}"
+            )
     for action in causal.get("next_actions", [])[:5]:
         lines.append(f"- Next action: {action}")
     return "\n".join(lines)

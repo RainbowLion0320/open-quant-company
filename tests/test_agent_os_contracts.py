@@ -2342,6 +2342,69 @@ def test_agent_reports_build_causal_chain_synthesis_from_evidence(tmp_path, monk
     reset_datahub()
 
 
+def test_agent_reports_escalate_recurring_causal_chains_from_history(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import get_datahub, reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 2, "ready": 4},
+            "blockers": [
+                {"dimension": "macro_gdp", "reason": "source_not_updated"},
+                {"dimension": "stock_limit_list", "reason": "rate_limited"},
+            ],
+        },
+        "data-sources/latest.json": {
+            "summary": {
+                "source_count": 8,
+                "capability_count": 300,
+                "project_integrated_count": 42,
+                "capability_unmapped_count": 21,
+            },
+        },
+        "tournaments/strategy_competition_latest.json": {
+            "summary": {"total": 12, "blocked": 9, "insufficient_alpha_evidence": 7},
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+
+    runtime = AgentRuntime()
+    first = runtime.create_session(title="First causal brief", default_desk="reporting")
+    second = runtime.create_session(title="Second causal brief", default_desk="reporting")
+    third = runtime.create_session(title="Third causal brief", default_desk="reporting")
+    runtime.generate_report(session_id=first.session_id, kind="daily_brief")
+    runtime.generate_report(session_id=second.session_id, kind="daily_brief")
+    report = runtime.generate_report(session_id=third.session_id, kind="daily_brief")
+
+    payload = json.loads(Path(report["path"]).read_text(encoding="utf-8"))
+    sections = {section["section_id"]: section for section in payload["sections"]}
+    causal = payload["artifact_context"]["causal_chain_synthesis"]
+    chain = next(chain for chain in causal["chains"] if chain["chain_id"] == "data_readiness_to_strategy_block")
+
+    assert causal["recurring_chain_count"] >= 1
+    assert chain["history"]["recurring"] is True
+    assert chain["history"]["max_total_count"] >= 3
+    assert set(chain["history"]["recurring_causes"]) >= {
+        "lifecycle_blocker",
+        "strategy_evidence_blocked",
+    }
+    assert chain["escalation"] == "recurring_blocker"
+    assert "standing owner review" in chain["next_action"]
+    assert "Recurring causal chain" in sections["causal_chain_synthesis"]["body"]
+    assert "3 report(s)" in sections["causal_chain_synthesis"]["body"]
+    reset_datahub()
+
+
 def test_agent_report_notification_env_only_writes_audit_artifact(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "secret-token")
