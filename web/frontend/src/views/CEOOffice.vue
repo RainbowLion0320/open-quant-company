@@ -49,6 +49,54 @@
         {{ t("ceoOffice.blocked") }} {{ autonomyStepResult.blocked_count }}
       </span>
     </section>
+    <section v-if="autonomyStepResult" class="ceo-panel autonomy-step-detail">
+      <header class="panel-head">
+        <span>{{ t("ceoOffice.autonomyStepStatus") }}</span>
+        <small>{{ autonomyStepResult.mode }}</small>
+      </header>
+      <div class="autonomy-step-grid">
+        <div>
+          <small>{{ t("ceoOffice.autonomyStepActions") }}</small>
+          <div v-if="!autonomyStepResult.actions.length" class="ceo-empty compact">{{ t("ceoOffice.noActions") }}</div>
+          <div v-else class="run-list">
+            <button
+              v-for="action in autonomyStepResult.actions"
+              :key="action.action_id"
+              class="run-row clickable"
+              type="button"
+              @click="selectAction(action.action_id)"
+            >
+              <strong>{{ action.summary }}</strong>
+              <small>{{ statusLabel(action.status) }} · {{ String(action.parameters.tool_id || action.action_type) }}</small>
+            </button>
+          </div>
+        </div>
+        <div>
+          <small>{{ t("ceoOffice.autonomyStepRuns") }}</small>
+          <div v-if="!autonomyStepResult.runs.length" class="ceo-empty compact">{{ t("ceoOffice.noRuns") }}</div>
+          <div v-else class="run-list">
+            <div v-for="run in autonomyStepResult.runs" :key="run.run_id" class="run-row">
+              <strong>{{ run.tool_name }}</strong>
+              <small>{{ statusLabel(run.status) }} · {{ run.stdout_summary || run.stderr_summary || run.run_id }}</small>
+            </div>
+          </div>
+        </div>
+        <div>
+          <small>{{ t("ceoOffice.autonomyStepSkipped") }}</small>
+          <div v-if="!autonomyStepResult.skipped.length" class="ceo-empty compact">{{ t("ceoOffice.skipped") }} 0</div>
+          <div v-else class="run-list">
+            <div
+              v-for="(skipped, index) in autonomyStepResult.skipped"
+              :key="autonomySkippedKey(skipped, index)"
+              class="run-row"
+            >
+              <strong>{{ String(skipped.reason || skipped.status || "skipped") }}</strong>
+              <small>{{ String(skipped.action_id || skipped.desk || skipped.risk_level || "") }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <section class="ceo-summary">
       <article class="ceo-metric">
@@ -996,6 +1044,10 @@ function selectDesk(deskId: string) {
 
 function reasoningKey(row: Record<string, unknown>) {
   return `${String(row.kind || "reasoning")}-${JSON.stringify(row)}`;
+}
+
+function autonomySkippedKey(row: Record<string, unknown>, index: number) {
+  return `${String(row.action_id || row.reason || row.status || "skipped")}-${index}`;
 }
 
 function reasoningSummary(row: Record<string, unknown>) {

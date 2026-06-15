@@ -87,8 +87,14 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "runAutonomyStep" in view
     assert "autonomyStepResult" in view
     assert "runningAutonomyStep" in view
+    assert "autonomyStepResult.actions" in view
+    assert "autonomyStepResult.runs" in view
+    assert "autonomyStepResult.skipped" in view
     assert "ceoOffice.runAutonomyStep" in view
     assert "ceoOffice.autonomyStepStatus" in view
+    assert "ceoOffice.autonomyStepActions" in view
+    assert "ceoOffice.autonomyStepRuns" in view
+    assert "ceoOffice.autonomyStepSkipped" in view
     assert "selectedDraftDesk" in view
     assert "selectedDeskId" in view
     assert "selectedDesk" in view
@@ -240,6 +246,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "token/成本记录" in zh_ceo
     assert "运行自主步骤" in zh_ceo
     assert "自主步骤状态" in zh_ceo
+    assert "自主行动" in zh_ceo
+    assert "自主运行" in zh_ceo
+    assert "自主跳过" in zh_ceo
     assert "Report Sections" in en_ceo
     assert "Run Live Monitor" in en_ceo
     assert "Semantic Draft" in en_ceo
@@ -250,6 +259,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "token/cost usage" in en_ceo
     assert "Run Autonomy Step" in en_ceo
     assert "Autonomy Step Status" in en_ceo
+    assert "Autonomy Actions" in en_ceo
+    assert "Autonomy Runs" in en_ceo
+    assert "Autonomy Skipped" in en_ceo
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
     assert "ceoOffice.paperReconciliation" in view

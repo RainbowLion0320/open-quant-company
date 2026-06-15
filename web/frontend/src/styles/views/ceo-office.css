@@ -210,6 +210,27 @@
   line-height: 1.45;
 }
 
+.autonomy-step-detail {
+  margin-bottom: 14px;
+}
+
+.autonomy-step-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.autonomy-step-grid > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.autonomy-step-grid small {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
 .semantic-draft-control textarea {
   min-height: 118px;
   border: 1px solid var(--border-subtle);
@@ -955,7 +976,8 @@
 @media (max-width: 700px) {
   .ceo-toolbar,
   .ceo-actions,
-  .message-composer {
+  .message-composer,
+  .autonomy-step-grid {
     align-items: stretch;
     grid-template-columns: 1fr;
     flex-direction: column;
