@@ -80,15 +80,16 @@ The 100% target includes all of the following. Partial implementation must not r
 4. Agent API endpoints under `/api/agent/*` expose sessions, messages, actions, approvals, evidence, and desk status.
 5. `astroq agent *` provides JSON-readable local automation.
 6. Desk agents are registered with explicit tool permissions and risk scopes.
-7. Agent actions use a common `AgentAction` contract and can be approved, rejected, expired, canceled, executed, or blocked.
-8. Evidence references resolve to existing Web pages, CLI commands, artifact paths, code locations, and report sections.
-9. Transparent memory is inspectable, exportable, and clearable.
-10. MiniQMT/QMT live execution adapter exists behind default-disabled live mode.
-11. Broker readiness, risk checks, order preview, approval, submission, reconciliation, and kill switch are auditable.
-12. Reporting desk can produce daily and weekly CEO briefs from current evidence.
-13. Web UI supports conversation, action cards, approval queue, evidence deep links, and desk drill-down.
-14. Tests verify action policies, evidence resolution, live execution boundaries, Web rendering, API contracts, and CLI JSON contracts.
-15. Docs/specs/wiki/acceptance matrix stay aligned with implementation.
+7. Desk-declared fixed tools are covered by the local tool registry, and deterministic routing can map common CEO intents to concrete safe tools such as data source registry diff, strategy competition, backtest dry-run, test design, and docs check.
+8. Agent actions use a common `AgentAction` contract and can be approved, rejected, expired, canceled, executed, or blocked.
+9. Evidence references resolve to existing Web pages, CLI commands, artifact paths, code locations, and report sections.
+10. Transparent memory is inspectable, exportable, and clearable.
+11. MiniQMT/QMT live execution adapter exists behind default-disabled live mode.
+12. Broker readiness, risk checks, order preview, approval, submission, reconciliation, and kill switch are auditable.
+13. Reporting desk can produce daily and weekly CEO briefs from current evidence.
+14. Web UI supports conversation, action cards, approval queue, evidence deep links, and desk drill-down.
+15. Tests verify action policies, evidence resolution, live execution boundaries, Web rendering, API contracts, and CLI JSON contracts.
+16. Docs/specs/wiki/acceptance matrix stay aligned with implementation.
 
 ## 6. Phase Roadmap
 

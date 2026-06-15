@@ -229,6 +229,8 @@ Handoffs must be recorded as ledger events, not hidden inside a conversational p
 ## 11. Acceptance Criteria
 
 - Each desk has a registry entry with mandate and tool permissions.
+- Every desk-declared fixed tool exists in `AgentToolRegistry` with matching desk scope.
+- Common CEO intents route to concrete safe tools where the deterministic contract is known, including data source registry diff, strategy competition, backtest dry-run, test design, and docs check.
 - Desk responses include evidence references and structured blockers.
 - A desk cannot invoke a tool outside its allowed scope.
 - A desk cannot execute write/paper/live actions without approval policy.

@@ -959,11 +959,10 @@ def test_agent_live_reconciliation_runner_scans_submitted_live_orders(tmp_path, 
     assert reconciliation["action_count"] == 2
     assert reconciliation["reconciled_count"] == 1
     assert reconciliation["skipped_count"] == 1
-    assert reconciliation["items"][0]["action_id"] == proposal["action"]["action_id"]
-    assert reconciliation["items"][0]["broker_reconciliation"]["status"] == "matched"
-    assert reconciliation["items"][1]["action_id"] == pending.action_id
-    assert reconciliation["items"][1]["status"] == "skipped"
-    assert reconciliation["items"][1]["reason"] == "no_submitted_live_order"
+    items_by_action = {item["action_id"]: item for item in reconciliation["items"]}
+    assert items_by_action[proposal["action"]["action_id"]]["broker_reconciliation"]["status"] == "matched"
+    assert items_by_action[pending.action_id]["status"] == "skipped"
+    assert items_by_action[pending.action_id]["reason"] == "no_submitted_live_order"
     assert reconciliation["evidence"]["label"] == "Live scheduled reconciliation"
     assert Path(reconciliation["path"]).exists()
     reset_datahub()
@@ -2315,6 +2314,83 @@ def test_agent_runtime_records_run_and_tool_registry_uses_fixed_command_arrays(t
     assert Path(loaded["command"][0]).name == "astroq"
     assert loaded["command"][1:] == ["health", "--json"]
     assert runtime.get_session(session.session_id)["runs"][0]["run_id"] == run.run_id
+    reset_datahub()
+
+
+def test_agent_tool_registry_covers_all_declared_desk_tools():
+    from agent_os.desks import list_desks
+    from agent_os.tools import AgentToolRegistry
+
+    registry = AgentToolRegistry()
+
+    for desk in list_desks():
+        for tool_id in desk["allowed_tools"]:
+            tool = registry.get(tool_id)
+            assert tool is not None, f"{desk['desk_id']} declares missing tool {tool_id}"
+            assert desk["desk_id"] in tool.desk_scopes
+
+    sources_command = registry.command_for("astroq.data.sources")
+    diff_command = registry.command_for("astroq.data.sources.diff_registry")
+    repair_dry_run = registry.command_for("astroq.data.repair.dry_run", {"table": "stock_limit_list"})
+    compete_command = registry.command_for("astroq.strategy.compete")
+    backtest_dry_run = registry.command_for("astroq.backtest.run.dry_run")
+    test_design_command = registry.command_for("astroq.test.design")
+    docs_command = registry.command_for("astroq.docs.check")
+
+    assert sources_command[1:] == ["data", "sources", "--json"]
+    assert diff_command[1:] == ["data", "sources", "diff-registry", "--json"]
+    assert repair_dry_run[1:] == ["data", "repair", "stock_limit_list", "--dry-run", "--json"]
+    assert compete_command[1:] == ["strategy", "compete", "--json"]
+    assert backtest_dry_run[1:] == ["backtest", "run", "--dry-run", "--json"]
+    assert test_design_command[1:] == ["test", "design", "--json"]
+    assert docs_command[1:] == ["docs", "check", "--json"]
+
+
+def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Desk intent routing")
+
+    data_result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="data",
+        content="检查数据源能力和项目 registry 有哪些差异",
+    )
+    research_result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="research",
+        content="让12个策略公平竞争，看 OOS 和 IC/ICIR 证据",
+    )
+    engineering_result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="engineering",
+        content="测试设计是否合理，帮我看 test design 风险",
+    )
+    docs_result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="engineering",
+        content="文档里有没有旧描述，跑一次 docs check",
+    )
+
+    data_action = runtime.get_action(data_result["desk_response"].proposed_actions[0])
+    research_action = runtime.get_action(research_result["desk_response"].proposed_actions[0])
+    engineering_action = runtime.get_action(engineering_result["desk_response"].proposed_actions[0])
+    docs_action = runtime.get_action(docs_result["desk_response"].proposed_actions[0])
+
+    assert data_action["parameters"]["tool_id"] == "astroq.data.sources.diff_registry"
+    assert research_action["parameters"]["tool_id"] == "astroq.strategy.compete"
+    assert engineering_action["parameters"]["tool_id"] == "astroq.test.design"
+    assert docs_action["parameters"]["tool_id"] == "astroq.docs.check"
+    assert "source capability" in data_result["desk_response"].answer.lower()
+    assert "IC/ICIR" in research_result["desk_response"].answer
+    assert "test design" in engineering_result["desk_response"].answer.lower()
+    assert "docs check" in docs_result["desk_response"].answer.lower()
     reset_datahub()
 
 

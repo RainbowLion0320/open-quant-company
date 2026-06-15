@@ -90,9 +90,88 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
     },
 }
 
+_INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
+    "data": [
+        (
+            ("数据源", "source", "capability", "registry", "能力", "diff", "差异"),
+            {
+                "answer": "Data Desk 已识别到数据源能力治理问题。下一步应对比 Source Capability Registry 与项目 data_registry，确认是未接入、权限缺失还是字段/频率口径不一致。",
+                "evidence_label": "Data source capability matrix",
+                "evidence_uri": "/datahub?tab=sources",
+                "evidence_summary": "Open data source capability matrix and registry diff.",
+                "action_type": "data_sources_diff",
+                "tool_id": "astroq.data.sources.diff_registry",
+                "risk_level": "read_only",
+                "action_summary": "Compare source capability registry with project data_registry.",
+                "expected_effect": "Records capability-vs-registry gaps without downloading data.",
+            },
+        ),
+    ],
+    "research": [
+        (
+            ("竞争", "compete", "competition", "公平", "12", "oos", "ic/icir", "icir"),
+            {
+                "answer": "Research Desk 已识别到策略公平竞争问题。下一步应读取统一 strategy competition evidence，检查 OOS、IC/ICIR、样本数和阻断原因。",
+                "evidence_label": "Strategy competition evidence",
+                "evidence_uri": "/strategy-lab",
+                "evidence_summary": "Open strategy competition and evidence views.",
+                "action_type": "strategy_competition",
+                "tool_id": "astroq.strategy.compete",
+                "risk_level": "read_only",
+                "action_summary": "Read fair strategy competition evidence.",
+                "expected_effect": "Records current strategy competition evidence without changing strategy state.",
+            },
+        ),
+        (
+            ("回测", "backtest", "dry-run"),
+            {
+                "answer": "Research Desk 已识别到回测请求。下一步先创建 backtest dry-run action，确认命令、策略范围和写入影响，再决定是否进入正式回测。",
+                "evidence_label": "Backtest evidence",
+                "evidence_uri": "/research",
+                "evidence_summary": "Open research and backtest evidence views.",
+                "action_type": "backtest_dry_run",
+                "tool_id": "astroq.backtest.run.dry_run",
+                "risk_level": "dry_run",
+                "action_summary": "Run backtest dry-run plan.",
+                "expected_effect": "Produces a backtest dry-run plan without official evidence writes.",
+            },
+        ),
+    ],
+    "engineering": [
+        (
+            ("文档", "docs", "doc", "旧描述", "stale"),
+            {
+                "answer": "Engineering Desk 已识别到文档一致性问题。下一步应运行 docs check，定位陈旧设计词和文档治理风险；Web runtime 仍不直接改仓库。",
+                "evidence_label": "Documentation hygiene",
+                "evidence_uri": "/system?tab=tests",
+                "evidence_summary": "Open system quality views and documentation hygiene evidence.",
+                "action_type": "docs_check",
+                "tool_id": "astroq.docs.check",
+                "risk_level": "read_only",
+                "action_summary": "Run documentation hygiene check.",
+                "expected_effect": "Records documentation stale phrase findings without editing files.",
+            },
+        ),
+        (
+            ("测试设计", "test design", "test", "测试", "fixture", "mock"),
+            {
+                "answer": "Engineering Desk 已识别到测试设计审查问题。下一步应运行 test design intelligence，检查测试风险、目标关联、fixture/mock 和断言强度。",
+                "evidence_label": "Test design intelligence",
+                "evidence_uri": "/system?tab=tests",
+                "evidence_summary": "Open test design intelligence diagnostics.",
+                "action_type": "test_design",
+                "tool_id": "astroq.test.design",
+                "risk_level": "read_only",
+                "action_summary": "Generate or read test design diagnostics.",
+                "expected_effect": "Records test design diagnostics without changing source files.",
+            },
+        ),
+    ],
+}
+
 
 def build_desk_workflow_plan(*, desk: str, content: str) -> DeskWorkflowPlan:
-    profile = _DESK_PROFILES.get(desk)
+    profile = _profile_for(desk, content)
     if profile is None:
         raise ValueError(f"Unknown desk workflow: {desk}")
     return DeskWorkflowPlan(
@@ -109,6 +188,14 @@ def build_desk_workflow_plan(*, desk: str, content: str) -> DeskWorkflowPlan:
         expected_effect=profile["expected_effect"],
         handoffs=_handoffs_for(desk, content),
     )
+
+
+def _profile_for(desk: str, content: str) -> dict[str, str] | None:
+    normalized = content.lower()
+    for triggers, profile in _INTENT_PROFILES.get(desk, []):
+        if any(trigger in normalized for trigger in triggers):
+            return profile
+    return _DESK_PROFILES.get(desk)
 
 
 def _confidence_for(desk: str) -> float:
