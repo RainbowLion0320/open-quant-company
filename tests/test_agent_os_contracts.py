@@ -309,6 +309,89 @@ def test_engineering_work_orders_are_auditable_runtime_cli_api_contracts(tmp_pat
     reset_datahub()
 
 
+def test_engineering_code_request_creates_work_order_and_safe_diagnostics(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Engineering bug triage", default_desk="engineering")
+
+    result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="engineering",
+        content=(
+            "agent_os/runtime.py 这里像有个 bug，请开一个工单给 Codex，"
+            "不要在 Web runtime 里直接改代码，验证 tests/test_agent_os_contracts.py"
+        ),
+    )
+    response = result["desk_response"]
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+    work_orders = runtime.list_work_orders(session.session_id)["work_orders"]
+
+    assert len(work_orders) == 1
+    work_order = work_orders[0]
+    assert work_order["status"] == "open"
+    assert work_order["desk"] == "engineering"
+    assert "agent_os/runtime.py" in work_order["affected_files"]
+    assert "tests/test_agent_os_contracts.py" in work_order["affected_files"]
+    assert ".venv/bin/python -m pytest tests/test_agent_os_contracts.py -q" in work_order["suggested_verification"]
+    assert work_order["evidence_refs"]
+    assert set(work_order["evidence_refs"]).issubset(set(response.evidence_refs))
+    assert {action["parameters"]["tool_id"] for action in actions} == {
+        "astroq.architecture.ast",
+        "astroq.test.design",
+    }
+    assert all(action["risk_level"] == "read_only" for action in actions)
+    assert all(action["status"] == "proposed" for action in actions)
+    assert "工单" in response.answer or "work order" in response.answer.lower()
+    assert runtime.memory_snapshot()["summary"]["work_order_count"] == 1
+    reset_datahub()
+
+
+def test_safe_workflow_runs_engineering_work_order_diagnostics(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Engineering safe workflow", default_desk="engineering")
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        desk="engineering",
+        content="请给 web/frontend/src/views/CeoOffice.vue 的 UI 问题开工单，验证 web/frontend/src/views/CeoOffice.vue",
+    )
+
+    result = runtime.run_session_read_only_actions(session.session_id, runner=fake_run)
+    work_orders = runtime.list_work_orders(session.session_id)["work_orders"]
+
+    assert result["status"] == "ready"
+    assert result["run_count"] == 2
+    assert result["skipped_count"] == 0
+    assert {run["action_id"] for run in result["runs"]} == set(routed["desk_response"].proposed_actions)
+    assert {tuple(command[1:]) for command in calls} == {
+        ("architecture", "ast", "--json"),
+        ("test", "design", "--json"),
+    }
+    assert len(work_orders) == 1
+    assert work_orders[0]["status"] == "open"
+    assert "web/frontend/src/views/CeoOffice.vue" in work_orders[0]["affected_files"]
+    assert "cd web/frontend && npm run typecheck" in work_orders[0]["suggested_verification"]
+    reset_datahub()
+
+
 def test_agent_live_readiness_defaults_disabled_and_never_falls_back_to_paper(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

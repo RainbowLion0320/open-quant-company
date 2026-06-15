@@ -25,6 +25,15 @@ class WorkflowActionSpec:
 
 
 @dataclass(frozen=True)
+class WorkflowWorkOrderSpec:
+    title: str
+    summary: str
+    impact: str
+    affected_files: list[str]
+    suggested_verification: list[str]
+
+
+@dataclass(frozen=True)
 class DeskWorkflowPlan:
     desk: str
     answer: str
@@ -32,6 +41,7 @@ class DeskWorkflowPlan:
     actions: list[WorkflowActionSpec]
     blockers: list[str] = field(default_factory=list)
     handoffs: list[dict[str, Any]] = field(default_factory=list)
+    work_orders: list[WorkflowWorkOrderSpec] = field(default_factory=list)
 
 
 _DESK_PROFILES: dict[str, dict[str, str]] = {
@@ -196,6 +206,20 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
     ],
     "engineering": [
         (
+            ("bug", "修", "修复", "改代码", "实现", "工单", "codex", "代码"),
+            {
+                "answer": "Engineering Desk 已识别到代码/bug 请求。Web runtime 不会直接改仓库；下一步会创建工程工单，并附带 AST 与测试设计诊断动作，交给 Codex、Claude 或人工维护者处理。",
+                "evidence_label": "Engineering work-order triage",
+                "evidence_uri": "/system?tab=ast",
+                "evidence_summary": "Open engineering diagnostics and work-order context.",
+                "action_type": "engineering_work_order_triage",
+                "tool_id": "astroq.architecture.ast",
+                "risk_level": "read_only",
+                "action_summary": "Run engineering diagnostics for a code-change work order.",
+                "expected_effect": "Creates diagnostics evidence and a work order without editing repository files.",
+            },
+        ),
+        (
             ("文档", "docs", "doc", "旧描述", "stale"),
             {
                 "answer": "Engineering Desk 已识别到文档一致性问题。下一步应运行 docs check，定位陈旧设计词和文档治理风险；Web runtime 仍不直接改仓库。",
@@ -239,6 +263,7 @@ def build_desk_workflow_plan(*, desk: str, content: str) -> DeskWorkflowPlan:
         confidence=_confidence_for(desk),
         actions=actions,
         handoffs=_handoffs_for(desk, content),
+        work_orders=_work_orders_for(desk, content),
     )
 
 
@@ -327,6 +352,35 @@ def _actions_for_profile(*, desk: str, profile: dict[str, str], normalized_conte
                     label="Lifecycle readiness",
                     uri="/system?tab=lifecycle",
                     summary="Open lifecycle readiness and blocker details.",
+                ),
+            ),
+        ]
+    if desk == "engineering" and _is_engineering_code_request(normalized_content):
+        return [
+            WorkflowActionSpec(
+                desk="engineering",
+                action_type="architecture_ast",
+                tool_id="astroq.architecture.ast",
+                risk_level="read_only",
+                summary="Run AST diagnostics for engineering work-order triage.",
+                expected_effect="Records duplicate implementation and architecture risk evidence without editing repository files.",
+                evidence=WorkflowEvidenceSpec(
+                    label="AST Intelligence",
+                    uri="/system?tab=ast",
+                    summary="Open AST duplicate implementation diagnostics.",
+                ),
+            ),
+            WorkflowActionSpec(
+                desk="engineering",
+                action_type="test_design",
+                tool_id="astroq.test.design",
+                risk_level="read_only",
+                summary="Run test design diagnostics for engineering work-order triage.",
+                expected_effect="Records test design risk evidence without editing repository files.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Test design intelligence",
+                    uri="/system?tab=tests",
+                    summary="Open test design intelligence diagnostics.",
                 ),
             ),
         ]
@@ -461,6 +515,23 @@ def _handoffs_for(desk: str, content: str) -> list[dict[str, Any]]:
     return []
 
 
+def _work_orders_for(desk: str, content: str) -> list[WorkflowWorkOrderSpec]:
+    normalized = content.lower()
+    if desk != "engineering" or not _is_engineering_code_request(normalized):
+        return []
+    affected_files = _extract_file_paths(content)
+    subject = affected_files[0] if affected_files else "engineering request"
+    return [
+        WorkflowWorkOrderSpec(
+            title=f"Investigate {subject}",
+            summary="Engineering Desk captured a code or bug request for an external coding agent or human maintainer.",
+            impact="Keeps repository edits outside the Web runtime while preserving a traceable CEO request and diagnostic evidence.",
+            affected_files=affected_files,
+            suggested_verification=_suggested_verification_for_paths(affected_files),
+        )
+    ]
+
+
 def _is_daily_brief_request(normalized: str) -> bool:
     tokens = ("今天", "日常", "简报", "daily", "brief", "should do", "what should")
     return any(token in normalized for token in tokens)
@@ -480,6 +551,11 @@ def _is_strategy_blocker_request(normalized: str) -> bool:
     strategy_tokens = ("策略", "strategy")
     blocker_tokens = ("阻断", "blocked", "blocker", "missing", "缺数据", "coverage", "lifecycle")
     return any(token in normalized for token in strategy_tokens) and any(token in normalized for token in blocker_tokens)
+
+
+def _is_engineering_code_request(normalized: str) -> bool:
+    code_tokens = ("bug", "修", "修复", "改代码", "实现", "工单", "codex", "代码")
+    return any(token in normalized for token in code_tokens)
 
 
 def _extract_repair_table(normalized: str) -> str | None:
@@ -502,3 +578,33 @@ def _extract_repair_table(normalized: str) -> str | None:
         if candidate not in ignored:
             return candidate
     return None
+
+
+def _extract_file_paths(content: str) -> list[str]:
+    pattern = re.compile(
+        r"(?:(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+\.(?:py|ts|tsx|js|mjs|vue|css|md|yaml|yml|json|toml)|[A-Za-z0-9_.-]+\.(?:py|ts|tsx|js|mjs|vue|css|md|yaml|yml|json|toml))"
+    )
+    paths: list[str] = []
+    for match in pattern.finditer(content):
+        path = match.group(0).strip("`'\"，。,. ")
+        if path and path not in paths:
+            paths.append(path)
+    return paths
+
+
+def _suggested_verification_for_paths(paths: list[str]) -> list[str]:
+    commands: list[str] = []
+    for path in paths:
+        if path.startswith("tests/") and path.endswith(".py"):
+            commands.append(f".venv/bin/python -m pytest {path} -q")
+    if any(path.endswith(".py") for path in paths):
+        commands.append(".venv/bin/ruff check agent_os tests --select E9,F63,F7,F82")
+    if any(path.endswith((".ts", ".tsx", ".vue", ".css")) or path.startswith("web/frontend/") for path in paths):
+        commands.append("cd web/frontend && npm run typecheck")
+    if not commands:
+        commands.append(".venv/bin/python -m pytest tests/test_agent_os_contracts.py -q")
+    deduped: list[str] = []
+    for command in commands:
+        if command not in deduped:
+            deduped.append(command)
+    return deduped

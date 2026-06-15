@@ -166,6 +166,10 @@ Hard rules:
 - Engineering work orders are auditable through runtime, CLI, API, memory snapshot, CEO Office, and engineering digest reports, and their lifecycle can move through `open`, `in_progress`, `resolved`, and `canceled`.
 - Codex, Claude, or a human handles code changes outside the Web runtime.
 
+Current foundation:
+
+- A code or bug CEO request creates AST/test-design diagnostic actions and an auditable Engineering work order instead of editing repository files.
+
 ## 8. Reporting Desk
 
 Mandate:

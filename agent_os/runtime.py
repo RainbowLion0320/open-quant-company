@@ -2197,6 +2197,16 @@ class AgentRuntime:
             )
             evidence_refs.append(evidence.evidence_id)
             proposed_actions.append(action.action_id)
+        for work_order_spec in plan.work_orders:
+            self.create_work_order(
+                session_id=session_id,
+                title=work_order_spec.title,
+                summary=work_order_spec.summary,
+                impact=work_order_spec.impact,
+                affected_files=work_order_spec.affected_files,
+                suggested_verification=work_order_spec.suggested_verification,
+                evidence_refs=evidence_refs,
+            )
         return self.respond_as_desk(
             session_id=session_id,
             source_message_id=source_message_id,
