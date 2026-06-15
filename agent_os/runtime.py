@@ -272,7 +272,7 @@ class AgentRuntime:
         return {"message": message, "desk_response": desk_response}
 
     def preview_workflow_plan(self, *, desk: str, content: str) -> dict[str, Any]:
-        plan = build_desk_workflow_plan(desk=desk, content=content)
+        plan = build_desk_workflow_plan(desk=desk, content=content, artifact_context=collect_report_artifact_context())
         actions: list[dict[str, Any]] = []
         for action_spec in plan.actions:
             approval_required = approval_required_for_risk(action_spec.risk_level)
@@ -2444,7 +2444,7 @@ class AgentRuntime:
         )
 
     def _route_ceo_message(self, *, session_id: str, source_message_id: str, desk: str, content: str) -> DeskResponse:
-        plan = build_desk_workflow_plan(desk=desk, content=content)
+        plan = build_desk_workflow_plan(desk=desk, content=content, artifact_context=collect_report_artifact_context())
         evidence_refs: list[str] = []
         proposed_actions: list[str] = []
         for action_spec in plan.actions:

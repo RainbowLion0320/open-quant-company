@@ -3292,6 +3292,90 @@ def test_agent_dynamic_workflow_plan_orchestrates_mixed_ceo_request(tmp_path, mo
     reset_datahub()
 
 
+def test_agent_workflow_plan_uses_artifact_context_for_broad_ceo_priority_request(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import get_datahub, reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 2, "ready": 4},
+            "blockers": [{"dimension": "macro_gdp", "reason": "source_not_updated"}],
+        },
+        "data-sources/latest.json": {
+            "summary": {
+                "source_count": 8,
+                "capability_count": 300,
+                "project_integrated_count": 42,
+                "capability_unmapped_count": 21,
+            },
+        },
+        "tournaments/strategy_competition_latest.json": {
+            "summary": {"total": 12, "blocked": 9, "insufficient_alpha_evidence": 7},
+        },
+        "architecture/ast/latest.json": {
+            "summary": {"issue_count": 2, "severity_counts": {"P1": 1, "P2": 1}},
+        },
+        "tests/design/latest.json": {
+            "summary": {"case_count": 180, "risk_count": 14, "design_risk_count": 3},
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Artifact-aware CEO priorities", default_desk="reporting")
+    before_summary = runtime.memory_snapshot()["summary"]
+    content = "今天公司应该先处理什么？根据当前证据给 Data Research Risk Engineering 安排优先级"
+
+    preview = runtime.preview_workflow_plan(desk="reporting", content=content)
+    after_summary = runtime.memory_snapshot()["summary"]
+    routed = runtime.submit_ceo_message(session.session_id, desk="reporting", content=content)
+    response = routed["desk_response"]
+    response_tools = [
+        runtime.get_action(action_id)["parameters"]["tool_id"]
+        for action_id in response.proposed_actions
+    ]
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+
+    assert before_summary == after_summary
+    assert preview["planning_mode"] == "artifact_aware"
+    assert preview["side_effects"]["ledger_writes"] is False
+    assert [action["tool_id"] for action in preview["actions"]] == [
+        "astroq.data.sources.diff_registry",
+        "astroq.lifecycle.check",
+        "astroq.strategy.compete",
+        "astroq.architecture.ast",
+        "astroq.test.design",
+    ]
+    assert response_tools == [action["tool_id"] for action in preview["actions"]]
+    assert {handoff["target_desk"] for handoff in preview["handoffs"]} == {
+        "data",
+        "risk",
+        "research",
+        "engineering",
+    }
+    assert reasoning_by_kind["intent_match"]["planning_mode"] == "artifact_aware"
+    assert reasoning_by_kind["artifact_context"]["root_causes"] == [
+        "lifecycle_blocker",
+        "data_source_gap",
+        "strategy_evidence_blocked",
+        "engineering_quality_risk",
+        "test_design_risk",
+    ]
+    assert reasoning_by_kind["artifact_context"]["missing_count"] >= 1
+    assert "artifact" in preview["answer"].lower() or "证据" in preview["answer"]
+    reset_datahub()
+
+
 def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

@@ -253,7 +253,16 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
 }
 
 
-def build_desk_workflow_plan(*, desk: str, content: str) -> DeskWorkflowPlan:
+def build_desk_workflow_plan(
+    *,
+    desk: str,
+    content: str,
+    artifact_context: dict[str, Any] | None = None,
+) -> DeskWorkflowPlan:
+    artifact_plan = _artifact_aware_plan(desk=desk, content=content, artifact_context=artifact_context or {})
+    if artifact_plan is not None:
+        return artifact_plan
+
     dynamic_plan = _dynamic_multi_intent_plan(desk=desk, content=content)
     if dynamic_plan is not None:
         return dynamic_plan
@@ -282,6 +291,137 @@ def build_desk_workflow_plan(*, desk: str, content: str) -> DeskWorkflowPlan:
         handoffs=handoffs,
         work_orders=work_orders,
     )
+
+
+def _artifact_aware_plan(
+    *,
+    desk: str,
+    content: str,
+    artifact_context: dict[str, Any],
+) -> DeskWorkflowPlan | None:
+    if desk != "reporting" or not _is_artifact_priority_request(content.lower()):
+        return None
+    root_causes = _artifact_root_causes(artifact_context)
+    if not root_causes:
+        return None
+    actions = _artifact_actions_for_causes(root_causes)
+    if len(actions) < 2:
+        return None
+
+    target_desks = _ordered_unique([action.desk for action in actions])
+    handoffs = [
+        {
+            "target_desk": target_desk,
+            "reason": f"Artifact-aware CEO priority plan needs {target_desk.title()} Desk evidence.",
+        }
+        for target_desk in target_desks
+    ]
+    reasoning = _reasoning_for_plan(
+        source_desk=desk,
+        planning_mode="artifact_aware",
+        actions=actions,
+        handoffs=handoffs,
+        work_orders=[],
+    )
+    reasoning.append(_artifact_context_reasoning(artifact_context=artifact_context, root_causes=root_causes))
+    return DeskWorkflowPlan(
+        desk=desk,
+        answer=(
+            "Reporting Desk 已根据当前本地 artifact evidence 生成 artifact-aware / 证据感知优先级计划："
+            "先处理数据源、生命周期、策略证据和工程质量链路，再汇总给 CEO。"
+        ),
+        confidence=0.78,
+        actions=actions,
+        planning_mode="artifact_aware",
+        reasoning=reasoning,
+        handoffs=handoffs,
+    )
+
+
+def _artifact_actions_for_causes(root_causes: list[str]) -> list[WorkflowActionSpec]:
+    actions: list[WorkflowActionSpec] = []
+    cause_set = set(root_causes)
+    if "data_source_gap" in cause_set:
+        actions.append(
+            WorkflowActionSpec(
+                desk="data",
+                action_type="data_sources_diff",
+                tool_id="astroq.data.sources.diff_registry",
+                risk_level="read_only",
+                summary="Review source capability gaps surfaced by local report artifacts.",
+                expected_effect="Records capability-vs-registry gaps without downloading data.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Data source capability matrix",
+                    uri="/datahub?tab=sources",
+                    summary="Open data source capability matrix and registry diff.",
+                ),
+            )
+        )
+    if "lifecycle_blocker" in cause_set:
+        actions.append(
+            WorkflowActionSpec(
+                desk="risk",
+                action_type="lifecycle_check",
+                tool_id="astroq.lifecycle.check",
+                risk_level="read_only",
+                summary="Review lifecycle blockers surfaced by local report artifacts.",
+                expected_effect="Records lifecycle readiness and blocker evidence without changing system state.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Lifecycle readiness",
+                    uri="/system?tab=lifecycle",
+                    summary="Open lifecycle readiness and blocker details.",
+                ),
+            )
+        )
+    if "strategy_evidence_blocked" in cause_set:
+        actions.append(
+            WorkflowActionSpec(
+                desk="research",
+                action_type="strategy_competition",
+                tool_id="astroq.strategy.compete",
+                risk_level="read_only",
+                summary="Review blocked strategy evidence surfaced by local report artifacts.",
+                expected_effect="Records OOS, IC/ICIR, sample-size, and strategy blocker evidence.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Strategy competition evidence",
+                    uri="/strategy-lab",
+                    summary="Open strategy competition and promotion evidence views.",
+                ),
+            )
+        )
+    if "engineering_quality_risk" in cause_set:
+        actions.append(
+            WorkflowActionSpec(
+                desk="engineering",
+                action_type="architecture_ast",
+                tool_id="astroq.architecture.ast",
+                risk_level="read_only",
+                summary="Review architecture risks surfaced by local report artifacts.",
+                expected_effect="Records duplicate implementation and architecture risk evidence without editing source files.",
+                evidence=WorkflowEvidenceSpec(
+                    label="AST Intelligence",
+                    uri="/system?tab=ast",
+                    summary="Open AST duplicate implementation diagnostics.",
+                ),
+            )
+        )
+    if "test_design_risk" in cause_set:
+        actions.append(
+            WorkflowActionSpec(
+                desk="engineering",
+                action_type="test_design",
+                tool_id="astroq.test.design",
+                risk_level="read_only",
+                summary="Review test design risks surfaced by local report artifacts.",
+                expected_effect="Records test design risk evidence without changing source files.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Test design intelligence",
+                    uri="/system?tab=tests",
+                    summary="Open test design intelligence diagnostics.",
+                ),
+            )
+        )
+    return _dedupe_actions(actions)
 
 
 def _dynamic_multi_intent_plan(*, desk: str, content: str) -> DeskWorkflowPlan | None:
@@ -758,6 +898,43 @@ def _is_strategy_blocker_request(normalized: str) -> bool:
 def _is_engineering_code_request(normalized: str) -> bool:
     code_tokens = ("bug", "修", "修复", "改代码", "实现", "工单", "codex", "代码")
     return any(token in normalized for token in code_tokens)
+
+
+def _is_artifact_priority_request(normalized: str) -> bool:
+    broad_tokens = ("今天", "today", "what should", "应该", "先处理", "优先", "priority", "prioritize", "安排")
+    evidence_tokens = ("证据", "artifact", "artifacts", "当前", "公司", "desk", "全局", "system")
+    report_tokens = ("简报", "brief", "报告", "report")
+    return (
+        any(token in normalized for token in broad_tokens)
+        and any(token in normalized for token in evidence_tokens)
+        and not any(token in normalized for token in report_tokens)
+    )
+
+
+def _artifact_root_causes(artifact_context: dict[str, Any]) -> list[str]:
+    synthesis = artifact_context.get("synthesis")
+    if not isinstance(synthesis, dict):
+        return []
+    causes: list[str] = []
+    for row in synthesis.get("root_causes", []) or []:
+        if not isinstance(row, dict):
+            continue
+        cause = str(row.get("cause") or "").strip()
+        if cause and cause not in causes:
+            causes.append(cause)
+    return causes
+
+
+def _artifact_context_reasoning(*, artifact_context: dict[str, Any], root_causes: list[str]) -> dict[str, Any]:
+    synthesis = artifact_context.get("synthesis") if isinstance(artifact_context.get("synthesis"), dict) else {}
+    return {
+        "kind": "artifact_context",
+        "status": str(synthesis.get("status") or "unknown"),
+        "available_count": int(artifact_context.get("available_count") or 0),
+        "missing_count": int(artifact_context.get("missing_count") or 0),
+        "invalid_count": int(artifact_context.get("invalid_count") or 0),
+        "root_causes": list(root_causes),
+    }
 
 
 def _mentions_data_source_gap(normalized: str) -> bool:

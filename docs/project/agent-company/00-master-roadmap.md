@@ -80,7 +80,7 @@ The 100% target includes all of the following. Partial implementation must not r
 4. Agent API endpoints under `/api/agent/*` expose sessions, messages, actions, approvals, evidence, and desk status.
 5. `astroq agent *` provides JSON-readable local automation.
 6. Desk agents are registered with explicit tool permissions and risk scopes.
-7. Desk-declared fixed tools are covered by the local tool registry, and deterministic routing can map common CEO intents plus bounded multi-intent CEO review requests to concrete safe tools such as data source registry diff, strategy competition, lifecycle checks, execution dry-run, test design, and docs check.
+7. Desk-declared fixed tools are covered by the local tool registry, and deterministic routing can map common CEO intents, bounded multi-intent CEO review requests, and artifact-aware priority requests to concrete safe tools such as data source registry diff, strategy competition, lifecycle checks, execution dry-run, AST/test-design diagnostics, and docs check.
 8. Agent actions use a common `AgentAction` contract and can be approved, rejected, expired, canceled, executed, or blocked.
 9. Evidence references resolve to existing Web pages, CLI commands, artifact paths, code locations, and report sections.
 10. Transparent memory is inspectable, exportable, and clearable.
@@ -171,6 +171,12 @@ Required desks:
 - Execution Desk
 - Engineering Desk
 - Reporting Desk
+
+Current foundation:
+
+- Common desk intents, bounded multi-intent CEO review requests, and broad CEO priority questions can be converted into fixed-registry safe actions without arbitrary shell command construction.
+- Artifact-aware priority planning reads only the fixed local report artifact context and maps current root causes to owner desks, including data source gaps, lifecycle blockers, strategy evidence blockers, AST risks, and test design risks.
+- Workflow previews and desk responses include structured reasoning rows for intent match, tool plan, safety, evidence plan, artifact context, and session context.
 
 ### Phase 4 - Evidence and Governance Closure
 
