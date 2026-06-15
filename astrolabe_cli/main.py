@@ -16,6 +16,9 @@ from astrolabe_cli.commands.agent import evidence as agent_evidence
 from astrolabe_cli.commands.agent import expire_actions as agent_expire_actions
 from astrolabe_cli.commands.agent import generate_report as agent_generate_report
 from astrolabe_cli.commands.agent import handoffs as agent_handoffs
+from astrolabe_cli.commands.agent import live_kill_switch_activate as agent_live_kill_switch_activate
+from astrolabe_cli.commands.agent import live_kill_switch_deactivate as agent_live_kill_switch_deactivate
+from astrolabe_cli.commands.agent import live_kill_switch_status as agent_live_kill_switch_status
 from astrolabe_cli.commands.agent import live_preview as agent_live_preview
 from astrolabe_cli.commands.agent import live_propose as agent_live_propose
 from astrolabe_cli.commands.agent import live_readiness as agent_live_readiness
@@ -306,6 +309,32 @@ def build_parser() -> argparse.ArgumentParser:
     agent_live_submit_cmd.add_argument("action_id")
     add_common_flags(agent_live_submit_cmd)
     agent_live_submit_cmd.set_defaults(handler=lambda args: agent_live_submit(args.action_id))
+    agent_live_kill_switch_cmd = agent_live_sub.add_parser("kill-switch", help="Inspect or change the live kill switch")
+    agent_live_kill_switch_sub = agent_live_kill_switch_cmd.add_subparsers(
+        dest="agent_live_kill_switch_command",
+        required=True,
+    )
+    agent_live_kill_switch_status_cmd = agent_live_kill_switch_sub.add_parser("status", help="Show live kill switch status")
+    add_common_flags(agent_live_kill_switch_status_cmd)
+    agent_live_kill_switch_status_cmd.set_defaults(handler=lambda args: agent_live_kill_switch_status())
+    agent_live_kill_switch_activate_cmd = agent_live_kill_switch_sub.add_parser(
+        "activate",
+        help="Activate the live kill switch and cancel queued live actions",
+    )
+    agent_live_kill_switch_activate_cmd.add_argument("--reason", default="")
+    add_common_flags(agent_live_kill_switch_activate_cmd)
+    agent_live_kill_switch_activate_cmd.set_defaults(
+        handler=lambda args: agent_live_kill_switch_activate(args.reason)
+    )
+    agent_live_kill_switch_deactivate_cmd = agent_live_kill_switch_sub.add_parser(
+        "deactivate",
+        help="Deactivate the live kill switch",
+    )
+    agent_live_kill_switch_deactivate_cmd.add_argument("--reason", default="")
+    add_common_flags(agent_live_kill_switch_deactivate_cmd)
+    agent_live_kill_switch_deactivate_cmd.set_defaults(
+        handler=lambda args: agent_live_kill_switch_deactivate(args.reason)
+    )
 
     agent_paper_cmd = agent_sub.add_parser("paper", help="Create approval-gated paper execution proposals")
     agent_paper_sub = agent_paper_cmd.add_subparsers(dest="agent_paper_command", required=True)

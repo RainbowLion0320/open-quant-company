@@ -559,6 +559,162 @@ def test_agent_live_order_submission_requires_approval_reruns_preview_and_reconc
     reset_datahub()
 
 
+def test_agent_live_kill_switch_cancels_queue_and_blocks_live_paths(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    class FakeLiveBroker:
+        def __init__(self):
+            self.preview_calls = 0
+            self.submit_calls = 0
+            self.reconcile_calls = 0
+
+        def preview_order(self, intent):
+            self.preview_calls += 1
+            normalized = {
+                "symbol": str(intent["symbol"]).upper(),
+                "side": intent["side"],
+                "quantity": int(intent["quantity"]),
+                "order_type": "limit",
+                "limit_price": float(intent["limit_price"]),
+                "strategy": intent.get("strategy", "manual"),
+                "reason": intent.get("reason", ""),
+                "evidence_refs": list(intent.get("evidence_refs", [])),
+                "risk_snapshot": dict(intent.get("risk_snapshot", {})),
+            }
+            return {
+                "status": "preview_ready",
+                "broker": "miniqmt",
+                "intent": normalized,
+                "approval_required": True,
+                "paper_fallback": False,
+                "submitted": False,
+                "risk_gate": {"passed": True, "blockers": [], "checks": [{"name": "fake_live_ready", "passed": True}]},
+                "health": {"mode": "live_ready", "paper_fallback": False},
+                "account_snapshot": {"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+            }
+
+        def submit_order(self, intent, approval_id):
+            self.submit_calls += 1
+            return {
+                "status": "submitted",
+                "broker_order_id": "LIVE_0002",
+                "broker_status": "accepted",
+                "submitted": True,
+                "ledger_id": approval_id,
+            }
+
+        def reconcile(self, ack):
+            self.reconcile_calls += 1
+            return {"status": "matched", "mismatches": [], "open_orders": []}
+
+    broker = FakeLiveBroker()
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Live kill switch", default_desk="execution")
+    intent = {
+        "symbol": "600000.SH",
+        "side": "buy",
+        "quantity": 100,
+        "order_type": "limit",
+        "limit_price": 10.0,
+        "strategy": "manual",
+        "reason": "kill switch coverage",
+        "evidence_refs": ["ev_demo"],
+        "risk_snapshot": {"tradable": True, "data_freshness_status": "fresh", "broker_account_consistent": True},
+    }
+    proposal = runtime.propose_live_order(session_id=session.session_id, intent=intent, broker=broker)
+
+    activated = runtime.activate_live_kill_switch(reason="CEO emergency stop")
+
+    assert proposal["status"] == "approval_required"
+    assert broker.preview_calls == 1
+    assert activated["status"] == "active"
+    assert activated["active"] is True
+    assert activated["reason"] == "CEO emergency stop"
+    assert activated["canceled_count"] == 1
+    assert activated["canceled_actions"][0]["action_id"] == proposal["action"]["action_id"]
+    assert runtime.get_action(proposal["action"]["action_id"])["status"] == "canceled"
+    assert Path(activated["artifact_path"]).exists()
+    assert activated["evidence"]["label"] == "Live kill switch"
+
+    blocked_proposal = runtime.propose_live_order(session_id=session.session_id, intent=intent, broker=broker)
+
+    assert blocked_proposal["status"] == "blocked"
+    assert blocked_proposal["action"] is None
+    assert blocked_proposal["preview"]["status"] == "blocked"
+    assert "live_kill_switch_active" in blocked_proposal["preview"]["risk_gate"]["blockers"]
+    assert broker.preview_calls == 1
+
+    manual_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="execution",
+        action_type="live_order",
+        risk_level="live_order",
+        summary="Approved action should still be blocked by kill switch",
+        parameters={"live_order_intent": intent, "live_order_preview": proposal["preview"]},
+        expected_effect="Would submit only if kill switch is inactive.",
+        evidence_refs=[],
+    )
+    runtime.approve_action(manual_action.action_id, decided_by="ceo")
+    blocked_submit = runtime.submit_live_order_action(manual_action.action_id, broker=broker)
+
+    assert blocked_submit["status"] == "blocked"
+    assert "live_kill_switch_active" in blocked_submit["run"]["stderr_summary"]
+    assert "live_kill_switch_active" in blocked_submit["preview"]["risk_gate"]["blockers"]
+    assert runtime.get_action(manual_action.action_id)["status"] == "blocked"
+    assert broker.preview_calls == 1
+    assert broker.submit_calls == 0
+    assert broker.reconcile_calls == 0
+
+    status = runtime.live_kill_switch_status()
+    assert status["active"] is True
+    assert status["reason"] == "CEO emergency stop"
+
+    deactivated = runtime.deactivate_live_kill_switch(reason="Incident resolved")
+    assert deactivated["status"] == "inactive"
+    assert runtime.live_kill_switch_status()["active"] is False
+    reset_datahub()
+
+
+def test_agent_live_kill_switch_invalid_state_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    state_path = Path(runtime.live_kill_switch_status()["state_path"])
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text("{broken-json", encoding="utf-8")
+
+    status = runtime.live_kill_switch_status()
+    preview = runtime.preview_live_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "invalid kill switch state must not fail open",
+            "evidence_refs": ["ev_demo"],
+        }
+    )
+
+    assert status["status"] == "invalid"
+    assert status["active"] is True
+    assert status["read_error"] == "invalid_live_kill_switch_state"
+    assert preview["status"] == "blocked"
+    assert "live_kill_switch_active" in preview["risk_gate"]["blockers"]
+    reset_datahub()
+
+
 def test_agent_live_order_proposal_and_submit_cli_api_fail_closed_by_default(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
@@ -673,6 +829,41 @@ def test_agent_live_order_proposal_and_submit_cli_api_fail_closed_by_default(tmp
     assert api_submit_res.status_code == 200
     assert api_submit_res.json()["submission"]["status"] == "blocked"
     assert api_submit_res.json()["submission"]["reconciliation"]["paper_fallback"] is False
+    reset_datahub()
+
+
+def test_agent_live_kill_switch_cli_and_api(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    cli_status_code = run_cli(["agent", "live", "kill-switch", "status", "--json"])
+    cli_status = json.loads(capsys.readouterr().out)
+    cli_activate_code = run_cli(
+        ["agent", "live", "kill-switch", "activate", "--reason", "manual test stop", "--json"]
+    )
+    cli_activated = json.loads(capsys.readouterr().out)
+    api_status_res = TestClient(create_app()).get("/api/agent/live/kill-switch")
+    api_deactivate_res = TestClient(create_app()).post(
+        "/api/agent/live/kill-switch/deactivate",
+        json={"reason": "manual test resolved"},
+    )
+
+    assert cli_status_code == 0
+    assert cli_status["data"]["kill_switch"]["active"] is False
+    assert cli_activate_code == 0
+    assert cli_activated["data"]["kill_switch"]["active"] is True
+    assert cli_activated["data"]["kill_switch"]["reason"] == "manual test stop"
+    assert api_status_res.status_code == 200
+    assert api_status_res.json()["kill_switch"]["active"] is True
+    assert api_deactivate_res.status_code == 200
+    assert api_deactivate_res.json()["kill_switch"]["active"] is False
+    assert api_deactivate_res.json()["kill_switch"]["reason"] == "manual test resolved"
     reset_datahub()
 
 

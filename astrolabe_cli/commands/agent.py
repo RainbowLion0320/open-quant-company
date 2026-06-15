@@ -387,6 +387,36 @@ def live_submit(action_id: str) -> CliResult:
     )
 
 
+def live_kill_switch_status() -> CliResult:
+    kill_switch = AgentRuntime().live_kill_switch_status()
+    return CliResult(
+        ok=True,
+        command="agent live kill-switch status",
+        message=f"Live kill switch: {kill_switch['status']}",
+        data={"kill_switch": kill_switch},
+    )
+
+
+def live_kill_switch_activate(reason: str) -> CliResult:
+    kill_switch = AgentRuntime().activate_live_kill_switch(reason=reason)
+    return CliResult(
+        ok=True,
+        command="agent live kill-switch activate",
+        message=f"Live kill switch activated; canceled {kill_switch['canceled_count']} action(s)",
+        data={"kill_switch": kill_switch},
+    )
+
+
+def live_kill_switch_deactivate(reason: str) -> CliResult:
+    kill_switch = AgentRuntime().deactivate_live_kill_switch(reason=reason)
+    return CliResult(
+        ok=True,
+        command="agent live kill-switch deactivate",
+        message="Live kill switch deactivated",
+        data={"kill_switch": kill_switch},
+    )
+
+
 def paper_propose(
     *,
     session_id: str,

@@ -578,10 +578,107 @@ class AgentRuntime:
         return list_desks()
 
     def live_readiness(self) -> dict[str, Any]:
-        return MiniQmtLiveBroker().health()
+        health = MiniQmtLiveBroker().health()
+        kill_switch = self.live_kill_switch_status()
+        if kill_switch["active"]:
+            blockers = list(health.get("blockers") or [])
+            if "live_kill_switch_active" not in blockers:
+                blockers.append("live_kill_switch_active")
+            health = {
+                **health,
+                "mode": "blocked",
+                "blockers": blockers,
+                "live_kill_switch": kill_switch,
+                "paper_fallback": False,
+            }
+        else:
+            health = {**health, "live_kill_switch": kill_switch}
+        return health
 
     def preview_live_order(self, intent: dict[str, Any]) -> dict[str, Any]:
+        kill_switch = self.live_kill_switch_status()
+        if kill_switch["active"]:
+            return self._live_kill_switch_block_preview(intent, kill_switch)
         return MiniQmtLiveBroker().preview_order(intent)
+
+    def live_kill_switch_status(self) -> dict[str, Any]:
+        return self._read_live_kill_switch_state()
+
+    def activate_live_kill_switch(self, *, reason: str = "", cancel_queued: bool = True) -> dict[str, Any]:
+        timestamp = _now()
+        clean_reason = reason.strip() or "Live kill switch activated"
+        state = {
+            "status": "active",
+            "active": True,
+            "reason": clean_reason,
+            "activated_at": timestamp,
+            "deactivated_at": "",
+            "updated_at": timestamp,
+            "paper_fallback": False,
+        }
+        self._write_live_kill_switch_state(state)
+        canceled_actions: list[dict[str, Any]] = []
+        if cancel_queued:
+            cancel_reason = f"Live kill switch active: {clean_reason}"
+            for action in self.ledger.list_actions():
+                refreshed = self._refresh_action_expiry(action)
+                if str(refreshed.get("action_type")) != "live_order":
+                    continue
+                if str(refreshed.get("status")) not in EXPIRABLE_ACTION_STATUSES:
+                    continue
+                try:
+                    canceled = self.cancel_action(str(refreshed["action_id"]), reason=cancel_reason)
+                except ValueError:
+                    continue
+                canceled_actions.append(canceled.to_dict())
+        event = {
+            **state,
+            "event": "activated",
+            "canceled_count": len(canceled_actions),
+            "canceled_actions": canceled_actions,
+        }
+        artifact_path = self._write_live_kill_switch_event_artifact(event)
+        evidence = self.create_evidence(
+            kind="artifact",
+            label="Live kill switch",
+            uri=str(artifact_path),
+            summary=f"Live kill switch activated; canceled {len(canceled_actions)} queued live action(s).",
+        )
+        return {
+            **event,
+            "artifact_path": str(artifact_path),
+            "state_path": str(self._live_kill_switch_state_path()),
+            "evidence": evidence.to_dict(),
+        }
+
+    def deactivate_live_kill_switch(self, *, reason: str = "") -> dict[str, Any]:
+        previous = self.live_kill_switch_status()
+        timestamp = _now()
+        clean_reason = reason.strip() or "Live kill switch deactivated"
+        state = {
+            "status": "inactive",
+            "active": False,
+            "reason": clean_reason,
+            "activated_at": str(previous.get("activated_at") or ""),
+            "deactivated_at": timestamp,
+            "updated_at": timestamp,
+            "paper_fallback": False,
+        }
+        self._write_live_kill_switch_state(state)
+        event = {**state, "event": "deactivated", "canceled_count": 0, "canceled_actions": []}
+        artifact_path = self._write_live_kill_switch_event_artifact(event)
+        evidence = self.create_evidence(
+            kind="artifact",
+            label="Live kill switch",
+            uri=str(artifact_path),
+            summary="Live kill switch deactivated.",
+        )
+        return {
+            **event,
+            "artifact_path": str(artifact_path),
+            "state_path": str(self._live_kill_switch_state_path()),
+            "evidence": evidence.to_dict(),
+        }
 
     def propose_live_order(
         self,
@@ -592,6 +689,14 @@ class AgentRuntime:
     ) -> dict[str, Any]:
         if not self.ledger.get_session(session_id):
             raise KeyError(f"Agent session not found: {session_id}")
+        kill_switch = self.live_kill_switch_status()
+        if kill_switch["active"]:
+            return {
+                "status": "blocked",
+                "preview": self._live_kill_switch_block_preview(intent, kill_switch),
+                "action": None,
+                "kill_switch": kill_switch,
+            }
         live_broker = broker or MiniQmtLiveBroker()
         preview = live_broker.preview_order(intent)
         if preview["status"] != "preview_ready":
@@ -658,8 +763,18 @@ class AgentRuntime:
                 update_action_status=False,
             )
 
-        live_broker = broker or MiniQmtLiveBroker()
         intent = dict((action.get("parameters") or {}).get("live_order_intent") or {})
+        kill_switch = self.live_kill_switch_status()
+        if kill_switch["active"]:
+            return self._record_live_submission_block(
+                action,
+                broker=None,
+                reason="live_kill_switch_active",
+                preview=self._live_kill_switch_block_preview(intent, kill_switch),
+                update_action_status=True,
+            )
+
+        live_broker = broker or MiniQmtLiveBroker()
         preview = live_broker.preview_order(intent)
         if preview.get("status") != "preview_ready":
             return self._record_live_submission_block(
@@ -1367,6 +1482,105 @@ class AgentRuntime:
         }
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
         return path
+
+    def _live_kill_switch_state_path(self) -> Path:
+        return get_datahub().artifact_dir("agent") / "live_kill_switch" / "state.json"
+
+    def _default_live_kill_switch_state(self) -> dict[str, Any]:
+        return {
+            "status": "inactive",
+            "active": False,
+            "reason": "",
+            "activated_at": "",
+            "deactivated_at": "",
+            "updated_at": "",
+            "paper_fallback": False,
+        }
+
+    def _read_live_kill_switch_state(self) -> dict[str, Any]:
+        path = self._live_kill_switch_state_path()
+        if not path.exists():
+            return {**self._default_live_kill_switch_state(), "state_path": str(path)}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {
+                **self._default_live_kill_switch_state(),
+                "status": "invalid",
+                "active": True,
+                "state_path": str(path),
+                "read_error": "invalid_live_kill_switch_state",
+            }
+        if not isinstance(payload, dict):
+            return {
+                **self._default_live_kill_switch_state(),
+                "status": "invalid",
+                "active": True,
+                "state_path": str(path),
+                "read_error": "invalid_live_kill_switch_state",
+            }
+        active = bool(payload.get("active"))
+        return {
+            **self._default_live_kill_switch_state(),
+            **payload,
+            "status": "active" if active else "inactive",
+            "active": active,
+            "paper_fallback": False,
+            "state_path": str(path),
+        }
+
+    def _write_live_kill_switch_state(self, state: dict[str, Any]) -> Path:
+        path = self._live_kill_switch_state_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            **self._default_live_kill_switch_state(),
+            **state,
+            "state_path": str(path),
+        }
+        payload["active"] = bool(payload.get("active"))
+        payload["status"] = "active" if payload["active"] else "inactive"
+        payload["paper_fallback"] = False
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return path
+
+    def _write_live_kill_switch_event_artifact(self, payload: dict[str, Any]) -> Path:
+        root = get_datahub().artifact_dir("agent") / "live_kill_switch" / "events"
+        root.mkdir(parents=True, exist_ok=True)
+        event = str(payload.get("event") or "event")
+        timestamp = str(payload.get("updated_at") or _now()).replace(":", "").replace("-", "").replace("T", "-").replace("Z", "")
+        path = root / f"{timestamp}-{event}-{uuid.uuid4().hex[:8]}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        return path
+
+    def _live_kill_switch_block_preview(self, intent: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+        reason = str(state.get("reason") or "Live kill switch active")
+        return {
+            "status": "blocked",
+            "broker": "miniqmt",
+            "intent": dict(intent or {}),
+            "approval_required": True,
+            "paper_fallback": False,
+            "submitted": False,
+            "risk_gate": {
+                "passed": False,
+                "blockers": ["live_kill_switch_active"],
+                "checks": [
+                    {
+                        "name": "live_kill_switch",
+                        "passed": False,
+                        "reason": reason,
+                    }
+                ],
+            },
+            "health": {
+                "mode": "blocked",
+                "paper_fallback": False,
+                "blockers": ["live_kill_switch_active"],
+                "live_kill_switch": dict(state),
+            },
+            "warnings": ["live_kill_switch_active"],
+            "created_at": _now(),
+        }
 
     def _record_live_submission_block(
         self,

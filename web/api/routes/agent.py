@@ -132,6 +132,23 @@ async def submit_agent_live_order(action_id: str) -> dict[str, Any]:
     return {"submission": submission}
 
 
+@router.get("/live/kill-switch")
+async def get_agent_live_kill_switch() -> dict[str, Any]:
+    return {"kill_switch": AgentRuntime().live_kill_switch_status()}
+
+
+@router.post("/live/kill-switch/activate")
+async def activate_agent_live_kill_switch(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    kill_switch = AgentRuntime().activate_live_kill_switch(reason=str((payload or {}).get("reason") or ""))
+    return {"kill_switch": kill_switch}
+
+
+@router.post("/live/kill-switch/deactivate")
+async def deactivate_agent_live_kill_switch(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    kill_switch = AgentRuntime().deactivate_live_kill_switch(reason=str((payload or {}).get("reason") or ""))
+    return {"kill_switch": kill_switch}
+
+
 @router.post("/paper/proposals")
 async def propose_agent_paper_order(payload: dict[str, Any]) -> dict[str, Any]:
     session_id = str(payload.get("session_id") or "")
