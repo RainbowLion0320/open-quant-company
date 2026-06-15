@@ -65,6 +65,30 @@ def update_session(
     )
 
 
+def run_session_read_only_actions(session_id: str) -> CliResult:
+    try:
+        workflow = AgentRuntime().run_session_read_only_actions(session_id)
+    except KeyError as exc:
+        return CliResult(
+            False,
+            "agent session run-readonly",
+            {"session_id": session_id},
+            "Agent session missing",
+            [str(exc)],
+        )
+    ok = workflow["status"] == "ready"
+    return CliResult(
+        ok=ok,
+        command="agent session run-readonly",
+        message=(
+            f"Ran {workflow['run_count']} read-only action(s), "
+            f"skipped {workflow['skipped_count']} action(s)"
+        ),
+        data={"workflow": workflow},
+        errors=[] if ok else [f"workflow_status:{workflow['status']}"],
+    )
+
+
 def add_message(session_id: str, desk: str, text: str) -> CliResult:
     try:
         routed = AgentRuntime().submit_ceo_message(session_id, desk=desk, content=text)

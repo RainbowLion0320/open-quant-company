@@ -610,6 +610,71 @@ class AgentRuntime:
                 started_at=started_at,
             )
 
+    def run_session_read_only_actions(
+        self,
+        session_id: str,
+        *,
+        runner: Any | None = None,
+        timeout_seconds: int = 120,
+        tool_registry: AgentToolRegistry | None = None,
+    ) -> dict[str, Any]:
+        if not self.ledger.get_session(session_id):
+            raise KeyError(f"Agent session not found: {session_id}")
+        actions = self.ledger.list_actions(session_id)
+        runs: list[dict[str, Any]] = []
+        skipped: list[dict[str, Any]] = []
+        for action in actions:
+            action_id = str(action["action_id"])
+            risk_level = str(action.get("risk_level") or "")
+            status = str(action.get("status") or "")
+            if risk_level != "read_only" or bool(action.get("approval_required")):
+                skipped.append(
+                    {
+                        "action_id": action_id,
+                        "desk": str(action.get("desk") or ""),
+                        "risk_level": risk_level,
+                        "status": status,
+                        "reason": "not_read_only",
+                    }
+                )
+                continue
+            if status != "proposed":
+                skipped.append(
+                    {
+                        "action_id": action_id,
+                        "desk": str(action.get("desk") or ""),
+                        "risk_level": risk_level,
+                        "status": status,
+                        "reason": "status_not_proposed",
+                    }
+                )
+                continue
+            run = self.dispatch_action(
+                action_id,
+                runner=runner,
+                timeout_seconds=timeout_seconds,
+                tool_registry=tool_registry,
+            )
+            runs.append(self.get_run(run.run_id) or run.to_dict())
+
+        succeeded_count = sum(1 for run in runs if run.get("status") == "succeeded")
+        failed_count = sum(1 for run in runs if run.get("status") == "failed")
+        blocked_count = sum(1 for run in runs if run.get("status") == "blocked")
+        status = "ready" if failed_count == 0 and blocked_count == 0 else "partial"
+        return {
+            "status": status,
+            "session_id": session_id,
+            "checked_at": _now(),
+            "action_count": len(actions),
+            "run_count": len(runs),
+            "succeeded_count": succeeded_count,
+            "failed_count": failed_count,
+            "blocked_count": blocked_count,
+            "skipped_count": len(skipped),
+            "runs": runs,
+            "skipped": skipped,
+        }
+
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         run = self.ledger.get_run(run_id)
         return self._run_with_events(run) if run else None

@@ -57,6 +57,15 @@ async def update_agent_session(session_id: str, payload: dict[str, Any]) -> dict
     return {"session": session.to_dict()}
 
 
+@router.post("/sessions/{session_id}/run-readonly")
+async def run_agent_session_read_only_actions(session_id: str) -> dict[str, Any]:
+    try:
+        workflow = AgentRuntime().run_session_read_only_actions(session_id)
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+    return {"workflow": workflow}
+
+
 @router.post("/sessions/{session_id}/messages")
 async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     role = str(payload.get("role") or "ceo")

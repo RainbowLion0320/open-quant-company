@@ -16,11 +16,29 @@
         >
           {{ t("ceoOffice.archiveSession") }}
         </button>
+        <button
+          class="btn btn-ghost"
+          type="button"
+          :disabled="runningReadOnlyWorkflow || !activeSession"
+          @click="runSessionReadOnlyActions"
+        >
+          {{ t("ceoOffice.runReadOnlyWorkflow") }}
+        </button>
         <button class="btn btn-primary" type="button" @click="createSession">{{ t("ceoOffice.createSession") }}</button>
       </div>
     </section>
 
     <section v-if="error" class="ceo-alert">{{ error }}</section>
+    <section v-if="readOnlyWorkflowResult" class="ceo-alert info">
+      <strong>{{ t("ceoOffice.readOnlyWorkflowStatus") }}</strong>
+      <span>
+        {{ statusLabel(readOnlyWorkflowResult.status) }} ·
+        {{ t("ceoOffice.ran") }} {{ readOnlyWorkflowResult.run_count }} ·
+        {{ t("ceoOffice.succeeded") }} {{ readOnlyWorkflowResult.succeeded_count }} ·
+        {{ t("ceoOffice.skipped") }} {{ readOnlyWorkflowResult.skipped_count }} ·
+        {{ t("ceoOffice.failed") }} {{ readOnlyWorkflowResult.failed_count }}
+      </span>
+    </section>
 
     <section class="ceo-summary">
       <article class="ceo-metric">
@@ -602,7 +620,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveKillSwitch, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -619,6 +637,7 @@ const notificationResult = ref<AgentReportNotification | null>(null);
 const liveReadiness = ref<AgentLiveReadiness | null>(null);
 const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
+const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
 const desks = ref<AgentDesk[]>([]);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
@@ -629,6 +648,7 @@ const runningAction = ref("");
 const submittingPaperAction = ref("");
 const cancelingAction = ref("");
 const archivingSession = ref(false);
+const runningReadOnlyWorkflow = ref(false);
 const resolvingHandoff = ref("");
 const generatingReport = ref(false);
 const runningRhythm = ref(false);
@@ -840,6 +860,21 @@ async function archiveSession() {
     error.value = `${t("ceoOffice.archiveFailed")}: ${err?.message || err}`;
   } finally {
     archivingSession.value = false;
+  }
+}
+
+async function runSessionReadOnlyActions() {
+  if (!activeSession.value) return;
+  runningReadOnlyWorkflow.value = true;
+  error.value = "";
+  try {
+    const payload = await api.agentRunSessionReadOnlyActions(activeSession.value.session_id);
+    readOnlyWorkflowResult.value = payload.workflow;
+    await loadSession(activeSession.value.session_id);
+  } catch (err: any) {
+    error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
+  } finally {
+    runningReadOnlyWorkflow.value = false;
   }
 }
 

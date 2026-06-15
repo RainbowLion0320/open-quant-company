@@ -687,6 +687,19 @@
   color: var(--negative);
 }
 
+.ceo-alert.info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+.ceo-alert.info strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
 @media (max-width: 1100px) {
   .ceo-summary,
   .ceo-grid {

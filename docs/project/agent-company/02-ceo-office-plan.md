@@ -152,6 +152,7 @@ Chinese and English strings must be maintained together. The Chinese wording sho
 - The current session can be archived from the Web UI without deleting ledger history.
 - A user message appears in the timeline and is persisted.
 - The user can choose the target desk for a CEO message from the registered desk list.
+- The user can run proposed read-only checks for the active session from the CEO Office, with run/skipped/failed counts visible.
 - The desk rail supports drill-down: selecting a desk shows its mandate, allowed tools, forbidden actions, evidence requirements, related actions, and related handoffs.
 - A desk response includes evidence references.
 - A proposed write action appears as an approval card instead of executing immediately.

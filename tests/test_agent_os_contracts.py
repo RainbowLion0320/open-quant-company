@@ -2433,6 +2433,61 @@ def test_reporting_daily_brief_orchestrates_multiple_desk_actions(tmp_path, monk
     reset_datahub()
 
 
+def test_agent_runtime_runs_session_read_only_workflow_actions(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Daily readonly workflow")
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        desk="reporting",
+        content="今天系统该做什么，给我 CEO 简报",
+    )
+    write_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="data",
+        action_type="data_repair",
+        risk_level="write_data",
+        summary="Repair data",
+        parameters={"tool_id": "astroq.data.repair", "table": "stock_limit_list"},
+    )
+
+    result = runtime.run_session_read_only_actions(session.session_id, runner=fake_run)
+
+    assert result["status"] == "ready"
+    assert result["session_id"] == session.session_id
+    assert result["action_count"] == 4
+    assert result["run_count"] == 3
+    assert result["succeeded_count"] == 3
+    assert result["failed_count"] == 0
+    assert result["blocked_count"] == 0
+    assert result["skipped_count"] == 1
+    assert result["skipped"][0]["action_id"] == write_action.action_id
+    assert result["skipped"][0]["reason"] == "not_read_only"
+    assert {run["status"] for run in result["runs"]} == {"succeeded"}
+    assert {run["action_id"] for run in result["runs"]} == set(routed["desk_response"].proposed_actions)
+    assert len(calls) == 3
+    assert {tuple(command[1:]) for command in calls} == {
+        ("data", "status", "--json"),
+        ("strategy", "catalog", "--json"),
+        ("lifecycle", "check", "--json"),
+    }
+    assert runtime.get_action(write_action.action_id)["status"] == "approval_required"
+    assert {runtime.get_action(action_id)["status"] for action_id in routed["desk_response"].proposed_actions} == {"succeeded"}
+    reset_datahub()
+
+
 def test_agent_dispatch_binds_approved_templated_tool_parameters(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
@@ -2917,6 +2972,44 @@ def test_agent_cli_and_api_dispatch_action_run(tmp_path, monkeypatch, capsys):
     assert cli_payload["data"]["run"]["status"] == "succeeded"
     assert api_res.status_code == 200
     assert api_res.json()["run"]["status"] == "succeeded"
+    reset_datahub()
+
+
+def test_agent_cli_and_api_run_session_read_only_actions(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    def fake_run(command, **kwargs):
+        return CompletedProcess(command, 0, stdout='{"batch": true}', stderr="")
+
+    monkeypatch.setattr("agent_os.runtime.subprocess.run", fake_run)
+
+    runtime = AgentRuntime()
+    cli_session = runtime.create_session(title="CLI readonly workflow")
+    runtime.submit_ceo_message(cli_session.session_id, desk="reporting", content="今天系统该做什么，给我 CEO 简报")
+
+    cli_code = run_cli(["agent", "session", "run-readonly", cli_session.session_id, "--json"])
+    cli_payload = json.loads(capsys.readouterr().out)
+
+    api_session = runtime.create_session(title="API readonly workflow")
+    runtime.submit_ceo_message(api_session.session_id, desk="reporting", content="今天系统该做什么，给我 CEO 简报")
+    api_res = TestClient(create_app()).post(f"/api/agent/sessions/{api_session.session_id}/run-readonly")
+
+    assert cli_code == 0
+    assert cli_payload["data"]["workflow"]["status"] == "ready"
+    assert cli_payload["data"]["workflow"]["run_count"] == 3
+    assert cli_payload["data"]["workflow"]["succeeded_count"] == 3
+    assert api_res.status_code == 200
+    assert api_res.json()["workflow"]["status"] == "ready"
+    assert api_res.json()["workflow"]["run_count"] == 3
+    assert api_res.json()["workflow"]["succeeded_count"] == 3
     reset_datahub()
 
 

@@ -12,6 +12,7 @@ import type {
   AgentLiveReconciliationResponse,
   AgentLiveReadinessResponse,
   AgentPaperCancelResponse,
+  AgentReadOnlyWorkflowResponse,
   AgentReportNotificationResponse,
   AgentPaperSubmitResponse,
   AgentReportRhythmResponse,
@@ -33,6 +34,8 @@ export const agentApi = {
     sessionId: string,
     payload: { title?: string; status?: string; default_desk?: string; tags?: string[] },
   ) => patch<{ session: AgentSession }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`, payload),
+  agentRunSessionReadOnlyActions: (sessionId: string) =>
+    post<AgentReadOnlyWorkflowResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/run-readonly`),
   agentAddMessage: (
     sessionId: string,
     payload: { role?: string; desk?: string; content: string; evidence_refs?: string[]; action_refs?: string[] },

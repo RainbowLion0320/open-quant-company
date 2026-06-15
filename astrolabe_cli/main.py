@@ -38,6 +38,7 @@ from astrolabe_cli.commands.agent import resolve_handoff as agent_resolve_handof
 from astrolabe_cli.commands.agent import run_report_rhythm as agent_run_report_rhythm
 from astrolabe_cli.commands.agent import run_scheduled_report_rhythm as agent_run_scheduled_report_rhythm
 from astrolabe_cli.commands.agent import run_action as agent_run_action
+from astrolabe_cli.commands.agent import run_session_read_only_actions as agent_run_session_read_only_actions
 from astrolabe_cli.commands.agent import sessions as agent_sessions
 from astrolabe_cli.commands.agent import show_action as agent_show_action
 from astrolabe_cli.commands.agent import show_session as agent_show_session
@@ -121,6 +122,13 @@ def build_parser() -> argparse.ArgumentParser:
             tags=args.tags,
         )
     )
+    agent_session_run_readonly = agent_session_sub.add_parser(
+        "run-readonly",
+        help="Run proposed read-only actions for one agent session",
+    )
+    agent_session_run_readonly.add_argument("session_id")
+    add_common_flags(agent_session_run_readonly)
+    agent_session_run_readonly.set_defaults(handler=lambda args: agent_run_session_read_only_actions(args.session_id))
 
     agent_message_cmd = agent_sub.add_parser("message", help="Add a CEO message to a session")
     agent_message_cmd.add_argument("--session", required=True)

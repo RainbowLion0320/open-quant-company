@@ -41,6 +41,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentCreateSession" in view
     assert "api.agentUpdateSession" in view
     assert "api.agentAddMessage" in view
+    assert "api.agentRunSessionReadOnlyActions" in view
+    assert "runSessionReadOnlyActions" in view
+    assert "readOnlyWorkflowResult" in view
+    assert "runningReadOnlyWorkflow" in view
     assert "selectedDraftDesk" in view
     assert "selectedDeskId" in view
     assert "selectedDesk" in view
@@ -54,6 +58,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'selected: selectedDeskId === desk.desk_id' in view
     assert 'desk: selectedDraftDesk.value' in view
     assert "ceoOffice.messageDesk" in view
+    assert "ceoOffice.runReadOnlyWorkflow" in view
+    assert "ceoOffice.readOnlyWorkflowStatus" in view
     assert "ceoOffice.deskMandate" in view
     assert "ceoOffice.allowedTools" in view
     assert "ceoOffice.forbiddenActions" in view
@@ -152,6 +158,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
     assert "目标 Desk" in zh_ceo
+    assert "运行只读检查" in zh_ceo
+    assert "只读检查状态" in zh_ceo
     assert "Desk 职责" in zh_ceo
     assert "允许工具" in zh_ceo
     assert "禁止行动" in zh_ceo
@@ -161,6 +169,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "相关交接" in zh_ceo
     assert "Action Queue" in en_ceo
     assert "Target Desk" in en_ceo
+    assert "Run Read-only Checks" in en_ceo
+    assert "Read-only Check Status" in en_ceo
     assert "Desk Mandate" in en_ceo
     assert "Allowed Tools" in en_ceo
     assert "Forbidden Actions" in en_ceo
@@ -279,6 +289,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentSessions" in agent_api
     assert "agentCreateSession" in agent_api
     assert "agentUpdateSession" in agent_api
+    assert "agentRunSessionReadOnlyActions" in agent_api
+    assert "/api/agent/sessions/${encodeURIComponent(sessionId)}/run-readonly" in agent_api
     assert "AgentAddMessageResponse" in agent_api
     assert "agentActions" in agent_api
     assert "agentApproveAction" in agent_api
@@ -306,6 +318,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "/api/agent/live/kill-switch" in agent_api
     assert "/api/agent/live/reconciliation" in agent_api
     assert "export interface AgentSession" in agent_types
+    assert "export interface AgentReadOnlyWorkflow" in agent_types
+    assert "export interface AgentReadOnlyWorkflowResponse" in agent_types
     assert "export interface AgentReport" in agent_types
     assert "export interface AgentReportRhythm" in agent_types
     assert "export interface AgentReportRhythmResponse" in agent_types
