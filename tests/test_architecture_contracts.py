@@ -830,8 +830,8 @@ def test_web_docs_match_current_api_pipeline_and_schema_contracts():
         "acceptance matrix": (
             "GET /api/system/db-health",
             "GET /api/strategies/buffett",
-            "WARN",
-            "vendor / ECharts / DWP chunk",
+            "ECharts、Vue ECharts adapter、Three、ELK、Vue/Pinia/Router",
+            "当前无 Vite chunk warning",
         ),
         "schema reference": (
             "`web/api/schemas/*` 分域 schema",
@@ -856,6 +856,28 @@ def test_web_docs_match_current_api_pipeline_and_schema_contracts():
         missing.extend(f"{source}:{token}" for token in tokens if token not in text)
 
     assert missing == []
+
+
+def test_frontend_vite_splits_heavy_runtime_vendor_chunks():
+    vite_config = Path("web/frontend/vite.config.ts").read_text(encoding="utf-8")
+    acceptance = Path("docs/product/acceptance-matrix.md").read_text(encoding="utf-8")
+
+    required_chunk_rules = (
+        'id.includes("/echarts/")',
+        'id.includes("/vue-echarts/")',
+        'id.includes("/three/")',
+        'id.includes("/elkjs/")',
+        'id.includes("/@vue/")',
+        'id.includes("/pinia/")',
+        'id.includes("/vue-router/")',
+    )
+
+    missing = [rule for rule in required_chunk_rules if rule not in vite_config]
+    assert missing == []
+    assert "chunkSizeWarningLimit: 1500" in vite_config
+    assert "vendor / ECharts / DWP chunk 仍超过 Vite warning threshold" not in acceptance
+    assert "| 5.13 | 前端构建通过且 bundle 体积可追踪" in acceptance
+    assert "| OK | — |" in acceptance
 
 
 def test_backtest_entrypoint_no_longer_exposes_legacy_runner():
