@@ -49,8 +49,12 @@ execution:
     sdk_modules:
     - xtquant.xttrader
     - xtquant.xttype
-    sdk_gateway_factory: ''
-    sdk_gateway_config: {}
+    sdk_gateway_factory: broker.live.xtquant_gateway:build_gateway
+    sdk_gateway_config:
+      userdata_path: ''
+      account_type: STOCK
+      strategy_name: open_quant_company
+      remark_prefix: approval
 backtest:
   benchmark: sh000001
   benchmark_name: 上证指数

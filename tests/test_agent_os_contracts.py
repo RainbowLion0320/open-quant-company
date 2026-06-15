@@ -1,5 +1,6 @@
 import json
 import sys
+import types
 from subprocess import CompletedProcess
 from pathlib import Path
 
@@ -719,6 +720,7 @@ def test_agent_live_order_preview_passes_with_ready_fake_broker_and_cash_gate():
         permissions=["query", "trade"],
         account_id="1234567890",
         account={"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+        sdk_gateway_factory="",
     )
     preview = broker.preview_order(
         {
@@ -807,6 +809,7 @@ def test_agent_live_order_preview_enforces_extended_risk_snapshot():
         permissions=["query", "trade"],
         account_id="1234567890",
         account={"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+        sdk_gateway_factory="",
     )
     preview = broker.preview_order(
         {
@@ -900,6 +903,7 @@ def test_agent_live_order_preview_enforces_portfolio_grade_risk_snapshot():
         permissions=["query", "trade"],
         account_id="1234567890",
         account={"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+        sdk_gateway_factory="",
     )
     base_snapshot = {
         "current_symbol_notional": 2_000.0,
@@ -1268,6 +1272,60 @@ execution:
     assert submitted["error"] == "live_sdk_gateway_unavailable"
     assert submitted["broker_status"] == "gateway_unavailable"
     assert submitted["paper_fallback"] is False
+    clear_settings_cache()
+
+
+def test_miniqmt_live_broker_default_xtquant_factory_requires_user_data_path(tmp_path, monkeypatch):
+    from core.settings import clear_settings_cache
+
+    xtquant = types.ModuleType("xtquant")
+    xttrader = types.ModuleType("xtquant.xttrader")
+    xttype = types.ModuleType("xtquant.xttype")
+    xtconstant = types.ModuleType("xtquant.xtconstant")
+    xttrader.XtQuantTrader = object
+    xttype.StockAccount = object
+    xtconstant.FIX_PRICE = 11
+    xtquant.xttrader = xttrader
+    xtquant.xttype = xttype
+    xtquant.xtconstant = xtconstant
+    monkeypatch.setitem(sys.modules, "xtquant", xtquant)
+    monkeypatch.setitem(sys.modules, "xtquant.xttrader", xttrader)
+    monkeypatch.setitem(sys.modules, "xtquant.xttype", xttype)
+    monkeypatch.setitem(sys.modules, "xtquant.xtconstant", xtconstant)
+
+    settings_path = tmp_path / "settings.yaml"
+    settings_path.write_text(
+        """
+execution:
+  live:
+    enabled: true
+    broker: miniqmt
+    logged_in: true
+    account_id: "1234567890"
+    permissions: ["query", "trade"]
+    account:
+      cash: 100000
+      total_asset: 120000
+      market_value: 20000
+    kill_switch: true
+    sdk_modules: []
+    sdk_gateway_factory: broker.live.xtquant_gateway:build_gateway
+    sdk_gateway_config:
+      userdata_path: ''
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ASTROLABE_SETTINGS", str(settings_path))
+    clear_settings_cache()
+
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    health = MiniQmtLiveBroker(import_checker=lambda _name: object()).health()
+
+    assert health["mode"] == "blocked"
+    assert "sdk_gateway_load_failed" in health["blockers"]
+    assert health["sdk_gateway_configured"] is False
+    assert "userdata_path" in health["sdk_gateway_error"]
     clear_settings_cache()
 
 
