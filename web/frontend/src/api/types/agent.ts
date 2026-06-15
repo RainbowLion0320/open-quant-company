@@ -252,9 +252,17 @@ export interface AgentSessionsResponse {
   total: number;
 }
 
+export interface AgentActionFilters {
+  session_id?: string;
+  status?: string;
+  desk?: string;
+  risk_level?: string;
+}
+
 export interface AgentActionsResponse {
   actions: AgentAction[];
   total: number;
+  filters?: AgentActionFilters;
 }
 
 export interface AgentDesksResponse {

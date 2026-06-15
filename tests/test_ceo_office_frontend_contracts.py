@@ -321,6 +321,7 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
 
     assert "agentApi" in api_index
     assert 'export * from "./types/agent";' in api_types
+    assert "AgentActionFilters" in agent_types
     assert "agentSessions" in agent_api
     assert "agentCreateSession" in agent_api
     assert "agentUpdateSession" in agent_api
@@ -330,6 +331,10 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert '"/api/agent/policies"' in agent_api
     assert "AgentAddMessageResponse" in agent_api
     assert "agentActions" in agent_api
+    assert "filters: AgentActionFilters = {}" in agent_api
+    assert "URLSearchParams" in agent_api
+    assert "session_id" in agent_api
+    assert "risk_level" in agent_api
     assert "agentApproveAction" in agent_api
     assert "agentRejectAction" in agent_api
     assert "agentCancelAction" in agent_api

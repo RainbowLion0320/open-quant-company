@@ -2,6 +2,7 @@ import { get, patch, post } from "../client";
 import type {
   AgentAction,
   AgentActionDetail,
+  AgentActionFilters,
   AgentAddMessageResponse,
   AgentActionsResponse,
   AgentApprovalPoliciesResponse,
@@ -43,8 +44,15 @@ export const agentApi = {
     sessionId: string,
     payload: { role?: string; desk?: string; content: string; evidence_refs?: string[]; action_refs?: string[] },
   ) => post<AgentAddMessageResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/messages`, payload),
-  agentActions: (sessionId = "") =>
-    get<AgentActionsResponse>(`/api/agent/actions${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
+  agentActions: (filters: AgentActionFilters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.session_id) params.set("session_id", filters.session_id);
+    if (filters.status) params.set("status", filters.status);
+    if (filters.desk) params.set("desk", filters.desk);
+    if (filters.risk_level) params.set("risk_level", filters.risk_level);
+    const query = params.toString();
+    return get<AgentActionsResponse>(`/api/agent/actions${query ? `?${query}` : ""}`);
+  },
   agentHandoffs: (sessionId = "") =>
     get<AgentHandoffsResponse>(`/api/agent/handoffs${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
   agentResolveHandoff: (handoffId: string) =>
