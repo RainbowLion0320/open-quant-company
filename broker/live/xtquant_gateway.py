@@ -253,8 +253,10 @@ def _compare_project_snapshot(
         }
 
     mismatches: list[dict[str, Any]] = []
-    cash_matched = True
-    if "cash" in project_snapshot:
+    cash_matched = False
+    if "cash" not in project_snapshot:
+        mismatches.append({"reason": "project_cash_not_provided"})
+    else:
         expected_cash = _as_float(project_snapshot.get("cash"))
         broker_cash = _as_float(broker_account.get("cash"))
         cash_matched = abs(expected_cash - broker_cash) <= cash_tolerance
@@ -269,11 +271,16 @@ def _compare_project_snapshot(
             )
 
     broker_position_map = _position_map(broker_positions)
-    positions_matched = True
-    for item in _records(project_snapshot.get("positions") or []):
+    project_positions = _records(project_snapshot.get("positions") or [])
+    positions_matched = "positions" in project_snapshot
+    if "positions" not in project_snapshot:
+        mismatches.append({"reason": "project_positions_not_provided"})
+    project_symbols: set[str] = set()
+    for item in project_positions:
         symbol = _position_symbol(item)
         if not symbol:
             continue
+        project_symbols.add(symbol)
         expected_qty = _position_quantity(item)
         broker_qty = broker_position_map.get(symbol, 0.0)
         if expected_qty != broker_qty:
@@ -283,6 +290,17 @@ def _compare_project_snapshot(
                     "reason": "position_mismatch",
                     "symbol": symbol,
                     "project_quantity": expected_qty,
+                    "broker_quantity": broker_qty,
+                }
+            )
+    for symbol, broker_qty in broker_position_map.items():
+        if symbol not in project_symbols and broker_qty:
+            positions_matched = False
+            mismatches.append(
+                {
+                    "reason": "unexpected_broker_position",
+                    "symbol": symbol,
+                    "project_quantity": 0.0,
                     "broker_quantity": broker_qty,
                 }
             )

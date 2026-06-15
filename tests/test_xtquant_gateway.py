@@ -174,6 +174,35 @@ def test_xtquant_gateway_reconcile_matches_project_ledger_snapshot(monkeypatch):
     assert report["project_snapshot"]["cash"] == 100000.0
 
 
+def test_xtquant_gateway_reconcile_requires_complete_project_ledger_snapshot(monkeypatch):
+    _install_fake_xtquant(monkeypatch)
+
+    from broker.live.xtquant_gateway import build_gateway
+
+    gateway = build_gateway(
+        config={"userdata_path": "/tmp/qmt-userdata", "session_id": 46},
+        account_id="1234567890",
+        broker="miniqmt",
+    )
+    report = gateway.reconcile(
+        {
+            "broker_order_id": "8848",
+            "project_snapshot": {
+                "cash": 100000.0,
+                "orders": [{"broker_order_id": "8848"}],
+            },
+        },
+        account_id="1234567890",
+    )
+
+    reasons = {item["reason"] for item in report["mismatches"]}
+    assert report["status"] == "needs_review"
+    assert report["cash_matched"] is True
+    assert report["positions_matched"] is False
+    assert report["orders_matched"] is True
+    assert "project_positions_not_provided" in reasons
+
+
 def test_xtquant_gateway_reconcile_reports_project_ledger_mismatches(monkeypatch):
     _install_fake_xtquant(monkeypatch)
 

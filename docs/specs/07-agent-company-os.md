@@ -1,7 +1,7 @@
 # Spec: Agent Company OS
 
 > Version: 0.1
-> Updated: 2026-06-14
+> Updated: 2026-06-16
 > Status: phased implementation contract
 > Related: [PRD](../product/prd.md), [Web Platform](05-web-platform.md), [Master Roadmap](../project/agent-company/00-master-roadmap.md)
 
@@ -9,7 +9,7 @@
 
 Agent Company OS is the planned local-first operating layer for Open Quant Company. It lets the human user act as CEO while desk agents coordinate data, research, risk, execution, engineering, and reporting work.
 
-This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, run event timelines, session snapshot SSE streaming, run event snapshot SSE streaming, active subprocess stdout/stderr chunk event recording, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, fixed cross-artifact report context aggregation, deterministic semantic report synthesis, deterministic cross-session report trend synthesis, deterministic causal-chain report synthesis with recurring-chain escalation, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, env-only report notification triggers, paper order preview/proposal/approved-submit/cancel cards with inline paper reconciliation summaries, default-disabled live readiness probing, live order preview risk gating, approval-gated live submit/reconciliation contracts, explicit MiniQMT/QMT SDK gateway bridge with config-based factory loading, desk-declared fixed tool registry coverage, deterministic intent-to-tool routing, deterministic multi-intent workflow planning, artifact-aware deterministic priority planning from local evidence, bounded session-backlog adaptive planning, Data Desk repair dry-run plus approval workflow, Research strategy-blocker cross-desk diagnosis, Engineering Desk code/bug work-order triage, daily-brief cross-desk orchestration, and portfolio review cross-desk orchestration are implemented first; richer adaptive desk reasoning, real-account xtquant gateway smoke tests and runtime project-ledger snapshot wiring, continuous live reconciliation, and open-ended adaptive cross-tool planning beyond bounded deterministic modes remain planned until their phase lands.
+This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk routing, bounded fixed-command dispatch, run event timelines, session snapshot SSE streaming, run event snapshot SSE streaming, active subprocess stdout/stderr chunk event recording, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, fixed cross-artifact report context aggregation, deterministic semantic report synthesis, deterministic cross-session report trend synthesis, deterministic causal-chain report synthesis with recurring-chain escalation, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, env-only report notification triggers, paper order preview/proposal/approved-submit/cancel cards with inline paper reconciliation summaries, default-disabled live readiness probing, live order preview risk gating, approval-gated live submit/reconciliation contracts, runtime project-ledger snapshot wiring for live reconciliation, explicit MiniQMT/QMT SDK gateway bridge with config-based factory loading, desk-declared fixed tool registry coverage, deterministic intent-to-tool routing, deterministic multi-intent workflow planning, artifact-aware deterministic priority planning from local evidence, bounded session-backlog adaptive planning, Data Desk repair dry-run plus approval workflow, Research strategy-blocker cross-desk diagnosis, Engineering Desk code/bug work-order triage, daily-brief cross-desk orchestration, and portfolio review cross-desk orchestration are implemented first; richer adaptive desk reasoning, real-account xtquant gateway smoke tests, continuous live reconciliation, and open-ended adaptive cross-tool planning beyond bounded deterministic modes remain planned until their phase lands.
 
 ## 2. Product Contract
 
@@ -651,10 +651,13 @@ gateway reconciliation path must return structured positions/cash/open
 orders/fills/mismatches and keeps `paper_fallback=false`.
 
 The default xtquant gateway supports an optional `project_snapshot` on the
-live ack or gateway config. When present, it compares project cash, positions,
-and broker order ids against the broker snapshot. When absent, reconciliation
-must remain `needs_review` with `project_ledger_comparison_not_configured`
-instead of fabricating a matched state.
+live ack or gateway config. `AgentRuntime` now attaches a preview-derived
+`project_snapshot` to live submit and scheduled reconciliation ack payloads
+before calling the live adapter. The snapshot includes cash after the previewed
+cash effect, symbol position after the previewed quantity delta when current
+quantity is available, and the submitted broker order id. Missing pieces are
+listed in `project_snapshot.missing`; incomplete or absent snapshots must remain
+`needs_review` instead of fabricating a matched state.
 
 ### 5.17 PaperOrderProposal and Submission
 
@@ -875,7 +878,8 @@ As of 2026-06-15:
 - PaperBroker order proposal, approved submission, and cancellation are available through CLI/API. Proposal writes preview artifact evidence and creates an approval-required `paper_order` action only when the non-mutating preview passes; submission requires approval, re-runs preview/risk gates, blocks stale previews, writes run/reconciliation evidence, persists default PaperBroker state on success, and exposes paper reconciliation summaries on action detail. Cancellation writes dedicated `paper.paper_order.cancel` runs and reconciliation evidence for queued approval requests or broker-confirmed active order cancellations.
 - MiniQMT/QMT readiness probing is available and defaults to `live_disabled`; missing SDK, login, permission, or disabled kill switch returns `blocked`, and `paper_fallback` is always false.
 - MiniQMT/QMT live order preview, proposal, approved-submit contract, scheduled reconciliation scan, explicit SDK gateway bridge, config-based gateway factory loading, xtquant project snapshot comparison, and local kill switch operations are available through CLI/API. The path never falls back to PaperBroker, always requires approval, re-runs preview/risk gates before submit, writes live reconciliation evidence, blocks before broker calls when kill switch is active, and defaults to `live_submission_not_integrated` / `not_integrated` unless a gateway is explicitly injected/configured. Preview risk gates now include cash, position concentration, total exposure, daily order count, tradability, data freshness, broker account consistency, drawdown, VaR, CVaR, sector concentration, and intraday limit-state checks.
+- Runtime live submit and scheduled reconciliation attach preview-derived project ledger snapshots to ack payloads before adapter reconciliation. Missing cash, position quantity, position delta, symbol, or broker order id is preserved as structured `project_snapshot.missing`, and the xtquant gateway treats incomplete snapshots as `needs_review`.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
 - CEO Office is implemented as the default `/` route with session creation, target desk selection for CEO messages, message entry, session safe workflow runner, desk status, desk drill-down for mandates/tools/evidence requirements/related work, explicit approval policy display, approval queue display, action detail, and run event timeline display; `/market` carries the market overview.
-- Rich adaptive desk reasoning beyond deterministic reasoning rows, open-ended adaptive cross-tool workflow planning beyond bounded deterministic/artifact-aware/session-backlog modes, and real-account xtquant gateway smoke tests plus runtime project-ledger snapshot wiring are not yet implemented.
+- Rich adaptive desk reasoning beyond deterministic reasoning rows, open-ended adaptive cross-tool workflow planning beyond bounded deterministic/artifact-aware/session-backlog modes, and real-account xtquant gateway smoke tests are not yet implemented.

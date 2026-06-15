@@ -1398,6 +1398,7 @@ def test_agent_live_order_submission_requires_approval_reruns_preview_and_reconc
             self.preview_calls = 0
             self.submit_calls = 0
             self.reconcile_calls = 0
+            self.reconcile_acks = []
 
         def preview_order(self, intent):
             self.preview_calls += 1
@@ -1422,6 +1423,8 @@ def test_agent_live_order_submission_requires_approval_reruns_preview_and_reconc
                 "risk_gate": {"passed": True, "blockers": [], "checks": [{"name": "fake_live_ready", "passed": True}]},
                 "health": {"mode": "live_ready", "paper_fallback": False},
                 "account_snapshot": {"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+                "estimated_cash_effect": -1005.0,
+                "estimated_position_effect": {"symbol": normalized["symbol"], "quantity_delta": 100.0},
             }
 
         def submit_order(self, intent, approval_id):
@@ -1438,6 +1441,7 @@ def test_agent_live_order_submission_requires_approval_reruns_preview_and_reconc
 
         def reconcile(self, ack):
             self.reconcile_calls += 1
+            self.reconcile_acks.append(dict(ack))
             return {
                 "status": "matched",
                 "as_of": "2026-06-15T00:00:01Z",
@@ -1463,6 +1467,7 @@ def test_agent_live_order_submission_requires_approval_reruns_preview_and_reconc
         "evidence_refs": ["ev_demo"],
         "risk_snapshot": {
             "current_symbol_notional": 0.0,
+            "current_symbol_quantity": 50.0,
             "max_position_pct": 0.2,
             "max_total_exposure_pct": 0.7,
             "daily_order_count": 1,
@@ -1492,8 +1497,14 @@ def test_agent_live_order_submission_requires_approval_reruns_preview_and_reconc
     assert broker.preview_calls == 2
     assert broker.submit_calls == 1
     assert broker.reconcile_calls == 1
+    project_snapshot = broker.reconcile_acks[0]["project_snapshot"]
+    assert project_snapshot["cash"] == 98_995.0
+    assert project_snapshot["positions"] == [{"symbol": "600000.SH", "quantity": 150.0}]
+    assert project_snapshot["orders"][0]["broker_order_id"] == "LIVE_0001"
+    assert project_snapshot["missing"] == []
     assert submitted["status"] == "succeeded"
     assert submitted["ack"]["broker_order_id"] == "LIVE_0001"
+    assert submitted["ack"]["project_snapshot"] == project_snapshot
     assert submitted["run"]["tool_name"] == "live.live_order.submit"
     assert submitted["run"]["artifact_refs"]
     assert submitted["reconciliation"]["status"] == "submitted"
@@ -1826,6 +1837,7 @@ def test_agent_live_reconciliation_runner_scans_submitted_live_orders(tmp_path, 
             self.preview_calls = 0
             self.submit_calls = 0
             self.reconcile_calls = 0
+            self.reconcile_acks = []
 
         def preview_order(self, intent):
             self.preview_calls += 1
@@ -1838,6 +1850,7 @@ def test_agent_live_reconciliation_runner_scans_submitted_live_orders(tmp_path, 
                 "strategy": intent.get("strategy", "manual"),
                 "reason": intent.get("reason", ""),
                 "evidence_refs": list(intent.get("evidence_refs", [])),
+                "risk_snapshot": dict(intent.get("risk_snapshot", {})),
             }
             return {
                 "status": "preview_ready",
@@ -1848,6 +1861,9 @@ def test_agent_live_reconciliation_runner_scans_submitted_live_orders(tmp_path, 
                 "submitted": False,
                 "risk_gate": {"passed": True, "blockers": [], "checks": [{"name": "fake_live_ready", "passed": True}]},
                 "health": {"mode": "live_ready", "paper_fallback": False},
+                "account_snapshot": {"cash": 50_000.0, "total_asset": 55_000.0, "market_value": 5_000.0},
+                "estimated_cash_effect": -1002.0,
+                "estimated_position_effect": {"symbol": normalized["symbol"], "quantity_delta": 100.0},
             }
 
         def submit_order(self, intent, approval_id):
@@ -1862,6 +1878,7 @@ def test_agent_live_reconciliation_runner_scans_submitted_live_orders(tmp_path, 
 
         def reconcile(self, ack):
             self.reconcile_calls += 1
+            self.reconcile_acks.append(dict(ack))
             return {
                 "status": "matched",
                 "as_of": "2026-06-15T00:00:02Z",
@@ -1883,6 +1900,7 @@ def test_agent_live_reconciliation_runner_scans_submitted_live_orders(tmp_path, 
         "strategy": "manual",
         "reason": "reconciliation coverage",
         "evidence_refs": ["ev_demo"],
+        "risk_snapshot": {"current_symbol_quantity": 10.0},
     }
     proposal = runtime.propose_live_order(session_id=session.session_id, intent=intent, broker=broker)
     runtime.approve_action(proposal["action"]["action_id"], decided_by="ceo")
@@ -1901,6 +1919,9 @@ def test_agent_live_reconciliation_runner_scans_submitted_live_orders(tmp_path, 
 
     assert submitted["status"] == "succeeded"
     assert broker.reconcile_calls == 2
+    assert broker.reconcile_acks[0]["project_snapshot"] == broker.reconcile_acks[1]["project_snapshot"]
+    assert broker.reconcile_acks[1]["project_snapshot"]["cash"] == 48_998.0
+    assert broker.reconcile_acks[1]["project_snapshot"]["positions"] == [{"symbol": "600000.SH", "quantity": 110.0}]
     assert reconciliation["status"] == "ready"
     assert reconciliation["action_count"] == 2
     assert reconciliation["reconciled_count"] == 1

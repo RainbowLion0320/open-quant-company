@@ -90,6 +90,15 @@ def _dataclass_to_dict(value: Any) -> dict[str, Any]:
     return dict(getattr(value, "__dict__", {}))
 
 
+def _optional_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _is_paper_reconciliation_evidence(evidence: dict[str, Any]) -> bool:
     return (
         str(evidence.get("kind") or "") == "artifact"
@@ -1351,6 +1360,7 @@ class AgentRuntime:
                 "evidence": evidence.to_dict(),
             }
 
+        ack = self._live_ack_with_project_snapshot(preview=preview, ack=ack)
         broker_reconciliation = dict(live_broker.reconcile(ack))
         reconciliation = self._live_reconciliation_payload(
             action=action,
@@ -1417,6 +1427,8 @@ class AgentRuntime:
 
             latest = submitted_reconciliations[0]
             ack = dict(latest.get("ack") or {})
+            preview = dict(latest.get("preview") or {})
+            ack = self._live_ack_with_project_snapshot(preview=preview, ack=ack)
             try:
                 broker_reconciliation = dict(live_broker.reconcile(ack))
             except Exception as exc:  # pragma: no cover - defensive adapter boundary
@@ -2370,6 +2382,66 @@ class AgentRuntime:
             "orders_after": orders,
             "generated_at": _now(),
         }
+
+    def _live_ack_with_project_snapshot(self, *, preview: dict[str, Any], ack: dict[str, Any]) -> dict[str, Any]:
+        enriched = dict(ack)
+        existing = enriched.get("project_snapshot")
+        if isinstance(existing, dict) and existing:
+            return enriched
+        enriched["project_snapshot"] = self._build_live_project_snapshot(preview=preview, ack=enriched)
+        return enriched
+
+    def _build_live_project_snapshot(self, *, preview: dict[str, Any], ack: dict[str, Any]) -> dict[str, Any]:
+        intent = dict(preview.get("intent") or ack.get("intent") or {})
+        account_snapshot = dict(preview.get("account_snapshot") or {})
+        position_effect = dict(preview.get("estimated_position_effect") or {})
+        risk_snapshot = dict(intent.get("risk_snapshot") or {})
+        missing: list[str] = []
+
+        snapshot: dict[str, Any] = {
+            "source": "live_preview_estimate",
+            "created_at": _now(),
+        }
+
+        cash = _optional_float(account_snapshot.get("cash"))
+        cash_effect = _optional_float(preview.get("estimated_cash_effect"))
+        if cash is None or cash_effect is None:
+            missing.append("cash_after_unavailable")
+        else:
+            snapshot["cash"] = round(cash + cash_effect, 6)
+
+        symbol = str(position_effect.get("symbol") or intent.get("symbol") or "").upper().strip()
+        quantity_delta = _optional_float(position_effect.get("quantity_delta"))
+        current_quantity = self._live_current_symbol_quantity(risk_snapshot)
+        if not symbol:
+            missing.append("symbol_unavailable")
+        if current_quantity is None:
+            missing.append("current_symbol_quantity_unavailable")
+        if quantity_delta is None:
+            missing.append("position_delta_unavailable")
+        if symbol and current_quantity is not None and quantity_delta is not None:
+            snapshot["positions"] = [{"symbol": symbol, "quantity": round(current_quantity + quantity_delta, 6)}]
+
+        broker_order_id = str(ack.get("broker_order_id") or "").strip()
+        if broker_order_id:
+            order: dict[str, Any] = {"broker_order_id": broker_order_id}
+            for key in ("symbol", "side", "quantity", "order_type", "limit_price"):
+                if key in intent:
+                    order[key] = intent[key]
+            snapshot["orders"] = [order]
+        else:
+            missing.append("broker_order_id_unavailable")
+
+        snapshot["missing"] = missing
+        return snapshot
+
+    @staticmethod
+    def _live_current_symbol_quantity(risk_snapshot: dict[str, Any]) -> float | None:
+        for key in ("current_symbol_quantity", "current_quantity", "position_quantity"):
+            value = _optional_float(risk_snapshot.get(key))
+            if value is not None:
+                return value
+        return None
 
     def _write_paper_reconciliation_evidence(self, action: dict[str, Any], reconciliation: dict[str, Any]) -> EvidenceRef:
         root = get_datahub().artifact_dir("agent") / "paper_reconciliation"
