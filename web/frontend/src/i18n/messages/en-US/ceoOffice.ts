@@ -14,6 +14,7 @@ export const ceoOffice = {
       handoffs: "Handoffs",
       evidence: "Evidence",
       reports: "Reports",
+      messageDesk: "Target Desk",
       liveReadiness: "Live Readiness",
       liveKillSwitch: "Live Kill Switch",
       messages: "Messages",

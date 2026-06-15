@@ -41,6 +41,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentCreateSession" in view
     assert "api.agentUpdateSession" in view
     assert "api.agentAddMessage" in view
+    assert "selectedDraftDesk" in view
+    assert 'v-model="selectedDraftDesk"' in view
+    assert 'v-for="desk in desks"' in view
+    assert 'desk: selectedDraftDesk.value' in view
+    assert "ceoOffice.messageDesk" in view
     assert "api.agentAction" in view
     assert "api.agentRunAction" in view
     assert "api.agentPaperSubmitAction" in view
@@ -131,7 +136,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice" in zh_index
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
+    assert "目标 Desk" in zh_ceo
     assert "Action Queue" in en_ceo
+    assert "Target Desk" in en_ceo
     assert "归档会话" in zh_ceo
     assert "Archive Session" in en_ceo
     assert "交接事项" in zh_ceo

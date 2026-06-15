@@ -80,6 +80,14 @@
         </div>
 
         <form class="message-composer" @submit.prevent="sendMessage">
+          <label class="desk-target-control">
+            <span>{{ t("ceoOffice.messageDesk") }}</span>
+            <select v-model="selectedDraftDesk">
+              <option v-for="desk in desks" :key="desk.desk_id" :value="desk.desk_id">
+                {{ deskLabel(desk.desk_id) }}
+              </option>
+            </select>
+          </label>
           <input v-model="draft" type="text" :placeholder="t('ceoOffice.messagePlaceholder')" />
           <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
             {{ t("ceoOffice.send") }}
@@ -560,6 +568,7 @@ const notifyingReport = ref("");
 const operatingLiveKillSwitch = ref<"activate" | "deactivate" | "">("");
 const runningLiveReconciliation = ref(false);
 const selectedReportKind = ref("daily_brief");
+const selectedDraftDesk = ref("reporting");
 const draft = ref("");
 const sending = ref(false);
 const error = ref("");
@@ -682,6 +691,9 @@ function formatNumber(value: unknown) {
 async function loadSession(sessionId: string) {
   const [detail, reportPayload] = await Promise.all([api.agentSession(sessionId), api.agentReports(sessionId)]);
   activeSession.value = detail.session;
+  if (!desks.value.some(desk => desk.desk_id === selectedDraftDesk.value)) {
+    selectedDraftDesk.value = detail.session.default_desk || "reporting";
+  }
   messages.value = detail.messages || [];
   actions.value = detail.actions || [];
   handoffs.value = detail.handoffs || [];
@@ -724,6 +736,7 @@ async function createSession() {
       default_desk: "reporting",
     });
     activeSession.value = payload.session;
+    selectedDraftDesk.value = payload.session.default_desk || "reporting";
     sessions.value = [payload.session, ...sessions.value];
     messages.value = [];
     await load();
@@ -766,7 +779,7 @@ async function sendMessage() {
     const session = await ensureSession();
     await api.agentAddMessage(session.session_id, {
       role: "ceo",
-      desk: "reporting",
+      desk: selectedDraftDesk.value,
       content: text,
     });
     draft.value = "";

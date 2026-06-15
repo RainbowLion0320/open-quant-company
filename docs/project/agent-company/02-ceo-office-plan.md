@@ -151,6 +151,7 @@ Chinese and English strings must be maintained together. The Chinese wording sho
 - A new session can be created from the Web UI.
 - The current session can be archived from the Web UI without deleting ledger history.
 - A user message appears in the timeline and is persisted.
+- The user can choose the target desk for a CEO message from the registered desk list.
 - A desk response includes evidence references.
 - A proposed write action appears as an approval card instead of executing immediately.
 - Approving, rejecting, and canceling actions update the ledger and UI state.

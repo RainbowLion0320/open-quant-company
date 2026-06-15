@@ -14,6 +14,7 @@ export const ceoOffice = {
       handoffs: "交接事项",
       evidence: "证据",
       reports: "报告",
+      messageDesk: "目标 Desk",
       liveReadiness: "实盘就绪",
       liveKillSwitch: "实盘红灯",
       messages: "消息",
