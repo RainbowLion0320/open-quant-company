@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -20,6 +21,7 @@ class WorkflowActionSpec:
     summary: str
     expected_effect: str
     evidence: WorkflowEvidenceSpec
+    parameters: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -120,6 +122,20 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
     ],
     "data": [
         (
+            ("补", "修复", "repair", "backfill", "补齐"),
+            {
+                "answer": "Data Desk 已识别到补数据请求。下一步会先生成 dry-run 演练动作，确认 provider、权限、覆盖率和写入影响；正式写入动作会进入 CEO 审批队列，不会自动执行。",
+                "evidence_label": "Data repair workflow",
+                "evidence_uri": "/datahub",
+                "evidence_summary": "Open DataHub health, coverage, and repair workflow context.",
+                "action_type": "data_repair_plan",
+                "tool_id": "astroq.data.repair.dry_run",
+                "risk_level": "dry_run",
+                "action_summary": "Prepare Data Desk repair dry-run and approval actions.",
+                "expected_effect": "Records repair preview and creates an approval-gated write action.",
+            },
+        ),
+        (
             ("数据源", "source", "capability", "registry", "能力", "diff", "差异"),
             {
                 "answer": "Data Desk 已识别到数据源能力治理问题。下一步应对比 Source Capability Registry 与项目 data_registry，确认是未接入、权限缺失还是字段/频率口径不一致。",
@@ -135,6 +151,20 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         ),
     ],
     "research": [
+        (
+            ("阻断", "blocked", "blocker", "missing", "缺数据", "coverage", "lifecycle"),
+            {
+                "answer": "Research Desk 已识别到 strategy blocker review。下一步会同时读取 strategy competition evidence、DataHub coverage 和 lifecycle gates，用证据区分策略质量不足、数据缺口、样本不足或系统门禁阻断。",
+                "evidence_label": "Strategy blocker review",
+                "evidence_uri": "/strategy-lab",
+                "evidence_summary": "Open strategy evidence, data coverage, and lifecycle blocker context.",
+                "action_type": "strategy_blocker_review",
+                "tool_id": "astroq.strategy.compete",
+                "risk_level": "read_only",
+                "action_summary": "Read strategy blocker evidence across Research, Data, and Risk desks.",
+                "expected_effect": "Records blocker evidence without changing data, strategy, or configuration.",
+            },
+        ),
         (
             ("竞争", "compete", "competition", "公平", "12", "oos", "ic/icir", "icir"),
             {
@@ -225,6 +255,81 @@ def _confidence_for(desk: str) -> float:
 
 
 def _actions_for_profile(*, desk: str, profile: dict[str, str], normalized_content: str) -> list[WorkflowActionSpec]:
+    if desk == "data" and _is_data_repair_request(normalized_content):
+        table = _extract_repair_table(normalized_content)
+        if table:
+            return [
+                WorkflowActionSpec(
+                    desk="data",
+                    action_type="data_repair_dry_run",
+                    tool_id="astroq.data.repair.dry_run",
+                    risk_level="dry_run",
+                    summary=f"Dry-run Data Desk repair plan for {table}.",
+                    expected_effect="Runs a non-writing data repair preview and records provider/data blockers.",
+                    parameters={"table": table},
+                    evidence=WorkflowEvidenceSpec(
+                        label="Data repair dry-run",
+                        uri="/datahub",
+                        summary="Open DataHub health and repair preview context.",
+                    ),
+                ),
+                WorkflowActionSpec(
+                    desk="data",
+                    action_type="data_repair",
+                    tool_id="astroq.data.repair",
+                    risk_level="write_data",
+                    summary=f"Repair DataHub dimension {table} after CEO approval.",
+                    expected_effect="Writes repaired DataHub partitions only after explicit CEO approval and provider success.",
+                    parameters={"table": table},
+                    evidence=WorkflowEvidenceSpec(
+                        label="Data repair approval",
+                        uri="/datahub",
+                        summary="Open DataHub health, coverage, and repair approval context.",
+                    ),
+                ),
+            ]
+    if desk == "research" and _is_strategy_blocker_request(normalized_content):
+        return [
+            WorkflowActionSpec(
+                desk="research",
+                action_type="strategy_competition",
+                tool_id="astroq.strategy.compete",
+                risk_level="read_only",
+                summary="Read Research Desk strategy competition blockers.",
+                expected_effect="Records OOS, IC/ICIR, sample-size, and strategy blocker evidence without changing strategy state.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Strategy competition evidence",
+                    uri="/strategy-lab",
+                    summary="Open strategy competition and promotion blocker evidence.",
+                ),
+            ),
+            WorkflowActionSpec(
+                desk="data",
+                action_type="data_status",
+                tool_id="astroq.data.status",
+                risk_level="read_only",
+                summary="Read Data Desk coverage and freshness blockers for strategy review.",
+                expected_effect="Records local DataHub health without repairing or downloading data.",
+                evidence=WorkflowEvidenceSpec(
+                    label="DataHub status view",
+                    uri="/datahub",
+                    summary="Open data coverage, freshness, and source capability blockers.",
+                ),
+            ),
+            WorkflowActionSpec(
+                desk="risk",
+                action_type="lifecycle_check",
+                tool_id="astroq.lifecycle.check",
+                risk_level="read_only",
+                summary="Read Risk Desk lifecycle gates for strategy blocker review.",
+                expected_effect="Records lifecycle readiness and risk blockers without changing system state.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Lifecycle readiness",
+                    uri="/system?tab=lifecycle",
+                    summary="Open lifecycle readiness and blocker details.",
+                ),
+            ),
+        ]
     if desk == "reporting" and _is_daily_brief_request(normalized_content):
         return [
             WorkflowActionSpec(
@@ -330,6 +435,11 @@ def _action_for_profile(*, desk: str, profile: dict[str, str]) -> WorkflowAction
 
 def _handoffs_for(desk: str, content: str) -> list[dict[str, Any]]:
     normalized = content.lower()
+    if desk == "research" and _is_strategy_blocker_request(normalized):
+        return [
+            {"target_desk": "data", "reason": "Strategy blocker review needs DataHub coverage and freshness evidence."},
+            {"target_desk": "risk", "reason": "Strategy blocker review needs lifecycle and risk-gate interpretation."},
+        ]
     if desk == "reporting" and _is_daily_brief_request(normalized):
         return [
             {"target_desk": "data", "reason": "CEO daily brief needs current data readiness and blocker status."},
@@ -359,3 +469,36 @@ def _is_daily_brief_request(normalized: str) -> bool:
 def _is_portfolio_review_request(normalized: str) -> bool:
     tokens = ("组合", "portfolio", "持仓", "风险复盘", "执行复盘", "execution review")
     return any(token in normalized for token in tokens)
+
+
+def _is_data_repair_request(normalized: str) -> bool:
+    tokens = ("补", "修复", "repair", "backfill", "补齐")
+    return any(token in normalized for token in tokens)
+
+
+def _is_strategy_blocker_request(normalized: str) -> bool:
+    strategy_tokens = ("策略", "strategy")
+    blocker_tokens = ("阻断", "blocked", "blocker", "missing", "缺数据", "coverage", "lifecycle")
+    return any(token in normalized for token in strategy_tokens) and any(token in normalized for token in blocker_tokens)
+
+
+def _extract_repair_table(normalized: str) -> str | None:
+    ignored = {
+        "api",
+        "backfill",
+        "ceo",
+        "data",
+        "dry",
+        "json",
+        "repair",
+        "run",
+        "table",
+    }
+    candidates = [match.group(0) for match in re.finditer(r"[a-z][a-z0-9_]{2,}", normalized)]
+    for candidate in candidates:
+        if "_" in candidate and candidate not in ignored:
+            return candidate
+    for candidate in candidates:
+        if candidate not in ignored:
+            return candidate
+    return None

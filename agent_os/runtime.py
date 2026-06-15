@@ -2191,7 +2191,7 @@ class AgentRuntime:
                 action_type=action_spec.action_type,
                 risk_level=action_spec.risk_level,
                 summary=action_spec.summary,
-                parameters={"tool_id": action_spec.tool_id},
+                parameters={"tool_id": action_spec.tool_id, **action_spec.parameters},
                 expected_effect=action_spec.expected_effect,
                 evidence_refs=[evidence.evidence_id],
             )

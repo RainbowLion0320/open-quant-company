@@ -228,6 +228,7 @@ Phase 1 should add JSON-readable commands:
 - Adding a message writes a durable message and produces deterministic desk routing metadata.
 - Read-only tools can run through fixed command arrays.
 - Session-level safe workflow runs dispatch only proposed `read_only` / `dry_run` actions and report skipped approval-required write/trading actions.
+- Data Desk repair requests with an explicit dimension create a safe dry-run action and a separate approval-required write action.
 - State-changing actions are queued as `approval_required`.
 - Approval policies are explicit runtime/CLI/API contracts, not hidden conditionals.
 - Approval and rejection decisions are persisted.

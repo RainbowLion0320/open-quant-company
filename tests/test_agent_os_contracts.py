@@ -2579,6 +2579,145 @@ def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monke
     reset_datahub()
 
 
+def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Data repair workflow", default_desk="data")
+
+    result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="data",
+        content="补一下 stock_limit_list 这张表，先演练再等我审批正式写入",
+    )
+    response = result["desk_response"]
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+    by_tool = {action["parameters"]["tool_id"]: action for action in actions}
+
+    assert len(actions) == 2
+    assert set(by_tool) == {"astroq.data.repair.dry_run", "astroq.data.repair"}
+    assert by_tool["astroq.data.repair.dry_run"]["risk_level"] == "dry_run"
+    assert by_tool["astroq.data.repair.dry_run"]["status"] == "proposed"
+    assert by_tool["astroq.data.repair.dry_run"]["parameters"]["table"] == "stock_limit_list"
+    assert by_tool["astroq.data.repair"]["risk_level"] == "write_data"
+    assert by_tool["astroq.data.repair"]["status"] == "approval_required"
+    assert by_tool["astroq.data.repair"]["approval_required"] is True
+    assert by_tool["astroq.data.repair"]["parameters"]["table"] == "stock_limit_list"
+    assert "dry-run" in response.answer.lower() or "演练" in response.answer
+    assert len(response.evidence_refs) == 2
+    reset_datahub()
+
+
+def test_safe_workflow_runs_data_repair_dry_run_and_skips_write_action(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Safe data repair workflow", default_desk="data")
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        desk="data",
+        content="请补 stock_limit_list 数据，先 dry-run，再生成需要 CEO 审批的写入动作",
+    )
+
+    result = runtime.run_session_read_only_actions(session.session_id, runner=fake_run)
+    actions = [runtime.get_action(action_id) for action_id in routed["desk_response"].proposed_actions]
+    by_tool = {action["parameters"]["tool_id"]: action for action in actions}
+
+    assert result["status"] == "ready"
+    assert result["run_count"] == 1
+    assert result["skipped_count"] == 1
+    assert result["skipped"][0]["reason"] == "not_safe_workflow_action"
+    assert calls[0][1:] == ["data", "repair", "stock_limit_list", "--dry-run", "--json"]
+    assert by_tool["astroq.data.repair.dry_run"]["status"] == "succeeded"
+    assert by_tool["astroq.data.repair"]["status"] == "approval_required"
+    reset_datahub()
+
+
+def test_research_strategy_blocker_review_orchestrates_research_data_risk_actions(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Strategy blocker diagnosis", default_desk="research")
+
+    result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="research",
+        content="为什么12个策略都被阻断，是缺数据、缺 IC/ICIR，还是 lifecycle gate 的问题？",
+    )
+    response = result["desk_response"]
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+
+    assert len(actions) == 3
+    assert {action["desk"] for action in actions} == {"research", "data", "risk"}
+    assert {action["parameters"]["tool_id"] for action in actions} == {
+        "astroq.strategy.compete",
+        "astroq.data.status",
+        "astroq.lifecycle.check",
+    }
+    assert all(action["risk_level"] == "read_only" for action in actions)
+    assert len(response.evidence_refs) == 3
+    assert {handoff["target_desk"] for handoff in response.handoffs} == {"data", "risk"}
+    assert "blocked" in response.answer.lower() or "阻断" in response.answer
+    reset_datahub()
+
+
+def test_safe_workflow_runs_strategy_blocker_review_actions(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Strategy blocker safe workflow", default_desk="research")
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        desk="research",
+        content="为什么策略全被 blocked，帮我同时看 data coverage、strategy evidence 和 lifecycle",
+    )
+
+    result = runtime.run_session_read_only_actions(session.session_id, runner=fake_run)
+
+    assert result["status"] == "ready"
+    assert result["run_count"] == 3
+    assert result["skipped_count"] == 0
+    assert {run["action_id"] for run in result["runs"]} == set(routed["desk_response"].proposed_actions)
+    assert {tuple(command[1:]) for command in calls} == {
+        ("strategy", "compete", "--json"),
+        ("data", "status", "--json"),
+        ("lifecycle", "check", "--json"),
+    }
+    reset_datahub()
+
+
 def test_reporting_daily_brief_orchestrates_multiple_desk_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

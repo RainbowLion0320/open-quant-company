@@ -60,6 +60,10 @@ Hard rules:
 - Stale data must not be green.
 - Backfill writes require approval.
 
+Current foundation:
+
+- A CEO repair request with an explicit dimension creates a dry-run repair action and a separate approval-required write action.
+
 ## 4. Research Desk
 
 Mandate:
@@ -83,6 +87,10 @@ Hard rules:
 - Missing score panels or alpha evidence must be `blocked`, not treated as weak performance.
 - Risk overlay strategies may use overlay evidence instead of IC/ICIR, but must mark IC/ICIR as `not_applicable` with a reason.
 - Full backtests that write official evidence require approval.
+
+Current foundation:
+
+- A strategy-blocker review request creates Research strategy competition, DataHub health, and lifecycle readiness actions with Data/Risk handoffs.
 
 ## 5. Risk Desk
 
