@@ -23,6 +23,7 @@ def _install_fake_xtquant(monkeypatch):
             self.connected = False
             self.subscribed = []
             self.orders = []
+            self.cancel_orders = []
             FakeTrader.instances.append(self)
 
         def start(self):
@@ -39,6 +40,10 @@ def _install_fake_xtquant(monkeypatch):
         def order_stock(self, *args):
             self.orders.append(args)
             return 8848
+
+        def cancel_order_stock(self, account, broker_order_id):
+            self.cancel_orders.append((account, broker_order_id))
+            return 0
 
         def query_stock_asset(self, account):
             return SimpleNamespace(account_id=account.account_id, cash=100000.0, total_asset=120000.0)
@@ -267,3 +272,32 @@ def test_xtquant_gateway_validates_terminal_environment_without_submitting(monke
     assert validation["position_count"] == 1
     assert validation["open_order_count"] == 1
     assert validation["trade_count"] == 1
+
+
+def test_xtquant_gateway_cancels_order_through_xtquant_sdk(monkeypatch):
+    fake_trader_cls = _install_fake_xtquant(monkeypatch)
+
+    from broker.live.xtquant_gateway import build_gateway
+
+    gateway = build_gateway(
+        config={"userdata_path": "/tmp/qmt-userdata", "session_id": 78},
+        account_id="1234567890",
+        broker="miniqmt",
+    )
+
+    result = gateway.cancel_order(
+        {"broker_order_id": "8848", "symbol": "600000.SH"},
+        account_id="1234567890",
+        reason="CEO emergency stop",
+    )
+
+    trader = fake_trader_cls.instances[0]
+    assert trader.started is True
+    assert trader.connected is True
+    assert trader.cancel_orders == [(trader.subscribed[0], "8848")]
+    assert trader.orders == []
+    assert result["status"] == "canceled"
+    assert result["broker_status"] == "cancel_requested"
+    assert result["broker_order_id"] == "8848"
+    assert result["broker"] == "miniqmt"
+    assert result["paper_fallback"] is False

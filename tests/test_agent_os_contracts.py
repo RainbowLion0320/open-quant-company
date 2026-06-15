@@ -1789,6 +1789,185 @@ def test_agent_live_kill_switch_cancels_queue_and_blocks_live_paths(tmp_path, mo
     reset_datahub()
 
 
+def test_agent_live_kill_switch_requests_broker_cancel_for_submitted_live_orders(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    class FakeLiveBroker:
+        def __init__(self):
+            self.cancel_calls = []
+            self.reconcile_calls = 0
+
+        def preview_order(self, intent):
+            normalized = {
+                "symbol": str(intent["symbol"]).upper(),
+                "side": intent["side"],
+                "quantity": int(intent["quantity"]),
+                "order_type": "limit",
+                "limit_price": float(intent["limit_price"]),
+                "strategy": intent.get("strategy", "manual"),
+                "reason": intent.get("reason", ""),
+                "evidence_refs": list(intent.get("evidence_refs", [])),
+                "risk_snapshot": dict(intent.get("risk_snapshot", {})),
+            }
+            return {
+                "status": "preview_ready",
+                "broker": "miniqmt",
+                "intent": normalized,
+                "approval_required": True,
+                "paper_fallback": False,
+                "submitted": False,
+                "risk_gate": {"passed": True, "blockers": [], "checks": []},
+                "health": {"mode": "live_ready", "paper_fallback": False},
+                "account_snapshot": {"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+            }
+
+        def submit_order(self, intent, approval_id):
+            return {
+                "status": "submitted",
+                "broker_order_id": "LIVE_CANCEL_0001",
+                "broker_status": "accepted",
+                "submitted": True,
+                "ledger_id": approval_id,
+                "intent": dict(intent),
+            }
+
+        def reconcile(self, ack):
+            self.reconcile_calls += 1
+            return {"status": "matched", "mismatches": [], "open_orders": [{"broker_order_id": ack["broker_order_id"]}]}
+
+        def cancel_order(self, ack, *, reason):
+            self.cancel_calls.append({"ack": dict(ack), "reason": reason})
+            return {
+                "status": "canceled",
+                "broker_order_id": ack["broker_order_id"],
+                "broker_status": "cancel_requested",
+                "paper_fallback": False,
+            }
+
+    broker = FakeLiveBroker()
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Broker kill switch", default_desk="execution")
+    intent = {
+        "symbol": "600000.SH",
+        "side": "buy",
+        "quantity": 100,
+        "order_type": "limit",
+        "limit_price": 10.0,
+        "strategy": "manual",
+        "reason": "submitted order must be canceled at broker",
+        "evidence_refs": ["ev_demo"],
+        "risk_snapshot": {"tradable": True, "data_freshness_status": "fresh", "broker_account_consistent": True},
+    }
+    proposal = runtime.propose_live_order(session_id=session.session_id, intent=intent, broker=broker)
+    runtime.approve_action(proposal["action"]["action_id"], decided_by="ceo")
+    submitted = runtime.submit_live_order_action(proposal["action"]["action_id"], broker=broker)
+
+    activated = runtime.activate_live_kill_switch(reason="CEO emergency stop", broker=broker)
+
+    assert submitted["status"] == "succeeded"
+    assert runtime.get_action(proposal["action"]["action_id"])["status"] == "succeeded"
+    assert broker.cancel_calls == [
+        {
+            "ack": submitted["ack"],
+            "reason": "CEO emergency stop",
+        }
+    ]
+    assert activated["status"] == "active"
+    assert activated["canceled_count"] == 0
+    assert activated["broker_canceled_count"] == 1
+    assert activated["broker_cancel_failed_count"] == 0
+    assert activated["broker_cancellations"][0]["action_id"] == proposal["action"]["action_id"]
+    assert activated["broker_cancellations"][0]["order_id"] == "LIVE_CANCEL_0001"
+    assert activated["broker_cancellations"][0]["status"] == "canceled"
+    assert activated["broker_cancellations"][0]["paper_fallback"] is False
+    artifact = json.loads(Path(activated["artifact_path"]).read_text(encoding="utf-8"))
+    assert artifact["broker_canceled_count"] == 1
+    assert artifact["broker_cancellations"][0]["order_id"] == "LIVE_CANCEL_0001"
+    assert activated["evidence"]["label"] == "Live kill switch"
+    reset_datahub()
+
+
+def test_agent_live_kill_switch_records_unsupported_broker_cancel_without_fake_success(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    class FakeLiveBroker:
+        def preview_order(self, intent):
+            return {
+                "status": "preview_ready",
+                "broker": "miniqmt",
+                "intent": {
+                    "symbol": str(intent["symbol"]).upper(),
+                    "side": intent["side"],
+                    "quantity": int(intent["quantity"]),
+                    "order_type": "limit",
+                    "limit_price": float(intent["limit_price"]),
+                    "strategy": "manual",
+                    "reason": "unsupported cancel",
+                    "evidence_refs": ["ev_demo"],
+                    "risk_snapshot": {"tradable": True, "data_freshness_status": "fresh", "broker_account_consistent": True},
+                },
+                "approval_required": True,
+                "paper_fallback": False,
+                "submitted": False,
+                "risk_gate": {"passed": True, "blockers": [], "checks": []},
+                "health": {"mode": "live_ready", "paper_fallback": False},
+                "account_snapshot": {"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+            }
+
+        def submit_order(self, intent, approval_id):
+            return {
+                "status": "submitted",
+                "broker_order_id": "LIVE_UNSUPPORTED_0001",
+                "broker_status": "accepted",
+                "submitted": True,
+                "ledger_id": approval_id,
+            }
+
+        def reconcile(self, ack):
+            return {"status": "matched", "mismatches": [], "open_orders": [{"broker_order_id": ack["broker_order_id"]}]}
+
+    broker = FakeLiveBroker()
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Unsupported broker cancel", default_desk="execution")
+    proposal = runtime.propose_live_order(
+        session_id=session.session_id,
+        intent={
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "strategy": "manual",
+            "reason": "unsupported cancel",
+            "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {"tradable": True, "data_freshness_status": "fresh", "broker_account_consistent": True},
+        },
+        broker=broker,
+    )
+    runtime.approve_action(proposal["action"]["action_id"], decided_by="ceo")
+    runtime.submit_live_order_action(proposal["action"]["action_id"], broker=broker)
+
+    activated = runtime.activate_live_kill_switch(reason="CEO emergency stop", broker=broker)
+
+    assert activated["broker_canceled_count"] == 0
+    assert activated["broker_cancel_failed_count"] == 1
+    assert activated["broker_cancellations"][0]["status"] == "blocked"
+    assert activated["broker_cancellations"][0]["reason"] == "broker_cancel_not_supported"
+    assert activated["broker_cancellations"][0]["order_id"] == "LIVE_UNSUPPORTED_0001"
+    assert activated["broker_cancellations"][0]["paper_fallback"] is False
+    reset_datahub()
+
+
 def test_agent_live_kill_switch_invalid_state_fails_closed(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

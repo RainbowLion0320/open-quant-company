@@ -1165,7 +1165,14 @@ class AgentRuntime:
     def live_kill_switch_status(self) -> dict[str, Any]:
         return self._read_live_kill_switch_state()
 
-    def activate_live_kill_switch(self, *, reason: str = "", cancel_queued: bool = True) -> dict[str, Any]:
+    def activate_live_kill_switch(
+        self,
+        *,
+        reason: str = "",
+        cancel_queued: bool = True,
+        cancel_submitted: bool = True,
+        broker: Any | None = None,
+    ) -> dict[str, Any]:
         timestamp = _now()
         clean_reason = reason.strip() or "Live kill switch activated"
         state = {
@@ -1192,18 +1199,31 @@ class AgentRuntime:
                 except ValueError:
                     continue
                 canceled_actions.append(canceled.to_dict())
+        broker_cancellations = (
+            self._cancel_submitted_live_orders_for_kill_switch(reason=clean_reason, broker=broker)
+            if cancel_submitted
+            else []
+        )
+        broker_canceled_count = len([item for item in broker_cancellations if str(item.get("status") or "") == "canceled"])
+        broker_cancel_failed_count = len(broker_cancellations) - broker_canceled_count
         event = {
             **state,
             "event": "activated",
             "canceled_count": len(canceled_actions),
             "canceled_actions": canceled_actions,
+            "broker_canceled_count": broker_canceled_count,
+            "broker_cancel_failed_count": broker_cancel_failed_count,
+            "broker_cancellations": broker_cancellations,
         }
         artifact_path = self._write_live_kill_switch_event_artifact(event)
         evidence = self.create_evidence(
             kind="artifact",
             label="Live kill switch",
             uri=str(artifact_path),
-            summary=f"Live kill switch activated; canceled {len(canceled_actions)} queued live action(s).",
+            summary=(
+                f"Live kill switch activated; canceled {len(canceled_actions)} queued live action(s) "
+                f"and requested {broker_canceled_count} broker-side live cancellation(s)."
+            ),
         )
         return {
             **event,
@@ -1211,6 +1231,73 @@ class AgentRuntime:
             "state_path": str(self._live_kill_switch_state_path()),
             "evidence": evidence.to_dict(),
         }
+
+    def _cancel_submitted_live_orders_for_kill_switch(self, *, reason: str, broker: Any | None) -> list[dict[str, Any]]:
+        live_broker = broker or MiniQmtLiveBroker()
+        cancel_order = getattr(live_broker, "cancel_order", None)
+        cancellations: list[dict[str, Any]] = []
+        for action in self.ledger.list_actions():
+            if str(action.get("action_type") or "") != "live_order":
+                continue
+            action_id = str(action.get("action_id") or "")
+            submitted_reconciliations = [
+                reconciliation
+                for reconciliation in self.live_reconciliations_for_action(action_id)
+                if str(reconciliation.get("status") or "") == "submitted"
+                and str(reconciliation.get("order_id") or "")
+            ]
+            if not submitted_reconciliations:
+                continue
+            latest = submitted_reconciliations[0]
+            ack = dict(latest.get("ack") or {})
+            order_id = str(latest.get("order_id") or ack.get("broker_order_id") or "")
+            if not callable(cancel_order):
+                cancellations.append(
+                    {
+                        "action_id": action_id,
+                        "status": "blocked",
+                        "reason": "broker_cancel_not_supported",
+                        "order_id": order_id,
+                        "broker_order_id": order_id,
+                        "broker_cancellation": {},
+                        "source_reconciliation": latest,
+                        "paper_fallback": False,
+                    }
+                )
+                continue
+            try:
+                broker_cancellation = dict(cancel_order(ack, reason=reason))
+            except Exception as exc:  # pragma: no cover - defensive adapter boundary
+                cancellations.append(
+                    {
+                        "action_id": action_id,
+                        "status": "blocked",
+                        "reason": "broker_cancel_failed",
+                        "order_id": order_id,
+                        "broker_order_id": order_id,
+                        "error_class": exc.__class__.__name__,
+                        "error_message": str(exc)[:300],
+                        "broker_cancellation": {},
+                        "source_reconciliation": latest,
+                        "paper_fallback": False,
+                    }
+                )
+                continue
+            broker_status = str(broker_cancellation.get("status") or "").strip().lower()
+            canceled = broker_status in {"canceled", "cancel_requested", "accepted", "submitted", "ok", "success"}
+            cancellations.append(
+                {
+                    "action_id": action_id,
+                    "status": "canceled" if canceled else "blocked",
+                    "reason": "" if canceled else broker_status or "broker_cancel_blocked",
+                    "order_id": str(broker_cancellation.get("broker_order_id") or order_id),
+                    "broker_order_id": str(broker_cancellation.get("broker_order_id") or order_id),
+                    "broker_cancellation": broker_cancellation,
+                    "source_reconciliation": latest,
+                    "paper_fallback": False,
+                }
+            )
+        return cancellations
 
     def deactivate_live_kill_switch(self, *, reason: str = "") -> dict[str, Any]:
         previous = self.live_kill_switch_status()

@@ -245,7 +245,7 @@ Current foundation:
 - Non-submitting live order preview includes extended risk checks for cash, concentration, total exposure, daily order count, tradability, data freshness, and broker account consistency.
 - `astroq agent live propose/submit` and `/api/agent/live/proposals` / `/api/agent/live/actions/{action_id}/submit` implement the approval-gated live submit/reconciliation contract. The default MiniQMT/QMT adapter fails closed with `live_submission_not_integrated`; an explicit SDK gateway bridge can submit/reconcile only when injected or loaded through `execution.live.sdk_gateway_factory`; the default factory is `broker.live.xtquant_gateway:build_gateway`, with masked/hashed audit responses.
 - `astroq agent live reconcile` and `/api/agent/live/reconciliation` scan submitted live order evidence, call adapter reconciliation, and write scheduled reconciliation artifacts.
-- `astroq agent live kill-switch status/activate/deactivate` and `/api/agent/live/kill-switch` implement a local kill switch. Activation cancels queued live actions, writes auditable artifacts, and blocks live preview/propose/submit before broker calls.
+- `astroq agent live kill-switch status/activate/deactivate` and `/api/agent/live/kill-switch` implement a local kill switch. Activation cancels queued live actions, requests broker-side cancellation for submitted live evidence when the adapter supports it, writes auditable artifacts, and blocks live preview/propose/submit before broker calls.
 
 ### Phase 7 - Reporting and Operating Rhythm
 

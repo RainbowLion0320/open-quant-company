@@ -1,6 +1,6 @@
 # Agent Company OS Phase 6 - MiniQMT/QMT Live Execution Plan
 
-> Status: readiness, environment validation, preview, approval-gated submit/reconciliation contract, explicit SDK gateway bridge, config-based gateway factory loading, xtquant gateway module, and runtime project snapshot wiring implemented; operator must still run environment/smoke checks against the real account before enabling live submissions
+> Status: readiness, environment validation, preview, approval-gated submit/reconciliation contract, broker-side kill-switch cancellation requests, explicit SDK gateway bridge, config-based gateway factory loading, xtquant gateway module, and runtime project snapshot wiring implemented; operator must still run environment/smoke checks against the real account before enabling live submissions
 > Created: 2026-06-14
 > Parent roadmap: [00-master-roadmap.md](00-master-roadmap.md)
 > Related spec: [04-execution-layer.md](../../specs/04-execution-layer.md)
@@ -43,7 +43,7 @@ Out of scope:
 | Preview first | Every order requires a preview with price, quantity, cost, risk, and broker account impact. |
 | Approval required | Every live order requires CEO approval. |
 | Reconcile after | Submitted orders must reconcile with broker orders/trades/positions. |
-| Kill switch | CEO can disable live execution and cancel open live proposals. |
+| Kill switch | CEO can disable live execution, cancel open live proposals, and request broker-side cancellation for submitted live orders when the adapter supports it. |
 
 ## 4. Proposed Contracts
 
@@ -55,7 +55,7 @@ Extends the existing `broker.base.Broker` interface with live readiness and reco
 - `get_account() -> AccountSnapshot`
 - `preview_order(intent: LiveOrderIntent) -> LiveOrderPreview`
 - `submit_order(intent: LiveOrderIntent, approval_id: str) -> LiveOrderAck`
-- `cancel_order(order_id: str) -> LiveCancelAck`
+- `cancel_order(ack: LiveOrderAck, reason: str) -> LiveCancelAck`
 - `reconcile() -> ReconciliationReport`
 
 ### BrokerHealth
@@ -220,7 +220,9 @@ Kill switch requirements:
 
 - Disable new live order approvals.
 - Cancel queued live actions.
-- Optionally attempt broker order cancellation for open orders when explicitly requested.
+- Attempt broker order cancellation for submitted live evidence when the configured adapter supports cancellation.
+- Record unsupported or failed broker cancellation as blocked evidence; do not report fake cancellation success.
+- Preserve the original submitted action status and record cancellation as a separate kill-switch event.
 - Write a ledger event with reason and timestamp.
 - Surface state in CEO Office and Portfolio/Execution views.
 
@@ -267,7 +269,7 @@ Current foundation:
 - `MiniQmtLiveBroker` accepts an explicit SDK gateway injection or `execution.live.sdk_gateway_factory` configuration for audited submit/reconcile. The gateway path still re-runs preview/risk gates, requires a broker order id, masks and hashes raw responses, keeps `paper_fallback=false`, and returns blocked status on unknown or failed gateway responses. A configured factory that cannot load becomes a readiness blocker instead of a silent fallback.
 - `broker.live.xtquant_gateway` provides the default xtquant-backed gateway factory. It calls `XtQuantTrader.order_stock()` for live submit and reads asset, position, order, and trade snapshots for reconciliation. When an ack or gateway config includes `project_snapshot`, the gateway compares broker cash, positions, and order ids against that project ledger snapshot. Without a project snapshot, reconciliation remains `needs_review` with `project_ledger_comparison_not_configured` instead of fake matched status.
 - `AgentRuntime` attaches a preview-derived `project_snapshot` to live submit and scheduled reconciliation ack payloads before calling the live adapter. The snapshot includes cash after the previewed cash effect, symbol position after the previewed quantity delta when current quantity is available, and the submitted broker order id. Missing pieces are recorded in `project_snapshot.missing`; incomplete snapshots remain reviewable rather than being treated as fake matches.
-- `astroq agent live kill-switch status/activate/deactivate --json` and `/api/agent/live/kill-switch` expose a local kill switch. Activation cancels queued `live_order` actions, writes state/event artifacts under `var/artifacts/agent/live_kill_switch/`, and blocks live preview/propose/submit before broker calls.
+- `astroq agent live kill-switch status/activate/deactivate --json` and `/api/agent/live/kill-switch` expose a local kill switch. Activation cancels queued `live_order` actions, scans submitted live evidence, requests broker-side cancellation for known broker order ids when the adapter supports it, writes state/event artifacts under `var/artifacts/agent/live_kill_switch/`, and blocks live preview/propose/submit before broker calls.
 - CEO Office shows read-only live readiness and environment validation status.
 - Blocked readiness always reports `paper_fallback=false`; no live path submits through PaperBroker.
 
@@ -276,7 +278,7 @@ Remaining work:
 - Broader broker account consistency reconciliation against real MiniQMT/QMT snapshots after SDK integration.
 - Operator should run `astroq agent live environment --json` and the no-submit smoke harness against the real MiniQMT/QMT terminal before enabling live submissions.
 - Real-account scheduled broker order/trade/position reconciliation through the configured gateway.
-- Broker-side kill-switch operations for canceling already submitted real MiniQMT/QMT orders after SDK integration.
+- Real terminal validation of broker-side kill-switch cancellation semantics with the user's MiniQMT/QMT SDK and account permissions.
 
 ## 13. Open Design Questions
 

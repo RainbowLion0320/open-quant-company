@@ -454,6 +454,77 @@ class MiniQmtLiveBroker:
             "paper_fallback": False,
         }
 
+    def cancel_order(self, ack: dict[str, Any], *, reason: str = "") -> dict[str, Any]:
+        """Request broker-side cancellation for an already-submitted live order."""
+        broker_order_id = str(ack.get("broker_order_id") or "").strip()
+        if not broker_order_id:
+            return {
+                "status": "blocked",
+                "broker_order_id": "",
+                "broker_status": "missing_broker_order_id",
+                "canceled": False,
+                "canceled_at": "",
+                "raw_response_hash": "",
+                "error": "missing_broker_order_id",
+                "paper_fallback": False,
+            }
+        if self.sdk_gateway_error:
+            return {
+                "status": "blocked",
+                "broker_order_id": broker_order_id,
+                "broker_status": "gateway_unavailable",
+                "canceled": False,
+                "canceled_at": "",
+                "raw_response_hash": "",
+                "error": "live_sdk_gateway_unavailable",
+                "error_message": self.sdk_gateway_error,
+                "paper_fallback": False,
+            }
+        if self.sdk_gateway is None or not callable(getattr(self.sdk_gateway, "cancel_order", None)):
+            return {
+                "status": "blocked",
+                "broker_order_id": broker_order_id,
+                "broker_status": "not_integrated",
+                "canceled": False,
+                "canceled_at": "",
+                "raw_response_hash": "",
+                "error": "broker_cancel_not_supported",
+                "paper_fallback": False,
+            }
+
+        try:
+            response = self.sdk_gateway.cancel_order(ack, account_id=self.account_id, reason=reason)
+        except Exception as exc:
+            return {
+                "status": "blocked",
+                "broker_order_id": broker_order_id,
+                "broker_status": "cancel_failed",
+                "canceled": False,
+                "canceled_at": "",
+                "raw_response_hash": "",
+                "error": "live_cancel_failed",
+                "error_class": exc.__class__.__name__,
+                "error_message": str(exc)[:300],
+                "paper_fallback": False,
+            }
+
+        raw_response_masked = _safe_payload(response)
+        response_status = str(_response_get(response, "status") or "").strip().lower()
+        broker_status = str(_response_get(response, "broker_status") or response_status or "cancel_requested")
+        canceled = response_status in {"canceled", "cancel_requested", "accepted", "submitted", "ok", "success"}
+        return {
+            "status": "canceled" if canceled else "blocked",
+            "broker_order_id": str(_response_get(response, "broker_order_id") or broker_order_id),
+            "broker_status": broker_status,
+            "canceled": canceled,
+            "canceled_at": _now() if canceled else "",
+            "raw_response_hash": _payload_hash(raw_response_masked),
+            "raw_response_masked": raw_response_masked,
+            "error": "" if canceled else broker_status,
+            "reason": reason,
+            "paper_fallback": False,
+        }
+
     def _normalize_intent(self, intent: dict[str, Any]) -> dict[str, Any]:
         side = str(intent.get("side") or "").strip().lower()
         return {

@@ -150,6 +150,36 @@ class XtQuantGateway:
             "mismatches": mismatches,
         }
 
+    def cancel_order(self, ack: dict[str, Any], *, account_id: str, reason: str = "") -> dict[str, Any]:
+        self._require_account(account_id)
+        self._ensure_connected()
+        broker_order_id = str(ack.get("broker_order_id") or ack.get("order_id") or "").strip()
+        if not broker_order_id:
+            raise ValueError("broker_order_id is required")
+        cancel = getattr(self.trader, "cancel_order_stock", None)
+        if not callable(cancel):
+            cancel = getattr(self.trader, "cancel_order_stock_async", None)
+        if not callable(cancel):
+            cancel = getattr(self.trader, "cancel_order", None)
+        if not callable(cancel):
+            raise AttributeError("xtquant trader missing cancel_order_stock()")
+        result = cancel(self.account, broker_order_id)
+        if result not in (0, None, True):
+            broker_status = str(result)
+            status = "blocked"
+        else:
+            broker_status = "cancel_requested"
+            status = "canceled"
+        return {
+            "status": status,
+            "broker": self.broker,
+            "broker_order_id": broker_order_id,
+            "broker_status": broker_status,
+            "account_id": self.account_id,
+            "reason": reason,
+            "paper_fallback": False,
+        }
+
     def _ensure_connected(self) -> None:
         if self._connected:
             return

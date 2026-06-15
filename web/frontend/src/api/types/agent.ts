@@ -201,6 +201,9 @@ export interface AgentLiveKillSwitch {
   artifact_path?: string;
   canceled_count?: number;
   canceled_actions?: AgentAction[];
+  broker_canceled_count?: number;
+  broker_cancel_failed_count?: number;
+  broker_cancellations?: Array<Record<string, unknown>>;
   read_error?: string;
   evidence?: EvidenceRef;
 }
