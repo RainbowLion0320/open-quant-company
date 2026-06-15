@@ -39,6 +39,7 @@ class DeskWorkflowPlan:
     answer: str
     confidence: float
     actions: list[WorkflowActionSpec]
+    planning_mode: str = "single_intent"
     blockers: list[str] = field(default_factory=list)
     handoffs: list[dict[str, Any]] = field(default_factory=list)
     work_orders: list[WorkflowWorkOrderSpec] = field(default_factory=list)
@@ -252,6 +253,10 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
 
 
 def build_desk_workflow_plan(*, desk: str, content: str) -> DeskWorkflowPlan:
+    dynamic_plan = _dynamic_multi_intent_plan(desk=desk, content=content)
+    if dynamic_plan is not None:
+        return dynamic_plan
+
     profile = _profile_for(desk, content)
     if profile is None:
         raise ValueError(f"Unknown desk workflow: {desk}")
@@ -262,9 +267,148 @@ def build_desk_workflow_plan(*, desk: str, content: str) -> DeskWorkflowPlan:
         answer=profile["answer"],
         confidence=_confidence_for(desk),
         actions=actions,
+        planning_mode="fixed_intent" if len(actions) > 1 else "single_intent",
         handoffs=_handoffs_for(desk, content),
         work_orders=_work_orders_for(desk, content),
     )
+
+
+def _dynamic_multi_intent_plan(*, desk: str, content: str) -> DeskWorkflowPlan | None:
+    normalized = content.lower()
+    if desk != "reporting" or _is_daily_brief_request(normalized) or _is_portfolio_review_request(normalized):
+        return None
+
+    actions = _dynamic_actions_for_content(normalized)
+    if len(actions) < 2:
+        return None
+
+    target_desks = _ordered_unique([action.desk for action in actions])
+    handoffs = [
+        {
+            "target_desk": target_desk,
+            "reason": f"Dynamic CEO multi-intent plan needs {target_desk.title()} Desk evidence.",
+        }
+        for target_desk in target_desks
+    ]
+    return DeskWorkflowPlan(
+        desk=desk,
+        answer=(
+            "Reporting Desk 已生成 dynamic multi-intent / 多意图计划：按 Data、Research、Risk、"
+            "Execution 和 Engineering 证据链拆分安全动作，再由 CEO Office 汇总结果。"
+        ),
+        confidence=0.72,
+        actions=actions,
+        planning_mode="dynamic_multi_intent",
+        handoffs=handoffs,
+    )
+
+
+def _dynamic_actions_for_content(normalized: str) -> list[WorkflowActionSpec]:
+    actions: list[WorkflowActionSpec] = []
+
+    if _mentions_data_source_gap(normalized):
+        actions.append(
+            WorkflowActionSpec(
+                desk="data",
+                action_type="data_sources_diff",
+                tool_id="astroq.data.sources.diff_registry",
+                risk_level="read_only",
+                summary="Compare source capability registry with project data_registry for CEO review.",
+                expected_effect="Records capability-vs-registry gaps without downloading data.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Data source capability matrix",
+                    uri="/datahub?tab=sources",
+                    summary="Open data source capability matrix and registry diff.",
+                ),
+            )
+        )
+
+    if _mentions_strategy_competition(normalized):
+        actions.append(
+            WorkflowActionSpec(
+                desk="research",
+                action_type="strategy_competition",
+                tool_id="astroq.strategy.compete",
+                risk_level="read_only",
+                summary="Read strategy competition evidence for CEO review.",
+                expected_effect="Records OOS, IC/ICIR, sample-size, and strategy blocker evidence.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Strategy competition evidence",
+                    uri="/strategy-lab",
+                    summary="Open strategy competition and promotion evidence views.",
+                ),
+            )
+        )
+
+    if _mentions_lifecycle(normalized):
+        actions.append(
+            WorkflowActionSpec(
+                desk="risk",
+                action_type="lifecycle_check",
+                tool_id="astroq.lifecycle.check",
+                risk_level="read_only",
+                summary="Read lifecycle readiness gates for CEO review.",
+                expected_effect="Records lifecycle readiness and blocker evidence without changing system state.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Lifecycle readiness",
+                    uri="/system?tab=lifecycle",
+                    summary="Open lifecycle readiness and blocker details.",
+                ),
+            )
+        )
+
+    if _mentions_execution_dry_run(normalized):
+        actions.append(
+            WorkflowActionSpec(
+                desk="execution",
+                action_type="execution_dry_run",
+                tool_id="astroq.execution.dry_run",
+                risk_level="dry_run",
+                summary="Run execution dry-run readiness for CEO review.",
+                expected_effect="Produces execution readiness preview without submitting paper or live orders.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Execution readiness",
+                    uri="/portfolio",
+                    summary="Open portfolio and execution readiness views.",
+                ),
+            )
+        )
+
+    if _mentions_test_design(normalized):
+        actions.append(
+            WorkflowActionSpec(
+                desk="engineering",
+                action_type="test_design",
+                tool_id="astroq.test.design",
+                risk_level="read_only",
+                summary="Run test design diagnostics for CEO review.",
+                expected_effect="Records test design risk evidence without changing source files.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Test design intelligence",
+                    uri="/system?tab=tests",
+                    summary="Open test design intelligence diagnostics.",
+                ),
+            )
+        )
+
+    if _mentions_ast_diagnostics(normalized):
+        actions.append(
+            WorkflowActionSpec(
+                desk="engineering",
+                action_type="architecture_ast",
+                tool_id="astroq.architecture.ast",
+                risk_level="read_only",
+                summary="Run AST diagnostics for CEO review.",
+                expected_effect="Records duplicate implementation and architecture risk evidence without editing source files.",
+                evidence=WorkflowEvidenceSpec(
+                    label="AST Intelligence",
+                    uri="/system?tab=ast",
+                    summary="Open AST duplicate implementation diagnostics.",
+                ),
+            )
+        )
+
+    return _dedupe_actions(actions)
 
 
 def _profile_for(desk: str, content: str) -> dict[str, str] | None:
@@ -556,6 +700,56 @@ def _is_strategy_blocker_request(normalized: str) -> bool:
 def _is_engineering_code_request(normalized: str) -> bool:
     code_tokens = ("bug", "修", "修复", "改代码", "实现", "工单", "codex", "代码")
     return any(token in normalized for token in code_tokens)
+
+
+def _mentions_data_source_gap(normalized: str) -> bool:
+    tokens = ("数据源", "source", "registry", "capability", "能力", "diff", "差异", "data_registry")
+    return any(token in normalized for token in tokens)
+
+
+def _mentions_strategy_competition(normalized: str) -> bool:
+    tokens = ("12", "策略", "strategy", "compete", "competition", "公平", "oos", "ic/icir", "icir")
+    return any(token in normalized for token in tokens)
+
+
+def _mentions_lifecycle(normalized: str) -> bool:
+    tokens = ("lifecycle", "生命周期", "门禁", "gate", "readiness", "阻断")
+    return any(token in normalized for token in tokens)
+
+
+def _mentions_execution_dry_run(normalized: str) -> bool:
+    tokens = ("execution dry-run", "execution dry run", "执行 dry-run", "执行 dry run", "执行演练")
+    return any(token in normalized for token in tokens)
+
+
+def _mentions_test_design(normalized: str) -> bool:
+    tokens = ("测试设计", "test design", "fixture", "mock", "断言", "测试风险")
+    return any(token in normalized for token in tokens)
+
+
+def _mentions_ast_diagnostics(normalized: str) -> bool:
+    tokens = ("ast", "重复实现", "重复造轮子", "架构风险", "architecture")
+    return any(token in normalized for token in tokens)
+
+
+def _dedupe_actions(actions: list[WorkflowActionSpec]) -> list[WorkflowActionSpec]:
+    deduped: list[WorkflowActionSpec] = []
+    seen: set[tuple[str, str]] = set()
+    for action in actions:
+        key = (action.desk, action.tool_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(action)
+    return deduped
+
+
+def _ordered_unique(values: list[str]) -> list[str]:
+    unique: list[str] = []
+    for value in values:
+        if value not in unique:
+            unique.append(value)
+    return unique
 
 
 def _extract_repair_table(normalized: str) -> str | None:

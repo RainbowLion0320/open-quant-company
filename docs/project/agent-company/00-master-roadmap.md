@@ -80,7 +80,7 @@ The 100% target includes all of the following. Partial implementation must not r
 4. Agent API endpoints under `/api/agent/*` expose sessions, messages, actions, approvals, evidence, and desk status.
 5. `astroq agent *` provides JSON-readable local automation.
 6. Desk agents are registered with explicit tool permissions and risk scopes.
-7. Desk-declared fixed tools are covered by the local tool registry, and deterministic routing can map common CEO intents to concrete safe tools such as data source registry diff, strategy competition, backtest dry-run, test design, and docs check.
+7. Desk-declared fixed tools are covered by the local tool registry, and deterministic routing can map common CEO intents plus bounded multi-intent CEO review requests to concrete safe tools such as data source registry diff, strategy competition, lifecycle checks, execution dry-run, test design, and docs check.
 8. Agent actions use a common `AgentAction` contract and can be approved, rejected, expired, canceled, executed, or blocked.
 9. Evidence references resolve to existing Web pages, CLI commands, artifact paths, code locations, and report sections.
 10. Transparent memory is inspectable, exportable, and clearable.
@@ -259,8 +259,8 @@ Current foundation:
 - `astroq agent rhythm --session ... --json`, `POST /api/agent/reports/rhythm`, and CEO Office can explicitly run due report templates and write a rhythm audit artifact.
 - `astroq agent rhythm --all-active --json` and `POST /api/agent/reports/rhythm/scheduled` scan active sessions, run due report templates, and write scheduled audit artifacts under `var/artifacts/agent/reports/scheduled/`; this is the local cron-callable scheduled cadence.
 - `astroq agent notify report ... --json`, `POST /api/agent/reports/{report_id}/notify`, and CEO Office report cards can send or dry-run env-only Telegram/WeChat/Feishu report notifications, with audit artifacts under `var/artifacts/agent/reports/notifications/`.
-- CEO reports aggregate a fixed local artifact context for lifecycle readiness, data source capabilities, strategy competition, AST intelligence, test design intelligence, and CodeGraph readiness. The report JSON includes `artifact_context`, and Markdown/sections surface artifact readiness plus blocker/issue/risk findings.
-- Advanced semantic synthesis across artifact history, trends, and root-cause chains remains future work.
+- CEO reports aggregate a fixed local artifact context for lifecycle readiness, data source capabilities, strategy competition, AST intelligence, test design intelligence, and CodeGraph readiness. The report JSON includes `artifact_context`, deterministic semantic synthesis for current root causes/impacts/next actions, and Markdown/sections surface artifact readiness plus blocker/issue/risk findings.
+- Cross-session semantic synthesis across artifact history, trends, and root-cause chains remains future work.
 
 ## 8. Design Decisions Locked by This Roadmap
 

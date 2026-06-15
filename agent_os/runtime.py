@@ -295,6 +295,7 @@ class AgentRuntime:
             "desk": plan.desk,
             "answer": plan.answer,
             "confidence": plan.confidence,
+            "planning_mode": plan.planning_mode,
             "actions": actions,
             "handoffs": list(plan.handoffs),
             "work_orders": [asdict(work_order) for work_order in plan.work_orders],

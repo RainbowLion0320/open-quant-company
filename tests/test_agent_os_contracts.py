@@ -3068,6 +3068,56 @@ def test_agent_workflow_plan_preview_is_side_effect_free_runtime_cli_api(tmp_pat
     reset_datahub()
 
 
+def test_agent_dynamic_workflow_plan_orchestrates_mixed_ceo_request(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    before_summary = runtime.memory_snapshot()["summary"]
+
+    preview = runtime.preview_workflow_plan(
+        desk="reporting",
+        content=(
+            "帮我做一次 CEO 复盘：查数据源 registry diff，分析12个策略 OOS 和 IC/ICIR，"
+            "看 lifecycle gate，跑 execution dry-run，再检查测试设计风险"
+        ),
+    )
+    after_summary = runtime.memory_snapshot()["summary"]
+
+    assert before_summary == after_summary
+    assert preview["status"] == "ready"
+    assert preview["planning_mode"] == "dynamic_multi_intent"
+    assert preview["side_effects"]["ledger_writes"] is False
+    assert [action["tool_id"] for action in preview["actions"]] == [
+        "astroq.data.sources.diff_registry",
+        "astroq.strategy.compete",
+        "astroq.lifecycle.check",
+        "astroq.execution.dry_run",
+        "astroq.test.design",
+    ]
+    assert {action["desk"] for action in preview["actions"]} == {
+        "data",
+        "research",
+        "risk",
+        "execution",
+        "engineering",
+    }
+    assert len({action["tool_id"] for action in preview["actions"]}) == len(preview["actions"])
+    assert {handoff["target_desk"] for handoff in preview["handoffs"]} == {
+        "data",
+        "research",
+        "risk",
+        "execution",
+        "engineering",
+    }
+    assert "dynamic" in preview["answer"].lower() or "多意图" in preview["answer"]
+    reset_datahub()
+
+
 def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
