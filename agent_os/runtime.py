@@ -972,6 +972,7 @@ class AgentRuntime:
         *,
         content: str = "",
         desk: str = "reporting",
+        semantic_planner: Any | None = None,
         runner: Any | None = None,
         timeout_seconds: int = 120,
         tool_registry: AgentToolRegistry | None = None,
@@ -988,7 +989,12 @@ class AgentRuntime:
             "请作为 CEO Office 推进当前公司优先级，只自动运行 read-only/dry-run 安全动作，"
             "不要写数据、写报告、改代码或交易。"
         )
-        routed = self.submit_ceo_message(session_id, desk=desk, content=normalized_content)
+        routed = self.submit_ceo_message(
+            session_id,
+            desk=desk,
+            content=normalized_content,
+            semantic_planner=semantic_planner,
+        )
         desk_response = routed["desk_response"]
         new_action_ids = list(desk_response.proposed_actions)
         runs: list[dict[str, Any]] = []
@@ -1042,15 +1048,23 @@ class AgentRuntime:
         failed_count = sum(1 for run in runs if run.get("status") == "failed")
         blocked_count = sum(1 for run in runs if run.get("status") == "blocked")
         status = "ready" if failed_count == 0 and blocked_count == 0 else "partial"
+        action_rows = []
+        for action_id in new_action_ids:
+            action = self.get_action(action_id)
+            if action:
+                action_rows.append(action)
+        planning_mode = str(desk_response.planning_mode or "")
         return {
             "status": status,
-            "mode": "bounded_fixed_registry",
+            "mode": "bounded_semantic_fixed_registry"
+            if planning_mode == "semantic_assisted"
+            else "bounded_fixed_registry",
             "session_id": session_id,
             "desk": desk,
             "checked_at": _now(),
             "message": routed["message"].to_dict(),
             "desk_response": desk_response.to_dict(),
-            "actions": [self.get_action(action_id) for action_id in new_action_ids if self.get_action(action_id)],
+            "actions": action_rows,
             "action_count": len(new_action_ids),
             "run_count": len(runs),
             "failed_count": failed_count,
@@ -1207,6 +1221,7 @@ class AgentRuntime:
         blockers: list[str] | None = None,
         handoffs: list[dict[str, Any]] | None = None,
         reasoning: list[dict[str, Any]] | None = None,
+        planning_mode: str = "single_intent",
     ) -> DeskResponse:
         if not self.ledger.get_session(session_id):
             raise KeyError(f"Agent session not found: {session_id}")
@@ -1252,6 +1267,7 @@ class AgentRuntime:
             blockers=list(blockers or []),
             handoffs=handoff_rows,
             reasoning=[dict(row) for row in reasoning or []],
+            planning_mode=planning_mode,
         )
 
     def list_desks(self) -> list[dict[str, Any]]:
@@ -2992,6 +3008,7 @@ class AgentRuntime:
             blockers=plan.blockers,
             handoffs=plan.handoffs,
             reasoning=[*plan.reasoning, self._session_context_reasoning(session_id)],
+            planning_mode=plan.planning_mode,
         )
 
     def _write_semantic_planner_audit_evidence(

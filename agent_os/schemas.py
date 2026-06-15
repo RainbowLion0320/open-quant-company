@@ -189,6 +189,7 @@ class DeskResponse:
     blockers: list[str]
     handoffs: list[dict[str, Any]]
     reasoning: list[dict[str, Any]] = field(default_factory=list)
+    planning_mode: str = "single_intent"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -200,4 +201,5 @@ class DeskResponse:
             "blockers": list(self.blockers),
             "handoffs": [dict(handoff) for handoff in self.handoffs],
             "reasoning": [dict(row) for row in self.reasoning],
+            "planning_mode": self.planning_mode,
         }

@@ -77,7 +77,18 @@ export const agentApi = {
   ) => patch<{ session: AgentSession }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`, payload),
   agentRunSessionReadOnlyActions: (sessionId: string) =>
     post<AgentReadOnlyWorkflowResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/run-readonly`),
-  agentAutonomyStep: (sessionId: string, payload: { content?: string; text?: string; desk?: string } = {}) =>
+  agentAutonomyStep: (
+    sessionId: string,
+    payload: {
+      content?: string;
+      text?: string;
+      desk?: string;
+      planner_mode?: string;
+      semantic_draft?: Record<string, unknown>;
+      planner_provider?: string;
+      planner_model?: string;
+    } = {},
+  ) =>
     post<AgentAutonomyStepResponse>(
       `/api/agent/sessions/${encodeURIComponent(sessionId)}/autonomy-step`,
       payload,

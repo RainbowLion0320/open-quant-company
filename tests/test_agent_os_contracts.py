@@ -99,6 +99,7 @@ def test_agent_actions_support_session_status_desk_and_risk_filters(tmp_path, mo
         desk="data",
         risk_level="write_data",
     )
+
     cli_code = run_cli(
         [
             "agent",
@@ -342,6 +343,129 @@ def test_agent_autonomy_step_runs_only_new_safe_fixed_registry_actions(tmp_path,
     assert api_res.json()["step"]["mode"] == "bounded_fixed_registry"
     assert api_res.json()["step"]["run_count"] == 0
     assert api_res.json()["step"]["skipped_count"] == 1
+    reset_datahub()
+
+
+def test_agent_autonomy_step_accepts_semantic_draft_then_runs_only_filtered_safe_actions(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import SemanticDraftPlanner
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    semantic_draft = {
+        "answer": "Semantic planner drafted a cross-desk autonomy step.",
+        "confidence": 0.82,
+        "actions": [
+            {
+                "desk": "data",
+                "tool_id": "astroq.data.sources.diff_registry",
+                "summary": "Compare source capabilities with data registry.",
+            },
+            {
+                "desk": "research",
+                "tool_id": "astroq.strategy.compete",
+                "summary": "Read strategy competition evidence.",
+            },
+            {
+                "desk": "data",
+                "tool_id": "astroq.data.repair",
+                "summary": "Unsafe write must not auto-run.",
+                "parameters": {"table": "stock_valuation"},
+            },
+            {"desk": "risk", "tool_id": "astroq.unknown.tool"},
+        ],
+        "reasoning": [{"kind": "semantic_goal", "goal": "autonomous_cross_desk_review"}],
+        "blockers": ["external_planner_untrusted"],
+    }
+    draft_path = tmp_path / "semantic-autonomy.json"
+    draft_path.write_text(json.dumps(semantic_draft, ensure_ascii=False), encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Semantic autonomy", default_desk="reporting")
+    step = runtime.run_autonomy_step(
+        session.session_id,
+        content="用 semantic planner 做一次跨 desk 自主诊断，但只跑安全工具",
+        semantic_planner=SemanticDraftPlanner(semantic_draft),
+        runner=fake_run,
+    )
+
+    assert step["status"] == "ready"
+    assert step["mode"] == "bounded_semantic_fixed_registry"
+    assert step["desk_response"]["planning_mode"] == "semantic_assisted"
+    assert step["run_count"] == 2
+    assert step["skipped_count"] == 0
+    assert [action["parameters"]["tool_id"] for action in step["actions"]] == [
+        "astroq.data.sources.diff_registry",
+        "astroq.strategy.compete",
+    ]
+    assert [command[1:] for command in calls] == [
+        ["data", "sources", "diff-registry", "--json"],
+        ["strategy", "compete", "--json"],
+    ]
+    assert "semantic_plan_requires_manual_review" in step["desk_response"]["blockers"]
+    assert "unsafe_semantic_actions_filtered" in step["desk_response"]["blockers"]
+
+    cli_api_draft = {
+        "answer": "Semantic planner proposed only approval or unknown actions.",
+        "confidence": 0.74,
+        "actions": [
+            {
+                "desk": "data",
+                "tool_id": "astroq.data.repair",
+                "summary": "Unsafe write must stay queued.",
+                "parameters": {"table": "stock_valuation"},
+            },
+            {"desk": "risk", "tool_id": "astroq.unknown.tool"},
+        ],
+        "reasoning": [{"kind": "semantic_goal", "goal": "cli_api_semantic_intake"}],
+    }
+    draft_path.write_text(json.dumps(cli_api_draft, ensure_ascii=False), encoding="utf-8")
+
+    cli_code = run_cli(
+        [
+            "agent",
+            "autonomy",
+            "step",
+            "--session",
+            session.session_id,
+            "--text",
+            "按 semantic draft 执行一次 bounded autonomy",
+            "--semantic-draft-file",
+            str(draft_path),
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(
+        f"/api/agent/sessions/{session.session_id}/autonomy-step",
+        json={
+            "content": "按 semantic draft 执行一次 bounded autonomy",
+            "planner_mode": "semantic_draft",
+            "semantic_draft": cli_api_draft,
+        },
+    )
+
+    assert cli_code == 0
+    assert cli_payload["data"]["step"]["mode"] == "bounded_semantic_fixed_registry"
+    assert cli_payload["data"]["step"]["desk_response"]["planning_mode"] == "semantic_assisted"
+    assert api_res.status_code == 200
+    assert api_res.json()["step"]["mode"] == "bounded_semantic_fixed_registry"
+    assert api_res.json()["step"]["desk_response"]["planning_mode"] == "semantic_assisted"
     reset_datahub()
 
 

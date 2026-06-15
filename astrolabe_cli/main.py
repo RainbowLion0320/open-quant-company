@@ -148,9 +148,29 @@ def build_parser() -> argparse.ArgumentParser:
     agent_autonomy_step_cmd.add_argument("--session", required=True)
     agent_autonomy_step_cmd.add_argument("--desk", default="reporting")
     agent_autonomy_step_cmd.add_argument("--text", default="")
+    agent_autonomy_step_cmd.add_argument(
+        "--semantic-draft-file",
+        default="",
+        help="JSON semantic planner draft to filter through bounded autonomy",
+    )
+    agent_autonomy_step_cmd.add_argument(
+        "--provider-semantic",
+        action="store_true",
+        help="Ask the configured LLM provider to draft a bounded autonomy plan, then server-filter it",
+    )
+    agent_autonomy_step_cmd.add_argument("--planner-provider", default="")
+    agent_autonomy_step_cmd.add_argument("--planner-model", default="")
     add_common_flags(agent_autonomy_step_cmd)
     agent_autonomy_step_cmd.set_defaults(
-        handler=lambda args: agent_autonomy_step(args.session, args.text, args.desk)
+        handler=lambda args: agent_autonomy_step(
+            args.session,
+            args.text,
+            args.desk,
+            args.semantic_draft_file,
+            provider_semantic=args.provider_semantic,
+            planner_provider=args.planner_provider,
+            planner_model=args.planner_model,
+        )
     )
 
     agent_message_cmd = agent_sub.add_parser("message", help="Add a CEO message to a session")

@@ -90,9 +90,28 @@ def run_session_read_only_actions(session_id: str) -> CliResult:
     )
 
 
-def autonomy_step(session_id: str, text: str, desk: str = "reporting") -> CliResult:
+def autonomy_step(
+    session_id: str,
+    text: str,
+    desk: str = "reporting",
+    semantic_draft_file: str = "",
+    *,
+    provider_semantic: bool = False,
+    planner_provider: str = "",
+    planner_model: str = "",
+) -> CliResult:
     try:
-        step = AgentRuntime().run_autonomy_step(session_id, content=text, desk=desk)
+        step = AgentRuntime().run_autonomy_step(
+            session_id,
+            content=text,
+            desk=desk,
+            semantic_planner=semantic_planner_from_cli(
+                semantic_draft_file=semantic_draft_file,
+                provider_semantic=provider_semantic,
+                planner_provider=planner_provider,
+                planner_model=planner_model,
+            ),
+        )
     except KeyError as exc:
         return CliResult(False, "agent autonomy step", {"session_id": session_id}, "Agent session missing", [str(exc)])
     except ValueError as exc:

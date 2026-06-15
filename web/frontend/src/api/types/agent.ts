@@ -263,6 +263,7 @@ export interface AgentDeskResponse {
   blockers: string[];
   handoffs: AgentHandoff[];
   reasoning: AgentReasoningRow[];
+  planning_mode: string;
 }
 
 export interface AgentReasoningRow {

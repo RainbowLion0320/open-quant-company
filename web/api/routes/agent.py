@@ -103,6 +103,7 @@ async def run_agent_autonomy_step(session_id: str, payload: dict[str, Any] | Non
             session_id,
             content=str(body.get("content") or body.get("text") or ""),
             desk=str(body.get("desk") or "reporting"),
+            semantic_planner=semantic_planner_from_payload(body),
         )
     except KeyError:
         raise DataNotFoundError("agent session", session_id)

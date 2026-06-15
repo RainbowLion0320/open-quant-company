@@ -438,6 +438,9 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "AgentAutonomyStepResponse" in agent_types
     assert "agentAutonomyStep" in agent_api
     assert "/api/agent/sessions/${encodeURIComponent(sessionId)}/autonomy-step" in agent_api
+    assert "planner_mode?: string" in agent_api
+    assert "semantic_draft?: Record<string, unknown>" in agent_api
+    assert "planning_mode: string" in agent_types
     assert "agentActions" in agent_api
     assert "filters: AgentActionFilters = {}" in agent_api
     assert "URLSearchParams" in agent_api

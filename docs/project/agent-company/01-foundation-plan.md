@@ -215,7 +215,7 @@ Phase 1 should add JSON-readable commands:
 | `astroq agent sessions --json` | List local agent sessions. |
 | `astroq agent session create --title ... --json` | Create a session. |
 | `astroq agent session run-readonly <session_id> --json` | Run proposed safe read-only/dry-run actions for one session and skip approval-required write/trading actions. |
-| `astroq agent autonomy step --session <session_id> --text ... --json` | Run one bounded autonomy step: create a CEO message, dispatch only newly proposed read-only/dry-run fixed-registry actions, and skip approval-required write/trading actions. |
+| `astroq agent autonomy step --session <session_id> --text ... [--semantic-draft-file draft.json \| --provider-semantic] --json` | Run one bounded autonomy step: create a CEO message, optionally filter semantic planner input, dispatch only newly proposed read-only/dry-run fixed-registry actions, and skip approval-required write/trading actions. |
 | `astroq agent message --session <id> --desk <desk> --text ... --semantic-draft-file draft.json --json` | Add a CEO message and route it; optional semantic draft files are filtered through fixed-registry safety before actions are persisted. |
 | `astroq agent plan --desk <desk> --text ... --semantic-draft-file draft.json --json` | Preview deterministic or draft-assisted workflow actions, approvals, handoffs, and work orders without ledger writes. |
 | `astroq agent actions --session <id> --status <status> --desk <desk> --risk-level <risk> --json` | List actions with explicit session/status/desk/risk filters. |
@@ -231,7 +231,7 @@ Phase 1 should add JSON-readable commands:
 - Adding a message writes a durable message and produces deterministic desk routing metadata.
 - Read-only tools can run through fixed command arrays.
 - Session-level safe workflow runs dispatch only proposed `read_only` / `dry_run` actions and report skipped approval-required write/trading actions.
-- Bounded autonomy steps dispatch only the newly proposed `read_only` / `dry_run` fixed-registry actions from that step and never auto-run older pending actions, writes, paper orders, live orders, or code changes.
+- Bounded autonomy steps dispatch only the newly proposed `read_only` / `dry_run` fixed-registry actions from that step and never auto-run older pending actions, writes, paper orders, live orders, or code changes; semantic draft/provider input is allowed only before the same fixed-registry filtering boundary.
 - Data Desk repair requests with an explicit dimension create a safe dry-run action and a separate approval-required write action.
 - State-changing actions are queued as `approval_required`.
 - Approval policies are explicit runtime/CLI/API contracts, not hidden conditionals.
