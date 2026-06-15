@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from agent_os.evidence import EvidenceResolver
 from agent_os.runtime import AgentRuntime
+from agent_os.semantic_planner import semantic_planner_from_payload
 from web.api.errors import DataNotFoundError, InvalidParameterError
 
 router = APIRouter(prefix="/api/agent", tags=["Agent"])
@@ -104,6 +105,7 @@ async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[st
                 session_id,
                 desk=desk,
                 content=str(payload.get("content") or ""),
+                semantic_planner=semantic_planner_from_payload(payload),
             )
             return {"message": routed["message"].to_dict(), "desk_response": routed["desk_response"].to_dict()}
         message = AgentRuntime().add_message(
@@ -128,7 +130,11 @@ async def preview_agent_workflow_plan(payload: dict[str, Any]) -> dict[str, Any]
     if not content.strip():
         raise InvalidParameterError("content", content, "expected a non-empty CEO message")
     try:
-        plan = AgentRuntime().preview_workflow_plan(desk=desk, content=content)
+        plan = AgentRuntime().preview_workflow_plan(
+            desk=desk,
+            content=content,
+            semantic_planner=semantic_planner_from_payload(payload),
+        )
     except ValueError as exc:
         raise InvalidParameterError("agent_plan", desk, str(exc))
     return {"plan": plan}

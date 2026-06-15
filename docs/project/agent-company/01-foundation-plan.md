@@ -214,8 +214,8 @@ Phase 1 should add JSON-readable commands:
 | `astroq agent sessions --json` | List local agent sessions. |
 | `astroq agent session create --title ... --json` | Create a session. |
 | `astroq agent session run-readonly <session_id> --json` | Run proposed safe read-only/dry-run actions for one session and skip approval-required write/trading actions. |
-| `astroq agent message --session <id> --desk <desk> --text ... --json` | Add a CEO message and route it. |
-| `astroq agent plan --desk <desk> --text ... --json` | Preview deterministic workflow actions, approvals, handoffs, and work orders without ledger writes. |
+| `astroq agent message --session <id> --desk <desk> --text ... --semantic-draft-file draft.json --json` | Add a CEO message and route it; optional semantic draft files are filtered through fixed-registry safety before actions are persisted. |
+| `astroq agent plan --desk <desk> --text ... --semantic-draft-file draft.json --json` | Preview deterministic or draft-assisted workflow actions, approvals, handoffs, and work orders without ledger writes. |
 | `astroq agent actions --session <id> --status <status> --desk <desk> --risk-level <risk> --json` | List actions with explicit session/status/desk/risk filters. |
 | `astroq agent approve <action_id> --json` | Approve an action. |
 | `astroq agent reject <action_id> --reason ... --json` | Reject an action. |

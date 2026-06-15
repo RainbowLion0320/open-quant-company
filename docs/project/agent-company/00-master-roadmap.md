@@ -179,7 +179,7 @@ Current foundation:
 - Bounded session-backlog adaptive planning reads current approval-required actions, open handoffs, and open Engineering work orders, then maps them to safe re-check actions and owner-desk handoffs without approving writes or trades.
 - Bounded `adaptive_artifact` planning fuses current session backlog with local artifact root causes, dedupes overlapping safe actions, and keeps both session and artifact reasoning visible to the CEO.
 - Open-ended company-wide CEO operating requests can be converted into diagnostic-only `open_ended_adaptive` plans across Data, Research, Risk, Execution, and Engineering fixed-registry tools; writes and trades remain blocked by policy.
-- Opt-in semantic planner drafts can be accepted only after filtering to known `read_only` / `dry_run` fixed-registry tools, valid desk scopes, and a manual-review blocker; this is a safety adapter, not production autonomous planning.
+- Opt-in semantic planner drafts can be accepted from runtime injection, API payloads, or CLI draft files only after filtering to known `read_only` / `dry_run` fixed-registry tools, valid desk scopes, and a manual-review blocker; this is a safety adapter, not production autonomous planning.
 - Workflow previews and desk responses include structured reasoning rows for intent match, tool plan, safety, evidence plan, artifact context, session backlog, context fusion, open goal decomposition, and session context.
 
 ### Phase 4 - Evidence and Governance Closure

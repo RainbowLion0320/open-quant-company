@@ -4839,6 +4839,128 @@ def test_agent_semantic_planner_is_opt_in_and_filtered_to_safe_known_tools(tmp_p
     reset_datahub()
 
 
+def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    semantic_draft = {
+        "answer": "Drafted a cross-desk CEO plan from an external planner.",
+        "confidence": 0.88,
+        "actions": [
+            {
+                "desk": "data",
+                "tool_id": "astroq.data.status",
+                "summary": "Inspect current data readiness.",
+                "parameters": {"tool_id": "astroq.data.repair", "table": "stock_limit_list"},
+            },
+            {
+                "desk": "data",
+                "tool_id": "astroq.data.repair",
+                "summary": "Unsafe write repair must be filtered.",
+                "parameters": {"table": "stock_limit_list"},
+            },
+            {
+                "desk": "execution",
+                "tool_id": "astroq.agent.live.submit",
+                "summary": "Unknown live submit must be filtered.",
+            },
+            {
+                "desk": "engineering",
+                "tool_id": "astroq.test.design",
+                "summary": "Inspect test design risks.",
+            },
+        ],
+        "reasoning": [{"kind": "semantic_goal", "goal": "cross_desk_review"}],
+        "blockers": ["external_planner_untrusted"],
+    }
+    draft_path = tmp_path / "semantic-draft.json"
+    draft_path.write_text(json.dumps(semantic_draft, ensure_ascii=False), encoding="utf-8")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="External semantic draft", default_desk="reporting")
+    client = TestClient(create_app())
+    before_summary = runtime.memory_snapshot()["summary"]
+
+    api_res = client.post(
+        "/api/agent/plans",
+        json={
+            "desk": "reporting",
+            "content": "按这个外部 planner 草案做一次安全预览",
+            "planner_mode": "semantic_draft",
+            "semantic_draft": semantic_draft,
+        },
+    )
+    after_summary = runtime.memory_snapshot()["summary"]
+    cli_code = run_cli(
+        [
+            "agent",
+            "plan",
+            "--desk",
+            "reporting",
+            "--text",
+            "按这个外部 planner 草案做一次安全预览",
+            "--semantic-draft-file",
+            str(draft_path),
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    message_res = client.post(
+        f"/api/agent/sessions/{session.session_id}/messages",
+        json={
+            "role": "ceo",
+            "desk": "reporting",
+            "content": "按这个外部 planner 草案创建安全行动卡",
+            "planner_mode": "semantic_draft",
+            "semantic_draft": semantic_draft,
+        },
+    )
+
+    assert before_summary == after_summary
+    assert api_res.status_code == 200
+    api_plan = api_res.json()["plan"]
+    assert api_plan["planning_mode"] == "semantic_assisted"
+    assert api_plan["side_effects"]["ledger_writes"] is False
+    assert [action["tool_id"] for action in api_plan["actions"]] == [
+        "astroq.data.status",
+        "astroq.test.design",
+    ]
+    assert api_plan["actions"][0]["parameters"]["tool_id"] == "astroq.data.status"
+    assert api_plan["actions"][0]["parameters"]["table"] == "stock_limit_list"
+    assert api_plan["blockers"] == [
+        "external_planner_untrusted",
+        "semantic_plan_requires_manual_review",
+        "unsafe_semantic_actions_filtered",
+    ]
+    semantic_reasoning = {row["kind"]: row for row in api_plan["reasoning"]}["semantic_planner"]
+    assert semantic_reasoning["accepted_action_count"] == 2
+    assert semantic_reasoning["rejected_action_count"] == 2
+
+    assert cli_code == 0
+    assert cli_payload["data"]["plan"]["planning_mode"] == "semantic_assisted"
+    assert [action["tool_id"] for action in cli_payload["data"]["plan"]["actions"]] == [
+        "astroq.data.status",
+        "astroq.test.design",
+    ]
+
+    assert message_res.status_code == 200
+    response = message_res.json()["desk_response"]
+    assert response["blockers"] == api_plan["blockers"]
+    persisted_actions = [runtime.get_action(action_id) for action_id in response["proposed_actions"]]
+    assert [action["parameters"]["tool_id"] for action in persisted_actions] == [
+        "astroq.data.status",
+        "astroq.test.design",
+    ]
+    assert all(action["risk_level"] == "read_only" for action in persisted_actions)
+    reset_datahub()
+
+
 def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

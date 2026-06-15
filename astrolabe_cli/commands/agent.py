@@ -3,6 +3,7 @@ from __future__ import annotations
 from astrolabe_cli.results import CliResult
 from agent_os.evidence import EvidenceResolver
 from agent_os.runtime import AgentRuntime
+from agent_os.semantic_planner import semantic_planner_from_file
 
 
 def sessions() -> CliResult:
@@ -89,9 +90,14 @@ def run_session_read_only_actions(session_id: str) -> CliResult:
     )
 
 
-def add_message(session_id: str, desk: str, text: str) -> CliResult:
+def add_message(session_id: str, desk: str, text: str, semantic_draft_file: str = "") -> CliResult:
     try:
-        routed = AgentRuntime().submit_ceo_message(session_id, desk=desk, content=text)
+        routed = AgentRuntime().submit_ceo_message(
+            session_id,
+            desk=desk,
+            content=text,
+            semantic_planner=semantic_planner_from_file(semantic_draft_file),
+        )
     except KeyError as exc:
         return CliResult(False, "agent message", {"session_id": session_id}, "Agent session missing", [str(exc)])
     except ValueError as exc:
@@ -106,9 +112,13 @@ def add_message(session_id: str, desk: str, text: str) -> CliResult:
     )
 
 
-def plan(desk: str, text: str) -> CliResult:
+def plan(desk: str, text: str, semantic_draft_file: str = "") -> CliResult:
     try:
-        workflow_plan = AgentRuntime().preview_workflow_plan(desk=desk, content=text)
+        workflow_plan = AgentRuntime().preview_workflow_plan(
+            desk=desk,
+            content=text,
+            semantic_planner=semantic_planner_from_file(semantic_draft_file),
+        )
     except ValueError as exc:
         return CliResult(False, "agent plan", {"desk": desk}, "Agent workflow plan invalid", [str(exc)])
     return CliResult(

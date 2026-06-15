@@ -38,7 +38,7 @@ Each desk response must include:
 
 Current foundation:
 
-- Workflow previews and persisted desk responses include deterministic reasoning rows for intent match, tool plan, safety, evidence plan, and current session context. Opt-in semantic planner drafts may add semantic-planner reasoning rows, but only after filtering to safe fixed-registry tools and manual review; fixed-tool reasoning remains the production boundary.
+- Workflow previews and persisted desk responses include deterministic reasoning rows for intent match, tool plan, safety, evidence plan, and current session context. Opt-in semantic planner drafts may come from runtime injection, API payloads, or CLI draft files and may add semantic-planner reasoning rows, but only after filtering to safe fixed-registry tools and manual review; fixed-tool reasoning remains the production boundary.
 
 ## 3. Data Desk
 

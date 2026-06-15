@@ -142,14 +142,26 @@ def build_parser() -> argparse.ArgumentParser:
     agent_message_cmd.add_argument("--session", required=True)
     agent_message_cmd.add_argument("--desk", default="reporting")
     agent_message_cmd.add_argument("--text", required=True)
+    agent_message_cmd.add_argument(
+        "--semantic-draft-file",
+        default="",
+        help="JSON semantic planner draft to filter through the fixed agent tool registry",
+    )
     add_common_flags(agent_message_cmd)
-    agent_message_cmd.set_defaults(handler=lambda args: agent_add_message(args.session, args.desk, args.text))
+    agent_message_cmd.set_defaults(
+        handler=lambda args: agent_add_message(args.session, args.desk, args.text, args.semantic_draft_file)
+    )
 
     agent_plan_cmd = agent_sub.add_parser("plan", help="Preview an agent workflow without ledger writes")
     agent_plan_cmd.add_argument("--desk", default="reporting")
     agent_plan_cmd.add_argument("--text", required=True)
+    agent_plan_cmd.add_argument(
+        "--semantic-draft-file",
+        default="",
+        help="JSON semantic planner draft to filter through the fixed agent tool registry",
+    )
     add_common_flags(agent_plan_cmd)
-    agent_plan_cmd.set_defaults(handler=lambda args: agent_plan(args.desk, args.text))
+    agent_plan_cmd.set_defaults(handler=lambda args: agent_plan(args.desk, args.text, args.semantic_draft_file))
 
     agent_actions_cmd = agent_sub.add_parser("actions", help="List agent actions")
     agent_actions_cmd.add_argument("--session", default="")
