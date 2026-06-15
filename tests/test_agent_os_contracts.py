@@ -255,6 +255,96 @@ def test_agent_session_stream_snapshot_and_sse_once_api(tmp_path, monkeypatch):
     reset_datahub()
 
 
+def test_agent_autonomy_step_runs_only_new_safe_fixed_registry_actions(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Bounded autonomy", default_desk="reporting")
+    old_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="data",
+        action_type="data_status",
+        risk_level="read_only",
+        summary="Old proposed action should not run in the new autonomy step.",
+        parameters={"tool_id": "astroq.data.status"},
+    )
+
+    step = runtime.run_autonomy_step(
+        session.session_id,
+        content="检查数据源、策略 OOS、lifecycle gate、execution dry-run 和测试设计；自动跑安全项",
+        runner=fake_run,
+    )
+    new_action_ids = {action["action_id"] for action in step["actions"]}
+
+    assert step["status"] == "ready"
+    assert step["mode"] == "bounded_fixed_registry"
+    assert step["desk_response"]["message"]["desk"] == "reporting"
+    assert step["run_count"] == 5
+    assert step["skipped_count"] == 0
+    assert old_action.action_id not in new_action_ids
+    assert {run["action_id"] for run in step["runs"]} == new_action_ids
+    assert [command[1:] for command in calls] == [
+        ["data", "sources", "diff-registry", "--json"],
+        ["strategy", "compete", "--json"],
+        ["lifecycle", "check", "--json"],
+        ["execution", "dry-run", "--json"],
+        ["test", "design", "--json"],
+    ]
+
+    write_step = runtime.run_autonomy_step(
+        session.session_id,
+        content="请生成 daily CEO brief report artifact，进入审批，不要自动写报告",
+        runner=fake_run,
+    )
+
+    assert write_step["run_count"] == 0
+    assert write_step["skipped_count"] == 1
+    assert write_step["skipped"][0]["risk_level"] == "write_artifact"
+    assert write_step["skipped"][0]["reason"] == "not_safe_autonomy_action"
+
+    cli_code = run_cli(
+        [
+            "agent",
+            "autonomy",
+            "step",
+            "--session",
+            session.session_id,
+            "--text",
+            "请生成 daily CEO brief report artifact，进入审批，不要自动写报告",
+            "--json",
+        ]
+    )
+    cli_payload = json.loads(capsys.readouterr().out)
+    api_res = TestClient(create_app()).post(
+        f"/api/agent/sessions/{session.session_id}/autonomy-step",
+        json={"content": "请生成 daily CEO brief report artifact，进入审批，不要自动写报告"},
+    )
+
+    assert cli_code == 0
+    assert cli_payload["data"]["step"]["mode"] == "bounded_fixed_registry"
+    assert cli_payload["data"]["step"]["run_count"] == 0
+    assert cli_payload["data"]["step"]["skipped_count"] == 1
+    assert api_res.status_code == 200
+    assert api_res.json()["step"]["mode"] == "bounded_fixed_registry"
+    assert api_res.json()["step"]["run_count"] == 0
+    assert api_res.json()["step"]["skipped_count"] == 1
+    reset_datahub()
+
+
 def test_agent_run_stream_snapshot_and_sse_once_api(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")

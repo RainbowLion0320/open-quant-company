@@ -90,6 +90,26 @@ def run_session_read_only_actions(session_id: str) -> CliResult:
     )
 
 
+def autonomy_step(session_id: str, text: str, desk: str = "reporting") -> CliResult:
+    try:
+        step = AgentRuntime().run_autonomy_step(session_id, content=text, desk=desk)
+    except KeyError as exc:
+        return CliResult(False, "agent autonomy step", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    except ValueError as exc:
+        return CliResult(False, "agent autonomy step", {"session_id": session_id, "desk": desk}, "Agent autonomy step invalid", [str(exc)])
+    ok = step["status"] in {"ready", "partial"}
+    return CliResult(
+        ok=ok,
+        command="agent autonomy step",
+        message=(
+            f"Bounded autonomy step {step['status']}: "
+            f"ran {step['run_count']} action(s), skipped {step['skipped_count']} action(s)"
+        ),
+        data={"step": step},
+        errors=[] if ok else [str(step["status"])],
+    )
+
+
 def add_message(
     session_id: str,
     desk: str,

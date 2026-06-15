@@ -95,6 +95,22 @@ async def run_agent_session_read_only_actions(session_id: str) -> dict[str, Any]
     return {"workflow": workflow}
 
 
+@router.post("/sessions/{session_id}/autonomy-step")
+async def run_agent_autonomy_step(session_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    body = payload or {}
+    try:
+        step = AgentRuntime().run_autonomy_step(
+            session_id,
+            content=str(body.get("content") or body.get("text") or ""),
+            desk=str(body.get("desk") or "reporting"),
+        )
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+    except ValueError as exc:
+        raise InvalidParameterError("agent_autonomy_step", session_id, str(exc))
+    return {"step": step}
+
+
 @router.post("/sessions/{session_id}/messages")
 async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     role = str(payload.get("role") or "ceo")

@@ -8,6 +8,7 @@ from astrolabe_cli.commands.config import env_status
 from astrolabe_cli.commands.config import validate_config
 from astrolabe_cli.commands.agent import actions as agent_actions
 from astrolabe_cli.commands.agent import add_message as agent_add_message
+from astrolabe_cli.commands.agent import autonomy_step as agent_autonomy_step
 from astrolabe_cli.commands.agent import approve as agent_approve
 from astrolabe_cli.commands.agent import cancel as agent_cancel
 from astrolabe_cli.commands.agent import create_session as agent_create_session
@@ -137,6 +138,20 @@ def build_parser() -> argparse.ArgumentParser:
     agent_session_run_readonly.add_argument("session_id")
     add_common_flags(agent_session_run_readonly)
     agent_session_run_readonly.set_defaults(handler=lambda args: agent_run_session_read_only_actions(args.session_id))
+
+    agent_autonomy_cmd = agent_sub.add_parser("autonomy", help="Run bounded Agent Company OS autonomy steps")
+    agent_autonomy_sub = agent_autonomy_cmd.add_subparsers(dest="agent_autonomy_command", required=True)
+    agent_autonomy_step_cmd = agent_autonomy_sub.add_parser(
+        "step",
+        help="Plan once and run only new read-only/dry-run fixed-registry actions",
+    )
+    agent_autonomy_step_cmd.add_argument("--session", required=True)
+    agent_autonomy_step_cmd.add_argument("--desk", default="reporting")
+    agent_autonomy_step_cmd.add_argument("--text", default="")
+    add_common_flags(agent_autonomy_step_cmd)
+    agent_autonomy_step_cmd.set_defaults(
+        handler=lambda args: agent_autonomy_step(args.session, args.text, args.desk)
+    )
 
     agent_message_cmd = agent_sub.add_parser("message", help="Add a CEO message to a session")
     agent_message_cmd.add_argument("--session", required=True)

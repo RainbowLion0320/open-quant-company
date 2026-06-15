@@ -103,6 +103,25 @@ export interface AgentReadOnlyWorkflow {
   skipped: Array<Record<string, unknown>>;
 }
 
+export interface AgentAutonomyStep {
+  status: string;
+  mode: string;
+  session_id: string;
+  desk: string;
+  checked_at: string;
+  message: AgentMessage;
+  desk_response: AgentDeskResponse;
+  actions: AgentAction[];
+  action_count: number;
+  run_count: number;
+  failed_count: number;
+  blocked_count: number;
+  skipped_count: number;
+  runs: AgentRun[];
+  skipped: Array<Record<string, unknown>>;
+  boundary: Record<string, unknown>;
+}
+
 export interface AgentApprovalPolicy {
   policy_id: string;
   risk_level: string;
@@ -340,6 +359,10 @@ export interface AgentRunStreamSnapshot {
 
 export interface AgentReadOnlyWorkflowResponse {
   workflow: AgentReadOnlyWorkflow;
+}
+
+export interface AgentAutonomyStepResponse {
+  step: AgentAutonomyStep;
 }
 
 export interface AgentActionDetail {

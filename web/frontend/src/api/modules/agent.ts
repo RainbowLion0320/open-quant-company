@@ -4,6 +4,7 @@ import type {
   AgentActionDetail,
   AgentActionFilters,
   AgentAddMessageResponse,
+  AgentAutonomyStepResponse,
   AgentActionsResponse,
   AgentApprovalPoliciesResponse,
   AgentDesksResponse,
@@ -76,6 +77,11 @@ export const agentApi = {
   ) => patch<{ session: AgentSession }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`, payload),
   agentRunSessionReadOnlyActions: (sessionId: string) =>
     post<AgentReadOnlyWorkflowResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/run-readonly`),
+  agentAutonomyStep: (sessionId: string, payload: { content?: string; text?: string; desk?: string } = {}) =>
+    post<AgentAutonomyStepResponse>(
+      `/api/agent/sessions/${encodeURIComponent(sessionId)}/autonomy-step`,
+      payload,
+    ),
   agentAddMessage: (
     sessionId: string,
     payload: {

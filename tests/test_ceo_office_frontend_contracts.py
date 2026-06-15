@@ -434,6 +434,10 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentRunStream" in agent_api
     assert "run_snapshot" in agent_api
     assert '`/api/agent/runs/${encodeURIComponent(runId)}/stream`' in agent_api
+    assert "AgentAutonomyStep" in agent_types
+    assert "AgentAutonomyStepResponse" in agent_types
+    assert "agentAutonomyStep" in agent_api
+    assert "/api/agent/sessions/${encodeURIComponent(sessionId)}/autonomy-step" in agent_api
     assert "agentActions" in agent_api
     assert "filters: AgentActionFilters = {}" in agent_api
     assert "URLSearchParams" in agent_api

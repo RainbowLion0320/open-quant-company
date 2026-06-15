@@ -966,6 +966,106 @@ class AgentRuntime:
             "skipped": skipped,
         }
 
+    def run_autonomy_step(
+        self,
+        session_id: str,
+        *,
+        content: str = "",
+        desk: str = "reporting",
+        runner: Any | None = None,
+        timeout_seconds: int = 120,
+        tool_registry: AgentToolRegistry | None = None,
+    ) -> dict[str, Any]:
+        """Run one bounded autonomous planning step for a session.
+
+        The step creates a normal CEO message and desk response, then dispatches
+        only the newly proposed read-only/dry-run actions. Approval-required,
+        write, paper, and live actions remain queued for the CEO.
+        """
+        if not self.ledger.get_session(session_id):
+            raise KeyError(f"Agent session not found: {session_id}")
+        normalized_content = content.strip() or (
+            "请作为 CEO Office 推进当前公司优先级，只自动运行 read-only/dry-run 安全动作，"
+            "不要写数据、写报告、改代码或交易。"
+        )
+        routed = self.submit_ceo_message(session_id, desk=desk, content=normalized_content)
+        desk_response = routed["desk_response"]
+        new_action_ids = list(desk_response.proposed_actions)
+        runs: list[dict[str, Any]] = []
+        skipped: list[dict[str, Any]] = []
+
+        for action_id in new_action_ids:
+            action = self.get_action(action_id)
+            if action is None:
+                skipped.append(
+                    {
+                        "action_id": action_id,
+                        "desk": "",
+                        "risk_level": "",
+                        "status": "missing",
+                        "reason": "missing_autonomy_action",
+                    }
+                )
+                continue
+            risk_level = str(action.get("risk_level") or "")
+            status = str(action.get("status") or "")
+            if risk_level not in {"read_only", "dry_run"} or bool(action.get("approval_required")):
+                skipped.append(
+                    {
+                        "action_id": action_id,
+                        "desk": str(action.get("desk") or ""),
+                        "risk_level": risk_level,
+                        "status": status,
+                        "reason": "not_safe_autonomy_action",
+                    }
+                )
+                continue
+            if status != "proposed":
+                skipped.append(
+                    {
+                        "action_id": action_id,
+                        "desk": str(action.get("desk") or ""),
+                        "risk_level": risk_level,
+                        "status": status,
+                        "reason": "status_not_proposed",
+                    }
+                )
+                continue
+            run = self.dispatch_action(
+                action_id,
+                runner=runner,
+                timeout_seconds=timeout_seconds,
+                tool_registry=tool_registry,
+            )
+            runs.append(self.get_run(run.run_id) or run.to_dict())
+
+        failed_count = sum(1 for run in runs if run.get("status") == "failed")
+        blocked_count = sum(1 for run in runs if run.get("status") == "blocked")
+        status = "ready" if failed_count == 0 and blocked_count == 0 else "partial"
+        return {
+            "status": status,
+            "mode": "bounded_fixed_registry",
+            "session_id": session_id,
+            "desk": desk,
+            "checked_at": _now(),
+            "message": routed["message"].to_dict(),
+            "desk_response": desk_response.to_dict(),
+            "actions": [self.get_action(action_id) for action_id in new_action_ids if self.get_action(action_id)],
+            "action_count": len(new_action_ids),
+            "run_count": len(runs),
+            "failed_count": failed_count,
+            "blocked_count": blocked_count,
+            "skipped_count": len(skipped),
+            "runs": runs,
+            "skipped": skipped,
+            "boundary": {
+                "allowed_risk_levels": ["read_only", "dry_run"],
+                "fixed_registry_only": True,
+                "approval_required_actions_skipped": True,
+                "writes_and_trades_skipped": True,
+            },
+        }
+
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         run = self.ledger.get_run(run_id)
         return self._run_with_events(run) if run else None
