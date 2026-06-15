@@ -109,6 +109,7 @@ def build_report_payload(
     normalized_kind = normalize_report_kind(kind)
     artifact_context = dict(artifact_context or empty_report_artifact_context())
     artifact_context["domain_scorecard"] = _domain_scorecard_synthesis(artifact_context)
+    artifact_context["source_narratives"] = _source_narrative_synthesis(artifact_context)
     artifact_context["trend_synthesis"] = _report_trend_synthesis(artifact_context, report_history or [])
     artifact_context["artifact_timeline_synthesis"] = _artifact_timeline_synthesis(
         artifact_context,
@@ -183,6 +184,12 @@ def build_report_payload(
             "section_id": "domain_scorecard",
             "title": "Domain Scorecard",
             "body": _domain_scorecard_body(artifact_context),
+            "evidence_refs": [],
+        },
+        {
+            "section_id": "source_narratives",
+            "title": "Source Narratives",
+            "body": _source_narratives_body(artifact_context),
             "evidence_refs": [],
         },
         {
@@ -267,6 +274,11 @@ def empty_report_artifact_context() -> dict[str, Any]:
             "desks": [],
             "next_actions": ["Generate local intelligence artifacts before building a desk-level scorecard."],
         },
+        "source_narratives": {
+            "overall_status": "missing",
+            "items": [],
+            "next_actions": ["Generate local intelligence artifacts before building source narratives."],
+        },
         "artifact_timeline_synthesis": {
             "status": "no_history",
             "history_report_count": 0,
@@ -318,6 +330,7 @@ def collect_report_artifact_context(artifact_root: Path | None = None) -> dict[s
     }
     context["synthesis"] = _artifact_semantic_synthesis(context)
     context["domain_scorecard"] = _domain_scorecard_synthesis(context)
+    context["source_narratives"] = _source_narrative_synthesis(context)
     return context
 
 
@@ -682,6 +695,230 @@ def _domain_scorecard_body(artifact_context: dict[str, Any]) -> str:
         causes = ", ".join(str(cause) for cause in row.get("root_causes", []) if cause) or "none"
         lines.append(f"- {desk}: {status} - causes={causes} - next={command}")
     for action in scorecard.get("next_actions", [])[:6]:
+        lines.append(f"- Next action: {action}")
+    return "\n".join(lines)
+
+
+def _source_narrative_synthesis(artifact_context: dict[str, Any]) -> dict[str, Any]:
+    items = [item for item in artifact_context.get("items", []) if isinstance(item, dict)]
+    narratives = [_source_narrative_row(item) for item in items]
+    statuses = {str(row.get("status") or "") for row in narratives}
+    if "blocked" in statuses:
+        overall_status = "blocked"
+    elif {"attention", "invalid"} & statuses:
+        overall_status = "attention"
+    elif narratives and statuses == {"missing"}:
+        overall_status = "missing"
+    elif "missing" in statuses:
+        overall_status = "partial"
+    else:
+        overall_status = "ready"
+    next_actions = _ordered_unique(
+        [
+            str(row.get("recommended_command") or "")
+            for row in narratives
+            if row.get("status") in {"blocked", "attention", "invalid", "missing"}
+        ]
+    )
+    return {
+        "overall_status": overall_status,
+        "item_count": len(narratives),
+        "items": narratives,
+        "next_actions": [action for action in next_actions if action][:8]
+        or ["No source-specific follow-up command is required for the current artifact context."],
+    }
+
+
+def _source_narrative_row(item: dict[str, Any]) -> dict[str, Any]:
+    key = str(item.get("key") or "")
+    owner_desk, command = _source_narrative_owner_and_command(key)
+    title = str(item.get("title") or key or "Unknown Source")
+    relative_path = str(item.get("relative_path") or "")
+    raw_status = str(item.get("status") or "unknown")
+    summary = item.get("summary") if isinstance(item.get("summary"), dict) else {}
+    findings = [finding for finding in item.get("findings", []) if isinstance(finding, dict)]
+    status = _source_narrative_status(key, raw_status, summary, findings)
+    headline, evidence_summary = _source_narrative_text(
+        key=key,
+        status=status,
+        raw_status=raw_status,
+        summary=summary,
+        findings=findings,
+        relative_path=relative_path,
+        error=str(item.get("error") or ""),
+    )
+    return {
+        "key": key,
+        "title": title,
+        "owner_desk": owner_desk,
+        "status": status,
+        "artifact_status": raw_status,
+        "relative_path": relative_path,
+        "headline": headline,
+        "evidence_summary": evidence_summary,
+        "finding_count": len(findings),
+        "recommended_command": command,
+    }
+
+
+def _source_narrative_owner_and_command(key: str) -> tuple[str, str]:
+    rules = {
+        "lifecycle": ("risk", "astroq lifecycle check --json"),
+        "data_sources": ("data", "astroq data sources diff-registry --json"),
+        "strategy_competition": ("research", "astroq strategy compete --json"),
+        "ast_intelligence": ("engineering", "astroq architecture ast --json"),
+        "test_design": ("engineering", "astroq test design --json"),
+        "codegraph": ("engineering", "codegraph sync ."),
+    }
+    return rules.get(key, ("reporting", "astroq agent report daily --session <session_id> --json"))
+
+
+def _source_narrative_status(
+    key: str,
+    raw_status: str,
+    summary: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> str:
+    if raw_status == "missing":
+        return "missing"
+    if raw_status == "invalid":
+        return "invalid"
+
+    if key == "lifecycle":
+        blocked = _int_value(summary.get("blocked"))
+        has_blockers = any(str(finding.get("kind") or "") == "blockers" for finding in findings)
+        return "blocked" if blocked > 0 or has_blockers else "ready"
+
+    if key == "data_sources":
+        capability_count = _int_value(summary.get("capability_count"))
+        integrated_count = _int_value(summary.get("project_integrated_count"))
+        unmapped_count = _int_value(summary.get("capability_unmapped_count"))
+        if capability_count > integrated_count or unmapped_count > 0:
+            return "attention"
+        return "ready"
+
+    if key == "strategy_competition":
+        blocked = _int_value(summary.get("blocked")) + _int_value(summary.get("invalid_count")) + _int_value(summary.get("error_count"))
+        return "blocked" if blocked > 0 else "ready"
+
+    if key == "ast_intelligence":
+        return "attention" if _int_value(summary.get("issue_count")) > 0 else "ready"
+
+    if key == "test_design":
+        risk_count = _int_value(summary.get("design_risk_count")) + _int_value(summary.get("smell_count"))
+        return "attention" if risk_count > 0 else "ready"
+
+    if key == "codegraph":
+        stale = str(summary.get("stale") or "").lower() == "true"
+        pending = _int_value(summary.get("pending_changes"))
+        return "attention" if stale or pending > 0 else "ready"
+
+    return "ready"
+
+
+def _source_narrative_text(
+    *,
+    key: str,
+    status: str,
+    raw_status: str,
+    summary: dict[str, Any],
+    findings: list[dict[str, Any]],
+    relative_path: str,
+    error: str,
+) -> tuple[str, str]:
+    if status == "missing":
+        return (
+            "Required local intelligence artifact is missing.",
+            f"{relative_path} has not been generated.",
+        )
+    if status == "invalid":
+        return (
+            "Required local intelligence artifact could not be parsed.",
+            error or f"{relative_path} is invalid.",
+        )
+
+    if key == "lifecycle":
+        if status == "blocked":
+            return (
+                "Lifecycle evidence has blockers, so Risk and Execution should stay gated.",
+                _source_findings_summary(findings) or _compact_json(summary, limit=300),
+            )
+        return ("Lifecycle readiness has no blocker findings in the latest artifact.", _compact_json(summary, limit=300))
+
+    if key == "data_sources":
+        capability_count = _int_value(summary.get("capability_count"))
+        integrated_count = _int_value(summary.get("project_integrated_count"))
+        unmapped_count = _int_value(summary.get("capability_unmapped_count"))
+        if status == "attention":
+            return (
+                "Source capability coverage is broader than project-integrated dimensions.",
+                f"{integrated_count}/{capability_count} capabilities integrated; {unmapped_count} unmapped.",
+            )
+        return ("Source capability registry and project integration summary look aligned.", _compact_json(summary, limit=300))
+
+    if key == "strategy_competition":
+        blocked = _int_value(summary.get("blocked")) + _int_value(summary.get("invalid_count")) + _int_value(summary.get("error_count"))
+        if status == "blocked":
+            return (
+                "Strategy competition evidence still contains blocked or invalid rows.",
+                f"{blocked} strategy evidence row(s) blocked or invalid; summary={_compact_json(summary, limit=260)}",
+            )
+        return ("Strategy competition evidence has no blocked rows in the latest summary.", _compact_json(summary, limit=300))
+
+    if key == "ast_intelligence":
+        issue_count = _int_value(summary.get("issue_count"))
+        if status == "attention":
+            return (
+                "Architecture diagnostics found implementation quality risks.",
+                f"{issue_count} AST issue(s); summary={_compact_json(summary, limit=300)}",
+            )
+        return ("Architecture diagnostics found no issue count in the latest summary.", _compact_json(summary, limit=300))
+
+    if key == "test_design":
+        risk_count = _int_value(summary.get("design_risk_count")) + _int_value(summary.get("smell_count"))
+        if status == "attention":
+            return (
+                "Test design diagnostics found review risks beyond plain pass/fail results.",
+                f"{risk_count} test design risk(s); summary={_compact_json(summary, limit=300)}",
+            )
+        return ("Test design diagnostics found no design risk count in the latest summary.", _compact_json(summary, limit=300))
+
+    if key == "codegraph":
+        if status == "attention":
+            return (
+                "CodeGraph index is stale or has pending changes.",
+                _compact_json(summary, limit=300),
+            )
+        return ("CodeGraph readiness has no stale or pending-change signal in the latest summary.", _compact_json(summary, limit=300))
+
+    return (f"{raw_status.title()} source artifact was included in the report context.", _compact_json(summary, limit=300))
+
+
+def _source_findings_summary(findings: list[dict[str, Any]]) -> str:
+    parts = [
+        _compact_json(finding.get("evidence"), limit=240)
+        for finding in findings[:3]
+        if isinstance(finding, dict)
+    ]
+    return " | ".join(part for part in parts if part)
+
+
+def _source_narratives_body(artifact_context: dict[str, Any]) -> str:
+    narratives = artifact_context.get("source_narratives")
+    if not isinstance(narratives, dict):
+        narratives = _source_narrative_synthesis(artifact_context)
+    lines = [f"- Overall: {narratives.get('overall_status', 'unknown')}"]
+    for row in narratives.get("items", [])[:8]:
+        if not isinstance(row, dict):
+            continue
+        owner = str(row.get("owner_desk") or "unknown").title()
+        lines.append(
+            "- "
+            f"{row.get('key')} [{owner}]: {row.get('status')} - "
+            f"{row.get('headline')} evidence={row.get('evidence_summary')} "
+            f"next={row.get('recommended_command')}"
+        )
+    for action in narratives.get("next_actions", [])[:6]:
         lines.append(f"- Next action: {action}")
     return "\n".join(lines)
 

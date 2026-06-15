@@ -2814,6 +2814,19 @@ def test_agent_reports_aggregate_system_artifact_context(tmp_path, monkeypatch):
     assert scorecard_by_desk["data"]["recommended_command"] == "astroq data sources diff-registry --json"
     assert scorecard_by_desk["execution"]["status"] == "blocked"
     assert "lifecycle_blocker" in scorecard_by_desk["execution"]["root_causes"]
+    assert "source_narratives" in sections
+    source_narratives = context["source_narratives"]
+    narratives_by_key = {row["key"]: row for row in source_narratives["items"]}
+    assert source_narratives["overall_status"] == "blocked"
+    assert narratives_by_key["lifecycle"]["owner_desk"] == "risk"
+    assert narratives_by_key["lifecycle"]["status"] == "blocked"
+    assert narratives_by_key["lifecycle"]["recommended_command"] == "astroq lifecycle check --json"
+    assert "macro_gdp" in narratives_by_key["lifecycle"]["evidence_summary"]
+    assert narratives_by_key["data_sources"]["owner_desk"] == "data"
+    assert narratives_by_key["data_sources"]["status"] == "attention"
+    assert narratives_by_key["data_sources"]["recommended_command"] == "astroq data sources diff-registry --json"
+    assert narratives_by_key["strategy_competition"]["owner_desk"] == "research"
+    assert narratives_by_key["strategy_competition"]["status"] == "blocked"
     assert any(item["key"] == "lifecycle" and item["status"] == "available" for item in context["items"])
     assert any(item["key"] == "codegraph" and item["status"] == "missing" for item in context["items"])
     assert "macro_gdp" in sections["artifact_findings"]["body"]
@@ -2823,6 +2836,8 @@ def test_agent_reports_aggregate_system_artifact_context(tmp_path, monkeypatch):
     assert "data_source_gap" in sections["semantic_synthesis"]["body"]
     assert "strategy_competition" in sections["artifact_readiness"]["body"]
     assert "Risk: blocked" in sections["domain_scorecard"]["body"]
+    assert "lifecycle [Risk]: blocked" in sections["source_narratives"]["body"]
+    assert "data_sources [Data]: attention" in sections["source_narratives"]["body"]
     assert "data-sources/latest.json" in sections["artifact_readiness"]["body"]
     assert "codegraph" in sections["artifact_readiness"]["body"]
     assert "artifact_context" in payload
