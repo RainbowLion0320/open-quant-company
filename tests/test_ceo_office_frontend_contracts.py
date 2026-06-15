@@ -170,6 +170,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.runLiveReconciliation" in view
     assert "ceoOffice.liveReconciliation" in view
     assert "reports" in view
+    assert "reportSectionPreview" in view
+    assert "report.sections" in view
+    assert "ceoOffice.reportSections" in view
     assert "generateReport" in view
     assert "ceoOffice.reportKind" in view
     assert "ceoOffice.generateReport" in view
@@ -181,6 +184,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.rhythmStatus" in view
     assert "ceoOffice.sessionCount" in view
     assert "ceoOffice.reports" in view
+    assert "报告要点" in zh_ceo
+    assert "Report Sections" in en_ceo
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
     assert "ceoOffice.paperReconciliation" in view

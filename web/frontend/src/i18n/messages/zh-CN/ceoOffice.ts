@@ -47,6 +47,7 @@ export const ceoOffice = {
       noHandoffs: "暂无交接事项",
       noWorkOrders: "暂无工程工单",
       noReports: "暂无报告",
+      reportSections: "报告要点",
       noLiveReadiness: "暂无实盘就绪状态",
       reportKind: "报告类型",
       generateReport: "生成报告",

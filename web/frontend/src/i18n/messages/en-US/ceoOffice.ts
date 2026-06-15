@@ -47,6 +47,7 @@ export const ceoOffice = {
       noHandoffs: "No handoffs",
       noWorkOrders: "No engineering work orders",
       noReports: "No reports",
+      reportSections: "Report Sections",
       noLiveReadiness: "No live readiness status",
       reportKind: "Report Type",
       generateReport: "Generate Report",

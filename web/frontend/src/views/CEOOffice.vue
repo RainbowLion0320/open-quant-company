@@ -499,6 +499,18 @@
               </div>
               <p>{{ report.summary }}</p>
               <small>{{ report.kind }} · {{ report.evidence_refs.length }} evidence refs</small>
+              <div v-if="reportSectionPreview(report).length" class="report-section-preview">
+                <small>{{ t("ceoOffice.reportSections") }}</small>
+                <div
+                  v-for="section in reportSectionPreview(report)"
+                  :key="`${report.report_id}-${section.sectionId}`"
+                  class="report-section-row"
+                >
+                  <code>{{ section.sectionId }}</code>
+                  <strong>{{ section.title }}</strong>
+                  <p>{{ section.body }}</p>
+                </div>
+              </div>
               <div class="approval-buttons">
                 <button class="btn btn-xs" type="button" @click="loadEvidence(report.evidence_id)">
                   {{ t("ceoOffice.openEvidence") }}
@@ -864,6 +876,12 @@ const deskNames = computed<Record<string, string>>(() => ({
   reporting: t("ceoOffice.reportingDesk"),
 }));
 
+interface ReportSectionPreview {
+  sectionId: string;
+  title: string;
+  body: string;
+}
+
 function deskLabel(desk: string) {
   return deskNames.value[desk] || desk;
 }
@@ -895,6 +913,31 @@ function reasoningSummary(row: Record<string, unknown>) {
     return `${kind}: ${Number(row.handoff_count || 0)} handoffs`;
   }
   return kind;
+}
+
+function reportSectionPreview(report: AgentReport): ReportSectionPreview[] {
+  const priorities = new Map([
+    ["causal_chain_synthesis", 0],
+    ["semantic_synthesis", 1],
+    ["trend_synthesis", 2],
+    ["artifact_findings", 3],
+    ["open_work", 4],
+  ]);
+  return (report.sections || [])
+    .map(section => {
+      const sectionId = String(section.section_id || "");
+      const body = String(section.body || "").replace(/\s+/g, " ").trim();
+      return {
+        sectionId,
+        title: String(section.title || sectionId || "Section"),
+        body: body.length > 220 ? `${body.slice(0, 220)}...` : body,
+        priority: priorities.get(sectionId) ?? 99,
+      };
+    })
+    .filter(section => section.sectionId && section.body)
+    .sort((left, right) => left.priority - right.priority)
+    .slice(0, 3)
+    .map(({ sectionId, title, body }) => ({ sectionId, title, body }));
 }
 
 function statusLabel(status: string) {

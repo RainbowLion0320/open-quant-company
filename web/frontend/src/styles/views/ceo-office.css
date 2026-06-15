@@ -484,6 +484,40 @@
   font-size: 12px;
 }
 
+.report-section-preview {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.report-section-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.22fr) minmax(120px, 0.28fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.026);
+}
+
+.report-section-row code {
+  color: var(--accent-cyan);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.report-section-row strong {
+  color: var(--text-primary);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.report-section-row p {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
 .rhythm-status {
   display: grid;
   gap: 4px;
