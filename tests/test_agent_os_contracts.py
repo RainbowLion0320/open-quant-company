@@ -5680,6 +5680,57 @@ def test_research_strategy_blocker_review_orchestrates_research_data_risk_action
     reset_datahub()
 
 
+def test_risk_lifecycle_review_cites_current_artifact_blockers(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import get_datahub, reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    hub = get_datahub()
+    artifact_root = hub.artifact_dir("lifecycle").parent
+    payloads = {
+        "lifecycle/latest.json": {
+            "status": "blocked",
+            "summary": {"blocked": 2},
+            "blockers": [{"dimension": "risk_free_curve", "reason": "missing_data"}],
+        },
+        "data-sources/latest.json": {
+            "summary": {"capability_unmapped_count": 3},
+        },
+    }
+    for relative, payload in payloads.items():
+        path = artifact_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Risk lifecycle review", default_desk="risk")
+
+    result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="risk",
+        content="看一下 lifecycle gate 和风险门禁为什么阻断",
+    )
+    response = result["desk_response"]
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+
+    assert len(actions) == 1
+    assert actions[0]["desk"] == "risk"
+    assert actions[0]["risk_level"] == "read_only"
+    assert actions[0]["parameters"]["tool_id"] == "astroq.lifecycle.check"
+    assert "risk_free_curve" in response.answer
+    assert "missing_data" in response.answer
+    assert "3" in response.answer
+    assert reasoning_by_kind["artifact_context"]["evidence_summary"][:2] == [
+        "lifecycle: risk_free_curve missing_data",
+        "data: 3 unmapped source capabilities",
+    ]
+    reset_datahub()
+
+
 def test_safe_workflow_runs_strategy_blocker_review_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub

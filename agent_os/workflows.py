@@ -335,6 +335,8 @@ def build_desk_workflow_plan(
         desk == "research" and _is_strategy_blocker_request(normalized)
     ) or (
         desk == "data" and (_mentions_data_source_gap(normalized) or _is_data_repair_request(normalized))
+    ) or (
+        desk == "risk" and _mentions_lifecycle(normalized)
     ):
         evidence_summary = _artifact_evidence_summary(artifact_context or {})
         if evidence_summary:
