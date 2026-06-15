@@ -281,6 +281,10 @@ def build_desk_workflow_plan(
     if dynamic_plan is not None:
         return dynamic_plan
 
+    open_plan = _open_ended_adaptive_plan(desk=desk, content=content)
+    if open_plan is not None:
+        return open_plan
+
     profile = _profile_for(desk, content)
     if profile is None:
         raise ValueError(f"Unknown desk workflow: {desk}")
@@ -875,6 +879,73 @@ def _dynamic_actions_for_content(normalized: str) -> list[WorkflowActionSpec]:
     return _dedupe_actions(actions)
 
 
+def _open_ended_adaptive_plan(*, desk: str, content: str) -> DeskWorkflowPlan | None:
+    normalized = content.lower()
+    if desk != "reporting" or not _is_open_ended_company_request(normalized):
+        return None
+
+    actions = [
+        _data_status_followup_action(),
+        _strategy_catalog_action(),
+        _risk_followup_action(),
+        _execution_followup_action(),
+        *_engineering_followup_actions(),
+    ]
+    target_desks = _ordered_unique([action.desk for action in actions])
+    handoffs = [
+        {
+            "target_desk": target_desk,
+            "reason": f"Open-ended CEO operating request needs {target_desk.title()} Desk diagnostic evidence.",
+        }
+        for target_desk in target_desks
+    ]
+    reasoning = _reasoning_for_plan(
+        source_desk=desk,
+        planning_mode="open_ended_adaptive",
+        actions=actions,
+        handoffs=handoffs,
+        work_orders=[],
+    )
+    reasoning.append(
+        {
+            "kind": "open_goal_decomposition",
+            "target_desks": target_desks,
+            "diagnostic_only": True,
+            "write_or_trade_actions_blocked": True,
+        }
+    )
+    return DeskWorkflowPlan(
+        desk=desk,
+        answer=(
+            "Reporting Desk 已生成 open-ended adaptive / 开放式公司运营计划："
+            "先让 Data、Research、Risk、Execution 和 Engineering Desk 读取各自证据，"
+            "只产出诊断和 dry-run，不直接写数据或交易。"
+        ),
+        confidence=0.7,
+        actions=actions,
+        planning_mode="open_ended_adaptive",
+        reasoning=reasoning,
+        blockers=["open_ended_plan_is_diagnostic_only"],
+        handoffs=handoffs,
+    )
+
+
+def _strategy_catalog_action() -> WorkflowActionSpec:
+    return WorkflowActionSpec(
+        desk="research",
+        action_type="strategy_catalog",
+        tool_id="astroq.strategy.catalog",
+        risk_level="read_only",
+        summary="Read Research Desk strategy catalog for open-ended CEO planning.",
+        expected_effect="Records strategy layer and promotion status without running backtests.",
+        evidence=WorkflowEvidenceSpec(
+            label="Strategy Lab",
+            uri="/strategy-lab",
+            summary="Open strategy catalog and evidence views.",
+        ),
+    )
+
+
 def _profile_for(desk: str, content: str) -> dict[str, str] | None:
     normalized = content.lower()
     for triggers, profile in _INTENT_PROFILES.get(desk, []):
@@ -1214,6 +1285,17 @@ def _is_artifact_priority_request(normalized: str) -> bool:
         any(token in normalized for token in broad_tokens)
         and any(token in normalized for token in evidence_tokens)
         and not any(token in normalized for token in report_tokens)
+    )
+
+
+def _is_open_ended_company_request(normalized: str) -> bool:
+    company_tokens = ("公司", "company", "ceo", "desk", "整体", "全局", "operating", "推进")
+    goal_tokens = ("推进", "安排", "判断", "看一下", "检查", "review", "诊断", "plan", "规划")
+    forbidden_specific = ("简报", "brief", "portfolio", "组合", "补", "repair", "backfill", "下单", "submit")
+    return (
+        any(token in normalized for token in company_tokens)
+        and any(token in normalized for token in goal_tokens)
+        and not any(token in normalized for token in forbidden_specific)
     )
 
 

@@ -4222,6 +4222,58 @@ def test_agent_workflow_plan_combines_artifact_context_with_session_backlog(tmp_
     reset_datahub()
 
 
+def test_agent_open_ended_ceo_request_gets_safe_company_wide_plan(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Open ended CEO planning", default_desk="reporting")
+    content = "现在公司整体往前推进一下，判断每个 desk 该先查什么，先别直接改数据也不要交易"
+
+    preview = runtime.preview_workflow_plan(desk="reporting", content=content, session_id=session.session_id)
+    routed = runtime.submit_ceo_message(session.session_id, desk="reporting", content=content)
+    response = routed["desk_response"]
+    response_actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+    preview_tools = [action["tool_id"] for action in preview["actions"]]
+    response_tools = [action["parameters"]["tool_id"] for action in response_actions]
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+
+    assert preview["planning_mode"] == "open_ended_adaptive"
+    assert preview["side_effects"]["ledger_writes"] is False
+    assert preview_tools == response_tools
+    assert preview_tools == [
+        "astroq.data.status",
+        "astroq.strategy.catalog",
+        "astroq.lifecycle.check",
+        "astroq.execution.dry_run",
+        "astroq.architecture.ast",
+        "astroq.test.design",
+    ]
+    assert {handoff["target_desk"] for handoff in preview["handoffs"]} == {
+        "data",
+        "research",
+        "risk",
+        "execution",
+        "engineering",
+    }
+    assert reasoning_by_kind["intent_match"]["planning_mode"] == "open_ended_adaptive"
+    assert reasoning_by_kind["open_goal_decomposition"]["target_desks"] == [
+        "data",
+        "research",
+        "risk",
+        "execution",
+        "engineering",
+    ]
+    assert reasoning_by_kind["safety"]["approval_required_count"] == 0
+    assert all(action["risk_level"] in {"read_only", "dry_run"} for action in response_actions)
+    assert response.blockers == ["open_ended_plan_is_diagnostic_only"]
+    reset_datahub()
+
+
 def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
