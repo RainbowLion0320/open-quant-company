@@ -1,10 +1,6 @@
 <template>
   <div class="ceo-office view-page">
     <section class="ceo-toolbar">
-      <div>
-        <p class="eyebrow">{{ t("ceoOffice.subtitle") }}</p>
-        <h2>{{ t("ceoOffice.title") }}</h2>
-      </div>
       <div class="ceo-actions">
         <button
           v-if="activeSession && activeSession.status !== 'archived'"
@@ -15,29 +11,11 @@
         >
           {{ t("ceoOffice.archiveSession") }}
         </button>
-        <button
-          class="btn btn-ghost"
-          type="button"
-          :disabled="runningReadOnlyWorkflow || !activeSession"
-          @click="runSessionReadOnlyActions"
-        >
-          {{ t("ceoOffice.runReadOnlyWorkflow") }}
-        </button>
         <button class="btn btn-primary" type="button" @click="createSession">{{ t("ceoOffice.createSession") }}</button>
       </div>
     </section>
 
     <section v-if="error" class="ceo-alert">{{ error }}</section>
-    <section v-if="readOnlyWorkflowResult" class="ceo-alert info">
-      <strong>{{ t("ceoOffice.readOnlyWorkflowStatus") }}</strong>
-      <span>
-        {{ statusLabel(readOnlyWorkflowResult.status) }} ·
-        {{ t("ceoOffice.ran") }} {{ readOnlyWorkflowResult.run_count }} ·
-        {{ t("ceoOffice.succeeded") }} {{ readOnlyWorkflowResult.succeeded_count }} ·
-        {{ t("ceoOffice.skipped") }} {{ readOnlyWorkflowResult.skipped_count }} ·
-        {{ t("ceoOffice.failed") }} {{ readOnlyWorkflowResult.failed_count }}
-      </span>
-    </section>
     <section v-if="autonomyStepResult" class="ceo-alert info">
       <strong>{{ t("ceoOffice.autonomyStepStatus") }}</strong>
       <span>
@@ -981,7 +959,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentAutonomyRun, type AgentAutonomyStep, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentProgram, type AgentProgramRun, type AgentReadOnlyWorkflow, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentAutonomyRun, type AgentAutonomyStep, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentProgram, type AgentProgramRun, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -1001,7 +979,6 @@ const liveEnvironment = ref<AgentLiveEnvironment | null>(null);
 const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
 const liveMonitor = ref<AgentLiveMonitor | null>(null);
-const readOnlyWorkflowResult = ref<AgentReadOnlyWorkflow | null>(null);
 const autonomyStepResult = ref<AgentAutonomyStep | null>(null);
 const autonomyRunResult = ref<AgentAutonomyRun | null>(null);
 const agentPrograms = ref<AgentProgram[]>([]);
@@ -1009,7 +986,6 @@ const programRunResult = ref<AgentProgramRun | null>(null);
 const workflowPlan = ref<AgentWorkflowPlan | null>(null);
 const sessionStream = ref<AbortController | null>(null);
 const sessionStreamId = ref("");
-const sessionStreamStatus = ref("inactive");
 const lastStreamSignature = ref("");
 const runStream = ref<AbortController | null>(null);
 const runStreamId = ref("");
@@ -1026,7 +1002,6 @@ const runningAction = ref("");
 const submittingPaperAction = ref("");
 const cancelingAction = ref("");
 const archivingSession = ref(false);
-const runningReadOnlyWorkflow = ref(false);
 const runningAutonomyStep = ref(false);
 const runningAutonomyRun = ref(false);
 const creatingProgram = ref(false);
@@ -1296,7 +1271,6 @@ function closeSessionStream() {
   sessionStream.value?.abort();
   sessionStream.value = null;
   sessionStreamId.value = "";
-  sessionStreamStatus.value = "inactive";
   lastStreamSignature.value = "";
 }
 
@@ -1314,19 +1288,16 @@ function connectSessionStream(sessionId: string) {
   const controller = new AbortController();
   sessionStream.value = controller;
   sessionStreamId.value = sessionId;
-  sessionStreamStatus.value = "connecting";
   void api.agentSessionStream(
     sessionId,
     {
       onSnapshot: snapshot => {
         if (snapshot.signature === lastStreamSignature.value) return;
         lastStreamSignature.value = snapshot.signature;
-        sessionStreamStatus.value = "connected";
         void loadSession(snapshot.session_id, { connectStream: false });
       },
       onMissing: () => {
         closeSessionStream();
-        sessionStreamStatus.value = "blocked";
       },
     },
     { signal: controller.signal },
@@ -1334,7 +1305,6 @@ function connectSessionStream(sessionId: string) {
     if (controller.signal.aborted) return;
     const name = err instanceof Error ? err.name : "";
     if (name === "AbortError") return;
-    sessionStreamStatus.value = "blocked";
   });
 }
 
@@ -1465,21 +1435,6 @@ async function archiveSession() {
     error.value = `${t("ceoOffice.archiveFailed")}: ${err?.message || err}`;
   } finally {
     archivingSession.value = false;
-  }
-}
-
-async function runSessionReadOnlyActions() {
-  if (!activeSession.value) return;
-  runningReadOnlyWorkflow.value = true;
-  error.value = "";
-  try {
-    const payload = await api.agentRunSessionReadOnlyActions(activeSession.value.session_id);
-    readOnlyWorkflowResult.value = payload.workflow;
-    await loadSession(activeSession.value.session_id);
-  } catch (err: any) {
-    error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
-  } finally {
-    runningReadOnlyWorkflow.value = false;
   }
 }
 

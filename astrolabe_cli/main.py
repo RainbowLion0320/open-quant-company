@@ -49,7 +49,6 @@ from astrolabe_cli.commands.agent import run_report_rhythm as agent_run_report_r
 from astrolabe_cli.commands.agent import run_scheduled_report_rhythm as agent_run_scheduled_report_rhythm
 from astrolabe_cli.commands.agent import run_action as agent_run_action
 from astrolabe_cli.commands.agent import run_program as agent_run_program
-from astrolabe_cli.commands.agent import run_session_read_only_actions as agent_run_session_read_only_actions
 from astrolabe_cli.commands.agent import sessions as agent_sessions
 from astrolabe_cli.commands.agent import show_action as agent_show_action
 from astrolabe_cli.commands.agent import show_program as agent_show_program
@@ -136,14 +135,6 @@ def build_parser() -> argparse.ArgumentParser:
             tags=args.tags,
         )
     )
-    agent_session_run_readonly = agent_session_sub.add_parser(
-        "run-readonly",
-        help="Run proposed read-only actions for one agent session",
-    )
-    agent_session_run_readonly.add_argument("session_id")
-    add_common_flags(agent_session_run_readonly)
-    agent_session_run_readonly.set_defaults(handler=lambda args: agent_run_session_read_only_actions(args.session_id))
-
     agent_autonomy_cmd = agent_sub.add_parser("autonomy", help="Run bounded Agent Company OS autonomy steps")
     agent_autonomy_sub = agent_autonomy_cmd.add_subparsers(dest="agent_autonomy_command", required=True)
     agent_autonomy_step_cmd = agent_autonomy_sub.add_parser(

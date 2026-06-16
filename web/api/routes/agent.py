@@ -86,15 +86,6 @@ async def update_agent_session(session_id: str, payload: dict[str, Any]) -> dict
     return {"session": session.to_dict()}
 
 
-@router.post("/sessions/{session_id}/run-readonly")
-async def run_agent_session_read_only_actions(session_id: str) -> dict[str, Any]:
-    try:
-        workflow = AgentRuntime().run_session_read_only_actions(session_id)
-    except KeyError:
-        raise DataNotFoundError("agent session", session_id)
-    return {"workflow": workflow}
-
-
 @router.post("/sessions/{session_id}/autonomy-step")
 async def run_agent_autonomy_step(session_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     body = payload or {}

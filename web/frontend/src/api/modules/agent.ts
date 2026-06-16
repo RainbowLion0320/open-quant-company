@@ -21,7 +21,6 @@ import type {
   AgentProgramResponse,
   AgentProgramRunResponse,
   AgentProgramsResponse,
-  AgentReadOnlyWorkflowResponse,
   AgentReportNotificationResponse,
   AgentPaperSubmitResponse,
   AgentReportRhythmResponse,
@@ -79,8 +78,6 @@ export const agentApi = {
     sessionId: string,
     payload: { title?: string; status?: string; default_desk?: string; tags?: string[] },
   ) => patch<{ session: AgentSession }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`, payload),
-  agentRunSessionReadOnlyActions: (sessionId: string) =>
-    post<AgentReadOnlyWorkflowResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/run-readonly`),
   agentAutonomyStep: (
     sessionId: string,
     payload: {

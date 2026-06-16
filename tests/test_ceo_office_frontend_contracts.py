@@ -49,7 +49,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "EventSource" not in view
     assert "streamSse" in api_client
     assert "authHeaders()" in api_client
-    assert "sessionStreamStatus" in view
+    assert "session" + "StreamStatus" not in view
     assert "closeSessionStream" in view
     assert "onBeforeUnmount(closeSessionStream)" in view
     assert "runStreamStatus" in view
@@ -79,10 +79,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'v-model="providerPlannerProvider"' in view
     assert 'v-model="providerPlannerModel"' in view
     assert 'v-model="semanticDraftText"' in view
-    assert "api.agentRunSessionReadOnlyActions" in view
-    assert "runSessionReadOnlyActions" in view
-    assert "readOnlyWorkflowResult" in view
-    assert "runningReadOnlyWorkflow" in view
+    assert "api.agentRun" + "SessionReadOnlyActions" not in view
+    assert "runSession" + "ReadOnlyActions" not in view
+    assert "readOnly" + "WorkflowResult" not in view
+    assert "runningReadOnly" + "Workflow" not in view
     assert "api.agentAutonomyStep" in view
     assert "runAutonomyStep" in view
     assert "api.agentAutonomyRun" in view
@@ -135,7 +135,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'selected: selectedDeskId === desk.desk_id' in view
     assert 'desk: selectedDraftDesk.value' in view
     assert "ceoOffice.messageDesk" in view
-    assert "ceoOffice.stream" in view
+    assert "ceoOffice." + "stream" not in view
     assert "ceoOffice.previewPlan" in view
     assert "ceoOffice.workflowPlan" in view
     assert "ceoOffice.semanticDraft" in view
@@ -148,8 +148,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.semanticDraftPlaceholder" in view
     assert "ceoOffice.semanticDraftInvalid" in view
     assert "ceoOffice.noLedgerWrites" in view
-    assert "ceoOffice.runReadOnlyWorkflow" in view
-    assert "ceoOffice.readOnlyWorkflowStatus" in view
+    assert "ceoOffice.runReadOnly" + "Workflow" not in view
+    assert "ceoOffice.readOnly" + "WorkflowStatus" not in view
     assert "ceoOffice.deskMandate" in view
     assert "ceoOffice.allowedTools" in view
     assert "ceoOffice.approvalPolicies" in view
@@ -299,14 +299,14 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
     assert "目标 Desk" in zh_ceo
-    assert "实时流" in zh_ceo
+    assert "实时流" not in zh_ceo
     assert "已连接" in zh_ceo
     assert "连接中" in zh_ceo
     assert "预览计划" in zh_ceo
     assert "工作流计划" in zh_ceo
     assert "不会写入 ledger" in zh_ceo
-    assert "运行安全工作流" in zh_ceo
-    assert "安全工作流状态" in zh_ceo
+    assert "运行安全" + "工作流" not in zh_ceo
+    assert "安全" + "工作流状态" not in zh_ceo
     assert "Desk 职责" in zh_ceo
     assert "允许工具" in zh_ceo
     assert "审批策略" in zh_ceo
@@ -320,14 +320,14 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "相关交接" in zh_ceo
     assert "Action Queue" in en_ceo
     assert "Target Desk" in en_ceo
-    assert "Stream" in en_ceo
+    assert 'stream: "Stream"' not in en_ceo
     assert "Connected" in en_ceo
     assert "Connecting" in en_ceo
     assert "Preview Plan" in en_ceo
     assert "Workflow Plan" in en_ceo
     assert "No ledger writes" in en_ceo
-    assert "Run Safe Workflow" in en_ceo
-    assert "Safe Workflow Status" in en_ceo
+    assert "Run Safe " + "Workflow" not in en_ceo
+    assert "Safe " + "Workflow Status" not in en_ceo
     assert "Desk Mandate" in en_ceo
     assert "Allowed Tools" in en_ceo
     assert "Approval Policies" in en_ceo
@@ -465,8 +465,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentSessions" in agent_api
     assert "agentCreateSession" in agent_api
     assert "agentUpdateSession" in agent_api
-    assert "agentRunSessionReadOnlyActions" in agent_api
-    assert "/api/agent/sessions/${encodeURIComponent(sessionId)}/run-readonly" in agent_api
+    assert "agentRunSession" + "ReadOnlyActions" not in agent_api
+    assert "run-" + "readonly" not in agent_api
     assert "agentApprovalPolicies" in agent_api
     assert '"/api/agent/policies"' in agent_api
     assert "AgentAddMessageResponse" in agent_api
@@ -541,8 +541,8 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "/api/agent/live/reconciliation" in agent_api
     assert "/api/agent/live/monitor" in agent_api
     assert "export interface AgentSession" in agent_types
-    assert "export interface AgentReadOnlyWorkflow" in agent_types
-    assert "export interface AgentReadOnlyWorkflowResponse" in agent_types
+    assert "export interface AgentReadOnly" + "Workflow" not in agent_types
+    assert "export interface AgentReadOnly" + "WorkflowResponse" not in agent_types
     assert "export interface AgentApprovalPolicy" in agent_types
     assert "export interface AgentApprovalPoliciesResponse" in agent_types
     assert "export interface AgentReport" in agent_types

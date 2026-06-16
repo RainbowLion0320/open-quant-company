@@ -15,17 +15,8 @@
   gap: 12px;
 }
 
-.ceo-toolbar h2 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 22px;
-}
-
-.eyebrow {
-  margin: 0 0 4px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  text-transform: uppercase;
+.ceo-toolbar {
+  justify-content: flex-end;
 }
 
 .ceo-panel,
