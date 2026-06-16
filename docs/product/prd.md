@@ -41,7 +41,7 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 ### 3.7 Agent Company OS
 长期目标是把 Web UI 和 CLI 之上的操作层升级为 Agent Company OS：用户作为 CEO，通过默认首页 CEO Office 与 Data / Research / Risk / Execution / Engineering / Reporting desk agents 协作。Desk agents 只能通过正式工具、审批策略和 evidence artifacts 工作；读操作和 dry-run 可以自动执行，配置写入、补数、正式回测、paper/live 执行和工程改动必须走显式审批或工程 work order。
 
-该能力的权威路线图位于 `docs/project/agent-company/`，正式行为契约位于 `docs/specs/07-agent-company-os.md`。当前阶段只固化长期方向；具体 API、CLI 和 Web UI 以后按阶段实现。
+该能力的长期路线图位于 `docs/project/agent-company/00-master-roadmap.md`，正式行为契约位于 `docs/specs/07-agent-company-os.md`，当前实现状态以 `docs/product/acceptance-matrix.md`、代码和测试为准。已完成阶段计划不保留在工作树；仍未完成的 MiniQMT/QMT 真实终端验收计划保留在 `docs/project/agent-company/04-live-execution-plan.md`。
 
 ## 4. 系统边界
 
@@ -158,7 +158,7 @@ Stock/ETF/Bond/Futures/Crypto 五类资产，统一 AssetAdapter ABC 接口，As
 │   ├── product/                  # PRD + 验收矩阵
 │   ├── specs/                    # 子系统行为契约
 │   ├── project/                  # 治理、维护、路线图、发布与合规
-│   │   └── agent-company/        # Agent Company OS 长期路线图和分阶段计划
+│   │   └── agent-company/        # Agent Company OS 长期路线图和未完成 live 计划
 │   ├── operations/               # 本地运维和外部服务接入
 │   └── quality/                  # 测试与质量审计
 ├── var/                          # 本地运行产物 (git ignored)

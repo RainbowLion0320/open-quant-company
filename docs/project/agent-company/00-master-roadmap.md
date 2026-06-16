@@ -1,14 +1,14 @@
 # Open Quant Company Agent Company OS Master Roadmap
 
 > Status: long-term product and engineering roadmap
-> Created: 2026-06-14
-> Authority: this file defines the full target direction; implementation contracts live in [07-agent-company-os.md](../../specs/07-agent-company-os.md).
+> Updated: 2026-06-16
+> Authority: this file defines the target direction. Current behavior is governed by [07-agent-company-os.md](../../specs/07-agent-company-os.md) and tracked in the acceptance matrix.
 
 ## 1. Target
 
-Open Quant Company will evolve from a quant research and execution toolkit into a local-first Agent Company OS. The user acts as CEO. Specialized desk agents operate the data, research, risk, execution, engineering, and reporting desks. Every recommendation, action, approval, and artifact must be traceable back to Web UI views, CLI commands, local ledgers, and evidence artifacts.
+Open Quant Company evolves from a quant research and execution toolkit into a local-first Agent Company OS. The user acts as CEO. Specialized desk agents operate data, research, risk, execution, engineering, and reporting desks. Every recommendation, action, approval, and artifact must be traceable back to Web UI views, CLI commands, local ledgers, and evidence artifacts.
 
-The target is not a chatbot bolted onto the side of the existing system. The target is a company-style operating layer over the existing data, strategy, backtest, execution, and system-intelligence core.
+The target is not a chatbot bolted onto the side of the existing system. It is a company-style operating layer over the existing data, strategy, backtest, execution, and system-intelligence core.
 
 ## 2. Non-Negotiable Principles
 
@@ -27,7 +27,7 @@ The target is not a chatbot bolted onto the side of the existing system. The tar
 
 ```mermaid
 flowchart TB
-    CEO["Human CEO"] --> Office["CEO Office Web Page (/)" ]
+    CEO["Human CEO"] --> Office["CEO Office Web Page (/)"]
     CEO --> CLI["astroq agent CLI"]
     Office --> Runtime["Local Agent Runtime"]
     CLI --> Runtime
@@ -70,212 +70,43 @@ flowchart TB
 | Engineering Desk | CodeGraph/AST/test design diagnostics, bug triage, work orders for coding agents. | Which code/design issue is real, which evidence supports it, and what work order should be opened. |
 | Reporting Desk | Daily CEO brief, weekly review, experiment summaries, release and audit packs. | Which conclusions are supported by artifacts and where to inspect the source. |
 
-## 5. Full Completion Scope
+## 5. Completion Scope
 
-The 100% target includes all of the following. Partial implementation must not redefine the target downward.
+The full target includes:
 
-1. CEO Office becomes the default Web entry at `/`.
-2. The current market overview moves to `/market`.
-3. A local Agent Runtime manages sessions, messages, actions, runs, approvals, and evidence.
-4. Agent API endpoints under `/api/agent/*` expose sessions, messages, actions, approvals, evidence, and desk status.
-5. `astroq agent *` provides JSON-readable local automation.
-6. Desk agents are registered with explicit tool permissions and risk scopes.
-7. Desk-declared fixed tools are covered by the local tool registry, and deterministic routing can map common CEO intents, bounded multi-intent CEO review requests, artifact-aware priority requests, session follow-ups, and artifact-plus-session hybrid follow-ups to concrete safe tools such as data source registry diff, strategy competition, lifecycle checks, execution dry-run, AST/test-design diagnostics, and docs check.
-8. Agent actions use a common `AgentAction` contract and can be approved, rejected, expired, canceled, executed, or blocked.
-9. Evidence references resolve to existing Web pages, CLI commands, artifact paths, code locations, and report sections.
-10. Transparent memory is inspectable, exportable, and clearable.
-11. MiniQMT/QMT live execution adapter exists behind default-disabled live mode.
-12. Broker readiness, risk checks, order preview, approval, submission, reconciliation, and kill switch are auditable.
-13. Reporting desk can produce daily and weekly CEO briefs from current evidence.
-14. Web UI supports conversation, action cards, approval queue, evidence deep links, and desk drill-down.
-15. Tests verify action policies, evidence resolution, live execution boundaries, Web rendering, API contracts, and CLI JSON contracts.
-16. Docs/specs/wiki/acceptance matrix stay aligned with implementation.
+1. CEO Office as the default Web entry at `/`.
+2. A local Agent Runtime for sessions, messages, actions, runs, approvals, memory, and evidence.
+3. Desk agents with explicit tool permissions and risk scopes.
+4. Approval-gated state-changing actions.
+5. Evidence references that resolve to Web pages, CLI commands, artifact paths, code locations, and report sections.
+6. Transparent memory that is inspectable, exportable, and clearable.
+7. Paper execution proposals with approval, risk gates, ledger writes, and reconciliation.
+8. MiniQMT/QMT live execution behind default-disabled live mode, readiness gates, explicit approval, reconciliation, and kill switch.
+9. Reports and operating-rhythm artifacts for daily, weekly, risk, execution, engineering, release, and audit workflows.
+10. Tests for action policies, evidence resolution, live execution boundaries, Web rendering, API contracts, and CLI JSON contracts.
 
-## 6. Phase Roadmap
+## 6. Phase Overview
 
 | Phase | Name | Outcome |
 | --- | --- | --- |
-| 0 | Documentation landing | Long-term roadmap, phased plans, and behavior spec are committed and linked from PRD/spec/wiki. |
-| 1 | Foundation runtime | Local schemas, session/action/run ledger, evidence resolver, approval engine, and tool registry exist without Web dependency. |
-| 2 | CEO Office Web | `/` becomes the conversation control page; `/market` hosts the former market overview; action cards and evidence drill-down work. |
+| 0 | Documentation landing | Roadmap and behavior spec committed and linked from product docs. |
+| 1 | Foundation runtime | Local schemas, session/action/run ledger, evidence resolver, approval engine, and tool registry. |
+| 2 | CEO Office Web | `/` conversation control page, `/market` market overview, action cards, evidence drill-down. |
 | 3 | Desk agents | Data, Research, Risk, Execution, Engineering, and Reporting desks operate through bounded tools and handoff contracts. |
-| 4 | Evidence and governance closure | Agent outputs are backed by lifecycle, strategy, data-source, CodeGraph, AST, and test-design evidence artifacts. |
+| 4 | Evidence and governance closure | Agent outputs backed by lifecycle, strategy, data-source, CodeGraph, AST, and test-design artifacts. |
 | 5 | Paper execution control | Agent-proposed paper orders require approval, risk gates, ledger writes, and reconciliation. |
-| 6 | MiniQMT/QMT live execution | Live adapter, SDK checks, account readiness, approval, reconciliation, and kill switch are implemented with no paper fallback. |
-| 7 | Reporting and operating rhythm | Daily CEO brief, weekly review, release/audit packs, and memory governance become first-class workflows. |
+| 6 | MiniQMT/QMT live execution | Live adapter, SDK checks, account readiness, approval, reconciliation, and kill switch with no paper fallback. |
+| 7 | Reporting and operating rhythm | CEO briefs, review reports, release/audit packs, and memory governance as first-class workflows. |
 
-## 7. Phase Boundaries
+## 7. Status Tracking
 
-### Phase 0 - Documentation Landing
+Completed phase execution plans are intentionally not kept in the work tree. Their implementation history is available through git, and current behavior is tracked in:
 
-Phase 0 creates the project memory for the transformation. It does not implement API, CLI, Web UI, or runtime behavior.
+- [Agent Company OS spec](../../specs/07-agent-company-os.md)
+- [Acceptance matrix](../../product/acceptance-matrix.md)
+- contract tests and CLI/API artifacts
 
-Deliverables:
-
-- `docs/project/agent-company/00-master-roadmap.md`
-- `docs/project/agent-company/01-foundation-plan.md`
-- `docs/project/agent-company/02-ceo-office-plan.md`
-- `docs/project/agent-company/03-desk-agents-plan.md`
-- `docs/project/agent-company/05-paper-execution-plan.md`
-- `docs/project/agent-company/04-live-execution-plan.md`
-- `docs/specs/07-agent-company-os.md`
-- PRD, Web spec, acceptance matrix, documentation guide, and wiki links
-
-### Phase 1 - Foundation Runtime
-
-Build the local orchestration kernel without requiring the new Web page.
-
-Required contracts:
-
-- `AgentSession`
-- `AgentMessage`
-- `AgentAction`
-- `AgentRun`
-- `EvidenceRef`
-- `ApprovalPolicy`
-- `DeskAgent`
-- `ToolDescriptor`
-
-Storage target:
-
-- `var/db/agent_os.sqlite` for ledgers and queue state
-- `var/artifacts/agent/` for run outputs and evidence snapshots
-
-### Phase 2 - CEO Office Web
-
-Implement the human-facing command center.
-
-Required UX:
-
-- Conversation timeline
-- Desk status rail
-- Action cards with approve/reject controls
-- Evidence cards with deep links into existing Web pages
-- Current blockers and next recommended commands
-- Audit timeline for approved and rejected actions
-
-Routing target:
-
-- `/` -> CEO Office
-- `/market` -> Market overview
-
-### Phase 3 - Desk Agents
-
-Turn existing deterministic capabilities into desk-scoped agents. Agents are not allowed to invent results. They call existing CLI/API services and cite evidence.
-
-Required desks:
-
-- Data Desk
-- Research Desk
-- Risk Desk
-- Execution Desk
-- Engineering Desk
-- Reporting Desk
-
-Current foundation:
-
-- Common desk intents, bounded multi-intent CEO review requests, broad CEO priority questions, session follow-up requests, and artifact-plus-session hybrid follow-ups can be converted into fixed-registry safe actions without arbitrary shell command construction.
-- Artifact-aware priority planning reads only the fixed local report artifact context and maps current root causes to owner desks, including data source gaps, lifecycle blockers, strategy evidence blockers, AST risks, and test design risks.
-- Bounded session-backlog adaptive planning reads current approval-required actions, open handoffs, and open Engineering work orders, then maps them to safe re-check actions and owner-desk handoffs without approving writes or trades.
-- Bounded `adaptive_artifact` planning fuses current session backlog with local artifact root causes, dedupes overlapping safe actions, and keeps both session and artifact reasoning visible to the CEO.
-- Open-ended company-wide CEO operating requests can be converted into diagnostic-only `open_ended_adaptive` plans across Data, Research, Risk, Execution, and Engineering fixed-registry tools; writes and trades remain blocked by policy.
-- Bounded autonomy steps can create a normal CEO message, generate a deterministic or semantic-assisted desk plan, dispatch only this step's newly proposed `read_only` / `dry_run` fixed-registry actions, and skip approval-required write, report artifact, paper, live, and code actions for CEO review. Capped autonomy runs can repeat that same boundary for a small explicit `max_steps` window and stop with a structured reason instead of drifting into unbounded planning.
-- Persisted autonomy programs can turn an open-ended CEO goal into a durable multi-stage plan with safe fixed-registry phases, blocked/approval-required items, and Engineering work-order routing for unknown or code-change requests.
-- Opt-in semantic planner drafts can be accepted from runtime injection, API payloads, or CLI draft files only after filtering to known `read_only` / `dry_run` fixed-registry tools, valid desk scopes, and a manual-review blocker; this is a safety adapter for bounded company planning, not permission for arbitrary shell, write, code, paper, or live-trading autonomy.
-- Workflow previews and desk responses include structured reasoning rows for intent match, tool plan, safety, evidence plan, artifact context, session backlog, context fusion, open goal decomposition, and session context.
-
-### Phase 4 - Evidence and Governance Closure
-
-All agent claims must resolve to evidence. Any uncited claim about data, strategy quality, execution readiness, or system health is a design failure.
-
-Required evidence sources:
-
-- Data source capability artifacts
-- DataHub health and coverage
-- Lifecycle readiness
-- Strategy evidence and tournament artifacts
-- Backtest score panels and alpha evidence
-- CodeGraph diagnostics
-- AST intelligence
-- Test design intelligence
-- Audit ledgers
-
-### Phase 5 - Paper Execution Control
-
-Paper execution becomes agent-controllable only through approval and risk gates.
-
-No paper order may be created by an agent unless:
-
-- The action card states order intent and expected broker effect.
-- Required data and price evidence are present.
-- Risk gate accepts the preview.
-- The CEO approves the action.
-- The action result is written to the ledger.
-
-Current foundation:
-
-- `PaperBroker.preview_order()` returns a non-mutating order preview.
-- `AgentRuntime.propose_paper_order()` writes a preview artifact and creates an approval-required `paper_order` action only when the preview passes.
-- `astroq agent paper propose ... --json` and `POST /api/agent/paper/proposals` expose paper order proposal cards.
-- `AgentRuntime.submit_paper_order_action()` submits only approved `paper_order` actions after re-running PaperBroker preview/risk gates against current broker state.
-- `astroq agent paper submit ACTION_ID --json` and `POST /api/agent/paper/actions/{action_id}/submit` expose the approved submit path.
-- CEO Office action detail shows PaperBroker preview/risk summary and uses the dedicated approved paper submit path instead of generic dispatch.
-- Successful paper submits write run ledger rows, reconciliation evidence, and default PaperBroker state/trade/NAV persistence. CEO Office run history can open run artifact evidence and action detail shows inline reconciliation status, order id, cash, and market value.
-- `astroq agent paper cancel ACTION_ID --json` and `POST /api/agent/paper/actions/{action_id}/cancel` write dedicated `paper.paper_order.cancel` runs and reconciliation evidence for queued approval-request cancellation or broker-confirmed active order cancellation. Submitted actions keep their original succeeded ledger row; cancellation is recorded as a separate auditable run.
-
-### Phase 6 - MiniQMT/QMT Live Execution
-
-Live execution is a separate capability, not a renamed paper path.
-
-Minimum requirements:
-
-- MiniQMT/QMT SDK readiness probe
-- Account and permission readiness
-- Holdings/cash/order/trade reconciliation
-- Order preview and risk gate
-- Explicit live approval
-- Kill switch
-- Audit pack export
-- No fallback to paper trading
-
-Current foundation:
-
-- Default-disabled MiniQMT/QMT readiness and environment validation are implemented and visible through CLI/API/CEO Office.
-- Missing SDK/login/permissions/kill switch readiness blockers are explicit.
-- `paper_fallback=false` is part of the readiness contract.
-- `astroq agent live environment --json` / `GET /api/agent/live/environment` validate SDK modules, account flags, permissions, userdata-path configuration, gateway load, and read-only terminal query support without submitting an order.
-- `astroq agent live smoke --json` and `POST /api/agent/live/smoke` run a no-submit smoke test that records readiness and, when live-ready, a read-only reconciliation probe under `var/artifacts/agent/live_smoke/`.
-- Non-submitting live order preview includes extended risk checks for cash, concentration, total exposure, daily order count, tradability, data freshness, and broker account consistency.
-- `astroq agent live propose/submit` and `/api/agent/live/proposals` / `/api/agent/live/actions/{action_id}/submit` implement the approval-gated live submit/reconciliation contract. The default MiniQMT/QMT adapter fails closed with `live_submission_not_integrated`; an explicit SDK gateway bridge can submit/reconcile only when injected or loaded through `execution.live.sdk_gateway_factory`; the default factory is `broker.live.xtquant_gateway:build_gateway`, with masked/hashed audit responses.
-- `astroq agent live reconcile` and `/api/agent/live/reconciliation` scan submitted live order evidence, call adapter reconciliation, and write scheduled reconciliation artifacts.
-- `astroq agent live monitor` and `/api/agent/live/monitor` provide a cron-callable live monitor tick that aggregates readiness, kill-switch state, and reconciliation into a single evidence artifact.
-- `astroq agent live kill-switch status/activate/deactivate` and `/api/agent/live/kill-switch` implement a local kill switch. Activation cancels queued live actions, requests broker-side cancellation for submitted live evidence when the adapter supports it, writes auditable artifacts, and blocks live preview/propose/submit before broker calls.
-
-### Phase 7 - Reporting and Operating Rhythm
-
-The system should behave like a small quant company with a local operating rhythm.
-
-Required outputs:
-
-- Daily CEO brief
-- Weekly research review
-- Data quality review
-- Risk and exposure review
-- Execution reconciliation report
-- Engineering work-order digest
-- Release and audit pack
-
-Current foundation:
-
-- Daily, weekly, audit, data quality, risk, execution reconciliation, engineering digest, and release audit report artifacts can be generated under `var/artifacts/agent/reports/`.
-- Reports are written as JSON and Markdown, cite session/action/run/handoff evidence ids, and register the JSON artifact as resolvable `report` evidence.
-- Dedicated report templates are deterministic and available through `astroq agent report ... --json` and `POST /api/agent/reports`.
-- CEO Office exposes a report-template selector and can generate the selected report from the main control page.
-- `astroq agent rhythm --session ... --json`, `POST /api/agent/reports/rhythm`, and CEO Office can explicitly run due report templates and write a rhythm audit artifact.
-- `astroq agent rhythm --all-active --json` and `POST /api/agent/reports/rhythm/scheduled` scan active sessions, run due report templates, and write scheduled audit artifacts under `var/artifacts/agent/reports/scheduled/`; this is the local cron-callable scheduled cadence.
-- `astroq agent notify report ... --json`, `POST /api/agent/reports/{report_id}/notify`, and CEO Office report cards can send or dry-run env-only Telegram/WeChat/Feishu report notifications, with audit artifacts under `var/artifacts/agent/reports/notifications/`.
-- CEO reports aggregate a fixed local artifact context for lifecycle readiness, data source capabilities, strategy competition, AST intelligence, test design intelligence, and CodeGraph readiness. The report JSON includes `artifact_context`, deterministic semantic synthesis for current root causes/impacts/next actions, deterministic desk-level domain scorecards with recommended `astroq` commands, deterministic source narratives for each fixed artifact source, deterministic artifact-specific timelines comparing current fixed-source artifacts against the latest prior report, deterministic cross-session trend synthesis for repeated root causes across prior local reports, deterministic causal-chain synthesis for owner-specific blocker chains, recurring causal-chain escalation from report history, and Markdown/sections surface artifact readiness plus blocker/issue/risk findings.
-- Future report work should deepen source-specific drill-downs and historical owner workflows, but current reports already expose deterministic source narratives, domain scorecards, artifact timelines, causal-chain synthesis, and recurring-chain escalation for the core data/lifecycle/strategy and engineering/test-design paths.
+The only phase plan intentionally retained is [MiniQMT/QMT Live Execution Plan](04-live-execution-plan.md), because real terminal cancellation semantics and scheduled reconciliation still require operator validation against a live MiniQMT/QMT environment.
 
 ## 8. Design Decisions Locked by This Roadmap
 
@@ -283,7 +114,7 @@ Current foundation:
 | --- | --- |
 | Runtime shape | Local in-project orchestration kernel. External multi-agent frameworks are not the default dependency. |
 | Autonomy | Approval-gated execution. Analysis can be automatic; state-changing actions require approval. |
-| Main page | CEO Office becomes `/`. Market overview moves to `/market`. |
+| Main page | CEO Office is `/`. Market overview is `/market`. |
 | Memory | Transparent local memory, not opaque model memory. |
 | Live broker | MiniQMT/QMT is the first planned live adapter. |
 | Engineering | Web Engineering Desk creates work orders; repository edits are performed by Codex, Claude, or humans outside the Web UI. |
