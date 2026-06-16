@@ -23,6 +23,7 @@ ALLOWED_ASSETS = {"stock", "macro", "fund", "futures", "crypto", "bond", "system
 ALLOWED_STATUSES = {"available", "rate_limited", "paid", "planned"}
 ALLOWED_FREQS = {"daily", "monthly", "quarterly", "event", "minute", "intraday", "system"}
 ALLOWED_REPAIR_POLICIES = {"auto", "rate_limited", "manual", "none"}
+ALLOWED_FRESHNESS_SEVERITIES = {"blocker", "warning"}
 
 SOURCE_LABELS = {
     "akshare": "AKShare",
@@ -93,6 +94,7 @@ class HealthTableMeta:
     freshness_sla_days: Optional[int] = None
     repair_policy: str = "none"
     partition_key: str = ""
+    freshness_severity: str = "blocker"
 
 
 COMPUTED_HEALTH_META: dict[str, HealthTableMeta] = {
@@ -156,6 +158,7 @@ class DataDimension:
     freshness_sla_days: Optional[int] = None
     repair_policy: str = "none"
     partition_key: str = ""
+    freshness_severity: str = "blocker"
     health_enabled: bool = True
     health_max_sample: int = 30
     # P1-8: DataContract integration
@@ -208,6 +211,7 @@ class DataRegistry:
                 freshness_sla_days=health.get("freshness_sla_days", info.get("freshness_sla_days", _default_sla(freq, status))),
                 repair_policy=health.get("repair_policy") or info.get("repair_policy") or _default_repair_policy(status),
                 partition_key=health.get("partition_key") or info.get("partition_key") or _infer_partition_key(cache),
+                freshness_severity=health.get("freshness_severity") or info.get("freshness_severity") or "blocker",
                 health_enabled=health.get("enabled", info.get("health_enabled", True)),
                 health_max_sample=int(health.get("max_sample", info.get("health_max_sample", 30))),
             )
@@ -273,6 +277,8 @@ class DataRegistry:
                 issues.append(f"{key}: invalid freq {dim.freq!r}")
             if dim.repair_policy not in ALLOWED_REPAIR_POLICIES:
                 issues.append(f"{key}: invalid repair_policy {dim.repair_policy!r}")
+            if dim.freshness_severity not in ALLOWED_FRESHNESS_SEVERITIES:
+                issues.append(f"{key}: invalid freshness_severity {dim.freshness_severity!r}")
             if dim.cache:
                 path = Path(dim.cache)
                 if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
@@ -300,6 +306,7 @@ class DataRegistry:
                 freshness_sla_days=dim.freshness_sla_days,
                 repair_policy=dim.repair_policy,
                 partition_key=dim.partition_key,
+                freshness_severity=dim.freshness_severity,
             )
 
         for table, item in COMPUTED_HEALTH_META.items():
@@ -312,6 +319,7 @@ class DataRegistry:
                 freshness_sla_days=item.freshness_sla_days,
                 repair_policy=item.repair_policy,
                 partition_key=item.partition_key,
+                freshness_severity=item.freshness_severity,
             )
         return meta
 

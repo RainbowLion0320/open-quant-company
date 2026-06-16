@@ -734,7 +734,6 @@ strategies:
         flow: 0.2
     data_requirements:
     - stock_daily
-    - moneyflow
   regime_gated:
     color: '#fb7185'
     config_key: strategies.regime_gated
@@ -952,6 +951,8 @@ data_registry:
     label: 日频资金流向 (近120日)
     cache: stock/moneyflow/{symbol}.parquet
     description: 同花顺个股资金流向, 近100交易日
+    health:
+      freshness_severity: warning
   moneyflow_tushare_daily:
     source: tushare_free
     asset: stock

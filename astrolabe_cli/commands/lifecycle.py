@@ -6,9 +6,29 @@ from typing import Any
 
 from astrolabe_cli.results import CliResult
 from astrolabe_cli.commands.data import freshness_gate_from_health_check
-from data.ingestion.source_capabilities import sources_diff_payload
+from data.ingestion.source_capabilities import sources_diff_payload, sources_summary_payload
 from data.storage.datahub import get_datahub
 from research.strategy_competition import build_strategy_competition_report
+
+SOURCE_CAPABILITY_STATUS_PRIORITY = {
+    "no_permission": 100,
+    "missing_secret": 90,
+    "rate_limited": 80,
+    "error": 70,
+    "empty": 40,
+    "ok": 0,
+}
+SOURCE_CAPABILITY_ARTIFACTS = (
+    "akshare",
+    "tushare",
+    "tencent_finance",
+    "eastmoney",
+    "sina_finance",
+    "tonghuashun",
+    "exchange_official",
+    "cninfo",
+    "computed",
+)
 
 
 def _source_capability_check() -> tuple[dict[str, Any], list[str], list[str]]:
@@ -24,12 +44,114 @@ def _source_capability_check() -> tuple[dict[str, Any], list[str], list[str]]:
     }, blockers, []
 
 
+def _source_specific_capabilities() -> list[dict[str, Any]]:
+    hub = get_datahub()
+    rows: list[dict[str, Any]] = []
+    for source in SOURCE_CAPABILITY_ARTIFACTS:
+        if hasattr(hub, "artifact_path"):
+            path = hub.artifact_path("data-sources", f"latest-{source}.json")
+        else:
+            path = hub.artifact_dir("data-sources") / f"latest-{source}.json"
+        if not path.exists():
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for item in payload.get("capabilities", []) if isinstance(payload, dict) else []:
+            if isinstance(item, dict):
+                rows.append(item)
+    return rows
+
+
+def _capability_status_by_dimension() -> dict[str, dict[str, str]]:
+    from data.storage.dimensions import get_registry
+
+    payload = sources_summary_payload()
+    capabilities = []
+    if isinstance(payload, dict):
+        capabilities.extend(item for item in payload.get("capabilities", []) if isinstance(item, dict))
+    capabilities.extend(_source_specific_capabilities())
+    registry = get_registry()
+    by_dimension: dict[str, dict[str, str]] = {}
+    for item in capabilities:
+        status = str(
+            item.get("access_status")
+            or item.get("probe_status")
+            or item.get("permission_status")
+            or ""
+        )
+        if status not in SOURCE_CAPABILITY_STATUS_PRIORITY:
+            continue
+        dimensions = item.get("mapped_dimensions") if isinstance(item.get("mapped_dimensions"), list) else []
+        for dimension in dimensions:
+            aliases = {str(dimension)}
+            registry_item = registry.get(str(dimension))
+            if registry_item is not None:
+                aliases.add(registry_item.key)
+                if registry_item.health_table:
+                    aliases.add(registry_item.health_table)
+            for key in aliases:
+                current = by_dimension.get(key)
+                current_rank = SOURCE_CAPABILITY_STATUS_PRIORITY.get(str(current.get("status")) if current else "", -1)
+                rank = SOURCE_CAPABILITY_STATUS_PRIORITY[status]
+                if current is None or rank > current_rank:
+                    by_dimension[key] = {
+                        "status": status,
+                        "source": str(item.get("source") or ""),
+                        "interface": str(item.get("interface") or ""),
+                        "message": str(item.get("message") or item.get("probe_block_reason") or ""),
+                    }
+    return by_dimension
+
+
+def _annotate_freshness_detail(
+    details: list[dict[str, Any]],
+    *,
+    key: str,
+    reason: str,
+    capability: dict[str, str] | None = None,
+) -> None:
+    for detail in details:
+        if str(detail.get("key") or "") != key:
+            continue
+        detail["reason"] = reason
+        if capability:
+            detail["capability_status"] = capability.get("status", "")
+            detail["capability_source"] = capability.get("source", "")
+            detail["capability_interface"] = capability.get("interface", "")
+            detail["capability_message"] = capability.get("message", "")
+        return
+
+
 def _freshness_check() -> tuple[dict[str, Any], list[str], list[str]]:
     gate, rows = freshness_gate_from_health_check()
     stale = list(gate.get("stale") or [])
     missing = list(gate.get("missing") or [])
     warning_keys = list(gate.get("warnings") or [])
-    blockers = [f"stale_data:{key}" for key in stale] + [f"missing_data:{key}" for key in missing]
+    details = [dict(item) for item in gate.get("details", []) if isinstance(item, dict)]
+    gate = {**gate, "details": details}
+    detail_reason = {str(item.get("key") or ""): str(item.get("reason") or "") for item in details}
+    capability_by_dimension = _capability_status_by_dimension()
+    blockers: list[str] = []
+    for key in stale:
+        capability = capability_by_dimension.get(str(key))
+        if capability and capability.get("status") in {"no_permission", "missing_secret"}:
+            status = str(capability["status"])
+            blockers.append(f"missing_capability:{key}:{status}")
+            _annotate_freshness_detail(details, key=str(key), reason=status, capability=capability)
+        elif detail_reason.get(str(key)) == "source_not_updated":
+            blockers.append(f"source_not_updated:{key}")
+        else:
+            blockers.append(f"stale_data:{key}")
+    for key in missing:
+        capability = capability_by_dimension.get(str(key))
+        if capability and capability.get("status") in {"no_permission", "missing_secret"}:
+            status = str(capability["status"])
+            blockers.append(f"missing_capability:{key}:{status}")
+            _annotate_freshness_detail(details, key=str(key), reason=status, capability=capability)
+        else:
+            blockers.append(f"missing_data:{key}")
     warnings = [f"freshness_warning:{key}" for key in warning_keys]
     return {
         "status": "ok" if gate.get("ok") else "blocked",

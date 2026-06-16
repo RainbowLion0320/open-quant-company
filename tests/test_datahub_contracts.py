@@ -108,10 +108,20 @@ def test_db_health_scans_moneyflow_symbol_and_tushare_daily(tmp_path, monkeypatc
     assert "stock_moneyflow_daily" in tables
     assert "stock_moneyflow_tushare_daily" in tables
     assert daily["registry_key"] == "moneyflow_daily"
+    assert daily["freshness_severity"] == "warning"
     assert tushare_daily["partition_key"] == "trade_date"
     assert daily["freshness_status"] in {"fresh", "stale"}
     assert int(daily["manifest_files"]) == 1
     reset_datahub()
+
+
+def test_moneyflow_daily_registry_is_warning_level_observability_source():
+    from data.storage.dimensions import get_registry
+
+    meta = get_registry().health_metadata()["stock_moneyflow_daily"]
+
+    assert meta.registry_key == "moneyflow_daily"
+    assert meta.freshness_severity == "warning"
 
 
 def test_db_health_prefers_explicit_date_over_quarter_column():
@@ -172,6 +182,51 @@ def test_macro_gdp_freshness_uses_quarter_release_window():
     assert stale_detail["latest_period"] == "2025Q4"
     assert fresh_status == "fresh"
     assert fresh_detail["reason"] == "quarter_available"
+
+
+def test_monthly_macro_freshness_uses_monthly_release_window():
+    import scripts.db_health_check as health
+    from data.storage.dimensions import HealthTableMeta
+
+    meta = HealthTableMeta(
+        "macro_cpi",
+        "Tushare",
+        "CPI 居民消费价格",
+        registry_key="macro_cpi",
+        freshness_sla_days=45,
+    )
+
+    fresh_status, fresh_detail = health._freshness_status(
+        {
+            "table": "macro_cpi",
+            "files": 1,
+            "freshness_date": "2026-05-01",
+            "freshness_days": 46,
+            "error": None,
+        },
+        meta,
+        today=date(2026, 6, 16),
+    )
+    stale_status, stale_detail = health._freshness_status(
+        {
+            "table": "macro_cpi",
+            "files": 1,
+            "freshness_date": "2026-05-01",
+            "freshness_days": 85,
+            "error": None,
+        },
+        meta,
+        today=date(2026, 7, 25),
+    )
+
+    assert fresh_status == "fresh"
+    assert fresh_detail["reason"] == "month_available"
+    assert fresh_detail["expected_period"] == "2026-04"
+    assert fresh_detail["latest_period"] == "2026-05"
+    assert stale_status == "stale"
+    assert stale_detail["reason"] == "source_not_updated"
+    assert stale_detail["expected_period"] == "2026-06"
+    assert stale_detail["latest_period"] == "2026-05"
 
 
 def test_datahub_uses_canonical_runtime_env(tmp_path, monkeypatch):

@@ -610,6 +610,29 @@ def test_rate_limited_market_event_freshness_is_warning_until_required():
     assert required_gate["stale"] == ["stock_limit_list"]
 
 
+def test_registry_warning_freshness_is_observable_but_not_global_blocker():
+    from data.quality.freshness_gate import freshness_gate, health_result_to_gate_data
+
+    rows = health_result_to_gate_data([
+        {
+            "table": "stock_moneyflow_daily",
+            "registry_key": "moneyflow_daily",
+            "freshness_status": "stale",
+            "freshness_severity": "warning",
+            "freshness_reason": "source_unavailable",
+        }
+    ])
+
+    global_gate = freshness_gate(rows)
+    required_gate = freshness_gate(rows, required=["stock_moneyflow_daily"])
+
+    assert global_gate["ok"] is True
+    assert global_gate["warnings"] == ["stock_moneyflow_daily"]
+    assert global_gate["details"][0]["severity"] == "warning"
+    assert required_gate["ok"] is False
+    assert required_gate["stale"] == ["stock_moneyflow_daily"]
+
+
 def test_formal_lifecycle_does_not_silently_fill_core_evidence_gaps():
     price_service = Path("data/market/price_service.py").read_text(encoding="utf-8")
     competition = Path("research/strategy_competition.py").read_text(encoding="utf-8")

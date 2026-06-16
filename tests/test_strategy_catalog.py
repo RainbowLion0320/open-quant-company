@@ -23,6 +23,16 @@ def test_data_strategy_catalog_applies_canonical_metadata_defaults():
     assert {"features", "stock_daily", "sector", "market_regime"} <= set(ml["data_requirements"])
 
 
+def test_volume_confirmation_declares_actual_ohlcv_proxy_inputs():
+    from data.strategy.catalog import get_strategy, load_registry
+
+    load_registry(force_reload=True)
+    strategy = get_strategy("volume_confirmation")
+
+    assert strategy is not None
+    assert strategy["data_requirements"] == ["stock_daily"]
+
+
 def test_strategy_catalog_api_is_not_shadowed(monkeypatch):
     from fastapi.testclient import TestClient
 
