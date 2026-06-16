@@ -153,3 +153,43 @@ def test_ml_strategy_with_insufficient_feature_store_is_invalid(monkeypatch, tmp
     assert "feature_store_symbol_coverage" in row["data_quality"]["blockers"]
     assert "ignored_noncanonical_feature_files" in row["warnings"]
     assert report["summary"]["invalid_count"] == 1
+
+
+def test_strategy_data_readiness_uses_backtest_as_of_coverage(monkeypatch):
+    from backtest import data_readiness
+
+    rows = pd.DataFrame(
+        [
+            {
+                "registry_key": "sector_sw_daily",
+                "freshness_status": "stale",
+                "freshness_date": "2026-06-09",
+            },
+            {
+                "registry_key": "sector_membership",
+                "freshness_status": "unknown",
+                "freshness_date": "",
+            },
+            {
+                "registry_key": "ohlcv_daily",
+                "freshness_status": "fresh",
+                "freshness_date": "2026-06-12",
+            },
+            {
+                "registry_key": "adj_factor",
+                "freshness_status": "fresh",
+                "freshness_date": "2026-06-12",
+            },
+        ]
+    )
+    monkeypatch.setattr(data_readiness, "_HEALTH_ROWS_CACHE", rows)
+
+    item = {"data_requirements": ["stock_daily", "sector"]}
+    covered = data_readiness.strategy_data_readiness(item, as_of="2026-05-08")
+    uncovered = data_readiness.strategy_data_readiness(item, as_of="2026-06-12")
+
+    assert covered["status"] == "ok"
+    assert covered["statuses"]["sector_sw_daily"] == "available_as_of"
+    assert covered["blockers"] == []
+    assert uncovered["status"] == "blocked"
+    assert "stale_data:sector_sw_daily" in uncovered["blockers"]

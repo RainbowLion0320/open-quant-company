@@ -31,7 +31,7 @@ def _health_rows():
     return _HEALTH_ROWS_CACHE
 
 
-def strategy_data_readiness(item: dict) -> dict:
+def strategy_data_readiness(item: dict, *, as_of: str | pd.Timestamp | None = None) -> dict:
     requirements = [str(req) for req in item.get("data_requirements", [])]
     required_dimensions = sorted(
         {dim for req in requirements for dim in REQUIREMENT_DIMENSIONS.get(req, [])}
@@ -51,6 +51,7 @@ def strategy_data_readiness(item: dict) -> dict:
     stale: list[str] = []
     missing: list[str] = []
     statuses: dict[str, str] = {}
+    as_of_ts = pd.Timestamp(as_of).normalize() if as_of is not None else None
     for dimension in required_dimensions:
         row = registry_rows.get(dimension)
         if row is None:
@@ -59,6 +60,15 @@ def strategy_data_readiness(item: dict) -> dict:
             statuses[dimension] = "missing"
             continue
         status = str(row.get("freshness_status") or row.get("status") or "unknown").lower()
+        freshness_date = pd.to_datetime(row.get("freshness_date"), errors="coerce")
+        if (
+            as_of_ts is not None
+            and status == "stale"
+            and pd.notna(freshness_date)
+            and pd.Timestamp(freshness_date).normalize() >= as_of_ts
+        ):
+            statuses[dimension] = "available_as_of"
+            continue
         statuses[dimension] = status
         if status in {"missing", "error"}:
             missing.append(dimension)

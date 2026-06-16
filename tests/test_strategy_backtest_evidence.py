@@ -68,6 +68,29 @@ def test_strategy_evidence_distinguishes_missing_ic_from_zero_ic():
     assert measured_zero["metrics"]["icir"] == 0.0
 
 
+def test_strategy_evidence_treats_risk_overlay_ic_as_not_applicable():
+    from research.strategy_evaluation import build_evidence_report
+
+    report = build_evidence_report(
+        strategy="cybernetic",
+        status="production",
+        metrics={"cagr": 0.08, "sharpe": 0.7, "max_drawdown": -0.12, "turnover": 1.0, "trades": 40},
+        oos={"months": 36},
+        alpha_evidence={
+            "status": "not_applicable",
+            "reason": "risk_overlay_uses_overlay_evidence",
+            "ic": None,
+            "icir": None,
+        },
+    )
+
+    assert report["missing_evidence"] == []
+    assert "missing_evidence:ic" not in report["promotion_decision"]["failed_rules"]
+    assert "missing_evidence:icir" not in report["promotion_decision"]["failed_rules"]
+    assert "ic" not in report["promotion_decision"]["failed_rules"]
+    assert "icir" not in report["promotion_decision"]["failed_rules"]
+
+
 def test_backtest_evidence_includes_measured_alpha_evidence_from_score_panel(tmp_path, monkeypatch):
     import pandas as pd
 
@@ -120,3 +143,111 @@ def test_backtest_evidence_includes_measured_alpha_evidence_from_score_panel(tmp
     assert saved["alpha_evidence"]["ic"] > 0.9
     assert saved["metrics"]["ic"] > 0.9
     assert saved["backtest_evidence"]["score_panel_rows"] == len(score_rows)
+
+
+def test_backtest_evidence_writes_measured_baselines_from_real_inputs(tmp_path, monkeypatch):
+    import pandas as pd
+
+    from research.strategy_evaluation import required_baselines, write_backtest_evidence
+
+    monkeypatch.setattr(
+        "research.strategy_competition.risk_free_series_for_index",
+        lambda index: pd.Series(0.02, index=index),
+    )
+    idx = pd.bdate_range("2023-01-02", periods=820)
+    result = {
+        "daily_returns": pd.Series(0.0008, index=idx),
+        "bench_returns": pd.Series(0.0002, index=idx),
+        "trade_log": [(dt, "BUY", "AAA", 100, 10.0) for dt in idx[::20]],
+        "score_panel": pd.DataFrame(
+            [
+                {
+                    "as_of_date": dt.date().isoformat(),
+                    "symbol": symbol,
+                    "strategy": "alpha",
+                    "score": score,
+                    "forward_return_20d": fwd,
+                }
+                for dt in pd.bdate_range("2024-01-02", periods=20)
+                for symbol, score, fwd in (("AAA", 90.0, 0.05), ("BBB", 10.0, -0.02))
+            ]
+        ),
+    }
+    champion = {
+        "daily_returns": pd.Series(0.0005, index=idx),
+        "bench_returns": pd.Series(0.0002, index=idx),
+        "trade_log": [(dt, "BUY", "CCC", 100, 10.0) for dt in idx[::30]],
+    }
+    price_matrix = pd.DataFrame(
+        {
+            "AAA": (1 + pd.Series(0.0007, index=idx)).cumprod() * 10,
+            "BBB": (1 + pd.Series(0.0001, index=idx)).cumprod() * 20,
+            "CCC": (1 + pd.Series(-0.0001, index=idx)).cumprod() * 30,
+        }
+    )
+
+    path = write_backtest_evidence(
+        "alpha",
+        "candidate",
+        result,
+        start="2023-01-02",
+        end="2026-02-20",
+        output_dir=tmp_path,
+        price_matrix=price_matrix,
+        peer_results={"current_champion": champion, "trend_following": champion},
+        current_champion="current_champion",
+    )
+    saved = json.loads(path.read_text(encoding="utf-8"))
+
+    assert set(saved["baselines"]) == set(required_baselines())
+    assert all(saved["baselines"][name]["status"] == "measured" for name in required_baselines())
+    assert saved["baselines"]["buy_and_hold"]["source"] == "benchmark_returns"
+    assert saved["baselines"]["fixed_weight"]["source"] == "price_matrix_equal_weight_buy_and_hold"
+    assert saved["baselines"]["trend_only"]["source"] == "peer_backtest:trend_following"
+    assert saved["baselines"]["current_champion"]["source"] == "peer_backtest:current_champion"
+    assert saved["baselines"]["ma_timing"]["trade_count"] >= 0
+    assert saved["backtest_evidence"]["baseline_count"] == len(required_baselines())
+    assert saved["backtest_evidence"]["measured_baseline_count"] == len(required_baselines())
+
+
+def test_backtest_evidence_preserves_data_readiness_blockers(tmp_path, monkeypatch):
+    import pandas as pd
+
+    from research.strategy_evaluation import write_backtest_evidence
+
+    monkeypatch.setattr(
+        "research.strategy_competition.risk_free_series_for_index",
+        lambda index: pd.Series(0.02, index=index),
+    )
+    idx = pd.bdate_range("2023-01-02", periods=820)
+    result = {
+        "daily_returns": pd.Series(0.001, index=idx),
+        "bench_returns": pd.Series(0.0001, index=idx),
+        "trade_log": [(dt, "BUY", "AAA", 100, 10.0) for dt in idx[::20]],
+        "score_panel": pd.DataFrame(
+            [
+                {
+                    "as_of_date": dt.date().isoformat(),
+                    "symbol": symbol,
+                    "strategy": "alpha",
+                    "score": score,
+                    "forward_return_20d": fwd,
+                }
+                for dt in pd.bdate_range("2024-01-02", periods=20)
+                for symbol, score, fwd in (("AAA", 90.0, 0.05), ("BBB", 10.0, -0.02))
+            ]
+        ),
+        "data_readiness": {
+            "status": "blocked",
+            "blockers": ["stale_data:sector_sw_daily"],
+            "stale": ["sector_sw_daily"],
+        },
+    }
+
+    path = write_backtest_evidence("alpha", "candidate", result, start="2023-01-02", end="2026-02-20", output_dir=tmp_path)
+    saved = json.loads(path.read_text(encoding="utf-8"))
+
+    assert saved["alpha_evidence"]["status"] == "measured"
+    assert saved["data_readiness"]["status"] == "blocked"
+    assert saved["data_readiness"]["blockers"] == ["stale_data:sector_sw_daily"]
+    assert "data_readiness:stale_data:sector_sw_daily" in saved["promotion_decision"]["failed_rules"]

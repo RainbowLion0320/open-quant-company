@@ -42,7 +42,7 @@
 | 2.14 | Market Regime 挣钱导向训练 | `research/regime/`, `scripts/train_market_regime_profit.py`, `cybernetics/regime_policy.py` | `test_regime_profit_training.py` | `reports/regime_profit_training/summary.json` | 可交易资产 risk-on/risk-off、强 baseline、walk-forward OOS、champion 同标准诊断、best validated 选择，`w0611` 已作为规则评分基线并由统一 production policy 常量约束 | OK | — |
 | 2.15 | Strategy Catalog 策略元数据权威目录 | `research/strategy_catalog.py`, `data/strategy/catalog.py` | `test_strategy_catalog.py` | `GET /api/strategies/catalog` → `Strategies.vue` | 策略目录含类型、层级、生命周期、config_key、数据需求和输出契约 | OK | — |
 | 2.16 | 策略 runtime mode 生产隔离 | `data/strategy/plugins.py`, `scripts/compute_signals.py`, `web/api/jobs.py` | `test_strategy_runtime_gates.py` | `POST /api/strategies/run` (`mode=production/research`) | production 默认排除 candidate；Strategy Lab 候选按钮显式 research scan | OK | — |
-| 2.17 | 首批候选策略池 | `signals/candidates/*.py`, `config/settings.yaml` | `test_candidate_strategy_contracts.py` | `GET /api/strategies/catalog` | 8 个候选策略输出统一 StrategySignalRows，默认候选买入上限 ≤20 | OK | 需后续 OOS 实证 |
+| 2.17 | 首批候选策略池 | `signals/candidates/*.py`, `config/settings.yaml` | `test_candidate_strategy_contracts.py`, `test_strategy_competition.py` | `GET /api/strategies/catalog`, `astroq strategy compete --run-backtest --json` | 8 个候选策略输出统一 StrategySignalRows，默认候选买入上限 ≤20；12 策略统一竞赛已生成 OOS/IC/ICIR 证据，候选策略按门槛保持 candidate/paper/production recommendation | OK | — |
 
 ## 3. 回测引擎 (Backtest Engine)
 
@@ -57,7 +57,7 @@
 | 3.7 | 生产共享回测流水线 | `backtest/pipeline_runner.py` + `pipeline/*` | `test_backtest_pipeline_runner_contracts.py` | — | `PipelineBacktest` 按 Alpha→Portfolio→Risk→Execution 生产阶段运行，并过滤缺失价格列 | OK | — |
 | 3.8 | 基准使用上证综指 (非个股) | `config/settings.yaml` backtest.benchmark | — | — | 确认 benchmark=sh000001 (非 000001) | OK (已修复) | — |
 | 3.9 | 约束组合构建 | `pipeline/portfolio.py:ConstrainedPortfolioConstructor` | `test_strategy_research_governance.py:test_constrained_portfolio_constructor_caps_sector_and_single_name_weight` | — | Top-N 同时受单票/行业/总仓位上限约束 | OK | — |
-| 3.10 | 候选策略证据报告契约 | `research/strategy_evaluation.py`, `backtest/run_all_strategies.py` | `test_strategy_backtest_evidence.py`, `test_strategy_evaluation.py` | `var/store/research/strategy_evidence/*.json` | 报告含强基准、metrics、OOS、成本、regime breakdown、alpha evidence、data readiness 和 promotion decision；缺证据明确 blocked | OK | 待接入更多真实 baseline 结果 |
+| 3.10 | 候选策略证据报告契约 | `research/strategy_evaluation.py`, `backtest/run_all_strategies.py` | `test_strategy_backtest_evidence.py`, `test_strategy_evaluation.py` | `var/store/research/strategy_evidence/*.json` | 报告含强基准、metrics、OOS、成本、regime breakdown、alpha evidence、data readiness 和 promotion decision；每个策略写入 benchmark、fixed-weight、timing、breadth、peer 和 champion measured baselines；缺证据明确 blocked | OK | — |
 
 ## 4. 执行层 (Execution Layer)
 
@@ -131,15 +131,15 @@
 | 能力域 | 总条目 | 功能可验收 | 规划中 | 质量债条目 | 待补自动化测试 |
 |--------|-------|------------|--------|------------|----------------|
 | 数据管道 | 13 | 13 | 0 | 0 | 0 |
-| 信号系统 | 17 | 17 | 0 | 1 | 0 |
-| 回测引擎 | 10 | 10 | 0 | 1 | 0 |
+| 信号系统 | 17 | 17 | 0 | 0 | 0 |
+| 回测引擎 | 10 | 10 | 0 | 0 | 0 |
 | 执行层 | 9 | 9 | 0 | 0 | 0 |
 | Web 平台 | 19 | 19 | 0 | 0 | 0 |
 | 多资产架构 | 10 | 10 | 0 | 0 | 0 |
 | Agent Company OS | 9 | 8 | 0 | 1 | 0 |
-| **合计** | **87** | **86** | **0** | **3** | **0** |
+| **合计** | **87** | **86** | **0** | **1** | **0** |
 
-> **说明：** `功能可验收` 表示该能力有完整可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数。`质量债条目` 统计"缺口"列非 `—` 的行，包含已实现能力的质量债和规划能力的未实现缺口。当前剩余缺口包括：候选策略需要真实 OOS 实证、候选策略证据报告需接入更多真实 baseline 结果；Agent Company OS 仍需真实 MiniQMT/QMT 终端撤单语义和定时对账人工演练。开放式 CEO 目标现在通过 autonomy program 持久化为多阶段计划；执行边界仍故意限定为 fixed-registry 的 `read_only` / `dry_run`，写入、代码、paper/live 交易和未知工具必须进入审批、工单或 blocker。
+> **说明：** `功能可验收` 表示该能力有完整可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数。`质量债条目` 统计"缺口"列非 `—` 的行，包含已实现能力的质量债和规划能力的未实现缺口。当前剩余缺口只剩 Agent Company OS 的真实 MiniQMT/QMT 终端撤单语义和定时对账人工演练；12 策略 OOS/IC/ICIR 竞赛和 measured baseline evidence 已接入，但大多数策略因收益、换手或 alpha 门槛未达标仍保持 candidate/paper recommendation。开放式 CEO 目标现在通过 autonomy program 持久化为多阶段计划；执行边界仍故意限定为 fixed-registry 的 `read_only` / `dry_run`，写入、代码、paper/live 交易和未知工具必须进入审批、工单或 blocker。
 
 **维护说明:**
 
