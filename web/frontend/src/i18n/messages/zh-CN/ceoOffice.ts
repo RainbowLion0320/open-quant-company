@@ -26,7 +26,6 @@ export const ceoOffice = {
       autonomyRunSteps: "自主步骤",
       autonomyRunMaxSteps: "最大步骤",
       stopReason: "停止原因",
-      refresh: "刷新",
       messagePlaceholder: "输入要交给 desk agents 的问题或任务",
       send: "发送",
       previewPlan: "预览计划",

@@ -6,7 +6,6 @@
         <h2>{{ t("ceoOffice.title") }}</h2>
       </div>
       <div class="ceo-actions">
-        <button class="btn btn-ghost" type="button" @click="load">{{ t("ceoOffice.refresh") }}</button>
         <button
           v-if="activeSession && activeSession.status !== 'archived'"
           class="btn btn-ghost"
@@ -208,50 +207,6 @@
           </div>
         </article>
       </div>
-    </section>
-
-    <section class="ceo-summary">
-      <article class="ceo-metric">
-        <span>{{ t("ceoOffice.session") }}</span>
-        <strong>{{ activeSession?.title || t("ceoOffice.noSession") }}</strong>
-        <small v-if="activeSession">
-          {{ statusLabel(activeSession.status) }} · {{ t("ceoOffice.stream") }} {{ statusLabel(sessionStreamStatus) }}
-        </small>
-      </article>
-      <article class="ceo-metric">
-        <span>{{ t("ceoOffice.deskStatus") }}</span>
-        <strong>{{ desks.length }}</strong>
-      </article>
-      <article class="ceo-metric">
-        <span>{{ t("ceoOffice.actionQueue") }}</span>
-        <strong>{{ pendingActions.length }}</strong>
-      </article>
-      <article class="ceo-metric">
-        <span>{{ t("ceoOffice.handoffs") }}</span>
-        <strong>{{ handoffs.length }}</strong>
-      </article>
-      <article class="ceo-metric">
-        <span>{{ t("ceoOffice.workOrders") }}</span>
-        <strong>{{ workOrders.length }}</strong>
-      </article>
-      <article class="ceo-metric">
-        <span>{{ t("ceoOffice.evidence") }}</span>
-        <strong>{{ evidenceCount }}</strong>
-      </article>
-      <article class="ceo-metric">
-        <span>{{ t("ceoOffice.reports") }}</span>
-        <strong>{{ reports.length }}</strong>
-      </article>
-      <article class="ceo-metric">
-        <span>{{ t("ceoOffice.liveReadiness") }}</span>
-        <strong>{{ statusLabel(liveReadiness?.mode || "unknown") }}</strong>
-        <small>{{ liveReadiness?.paper_fallback === false ? t("ceoOffice.noPaperFallback") : "—" }}</small>
-      </article>
-      <article class="ceo-metric">
-        <span>{{ t("ceoOffice.liveKillSwitch") }}</span>
-        <strong>{{ statusLabel(liveKillSwitch?.status || "inactive") }}</strong>
-        <small>{{ liveKillSwitch?.active ? t("ceoOffice.killSwitchBlocking") : t("ceoOffice.killSwitchClear") }}</small>
-      </article>
     </section>
 
     <section class="ceo-grid">
@@ -1443,7 +1398,7 @@ async function loadSession(sessionId: string, options: { connectStream?: boolean
   }
 }
 
-async function load() {
+async function loadOfficeState() {
   error.value = "";
   try {
     const [sessionPayload, deskPayload, policyPayload, actionPayload, handoffPayload, workOrderPayload, programPayload, livePayload, environmentPayload, killSwitchPayload] = await Promise.all([
@@ -1493,7 +1448,7 @@ async function createSession() {
     selectedDraftDesk.value = payload.session.default_desk || "reporting";
     sessions.value = [payload.session, ...sessions.value];
     messages.value = [];
-    await load();
+    await loadOfficeState();
   } catch (err: any) {
     error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;
   }
@@ -1505,7 +1460,7 @@ async function archiveSession() {
   error.value = "";
   try {
     await api.agentUpdateSession(activeSession.value.session_id, { status: "archived" });
-    await load();
+    await loadOfficeState();
   } catch (err: any) {
     error.value = `${t("ceoOffice.archiveFailed")}: ${err?.message || err}`;
   } finally {
@@ -1691,12 +1646,12 @@ async function sendMessage() {
 
 async function approveAction(actionId: string) {
   await api.agentApproveAction(actionId);
-  await load();
+  await loadOfficeState();
 }
 
 async function rejectAction(actionId: string) {
   await api.agentRejectAction(actionId, "Rejected from CEO Office");
-  await load();
+  await loadOfficeState();
 }
 
 async function cancelAction(actionId: string) {
@@ -1711,7 +1666,7 @@ async function cancelAction(actionId: string) {
     } else {
       await api.agentCancelAction(actionId, "Canceled from CEO Office");
     }
-    await load();
+    await loadOfficeState();
   } catch (err: any) {
     error.value = `${t("ceoOffice.cancelFailed")}: ${err?.message || err}`;
   } finally {
@@ -1740,7 +1695,7 @@ async function runAction(actionId: string) {
   try {
     await api.agentRunAction(actionId);
     await selectAction(actionId);
-    await load();
+    await loadOfficeState();
   } catch (err: any) {
     error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
   } finally {
@@ -1754,7 +1709,7 @@ async function submitPaperAction(actionId: string) {
   try {
     await api.agentPaperSubmitAction(actionId);
     await selectAction(actionId);
-    await load();
+    await loadOfficeState();
   } catch (err: any) {
     error.value = `${t("ceoOffice.paperSubmitFailed")}: ${err?.message || err}`;
   } finally {
@@ -1802,7 +1757,7 @@ async function runScheduledReportRhythm() {
     if (activeSession.value) {
       await loadSession(activeSession.value.session_id);
     } else {
-      await load();
+      await loadOfficeState();
     }
   } catch (err: any) {
     error.value = `${t("ceoOffice.rhythmFailed")}: ${err?.message || err}`;
@@ -1836,7 +1791,7 @@ async function operateLiveKillSwitch(nextState: "activate" | "deactivate") {
       ? await api.agentLiveKillSwitchActivate(reason)
       : await api.agentLiveKillSwitchDeactivate(reason);
     liveKillSwitch.value = payload.kill_switch;
-    await load();
+    await loadOfficeState();
   } catch (err: any) {
     error.value = `${t("ceoOffice.killSwitchFailed")}: ${err?.message || err}`;
   } finally {
@@ -1903,7 +1858,7 @@ async function resolveHandoff(handoffId: string) {
   error.value = "";
   try {
     await api.agentResolveHandoff(handoffId);
-    await load();
+    await loadOfficeState();
   } catch (err: any) {
     error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;
   } finally {
@@ -1916,7 +1871,7 @@ async function updateWorkOrder(workOrderId: string, status: string, resolution: 
   error.value = "";
   try {
     await api.agentUpdateWorkOrder(workOrderId, { status, resolution });
-    await load();
+    await loadOfficeState();
   } catch (err: any) {
     error.value = `${t("ceoOffice.updateWorkOrderFailed")}: ${err?.message || err}`;
   } finally {
@@ -1924,7 +1879,7 @@ async function updateWorkOrder(workOrderId: string, status: string, resolution: 
   }
 }
 
-onMounted(load);
+onMounted(loadOfficeState);
 onBeforeUnmount(closeSessionStream);
 onBeforeUnmount(closeRunStream);
 </script>

@@ -26,7 +26,6 @@ export const ceoOffice = {
       autonomyRunSteps: "Autonomy Steps",
       autonomyRunMaxSteps: "Max Steps",
       stopReason: "Stop Reason",
-      refresh: "Refresh",
       messagePlaceholder: "Ask the desk agents a question or task",
       send: "Send",
       previewPlan: "Preview Plan",

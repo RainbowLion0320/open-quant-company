@@ -28,13 +28,6 @@
   text-transform: uppercase;
 }
 
-.ceo-summary {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.ceo-metric,
 .ceo-panel,
 .ceo-alert {
   border: 1px solid var(--border-default);
@@ -42,29 +35,10 @@
   background: var(--bg-panel);
 }
 
-.ceo-metric {
-  min-height: 92px;
-  display: grid;
-  align-content: space-between;
-  padding: 14px;
-}
-
-.ceo-metric span,
 .panel-head span,
 .message-meta,
 .action-row small,
 .desk-row small {
-  color: var(--text-tertiary);
-  font-size: 11px;
-}
-
-.ceo-metric strong {
-  color: var(--text-primary);
-  font-size: 18px;
-  overflow-wrap: anywhere;
-}
-
-.ceo-metric small {
   color: var(--text-tertiary);
   font-size: 11px;
 }
@@ -978,7 +952,6 @@
 }
 
 @media (max-width: 1100px) {
-  .ceo-summary,
   .ceo-grid {
     grid-template-columns: 1fr;
   }
