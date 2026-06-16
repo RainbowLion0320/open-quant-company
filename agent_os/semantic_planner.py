@@ -7,7 +7,6 @@ from typing import Any
 
 from agent_os.tools import DEFAULT_TOOLS
 from data.llm.usage import load_provider_api_key
-from data.llm.usage import provider_config
 from data.llm.usage import record_llm_response_usage
 from data.llm.usage import resolve_llm_use_case
 
@@ -82,11 +81,23 @@ class ProviderSemanticPlanner:
             "model": model,
             "credential_env": runtime["credential_env"],
         }
-        if not provider_config(provider).get("enabled", True):
+        if runtime.get("block_reason") == "provider_not_configured":
+            return _provider_blocked_draft(
+                "semantic_provider_not_configured",
+                "Semantic provider is not configured; no provider request was sent.",
+                {**provider_reasoning, "status": "not_configured"},
+            )
+        if runtime.get("block_reason") == "provider_disabled" or not runtime.get("enabled", True):
             return _provider_blocked_draft(
                 "semantic_provider_disabled",
                 "Semantic provider is disabled in configuration; no provider request was sent.",
                 {**provider_reasoning, "status": "disabled"},
+            )
+        if runtime.get("block_reason") == "unsupported_protocol":
+            return _provider_blocked_draft(
+                "semantic_provider_unsupported_protocol",
+                "Semantic provider protocol is unsupported; no provider request was sent.",
+                {**provider_reasoning, "status": "unsupported_protocol", "protocol": runtime.get("protocol", "")},
             )
         key = load_provider_api_key(provider)
         if not key:
@@ -95,11 +106,17 @@ class ProviderSemanticPlanner:
                 "Semantic provider API key is missing; no provider request was sent.",
                 {**provider_reasoning, "status": "missing_secret"},
             )
-        if not runtime["base_url"]:
+        if runtime.get("block_reason") == "base_url_missing" or not runtime["base_url"]:
             return _provider_blocked_draft(
                 "semantic_provider_base_url_missing",
                 "Semantic provider base_url is missing; no provider request was sent.",
                 {**provider_reasoning, "status": "missing_base_url"},
+            )
+        if runtime.get("block_reason") == "model_missing" or not model:
+            return _provider_blocked_draft(
+                "semantic_provider_model_missing",
+                "Semantic provider model is missing; no provider request was sent.",
+                {**provider_reasoning, "status": "missing_model"},
             )
 
         request = {
@@ -107,8 +124,11 @@ class ProviderSemanticPlanner:
             "provider": provider,
             "model": model,
             "base_url": runtime["base_url"],
+            "chat_path": runtime.get("chat_path", "/chat/completions"),
+            "response_format_json": bool(runtime.get("response_format_json", True)),
+            "temperature": float(runtime.get("temperature", 0.1) or 0.1),
             "api_key": key,
-            "timeout_seconds": self._timeout_seconds,
+            "timeout_seconds": float(runtime.get("timeout_seconds", self._timeout_seconds) or self._timeout_seconds),
             "messages": _semantic_provider_messages(
                 desk=desk,
                 content=content,
@@ -278,13 +298,17 @@ def _is_secret_like_key(key: str) -> bool:
 
 def _openai_compatible_chat_completion(request: dict[str, Any]) -> dict[str, Any]:
     base_url = str(request.get("base_url") or "").rstrip("/")
-    url = f"{base_url}/chat/completions"
+    chat_path = str(request.get("chat_path") or "/chat/completions")
+    if not chat_path.startswith("/"):
+        chat_path = f"/{chat_path}"
+    url = f"{base_url}{chat_path}"
     payload = {
         "model": str(request.get("model") or ""),
         "messages": request.get("messages") or [],
-        "temperature": 0.1,
-        "response_format": {"type": "json_object"},
+        "temperature": float(request.get("temperature", 0.1) or 0.1),
     }
+    if bool(request.get("response_format_json", True)):
+        payload["response_format"] = {"type": "json_object"}
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     http_request = urllib.request.Request(
         url,

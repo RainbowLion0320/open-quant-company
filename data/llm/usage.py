@@ -20,6 +20,9 @@ from data.storage.datahub import get_datahub
 DEFAULT_PROVIDER = "deepseek"
 DEFAULT_USAGE_SCHEMA = "openai_cache"
 DEFAULT_LEDGER_SOURCE = "provider_balance_api+project_usage_ledger"
+DEFAULT_LLM_PROTOCOL = "openai_compatible"
+DEFAULT_CHAT_PATH = "/chat/completions"
+SUPPORTED_LLM_PROTOCOLS = {DEFAULT_LLM_PROTOCOL}
 
 DEFAULT_LLM_CONFIG: dict[str, Any] = {
     "default_provider": DEFAULT_PROVIDER,
@@ -31,9 +34,16 @@ DEFAULT_LLM_CONFIG: dict[str, Any] = {
         "deepseek": {
             "enabled": True,
             "label": "DeepSeek",
+            "protocol": DEFAULT_LLM_PROTOCOL,
             "api_key_env": "DEEPSEEK_API_KEY",
             "base_url": "https://api.deepseek.com/v1",
             "default_model": "deepseek-v4-flash",
+            "request": {
+                "chat_path": DEFAULT_CHAT_PATH,
+                "response_format_json": True,
+                "temperature": 0.1,
+                "timeout_seconds": 20.0,
+            },
             "balance_url": "https://api.deepseek.com/user/balance",
             "pricing_source": "https://api-docs.deepseek.com/quick_start/pricing",
             "usage_schema": DEFAULT_USAGE_SCHEMA,
@@ -78,7 +88,7 @@ def enabled_providers() -> list[str]:
 def default_provider() -> str:
     cfg = llm_config()
     provider = str(cfg.get("default_provider") or DEFAULT_PROVIDER)
-    return provider if provider in cfg.get("providers", {}) else DEFAULT_PROVIDER
+    return provider
 
 
 def provider_config(provider: str = DEFAULT_PROVIDER) -> dict[str, Any]:
@@ -86,19 +96,73 @@ def provider_config(provider: str = DEFAULT_PROVIDER) -> dict[str, Any]:
     cfg = providers.get(provider) if isinstance(providers, dict) else None
     if isinstance(cfg, dict):
         return cfg
-    return providers.get(DEFAULT_PROVIDER, DEFAULT_LLM_CONFIG["providers"][DEFAULT_PROVIDER])
+    return {}
 
 
-def resolve_llm_use_case(use_case: str, *, provider: str | None = None, model: str | None = None) -> dict[str, str]:
+def _provider_request_config(provider_cfg: dict[str, Any]) -> dict[str, Any]:
+    request = provider_cfg.get("request", {})
+    request = request if isinstance(request, dict) else {}
+    try:
+        temperature = float(request.get("temperature", 0.1))
+    except (TypeError, ValueError):
+        temperature = 0.1
+    try:
+        timeout_seconds = float(request.get("timeout_seconds", 20.0))
+    except (TypeError, ValueError):
+        timeout_seconds = 20.0
+    return {
+        "chat_path": str(request.get("chat_path") or DEFAULT_CHAT_PATH),
+        "response_format_json": bool(request.get("response_format_json", True)),
+        "temperature": temperature,
+        "timeout_seconds": timeout_seconds,
+    }
+
+
+def _blocked_runtime(use_case: str, provider: str, model: str, reason: str) -> dict[str, Any]:
+    return {
+        "use_case": use_case,
+        "provider": provider,
+        "label": provider,
+        "model": model,
+        "base_url": "",
+        "credential_env": "",
+        "usage_schema": DEFAULT_USAGE_SCHEMA,
+        "configured": False,
+        "enabled": False,
+        "protocol": "",
+        "chat_path": DEFAULT_CHAT_PATH,
+        "response_format_json": True,
+        "temperature": 0.1,
+        "timeout_seconds": 20.0,
+        "block_reason": reason,
+    }
+
+
+def resolve_llm_use_case(use_case: str, *, provider: str | None = None, model: str | None = None) -> dict[str, Any]:
     """Resolve provider runtime settings for an LLM use case without hard-coding one vendor."""
     cfg = llm_config()
     use_cases = cfg.get("use_cases", {})
     use_case_cfg = use_cases.get(use_case, {}) if isinstance(use_cases, dict) else {}
     providers = cfg.get("providers", {})
     candidate_provider = str(provider or use_case_cfg.get("provider") or default_provider())
-    resolved_provider = candidate_provider if isinstance(providers, dict) and candidate_provider in providers else default_provider()
+    candidate_model = str(model or use_case_cfg.get("model") or "")
+    if not isinstance(providers, dict) or candidate_provider not in providers or not isinstance(providers.get(candidate_provider), dict):
+        return _blocked_runtime(use_case, candidate_provider, candidate_model, "provider_not_configured")
+    resolved_provider = candidate_provider
     pcfg = provider_config(resolved_provider)
-    resolved_model = str(model or use_case_cfg.get("model") or pcfg.get("default_model") or pricing_model(resolved_provider, ""))
+    request_cfg = _provider_request_config(pcfg)
+    protocol = str(pcfg.get("protocol") or DEFAULT_LLM_PROTOCOL)
+    enabled = bool(pcfg.get("enabled", True))
+    resolved_model = str(model or use_case_cfg.get("model") or pcfg.get("default_model") or "")
+    block_reason = ""
+    if not enabled:
+        block_reason = "provider_disabled"
+    elif protocol not in SUPPORTED_LLM_PROTOCOLS:
+        block_reason = "unsupported_protocol"
+    elif not str(pcfg.get("base_url") or pcfg.get("chat_base_url") or "").strip():
+        block_reason = "base_url_missing"
+    elif not resolved_model:
+        block_reason = "model_missing"
     return {
         "use_case": use_case,
         "provider": resolved_provider,
@@ -107,6 +171,14 @@ def resolve_llm_use_case(use_case: str, *, provider: str | None = None, model: s
         "base_url": str(pcfg.get("base_url") or pcfg.get("chat_base_url") or ""),
         "credential_env": _env_name(resolved_provider),
         "usage_schema": str(pcfg.get("usage_schema") or DEFAULT_USAGE_SCHEMA),
+        "configured": True,
+        "enabled": enabled,
+        "protocol": protocol,
+        "chat_path": request_cfg["chat_path"],
+        "response_format_json": request_cfg["response_format_json"],
+        "temperature": request_cfg["temperature"],
+        "timeout_seconds": request_cfg["timeout_seconds"],
+        "block_reason": block_reason,
     }
 
 
@@ -138,7 +210,7 @@ def _models(provider: str) -> dict[str, dict[str, float]]:
     models = _pricing(provider).get("models")
     if isinstance(models, dict) and models:
         return models
-    return _normalize_pricing_config(DEFAULT_LLM_CONFIG["providers"][DEFAULT_PROVIDER]["pricing"])["models"]
+    return {}
 
 
 def _aliases(provider: str) -> dict[str, str]:
@@ -151,7 +223,7 @@ def pricing_model(provider: str, model: str) -> str:
     canonical = _aliases(provider).get(str(model), str(model))
     if canonical in models:
         return canonical
-    return next(iter(models))
+    return ""
 
 
 def pricing_source(provider: str = DEFAULT_PROVIDER) -> str:
@@ -293,19 +365,28 @@ def normalize_llm_usage(
     output = _usage_value(usage, "completion_tokens")
     total = _usage_value(usage, "total_tokens", hit + miss + output) or (hit + miss + output)
 
+    provider_models = _models(provider)
     priced_model = pricing_model(provider, model)
-    price = _models(provider)[priced_model]
-    input_uncached_rate = price.get("input_cache_miss", price.get("input", 0.0))
-    has_split_rate = bool(price.get("input_cache_hit") or input_uncached_rate or price.get("output"))
-    cost_usd = (
-        hit * price.get("input_cache_hit", 0.0)
-        + miss * input_uncached_rate
-        + output * price.get("output", 0.0)
-    ) / 1_000_000
-    if price.get("total") and not has_split_rate:
-        cost_usd += total * price.get("total", 0.0) / 1_000_000
-    if price.get("request"):
-        cost_usd += price.get("request", 0.0)
+    pricing_status = "ok"
+    cost_usd = 0.0
+    if not provider_models:
+        pricing_status = "missing_provider_pricing"
+    elif not priced_model:
+        pricing_status = "missing_model_pricing"
+        priced_model = str(model)
+    else:
+        price = provider_models[priced_model]
+        input_uncached_rate = price.get("input_cache_miss", price.get("input", 0.0))
+        has_split_rate = bool(price.get("input_cache_hit") or input_uncached_rate or price.get("output"))
+        cost_usd = (
+            hit * price.get("input_cache_hit", 0.0)
+            + miss * input_uncached_rate
+            + output * price.get("output", 0.0)
+        ) / 1_000_000
+        if price.get("total") and not has_split_rate:
+            cost_usd += total * price.get("total", 0.0) / 1_000_000
+        if price.get("request"):
+            cost_usd += price.get("request", 0.0)
 
     return {
         "ts": ts.isoformat(),
@@ -313,6 +394,7 @@ def normalize_llm_usage(
         "provider": provider,
         "model": str(model),
         "pricing_model": priced_model,
+        "pricing_status": pricing_status,
         "source": source,
         "request_id": request_id,
         "usage_source": "api_response",
@@ -407,6 +489,9 @@ def summarize_llm_project_usage(days: int = 30, provider: str | None = None) -> 
     df["utc_date"] = df["utc_date"].astype(str).str.slice(0, 10)
     df["provider"] = df["provider"].astype(str)
     df["model"] = df["model"].astype(str)
+    if "pricing_status" not in df.columns:
+        df["pricing_status"] = "ok"
+    df["pricing_status"] = df["pricing_status"].astype(str).replace({"": "ok"})
 
     cutoff = (datetime.now(timezone.utc).date() - timedelta(days=max(1, int(days)) - 1)).isoformat()
     df = df[df["utc_date"] >= cutoff]
@@ -421,6 +506,8 @@ def summarize_llm_project_usage(days: int = 30, provider: str | None = None) -> 
     daily["usage_source"] = "api_response"
     daily["cost_cny"] = daily["estimated_cost_cny"]
     records = daily.to_dict(orient="records")
+    pricing_statuses = sorted({status for status in df["pricing_status"].unique().tolist() if status != "ok"})
+    unpriced_rows = int((df["pricing_status"] != "ok").sum())
 
     return {
         "status": "ok",
@@ -436,6 +523,9 @@ def summarize_llm_project_usage(days: int = 30, provider: str | None = None) -> 
             "estimated_cost_usd": round(float(daily["estimated_cost_usd"].sum()), 6),
             "estimated_cost_cny": round(float(daily["estimated_cost_cny"].sum()), 4),
         },
+        "pricing_status": "partial" if pricing_statuses else "ok",
+        "unpriced_rows": unpriced_rows,
+        "unpriced_reasons": pricing_statuses,
         "pricing_source": ",".join(sorted({pricing_source(name) for name in daily["provider"].unique()})),
     }
 
@@ -450,5 +540,8 @@ def empty_usage_summary(status: str, *, days: int = 30, provider: str | None = N
         "models": [],
         "dates": [],
         "totals": {"tokens": 0, "requests": 0, "estimated_cost_usd": 0.0, "estimated_cost_cny": 0.0},
+        "pricing_status": "ok",
+        "unpriced_rows": 0,
+        "unpriced_reasons": [],
         "pricing_source": pricing_source(provider or DEFAULT_PROVIDER),
     }

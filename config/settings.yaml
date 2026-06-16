@@ -330,9 +330,15 @@ llm:
     deepseek:
       enabled: true
       label: DeepSeek
+      protocol: openai_compatible
       api_key_env: DEEPSEEK_API_KEY
       base_url: https://api.deepseek.com/v1
       default_model: deepseek-v4-flash
+      request:
+        chat_path: /chat/completions
+        response_format_json: true
+        temperature: 0.1
+        timeout_seconds: 20
       balance_url: https://api.deepseek.com/user/balance
       pricing_source: https://api-docs.deepseek.com/quick_start/pricing
       usage_schema: openai_cache

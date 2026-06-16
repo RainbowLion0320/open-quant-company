@@ -349,6 +349,86 @@ def test_llm_factor_hypothesis_runtime_resolves_from_use_case_config():
     assert "api_key_env" not in runtime
 
 
+def test_llm_runtime_resolves_custom_openai_compatible_provider(monkeypatch):
+    import data.llm.usage as usage
+
+    monkeypatch.setattr(
+        usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "default_provider": "qwen",
+                "use_cases": {"agent_planning": {"provider": "qwen", "model": "qwen-plus"}},
+                "providers": {
+                    "qwen": {
+                        "enabled": True,
+                        "label": "Qwen",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "DASHSCOPE_API_KEY",
+                        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        "default_model": "qwen-plus",
+                        "request": {
+                            "chat_path": "/chat/completions",
+                            "response_format_json": False,
+                            "temperature": 0.2,
+                            "timeout_seconds": 12,
+                        },
+                        "pricing": {"models": {"qwen-plus": {"input": 0.2, "output": 0.6}}},
+                    }
+                },
+            }
+        },
+    )
+
+    runtime = usage.resolve_llm_use_case("agent_planning")
+
+    assert runtime["provider"] == "qwen"
+    assert runtime["model"] == "qwen-plus"
+    assert runtime["configured"] is True
+    assert runtime["enabled"] is True
+    assert runtime["protocol"] == "openai_compatible"
+    assert runtime["base_url"] == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    assert runtime["credential_env"] == "DASHSCOPE_API_KEY"
+    assert runtime["chat_path"] == "/chat/completions"
+    assert runtime["response_format_json"] is False
+    assert runtime["temperature"] == 0.2
+    assert runtime["timeout_seconds"] == 12.0
+    assert runtime["block_reason"] == ""
+
+
+def test_llm_runtime_unknown_provider_fails_closed_without_default_fallback(monkeypatch):
+    import data.llm.usage as usage
+
+    monkeypatch.setattr(
+        usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "default_provider": "deepseek",
+                "use_cases": {"agent_planning": {"provider": "missing-provider", "model": "missing-model"}},
+                "providers": {
+                    "deepseek": {
+                        "enabled": True,
+                        "api_key_env": "DEEPSEEK_API_KEY",
+                        "base_url": "https://api.deepseek.com/v1",
+                        "default_model": "deepseek-v4-pro",
+                    }
+                },
+            }
+        },
+    )
+
+    runtime = usage.resolve_llm_use_case("agent_planning")
+
+    assert runtime["provider"] == "missing-provider"
+    assert runtime["model"] == "missing-model"
+    assert runtime["configured"] is False
+    assert runtime["enabled"] is False
+    assert runtime["base_url"] == ""
+    assert runtime["credential_env"] == ""
+    assert runtime["block_reason"] == "provider_not_configured"
+
+
 def test_llm_usage_supports_total_token_and_request_pricing(monkeypatch):
     import data.llm.usage as usage
 
@@ -380,8 +460,47 @@ def test_llm_usage_supports_total_token_and_request_pricing(monkeypatch):
     )
 
     assert row["pricing_model"] == "unit-total"
+    assert row["pricing_status"] == "ok"
     assert row["estimated_cost_usd"] == round((2000 * 1.5 / 1_000_000) + 0.01, 9)
     assert row["estimated_cost_cny"] == round(row["estimated_cost_usd"] * 7.0, 9)
+
+
+def test_llm_usage_marks_missing_pricing_without_deepseek_fallback(monkeypatch):
+    import data.llm.usage as usage
+
+    monkeypatch.setattr(
+        usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "providers": {
+                    "qwen": {
+                        "enabled": True,
+                        "label": "Qwen",
+                        "api_key_env": "DASHSCOPE_API_KEY",
+                        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        "default_model": "qwen-plus",
+                    }
+                }
+            }
+        },
+    )
+
+    row = usage.normalize_llm_usage(
+        "qwen",
+        "qwen-plus",
+        {"prompt_tokens": 1000, "completion_tokens": 500, "total_tokens": 1500},
+        source="unit",
+        created_at="2026-06-02T12:00:00+00:00",
+    )
+
+    assert row["provider"] == "qwen"
+    assert row["model"] == "qwen-plus"
+    assert row["pricing_model"] == ""
+    assert row["pricing_status"] == "missing_provider_pricing"
+    assert row["estimated_cost_usd"] == 0.0
+    assert row["estimated_cost_cny"] == 0.0
+    assert row["pricing_source"] == ""
 
 
 def test_llm_provider_balance_reports_unknown_provider_without_default_fallback(monkeypatch):
@@ -434,6 +553,9 @@ def test_llm_usage_payload_combines_provider_balance_and_project_ledger(monkeypa
             "models": ["deepseek-v4-pro"],
             "dates": ["2026-06-02"],
             "totals": {"tokens": 6000, "requests": 1, "estimated_cost_usd": 0.0009, "estimated_cost_cny": 0.0065},
+            "pricing_status": "ok",
+            "unpriced_rows": 0,
+            "unpriced_reasons": [],
             "status": "ok",
         },
     )
@@ -446,6 +568,7 @@ def test_llm_usage_payload_combines_provider_balance_and_project_ledger(monkeypa
     assert payload["providers"] == ["deepseek"]
     assert payload["balance"]["is_available"] is True
     assert payload["usage"]["totals"]["tokens"] == 6000
+    assert payload["usage"]["pricing_status"] == "ok"
     assert payload["data"][0]["usage_source"] == "api_response"
 
 
@@ -462,6 +585,9 @@ def test_monitor_is_read_only_but_keeps_system_status_cards():
     assert "Telegram" in monitor
     assert "api.apiHealth()" in monitor_logic
     assert "api.cronJobs()" in monitor_logic
+    assert "activity.unpricedUsage" in monitor
+    assert "pricingStatus" in monitor_logic
+    assert "unpricedRows" in monitor_logic
     assert "serviceStatus" not in monitor
 
 

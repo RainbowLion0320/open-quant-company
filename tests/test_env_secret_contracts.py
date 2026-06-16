@@ -99,3 +99,77 @@ def test_config_env_cli_reports_masked_secret_status(monkeypatch, capsys):
     assert data["data"]["secrets"]["llm.deepseek"]["status"] == "ok"
     assert "abcdefghijklmnop" not in rendered
     assert "deepseek-secret-value" not in rendered
+
+
+def test_config_env_cli_reports_custom_llm_provider_secret(monkeypatch, capsys):
+    import data.llm.usage as usage
+    from astrolabe_cli.main import run_cli
+
+    monkeypatch.setenv("TUSHARE_TOKEN", "abcdefghijklmnop")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-secret-value")
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "dashscope-secret-value")
+    monkeypatch.setattr(
+        usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "providers": {
+                    "qwen": {
+                        "enabled": True,
+                        "api_key_env": "DASHSCOPE_API_KEY",
+                    }
+                }
+            }
+        },
+    )
+
+    code = run_cli(["config", "env", "--json"])
+    data = _json_from_cli(capsys)
+    rendered = json.dumps(data, ensure_ascii=False)
+
+    assert code == 0
+    assert data["data"]["secrets"]["llm.qwen"]["status"] == "ok"
+    assert data["data"]["secrets"]["llm.qwen"]["source"] == "DASHSCOPE_API_KEY"
+    assert "dashscope-secret-value" not in rendered
+
+
+def test_config_validate_rejects_invalid_llm_provider_configuration(monkeypatch):
+    import astrolabe_cli.commands.config as config_cmd
+    import core.settings as settings
+    import data.strategy.catalog as catalog
+
+    monkeypatch.setattr(catalog, "load_registry", lambda force_reload=False: {})
+    monkeypatch.setattr(catalog, "get_enabled_strategies", lambda: [])
+    monkeypatch.setattr(
+        settings,
+        "get_settings",
+        lambda: {
+            "strategies": {},
+            "backtest": {},
+            "risk_control": {},
+            "llm": {
+                "default_provider": "qwen",
+                "use_cases": {
+                    "agent_planning": {"provider": "missing-provider", "model": "x"},
+                    "factor_hypothesis": {"provider": "qwen", "model": "qwen-plus"},
+                },
+                "providers": {
+                    "qwen": {
+                        "enabled": True,
+                        "protocol": "native_sdk",
+                        "api_key_env": "DASHSCOPE_API_KEY",
+                        "base_url": "",
+                        "default_model": "",
+                    }
+                },
+            },
+        },
+    )
+
+    result = config_cmd.validate_config()
+
+    assert result.ok is False
+    assert "llm.use_cases.agent_planning.provider unknown: missing-provider" in result.errors
+    assert "llm.providers.qwen.protocol unsupported: native_sdk" in result.errors
+    assert "llm.providers.qwen.base_url missing" in result.errors
+    assert "llm.providers.qwen.default_model missing" in result.errors

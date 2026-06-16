@@ -5680,6 +5680,162 @@ def test_agent_provider_semantic_planner_fails_closed_when_provider_disabled(tmp
     reset_datahub()
 
 
+def test_agent_provider_semantic_planner_fails_closed_for_unknown_provider(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "must-not-fallback-to-deepseek")
+    from data.storage.datahub import reset_datahub
+    import data.llm.usage as llm_usage
+
+    reset_datahub()
+
+    monkeypatch.setattr(
+        llm_usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "default_provider": "deepseek",
+                "use_cases": {"agent_planning": {"provider": "missing-provider", "model": "missing-model"}},
+                "providers": {
+                    "deepseek": {
+                        "enabled": True,
+                        "api_key_env": "DEEPSEEK_API_KEY",
+                        "base_url": "https://api.deepseek.com/v1",
+                        "default_model": "deepseek-v4-pro",
+                    }
+                },
+            }
+        },
+    )
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import ProviderSemanticPlanner
+
+    def forbidden_transport(*_args, **_kwargs):
+        raise AssertionError("unknown provider must not fall back to the default provider")
+
+    preview = AgentRuntime().preview_workflow_plan(
+        desk="reporting",
+        content="未知 provider 不能回退默认模型",
+        semantic_planner=ProviderSemanticPlanner(provider="missing-provider", model="missing-model", transport=forbidden_transport),
+    )
+    reasoning_by_kind = {row["kind"]: row for row in preview["reasoning"]}
+
+    assert preview["actions"] == []
+    assert "semantic_provider_not_configured" in preview["blockers"]
+    assert reasoning_by_kind["semantic_provider"]["status"] == "not_configured"
+    assert reasoning_by_kind["semantic_provider"]["provider"] == "missing-provider"
+    assert reasoning_by_kind["semantic_provider"]["model"] == "missing-model"
+    reset_datahub()
+
+
+def test_agent_provider_semantic_planner_passes_custom_provider_request_options(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "qwen-secret")
+    from data.storage.datahub import reset_datahub
+    import data.llm.usage as llm_usage
+
+    reset_datahub()
+
+    monkeypatch.setattr(
+        llm_usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "use_cases": {"agent_planning": {"provider": "qwen", "model": "qwen-plus"}},
+                "providers": {
+                    "qwen": {
+                        "enabled": True,
+                        "label": "Qwen",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "DASHSCOPE_API_KEY",
+                        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                        "default_model": "qwen-plus",
+                        "request": {
+                            "chat_path": "/chat/completions",
+                            "response_format_json": False,
+                            "temperature": 0.2,
+                            "timeout_seconds": 12,
+                        },
+                        "pricing": {"models": {"qwen-plus": {"total": 1.0}}},
+                    }
+                },
+            }
+        },
+    )
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import ProviderSemanticPlanner
+
+    calls: list[dict[str, object]] = []
+
+    def fake_transport(request: dict[str, object]) -> dict[str, object]:
+        calls.append(request)
+        return {
+            "choices": [{"message": {"content": json.dumps({"answer": "ok", "actions": [], "reasoning": [], "blockers": []})}}],
+            "usage": {"total_tokens": 1},
+        }
+
+    AgentRuntime().preview_workflow_plan(
+        desk="reporting",
+        content="用 qwen 做 provider 规划",
+        semantic_planner=ProviderSemanticPlanner(transport=fake_transport),
+    )
+
+    assert calls[0]["provider"] == "qwen"
+    assert calls[0]["model"] == "qwen-plus"
+    assert calls[0]["api_key"] == "qwen-secret"
+    assert calls[0]["base_url"] == "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    assert calls[0]["chat_path"] == "/chat/completions"
+    assert calls[0]["response_format_json"] is False
+    assert calls[0]["temperature"] == 0.2
+    assert calls[0]["timeout_seconds"] == 12.0
+    reset_datahub()
+
+
+def test_openai_compatible_transport_respects_response_format_option(monkeypatch):
+    from agent_os import semantic_planner
+
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"choices":[{"message":{"content":"{\\"answer\\":\\"ok\\"}"}}]}'
+
+    def fake_urlopen(request, timeout=0):
+        captured["url"] = request.full_url
+        captured["timeout"] = timeout
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse()
+
+    monkeypatch.setattr(semantic_planner.urllib.request, "urlopen", fake_urlopen)
+
+    response = semantic_planner._openai_compatible_chat_completion(
+        {
+            "base_url": "https://unit.example/v1",
+            "chat_path": "/custom/chat",
+            "api_key": "unit-secret",
+            "model": "unit-model",
+            "messages": [{"role": "user", "content": "hello"}],
+            "temperature": 0.3,
+            "response_format_json": False,
+            "timeout_seconds": 7,
+        }
+    )
+
+    assert response["choices"][0]["message"]["content"]
+    assert captured["url"] == "https://unit.example/v1/custom/chat"
+    assert captured["timeout"] == 7.0
+    assert captured["payload"]["model"] == "unit-model"
+    assert captured["payload"]["temperature"] == 0.3
+    assert "response_format" not in captured["payload"]
+
+
 def test_agent_provider_semantic_planner_uses_transport_then_filters_safe_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setenv("DEEPSEEK_API_KEY", "semantic-secret")
