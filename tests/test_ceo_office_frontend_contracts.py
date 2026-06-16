@@ -41,7 +41,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentDesks" in view
     assert "api.agentApprovalPolicies" in view
     assert "api.agentCreateSession" in view
-    assert "api.agentUpdateSession" in view
+    assert "api.agentUpdateSession" not in view
     assert "api.agentAddMessage" in view
     assert "api.agentPlan" in view
     assert "api.agentSessionStream" in view
@@ -185,8 +185,13 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "canCancelAction" in view
     assert "selectedAction.action.expires_at" in view
     assert "ceoOffice.expiresAt" in view
-    assert "archiveSession" in view
-    assert "archivingSession" in view
+    assert "archiveSession" not in view
+    assert "archivingSession" not in view
+    assert '@click="createSession"' not in view
+    assert "async function createSession" not in view
+    assert "ceoOffice.createSession" not in view
+    assert "ceoOffice.archiveSession" not in view
+    assert "activeSession?.session_id" not in view
     assert "selectedEvidence" in view
     assert "selectedEvidenceNavigation" in view
     assert "selectedEvidenceSnapshot" in view
@@ -259,7 +264,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.notificationStatus" in view
     assert "ceoOffice.sent" in view
     assert "ceoOffice.rhythmStatus" in view
-    assert "ceoOffice.sessionCount" in view
+    assert "ceoOffice.sessionCount" not in view
     assert "ceoOffice.reports" in view
     assert "报告要点" in zh_ceo
     assert "实盘监控" in zh_ceo
@@ -339,8 +344,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Related Messages" in en_ceo
     assert "Related Actions" in en_ceo
     assert "Related Handoffs" in en_ceo
-    assert "归档会话" in zh_ceo
-    assert "Archive Session" in en_ceo
+    assert "新建会话" not in zh_ceo
+    assert "归档会话" not in zh_ceo
+    assert "会话数" not in zh_ceo
+    assert "Archive Session" not in en_ceo
+    assert "New Session" not in en_ceo
+    assert "Sessions" not in en_ceo
     assert "交接事项" in zh_ceo
     assert "工程工单" in zh_ceo
     assert "暂无工程工单" in zh_ceo
@@ -392,7 +401,6 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "通知状态" in zh_ceo
     assert "已发送" in zh_ceo
     assert "节奏状态" in zh_ceo
-    assert "会话数" in zh_ceo
     assert "已生成" in zh_ceo
     assert "已跳过" in zh_ceo
     assert "提交纸面订单" in zh_ceo
@@ -424,7 +432,6 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Notification Status" in en_ceo
     assert "Sent" in en_ceo
     assert "Rhythm Status" in en_ceo
-    assert "Sessions" in en_ceo
     assert "Generated" in en_ceo
     assert "Skipped" in en_ceo
     assert "Submit Paper Order" in en_ceo

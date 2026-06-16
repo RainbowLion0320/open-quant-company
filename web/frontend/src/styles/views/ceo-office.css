@@ -3,8 +3,6 @@
   gap: 14px;
 }
 
-.ceo-toolbar,
-.ceo-actions,
 .panel-head,
 .message-meta,
 .action-title,
@@ -13,10 +11,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.ceo-toolbar {
-  justify-content: flex-end;
 }
 
 .ceo-panel,
@@ -949,8 +943,6 @@
 }
 
 @media (max-width: 700px) {
-  .ceo-toolbar,
-  .ceo-actions,
   .message-composer,
   .autonomy-step-grid {
     align-items: stretch;

@@ -1,20 +1,5 @@
 <template>
   <div class="ceo-office view-page">
-    <section class="ceo-toolbar">
-      <div class="ceo-actions">
-        <button
-          v-if="activeSession && activeSession.status !== 'archived'"
-          class="btn btn-ghost"
-          type="button"
-          :disabled="archivingSession"
-          @click="archiveSession"
-        >
-          {{ t("ceoOffice.archiveSession") }}
-        </button>
-        <button class="btn btn-primary" type="button" @click="createSession">{{ t("ceoOffice.createSession") }}</button>
-      </div>
-    </section>
-
     <section v-if="error" class="ceo-alert">{{ error }}</section>
     <section v-if="autonomyStepResult" class="ceo-alert info">
       <strong>{{ t("ceoOffice.autonomyStepStatus") }}</strong>
@@ -191,7 +176,7 @@
       <article class="ceo-panel conversation-panel">
         <header class="panel-head">
           <span>{{ t("ceoOffice.messages") }}</span>
-          <small>{{ activeSession?.session_id || "—" }}</small>
+          <small>{{ messages.length }}</small>
         </header>
 
         <div v-if="!messages.length" class="ceo-empty">{{ t("ceoOffice.noMessages") }}</div>
@@ -660,7 +645,6 @@
           <div v-if="scheduledRhythmResult" class="rhythm-status">
             <span>{{ t("ceoOffice.scheduledRhythmStatus") }}</span>
             <strong>
-              {{ t("ceoOffice.sessionCount") }} {{ scheduledRhythmResult.session_count }} ·
               {{ t("ceoOffice.generated") }} {{ scheduledRhythmResult.generated_count }} ·
               {{ t("ceoOffice.skipped") }} {{ scheduledRhythmResult.skipped_count }} ·
               {{ t("ceoOffice.sent") }} {{ scheduledRhythmResult.notification_count }}
@@ -1001,7 +985,6 @@ const selectedEvidenceStatus = ref("");
 const runningAction = ref("");
 const submittingPaperAction = ref("");
 const cancelingAction = ref("");
-const archivingSession = ref(false);
 const runningAutonomyStep = ref(false);
 const runningAutonomyRun = ref(false);
 const creatingProgram = ref(false);
@@ -1122,7 +1105,7 @@ function reasoningSummary(row: Record<string, unknown>) {
     return `${kind}: ${Number(row.approval_required_count || 0)} approvals`;
   }
   if (kind === "session_context") {
-    return `${kind}: ${Number(row.active_action_count || 0)} active / ${Number(row.open_work_order_count || 0)} work orders`;
+    return `context: ${Number(row.active_action_count || 0)} active / ${Number(row.open_work_order_count || 0)} work orders`;
   }
   if (kind === "evidence_plan") {
     return `${kind}: ${Number(row.handoff_count || 0)} handoffs`;
@@ -1407,37 +1390,6 @@ async function loadOfficeState() {
   }
 }
 
-async function createSession() {
-  error.value = "";
-  try {
-    const payload = await api.agentCreateSession({
-      title: t("ceoOffice.defaultSessionTitle"),
-      default_desk: "reporting",
-    });
-    activeSession.value = payload.session;
-    selectedDraftDesk.value = payload.session.default_desk || "reporting";
-    sessions.value = [payload.session, ...sessions.value];
-    messages.value = [];
-    await loadOfficeState();
-  } catch (err: any) {
-    error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;
-  }
-}
-
-async function archiveSession() {
-  if (!activeSession.value) return;
-  archivingSession.value = true;
-  error.value = "";
-  try {
-    await api.agentUpdateSession(activeSession.value.session_id, { status: "archived" });
-    await loadOfficeState();
-  } catch (err: any) {
-    error.value = `${t("ceoOffice.archiveFailed")}: ${err?.message || err}`;
-  } finally {
-    archivingSession.value = false;
-  }
-}
-
 async function runAutonomyStep() {
   const semanticDraft = parseSemanticDraft();
   if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
@@ -1545,7 +1497,7 @@ async function runAutonomyProgram(programId: string) {
 async function ensureSession(): Promise<AgentSession> {
   if (activeSession.value) return activeSession.value;
   const payload = await api.agentCreateSession({
-    title: t("ceoOffice.defaultSessionTitle"),
+    title: t("ceoOffice.defaultControlTitle"),
     default_desk: "reporting",
   });
   activeSession.value = payload.session;
