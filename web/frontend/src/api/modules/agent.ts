@@ -17,6 +17,7 @@ import type {
   AgentLiveMonitorResponse,
   AgentLiveReconciliationResponse,
   AgentLiveReadinessResponse,
+  AgentModelRuntimeResponse,
   AgentPaperCancelResponse,
   AgentProgramResponse,
   AgentProgramRunResponse,
@@ -78,6 +79,8 @@ export const agentApi = {
     sessionId: string,
     payload: { title?: string; status?: string; default_desk?: string; tags?: string[] },
   ) => patch<{ session: AgentSession }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`, payload),
+  agentModelRuntime: (sessionId = "") =>
+    get<AgentModelRuntimeResponse>(`/api/agent/model-runtime${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
   agentAutonomyStep: (
     sessionId: string,
     payload: {

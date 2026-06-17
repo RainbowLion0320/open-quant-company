@@ -20,6 +20,34 @@ export interface AgentMessage {
   created_at: string;
 }
 
+export interface AgentModelRuntimeResponse {
+  runtime: {
+    use_case: string;
+    provider: string;
+    label: string;
+    model: string;
+    base_url: string;
+    credential_env: string;
+    configured: boolean;
+    enabled: boolean;
+    protocol: string;
+    block_reason: string;
+  };
+  reasoning: {
+    level: string;
+    temperature: number;
+    response_format_json: boolean;
+  };
+  context: {
+    max_tokens: number;
+    used_tokens: number;
+    remaining_tokens: number;
+    usage_pct: number;
+    message_count: number;
+    estimator: string;
+  };
+}
+
 export interface AgentAction {
   action_id: string;
   session_id: string;

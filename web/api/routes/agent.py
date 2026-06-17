@@ -33,6 +33,14 @@ async def create_agent_session(payload: dict[str, Any]) -> dict[str, Any]:
     return {"session": session.to_dict()}
 
 
+@router.get("/model-runtime")
+async def get_agent_model_runtime(session_id: str = "") -> dict[str, Any]:
+    try:
+        return AgentRuntime().model_runtime(session_id or None)
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+
+
 @router.get("/sessions/{session_id}")
 async def get_agent_session(session_id: str) -> dict[str, Any]:
     payload = AgentRuntime().get_session(session_id)

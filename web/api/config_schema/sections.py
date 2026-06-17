@@ -452,6 +452,8 @@ BASE_SECTIONS: list[dict[str, Any]] = [
             field("providers.mimo.request.chat_path", "Mimo Chat Path", "string", default="/chat/completions"),
             field("providers.mimo.request.response_format_json", "Mimo JSON响应", "bool", default=True),
             field("providers.mimo.request.temperature", "Mimo 温度", "float", min_val=0, max_val=2, default=0.1),
+            field("providers.mimo.request.reasoning_level", "Mimo 推理程度", "string", default="thinking_enabled"),
+            field("providers.mimo.request.context_window_tokens", "Mimo 最大上下文", "int", min_val=1024, max_val=2000000, default=1048576),
             field("providers.mimo.request.timeout_seconds", "Mimo 超时秒数", "float", min_val=1, max_val=120, default=20),
         ],
     },

@@ -110,11 +110,20 @@ def _provider_request_config(provider_cfg: dict[str, Any]) -> dict[str, Any]:
         timeout_seconds = float(request.get("timeout_seconds", 20.0))
     except (TypeError, ValueError):
         timeout_seconds = 20.0
+    try:
+        context_window_tokens = int(request.get("context_window_tokens", 0) or 0)
+    except (TypeError, ValueError):
+        context_window_tokens = 0
+    extra_body = request.get("extra_body", {})
+    extra_body = copy.deepcopy(extra_body) if isinstance(extra_body, dict) else {}
     return {
         "chat_path": str(request.get("chat_path") or DEFAULT_CHAT_PATH),
         "response_format_json": bool(request.get("response_format_json", True)),
         "temperature": temperature,
         "timeout_seconds": timeout_seconds,
+        "reasoning_level": str(request.get("reasoning_level") or request.get("reasoning_effort") or ""),
+        "context_window_tokens": context_window_tokens,
+        "extra_body": extra_body,
     }
 
 
@@ -134,6 +143,9 @@ def _blocked_runtime(use_case: str, provider: str, model: str, reason: str) -> d
         "response_format_json": True,
         "temperature": 0.1,
         "timeout_seconds": 20.0,
+        "reasoning_level": "",
+        "context_window_tokens": 0,
+        "extra_body": {},
         "block_reason": reason,
     }
 
@@ -178,6 +190,9 @@ def resolve_llm_use_case(use_case: str, *, provider: str | None = None, model: s
         "response_format_json": request_cfg["response_format_json"],
         "temperature": request_cfg["temperature"],
         "timeout_seconds": request_cfg["timeout_seconds"],
+        "reasoning_level": request_cfg["reasoning_level"],
+        "context_window_tokens": request_cfg["context_window_tokens"],
+        "extra_body": request_cfg["extra_body"],
         "block_reason": block_reason,
     }
 

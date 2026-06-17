@@ -367,7 +367,12 @@ llm:
         chat_path: /chat/completions
         response_format_json: true
         temperature: 0.1
+        reasoning_level: thinking_enabled
+        context_window_tokens: 1048576
         timeout_seconds: 20
+        extra_body:
+          thinking:
+            type: enabled
 signals:
   multifactor:
     buy_threshold: 52

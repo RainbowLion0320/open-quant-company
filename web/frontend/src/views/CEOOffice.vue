@@ -54,6 +54,24 @@
           <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
             {{ t("ceoOffice.send") }}
           </button>
+          <div v-if="modelRuntime" class="model-runtime-strip">
+            <span>
+              <small>{{ t("ceoOffice.modelRuntime") }}</small>
+              <strong>{{ modelRuntimeSummary }}</strong>
+            </span>
+            <span>
+              <small>{{ t("ceoOffice.reasoningLevel") }}</small>
+              <strong>{{ reasoningLevelLabel(modelRuntime.reasoning.level) }}</strong>
+            </span>
+            <span>
+              <small>{{ t("ceoOffice.contextUsed") }}</small>
+              <strong>{{ formatTokenCount(contextUsedTokens) }} · {{ contextUsagePct }}%</strong>
+            </span>
+            <span>
+              <small>{{ t("ceoOffice.contextMax") }}</small>
+              <strong>{{ formatTokenCount(modelRuntime.context.max_tokens) }}</strong>
+            </span>
+          </div>
         </form>
       </article>
 
@@ -314,7 +332,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentMessage, type AgentModelRuntimeResponse, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -331,6 +349,7 @@ const runStreamId = ref("");
 const runStreamStatus = ref("inactive");
 const lastRunStreamSignature = ref("");
 const desks = ref<AgentDesk[]>([]);
+const modelRuntime = ref<AgentModelRuntimeResponse | null>(null);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
 const selectedEvidenceSnapshot = ref<AgentEvidenceSnapshot | null>(null);
@@ -361,6 +380,19 @@ const paperReconciliationSummary = computed(() => {
     marketValueAfter: account.market_value,
     error: String(reconciliation.error || ""),
   };
+});
+const modelRuntimeSummary = computed(() => {
+  if (!modelRuntime.value) return "—";
+  const label = modelRuntime.value.runtime.label || modelRuntime.value.runtime.provider;
+  const model = modelRuntime.value.runtime.model || "—";
+  return `${label} · ${model}`;
+});
+const draftContextTokens = computed(() => estimateTextTokens(draft.value));
+const contextUsedTokens = computed(() => (modelRuntime.value?.context.used_tokens || 0) + draftContextTokens.value);
+const contextUsagePct = computed(() => {
+  const maxTokens = modelRuntime.value?.context.max_tokens || 0;
+  if (!maxTokens) return 0;
+  return Math.min(100, Math.round((contextUsedTokens.value / maxTokens) * 10000) / 100);
 });
 
 const deskNames = computed<Record<string, string>>(() => ({
@@ -438,6 +470,25 @@ function formatNumber(value: unknown) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "—";
   return numeric.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function estimateTextTokens(value: string) {
+  const text = value.trim();
+  if (!text) return 0;
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+function formatTokenCount(value: number) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return "—";
+  return Math.round(numeric).toLocaleString();
+}
+
+function reasoningLevelLabel(level: string) {
+  if (level === "thinking_enabled") return t("ceoOffice.reasoningThinking");
+  if (level === "thinking_disabled") return t("ceoOffice.reasoningOff");
+  if (!level || level === "default") return t("ceoOffice.reasoningDefault");
+  return level;
 }
 
 function closeSessionStream() {
@@ -531,19 +582,22 @@ async function loadSession(sessionId: string, options: { connectStream?: boolean
   if (options.connectStream !== false) {
     connectSessionStream(sessionId);
   }
+  await loadModelRuntime(sessionId);
 }
 
 async function loadOfficeState() {
   error.value = "";
   try {
-    const [sessionPayload, deskPayload, actionPayload] = await Promise.all([
+    const [sessionPayload, deskPayload, actionPayload, modelRuntimePayload] = await Promise.all([
       api.agentSessions(),
       api.agentDesks(),
       api.agentActions(),
+      api.agentModelRuntime(),
     ]);
     sessions.value = sessionPayload.sessions || [];
     desks.value = deskPayload.desks || [];
     actions.value = actionPayload.actions || [];
+    modelRuntime.value = modelRuntimePayload;
     if (sessions.value.length) {
       await loadSession(activeSession.value?.session_id || sessions.value[0].session_id);
     }
@@ -553,6 +607,10 @@ async function loadOfficeState() {
   } catch (err: any) {
     error.value = `${t("ceoOffice.loadFailed")}: ${err?.message || err}`;
   }
+}
+
+async function loadModelRuntime(sessionId = "") {
+  modelRuntime.value = await api.agentModelRuntime(sessionId);
 }
 
 async function ensureSession(): Promise<AgentSession> {

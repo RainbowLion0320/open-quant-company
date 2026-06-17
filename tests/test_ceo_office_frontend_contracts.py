@@ -64,6 +64,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "attentionStatuses" in view
     assert "selectedAction" in view
     assert "api.agentAction" in view
+    assert "api.agentModelRuntime" in view
     assert "api.agentApproveAction" in view
     assert "api.agentRejectAction" in view
     assert "api.agentPaperSubmitAction" in view
@@ -78,6 +79,13 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentEvidence" in view
     assert "message.evidence_refs" in view
     assert "message.action_refs" in view
+    assert "modelRuntimeSummary" in view
+    assert "contextUsedTokens" in view
+    assert "contextUsagePct" in view
+    assert "ceoOffice.modelRuntime" in view
+    assert "ceoOffice.reasoningLevel" in view
+    assert "ceoOffice.contextUsed" in view
+    assert "ceoOffice.contextMax" in view
     assert "ceoOffice.openEvidence" in view
     assert "ceoOffice.viewAction" in view
 
@@ -191,6 +199,14 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Paper Reconciliation" in en_ceo
     assert "Run Evidence" in en_ceo
     assert "Run Timeline" in en_ceo
+    assert "模型" in zh_ceo
+    assert "推理" in zh_ceo
+    assert "已用上下文" in zh_ceo
+    assert "最大上下文" in zh_ceo
+    assert "Model" in en_ceo
+    assert "Reasoning" in en_ceo
+    assert "Context Used" in en_ceo
+    assert "Max Context" in en_ceo
 
     forbidden_zh_phrases = [
         "Desk 状态",
@@ -258,6 +274,10 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentSessions" in agent_api
     assert "agentCreateSession" in agent_api
     assert "agentUpdateSession" in agent_api
+    assert "AgentModelRuntimeResponse" in agent_types
+    assert "agentModelRuntime" in agent_api
+    assert "get<AgentModelRuntimeResponse>" in agent_api
+    assert "/api/agent/model-runtime" in agent_api
     assert "agentRunSession" + "ReadOnlyActions" not in agent_api
     assert "run-" + "readonly" not in agent_api
     assert "agentApprovalPolicies" in agent_api

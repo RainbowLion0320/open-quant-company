@@ -46,6 +46,38 @@ def test_agent_runtime_creates_session_message_and_action(tmp_path, monkeypatch)
     reset_datahub()
 
 
+def test_agent_model_runtime_reports_llm_config_and_context_usage(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Model runtime context", default_desk="reporting")
+    runtime.add_message(session.session_id, role="ceo", desk="reporting", content="检查组合仓位和风险预算。")
+    runtime.add_message(session.session_id, role="reporting", desk="reporting", content="我会先读取策略证据，再交给组合和风控。")
+
+    response = TestClient(create_app()).get("/api/agent/model-runtime", params={"session_id": session.session_id})
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["runtime"]["use_case"] == "agent_planning"
+    assert payload["runtime"]["provider"] == "mimo"
+    assert payload["runtime"]["model"] == "mimo-v2.5-pro"
+    assert payload["runtime"]["credential_env"] == "MIMO_API_KEY"
+    assert payload["reasoning"]["level"] == "thinking_enabled"
+    assert payload["reasoning"]["temperature"] == 0.1
+    assert payload["context"]["max_tokens"] == 1048576
+    assert payload["context"]["used_tokens"] > 0
+    assert payload["context"]["estimator"] == "chars_div_4"
+    assert payload["context"]["message_count"] == 2
+    reset_datahub()
+
+
 def test_agent_actions_support_session_status_desk_and_risk_filters(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
@@ -5907,6 +5939,11 @@ def test_openai_compatible_transport_respects_response_format_option(monkeypatch
             "temperature": 0.3,
             "response_format_json": False,
             "timeout_seconds": 7,
+            "extra_body": {
+                "thinking": {"type": "enabled"},
+                "model": "must-not-override",
+                "temperature": 1.8,
+            },
         }
     )
 
@@ -5915,6 +5952,7 @@ def test_openai_compatible_transport_respects_response_format_option(monkeypatch
     assert captured["timeout"] == 7.0
     assert captured["payload"]["model"] == "unit-model"
     assert captured["payload"]["temperature"] == 0.3
+    assert captured["payload"]["thinking"] == {"type": "enabled"}
     assert "response_format" not in captured["payload"]
 
 

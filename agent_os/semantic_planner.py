@@ -127,6 +127,7 @@ class ProviderSemanticPlanner:
             "chat_path": runtime.get("chat_path", "/chat/completions"),
             "response_format_json": bool(runtime.get("response_format_json", True)),
             "temperature": float(runtime.get("temperature", 0.1) or 0.1),
+            "extra_body": runtime.get("extra_body") if isinstance(runtime.get("extra_body"), dict) else {},
             "api_key": key,
             "timeout_seconds": float(runtime.get("timeout_seconds", self._timeout_seconds) or self._timeout_seconds),
             "messages": _semantic_provider_messages(
@@ -302,11 +303,15 @@ def _openai_compatible_chat_completion(request: dict[str, Any]) -> dict[str, Any
     if not chat_path.startswith("/"):
         chat_path = f"/{chat_path}"
     url = f"{base_url}{chat_path}"
-    payload = {
-        "model": str(request.get("model") or ""),
-        "messages": request.get("messages") or [],
-        "temperature": float(request.get("temperature", 0.1) or 0.1),
-    }
+    extra_body = request.get("extra_body")
+    payload = dict(extra_body) if isinstance(extra_body, dict) else {}
+    payload.update(
+        {
+            "model": str(request.get("model") or ""),
+            "messages": request.get("messages") or [],
+            "temperature": float(request.get("temperature", 0.1) or 0.1),
+        }
+    )
     if bool(request.get("response_format_json", True)):
         payload["response_format"] = {"type": "json_object"}
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")

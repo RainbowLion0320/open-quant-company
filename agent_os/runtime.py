@@ -44,6 +44,7 @@ from agent_os.tools import AgentToolRegistry
 from agent_os.workflows import build_desk_workflow_plan
 from broker import PaperBroker
 from broker.live.qmt import MiniQmtLiveBroker
+from data.llm.usage import resolve_llm_use_case
 from data.storage.datahub import get_datahub
 
 
@@ -81,6 +82,22 @@ def _summary(value: str, *, limit: int = 4000) -> str:
     if len(value) <= limit:
         return value
     return value[:limit] + "\n...[truncated]"
+
+
+def _estimate_context_tokens(messages: list[dict[str, Any]]) -> int:
+    """Cheap local estimate for UI telemetry; provider usage remains authoritative after calls."""
+    if not messages:
+        return 0
+    payload = [
+        {
+            "role": str(message.get("role") or ""),
+            "desk": str(message.get("desk") or ""),
+            "content": str(message.get("content") or ""),
+        }
+        for message in messages
+    ]
+    text = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    return max(1, (len(text) + 3) // 4)
 
 
 def _dataclass_to_dict(value: Any) -> dict[str, Any]:
@@ -262,6 +279,47 @@ class AgentRuntime:
             "counts": counts,
             "latest": latest,
             "signature": signature,
+        }
+
+    def model_runtime(self, session_id: str | None = None) -> dict[str, Any]:
+        if session_id:
+            session_payload = self.get_session(session_id)
+            if session_payload is None:
+                raise KeyError(f"Agent session not found: {session_id}")
+            messages = list(session_payload.get("messages") or [])
+        else:
+            messages = []
+        runtime = resolve_llm_use_case("agent_planning")
+        max_tokens = int(runtime.get("context_window_tokens") or 0)
+        used_tokens = _estimate_context_tokens(messages)
+        remaining_tokens = max(max_tokens - used_tokens, 0) if max_tokens else 0
+        usage_pct = round((used_tokens / max_tokens) * 100, 2) if max_tokens else 0.0
+        return {
+            "runtime": {
+                "use_case": runtime.get("use_case", "agent_planning"),
+                "provider": runtime.get("provider", ""),
+                "label": runtime.get("label", ""),
+                "model": runtime.get("model", ""),
+                "base_url": runtime.get("base_url", ""),
+                "credential_env": runtime.get("credential_env", ""),
+                "configured": bool(runtime.get("configured")),
+                "enabled": bool(runtime.get("enabled")),
+                "protocol": runtime.get("protocol", ""),
+                "block_reason": runtime.get("block_reason", ""),
+            },
+            "reasoning": {
+                "level": str(runtime.get("reasoning_level") or "default"),
+                "temperature": float(runtime.get("temperature", 0.1) or 0.1),
+                "response_format_json": bool(runtime.get("response_format_json", True)),
+            },
+            "context": {
+                "max_tokens": max_tokens,
+                "used_tokens": used_tokens,
+                "remaining_tokens": remaining_tokens,
+                "usage_pct": usage_pct,
+                "message_count": len(messages),
+                "estimator": "chars_div_4",
+            },
         }
 
     def add_message(
