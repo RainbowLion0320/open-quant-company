@@ -318,14 +318,14 @@ project:
   english_name: Open Quant Company
   description: 开源量化公司操作系统：用户作为 CEO，多个 agent 负责数据、研究、风控、工程与报告，所有结论可回溯到 Web UI、CLI 和 evidence artifacts。
 llm:
-  default_provider: deepseek
+  default_provider: mimo
   use_cases:
     factor_hypothesis:
-      provider: deepseek
-      model: deepseek-v4-pro
+      provider: mimo
+      model: mimo-v2.5-pro
     agent_planning:
-      provider: deepseek
-      model: deepseek-v4-pro
+      provider: mimo
+      model: mimo-v2.5-pro
   providers:
     deepseek:
       enabled: true
@@ -356,6 +356,18 @@ llm:
             input_cache_hit: 0.003625
             input_cache_miss: 0.435
             output: 0.87
+    mimo:
+      enabled: true
+      label: Mimo
+      protocol: openai_compatible
+      api_key_env: MIMO_API_KEY
+      base_url: https://token-plan-cn.xiaomimimo.com/v1
+      default_model: mimo-v2.5-pro
+      request:
+        chat_path: /chat/completions
+        response_format_json: true
+        temperature: 0.1
+        timeout_seconds: 20
 signals:
   multifactor:
     buy_threshold: 52

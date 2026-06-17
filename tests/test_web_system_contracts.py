@@ -342,10 +342,10 @@ def test_llm_factor_hypothesis_runtime_resolves_from_use_case_config():
 
     runtime = resolve_llm_use_case("factor_hypothesis")
 
-    assert runtime["provider"] == "deepseek"
-    assert runtime["model"] == "deepseek-v4-pro"
-    assert runtime["base_url"].startswith("https://")
-    assert runtime["credential_env"] == "DEEPSEEK_API_KEY"
+    assert runtime["provider"] == "mimo"
+    assert runtime["model"] == "mimo-v2.5-pro"
+    assert runtime["base_url"] == "https://token-plan-cn.xiaomimimo.com/v1"
+    assert runtime["credential_env"] == "MIMO_API_KEY"
     assert "api_key_env" not in runtime
 
 
