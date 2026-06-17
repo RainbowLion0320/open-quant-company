@@ -39,430 +39,212 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "useI18n" in view
     assert "api.agentSessions" in view
     assert "api.agentDesks" in view
-    assert "api.agentApprovalPolicies" in view
+    assert "api.agentActions" in view
     assert "api.agentCreateSession" in view
-    assert "api.agentUpdateSession" not in view
     assert "api.agentAddMessage" in view
-    assert "api.agentPlan" not in view
     assert "api.agentSessionStream" in view
     assert "AbortController" in view
     assert "EventSource" not in view
     assert "streamSse" in api_client
     assert "authHeaders()" in api_client
-    assert "session" + "StreamStatus" not in view
     assert "closeSessionStream" in view
     assert "onBeforeUnmount(closeSessionStream)" in view
-    assert "runStreamStatus" in view
     assert "connectRunStream" in view
     assert "api.agentRunStream" in view
     assert "closeRunStream" in view
     assert "onBeforeUnmount(closeRunStream)" in view
-    assert "previewWorkflowPlan" not in view
-    assert "workflowPlan" not in view
-    assert "planningWorkflow" not in view
-    assert "semanticDraftEnabled" not in view
-    assert "providerSemanticEnabled" not in view
-    assert "providerPlannerProvider" not in view
-    assert "providerPlannerModel" not in view
-    assert "semanticDraftText" not in view
-    assert "semanticDraftError" not in view
-    assert "parseSemanticDraft" not in view
-    assert "semanticPayload" not in view
-    assert "providerSemanticPayload" not in view
-    assert "planner_mode: \"semantic_draft\"" not in view
-    assert "planner_mode: \"provider_semantic\"" not in view
-    assert "planner_provider: providerPlannerProvider.value.trim()" not in view
-    assert "planner_model: providerPlannerModel.value.trim()" not in view
-    assert "semantic_draft: semanticDraft" not in view
-    assert 'v-model="semanticDraftEnabled"' not in view
-    assert 'v-model="providerSemanticEnabled"' not in view
-    assert 'v-model="providerPlannerProvider"' not in view
-    assert 'v-model="providerPlannerModel"' not in view
-    assert 'v-model="semanticDraftText"' not in view
-    assert "api.agentRun" + "SessionReadOnlyActions" not in view
-    assert "runSession" + "ReadOnlyActions" not in view
-    assert "readOnly" + "WorkflowResult" not in view
-    assert "runningReadOnly" + "Workflow" not in view
-    assert "api.agentAutonomyStep" not in view
-    assert "runAutonomyStep" not in view
-    assert "api.agentAutonomyRun" not in view
-    assert "runAutonomyRun" not in view
-    assert "autonomyStepResult" not in view
-    assert "autonomyRunResult" not in view
-    assert "runningAutonomyStep" not in view
-    assert "runningAutonomyRun" not in view
-    assert "autonomyRunMaxSteps" not in view
-    assert 'v-model.number="autonomyRunMaxSteps"' not in view
-    assert "api.agentPrograms" not in view
-    assert "api.agentCreateProgram" not in view
-    assert "api.agentRunProgram" not in view
-    assert "agentPrograms" not in view
-    assert "createAutonomyProgram" not in view
-    assert "runAutonomyProgram" not in view
-    assert "dryRunAutonomyProgram" not in view
-    assert "programRunResult" not in view
-    assert "ceoOffice.createAutonomyProgram" not in view
-    assert "ceoOffice.autonomyPrograms" not in view
-    assert "ceoOffice.programRunStatus" not in view
-    assert "ceoOffice.programBlockedItems" not in view
-    assert "autonomyStepResult.actions" not in view
-    assert "autonomyStepResult.runs" not in view
-    assert "autonomyStepResult.skipped" not in view
-    assert "autonomyRunResult.steps" not in view
-    assert "autonomyRunResult.stop_reason" not in view
-    assert "ceoOffice.runAutonomyRun" not in view
-    assert "ceoOffice.autonomyRunStatus" not in view
-    assert "ceoOffice.autonomyRunSteps" not in view
-    assert "ceoOffice.autonomyRunMaxSteps" not in view
-    assert "ceoOffice.stopReason" not in view
-    assert "ceoOffice.runAutonomyStep" not in view
-    assert "ceoOffice.autonomyStepStatus" not in view
-    assert "ceoOffice.autonomyStepActions" not in view
-    assert "ceoOffice.autonomyStepRuns" not in view
-    assert "ceoOffice.autonomyStepSkipped" not in view
+
+    # CEO Office remains a conversation, decision, and evidence surface.
     assert "selectedDraftDesk" in view
-    assert "selectedDeskId" in view
-    assert "selectedDesk" in view
-    assert "selectedDesk.capabilities" in view
-    assert "deskScopedMessages" in view
-    assert "deskScopedActions" in view
-    assert "deskScopedHandoffs" in view
-    assert "selectDesk" in view
     assert 'v-model="selectedDraftDesk"' in view
     assert 'v-for="desk in desks"' in view
-    assert "approvalPolicies" in view
-    assert "policyDecisionLabel" in view
-    assert '@click="selectDesk(desk.desk_id)"' in view
-    assert 'selected: selectedDeskId === desk.desk_id' in view
-    assert 'desk: selectedDraftDesk.value' in view
+    assert "desk: selectedDraftDesk.value" in view
     assert "ceoOffice.messageDesk" in view
-    assert "ceoOffice." + "stream" not in view
-    assert "ceoOffice.previewPlan" not in view
-    assert "ceoOffice.workflowPlan" not in view
-    assert "ceoOffice.semanticDraft" not in view
-    assert "ceoOffice.providerSemantic" not in view
-    assert "ceoOffice.providerPlannerProvider" not in view
-    assert "ceoOffice.providerPlannerModel" not in view
-    assert "ceoOffice.providerPlannerProviderPlaceholder" not in view
-    assert "ceoOffice.providerPlannerModelPlaceholder" not in view
-    assert "ceoOffice.providerPlannerNotice" not in view
-    assert "ceoOffice.semanticDraftPlaceholder" not in view
-    assert "ceoOffice.semanticDraftInvalid" not in view
-    assert "ceoOffice.noLedgerWrites" not in view
-    assert "ceoOffice.runReadOnly" + "Workflow" not in view
-    assert "ceoOffice.readOnly" + "WorkflowStatus" not in view
-    assert "ceoOffice.deskMandate" in view
-    assert "ceoOffice.allowedTools" in view
-    assert "ceoOffice.approvalPolicies" in view
-    assert "ceoOffice.defaultDecision" in view
-    assert "ceoOffice.requiredRole" in view
-    assert "ceoOffice.policyReason" in view
-    assert "ceoOffice.forbiddenActions" in view
-    assert "ceoOffice.evidenceRequired" in view
-    assert "ceoOffice.relatedMessages" in view
-    assert "ceoOffice.relatedActions" in view
-    assert "ceoOffice.relatedHandoffs" in view
+    assert "attentionActions" in view
+    assert "attentionStatuses" in view
+    assert "selectedAction" in view
     assert "api.agentAction" in view
-    assert "api.agentRunAction" in view
+    assert "api.agentApproveAction" in view
+    assert "api.agentRejectAction" in view
     assert "api.agentPaperSubmitAction" in view
     assert "api.agentPaperCancelAction" in view
     assert "api.agentCancelAction" in view
-    assert "selectedAction" in view
     assert "submitPaperAction" in view
-    assert "isPaperAction" in view
     assert "canSubmitPaperAction" in view
-    assert "paperOrderPreview" in view
-    assert "paperReconciliation" in view
-    assert "paperReconciliationSummary" in view
-    assert "paper_reconciliations" in view
-    assert "run.artifact_refs" in view
-    assert "ceoOffice.runEvidence" in view
-    assert "run.events" in view
-    assert "ceoOffice.runTimeline" in view
-    assert "event.sequence" in view
-    assert "event.event_type" in view
-    assert "event.message" in view
     assert "cancelAction" in view
-    assert "canCancelAction" in view
-    assert "selectedAction.action.expires_at" in view
-    assert "ceoOffice.expiresAt" in view
-    assert "archiveSession" not in view
-    assert "archivingSession" not in view
-    assert '@click="createSession"' not in view
-    assert "async function createSession" not in view
-    assert "ceoOffice.createSession" not in view
-    assert "ceoOffice.archiveSession" not in view
-    assert "activeSession?.session_id" not in view
     assert "selectedEvidence" in view
     assert "selectedEvidenceNavigation" in view
     assert "selectedEvidenceSnapshot" in view
-    assert "selectedEvidenceStatus" in view
-    assert "openLinkedView" in view
-    assert "handoffs" in view
-    assert "api.agentHandoffs" in view
-    assert "api.agentResolveHandoff" in view
-    assert "api.agentWorkOrders" in view
-    assert "workOrders" in view
-    assert "ceoOffice.workOrders" in view
-    assert "ceoOffice.noWorkOrders" in view
-    assert "ceoOffice.affectedFiles" in view
-    assert "ceoOffice.suggestedVerification" in view
-    assert "resolveHandoff" in view
-    assert "api.agentReports" in view
-    assert "api.agentGenerateReport" in view
-    assert "api.agentRunReportRhythm" in view
-    assert "api.agentRunScheduledReportRhythm" in view
-    assert "api.agentNotifyReport" in view
-    assert "rhythmResult" in view
-    assert "scheduledRhythmResult" in view
-    assert "notificationResult" in view
-    assert "runReportRhythm" in view
-    assert "runScheduledReportRhythm" in view
-    assert "notifyReport" in view
-    assert "runningRhythm" in view
-    assert "notifyingReport" in view
-    assert "selectedReportKind" in view
-    assert "reportKindOptions" in view
-    assert "kind: selectedReportKind.value" in view
-    assert "api.agentLiveReadiness" in view
-    assert "api.agentLiveEnvironment" in view
-    assert "api.agentLiveKillSwitch" in view
-    assert "api.agentLiveKillSwitchActivate" in view
-    assert "api.agentLiveKillSwitchDeactivate" in view
-    assert "api.agentLiveReconciliation" in view
-    assert "api.agentLiveMonitor" in view
-    assert "liveReadiness" in view
-    assert "liveEnvironment" in view
-    assert "liveEnvironmentChecks" in view
-    assert "liveKillSwitch" in view
-    assert "liveReconciliation" in view
-    assert "liveMonitor" in view
-    assert "operateLiveKillSwitch" in view
-    assert "runLiveReconciliation" in view
-    assert "runLiveMonitor" in view
-    assert "runningLiveMonitor" in view
-    assert "ceoOffice.liveReadiness" in view
-    assert "ceoOffice.liveEnvironment" in view
-    assert "ceoOffice.environmentChecks" in view
-    assert "ceoOffice.liveKillSwitch" in view
-    assert "ceoOffice.activateKillSwitch" in view
-    assert "ceoOffice.deactivateKillSwitch" in view
-    assert "ceoOffice.runLiveReconciliation" in view
-    assert "ceoOffice.liveReconciliation" in view
-    assert "ceoOffice.runLiveMonitor" in view
-    assert "ceoOffice.liveMonitor" in view
-    assert "ceoOffice.liveMonitorFailed" in view
-    assert "reports" in view
-    assert "reportSectionPreview" in view
-    assert "report.sections" in view
-    assert "ceoOffice.reportSections" in view
-    assert "generateReport" in view
-    assert "ceoOffice.reportKind" in view
-    assert "ceoOffice.generateReport" in view
-    assert "ceoOffice.runRhythm" in view
-    assert "ceoOffice.runScheduledRhythm" in view
-    assert "ceoOffice.notifyReport" in view
-    assert "ceoOffice.notificationStatus" in view
-    assert "ceoOffice.sent" in view
-    assert "ceoOffice.rhythmStatus" in view
-    assert "ceoOffice.sessionCount" not in view
-    assert "ceoOffice.reports" in view
-    assert "报告要点" in zh_ceo
-    assert "实盘监控" in zh_ceo
-    assert "语义草案" not in zh_ceo
-    assert "Provider 规划" not in zh_ceo
-    assert "Provider 名称" not in zh_ceo
-    assert "模型名称" not in zh_ceo
-    assert "会调用外部 LLM provider" not in zh_ceo
-    assert "token/成本记录" not in zh_ceo
-    assert "运行自主步骤" not in zh_ceo
-    assert "自主步骤状态" not in zh_ceo
-    assert "自主行动" not in zh_ceo
-    assert "自主运行" not in zh_ceo
-    assert "自主跳过" not in zh_ceo
-    assert "Report Sections" in en_ceo
-    assert "Run Live Monitor" in en_ceo
-    assert "Semantic Draft" not in en_ceo
-    assert "Provider Planner" not in en_ceo
-    assert "Provider Name" not in en_ceo
-    assert "Model Name" not in en_ceo
-    assert "Calls the external LLM provider" not in en_ceo
-    assert "token/cost usage" not in en_ceo
-    assert "Run Autonomy Step" not in en_ceo
-    assert "Autonomy Step Status" not in en_ceo
-    assert "Autonomy Actions" not in en_ceo
-    assert "Autonomy Runs" not in en_ceo
-    assert "Autonomy Skipped" not in en_ceo
-    assert "ceoOffice.submitPaperOrder" in view
-    assert "ceoOffice.paperOrderPreview" in view
-    assert "ceoOffice.paperReconciliation" in view
-    assert "ceoOffice.orderId" in view
-    assert "ceoOffice.cashAfter" in view
-    assert "ceoOffice.marketValueAfter" in view
-    assert "ceoOffice.riskGate" in view
-    assert "ceoOffice.runEvidence" in view
+    assert "api.agentEvidence" in view
+    assert "message.evidence_refs" in view
+    assert "message.action_refs" in view
+    assert "ceoOffice.openEvidence" in view
+    assert "ceoOffice.viewAction" in view
+
+    # The CEO page must not become a runtime/ops control panel again.
+    forbidden_view_tokens = [
+        "api.agentApprovalPolicies",
+        "api.agentHandoffs",
+        "api.agentResolveHandoff",
+        "api.agentWorkOrders",
+        "api.agentUpdateWorkOrder",
+        "api.agentReports",
+        "api.agentGenerateReport",
+        "api.agentRunReportRhythm",
+        "api.agentRunScheduledReportRhythm",
+        "api.agentNotifyReport",
+        "api.agentLiveReadiness",
+        "api.agentLiveEnvironment",
+        "api.agentLiveKillSwitch",
+        "api.agentLiveKillSwitchActivate",
+        "api.agentLiveKillSwitchDeactivate",
+        "api.agentLiveReconciliation",
+        "api.agentLiveMonitor",
+        "approvalPolicies",
+        "policyDecisionLabel",
+        "handoffs",
+        "workOrders",
+        "reports",
+        "rhythmResult",
+        "scheduledRhythmResult",
+        "notificationResult",
+        "liveReadiness",
+        "liveEnvironment",
+        "liveKillSwitch",
+        "liveReconciliation",
+        "liveMonitor",
+        "resolveHandoff",
+        "updateWorkOrder",
+        "generateReport",
+        "runReportRhythm",
+        "runScheduledReportRhythm",
+        "notifyReport",
+        "operateLiveKillSwitch",
+        "runLiveReconciliation",
+        "runLiveMonitor",
+        "runAction",
+        "api.agentRunAction",
+        "selectedDesk",
+        "selectedDeskId",
+        "deskScopedMessages",
+        "deskScopedActions",
+        "deskScopedHandoffs",
+        "ceoOffice.deskStatus",
+        "ceoOffice.approvalPolicies",
+        "ceoOffice.workOrders",
+        "ceoOffice.handoffs",
+        "ceoOffice.liveReadiness",
+        "ceoOffice.reports",
+        "ceoOffice.runRhythm",
+        "ceoOffice.runScheduledRhythm",
+        "ceoOffice.runLiveMonitor",
+        "ceoOffice.runLiveReconciliation",
+        "ceoOffice.generateReport",
+        "ceoOffice.notifyReport",
+        "ceoOffice.runAction",
+    ]
+    for token in forbidden_view_tokens:
+        assert token not in view
+
+    # Planner/autonomy/debug controls remain hidden from CEO Office.
+    forbidden_planner_tokens = [
+        "previewWorkflowPlan",
+        "workflowPlan",
+        "planningWorkflow",
+        "semanticDraftEnabled",
+        "providerSemanticEnabled",
+        "providerPlannerProvider",
+        "providerPlannerModel",
+        "semanticDraftText",
+        "semanticPayload",
+        "providerSemanticPayload",
+        "api.agentAutonomyStep",
+        "runAutonomyStep",
+        "api.agentAutonomyRun",
+        "runAutonomyRun",
+        "api.agentPrograms",
+        "api.agentCreateProgram",
+        "api.agentRunProgram",
+        "agentPrograms",
+        "programRunResult",
+    ]
+    for token in forbidden_planner_tokens:
+        assert token not in view
+
     assert "ceoOffice" in zh_index
     assert "ceoOffice" in en_index
     assert "行动队列" in zh_ceo
     assert "目标 Desk" in zh_ceo
-    assert "实时流" not in zh_ceo
-    assert "已连接" in zh_ceo
-    assert "连接中" in zh_ceo
-    assert "预览计划" not in zh_ceo
-    assert "工作流计划" not in zh_ceo
-    assert "不会写入 ledger" not in zh_ceo
-    assert "运行安全" + "工作流" not in zh_ceo
-    assert "安全" + "工作流状态" not in zh_ceo
-    assert "Desk 职责" in zh_ceo
-    assert "研究能力" in zh_ceo
-    assert "允许工具" in zh_ceo
-    assert "审批策略" in zh_ceo
-    assert "默认决策" in zh_ceo
-    assert "要求角色" in zh_ceo
-    assert "策略原因" in zh_ceo
-    assert "禁止行动" in zh_ceo
-    assert "证据要求" in zh_ceo
-    assert "相关消息" in zh_ceo
-    assert "相关行动" in zh_ceo
-    assert "相关交接" in zh_ceo
-    assert "Action Queue" in en_ceo
-    assert "Target Desk" in en_ceo
-    assert "Portfolio" in en_ceo
-    assert 'stream: "Stream"' not in en_ceo
-    assert "Connected" in en_ceo
-    assert "Connecting" in en_ceo
-    assert "Preview Plan" not in en_ceo
-    assert "Workflow Plan" not in en_ceo
-    assert "No ledger writes" not in en_ceo
-    assert "Run Safe " + "Workflow" not in en_ceo
-    assert "Safe " + "Workflow Status" not in en_ceo
-    assert "Desk Mandate" in en_ceo
-    assert "Capabilities" in en_ceo
-    assert "Allowed Tools" in en_ceo
-    assert "Approval Policies" in en_ceo
-    assert "Default Decision" in en_ceo
-    assert "Required Role" in en_ceo
-    assert "Policy Reason" in en_ceo
-    assert "Forbidden Actions" in en_ceo
-    assert "Evidence Required" in en_ceo
-    assert "Related Messages" in en_ceo
-    assert "Related Actions" in en_ceo
-    assert "Related Handoffs" in en_ceo
-    assert "新建会话" not in zh_ceo
-    assert "归档会话" not in zh_ceo
-    assert "会话数" not in zh_ceo
-    assert "Archive Session" not in en_ceo
-    assert "New Session" not in en_ceo
-    assert "Sessions" not in en_ceo
-    assert "交接事项" in zh_ceo
-    assert "工程工单" in zh_ceo
-    assert "暂无工程工单" in zh_ceo
-    assert "影响文件" in zh_ceo
-    assert "建议验证" in zh_ceo
-    assert "更新工单失败" in zh_ceo
-    assert "处理工单" in zh_ceo
-    assert "取消工单" in zh_ceo
-    assert "标记完成" in zh_ceo
-    assert "Handoffs" in en_ceo
-    assert "Engineering Work Orders" in en_ceo
-    assert "No engineering work orders" in en_ceo
-    assert "Affected Files" in en_ceo
-    assert "Suggested Verification" in en_ceo
-    assert "Failed to update work order" in en_ceo
-    assert "Start Work" in en_ceo
-    assert "Cancel Work" in en_ceo
-    assert "Resolve" in en_ceo
-    assert "取消行动" in zh_ceo
-    assert "已取消" in zh_ceo
-    assert "已过期" in zh_ceo
-    assert "过期时间" in zh_ceo
-    assert "Cancel Action" in en_ceo
-    assert "Canceled" in en_ceo
-    assert "Expired" in en_ceo
-    assert "Expires At" in en_ceo
+    assert "查看行动" in zh_ceo
     assert "证据详情" in zh_ceo
-    assert "证据快照" in zh_ceo
-    assert "当前哈希" in zh_ceo
-    assert "打开关联视图" in zh_ceo
-    assert "Evidence Detail" in en_ceo
-    assert "Evidence Snapshot" in en_ceo
-    assert "Current Hash" in en_ceo
-    assert "Open Linked View" in en_ceo
-    assert "报告" in zh_ceo
-    assert "报告类型" in zh_ceo
-    assert "生成报告" in zh_ceo
-    assert "CEO 日报" in zh_ceo
-    assert "周度研究复盘" in zh_ceo
-    assert "审计包" in zh_ceo
-    assert "数据质量报告" in zh_ceo
-    assert "风控报告" in zh_ceo
-    assert "执行对账报告" in zh_ceo
-    assert "工程摘要" in zh_ceo
-    assert "发布审计" in zh_ceo
-    assert "运行节奏" in zh_ceo
-    assert "运行后台节奏" in zh_ceo
-    assert "通知报告" in zh_ceo
-    assert "通知状态" in zh_ceo
-    assert "已发送" in zh_ceo
-    assert "节奏状态" in zh_ceo
-    assert "已生成" in zh_ceo
-    assert "已跳过" in zh_ceo
     assert "提交纸面订单" in zh_ceo
     assert "纸面订单预览" in zh_ceo
     assert "纸面订单对账" in zh_ceo
-    assert "订单号" in zh_ceo
-    assert "对账后现金" in zh_ceo
-    assert "对账后市值" in zh_ceo
-    assert "已提交" in zh_ceo
-    assert "订单已撤销" in zh_ceo
-    assert "审批请求已取消" in zh_ceo
-    assert "风控门" in zh_ceo
     assert "运行证据" in zh_ceo
     assert "运行时间线" in zh_ceo
-    assert "Reports" in en_ceo
-    assert "Report Type" in en_ceo
-    assert "Generate Report" in en_ceo
-    assert "Daily Brief" in en_ceo
-    assert "Weekly Review" in en_ceo
-    assert "Audit Pack" in en_ceo
-    assert "Data Quality Report" in en_ceo
-    assert "Risk Report" in en_ceo
-    assert "Execution Reconciliation" in en_ceo
-    assert "Engineering Digest" in en_ceo
-    assert "Release Audit" in en_ceo
-    assert "Run Rhythm" in en_ceo
-    assert "Run Scheduled Rhythm" in en_ceo
-    assert "Notify Report" in en_ceo
-    assert "Notification Status" in en_ceo
-    assert "Sent" in en_ceo
-    assert "Rhythm Status" in en_ceo
-    assert "Generated" in en_ceo
-    assert "Skipped" in en_ceo
+    assert "Action Queue" in en_ceo
+    assert "Target Desk" in en_ceo
+    assert "View Action" in en_ceo
+    assert "Evidence Detail" in en_ceo
     assert "Submit Paper Order" in en_ceo
     assert "Paper Order Preview" in en_ceo
     assert "Paper Reconciliation" in en_ceo
-    assert "Order ID" in en_ceo
-    assert "Cash After" in en_ceo
-    assert "Market Value After" in en_ceo
-    assert "Submitted" in en_ceo
-    assert "Order Canceled" in en_ceo
-    assert "Approval Request Canceled" in en_ceo
-    assert "Risk Gate" in en_ceo
     assert "Run Evidence" in en_ceo
     assert "Run Timeline" in en_ceo
-    assert "实盘就绪" in zh_ceo
-    assert "实盘红灯" in zh_ceo
-    assert "激活红灯" in zh_ceo
-    assert "解除红灯" in zh_ceo
-    assert "运行实盘对账" in zh_ceo
-    assert "实盘对账" in zh_ceo
-    assert "Live Readiness" in en_ceo
-    assert "Live Kill Switch" in en_ceo
-    assert "Activate Kill Switch" in en_ceo
-    assert "Deactivate Kill Switch" in en_ceo
-    assert "Run Live Reconciliation" in en_ceo
-    assert "Live Reconciliation" in en_ceo
 
+    forbidden_zh_phrases = [
+        "Desk 状态",
+        "审批策略",
+        "交接事项",
+        "工程工单",
+        "暂无工程工单",
+        "影响文件",
+        "建议验证",
+        "处理工单",
+        "取消工单",
+        "实盘就绪",
+        "实盘红灯",
+        "运行实盘监控",
+        "运行实盘对账",
+        "报告类型",
+        "生成报告",
+        "运行节奏",
+        "运行后台节奏",
+        "通知报告",
+        "语义草案",
+        "Provider 规划",
+        "运行自主步骤",
+        "自主步骤状态",
+    ]
+    for phrase in forbidden_zh_phrases:
+        assert phrase not in zh_ceo
+
+    forbidden_en_phrases = [
+        "Desk Status",
+        "Approval Policies",
+        "Handoffs",
+        "Engineering Work Orders",
+        "No engineering work orders",
+        "Affected Files",
+        "Suggested Verification",
+        "Start Work",
+        "Cancel Work",
+        "Live Readiness",
+        "Live Kill Switch",
+        "Run Live Monitor",
+        "Run Live Reconciliation",
+        "Report Type",
+        "Generate Report",
+        "Run Rhythm",
+        "Run Scheduled Rhythm",
+        "Notify Report",
+        "Semantic Draft",
+        "Provider Planner",
+        "Run Autonomy Step",
+        "Autonomy Step Status",
+    ]
+    for phrase in forbidden_en_phrases:
+        assert phrase not in en_ceo
 
 def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     api_index = read_frontend("api/index.ts")
