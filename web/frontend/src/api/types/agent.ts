@@ -372,6 +372,7 @@ export interface AgentDesk {
   desk_id: string;
   display_name: string;
   mandate: string;
+  capabilities?: string[];
   allowed_tools: string[];
   forbidden_actions: string[];
   evidence_required: string[];

@@ -123,6 +123,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "selectedDraftDesk" in view
     assert "selectedDeskId" in view
     assert "selectedDesk" in view
+    assert "selectedDesk.capabilities" in view
     assert "deskScopedMessages" in view
     assert "deskScopedActions" in view
     assert "deskScopedHandoffs" in view
@@ -313,6 +314,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "运行安全" + "工作流" not in zh_ceo
     assert "安全" + "工作流状态" not in zh_ceo
     assert "Desk 职责" in zh_ceo
+    assert "研究能力" in zh_ceo
     assert "允许工具" in zh_ceo
     assert "审批策略" in zh_ceo
     assert "默认决策" in zh_ceo
@@ -325,6 +327,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "相关交接" in zh_ceo
     assert "Action Queue" in en_ceo
     assert "Target Desk" in en_ceo
+    assert "Portfolio" in en_ceo
     assert 'stream: "Stream"' not in en_ceo
     assert "Connected" in en_ceo
     assert "Connecting" in en_ceo
@@ -334,6 +337,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Run Safe " + "Workflow" not in en_ceo
     assert "Safe " + "Workflow Status" not in en_ceo
     assert "Desk Mandate" in en_ceo
+    assert "Capabilities" in en_ceo
     assert "Allowed Tools" in en_ceo
     assert "Approval Policies" in en_ceo
     assert "Default Decision" in en_ceo

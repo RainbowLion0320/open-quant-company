@@ -92,7 +92,7 @@ The full target includes:
 | 0 | Documentation landing | Roadmap and behavior spec committed and linked from product docs. |
 | 1 | Foundation runtime | Local schemas, session/action/run ledger, evidence resolver, approval engine, and tool registry. |
 | 2 | CEO Office Web | `/` conversation control page, `/market` market overview, action cards, evidence drill-down. |
-| 3 | Desk agents | Data, Research, Risk, Execution, Engineering, and Reporting desks operate through bounded tools and handoff contracts. |
+| 3 | Desk agents | Data, Research, Portfolio, Risk, Execution, Engineering, and Reporting desks operate through bounded tools and handoff contracts. |
 | 4 | Evidence and governance closure | Agent outputs backed by lifecycle, strategy, data-source, CodeGraph, AST, and test-design artifacts. |
 | 5 | Paper execution control | Agent-proposed paper orders require approval, risk gates, ledger writes, and reconciliation. |
 | 6 | MiniQMT/QMT live execution | Live adapter, SDK checks, account readiness, approval, reconciliation, and kill switch with no paper fallback. |

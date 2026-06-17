@@ -70,7 +70,7 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
         "expected_effect": "Records current data health without writing data.",
     },
     "research": {
-        "answer": "Research Desk 已记录 CEO 问题。下一步应读取策略目录和证据状态，再判断哪些策略有足够 OOS、IC/ICIR 或 overlay evidence。",
+        "answer": "Research Desk 已记录 CEO 问题。下一步应读取策略目录和证据状态，在技术面、情绪面、基本面、因子和 ML 研究能力内判断哪些策略有足够 OOS、IC/ICIR 或 overlay evidence。",
         "evidence_label": "Strategy Lab",
         "evidence_uri": "/strategy-lab",
         "evidence_summary": "Open strategy catalog and evidence views.",
@@ -79,6 +79,17 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
         "risk_level": "read_only",
         "action_summary": "Read strategy catalog and promotion layers.",
         "expected_effect": "Records current strategy catalog state without running backtests.",
+    },
+    "portfolio": {
+        "answer": "Portfolio Desk 已记录 CEO 问题。下一步应读取策略证据、生命周期门禁和执行 dry-run 预览，用现有 evidence 判断组合权重、仓位约束、调仓节奏和策略组合优先级；不会生成假目标权重或直接下单。",
+        "evidence_label": "Portfolio decision workspace",
+        "evidence_uri": "/portfolio",
+        "evidence_summary": "Open portfolio, risk, and execution review context.",
+        "action_type": "portfolio_decision_review",
+        "tool_id": "astroq.strategy.compete",
+        "risk_level": "read_only",
+        "action_summary": "Read strategy evidence for portfolio-level decision review.",
+        "expected_effect": "Records strategy and signal evidence for portfolio decisions without creating target weights or orders.",
     },
     "risk": {
         "answer": "Risk Desk 已记录 CEO 问题。下一步应读取 lifecycle readiness，确认数据、策略、风险和执行门禁是否阻断。",
@@ -189,6 +200,20 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
     ],
     "research": [
         (
+            ("技术面", "technical", "技术指标", "趋势", "动量", "均线", "量价", "突破", "情绪", "sentiment", "资金流", "涨跌停", "龙虎榜", "基本面", "fundamental", "因子", "factor", "ml", "机器学习"),
+            {
+                "answer": "Research Desk 已识别到研究能力请求。技术面、情绪面、基本面、因子和 ML 都是 Research Desk 的子能力；下一步读取策略目录和证据状态，不把这些研究来源拆成新的一级 desk。",
+                "evidence_label": "Strategy Lab",
+                "evidence_uri": "/strategy-lab",
+                "evidence_summary": "Open strategy catalog, factor evidence, and research views.",
+                "action_type": "research_capability_review",
+                "tool_id": "astroq.strategy.catalog",
+                "risk_level": "read_only",
+                "action_summary": "Read strategy catalog for research capability review.",
+                "expected_effect": "Records research capability context without running backtests or changing strategy state.",
+            },
+        ),
+        (
             ("阻断", "blocked", "blocker", "missing", "缺数据", "coverage", "lifecycle"),
             {
                 "answer": "Research Desk 已识别到 strategy blocker review。下一步会同时读取 strategy competition evidence、DataHub coverage 和 lifecycle gates，用证据区分策略质量不足、数据缺口、样本不足或系统门禁阻断。",
@@ -228,6 +253,22 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
                 "risk_level": "dry_run",
                 "action_summary": "Run backtest dry-run plan.",
                 "expected_effect": "Produces a backtest dry-run plan without official evidence writes.",
+            },
+        ),
+    ],
+    "portfolio": [
+        (
+            ("组合", "portfolio", "持仓", "权重", "调仓", "仓位", "策略组合", "rebalance", "allocation", "weight", "weights", "position sizing"),
+            {
+                "answer": "Portfolio Desk 已识别到组合决策请求。下一步只读取策略证据、风险门禁和执行演练，判断组合层面的权重、仓位、调仓节奏和策略优先级；缺 evidence 时会返回阻断，不生成假组合建议。",
+                "evidence_label": "Portfolio decision workspace",
+                "evidence_uri": "/portfolio",
+                "evidence_summary": "Open portfolio, strategy evidence, risk gates, and execution readiness.",
+                "action_type": "portfolio_decision_review",
+                "tool_id": "astroq.strategy.compete",
+                "risk_level": "read_only",
+                "action_summary": "Read strategy competition evidence for portfolio allocation review.",
+                "expected_effect": "Records portfolio decision evidence without creating target weights or submitting orders.",
             },
         ),
     ],
@@ -605,6 +646,8 @@ def _handoff_followup_actions(target_desk: str) -> list[WorkflowActionSpec]:
         return [_data_status_followup_action()]
     if target_desk == "research":
         return [_strategy_followup_action()]
+    if target_desk == "portfolio":
+        return [_portfolio_followup_action()]
     if target_desk == "risk":
         return [_risk_followup_action()]
     if target_desk == "execution":
@@ -642,6 +685,22 @@ def _strategy_followup_action() -> WorkflowActionSpec:
             label="Strategy competition evidence",
             uri="/strategy-lab",
             summary="Open strategy competition and promotion evidence views.",
+        ),
+    )
+
+
+def _portfolio_followup_action() -> WorkflowActionSpec:
+    return WorkflowActionSpec(
+        desk="portfolio",
+        action_type="portfolio_decision_review",
+        tool_id="astroq.strategy.compete",
+        risk_level="read_only",
+        summary="Refresh Portfolio Desk decision evidence for open session follow-up.",
+        expected_effect="Records strategy, alpha, and blocker evidence for portfolio review without creating target weights or orders.",
+        evidence=WorkflowEvidenceSpec(
+            label="Portfolio decision workspace",
+            uri="/portfolio",
+            summary="Open portfolio, strategy evidence, risk gates, and execution readiness.",
         ),
     )
 
@@ -814,6 +873,7 @@ def _artifact_actions_for_causes(root_causes: list[str]) -> list[WorkflowActionS
                 ),
             )
         )
+        actions.append(_portfolio_followup_action())
     if "engineering_quality_risk" in cause_set:
         actions.append(
             WorkflowActionSpec(
@@ -891,8 +951,8 @@ def _dynamic_multi_intent_plan(
     return DeskWorkflowPlan(
         desk=desk,
         answer=(
-            "Reporting Desk 已生成 dynamic multi-intent / 多意图计划：按 Data、Research、Risk、"
-            "Execution 和 Engineering 证据链拆分安全动作，再由 CEO Office 汇总结果。"
+            "Reporting Desk 已生成 dynamic multi-intent / 多意图计划：按 Data、Research、Portfolio、"
+            "Risk、Execution 和 Engineering 证据链拆分安全动作，再由 CEO Office 汇总结果。"
             f"{summary_suffix}"
         ),
         confidence=0.72,
@@ -1024,6 +1084,7 @@ def _open_ended_adaptive_plan(
     actions = [
         _data_status_followup_action(),
         _strategy_catalog_action(),
+        _portfolio_followup_action(),
         _risk_followup_action(),
         _execution_followup_action(),
         *_engineering_followup_actions(),
@@ -1065,7 +1126,7 @@ def _open_ended_adaptive_plan(
         desk=desk,
         answer=(
             "Reporting Desk 已生成 open-ended adaptive / 开放式公司运营计划："
-            "先让 Data、Research、Risk、Execution 和 Engineering Desk 读取各自证据，"
+            "先让 Data、Research、Portfolio、Risk、Execution 和 Engineering Desk 读取各自证据，"
             "只产出诊断和 dry-run，不直接写数据或交易。"
             f"{summary_suffix}"
         ),
@@ -1572,6 +1633,19 @@ def _actions_for_profile(
                 ),
             ),
             WorkflowActionSpec(
+                desk="portfolio",
+                action_type="portfolio_decision_review",
+                tool_id="astroq.strategy.compete",
+                risk_level="read_only",
+                summary="Read Portfolio Desk decision evidence for portfolio review.",
+                expected_effect="Records strategy mix, position sizing, rebalance cadence, and allocation blockers without creating target weights or orders.",
+                evidence=WorkflowEvidenceSpec(
+                    label="Portfolio decision workspace",
+                    uri="/portfolio",
+                    summary="Open portfolio, strategy evidence, risk gates, and execution readiness.",
+                ),
+            ),
+            WorkflowActionSpec(
                 desk="risk",
                 action_type="lifecycle_check",
                 tool_id="astroq.lifecycle.check",
@@ -1673,8 +1747,15 @@ def _handoffs_for(desk: str, content: str) -> list[dict[str, Any]]:
     if desk == "reporting" and _is_portfolio_review_request(normalized):
         return [
             {"target_desk": "research", "reason": "Portfolio review needs current strategy competition evidence."},
+            {"target_desk": "portfolio", "reason": "Portfolio review needs position-sizing, rebalance, and strategy-mix decision evidence."},
             {"target_desk": "risk", "reason": "Portfolio review needs lifecycle and risk gate interpretation."},
             {"target_desk": "execution", "reason": "Portfolio review needs execution dry-run readiness."},
+        ]
+    if desk == "portfolio":
+        return [
+            {"target_desk": "research", "reason": "Portfolio decisions depend on current strategy, alpha, and research evidence."},
+            {"target_desk": "risk", "reason": "Portfolio decisions require risk-gate interpretation before execution."},
+            {"target_desk": "execution", "reason": "Portfolio decisions need execution dry-run readiness before orders."},
         ]
     if desk == "research" and any(token in normalized for token in ("数据", "data", "coverage", "缺")):
         return [{"target_desk": "data", "reason": "Research answer depends on data coverage or missing-data evidence."}]

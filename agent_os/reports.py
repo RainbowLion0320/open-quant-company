@@ -600,13 +600,17 @@ def _domain_scorecard_synthesis(artifact_context: dict[str, Any]) -> dict[str, A
 
     data_status = "attention" if "data_source_gap" in root_causes else "ready"
     research_status = "blocked" if "strategy_evidence_blocked" in root_causes else "ready"
+    portfolio_roots = [
+        cause for cause in ("strategy_evidence_blocked", "lifecycle_blocker") if cause in root_causes
+    ]
+    portfolio_status = "blocked" if portfolio_roots else "ready"
     risk_status = "blocked" if "lifecycle_blocker" in root_causes else "ready"
     execution_status = "blocked" if "lifecycle_blocker" in root_causes else "ready"
     engineering_roots = [
         cause for cause in ("engineering_quality_risk", "test_design_risk") if cause in root_causes
     ]
     engineering_status = "attention" if engineering_roots else "ready"
-    reporting_status = "blocked" if "blocked" in {research_status, risk_status, execution_status} else (
+    reporting_status = "blocked" if "blocked" in {research_status, portfolio_status, risk_status, execution_status} else (
         "attention" if "attention" in {data_status, engineering_status} or missing_count or invalid_count else "ready"
     )
 
@@ -624,6 +628,13 @@ def _domain_scorecard_synthesis(artifact_context: dict[str, Any]) -> dict[str, A
             root_cause_names=["strategy_evidence_blocked"] if "strategy_evidence_blocked" in root_causes else [],
             recommended_command="astroq strategy compete --json",
             rationale="Strategy promotion depends on complete OOS, IC/ICIR, and backtest evidence.",
+        ),
+        row(
+            desk="portfolio",
+            status=portfolio_status,
+            root_cause_names=portfolio_roots,
+            recommended_command="astroq strategy compete --json",
+            rationale="Portfolio decisions consume research evidence and lifecycle gates before target weights, exposure, or rebalance cadence can be trusted.",
         ),
         row(
             desk="risk",
@@ -1080,7 +1091,7 @@ def _report_trend_synthesis(
 
     status = "attention" if recurring else "ready"
     next_actions = [
-        "Open recurring blockers as Data/Research/Risk/Engineering desk actions instead of repeating report-only observations."
+        "Open recurring blockers as Data/Research/Portfolio/Risk/Engineering desk actions instead of repeating report-only observations."
     ] if recurring else ["No repeated root causes were found in recent report history."]
     return {
         "status": status,
@@ -1135,7 +1146,7 @@ def _report_causal_chain_synthesis(artifact_context: dict[str, Any]) -> dict[str
                 "severity": "P0",
                 "status": "blocked",
                 "nodes": nodes,
-                "owner_desks": ["data", "research", "risk"],
+                "owner_desks": ["data", "research", "portfolio", "risk"],
                 "evidence": _chain_evidence(root_causes, nodes),
                 "impact": "Strategy promotion, paper execution, and live execution must remain blocked until data readiness and alpha evidence are regenerated.",
                 "next_action": (

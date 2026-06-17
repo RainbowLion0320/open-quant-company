@@ -3491,7 +3491,10 @@ def test_agent_reports_aggregate_system_artifact_context(tmp_path, monkeypatch):
     scorecard = context["domain_scorecard"]
     scorecard_by_desk = {row["desk"]: row for row in scorecard["desks"]}
     assert scorecard["overall_status"] == "blocked"
-    assert list(scorecard_by_desk) == ["data", "research", "risk", "execution", "engineering", "reporting"]
+    assert list(scorecard_by_desk) == ["data", "research", "portfolio", "risk", "execution", "engineering", "reporting"]
+    assert scorecard_by_desk["portfolio"]["status"] == "blocked"
+    assert scorecard_by_desk["portfolio"]["recommended_command"] == "astroq strategy compete --json"
+    assert "strategy_evidence_blocked" in scorecard_by_desk["portfolio"]["root_causes"]
     assert scorecard_by_desk["risk"]["status"] == "blocked"
     assert scorecard_by_desk["risk"]["recommended_command"] == "astroq lifecycle check --json"
     assert scorecard_by_desk["data"]["recommended_command"] == "astroq data sources diff-registry --json"
@@ -3698,7 +3701,7 @@ def test_agent_reports_build_causal_chain_synthesis_from_evidence(tmp_path, monk
     assert "engineering_quality_to_release_risk" in chain_ids
     strategy_chain = next(chain for chain in causal["chains"] if chain["chain_id"] == "data_readiness_to_strategy_block")
     assert strategy_chain["severity"] == "P0"
-    assert strategy_chain["owner_desks"] == ["data", "research", "risk"]
+    assert strategy_chain["owner_desks"] == ["data", "research", "portfolio", "risk"]
     assert strategy_chain["nodes"] == ["data_source_gap", "lifecycle_blocker", "strategy_evidence_blocked"]
     assert "macro_gdp" in strategy_chain["evidence"]
     assert "stock_limit_list" in strategy_chain["evidence"]
@@ -4330,7 +4333,15 @@ def test_agent_api_reads_local_ledger_without_running_tools(tmp_path, monkeypatc
     assert detail.status_code == 200
     assert detail.json()["messages"][0]["content"] == "检查数据缺口"
     assert desks.status_code == 200
-    assert {desk["desk_id"] for desk in desks.json()["desks"]} >= {"data", "research", "risk"}
+    assert {desk["desk_id"] for desk in desks.json()["desks"]} >= {"data", "research", "portfolio", "risk"}
+    research_desk = next(desk for desk in desks.json()["desks"] if desk["desk_id"] == "research")
+    assert set(research_desk["capabilities"]) >= {
+        "technical_analysis",
+        "sentiment_analysis",
+        "fundamental_analysis",
+        "factor_research",
+        "ml_research",
+    }
     reset_datahub()
 
 
@@ -4624,8 +4635,13 @@ def test_agent_tool_registry_covers_all_declared_desk_tools():
     from agent_os.tools import AgentToolRegistry
 
     registry = AgentToolRegistry()
+    desks_by_id = {desk["desk_id"]: desk for desk in list_desks()}
 
-    for desk in list_desks():
+    assert "portfolio" in desks_by_id
+    assert "technical_analysis" in desks_by_id["research"]["capabilities"]
+    assert "sentiment_analysis" in desks_by_id["research"]["capabilities"]
+
+    for desk in desks_by_id.values():
         for tool_id in desk["allowed_tools"]:
             tool = registry.get(tool_id)
             assert tool is not None, f"{desk['desk_id']} declares missing tool {tool_id}"
@@ -4654,6 +4670,66 @@ def test_agent_tool_registry_covers_all_declared_desk_tools():
     assert report_daily_command[1:] == ["agent", "report", "daily", "--session", "ses_123abc", "--json"]
     assert test_design_command[1:] == ["test", "design", "--json"]
     assert docs_command[1:] == ["docs", "check", "--json"]
+
+
+def test_portfolio_desk_reviews_portfolio_decisions_without_fake_weights(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Portfolio review", default_desk="portfolio")
+
+    result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="portfolio",
+        content="帮我看一下组合权重、仓位和调仓节奏",
+    )
+    response = result["desk_response"]
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+
+    assert response.message.desk == "portfolio"
+    assert len(actions) == 1
+    assert actions[0]["desk"] == "portfolio"
+    assert actions[0]["parameters"]["tool_id"] == "astroq.strategy.compete"
+    assert actions[0]["risk_level"] == "read_only"
+    evidence = runtime.ledger.get_evidence(actions[0]["evidence_refs"][0])
+    assert evidence["uri"] == "/portfolio"
+    assert "Portfolio Desk" in response.answer
+    assert "不生成假组合建议" in response.answer
+    assert {handoff["target_desk"] for handoff in response.handoffs} == {"research", "risk", "execution"}
+    reset_datahub()
+
+
+def test_research_capability_requests_stay_under_research_desk(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Research capabilities", default_desk="research")
+
+    result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="research",
+        content="技术面和情绪面的研究能力是不是要看一下",
+    )
+    response = result["desk_response"]
+    actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
+
+    assert response.message.desk == "research"
+    assert len(actions) == 1
+    assert actions[0]["desk"] == "research"
+    assert actions[0]["parameters"]["tool_id"] == "astroq.strategy.catalog"
+    assert "子能力" in response.answer
+    assert "不把这些研究来源拆成新的一级 desk" in response.answer
+    reset_datahub()
 
 
 def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monkeypatch):
@@ -4971,18 +5047,20 @@ def test_agent_workflow_plan_uses_artifact_context_for_broad_ceo_priority_reques
     assert before_summary == after_summary
     assert preview["planning_mode"] == "artifact_aware"
     assert preview["side_effects"]["ledger_writes"] is False
-    assert [action["tool_id"] for action in preview["actions"]] == [
-        "astroq.data.sources.diff_registry",
-        "astroq.lifecycle.check",
-        "astroq.strategy.compete",
-        "astroq.architecture.ast",
-        "astroq.test.design",
+    assert [(action["desk"], action["tool_id"]) for action in preview["actions"]] == [
+        ("data", "astroq.data.sources.diff_registry"),
+        ("risk", "astroq.lifecycle.check"),
+        ("research", "astroq.strategy.compete"),
+        ("portfolio", "astroq.strategy.compete"),
+        ("engineering", "astroq.architecture.ast"),
+        ("engineering", "astroq.test.design"),
     ]
     assert response_tools == [action["tool_id"] for action in preview["actions"]]
     assert {handoff["target_desk"] for handoff in preview["handoffs"]} == {
         "data",
         "risk",
         "research",
+        "portfolio",
         "engineering",
     }
     assert reasoning_by_kind["intent_match"]["planning_mode"] == "artifact_aware"
@@ -5097,13 +5175,14 @@ def test_agent_workflow_plan_combines_artifact_context_with_session_backlog(tmp_
     assert preview["planning_mode"] == "adaptive_artifact"
     assert preview["side_effects"]["ledger_writes"] is False
     assert preview_tools == response_tools
-    assert preview_tools == [
-        "astroq.data.repair.dry_run",
-        "astroq.lifecycle.check",
-        "astroq.architecture.ast",
-        "astroq.test.design",
-        "astroq.data.sources.diff_registry",
-        "astroq.strategy.compete",
+    assert [(action["desk"], action["tool_id"]) for action in preview["actions"]] == [
+        ("data", "astroq.data.repair.dry_run"),
+        ("risk", "astroq.lifecycle.check"),
+        ("engineering", "astroq.architecture.ast"),
+        ("engineering", "astroq.test.design"),
+        ("data", "astroq.data.sources.diff_registry"),
+        ("research", "astroq.strategy.compete"),
+        ("portfolio", "astroq.strategy.compete"),
     ]
     assert "risk_free_curve" in response.answer
     assert "missing_data" in response.answer
@@ -5180,6 +5259,7 @@ def test_agent_open_ended_ceo_request_gets_safe_company_wide_plan(tmp_path, monk
     assert preview_tools == [
         "astroq.data.status",
         "astroq.strategy.catalog",
+        "astroq.strategy.compete",
         "astroq.lifecycle.check",
         "astroq.execution.dry_run",
         "astroq.architecture.ast",
@@ -5188,6 +5268,7 @@ def test_agent_open_ended_ceo_request_gets_safe_company_wide_plan(tmp_path, monk
     assert {handoff["target_desk"] for handoff in preview["handoffs"]} == {
         "data",
         "research",
+        "portfolio",
         "risk",
         "execution",
         "engineering",
@@ -5196,6 +5277,7 @@ def test_agent_open_ended_ceo_request_gets_safe_company_wide_plan(tmp_path, monk
     assert reasoning_by_kind["open_goal_decomposition"]["target_desks"] == [
         "data",
         "research",
+        "portfolio",
         "risk",
         "execution",
         "engineering",
@@ -6356,7 +6438,7 @@ def test_reporting_daily_brief_orchestrates_multiple_desk_actions(tmp_path, monk
     reset_datahub()
 
 
-def test_reporting_portfolio_review_orchestrates_research_risk_execution_actions(tmp_path, monkeypatch):
+def test_reporting_portfolio_review_orchestrates_research_portfolio_risk_execution_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
 
@@ -6375,16 +6457,17 @@ def test_reporting_portfolio_review_orchestrates_research_risk_execution_actions
     response = result["desk_response"]
     actions = [runtime.get_action(action_id) for action_id in response.proposed_actions]
 
-    assert len(actions) == 3
-    assert {action["desk"] for action in actions} == {"research", "risk", "execution"}
-    assert {action["parameters"]["tool_id"] for action in actions} == {
-        "astroq.strategy.compete",
-        "astroq.lifecycle.check",
-        "astroq.execution.dry_run",
-    }
+    assert len(actions) == 4
+    assert {action["desk"] for action in actions} == {"research", "portfolio", "risk", "execution"}
+    assert [(action["desk"], action["parameters"]["tool_id"]) for action in actions] == [
+        ("research", "astroq.strategy.compete"),
+        ("portfolio", "astroq.strategy.compete"),
+        ("risk", "astroq.lifecycle.check"),
+        ("execution", "astroq.execution.dry_run"),
+    ]
     assert {action["risk_level"] for action in actions} == {"read_only", "dry_run"}
-    assert len(response.evidence_refs) == 3
-    assert {handoff["target_desk"] for handoff in response.handoffs} == {"research", "risk", "execution"}
+    assert len(response.evidence_refs) == 4
+    assert {handoff["target_desk"] for handoff in response.handoffs} == {"research", "portfolio", "risk", "execution"}
     assert "portfolio" in response.answer.lower() or "组合" in response.answer
     reset_datahub()
 

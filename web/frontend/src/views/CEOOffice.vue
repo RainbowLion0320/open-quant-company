@@ -69,6 +69,12 @@
               <code>{{ selectedDesk.default_policy }}</code>
             </div>
             <div class="desk-chip-section">
+              <small>{{ t("ceoOffice.capabilities") }}</small>
+              <div class="desk-chip-list">
+                <code v-for="capability in selectedDesk.capabilities || []" :key="capability">{{ capability }}</code>
+              </div>
+            </div>
+            <div class="desk-chip-section">
               <small>{{ t("ceoOffice.allowedTools") }}</small>
               <div class="desk-chip-list">
                 <code v-for="tool in selectedDesk.allowed_tools" :key="tool">{{ tool }}</code>
@@ -794,6 +800,7 @@ const reportKindOptions = computed(() => [
 const deskNames = computed<Record<string, string>>(() => ({
   data: t("ceoOffice.dataDesk"),
   research: t("ceoOffice.researchDesk"),
+  portfolio: t("ceoOffice.portfolioDesk"),
   risk: t("ceoOffice.riskDesk"),
   execution: t("ceoOffice.executionDesk"),
   engineering: t("ceoOffice.engineeringDesk"),

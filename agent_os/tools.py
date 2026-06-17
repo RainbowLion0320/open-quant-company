@@ -48,14 +48,14 @@ DEFAULT_TOOLS: dict[str, ToolDescriptor] = {
         label="Lifecycle readiness",
         command=_astroq_command("lifecycle", "check", "--json"),
         risk_level="read_only",
-        desk_scopes=["risk", "reporting", "execution"],
+        desk_scopes=["portfolio", "risk", "reporting", "execution"],
     ),
     "astroq.execution.dry_run": ToolDescriptor(
         tool_id="astroq.execution.dry_run",
         label="Execution dry-run",
         command=_astroq_command("execution", "dry-run", "--json"),
         risk_level="dry_run",
-        desk_scopes=["execution", "risk"],
+        desk_scopes=["portfolio", "execution", "risk"],
     ),
     "astroq.agent.live.readiness": ToolDescriptor(
         tool_id="astroq.agent.live.readiness",
@@ -111,14 +111,14 @@ DEFAULT_TOOLS: dict[str, ToolDescriptor] = {
         label="Strategy catalog",
         command=_astroq_command("strategy", "catalog", "--json"),
         risk_level="read_only",
-        desk_scopes=["research", "reporting"],
+        desk_scopes=["research", "portfolio", "reporting"],
     ),
     "astroq.strategy.compete": ToolDescriptor(
         tool_id="astroq.strategy.compete",
         label="Strategy competition evidence",
         command=_astroq_command("strategy", "compete", "--json"),
         risk_level="read_only",
-        desk_scopes=["research"],
+        desk_scopes=["research", "portfolio"],
     ),
     "astroq.backtest.run.dry_run": ToolDescriptor(
         tool_id="astroq.backtest.run.dry_run",
