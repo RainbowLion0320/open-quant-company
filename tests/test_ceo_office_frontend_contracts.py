@@ -79,13 +79,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentEvidence" in view
     assert "message.evidence_refs" in view
     assert "message.action_refs" in view
-    assert "modelRuntimeSummary" in view
+    assert "modelRuntimeLine" in view
     assert "contextUsedTokens" in view
     assert "contextUsagePct" in view
-    assert "ceoOffice.modelRuntime" in view
-    assert "ceoOffice.reasoningLevel" in view
-    assert "ceoOffice.contextUsed" in view
-    assert "ceoOffice.contextMax" in view
+    assert "ceoOffice.modelRuntimeA11y" in view
+    assert "ceoOffice.reasoningShort" in view
+    assert "ceoOffice.contextShort" in view
     assert "ceoOffice.openEvidence" in view
     assert "ceoOffice.viewAction" in view
 
@@ -199,14 +198,15 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Paper Reconciliation" in en_ceo
     assert "Run Evidence" in en_ceo
     assert "Run Timeline" in en_ceo
-    assert "模型" in zh_ceo
-    assert "推理" in zh_ceo
-    assert "已用上下文" in zh_ceo
-    assert "最大上下文" in zh_ceo
-    assert "Model" in en_ceo
-    assert "Reasoning" in en_ceo
-    assert "Context Used" in en_ceo
-    assert "Max Context" in en_ceo
+    assert "modelRuntimeA11y" in zh_ceo
+    assert 'reasoningShort: "R"' in zh_ceo
+    assert 'contextShort: "CTX"' in zh_ceo
+    assert 'reasoningShort: "R"' in en_ceo
+    assert 'contextShort: "CTX"' in en_ceo
+    assert "已用上下文" not in zh_ceo
+    assert "最大上下文" not in zh_ceo
+    assert "Context Used" not in en_ceo
+    assert "Max Context" not in en_ceo
 
     forbidden_zh_phrases = [
         "Desk 状态",

@@ -54,23 +54,8 @@
           <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
             {{ t("ceoOffice.send") }}
           </button>
-          <div v-if="modelRuntime" class="model-runtime-strip">
-            <span>
-              <small>{{ t("ceoOffice.modelRuntime") }}</small>
-              <strong>{{ modelRuntimeSummary }}</strong>
-            </span>
-            <span>
-              <small>{{ t("ceoOffice.reasoningLevel") }}</small>
-              <strong>{{ reasoningLevelLabel(modelRuntime.reasoning.level) }}</strong>
-            </span>
-            <span>
-              <small>{{ t("ceoOffice.contextUsed") }}</small>
-              <strong>{{ formatTokenCount(contextUsedTokens) }} · {{ contextUsagePct }}%</strong>
-            </span>
-            <span>
-              <small>{{ t("ceoOffice.contextMax") }}</small>
-              <strong>{{ formatTokenCount(modelRuntime.context.max_tokens) }}</strong>
-            </span>
+          <div v-if="modelRuntime" class="model-runtime-line" :aria-label="t('ceoOffice.modelRuntimeA11y')">
+            {{ modelRuntimeLine }}
           </div>
         </form>
       </article>
@@ -381,11 +366,16 @@ const paperReconciliationSummary = computed(() => {
     error: String(reconciliation.error || ""),
   };
 });
-const modelRuntimeSummary = computed(() => {
+const modelRuntimeLine = computed(() => {
   if (!modelRuntime.value) return "—";
   const label = modelRuntime.value.runtime.label || modelRuntime.value.runtime.provider;
   const model = modelRuntime.value.runtime.model || "—";
-  return `${label} · ${model}`;
+  return [
+    `${label} · ${model}`,
+    `${t("ceoOffice.reasoningShort")} ${reasoningLevelShort(modelRuntime.value.reasoning.level)}`,
+    `${t("ceoOffice.contextShort")} ${formatTokenCount(contextUsedTokens.value)}/${formatTokenCount(modelRuntime.value.context.max_tokens)}`,
+    `${contextUsagePct.value}%`,
+  ].join(" · ");
 });
 const draftContextTokens = computed(() => estimateTextTokens(draft.value));
 const contextUsedTokens = computed(() => (modelRuntime.value?.context.used_tokens || 0) + draftContextTokens.value);
@@ -484,10 +474,10 @@ function formatTokenCount(value: number) {
   return Math.round(numeric).toLocaleString();
 }
 
-function reasoningLevelLabel(level: string) {
-  if (level === "thinking_enabled") return t("ceoOffice.reasoningThinking");
-  if (level === "thinking_disabled") return t("ceoOffice.reasoningOff");
-  if (!level || level === "default") return t("ceoOffice.reasoningDefault");
+function reasoningLevelShort(level: string) {
+  if (level === "thinking_enabled") return t("ceoOffice.reasoningThinkingShort");
+  if (level === "thinking_disabled") return t("ceoOffice.reasoningOffShort");
+  if (!level || level === "default") return t("ceoOffice.reasoningDefaultShort");
   return level;
 }
 
