@@ -43,7 +43,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentCreateSession" in view
     assert "api.agentUpdateSession" not in view
     assert "api.agentAddMessage" in view
-    assert "api.agentPlan" in view
+    assert "api.agentPlan" not in view
     assert "api.agentSessionStream" in view
     assert "AbortController" in view
     assert "EventSource" not in view
@@ -57,69 +57,69 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentRunStream" in view
     assert "closeRunStream" in view
     assert "onBeforeUnmount(closeRunStream)" in view
-    assert "previewWorkflowPlan" in view
-    assert "workflowPlan" in view
-    assert "planningWorkflow" in view
-    assert "semanticDraftEnabled" in view
-    assert "providerSemanticEnabled" in view
-    assert "providerPlannerProvider" in view
-    assert "providerPlannerModel" in view
-    assert "semanticDraftText" in view
-    assert "semanticDraftError" in view
-    assert "parseSemanticDraft" in view
-    assert "semanticPayload" in view
-    assert "providerSemanticPayload" in view
-    assert "planner_mode: \"semantic_draft\"" in view
-    assert "planner_mode: \"provider_semantic\"" in view
-    assert "planner_provider: providerPlannerProvider.value.trim()" in view
-    assert "planner_model: providerPlannerModel.value.trim()" in view
-    assert "semantic_draft: semanticDraft" in view
-    assert 'v-model="semanticDraftEnabled"' in view
-    assert 'v-model="providerSemanticEnabled"' in view
-    assert 'v-model="providerPlannerProvider"' in view
-    assert 'v-model="providerPlannerModel"' in view
-    assert 'v-model="semanticDraftText"' in view
+    assert "previewWorkflowPlan" not in view
+    assert "workflowPlan" not in view
+    assert "planningWorkflow" not in view
+    assert "semanticDraftEnabled" not in view
+    assert "providerSemanticEnabled" not in view
+    assert "providerPlannerProvider" not in view
+    assert "providerPlannerModel" not in view
+    assert "semanticDraftText" not in view
+    assert "semanticDraftError" not in view
+    assert "parseSemanticDraft" not in view
+    assert "semanticPayload" not in view
+    assert "providerSemanticPayload" not in view
+    assert "planner_mode: \"semantic_draft\"" not in view
+    assert "planner_mode: \"provider_semantic\"" not in view
+    assert "planner_provider: providerPlannerProvider.value.trim()" not in view
+    assert "planner_model: providerPlannerModel.value.trim()" not in view
+    assert "semantic_draft: semanticDraft" not in view
+    assert 'v-model="semanticDraftEnabled"' not in view
+    assert 'v-model="providerSemanticEnabled"' not in view
+    assert 'v-model="providerPlannerProvider"' not in view
+    assert 'v-model="providerPlannerModel"' not in view
+    assert 'v-model="semanticDraftText"' not in view
     assert "api.agentRun" + "SessionReadOnlyActions" not in view
     assert "runSession" + "ReadOnlyActions" not in view
     assert "readOnly" + "WorkflowResult" not in view
     assert "runningReadOnly" + "Workflow" not in view
-    assert "api.agentAutonomyStep" in view
-    assert "runAutonomyStep" in view
-    assert "api.agentAutonomyRun" in view
-    assert "runAutonomyRun" in view
-    assert "autonomyStepResult" in view
-    assert "autonomyRunResult" in view
-    assert "runningAutonomyStep" in view
-    assert "runningAutonomyRun" in view
-    assert "autonomyRunMaxSteps" in view
-    assert 'v-model.number="autonomyRunMaxSteps"' in view
-    assert "api.agentPrograms" in view
-    assert "api.agentCreateProgram" in view
-    assert "api.agentRunProgram" in view
-    assert "agentPrograms" in view
-    assert "createAutonomyProgram" in view
-    assert "runAutonomyProgram" in view
-    assert "dryRunAutonomyProgram" in view
-    assert "programRunResult" in view
-    assert "ceoOffice.createAutonomyProgram" in view
-    assert "ceoOffice.autonomyPrograms" in view
-    assert "ceoOffice.programRunStatus" in view
-    assert "ceoOffice.programBlockedItems" in view
-    assert "autonomyStepResult.actions" in view
-    assert "autonomyStepResult.runs" in view
-    assert "autonomyStepResult.skipped" in view
-    assert "autonomyRunResult.steps" in view
-    assert "autonomyRunResult.stop_reason" in view
-    assert "ceoOffice.runAutonomyRun" in view
-    assert "ceoOffice.autonomyRunStatus" in view
-    assert "ceoOffice.autonomyRunSteps" in view
-    assert "ceoOffice.autonomyRunMaxSteps" in view
-    assert "ceoOffice.stopReason" in view
-    assert "ceoOffice.runAutonomyStep" in view
-    assert "ceoOffice.autonomyStepStatus" in view
-    assert "ceoOffice.autonomyStepActions" in view
-    assert "ceoOffice.autonomyStepRuns" in view
-    assert "ceoOffice.autonomyStepSkipped" in view
+    assert "api.agentAutonomyStep" not in view
+    assert "runAutonomyStep" not in view
+    assert "api.agentAutonomyRun" not in view
+    assert "runAutonomyRun" not in view
+    assert "autonomyStepResult" not in view
+    assert "autonomyRunResult" not in view
+    assert "runningAutonomyStep" not in view
+    assert "runningAutonomyRun" not in view
+    assert "autonomyRunMaxSteps" not in view
+    assert 'v-model.number="autonomyRunMaxSteps"' not in view
+    assert "api.agentPrograms" not in view
+    assert "api.agentCreateProgram" not in view
+    assert "api.agentRunProgram" not in view
+    assert "agentPrograms" not in view
+    assert "createAutonomyProgram" not in view
+    assert "runAutonomyProgram" not in view
+    assert "dryRunAutonomyProgram" not in view
+    assert "programRunResult" not in view
+    assert "ceoOffice.createAutonomyProgram" not in view
+    assert "ceoOffice.autonomyPrograms" not in view
+    assert "ceoOffice.programRunStatus" not in view
+    assert "ceoOffice.programBlockedItems" not in view
+    assert "autonomyStepResult.actions" not in view
+    assert "autonomyStepResult.runs" not in view
+    assert "autonomyStepResult.skipped" not in view
+    assert "autonomyRunResult.steps" not in view
+    assert "autonomyRunResult.stop_reason" not in view
+    assert "ceoOffice.runAutonomyRun" not in view
+    assert "ceoOffice.autonomyRunStatus" not in view
+    assert "ceoOffice.autonomyRunSteps" not in view
+    assert "ceoOffice.autonomyRunMaxSteps" not in view
+    assert "ceoOffice.stopReason" not in view
+    assert "ceoOffice.runAutonomyStep" not in view
+    assert "ceoOffice.autonomyStepStatus" not in view
+    assert "ceoOffice.autonomyStepActions" not in view
+    assert "ceoOffice.autonomyStepRuns" not in view
+    assert "ceoOffice.autonomyStepSkipped" not in view
     assert "selectedDraftDesk" in view
     assert "selectedDeskId" in view
     assert "selectedDesk" in view
@@ -136,18 +136,18 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'desk: selectedDraftDesk.value' in view
     assert "ceoOffice.messageDesk" in view
     assert "ceoOffice." + "stream" not in view
-    assert "ceoOffice.previewPlan" in view
-    assert "ceoOffice.workflowPlan" in view
-    assert "ceoOffice.semanticDraft" in view
-    assert "ceoOffice.providerSemantic" in view
-    assert "ceoOffice.providerPlannerProvider" in view
-    assert "ceoOffice.providerPlannerModel" in view
-    assert "ceoOffice.providerPlannerProviderPlaceholder" in view
-    assert "ceoOffice.providerPlannerModelPlaceholder" in view
-    assert "ceoOffice.providerPlannerNotice" in view
-    assert "ceoOffice.semanticDraftPlaceholder" in view
-    assert "ceoOffice.semanticDraftInvalid" in view
-    assert "ceoOffice.noLedgerWrites" in view
+    assert "ceoOffice.previewPlan" not in view
+    assert "ceoOffice.workflowPlan" not in view
+    assert "ceoOffice.semanticDraft" not in view
+    assert "ceoOffice.providerSemantic" not in view
+    assert "ceoOffice.providerPlannerProvider" not in view
+    assert "ceoOffice.providerPlannerModel" not in view
+    assert "ceoOffice.providerPlannerProviderPlaceholder" not in view
+    assert "ceoOffice.providerPlannerModelPlaceholder" not in view
+    assert "ceoOffice.providerPlannerNotice" not in view
+    assert "ceoOffice.semanticDraftPlaceholder" not in view
+    assert "ceoOffice.semanticDraftInvalid" not in view
+    assert "ceoOffice.noLedgerWrites" not in view
     assert "ceoOffice.runReadOnly" + "Workflow" not in view
     assert "ceoOffice.readOnly" + "WorkflowStatus" not in view
     assert "ceoOffice.deskMandate" in view
@@ -268,30 +268,30 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.reports" in view
     assert "报告要点" in zh_ceo
     assert "实盘监控" in zh_ceo
-    assert "语义草案" in zh_ceo
-    assert "Provider 规划" in zh_ceo
-    assert "Provider 名称" in zh_ceo
-    assert "模型名称" in zh_ceo
-    assert "会调用外部 LLM provider" in zh_ceo
-    assert "token/成本记录" in zh_ceo
-    assert "运行自主步骤" in zh_ceo
-    assert "自主步骤状态" in zh_ceo
-    assert "自主行动" in zh_ceo
-    assert "自主运行" in zh_ceo
-    assert "自主跳过" in zh_ceo
+    assert "语义草案" not in zh_ceo
+    assert "Provider 规划" not in zh_ceo
+    assert "Provider 名称" not in zh_ceo
+    assert "模型名称" not in zh_ceo
+    assert "会调用外部 LLM provider" not in zh_ceo
+    assert "token/成本记录" not in zh_ceo
+    assert "运行自主步骤" not in zh_ceo
+    assert "自主步骤状态" not in zh_ceo
+    assert "自主行动" not in zh_ceo
+    assert "自主运行" not in zh_ceo
+    assert "自主跳过" not in zh_ceo
     assert "Report Sections" in en_ceo
     assert "Run Live Monitor" in en_ceo
-    assert "Semantic Draft" in en_ceo
-    assert "Provider Planner" in en_ceo
-    assert "Provider Name" in en_ceo
-    assert "Model Name" in en_ceo
-    assert "Calls the external LLM provider" in en_ceo
-    assert "token/cost usage" in en_ceo
-    assert "Run Autonomy Step" in en_ceo
-    assert "Autonomy Step Status" in en_ceo
-    assert "Autonomy Actions" in en_ceo
-    assert "Autonomy Runs" in en_ceo
-    assert "Autonomy Skipped" in en_ceo
+    assert "Semantic Draft" not in en_ceo
+    assert "Provider Planner" not in en_ceo
+    assert "Provider Name" not in en_ceo
+    assert "Model Name" not in en_ceo
+    assert "Calls the external LLM provider" not in en_ceo
+    assert "token/cost usage" not in en_ceo
+    assert "Run Autonomy Step" not in en_ceo
+    assert "Autonomy Step Status" not in en_ceo
+    assert "Autonomy Actions" not in en_ceo
+    assert "Autonomy Runs" not in en_ceo
+    assert "Autonomy Skipped" not in en_ceo
     assert "ceoOffice.submitPaperOrder" in view
     assert "ceoOffice.paperOrderPreview" in view
     assert "ceoOffice.paperReconciliation" in view
@@ -307,9 +307,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "实时流" not in zh_ceo
     assert "已连接" in zh_ceo
     assert "连接中" in zh_ceo
-    assert "预览计划" in zh_ceo
-    assert "工作流计划" in zh_ceo
-    assert "不会写入 ledger" in zh_ceo
+    assert "预览计划" not in zh_ceo
+    assert "工作流计划" not in zh_ceo
+    assert "不会写入 ledger" not in zh_ceo
     assert "运行安全" + "工作流" not in zh_ceo
     assert "安全" + "工作流状态" not in zh_ceo
     assert "Desk 职责" in zh_ceo
@@ -328,9 +328,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'stream: "Stream"' not in en_ceo
     assert "Connected" in en_ceo
     assert "Connecting" in en_ceo
-    assert "Preview Plan" in en_ceo
-    assert "Workflow Plan" in en_ceo
-    assert "No ledger writes" in en_ceo
+    assert "Preview Plan" not in en_ceo
+    assert "Workflow Plan" not in en_ceo
+    assert "No ledger writes" not in en_ceo
     assert "Run Safe " + "Workflow" not in en_ceo
     assert "Safe " + "Workflow Status" not in en_ceo
     assert "Desk Mandate" in en_ceo

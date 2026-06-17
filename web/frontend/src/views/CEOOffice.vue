@@ -1,176 +1,6 @@
 <template>
   <div class="ceo-office view-page">
     <section v-if="error" class="ceo-alert">{{ error }}</section>
-    <section v-if="autonomyStepResult" class="ceo-alert info">
-      <strong>{{ t("ceoOffice.autonomyStepStatus") }}</strong>
-      <span>
-        {{ statusLabel(autonomyStepResult.status) }} ·
-        {{ t("ceoOffice.ran") }} {{ autonomyStepResult.run_count }} ·
-        {{ t("ceoOffice.skipped") }} {{ autonomyStepResult.skipped_count }} ·
-        {{ t("ceoOffice.failed") }} {{ autonomyStepResult.failed_count }} ·
-        {{ t("ceoOffice.blocked") }} {{ autonomyStepResult.blocked_count }}
-      </span>
-    </section>
-    <section v-if="autonomyRunResult" class="ceo-alert info">
-      <strong>{{ t("ceoOffice.autonomyRunStatus") }}</strong>
-      <span>
-        {{ statusLabel(autonomyRunResult.status) }} ·
-        {{ t("ceoOffice.autonomyRunSteps") }} {{ autonomyRunResult.step_count }} ·
-        {{ t("ceoOffice.ran") }} {{ autonomyRunResult.run_count }} ·
-        {{ t("ceoOffice.skipped") }} {{ autonomyRunResult.skipped_count }} ·
-        {{ t("ceoOffice.stopReason") }} {{ autonomyRunResult.stop_reason }}
-      </span>
-    </section>
-    <section v-if="programRunResult" class="ceo-alert info">
-      <strong>{{ t("ceoOffice.programRunStatus") }}</strong>
-      <span>
-        {{ statusLabel(programRunResult.status) }} ·
-        {{ t("ceoOffice.autonomyRunSteps") }} {{ programRunResult.step_count }} ·
-        {{ t("ceoOffice.ran") }} {{ programRunResult.run_count }} ·
-        {{ t("ceoOffice.programBlockedItems") }} {{ programRunResult.blocked_item_count }}
-      </span>
-    </section>
-    <section v-if="autonomyStepResult" class="ceo-panel autonomy-step-detail">
-      <header class="panel-head">
-        <span>{{ t("ceoOffice.autonomyStepStatus") }}</span>
-        <small>{{ autonomyStepResult.mode }}</small>
-      </header>
-      <div class="autonomy-step-grid">
-        <div>
-          <small>{{ t("ceoOffice.autonomyStepActions") }}</small>
-          <div v-if="!autonomyStepResult.actions.length" class="ceo-empty compact">{{ t("ceoOffice.noActions") }}</div>
-          <div v-else class="run-list">
-            <button
-              v-for="action in autonomyStepResult.actions"
-              :key="action.action_id"
-              class="run-row clickable"
-              type="button"
-              @click="selectAction(action.action_id)"
-            >
-              <strong>{{ action.summary }}</strong>
-              <small>{{ statusLabel(action.status) }} · {{ String(action.parameters.tool_id || action.action_type) }}</small>
-            </button>
-          </div>
-        </div>
-        <div>
-          <small>{{ t("ceoOffice.autonomyStepRuns") }}</small>
-          <div v-if="!autonomyStepResult.runs.length" class="ceo-empty compact">{{ t("ceoOffice.noRuns") }}</div>
-          <div v-else class="run-list">
-            <div v-for="run in autonomyStepResult.runs" :key="run.run_id" class="run-row">
-              <strong>{{ run.tool_name }}</strong>
-              <small>{{ statusLabel(run.status) }} · {{ run.stdout_summary || run.stderr_summary || run.run_id }}</small>
-            </div>
-          </div>
-        </div>
-        <div>
-          <small>{{ t("ceoOffice.autonomyStepSkipped") }}</small>
-          <div v-if="!autonomyStepResult.skipped.length" class="ceo-empty compact">{{ t("ceoOffice.skipped") }} 0</div>
-          <div v-else class="run-list">
-            <div
-              v-for="(skipped, index) in autonomyStepResult.skipped"
-              :key="autonomySkippedKey(skipped, index)"
-              class="run-row"
-            >
-              <strong>{{ String(skipped.reason || skipped.status || "skipped") }}</strong>
-              <small>{{ String(skipped.action_id || skipped.desk || skipped.risk_level || "") }}</small>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-    <section v-if="autonomyRunResult" class="ceo-panel autonomy-step-detail">
-      <header class="panel-head">
-        <span>{{ t("ceoOffice.autonomyRunStatus") }}</span>
-        <small>{{ autonomyRunResult.mode }} · {{ t("ceoOffice.stopReason") }} {{ autonomyRunResult.stop_reason }}</small>
-      </header>
-      <div class="autonomy-step-grid">
-        <div>
-          <small>{{ t("ceoOffice.autonomyRunSteps") }}</small>
-          <div v-if="!autonomyRunResult.steps.length" class="ceo-empty compact">{{ t("ceoOffice.noRuns") }}</div>
-          <div v-else class="run-list">
-            <div v-for="step in autonomyRunResult.steps" :key="`autonomy-step-${step.step_index}`" class="run-row">
-              <strong>{{ t("ceoOffice.autonomyRunSteps") }} {{ step.step_index }}</strong>
-              <small>
-                {{ statusLabel(step.status) }} ·
-                {{ t("ceoOffice.ran") }} {{ step.run_count }} ·
-                {{ t("ceoOffice.skipped") }} {{ step.skipped_count }}
-              </small>
-            </div>
-          </div>
-        </div>
-        <div>
-          <small>{{ t("ceoOffice.autonomyStepRuns") }}</small>
-          <div v-if="!autonomyRunResult.steps.some(step => step.runs.length)" class="ceo-empty compact">{{ t("ceoOffice.noRuns") }}</div>
-          <div v-else class="run-list">
-            <div v-for="run in autonomyRunResult.steps.flatMap(step => step.runs)" :key="run.run_id" class="run-row">
-              <strong>{{ run.tool_name }}</strong>
-              <small>{{ statusLabel(run.status) }} · {{ run.stdout_summary || run.stderr_summary || run.run_id }}</small>
-            </div>
-          </div>
-        </div>
-        <div>
-          <small>{{ t("ceoOffice.autonomyStepSkipped") }}</small>
-          <div v-if="!autonomyRunResult.steps.some(step => step.skipped.length)" class="ceo-empty compact">{{ t("ceoOffice.skipped") }} 0</div>
-          <div v-else class="run-list">
-            <template v-for="step in autonomyRunResult.steps" :key="`skipped-step-${step.step_index}`">
-              <div
-                v-for="(skipped, index) in step.skipped"
-                :key="`skipped-${step.step_index}-${autonomySkippedKey(skipped, index)}`"
-                class="run-row"
-              >
-                <strong>{{ String(skipped.reason || skipped.status || "skipped") }}</strong>
-                <small>{{ t("ceoOffice.autonomyRunSteps") }} {{ step.step_index }} · {{ String(skipped.action_id || skipped.desk || skipped.risk_level || "") }}</small>
-              </div>
-            </template>
-          </div>
-        </div>
-      </div>
-    </section>
-    <section class="ceo-panel autonomy-step-detail">
-      <header class="panel-head">
-        <span>{{ t("ceoOffice.autonomyPrograms") }}</span>
-        <small>{{ agentPrograms.length }}</small>
-      </header>
-      <div v-if="!agentPrograms.length" class="ceo-empty compact">{{ t("ceoOffice.noPrograms") }}</div>
-      <div v-else class="run-list">
-        <article v-for="program in agentPrograms" :key="program.program_id" class="run-row">
-          <strong>{{ program.goal }}</strong>
-          <small>
-            {{ statusLabel(program.status) }} · {{ program.planning_mode }} ·
-            {{ program.current_step }}/{{ program.phase_count }} ·
-            {{ t("ceoOffice.programBlockedItems") }} {{ program.blocked_item_count }}
-          </small>
-          <div class="action-inline">
-            <button
-              class="btn btn-ghost compact"
-              type="button"
-              :disabled="dryRunningProgram === program.program_id"
-              @click="dryRunAutonomyProgram(program.program_id)"
-            >
-              {{ t("ceoOffice.programDryRun") }}
-            </button>
-            <button
-              class="btn btn-primary compact"
-              type="button"
-              :disabled="runningProgram === program.program_id || program.status.startsWith('completed')"
-              @click="runAutonomyProgram(program.program_id)"
-            >
-              {{ t("ceoOffice.programRun") }}
-            </button>
-          </div>
-          <div class="mini-list">
-            <span v-for="phase in program.phases.slice(0, 4)" :key="phase.phase_id" class="ceo-chip">
-              {{ deskLabel(phase.desk) }} · {{ phase.tool_id }} · {{ statusLabel(phase.status) }}
-            </span>
-          </div>
-          <div v-if="program.blocked_items.length" class="mini-list">
-            <span v-for="(item, index) in program.blocked_items.slice(0, 4)" :key="`${program.program_id}-blocker-${index}`" class="ceo-chip warning">
-              {{ item.reason }} · {{ item.tool_id || item.desk || "blocked" }}
-            </span>
-          </div>
-        </article>
-      </div>
-    </section>
 
     <section class="ceo-grid">
       <article class="ceo-panel conversation-panel">
@@ -204,89 +34,7 @@
           <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
             {{ t("ceoOffice.send") }}
           </button>
-          <button class="btn btn-ghost" type="button" :disabled="planningWorkflow || !draft.trim()" @click="previewWorkflowPlan">
-            {{ t("ceoOffice.previewPlan") }}
-          </button>
-          <button class="btn btn-ghost" type="button" :disabled="runningAutonomyStep" @click="runAutonomyStep">
-            {{ t("ceoOffice.runAutonomyStep") }}
-          </button>
-          <button class="btn btn-ghost" type="button" :disabled="runningAutonomyRun" @click="runAutonomyRun">
-            {{ t("ceoOffice.runAutonomyRun") }}
-          </button>
-          <button class="btn btn-ghost" type="button" :disabled="creatingProgram || !draft.trim()" @click="createAutonomyProgram">
-            {{ t("ceoOffice.createAutonomyProgram") }}
-          </button>
-          <label class="autonomy-run-control">
-            <span>{{ t("ceoOffice.autonomyRunMaxSteps") }}</span>
-            <input v-model.number="autonomyRunMaxSteps" type="number" min="1" max="5" />
-          </label>
-          <label class="semantic-draft-toggle">
-            <input v-model="semanticDraftEnabled" type="checkbox" />
-            <span>{{ t("ceoOffice.semanticDraft") }}</span>
-          </label>
-          <label class="semantic-draft-toggle">
-            <input v-model="providerSemanticEnabled" type="checkbox" />
-            <span>{{ t("ceoOffice.providerSemantic") }}</span>
-          </label>
-          <div v-if="providerSemanticEnabled" class="provider-semantic-control">
-            <label>
-              <span>{{ t("ceoOffice.providerPlannerProvider") }}</span>
-              <input
-                v-model="providerPlannerProvider"
-                type="text"
-                :placeholder="t('ceoOffice.providerPlannerProviderPlaceholder')"
-              />
-            </label>
-            <label>
-              <span>{{ t("ceoOffice.providerPlannerModel") }}</span>
-              <input
-                v-model="providerPlannerModel"
-                type="text"
-                :placeholder="t('ceoOffice.providerPlannerModelPlaceholder')"
-              />
-            </label>
-            <small class="provider-semantic-notice">{{ t("ceoOffice.providerPlannerNotice") }}</small>
-          </div>
-          <div v-if="semanticDraftEnabled && !providerSemanticEnabled" class="semantic-draft-control">
-            <textarea
-              v-model="semanticDraftText"
-              :placeholder="t('ceoOffice.semanticDraftPlaceholder')"
-              rows="5"
-            />
-            <small v-if="semanticDraftError">{{ semanticDraftError }}</small>
-          </div>
         </form>
-        <div v-if="workflowPlan" class="workflow-plan">
-          <header>
-            <div>
-              <strong>{{ t("ceoOffice.workflowPlan") }}</strong>
-              <small>{{ deskLabel(workflowPlan.desk) }} · {{ Math.round(workflowPlan.confidence * 100) }}%</small>
-            </div>
-            <span>{{ t("ceoOffice.noLedgerWrites") }}</span>
-          </header>
-          <p>{{ workflowPlan.answer }}</p>
-          <div v-if="workflowPlan.reasoning?.length" class="workflow-plan-reasoning">
-            <small>{{ t("ceoOffice.reasoning") }}</small>
-            <code v-for="row in workflowPlan.reasoning" :key="reasoningKey(row)">
-              {{ reasoningSummary(row) }}
-            </code>
-          </div>
-          <div class="workflow-plan-list">
-            <div v-for="action in workflowPlan.actions" :key="`${action.tool_id}-${action.summary}`" class="workflow-plan-action">
-              <span class="action-status" :class="action.status_preview">{{ statusLabel(action.status_preview) }}</span>
-              <div>
-                <strong>{{ deskLabel(action.desk) }} · {{ action.tool_id }}</strong>
-                <small>{{ action.summary }}</small>
-              </div>
-            </div>
-          </div>
-          <div v-if="workflowPlan.handoffs.length" class="workflow-plan-handoffs">
-            <small>{{ t("ceoOffice.plannedHandoffs") }}</small>
-            <code v-for="handoff in workflowPlan.handoffs" :key="String(handoff.target_desk || handoff.reason)">
-              {{ String(handoff.target_desk || "") }}
-            </code>
-          </div>
-        </div>
       </article>
 
       <aside class="ceo-side">
@@ -943,7 +691,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentAutonomyRun, type AgentAutonomyStep, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentProgram, type AgentProgramRun, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkflowPlan, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentApprovalPolicy, type AgentDesk, type AgentEvidenceSnapshot, type AgentHandoff, type AgentLiveEnvironment, type AgentLiveKillSwitch, type AgentLiveMonitor, type AgentLiveReadiness, type AgentLiveReconciliation, type AgentMessage, type AgentReport, type AgentReportNotification, type AgentReportRhythm, type AgentScheduledReportRhythm, type AgentSession, type AgentWorkOrder, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -963,11 +711,6 @@ const liveEnvironment = ref<AgentLiveEnvironment | null>(null);
 const liveKillSwitch = ref<AgentLiveKillSwitch | null>(null);
 const liveReconciliation = ref<AgentLiveReconciliation | null>(null);
 const liveMonitor = ref<AgentLiveMonitor | null>(null);
-const autonomyStepResult = ref<AgentAutonomyStep | null>(null);
-const autonomyRunResult = ref<AgentAutonomyRun | null>(null);
-const agentPrograms = ref<AgentProgram[]>([]);
-const programRunResult = ref<AgentProgramRun | null>(null);
-const workflowPlan = ref<AgentWorkflowPlan | null>(null);
 const sessionStream = ref<AbortController | null>(null);
 const sessionStreamId = ref("");
 const lastStreamSignature = ref("");
@@ -985,11 +728,6 @@ const selectedEvidenceStatus = ref("");
 const runningAction = ref("");
 const submittingPaperAction = ref("");
 const cancelingAction = ref("");
-const runningAutonomyStep = ref(false);
-const runningAutonomyRun = ref(false);
-const creatingProgram = ref(false);
-const runningProgram = ref("");
-const dryRunningProgram = ref("");
 const resolvingHandoff = ref("");
 const updatingWorkOrder = ref("");
 const generatingReport = ref(false);
@@ -1002,16 +740,8 @@ const runningLiveMonitor = ref(false);
 const selectedReportKind = ref("daily_brief");
 const selectedDraftDesk = ref("reporting");
 const selectedDeskId = ref("reporting");
-const autonomyRunMaxSteps = ref(2);
 const draft = ref("");
-const semanticDraftEnabled = ref(false);
-const providerSemanticEnabled = ref(false);
-const providerPlannerProvider = ref("");
-const providerPlannerModel = ref("");
-const semanticDraftText = ref("");
-const semanticDraftError = ref("");
 const sending = ref(false);
-const planningWorkflow = ref(false);
 const error = ref("");
 
 const pendingActions = computed(() => actions.value.filter(action => action.status === "approval_required"));
@@ -1083,34 +813,6 @@ function deskLabel(desk: string) {
 function selectDesk(deskId: string) {
   selectedDeskId.value = deskId;
   selectedDraftDesk.value = deskId;
-}
-
-function reasoningKey(row: Record<string, unknown>) {
-  return `${String(row.kind || "reasoning")}-${JSON.stringify(row)}`;
-}
-
-function autonomySkippedKey(row: Record<string, unknown>, index: number) {
-  return `${String(row.action_id || row.reason || row.status || "skipped")}-${index}`;
-}
-
-function reasoningSummary(row: Record<string, unknown>) {
-  const kind = String(row.kind || "reasoning");
-  if (kind === "intent_match") {
-    return `${kind}: ${String(row.planning_mode || "")}`;
-  }
-  if (kind === "tool_plan") {
-    return `${kind}: ${Number(row.tool_count || 0)} tools / ${Number(row.desk_count || 0)} desks`;
-  }
-  if (kind === "safety") {
-    return `${kind}: ${Number(row.approval_required_count || 0)} approvals`;
-  }
-  if (kind === "session_context") {
-    return `context: ${Number(row.active_action_count || 0)} active / ${Number(row.open_work_order_count || 0)} work orders`;
-  }
-  if (kind === "evidence_plan") {
-    return `${kind}: ${Number(row.handoff_count || 0)} handoffs`;
-  }
-  return kind;
 }
 
 function reportSectionPreview(report: AgentReport): ReportSectionPreview[] {
@@ -1217,39 +919,6 @@ function formatNumber(value: unknown) {
   return numeric.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-function parseSemanticDraft(): Record<string, unknown> | null {
-  semanticDraftError.value = "";
-  if (providerSemanticEnabled.value || !semanticDraftEnabled.value) return null;
-  try {
-    const parsed = JSON.parse(semanticDraftText.value.trim());
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      semanticDraftError.value = t("ceoOffice.semanticDraftInvalid");
-      return null;
-    }
-    return parsed as Record<string, unknown>;
-  } catch {
-    semanticDraftError.value = t("ceoOffice.semanticDraftInvalid");
-    return null;
-  }
-}
-
-function semanticPayload(semanticDraft: Record<string, unknown> | null) {
-  if (providerSemanticEnabled.value) return providerSemanticPayload();
-  if (!semanticDraftEnabled.value || !semanticDraft) return {};
-  return {
-    planner_mode: "semantic_draft" as const,
-    semantic_draft: semanticDraft,
-  };
-}
-
-function providerSemanticPayload() {
-  return {
-    planner_mode: "provider_semantic" as const,
-    planner_provider: providerPlannerProvider.value.trim(),
-    planner_model: providerPlannerModel.value.trim(),
-  };
-}
-
 function closeSessionStream() {
   sessionStream.value?.abort();
   sessionStream.value = null;
@@ -1331,10 +1000,9 @@ function connectRunStream(runId: string) {
 }
 
 async function loadSession(sessionId: string, options: { connectStream?: boolean } = {}) {
-  const [detail, reportPayload, programPayload] = await Promise.all([
+  const [detail, reportPayload] = await Promise.all([
     api.agentSession(sessionId),
     api.agentReports(sessionId),
-    api.agentPrograms(sessionId),
   ]);
   activeSession.value = detail.session;
   if (!desks.value.some(desk => desk.desk_id === selectedDraftDesk.value)) {
@@ -1345,7 +1013,6 @@ async function loadSession(sessionId: string, options: { connectStream?: boolean
   handoffs.value = detail.handoffs || [];
   workOrders.value = detail.work_orders || [];
   reports.value = reportPayload.reports || [];
-  agentPrograms.value = programPayload.programs || [];
   if (options.connectStream !== false) {
     connectSessionStream(sessionId);
   }
@@ -1354,14 +1021,13 @@ async function loadSession(sessionId: string, options: { connectStream?: boolean
 async function loadOfficeState() {
   error.value = "";
   try {
-    const [sessionPayload, deskPayload, policyPayload, actionPayload, handoffPayload, workOrderPayload, programPayload, livePayload, environmentPayload, killSwitchPayload] = await Promise.all([
+    const [sessionPayload, deskPayload, policyPayload, actionPayload, handoffPayload, workOrderPayload, livePayload, environmentPayload, killSwitchPayload] = await Promise.all([
       api.agentSessions(),
       api.agentDesks(),
       api.agentApprovalPolicies(),
       api.agentActions(),
       api.agentHandoffs(),
       api.agentWorkOrders(),
-      api.agentPrograms(),
       api.agentLiveReadiness(),
       api.agentLiveEnvironment(),
       api.agentLiveKillSwitch(),
@@ -1375,7 +1041,6 @@ async function loadOfficeState() {
     actions.value = actionPayload.actions || [];
     handoffs.value = handoffPayload.handoffs || [];
     workOrders.value = workOrderPayload.work_orders || [];
-    agentPrograms.value = programPayload.programs || [];
     liveReadiness.value = livePayload.health;
     liveEnvironment.value = environmentPayload.environment;
     liveKillSwitch.value = killSwitchPayload.kill_switch || livePayload.health.live_kill_switch || environmentPayload.environment.live_kill_switch || null;
@@ -1390,110 +1055,6 @@ async function loadOfficeState() {
   }
 }
 
-async function runAutonomyStep() {
-  const semanticDraft = parseSemanticDraft();
-  if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
-  runningAutonomyStep.value = true;
-  error.value = "";
-  try {
-    const session = await ensureSession();
-    const payload = await api.agentAutonomyStep(session.session_id, {
-      desk: selectedDraftDesk.value,
-      content: draft.value.trim(),
-      ...semanticPayload(semanticDraft),
-    });
-    autonomyStepResult.value = payload.step;
-    workflowPlan.value = null;
-    await loadSession(session.session_id);
-  } catch (err: any) {
-    error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
-  } finally {
-    runningAutonomyStep.value = false;
-  }
-}
-
-async function runAutonomyRun() {
-  const semanticDraft = parseSemanticDraft();
-  if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
-  runningAutonomyRun.value = true;
-  error.value = "";
-  try {
-    const session = await ensureSession();
-    const payload = await api.agentAutonomyRun(session.session_id, {
-      desk: selectedDraftDesk.value,
-      content: draft.value.trim(),
-      max_steps: autonomyRunMaxSteps.value,
-      ...semanticPayload(semanticDraft),
-    });
-    autonomyRunResult.value = payload.run;
-    workflowPlan.value = null;
-    await loadSession(session.session_id);
-  } catch (err: any) {
-    error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
-  } finally {
-    runningAutonomyRun.value = false;
-  }
-}
-
-async function createAutonomyProgram() {
-  const semanticDraft = parseSemanticDraft();
-  if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
-  creatingProgram.value = true;
-  error.value = "";
-  try {
-    const session = await ensureSession();
-    const payload = await api.agentCreateProgram(session.session_id, {
-      desk: selectedDraftDesk.value,
-      goal: draft.value.trim(),
-      max_steps: autonomyRunMaxSteps.value,
-      ...semanticPayload(semanticDraft),
-    });
-    agentPrograms.value = [
-      payload.program,
-      ...agentPrograms.value.filter(program => program.program_id !== payload.program.program_id),
-    ];
-    programRunResult.value = null;
-    workflowPlan.value = null;
-    await loadSession(session.session_id);
-  } catch (err: any) {
-    error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;
-  } finally {
-    creatingProgram.value = false;
-  }
-}
-
-async function dryRunAutonomyProgram(programId: string) {
-  dryRunningProgram.value = programId;
-  error.value = "";
-  try {
-    const payload = await api.agentRunProgram(programId, { dry_run: true });
-    programRunResult.value = payload.run;
-  } catch (err: any) {
-    error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
-  } finally {
-    dryRunningProgram.value = "";
-  }
-}
-
-async function runAutonomyProgram(programId: string) {
-  runningProgram.value = programId;
-  error.value = "";
-  try {
-    const payload = await api.agentRunProgram(programId);
-    programRunResult.value = payload.run;
-    agentPrograms.value = agentPrograms.value.map(program =>
-      program.program_id === payload.run.program.program_id ? payload.run.program : program,
-    );
-    if (activeSession.value) {
-      await loadSession(activeSession.value.session_id);
-    }
-  } catch (err: any) {
-    error.value = `${t("ceoOffice.runFailed")}: ${err?.message || err}`;
-  } finally {
-    runningProgram.value = "";
-  }
-}
-
 async function ensureSession(): Promise<AgentSession> {
   if (activeSession.value) return activeSession.value;
   const payload = await api.agentCreateSession({
@@ -1505,32 +1066,9 @@ async function ensureSession(): Promise<AgentSession> {
   return payload.session;
 }
 
-async function previewWorkflowPlan() {
-  const text = draft.value.trim();
-  if (!text) return;
-  const semanticDraft = parseSemanticDraft();
-  if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
-  planningWorkflow.value = true;
-  error.value = "";
-  try {
-    const payload = await api.agentPlan({
-      desk: selectedDraftDesk.value,
-      content: text,
-      ...semanticPayload(semanticDraft),
-    });
-    workflowPlan.value = payload.plan;
-  } catch (err: any) {
-    error.value = `${t("ceoOffice.planPreviewFailed")}: ${err?.message || err}`;
-  } finally {
-    planningWorkflow.value = false;
-  }
-}
-
 async function sendMessage() {
   const text = draft.value.trim();
   if (!text) return;
-  const semanticDraft = parseSemanticDraft();
-  if (!providerSemanticEnabled.value && semanticDraftEnabled.value && !semanticDraft) return;
   sending.value = true;
   error.value = "";
   try {
@@ -1539,10 +1077,8 @@ async function sendMessage() {
       role: "ceo",
       desk: selectedDraftDesk.value,
       content: text,
-      ...semanticPayload(semanticDraft),
     });
     draft.value = "";
-    workflowPlan.value = null;
     await loadSession(session.session_id);
   } catch (err: any) {
     error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;
