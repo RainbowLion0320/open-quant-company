@@ -87,12 +87,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "runtimeBatteryCells" in view
     assert "contextBatteryCells" in view
     assert "context-progress" in view
-    assert "contextStatusShort" in view
     assert "contextStatusKind" in view
     assert "runtime-progress-cell" in css
-    assert "runtime-progress::after" in css
-    assert "runtime-segment-context-compacted" in css
-    assert "runtime-segment-context-blocked" in css
+    assert "runtime-progress::after" not in css
+    assert "runtime-progress-compacted" in css
+    assert "runtime-progress-blocked" in css
     assert "contextUsedTokens" in view
     assert "contextUsagePct" in view
     assert "ceoOffice.modelRuntimeA11y" in view
@@ -103,6 +102,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "formatTokenCount(contextUsedTokens" not in view
     assert "formatTokenCount(modelRuntime.value.context.max_tokens)" not in view
     assert '{ key: "usage"' not in view
+    assert '{ key: "context-status"' not in view
+    assert "contextStatusShort" not in view
     assert "formatTokenK(contextUsedTokens.value)" not in view
     assert "ceoOffice.openEvidence" in view
     assert "ceoOffice.viewAction" in view

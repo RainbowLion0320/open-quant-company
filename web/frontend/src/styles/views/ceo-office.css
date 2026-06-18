@@ -196,17 +196,6 @@
   border-radius: 3px;
 }
 
-.runtime-progress::after {
-  content: "";
-  position: absolute;
-  right: -4px;
-  top: 3px;
-  width: 2px;
-  height: 4px;
-  border-radius: 0 2px 2px 0;
-  background: rgba(148, 163, 184, 0.35);
-}
-
 .runtime-progress-cell {
   display: block;
   flex: 1 1 0;
@@ -217,23 +206,19 @@
 }
 
 .runtime-progress-cell.active {
-  background: rgba(245, 158, 11, 0.78);
+  background: rgba(125, 211, 252, 0.72);
 }
 
-.runtime-segment-context-ok {
-  color: rgba(148, 163, 184, 0.82);
+.runtime-progress-warn .runtime-progress-cell.active {
+  background: rgba(245, 158, 11, 0.82);
 }
 
-.runtime-segment-context-warn {
-  color: rgba(245, 158, 11, 0.9);
+.runtime-progress-compacted .runtime-progress-cell.active {
+  background: rgba(34, 197, 94, 0.78);
 }
 
-.runtime-segment-context-compacted {
-  color: rgba(34, 197, 94, 0.82);
-}
-
-.runtime-segment-context-blocked {
-  color: rgba(248, 113, 113, 0.9);
+.runtime-progress-blocked .runtime-progress-cell.active {
+  background: rgba(248, 113, 113, 0.86);
 }
 
 .action-row {

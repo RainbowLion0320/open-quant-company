@@ -61,6 +61,7 @@
                 <span
                   v-if="segment.kind === 'context-progress'"
                   class="runtime-progress"
+                  :class="`runtime-progress-${segment.status}`"
                   role="meter"
                   :aria-valuenow="segment.progress"
                   aria-valuemin="0"
@@ -396,9 +397,8 @@ const modelRuntimeSegments = computed(() => {
     { key: "model", kind: "model", text: model },
     { key: "reasoning", kind: "reasoning", text: `${t("ceoOffice.reasoningShort")} ${reasoningLevelShort(modelRuntime.value.reasoning.level)}` },
     { key: "context", kind: "context", text: t("ceoOffice.contextShort") },
-    { key: "context-progress", kind: "context-progress", text: "", progress: contextUsagePct.value, cells: contextBatteryCells.value },
+    { key: "context-progress", kind: "context-progress", text: "", progress: contextUsagePct.value, cells: contextBatteryCells.value, status: contextStatusKind(modelRuntime.value.context.status) },
     { key: "context-max", kind: "context", text: formatTokenK(modelRuntime.value.context.max_tokens) },
-    { key: "context-status", kind: contextStatusKind(modelRuntime.value.context.status), text: contextStatusShort(modelRuntime.value.context.status) },
   ];
 });
 const draftContextTokens = computed(() => estimateTextTokens(draft.value));
@@ -449,20 +449,12 @@ function statusLabel(status: string) {
   return status;
 }
 
-function contextStatusShort(status: string) {
-  const normalized = (status || "ok").toLowerCase();
-  if (normalized === "warn") return "WARN";
-  if (normalized === "compacted") return "COMPACTED";
-  if (normalized === "blocked") return "BLOCKED";
-  return "OK";
-}
-
 function contextStatusKind(status: string) {
   const normalized = (status || "ok").toLowerCase();
-  if (normalized === "warn") return "context-warn";
-  if (normalized === "compacted") return "context-compacted";
-  if (normalized === "blocked") return "context-blocked";
-  return "context-ok";
+  if (normalized === "warn") return "warn";
+  if (normalized === "compacted") return "compacted";
+  if (normalized === "blocked") return "blocked";
+  return "ok";
 }
 
 function formatJson(value: Record<string, unknown>) {
