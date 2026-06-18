@@ -79,12 +79,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentEvidence" in view
     assert "message.evidence_refs" in view
     assert "message.action_refs" in view
-    assert "modelRuntimeLine" in view
+    assert "modelRuntimeSegments" in view
+    assert "formatTokenK" in view
+    assert "runtime-segment" in view
     assert "contextUsedTokens" in view
     assert "contextUsagePct" in view
     assert "ceoOffice.modelRuntimeA11y" in view
     assert "ceoOffice.reasoningShort" in view
     assert "ceoOffice.contextShort" in view
+    assert "formatTokenCount(contextUsedTokens" not in view
+    assert "formatTokenCount(modelRuntime.value.context.max_tokens)" not in view
     assert "ceoOffice.openEvidence" in view
     assert "ceoOffice.viewAction" in view
 

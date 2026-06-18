@@ -55,7 +55,12 @@
             {{ t("ceoOffice.send") }}
           </button>
           <div v-if="modelRuntime" class="model-runtime-line" :aria-label="t('ceoOffice.modelRuntimeA11y')">
-            {{ modelRuntimeLine }}
+            <template v-for="(segment, index) in modelRuntimeSegments" :key="segment.key">
+              <span v-if="index" class="runtime-separator">·</span>
+              <span :class="['runtime-segment', `runtime-segment-${segment.kind}`]">
+                {{ segment.text }}
+              </span>
+            </template>
           </div>
         </form>
       </article>
@@ -366,16 +371,17 @@ const paperReconciliationSummary = computed(() => {
     error: String(reconciliation.error || ""),
   };
 });
-const modelRuntimeLine = computed(() => {
-  if (!modelRuntime.value) return "—";
+const modelRuntimeSegments = computed(() => {
+  if (!modelRuntime.value) return [];
   const label = modelRuntime.value.runtime.label || modelRuntime.value.runtime.provider;
   const model = modelRuntime.value.runtime.model || "—";
   return [
-    `${label} · ${model}`,
-    `${t("ceoOffice.reasoningShort")} ${reasoningLevelShort(modelRuntime.value.reasoning.level)}`,
-    `${t("ceoOffice.contextShort")} ${formatTokenCount(contextUsedTokens.value)}/${formatTokenCount(modelRuntime.value.context.max_tokens)}`,
-    `${contextUsagePct.value}%`,
-  ].join(" · ");
+    { key: "provider", kind: "provider", text: label },
+    { key: "model", kind: "model", text: model },
+    { key: "reasoning", kind: "reasoning", text: `${t("ceoOffice.reasoningShort")} ${reasoningLevelShort(modelRuntime.value.reasoning.level)}` },
+    { key: "context", kind: "context", text: `${t("ceoOffice.contextShort")} ${formatTokenK(contextUsedTokens.value)}/${formatTokenK(modelRuntime.value.context.max_tokens)}` },
+    { key: "usage", kind: "usage", text: `${contextUsagePct.value}%` },
+  ];
 });
 const draftContextTokens = computed(() => estimateTextTokens(draft.value));
 const contextUsedTokens = computed(() => (modelRuntime.value?.context.used_tokens || 0) + draftContextTokens.value);
@@ -468,10 +474,10 @@ function estimateTextTokens(value: string) {
   return Math.max(1, Math.ceil(text.length / 4));
 }
 
-function formatTokenCount(value: number) {
+function formatTokenK(value: number) {
   const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return "—";
-  return Math.round(numeric).toLocaleString();
+  if (!Number.isFinite(numeric) || numeric < 0) return "—";
+  return `${(numeric / 1000).toFixed(1)}k`;
 }
 
 function reasoningLevelShort(level: string) {
