@@ -94,9 +94,8 @@
             </span>
           </template>
         </div>
-        <div class="statusbar-health" :title="systemLabel">
+        <div class="statusbar-health" :aria-label="systemHealthLabel">
           <span class="status-dot" :style="{ '--dot-color': systemColor }"></span>
-          <strong>{{ systemLabel }}</strong>
         </div>
       </footer>
     </section>
@@ -162,17 +161,15 @@ const regimeColor = computed(() => {
   if (regime.value.value === "bear") return "var(--negative)";
   return "var(--warning)";
 });
-const systemLabel = computed(() => {
-  if (systemHealth.value.total === 0) return t("app.health.unknown");
-  if (systemHealth.value.all_ok) return t("app.health.operational");
-  if (systemHealth.value.ok_count === 0) return t("app.health.down");
-  return t("app.health.degraded");
+const systemHealthLabel = computed(() => {
+  if (systemHealth.value.total === 0) return t("app.health.unavailable");
+  if (systemHealth.value.all_ok) return t("app.health.normal");
+  return t("app.health.abnormal");
 });
 const systemColor = computed(() => {
   if (systemHealth.value.total === 0) return "var(--text-muted)";
   if (systemHealth.value.all_ok) return "var(--positive)";
-  if (systemHealth.value.ok_count === 0) return "var(--negative)";
-  return "var(--warning)";
+  return "var(--negative)";
 });
 const buildVersion = computed(() => {
   const version = (marketMeta.value.config as any)?.project?.version;

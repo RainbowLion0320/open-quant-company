@@ -20,12 +20,30 @@ def test_app_shell_nav_exposes_ceo_office_and_market_separately():
     app = read_frontend("App.vue")
     zh_nav = read_frontend("i18n/messages/zh-CN/nav.ts")
     en_nav = read_frontend("i18n/messages/en-US/nav.ts")
+    zh_app = read_frontend("i18n/messages/zh-CN/app.ts")
+    en_app = read_frontend("i18n/messages/en-US/app.ts")
+    workspace_css = read_frontend("styles/layout/workspace.css")
 
     assert 'path: "/", labelKey: "nav.ceoOffice"' in app
     assert 'path: "/market", labelKey: "nav.market"' in app
     assert 'if (route.path.startsWith("/market")) return "/market";' in app
     assert 'ceoOffice: "CEO 办公室"' in zh_nav
     assert 'ceoOffice: "CEO Office"' in en_nav
+    assert 'class="statusbar-health"' in app
+    assert ":aria-label=\"systemHealthLabel\"" in app
+    assert ":title=\"systemLabel\"" not in app
+    assert "<strong>{{ systemLabel }}</strong>" not in app
+    assert "app.health.normal" in app
+    assert "app.health.abnormal" in app
+    assert "app.health.unavailable" in app
+    assert "app.health.degraded" not in app
+    assert 'normal: "系统正常"' in zh_app
+    assert 'abnormal: "系统异常"' in zh_app
+    assert 'unavailable: "健康数据不可用"' in zh_app
+    assert 'normal: "System normal"' in en_app
+    assert 'abnormal: "System abnormal"' in en_app
+    assert 'unavailable: "Health data unavailable"' in en_app
+    assert ".statusbar-health strong" not in workspace_css
 
 
 def test_ceo_office_view_uses_agent_api_and_i18n():

@@ -151,17 +151,11 @@
 .statusbar-health {
   display: flex;
   align-items: center;
-  gap: 7px;
-  min-width: max-content;
+  justify-content: center;
+  width: 18px;
+  min-width: 18px;
   user-select: none;
   cursor: default;
-}
-.statusbar-health strong {
-  color: var(--text-tertiary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
 }
 .status-dot {
   width: 8px;

@@ -20,9 +20,8 @@ export const app = {
       language: "语言",
       languageSwitch: "切换语言",
       health: {
-        unknown: "Unknown",
-        operational: "Operational",
-        down: "Down",
-        degraded: "Degraded",
+        normal: "系统正常",
+        abnormal: "系统异常",
+        unavailable: "健康数据不可用",
       },
     } as const;

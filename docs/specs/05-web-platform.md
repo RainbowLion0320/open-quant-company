@@ -73,7 +73,7 @@ CEO Office 也不展示 autonomy step/run/program、semantic draft JSON 或 prov
 - 顶部为 animated regime orb + confirmed regime 名称 + 居中纯数字 score；不再额外显示分数字段标题或卡片边框。
 - 中部保留 4 个核心小仪表盘：Risk Buffer、A-share Breadth、Index Trend、Above MA20。
 - 稳定性状态以紧凑状态卡展示 Confirmed / Raw / Pending / Dwell；Pending 空闲时显示 `—`，有候选时显示 `x/y`。
-- 全局页脚只展示 REGIME / FRESH、CEO 会话模型上下文和系统健康状态，不再承担行情 ticker 或点位/日涨跌展示。
+- 全局页脚只展示 REGIME / FRESH、CEO 会话模型上下文和三态纯色系统健康灯，不再承担行情 ticker、文字健康状态或点位/日涨跌展示。
 
 **市场研究行业雷达契约：**
 
