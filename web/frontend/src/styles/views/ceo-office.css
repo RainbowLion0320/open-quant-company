@@ -138,13 +138,6 @@
   font-size: 11px;
 }
 
-.message-meta time {
-  color: var(--text-disabled);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  overflow-wrap: anywhere;
-}
-
 .message-desk-label {
   color: var(--desk-color, var(--text-tertiary));
   font-weight: 600;
@@ -164,6 +157,21 @@
   overflow: auto;
   padding-right: 2px;
   padding-bottom: 4px;
+}
+
+.message-time-separator {
+  justify-self: center;
+  color: var(--text-disabled);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.message-time-separator time {
+  white-space: nowrap;
 }
 
 .message-row,
@@ -199,10 +207,6 @@
 .action-title strong {
   color: var(--text-primary);
   font-size: 12px;
-}
-
-.message-meta time {
-  margin-left: auto;
 }
 
 .message-ref-list {

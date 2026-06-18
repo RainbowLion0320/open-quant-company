@@ -19,158 +19,162 @@
       <article class="conversation-panel">
         <div v-if="!messages.length" class="ceo-empty">{{ t("ceoOffice.noMessages") }}</div>
         <div v-else class="message-list">
-          <div v-for="message in messages" :key="message.message_id" class="message-row" :class="message.role">
-            <div class="message-meta">
-              <strong>{{ message.role }}</strong>
-              <span v-if="message.role !== 'ceo'" :class="['message-desk-label', `desk-color-${message.desk}`]">{{ deskLabel(message.desk) }}</span>
-              <time>{{ formatTime(message.created_at) }}</time>
+          <template v-for="item in messageTimelineItems" :key="item.key">
+            <div v-if="item.type === 'time'" class="message-time-separator">
+              <time>{{ item.label }}</time>
             </div>
-            <p>{{ message.content }}</p>
-            <div v-if="message.evidence_refs.length" class="message-ref-list">
-              <button
-                v-for="evidenceId in message.evidence_refs"
-                :key="`${message.message_id}-evidence-${evidenceId}`"
-                class="btn btn-xs"
-                type="button"
-                @click="loadEvidence(evidenceId)"
-              >
-                {{ t("ceoOffice.openEvidence") }}
-              </button>
-            </div>
-            <div v-if="message.action_refs.length" class="message-action-list">
-              <div
-                v-for="actionId in message.action_refs"
-                :key="`${message.message_id}-inline-action-${actionId}`"
-                class="inline-action-card"
-                :class="{ selected: selectedAction?.action.action_id === actionId }"
-              >
-                <template v-if="actionById(actionId)">
-                  <div class="action-title">
-                    <strong>{{ actionById(actionId)?.summary }}</strong>
-                    <span :class="['action-status', actionById(actionId)?.status || 'unknown']">
-                      {{ statusLabel(actionById(actionId)?.status || "unknown") }}
-                    </span>
-                  </div>
-                  <small>{{ deskLabel(actionById(actionId)?.desk || "") }} · {{ actionById(actionId)?.risk_level }}</small>
-                  <div class="approval-buttons">
-                    <button v-if="actionById(actionId)?.status === 'approval_required'" class="btn btn-xs" type="button" @click="approveAction(actionId)">
-                      {{ t("ceoOffice.approved") }}
-                    </button>
-                    <button v-if="actionById(actionId)?.status === 'approval_required'" class="btn btn-xs btn-danger" type="button" @click="rejectAction(actionId)">
-                      {{ t("ceoOffice.rejected") }}
-                    </button>
-                    <button
-                      v-if="canSubmitPaperAction(actionById(actionId))"
-                      class="btn btn-xs btn-primary"
-                      type="button"
-                      :disabled="submittingPaperAction === actionId"
-                      @click="submitPaperAction(actionId)"
-                    >
-                      {{ t("ceoOffice.submitPaperOrder") }}
-                    </button>
-                    <button
-                      v-if="canCancelAction(actionById(actionId))"
-                      class="btn btn-xs btn-ghost"
-                      type="button"
-                      :disabled="cancelingAction === actionId"
-                      @click="cancelAction(actionId)"
-                    >
-                      {{ t("ceoOffice.cancelAction") }}
-                    </button>
-                    <button class="btn btn-xs btn-ghost" type="button" @click="selectAction(actionId)">
-                      {{ t("ceoOffice.viewDetails") }}
-                    </button>
-                  </div>
-                </template>
+            <div v-else class="message-row" :class="item.message.role">
+              <div class="message-meta">
+                <strong>{{ item.message.role }}</strong>
+                <span v-if="item.message.role !== 'ceo'" :class="['message-desk-label', `desk-color-${item.message.desk}`]">{{ deskLabel(item.message.desk) }}</span>
               </div>
-            </div>
-            <div v-if="selectedAction && message.action_refs.includes(selectedAction.action.action_id)" class="inline-detail detail-stack">
-              <div class="detail-row">
-                <span>{{ t("ceoOffice.expectedEffect") }}</span>
-                <p>{{ selectedAction.action.expected_effect || "—" }}</p>
+              <p>{{ item.message.content }}</p>
+              <div v-if="item.message.evidence_refs.length" class="message-ref-list">
+                <button
+                  v-for="evidenceId in item.message.evidence_refs"
+                  :key="`${item.message.message_id}-evidence-${evidenceId}`"
+                  class="btn btn-xs"
+                  type="button"
+                  @click="loadEvidence(evidenceId)"
+                >
+                  {{ t("ceoOffice.openEvidence") }}
+                </button>
               </div>
-              <div class="detail-row">
-                <span>{{ t("ceoOffice.expiresAt") }}</span>
-                <code>{{ formatTime(selectedAction.action.expires_at) }}</code>
-              </div>
-              <details class="detail-row">
-                <summary>{{ t("ceoOffice.parameters") }}</summary>
-                <pre>{{ formatJson(selectedAction.action.parameters) }}</pre>
-              </details>
-              <div v-if="paperOrderPreview" class="detail-row">
-                <span>{{ t("ceoOffice.paperOrderPreview") }}</span>
-                <div class="paper-preview-grid">
-                  <div class="paper-preview-cell">
-                    <small>{{ t("ceoOffice.status") }}</small>
-                    <strong>{{ statusLabel(String(paperOrderPreview.status || "unknown")) }}</strong>
-                  </div>
-                  <div class="paper-preview-cell">
-                    <small>{{ t("ceoOffice.riskGate") }}</small>
-                    <strong>{{ paperRiskGatePassed ? t("ceoOffice.passed") : t("ceoOffice.blocked") }}</strong>
-                  </div>
-                  <div class="paper-preview-cell">
-                    <small>{{ t("ceoOffice.cashEffect") }}</small>
-                    <strong>{{ formatNumber(paperOrderPreview.estimated_cash_effect) }}</strong>
-                  </div>
-                </div>
-              </div>
-              <div v-if="selectedAction.action.evidence_refs.length" class="detail-row">
-                <span>{{ t("ceoOffice.evidenceRefs") }}</span>
-                <div class="evidence-ref-list">
-                  <button
-                    v-for="evidenceId in selectedAction.action.evidence_refs"
-                    :key="`${selectedAction.action.action_id}-${evidenceId}`"
-                    class="btn btn-xs"
-                    type="button"
-                    @click="loadEvidence(evidenceId)"
-                  >
-                    {{ t("ceoOffice.openEvidence") }}
-                  </button>
-                </div>
-              </div>
-              <details v-if="selectedAction.runs.length" class="detail-row">
-                <summary>{{ t("ceoOffice.runHistory") }}</summary>
-                <div class="run-list">
-                  <div v-for="run in selectedAction.runs" :key="run.run_id" class="run-row">
-                    <strong>{{ statusLabel(run.status) }}</strong>
-                    <small>{{ run.tool_name }} · {{ run.return_code ?? "—" }}</small>
-                    <code>{{ run.command.join(" ") }}</code>
-                    <p v-if="run.stdout_summary">{{ t("ceoOffice.stdout") }}: {{ run.stdout_summary }}</p>
-                    <p v-if="run.stderr_summary">{{ t("ceoOffice.stderr") }}: {{ run.stderr_summary }}</p>
-                    <div v-if="run.artifact_refs.length" class="run-evidence-list">
-                      <small>{{ t("ceoOffice.runEvidence") }}</small>
-                      <button
-                        v-for="evidenceId in run.artifact_refs"
-                        :key="`${run.run_id}-${evidenceId}`"
-                        class="btn btn-xs"
-                        type="button"
-                        @click="loadEvidence(evidenceId)"
-                      >
-                        {{ t("ceoOffice.openEvidence") }}
+              <div v-if="item.message.action_refs.length" class="message-action-list">
+                <div
+                  v-for="actionId in item.message.action_refs"
+                  :key="`${item.message.message_id}-inline-action-${actionId}`"
+                  class="inline-action-card"
+                  :class="{ selected: selectedAction?.action.action_id === actionId }"
+                >
+                  <template v-if="actionById(actionId)">
+                    <div class="action-title">
+                      <strong>{{ actionById(actionId)?.summary }}</strong>
+                      <span :class="['action-status', actionById(actionId)?.status || 'unknown']">
+                        {{ statusLabel(actionById(actionId)?.status || "unknown") }}
+                      </span>
+                    </div>
+                    <small>{{ deskLabel(actionById(actionId)?.desk || "") }} · {{ actionById(actionId)?.risk_level }}</small>
+                    <div class="approval-buttons">
+                      <button v-if="actionById(actionId)?.status === 'approval_required'" class="btn btn-xs" type="button" @click="approveAction(actionId)">
+                        {{ t("ceoOffice.approved") }}
                       </button>
+                      <button v-if="actionById(actionId)?.status === 'approval_required'" class="btn btn-xs btn-danger" type="button" @click="rejectAction(actionId)">
+                        {{ t("ceoOffice.rejected") }}
+                      </button>
+                      <button
+                        v-if="canSubmitPaperAction(actionById(actionId))"
+                        class="btn btn-xs btn-primary"
+                        type="button"
+                        :disabled="submittingPaperAction === actionId"
+                        @click="submitPaperAction(actionId)"
+                      >
+                        {{ t("ceoOffice.submitPaperOrder") }}
+                      </button>
+                      <button
+                        v-if="canCancelAction(actionById(actionId))"
+                        class="btn btn-xs btn-ghost"
+                        type="button"
+                        :disabled="cancelingAction === actionId"
+                        @click="cancelAction(actionId)"
+                      >
+                        {{ t("ceoOffice.cancelAction") }}
+                      </button>
+                      <button class="btn btn-xs btn-ghost" type="button" @click="selectAction(actionId)">
+                        {{ t("ceoOffice.viewDetails") }}
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <div v-if="selectedAction && item.message.action_refs.includes(selectedAction.action.action_id)" class="inline-detail detail-stack">
+                <div class="detail-row">
+                  <span>{{ t("ceoOffice.expectedEffect") }}</span>
+                  <p>{{ selectedAction.action.expected_effect || "—" }}</p>
+                </div>
+                <div class="detail-row">
+                  <span>{{ t("ceoOffice.expiresAt") }}</span>
+                  <code>{{ formatTime(selectedAction.action.expires_at) }}</code>
+                </div>
+                <details class="detail-row">
+                  <summary>{{ t("ceoOffice.parameters") }}</summary>
+                  <pre>{{ formatJson(selectedAction.action.parameters) }}</pre>
+                </details>
+                <div v-if="paperOrderPreview" class="detail-row">
+                  <span>{{ t("ceoOffice.paperOrderPreview") }}</span>
+                  <div class="paper-preview-grid">
+                    <div class="paper-preview-cell">
+                      <small>{{ t("ceoOffice.status") }}</small>
+                      <strong>{{ statusLabel(String(paperOrderPreview.status || "unknown")) }}</strong>
+                    </div>
+                    <div class="paper-preview-cell">
+                      <small>{{ t("ceoOffice.riskGate") }}</small>
+                      <strong>{{ paperRiskGatePassed ? t("ceoOffice.passed") : t("ceoOffice.blocked") }}</strong>
+                    </div>
+                    <div class="paper-preview-cell">
+                      <small>{{ t("ceoOffice.cashEffect") }}</small>
+                      <strong>{{ formatNumber(paperOrderPreview.estimated_cash_effect) }}</strong>
                     </div>
                   </div>
                 </div>
-              </details>
-            </div>
-            <div v-if="selectedEvidence && messageHasSelectedEvidence(message)" class="inline-detail detail-stack">
-              <strong>{{ selectedEvidence.label }}</strong>
-              <p>{{ selectedEvidence.summary }}</p>
-              <div v-if="selectedEvidenceNavigation" class="detail-row">
-                <span>{{ t("ceoOffice.linkedView") }}</span>
-                <a class="evidence-link" :href="selectedEvidenceNavigation.href">
-                  {{ t("ceoOffice.openLinkedView") }}
-                </a>
+                <div v-if="selectedAction.action.evidence_refs.length" class="detail-row">
+                  <span>{{ t("ceoOffice.evidenceRefs") }}</span>
+                  <div class="evidence-ref-list">
+                    <button
+                      v-for="evidenceId in selectedAction.action.evidence_refs"
+                      :key="`${selectedAction.action.action_id}-${evidenceId}`"
+                      class="btn btn-xs"
+                      type="button"
+                      @click="loadEvidence(evidenceId)"
+                    >
+                      {{ t("ceoOffice.openEvidence") }}
+                    </button>
+                  </div>
+                </div>
+                <details v-if="selectedAction.runs.length" class="detail-row">
+                  <summary>{{ t("ceoOffice.runHistory") }}</summary>
+                  <div class="run-list">
+                    <div v-for="run in selectedAction.runs" :key="run.run_id" class="run-row">
+                      <strong>{{ statusLabel(run.status) }}</strong>
+                      <small>{{ run.tool_name }} · {{ run.return_code ?? "—" }}</small>
+                      <code>{{ run.command.join(" ") }}</code>
+                      <p v-if="run.stdout_summary">{{ t("ceoOffice.stdout") }}: {{ run.stdout_summary }}</p>
+                      <p v-if="run.stderr_summary">{{ t("ceoOffice.stderr") }}: {{ run.stderr_summary }}</p>
+                      <div v-if="run.artifact_refs.length" class="run-evidence-list">
+                        <small>{{ t("ceoOffice.runEvidence") }}</small>
+                        <button
+                          v-for="evidenceId in run.artifact_refs"
+                          :key="`${run.run_id}-${evidenceId}`"
+                          class="btn btn-xs"
+                          type="button"
+                          @click="loadEvidence(evidenceId)"
+                        >
+                          {{ t("ceoOffice.openEvidence") }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </details>
               </div>
-              <details class="detail-row">
-                <summary>{{ t("ceoOffice.evidenceDetail") }}</summary>
-                <code>{{ selectedEvidence.uri }}</code>
-                <code>{{ selectedEvidenceStatus || selectedEvidence.freshness_status }}</code>
-                <code v-if="selectedEvidence.hash">{{ selectedEvidence.hash }}</code>
-                <code v-if="selectedEvidenceSnapshot">{{ selectedEvidenceSnapshot.uri }}</code>
-              </details>
+              <div v-if="selectedEvidence && messageHasSelectedEvidence(item.message)" class="inline-detail detail-stack">
+                <strong>{{ selectedEvidence.label }}</strong>
+                <p>{{ selectedEvidence.summary }}</p>
+                <div v-if="selectedEvidenceNavigation" class="detail-row">
+                  <span>{{ t("ceoOffice.linkedView") }}</span>
+                  <a class="evidence-link" :href="selectedEvidenceNavigation.href">
+                    {{ t("ceoOffice.openLinkedView") }}
+                  </a>
+                </div>
+                <details class="detail-row">
+                  <summary>{{ t("ceoOffice.evidenceDetail") }}</summary>
+                  <code>{{ selectedEvidence.uri }}</code>
+                  <code>{{ selectedEvidenceStatus || selectedEvidence.freshness_status }}</code>
+                  <code v-if="selectedEvidence.hash">{{ selectedEvidence.hash }}</code>
+                  <code v-if="selectedEvidenceSnapshot">{{ selectedEvidenceSnapshot.uri }}</code>
+                </details>
+              </div>
             </div>
-          </div>
+          </template>
         </div>
 
         <form class="message-composer" @submit.prevent="sendMessage">
@@ -206,7 +210,11 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
-const { t } = useI18n();
+const { currentLocale, t } = useI18n();
+
+type MessageTimelineItem =
+  | { type: "time"; key: string; label: string }
+  | { type: "message"; key: string; message: AgentMessage };
 
 const sessions = ref<AgentSession[]>([]);
 const activeSession = ref<AgentSession | null>(null);
@@ -236,6 +244,7 @@ const paperOrderPreview = computed(() => objectParam(selectedAction.value?.actio
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
 const paperRiskGatePassed = computed(() => Boolean(paperRiskGate.value?.passed));
 const deskOrder = ["data", "research", "portfolio", "risk", "execution", "engineering", "reporting"];
+const messageTimeSeparatorMs = 5 * 60 * 1000;
 const slashCommands = computed(() => [
   { name: "/new", description: t("ceoOffice.slashNewDescription") },
   { name: "/clear", description: t("ceoOffice.slashClearDescription") },
@@ -291,9 +300,55 @@ const filteredSlashCommands = computed(() => {
     .map(row => row.command);
 });
 const selectedSlashCommand = computed(() => filteredSlashCommands.value[selectedSlashIndex.value] || null);
+const messageTimelineItems = computed<MessageTimelineItem[]>(() => {
+  const items: MessageTimelineItem[] = [];
+  let previousMessageDate: Date | null = null;
+
+  for (const message of messages.value) {
+    const messageDate = parseMessageDate(message.created_at);
+    if (messageDate && shouldShowMessageTimeSeparator(previousMessageDate, messageDate)) {
+      items.push({ type: "time", key: `time-${message.message_id}`, label: formatChatTime(messageDate) });
+    }
+    if (messageDate) previousMessageDate = messageDate;
+    items.push({ type: "message", key: `message-${message.message_id}`, message });
+  }
+
+  return items;
+});
 
 function deskLabel(desk: string) {
   return deskNames.value[desk] || desk;
+}
+
+function parseMessageDate(value: string) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function shouldShowMessageTimeSeparator(previousDate: Date | null, currentDate: Date) {
+  if (!previousDate) return true;
+  return currentDate.getTime() - previousDate.getTime() >= messageTimeSeparatorMs;
+}
+
+function sameLocalDate(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate();
+}
+
+function formatChatTime(date: Date) {
+  const locale = currentLocale.value;
+  const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+
+  if (sameLocalDate(date, now)) return time;
+  if (sameLocalDate(date, yesterday)) return locale === "zh-CN" ? `昨天 ${time}` : `Yesterday ${time}`;
+  if (date.getFullYear() === now.getFullYear()) {
+    if (locale === "zh-CN") return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
+    return `${new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(date)} ${time}`;
+  }
+  if (locale === "zh-CN") return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
+  return `${new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", day: "numeric" }).format(date)} ${time}`;
 }
 
 function slashMatchesCommand(command: { name: string; description: string }, query: string) {

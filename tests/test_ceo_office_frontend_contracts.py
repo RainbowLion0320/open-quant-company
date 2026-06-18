@@ -79,7 +79,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "onBeforeUnmount(closeRunStream)" in view
 
     # CEO Office remains a conversation, decision, and evidence surface.
-    assert "deskLabel(message.desk)" in view
+    assert "deskLabel(item.message.desk)" in view
     assert "selectedDraftDesk" not in view
     assert 'v-model="selectedDraftDesk"' not in view
     assert 'v-for="desk in desks"' not in view
@@ -105,6 +105,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "message.action_refs" in view
     assert "actionById" in view
     assert "messageHasSelectedEvidence" in view
+    assert "messageTimelineItems" in view
+    assert "shouldShowMessageTimeSeparator" in view
+    assert "formatChatTime" in view
+    assert '<time>{{ formatTime(message.created_at) }}</time>' not in view
+    assert ".message-meta time" not in css
+    assert "formatTime(selectedAction.action.expires_at)" in view
     assert "desk-status-strip" in view
     assert "deskStatusCards" in view
     assert "deskCardState" in view
@@ -112,8 +118,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "desk-status-card" in view
     assert "`desk-color-${card.deskId}`" in view
     assert "message-desk-label" in view
-    assert 'v-if="message.role !== \'ceo\'"' in view
-    assert "`desk-color-${message.desk}`" in view
+    assert 'v-if="item.message.role !== \'ceo\'"' in view
+    assert "`desk-color-${item.message.desk}`" in view
+    assert "message-time-separator" in view
+    assert ".message-time-separator" in css
     assert "grid-template-columns: repeat(7" not in css
     assert "width: clamp(112px, 10.5vw, 148px)" in css
     assert "desk-status-standby" in css
@@ -176,7 +184,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "padding: 4px 7px 4px 6px" in css
     assert ".slash-command-option.selected" in css
     assert "border-left-color: var(--accent-primary)" in css
-    assert "class=\"message-row\" :class=\"message.role\"" in view
+    assert "class=\"message-row\" :class=\"item.message.role\"" in view
     assert "justify-self: start" in css
     assert "justify-self: end" in css
     assert "max-width: min(760px, 88%)" in css
