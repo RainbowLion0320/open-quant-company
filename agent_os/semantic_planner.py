@@ -51,6 +51,8 @@ class ProviderSemanticPlanner:
     a preview or ledger row.
     """
 
+    requires_context_pack = True
+
     def __init__(
         self,
         *,
@@ -75,12 +77,23 @@ class ProviderSemanticPlanner:
         runtime = resolve_llm_use_case("agent_planning", provider=self._provider, model=self._model)
         provider = runtime["provider"]
         model = runtime["model"]
+        context_pack = session_context.get("context_pack") if isinstance(session_context.get("context_pack"), dict) else {}
+        context_artifact = context_pack.get("artifact") if isinstance(context_pack.get("artifact"), dict) else {}
         provider_reasoning = {
             "kind": "semantic_provider",
             "provider": provider,
             "model": model,
             "credential_env": runtime["credential_env"],
+            "context_status": str(context_pack.get("status") or "unknown"),
+            "context_mode": str(context_pack.get("mode") or ""),
+            "context_artifact": str(context_artifact.get("path") or ""),
         }
+        if str(context_pack.get("status") or "") == "blocked":
+            return _provider_blocked_draft(
+                "semantic_context_overflow",
+                "Agent context could not be compacted under the hard threshold; no provider request was sent.",
+                {**provider_reasoning, "status": "context_blocked", "block_reason": context_pack.get("block_reason", "")},
+            )
         if runtime.get("block_reason") == "provider_not_configured":
             return _provider_blocked_draft(
                 "semantic_provider_not_configured",

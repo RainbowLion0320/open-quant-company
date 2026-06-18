@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import Any
 
 from agent_os.approval import approval_required_for_risk, list_approval_policies as approval_policy_rows
+from agent_os.context import build_context_pack
+from agent_os.context import context_status as build_context_status
+from agent_os.context import estimate_context_tokens
 from agent_os.desks import get_desk, list_desks
 from agent_os.evidence import FILE_EVIDENCE_KINDS, evidence_source_path, hash_file
 from agent_os.ledger import AgentLedger
@@ -96,8 +99,7 @@ def _estimate_context_tokens(messages: list[dict[str, Any]]) -> int:
         }
         for message in messages
     ]
-    text = json.dumps(payload, ensure_ascii=False, sort_keys=True)
-    return max(1, (len(text) + 3) // 4)
+    return estimate_context_tokens(payload)
 
 
 def _dataclass_to_dict(value: Any) -> dict[str, Any]:
@@ -291,9 +293,23 @@ class AgentRuntime:
             messages = []
         runtime = resolve_llm_use_case("agent_planning")
         max_tokens = int(runtime.get("context_window_tokens") or 0)
-        used_tokens = _estimate_context_tokens(messages)
-        remaining_tokens = max(max_tokens - used_tokens, 0) if max_tokens else 0
-        usage_pct = round((used_tokens / max_tokens) * 100, 2) if max_tokens else 0.0
+        status = (
+            build_context_status(session_id=session_id, messages=messages, runtime=runtime)
+            if session_id
+            else {
+                "status": "ok",
+                "max_tokens": max_tokens,
+                "raw_tokens": 0,
+                "effective_tokens": 0,
+                "remaining_tokens": max_tokens,
+                "usage_pct": 0.0,
+                "raw_usage_pct": 0.0,
+                "message_count": 0,
+                "thresholds": {},
+                "unknown_window": not bool(max_tokens),
+                "latest_pack": None,
+            }
+        )
         return {
             "runtime": {
                 "use_case": runtime.get("use_case", "agent_planning"),
@@ -315,14 +331,58 @@ class AgentRuntime:
                 "response_format_json": bool(runtime.get("response_format_json", True)),
             },
             "context": {
-                "max_tokens": max_tokens,
-                "used_tokens": used_tokens,
-                "remaining_tokens": remaining_tokens,
-                "usage_pct": usage_pct,
+                "status": status.get("status", "ok"),
+                "max_tokens": int(status.get("max_tokens") or max_tokens),
+                "used_tokens": int(status.get("effective_tokens") or 0),
+                "raw_tokens": int(status.get("raw_tokens") or 0),
+                "remaining_tokens": int(status.get("remaining_tokens") or 0),
+                "usage_pct": float(status.get("usage_pct") or 0.0),
+                "raw_usage_pct": float(status.get("raw_usage_pct") or 0.0),
                 "message_count": len(messages),
                 "estimator": "chars_div_4",
+                "thresholds": status.get("thresholds") if isinstance(status.get("thresholds"), dict) else {},
+                "unknown_window": bool(status.get("unknown_window")),
+                "latest_pack": status.get("latest_pack"),
             },
         }
+
+    def context_status(self, session_id: str) -> dict[str, Any]:
+        session_payload = self.get_session(session_id)
+        if session_payload is None:
+            raise KeyError(f"Agent session not found: {session_id}")
+        runtime = resolve_llm_use_case("agent_planning")
+        messages = list(session_payload.get("messages") or [])
+        return build_context_status(session_id=session_id, messages=messages, runtime=runtime)
+
+    def compact_context(self, session_id: str, *, dry_run: bool = False) -> dict[str, Any]:
+        session_payload = self.get_session(session_id)
+        if session_payload is None:
+            raise KeyError(f"Agent session not found: {session_id}")
+        runtime = resolve_llm_use_case("agent_planning")
+        messages = list(session_payload.get("messages") or [])
+        pack = build_context_pack(
+            session_id=session_id,
+            messages=messages,
+            runtime=runtime,
+            force=True,
+            dry_run=dry_run,
+            allow_provider_summary=not dry_run,
+        )
+        evidence = None
+        artifact = pack.get("artifact") if isinstance(pack.get("artifact"), dict) else None
+        artifact_path = str((artifact or {}).get("path") or "")
+        if artifact_path and not dry_run:
+            evidence_ref = self.create_evidence(
+                kind="artifact",
+                label="Agent context pack",
+                uri=artifact_path,
+                summary=(
+                    f"Agent context pack {pack.get('status')} with "
+                    f"{pack.get('compressed_message_count', 0)} compressed message(s)."
+                ),
+            )
+            evidence = evidence_ref.to_dict()
+        return {"pack": pack, "evidence": evidence}
 
     def add_message(
         self,
@@ -381,7 +441,14 @@ class AgentRuntime:
         session_id: str | None = None,
         semantic_planner: Any | None = None,
     ) -> dict[str, Any]:
-        session_context = self._workflow_session_context(session_id) if session_id else None
+        session_context = (
+            self._workflow_session_context(
+                session_id,
+                compact_for_provider=bool(getattr(semantic_planner, "requires_context_pack", False)),
+            )
+            if session_id
+            else None
+        )
         plan = build_desk_workflow_plan(
             desk=desk,
             content=content,
@@ -1183,7 +1250,10 @@ class AgentRuntime:
             desk=desk,
             content=normalized_goal,
             artifact_context=collect_report_artifact_context(),
-            session_context=self._workflow_session_context(session_id),
+            session_context=self._workflow_session_context(
+                session_id,
+                compact_for_provider=bool(getattr(semantic_planner, "requires_context_pack", False)),
+            ),
             semantic_planner=semantic_planner,
         )
         registry = AgentToolRegistry()
@@ -3225,7 +3295,10 @@ class AgentRuntime:
             desk=desk,
             content=content,
             artifact_context=collect_report_artifact_context(),
-            session_context=self._workflow_session_context(session_id),
+            session_context=self._workflow_session_context(
+                session_id,
+                compact_for_provider=bool(getattr(semantic_planner, "requires_context_pack", False)),
+            ),
             semantic_planner=semantic_planner,
         )
         evidence_refs: list[str] = []
@@ -3357,10 +3430,20 @@ class AgentRuntime:
             ),
         }
 
-    def _workflow_session_context(self, session_id: str) -> dict[str, Any]:
+    def _workflow_session_context(self, session_id: str, *, compact_for_provider: bool = False) -> dict[str, Any]:
         actions = self.ledger.list_actions(session_id)
         handoffs = self.ledger.list_handoffs(session_id)
         work_orders = self.ledger.list_work_orders(session_id)
+        messages = self.ledger.list_messages(session_id)
+        runtime = resolve_llm_use_case("agent_planning")
+        context_pack = build_context_pack(
+            session_id=session_id,
+            messages=messages,
+            runtime=runtime,
+            force=False,
+            dry_run=not compact_for_provider,
+            allow_provider_summary=compact_for_provider,
+        )
         active_statuses = {"proposed", "approval_required", "approved", "running"}
         active_actions = [action for action in actions if str(action.get("status") or "") in active_statuses]
         open_handoffs = [handoff for handoff in handoffs if str(handoff.get("status") or "") == "open"]
@@ -3370,6 +3453,7 @@ class AgentRuntime:
             "active_actions": active_actions,
             "open_handoffs": open_handoffs,
             "open_work_orders": open_work_orders,
+            "context_pack": context_pack,
         }
 
     def memory_snapshot(self) -> dict[str, Any]:

@@ -4,6 +4,8 @@ import type {
   AgentActionDetail,
   AgentActionFilters,
   AgentAddMessageResponse,
+  AgentContextCompactResponse,
+  AgentContextStatusResponse,
   AgentAutonomyRunResponse,
   AgentAutonomyStepResponse,
   AgentActionsResponse,
@@ -81,6 +83,10 @@ export const agentApi = {
   ) => patch<{ session: AgentSession }>(`/api/agent/sessions/${encodeURIComponent(sessionId)}`, payload),
   agentModelRuntime: (sessionId = "") =>
     get<AgentModelRuntimeResponse>(`/api/agent/model-runtime${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
+  agentContextStatus: (sessionId: string) =>
+    get<AgentContextStatusResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/context`),
+  agentContextCompact: (sessionId: string, payload: { dry_run?: boolean } = {}) =>
+    post<AgentContextCompactResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/context/compact`, payload),
   agentAutonomyStep: (
     sessionId: string,
     payload: {

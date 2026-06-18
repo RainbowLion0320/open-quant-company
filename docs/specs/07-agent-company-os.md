@@ -35,6 +35,8 @@ All endpoints are planned under `/api/agent/*`.
 | `GET` | `/api/agent/sessions/{session_id}` | Read a session with messages and linked actions. | Implemented |
 | `GET` | `/api/agent/sessions/{session_id}/stream` | Stream session snapshot changes over Server-Sent Events with a one-shot mode for tests and clients that need a bounded read. | Implemented |
 | `GET` | `/api/agent/model-runtime` | Read the configured `agent_planning` provider/model, reasoning level, temperature, max context setting, and an estimated current session context usage. Optional `session_id` scopes the usage estimate to that session's message ledger. | Implemented |
+| `GET` | `/api/agent/sessions/{session_id}/context` | Read prompt context budget, thresholds, raw/effective token estimates, and latest context pack metadata without writing artifacts. | Implemented |
+| `POST` | `/api/agent/sessions/{session_id}/context/compact` | Create or dry-run an auditable context pack for one session without deleting or rewriting the raw message ledger. | Implemented |
 | `PATCH` | `/api/agent/sessions/{session_id}` | Rename, archive, tag, or update session metadata. | Implemented |
 | `POST` | `/api/agent/sessions/{session_id}/autonomy-step` | Run one bounded autonomy step: add a CEO message, create a deterministic or explicitly semantic-assisted desk plan, dispatch only this step's new `read_only` / `dry_run` fixed-registry actions, and skip approval-required, write, paper, and live actions. Payloads may use `planner_mode=semantic_draft` or `planner_mode=provider_semantic`; semantic output remains untrusted and safety-filtered before dispatch. | Implemented |
 | `POST` | `/api/agent/sessions/{session_id}/autonomy-run` | Run a bounded multi-step autonomy loop with an explicit `max_steps` cap. Each step reuses the same fixed-registry safety boundary as `/autonomy-step`; the loop stops on `max_steps_reached`, `no_runnable_actions`, or `step_not_ready`, and never auto-runs approval-required, write, paper, live, or code actions. | Implemented |
@@ -137,6 +139,9 @@ All commands must support `--json`.
 | `astroq agent evidence EVIDENCE_ID --json` | Resolve evidence. | Implemented |
 | `astroq agent desks --json` | List desk registry and health. | Implemented |
 | `astroq agent policies --json` | List explicit approval policies for every risk level. | Implemented |
+| `astroq agent context status --session SESSION_ID --json` | Inspect prompt context budget, thresholds, compression state, and latest context pack metadata. | Implemented |
+| `astroq agent context compact --session SESSION_ID --dry-run --json` | Preview context pack creation without writing an artifact. | Implemented |
+| `astroq agent context compact --session SESSION_ID --json` | Write an auditable context pack artifact and evidence row without deleting raw messages. | Implemented |
 | `astroq agent memory show --json` | Inspect local transparent memory. | Implemented |
 | `astroq agent memory export --json` | Export local transparent memory. | Implemented |
 | `astroq agent memory prune --dry-run --json` | Preview or prune archived session memory. | Implemented |
@@ -942,6 +947,15 @@ Memory must not store:
 - Hidden model chain-of-thought
 - Unmasked provider secrets
 
+Prompt context compression is separate from memory maintenance. When a CEO
+Office session approaches the configured provider context window, the runtime
+builds a context pack for provider planning: recent messages remain raw, older
+messages become a deterministic summary optionally enriched by the configured
+provider, and all evidence/action refs are preserved. The original `messages`
+ledger is not deleted or rewritten. Context pack artifacts live under
+`var/artifacts/agent/context/`; if a pack cannot fit under the hard threshold,
+provider planning returns a blocker instead of calling the model.
+
 ## 9. Tool Execution Rules
 
 - Tools must be invoked through fixed command arrays or internal callables.
@@ -1007,6 +1021,7 @@ Planned paths:
 | --- | --- |
 | `var/db/agent_os.sqlite` | Sessions, messages, actions, approvals, runs, run events, and desk registry snapshots. |
 | `var/artifacts/agent/runs/` | Run outputs. |
+| `var/artifacts/agent/context/` | Auditable prompt context packs for long CEO Office sessions. |
 | `var/artifacts/agent/evidence/` | Evidence snapshots. |
 | `var/artifacts/agent/memory/` | Transparent memory exports. |
 | `var/artifacts/agent/reports/` | CEO briefs and audit packs. |

@@ -41,13 +41,43 @@ export interface AgentModelRuntimeResponse {
     response_format_json: boolean;
   };
   context: {
+    status: string;
     max_tokens: number;
     used_tokens: number;
+    raw_tokens: number;
     remaining_tokens: number;
     usage_pct: number;
+    raw_usage_pct: number;
     message_count: number;
     estimator: string;
+    thresholds: Record<string, number>;
+    unknown_window: boolean;
+    latest_pack: Record<string, unknown> | null;
   };
+}
+
+export interface AgentContextStatusResponse {
+  context: {
+    status: string;
+    session_id: string;
+    generated_at: string;
+    thresholds: Record<string, number>;
+    max_tokens: number;
+    unknown_window: boolean;
+    raw_tokens: number;
+    effective_tokens: number;
+    remaining_tokens: number;
+    usage_pct: number;
+    raw_usage_pct: number;
+    message_count: number;
+    input_signature: string;
+    latest_pack: Record<string, unknown> | null;
+  };
+}
+
+export interface AgentContextCompactResponse {
+  pack: Record<string, unknown>;
+  evidence: EvidenceRef | null;
 }
 
 export interface AgentAction {

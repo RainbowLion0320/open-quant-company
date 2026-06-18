@@ -219,6 +219,35 @@ def plan(
     )
 
 
+def context_status(session_id: str) -> CliResult:
+    try:
+        status = AgentRuntime().context_status(session_id)
+    except KeyError as exc:
+        return CliResult(False, "agent context status", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    return CliResult(
+        ok=True,
+        command="agent context status",
+        message=f"Agent context status: {status['status']}",
+        data={"context": status},
+    )
+
+
+def context_compact(session_id: str, *, dry_run: bool = False) -> CliResult:
+    try:
+        result = AgentRuntime().compact_context(session_id, dry_run=dry_run)
+    except KeyError as exc:
+        return CliResult(False, "agent context compact", {"session_id": session_id}, "Agent session missing", [str(exc)])
+    pack = result["pack"]
+    ok = pack.get("status") != "blocked"
+    return CliResult(
+        ok=ok,
+        command="agent context compact",
+        message="Agent context compact dry-run" if dry_run else f"Agent context compact: {pack.get('status')}",
+        data=result,
+        errors=[] if ok else [str(pack.get("block_reason") or "context_blocked")],
+    )
+
+
 def programs(session_id: str = "") -> CliResult:
     listing = AgentRuntime().list_autonomy_programs(session_id or None)
     return CliResult(

@@ -49,6 +49,23 @@ async def get_agent_session(session_id: str) -> dict[str, Any]:
     return payload
 
 
+@router.get("/sessions/{session_id}/context")
+async def get_agent_context_status(session_id: str) -> dict[str, Any]:
+    try:
+        return {"context": AgentRuntime().context_status(session_id)}
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+
+
+@router.post("/sessions/{session_id}/context/compact")
+async def compact_agent_context(session_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    body = payload or {}
+    try:
+        return AgentRuntime().compact_context(session_id, dry_run=bool(body.get("dry_run") or False))
+    except KeyError:
+        raise DataNotFoundError("agent session", session_id)
+
+
 @router.get("/sessions/{session_id}/stream")
 async def stream_agent_session(session_id: str, once: bool = False, poll_seconds: float = 1.0) -> StreamingResponse:
     if AgentRuntime().get_session(session_id) is None:

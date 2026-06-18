@@ -107,9 +107,214 @@ def test_agent_model_runtime_reports_llm_config_and_context_usage(tmp_path, monk
     assert payload["reasoning"]["temperature"] == 0.1
     assert payload["context"]["max_tokens"] == 1048576
     assert payload["context"]["used_tokens"] > 0
+    assert payload["context"]["raw_tokens"] > 0
+    assert payload["context"]["status"] == "ok"
     assert payload["context"]["estimator"] == "chars_div_4"
     assert payload["context"]["message_count"] == 2
     reset_datahub()
+
+
+def test_agent_context_status_and_compact_preserve_raw_messages(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.delenv("UNIT_API_KEY", raising=False)
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+    import data.llm.usage as llm_usage
+
+    reset_datahub()
+
+    monkeypatch.setattr(
+        llm_usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "use_cases": {"agent_planning": {"provider": "unit", "model": "unit-model"}},
+                "providers": {
+                    "unit": {
+                        "enabled": True,
+                        "label": "Unit",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "UNIT_API_KEY",
+                        "base_url": "https://unit.example/v1",
+                        "default_model": "unit-model",
+                            "request": {"context_window_tokens": 2000, "timeout_seconds": 1},
+                    }
+                },
+            }
+        },
+    )
+
+    from agent_os.runtime import AgentRuntime
+    from astrolabe_cli.main import run_cli
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Long context", default_desk="reporting")
+    for index in range(30):
+        runtime.add_message(
+            session.session_id,
+            role="ceo" if index % 2 == 0 else "reporting",
+            desk="reporting",
+            content=f"历史消息 {index}，包含阻断、审批、证据和组合风险。" + ("长内容 " * 40),
+            evidence_refs=[f"ev_{index}"] if index % 5 == 0 else [],
+            action_refs=[f"act_{index}"] if index % 7 == 0 else [],
+        )
+    before_messages = runtime.ledger.list_messages(session.session_id)
+
+    response = TestClient(create_app()).get(f"/api/agent/sessions/{session.session_id}/context")
+    status_payload = response.json()["context"]
+    assert response.status_code == 200
+    assert status_payload["status"] == "warn"
+    assert status_payload["raw_tokens"] > status_payload["thresholds"]["auto_compact_tokens"]
+    assert status_payload["latest_pack"] is None
+
+    run_cli(["agent", "context", "compact", "--session", session.session_id, "--dry-run", "--json"])
+    dry_run = json.loads(capsys.readouterr().out)
+    assert dry_run["ok"] is True
+    assert dry_run["data"]["pack"]["dry_run"] is True
+    assert dry_run["data"]["pack"]["artifact"] is None
+
+    compacted = runtime.compact_context(session.session_id)
+    pack = compacted["pack"]
+    assert pack["status"] == "compacted"
+    assert pack["compressed_message_count"] > 0
+    assert pack["refs"]["evidence_refs"]
+    assert pack["refs"]["action_refs"]
+    assert compacted["evidence"]["label"] == "Agent context pack"
+    assert Path(pack["artifact"]["path"]).exists()
+    assert runtime.ledger.list_messages(session.session_id) == before_messages
+
+    model_runtime = runtime.model_runtime(session.session_id)
+    assert model_runtime["context"]["status"] == "compacted"
+    assert model_runtime["context"]["used_tokens"] < model_runtime["context"]["raw_tokens"]
+    reset_datahub()
+
+
+def test_agent_provider_semantic_planner_uses_context_pack_for_long_session(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_API_KEY", "unit-secret")
+    from data.storage.datahub import reset_datahub
+    import agent_os.context as context_module
+    import data.llm.usage as llm_usage
+
+    reset_datahub()
+
+    monkeypatch.setattr(
+        llm_usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "use_cases": {"agent_planning": {"provider": "unit", "model": "unit-model"}},
+                "providers": {
+                    "unit": {
+                        "enabled": True,
+                        "label": "Unit",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "UNIT_API_KEY",
+                        "base_url": "https://unit.example/v1",
+                        "default_model": "unit-model",
+                            "request": {"context_window_tokens": 2000, "timeout_seconds": 1},
+                        "pricing": {"models": {"unit-model": {"total": 1.0}}},
+                    }
+                },
+            }
+        },
+    )
+    monkeypatch.setattr(
+        context_module,
+        "_openai_compatible_chat_completion",
+        lambda _request: {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "summary": "compressed prior CEO Office context",
+                                "unresolved_items": ["data blocker"],
+                                "evidence_refs": ["ev_0"],
+                            }
+                        )
+                    }
+                }
+            ]
+        },
+    )
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import ProviderSemanticPlanner
+
+    captured: list[dict[str, object]] = []
+
+    def fake_transport(request: dict[str, object]) -> dict[str, object]:
+        captured.append(request)
+        return {
+            "choices": [{"message": {"content": json.dumps({"answer": "ok", "actions": [], "reasoning": [], "blockers": []})}}],
+            "usage": {"total_tokens": 1},
+        }
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Provider context pack", default_desk="reporting")
+    for index in range(30):
+        runtime.add_message(
+            session.session_id,
+            role="ceo",
+            desk="reporting",
+            content=f"prior message {index} needs evidence review " + ("token pressure " * 35),
+            evidence_refs=[f"ev_{index}"] if index == 0 else [],
+        )
+
+    runtime.submit_ceo_message(
+        session.session_id,
+        desk="reporting",
+        content="请基于上下文继续判断下一步",
+        semantic_planner=ProviderSemanticPlanner(transport=fake_transport),
+    )
+    assert captured
+    request_context = json.loads(captured[0]["messages"][1]["content"])
+    context_pack = request_context["session_context"]["context_pack"]
+    assert context_pack["status"] == "compacted"
+    assert context_pack["mode"] == "hybrid"
+    assert Path(context_pack["artifact"]["path"]).exists()
+    assert "unit-secret" not in json.dumps(context_pack, ensure_ascii=False)
+    reset_datahub()
+
+
+def test_agent_provider_semantic_planner_blocks_on_context_overflow(monkeypatch):
+    monkeypatch.setenv("UNIT_API_KEY", "unit-secret")
+    from agent_os.semantic_planner import ProviderSemanticPlanner
+    import data.llm.usage as llm_usage
+
+    monkeypatch.setattr(
+        llm_usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "use_cases": {"agent_planning": {"provider": "unit", "model": "unit-model"}},
+                "providers": {
+                    "unit": {
+                        "enabled": True,
+                        "protocol": "openai_compatible",
+                        "api_key_env": "UNIT_API_KEY",
+                        "base_url": "https://unit.example/v1",
+                        "default_model": "unit-model",
+                    }
+                },
+            }
+        },
+    )
+
+    def forbidden_transport(*_args, **_kwargs):
+        raise AssertionError("blocked context must not call provider transport")
+
+    draft = ProviderSemanticPlanner(transport=forbidden_transport).plan(
+        desk="reporting",
+        content="continue",
+        artifact_context={},
+        session_context={"context_pack": {"status": "blocked", "block_reason": "context_pack_exceeds_hard_threshold"}},
+    )
+    assert draft["actions"] == []
+    assert "semantic_context_overflow" in draft["blockers"]
+    assert draft["reasoning"][0]["status"] == "context_blocked"
 
 
 def test_agent_actions_support_session_status_desk_and_risk_filters(tmp_path, monkeypatch, capsys):

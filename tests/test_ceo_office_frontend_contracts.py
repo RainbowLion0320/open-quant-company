@@ -35,6 +35,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     en_index = read_frontend("i18n/messages/en-US/index.ts")
     zh_ceo = read_frontend("i18n/messages/zh-CN/ceoOffice.ts")
     en_ceo = read_frontend("i18n/messages/en-US/ceoOffice.ts")
+    css = read_frontend("styles/views/ceo-office.css")
 
     assert "useI18n" in view
     assert "api.agentSessions" in view
@@ -82,6 +83,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "modelRuntimeSegments" in view
     assert "formatTokenK" in view
     assert "runtime-segment" in view
+    assert "runtime-progress" in view
+    assert "runtimeBatteryCells" in view
+    assert "contextBatteryCells" in view
+    assert "context-progress" in view
+    assert "contextStatusShort" in view
+    assert "contextStatusKind" in view
+    assert "runtime-progress-cell" in css
+    assert "runtime-progress::after" in css
+    assert "runtime-segment-context-compacted" in css
+    assert "runtime-segment-context-blocked" in css
     assert "contextUsedTokens" in view
     assert "contextUsagePct" in view
     assert "ceoOffice.modelRuntimeA11y" in view
@@ -91,6 +102,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
         assert f'level === "{reasoning_level}"' in view
     assert "formatTokenCount(contextUsedTokens" not in view
     assert "formatTokenCount(modelRuntime.value.context.max_tokens)" not in view
+    assert '{ key: "usage"' not in view
+    assert "formatTokenK(contextUsedTokens.value)" not in view
     assert "ceoOffice.openEvidence" in view
     assert "ceoOffice.viewAction" in view
 

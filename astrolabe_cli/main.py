@@ -12,6 +12,8 @@ from astrolabe_cli.commands.agent import autonomy_run as agent_autonomy_run
 from astrolabe_cli.commands.agent import autonomy_step as agent_autonomy_step
 from astrolabe_cli.commands.agent import approve as agent_approve
 from astrolabe_cli.commands.agent import cancel as agent_cancel
+from astrolabe_cli.commands.agent import context_compact as agent_context_compact
+from astrolabe_cli.commands.agent import context_status as agent_context_status
 from astrolabe_cli.commands.agent import create_session as agent_create_session
 from astrolabe_cli.commands.agent import create_program as agent_create_program
 from astrolabe_cli.commands.agent import create_work_order as agent_create_work_order
@@ -615,6 +617,18 @@ def build_parser() -> argparse.ArgumentParser:
     agent_paper_cancel_cmd.add_argument("--reason", default="")
     add_common_flags(agent_paper_cancel_cmd)
     agent_paper_cancel_cmd.set_defaults(handler=lambda args: agent_paper_cancel(args.action_id, args.reason))
+
+    agent_context_cmd = agent_sub.add_parser("context", help="Inspect or compact agent prompt context")
+    agent_context_sub = agent_context_cmd.add_subparsers(dest="agent_context_command", required=True)
+    agent_context_status_cmd = agent_context_sub.add_parser("status", help="Show prompt context budget for one session")
+    agent_context_status_cmd.add_argument("--session", required=True)
+    add_common_flags(agent_context_status_cmd)
+    agent_context_status_cmd.set_defaults(handler=lambda args: agent_context_status(args.session))
+    agent_context_compact_cmd = agent_context_sub.add_parser("compact", help="Create an auditable context pack for one session")
+    agent_context_compact_cmd.add_argument("--session", required=True)
+    agent_context_compact_cmd.add_argument("--dry-run", action="store_true")
+    add_common_flags(agent_context_compact_cmd)
+    agent_context_compact_cmd.set_defaults(handler=lambda args: agent_context_compact(args.session, dry_run=args.dry_run))
 
     agent_memory_cmd = agent_sub.add_parser("memory", help="Inspect, export, or maintain local transparent memory")
     agent_memory_sub = agent_memory_cmd.add_subparsers(dest="agent_memory_command", required=True)

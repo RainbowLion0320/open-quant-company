@@ -58,7 +58,23 @@
             <template v-for="(segment, index) in modelRuntimeSegments" :key="segment.key">
               <span v-if="index" class="runtime-separator">·</span>
               <span :class="['runtime-segment', `runtime-segment-${segment.kind}`]">
-                {{ segment.text }}
+                <span
+                  v-if="segment.kind === 'context-progress'"
+                  class="runtime-progress"
+                  role="meter"
+                  :aria-valuenow="segment.progress"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  :aria-label="`${t('ceoOffice.contextShort')} ${segment.progress}%`"
+                >
+                  <span
+                    v-for="cell in runtimeBatteryCells"
+                    :key="cell"
+                    class="runtime-progress-cell"
+                    :class="{ active: cell <= segment.cells }"
+                  ></span>
+                </span>
+                <template v-else>{{ segment.text }}</template>
               </span>
             </template>
           </div>
@@ -379,8 +395,10 @@ const modelRuntimeSegments = computed(() => {
     { key: "provider", kind: "provider", text: label },
     { key: "model", kind: "model", text: model },
     { key: "reasoning", kind: "reasoning", text: `${t("ceoOffice.reasoningShort")} ${reasoningLevelShort(modelRuntime.value.reasoning.level)}` },
-    { key: "context", kind: "context", text: `${t("ceoOffice.contextShort")} ${formatTokenK(contextUsedTokens.value)}/${formatTokenK(modelRuntime.value.context.max_tokens)}` },
-    { key: "usage", kind: "usage", text: `${contextUsagePct.value}%` },
+    { key: "context", kind: "context", text: t("ceoOffice.contextShort") },
+    { key: "context-progress", kind: "context-progress", text: "", progress: contextUsagePct.value, cells: contextBatteryCells.value },
+    { key: "context-max", kind: "context", text: formatTokenK(modelRuntime.value.context.max_tokens) },
+    { key: "context-status", kind: contextStatusKind(modelRuntime.value.context.status), text: contextStatusShort(modelRuntime.value.context.status) },
   ];
 });
 const draftContextTokens = computed(() => estimateTextTokens(draft.value));
@@ -390,6 +408,8 @@ const contextUsagePct = computed(() => {
   if (!maxTokens) return 0;
   return Math.min(100, Math.round((contextUsedTokens.value / maxTokens) * 10000) / 100);
 });
+const runtimeBatteryCells = [1, 2, 3, 4, 5, 6, 7, 8];
+const contextBatteryCells = computed(() => Math.min(runtimeBatteryCells.length, Math.max(0, Math.ceil((contextUsagePct.value / 100) * runtimeBatteryCells.length))));
 
 const deskNames = computed<Record<string, string>>(() => ({
   data: t("ceoOffice.dataDesk"),
@@ -427,6 +447,22 @@ function statusLabel(status: string) {
   if (status === "partial") return t("ceoOffice.partial");
   if (status === "missing_secret") return t("ceoOffice.missingSecret");
   return status;
+}
+
+function contextStatusShort(status: string) {
+  const normalized = (status || "ok").toLowerCase();
+  if (normalized === "warn") return "WARN";
+  if (normalized === "compacted") return "COMPACTED";
+  if (normalized === "blocked") return "BLOCKED";
+  return "OK";
+}
+
+function contextStatusKind(status: string) {
+  const normalized = (status || "ok").toLowerCase();
+  if (normalized === "warn") return "context-warn";
+  if (normalized === "compacted") return "context-compacted";
+  if (normalized === "blocked") return "context-blocked";
+  return "context-ok";
 }
 
 function formatJson(value: Record<string, unknown>) {
