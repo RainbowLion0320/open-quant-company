@@ -61,7 +61,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
 
     assert "useI18n" in view
     assert "api.agentSessions" in view
-    assert "api.agentDesks" not in view
+    assert "api.agentDesks" in view
     assert "api.agentActions" in view
     assert "api.agentCreateSession" in view
     assert "api.agentAddMessage" in view
@@ -104,6 +104,19 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "message.action_refs" in view
     assert "actionById" in view
     assert "messageHasSelectedEvidence" in view
+    assert "desk-status-strip" in view
+    assert "deskStatusCards" in view
+    assert "deskCardState" in view
+    assert "deskStateLabel" in view
+    assert "desk-status-card" in view
+    assert "desk-status-standby" in css
+    assert "desk-status-running" in css
+    assert "desk-status-unavailable" in css
+    assert "desk-status-failed" in css
+    assert "@keyframes desk-running-pulse" in css
+    assert "allowed_tools" not in view
+    assert "handoff_targets" not in view
+    assert "default_policy" not in view
     assert 'class="ceo-panel conversation-panel"' not in view
     assert '<header class="panel-head">' not in view
     assert 't("ceoOffice.messages")' not in view
@@ -267,12 +280,26 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "交易执行部" in zh_ceo
     assert "技术平台部" in zh_ceo
     assert "运营报告部" in zh_ceo
+    assert "数据源、补数、覆盖率" in zh_ceo
+    assert "策略、因子、回测证据" in zh_ceo
+    assert "仓位、权重、调仓判断" in zh_ceo
+    assert "风控、暴露、阻断检查" in zh_ceo
+    assert "订单、券商、对账" in zh_ceo
+    assert "代码、测试、诊断" in zh_ceo
+    assert "简报、总结、协调" in zh_ceo
     assert "证据详情" in zh_ceo
     assert "提交纸面订单" in zh_ceo
     assert "纸面订单预览" in zh_ceo
     assert "运行证据" in zh_ceo
     assert "运行时间线" in zh_ceo
     assert "assigns the responsible desk" in en_ceo
+    assert "Sources, backfills, coverage" in en_ceo
+    assert "Strategies, factors, evidence" in en_ceo
+    assert "Positions, weights, rebalance" in en_ceo
+    assert "Gates, exposure, blockers" in en_ceo
+    assert "Orders, broker, reconcile" in en_ceo
+    assert "Code, tests, diagnostics" in en_ceo
+    assert "Briefs, summaries, routing" in en_ceo
     assert "Evidence Detail" in en_ceo
     assert "Submit Paper Order" in en_ceo
     assert "Paper Order Preview" in en_ceo

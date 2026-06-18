@@ -31,6 +31,75 @@
   min-height: 0;
 }
 
+.desk-status-strip {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(112px, 1fr));
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.desk-status-card {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: rgba(3, 10, 18, 0.22);
+}
+
+.desk-status-card strong {
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-status-card p {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-status-standby {
+  border-color: rgba(125, 211, 252, 0.26);
+}
+
+.desk-status-running {
+  border-color: rgba(34, 197, 94, 0.62);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.08), 0 0 16px rgba(34, 197, 94, 0.1);
+  animation: desk-running-pulse 2.2s ease-in-out infinite;
+}
+
+.desk-status-running strong {
+  color: rgba(187, 247, 208, 0.95);
+}
+
+.desk-status-failed {
+  border-color: rgba(248, 113, 113, 0.68);
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.08);
+}
+
+.desk-status-unavailable {
+  border-color: rgba(148, 163, 184, 0.22);
+  opacity: 0.58;
+  filter: saturate(0.55);
+}
+
+@keyframes desk-running-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.08), 0 0 12px rgba(34, 197, 94, 0.08); }
+  50% { box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.24), 0 0 22px rgba(34, 197, 94, 0.22); }
+}
+
 .message-list,
 .message-action-list,
 .action-list,

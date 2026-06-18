@@ -2,6 +2,18 @@
   <div class="ceo-office view-page">
     <section v-if="error" class="ceo-alert">{{ error }}</section>
 
+    <section class="desk-status-strip" :aria-label="t('ceoOffice.departmentStatusAria')">
+      <article
+        v-for="card in deskStatusCards"
+        :key="card.deskId"
+        :class="['desk-status-card', `desk-status-${card.state}`]"
+        :aria-label="`${card.label}: ${card.statusLabel}`"
+      >
+        <strong>{{ card.label }}</strong>
+        <p>{{ card.description }}</p>
+      </article>
+    </section>
+
     <section class="ceo-grid">
       <article class="conversation-panel">
         <div v-if="!messages.length" class="ceo-empty">{{ t("ceoOffice.noMessages") }}</div>
@@ -176,7 +188,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentEvidenceSnapshot, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -185,6 +197,7 @@ const sessions = ref<AgentSession[]>([]);
 const activeSession = ref<AgentSession | null>(null);
 const messages = ref<AgentMessage[]>([]);
 const actions = ref<AgentAction[]>([]);
+const agentDesks = ref<AgentDesk[]>([]);
 const sessionStream = ref<AbortController | null>(null);
 const sessionStreamId = ref("");
 const lastStreamSignature = ref("");
@@ -205,6 +218,7 @@ const error = ref("");
 const paperOrderPreview = computed(() => objectParam(selectedAction.value?.action.parameters.paper_order_preview));
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
 const paperRiskGatePassed = computed(() => Boolean(paperRiskGate.value?.passed));
+const deskOrder = ["data", "research", "portfolio", "risk", "execution", "engineering", "reporting"];
 const deskNames = computed<Record<string, string>>(() => ({
   data: t("ceoOffice.dataDesk"),
   research: t("ceoOffice.researchDesk"),
@@ -214,9 +228,54 @@ const deskNames = computed<Record<string, string>>(() => ({
   engineering: t("ceoOffice.engineeringDesk"),
   reporting: t("ceoOffice.reportingDesk"),
 }));
+const deskDescriptions = computed<Record<string, string>>(() => ({
+  data: t("ceoOffice.dataDeskBrief"),
+  research: t("ceoOffice.researchDeskBrief"),
+  portfolio: t("ceoOffice.portfolioDeskBrief"),
+  risk: t("ceoOffice.riskDeskBrief"),
+  execution: t("ceoOffice.executionDeskBrief"),
+  engineering: t("ceoOffice.engineeringDeskBrief"),
+  reporting: t("ceoOffice.reportingDeskBrief"),
+}));
+const deskRegistryById = computed<Record<string, AgentDesk>>(() =>
+  Object.fromEntries(agentDesks.value.map(desk => [desk.desk_id, desk])),
+);
+const currentSessionActions = computed(() => {
+  const sessionId = activeSession.value?.session_id || "";
+  if (!sessionId) return [];
+  return actions.value.filter(action => action.session_id === sessionId);
+});
+const deskStatusCards = computed(() =>
+  deskOrder.map(deskId => {
+    const state = deskCardState(deskId);
+    return {
+      deskId,
+      state,
+      label: deskLabel(deskId),
+      description: deskDescriptions.value[deskId],
+      statusLabel: deskStateLabel(state),
+    };
+  }),
+);
 
 function deskLabel(desk: string) {
   return deskNames.value[desk] || desk;
+}
+
+function deskCardState(deskId: string) {
+  const registry = deskRegistryById.value[deskId];
+  if (!registry || registry.status !== "available") return "unavailable";
+  const relatedActions = currentSessionActions.value.filter(action => action.desk === deskId);
+  if (relatedActions.some(action => action.status === "failed" || action.status === "blocked")) return "failed";
+  if (relatedActions.some(action => action.status === "running")) return "running";
+  return "standby";
+}
+
+function deskStateLabel(state: string) {
+  if (state === "running") return t("ceoOffice.departmentStateRunning");
+  if (state === "failed") return t("ceoOffice.departmentStateFailed");
+  if (state === "unavailable") return t("ceoOffice.departmentStateUnavailable");
+  return t("ceoOffice.departmentStateStandby");
 }
 
 function statusLabel(status: string) {
@@ -379,12 +438,14 @@ async function loadSession(sessionId: string, options: { connectStream?: boolean
 async function loadOfficeState() {
   error.value = "";
   try {
-    const [sessionPayload, actionPayload] = await Promise.all([
+    const [sessionPayload, actionPayload, deskPayload] = await Promise.all([
       api.agentSessions(),
       api.agentActions(),
+      api.agentDesks().catch(() => ({ desks: [] })),
     ]);
     sessions.value = sessionPayload.sessions || [];
     actions.value = actionPayload.actions || [];
+    agentDesks.value = deskPayload.desks || [];
     if (sessions.value.length) {
       await loadSession(activeSession.value?.session_id || sessions.value[0].session_id);
     }
