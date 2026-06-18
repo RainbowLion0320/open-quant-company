@@ -4647,8 +4647,9 @@ def test_agent_runtime_records_run_and_tool_registry_uses_fixed_command_arrays(t
     health_tool = registry.get("astroq.health")
     assert health_tool is not None
     health_command = registry.command_for("astroq.health")
+    assert isinstance(health_command, list)
+    assert all(isinstance(part, str) and part for part in health_command)
     assert Path(health_command[0]).name == "astroq"
-    assert health_command[0] != "astroq"
     assert health_command[1:] == ["health", "--json"]
 
     try:
@@ -6612,8 +6613,8 @@ def test_agent_dispatch_runs_read_only_tool_and_updates_ledger(tmp_path, monkeyp
     run = runtime.dispatch_action(action.action_id, runner=fake_run)
 
     assert len(calls) == 1
+    assert all(isinstance(part, str) and part for part in calls[0])
     assert Path(calls[0][0]).name == "astroq"
-    assert calls[0][0] != "astroq"
     assert calls[0][1:] == ["health", "--json"]
     assert run.status == "succeeded"
     assert run.return_code == 0
@@ -7119,7 +7120,8 @@ def test_agent_session_read_only_workflow_entrypoints_are_removed(tmp_path, monk
         raise AssertionError("removed agent session command should not be registered")
 
     app = create_app()
-    assert removed_path.replace(session.session_id, "{session_id}") not in {route.path for route in app.routes}
+    route_paths = {getattr(route, "path", "") for route in app.routes}
+    assert removed_path.replace(session.session_id, "{session_id}") not in route_paths
     api_res = TestClient(app).post(removed_path)
     assert api_res.status_code in {404, 405}
     reset_datahub()
