@@ -12,6 +12,7 @@ export const activity = {
       projectTokens: "project tokens",
       calls: "{count} calls",
       estimatedCost: "estimated cost",
+      unpricedUsage: "{count} rows unpriced",
       estimatedDailyCost: "estimated daily cost",
       modelTokenStack: "{model} token stack",
       usageEmpty: "Future LLM provider API calls in this project will write usage into the local ledger and show trends here.",

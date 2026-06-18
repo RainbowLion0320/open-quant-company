@@ -1,6 +1,6 @@
 # Onboarding Without Secrets
 
-Open Quant Company should be inspectable without provider credentials. A new contributor can validate the codebase, build the Web UI, and run deterministic checks without `TUSHARE_TOKEN`, `DEEPSEEK_API_KEY`, notification webhooks, or private local data.
+Open Quant Company should be inspectable without provider credentials. A new contributor can validate the codebase, build the Web UI, and run deterministic checks without `TUSHARE_TOKEN`, configured LLM provider keys such as `DEEPSEEK_API_KEY`, notification webhooks, or private local data.
 
 Development checks require Python 3.11+, Node.js 18+, Git, and ripgrep (`rg`).
 
@@ -36,7 +36,7 @@ npm run build
 ## What Requires Secrets
 
 - Full Tushare capability probing and backfill require `TUSHARE_TOKEN`.
-- LLM-assisted factor discovery and provider usage checks require provider API keys such as `DEEPSEEK_API_KEY`.
+- LLM-assisted factor discovery and provider usage checks require the configured provider API key named by `llm.providers.<provider>.api_key_env`.
 - Push notifications require Telegram, WeChat, or Feishu webhook configuration.
 
 ## Local Runtime Data

@@ -101,7 +101,8 @@ const runMode = ref("research");
 const systemHealth = ref<{ all_ok: boolean; ok_count: number; total: number }>({ all_ok: true, ok_count: 0, total: 0 });
 
 const nav = [
-  { path: "/", labelKey: "nav.market", pathData: "M4 17V7l8-4 8 4v10l-8 4-8-4Zm4-1 4 2 4-2V9l-4-2-4 2v7Zm2-1.5h4M10 11h4" },
+  { path: "/", labelKey: "nav.ceoOffice", pathData: "M4 18V8l8-5 8 5v10l-8 3-8-3Zm4-2.5 4 1.5 4-1.5V9.5L12 7 8 9.5v6Zm2-1.5h4M9.5 11h5M12 7v10" },
+  { path: "/market", labelKey: "nav.market", pathData: "M4 17V7l8-4 8 4v10l-8 4-8-4Zm4-1 4 2 4-2V9l-4-2-4 2v7Zm2-1.5h4M10 11h4" },
   { path: "/research", labelKey: "nav.research", pathData: "M3 18l5-5 4 3 7-9M4 6h16M4 21h16M7 11h3m4 7h3" },
   { path: "/strategy-lab", labelKey: "nav.strategyLab", pathData: "M12 3l8 4v10l-8 4-8-4V7l8-4Zm0 4v10M7 9.5l5 2.5 5-2.5M8 17l4-2 4 2" },
   { path: "/portfolio", labelKey: "nav.portfolio", pathData: "M5 7h14v12H5V7Zm3 0V5h8v2M8 13h3m2 0h3M8 16h8" },
@@ -112,6 +113,7 @@ const nav = [
 
 const activeSectionPath = computed(() => {
   if (route.path === "/") return "/";
+  if (route.path.startsWith("/market")) return "/market";
   if (route.path.startsWith("/research") || route.path.startsWith("/stocks")) return "/research";
   if (route.path.startsWith("/strategy-lab")) return "/strategy-lab";
   if (route.path.startsWith("/portfolio")) return "/portfolio";

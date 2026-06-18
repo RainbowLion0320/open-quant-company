@@ -46,6 +46,9 @@ export interface LlmUsageResponse {
     models: string[];
     dates: string[];
     totals: { tokens: number; requests: number; estimated_cost_usd: number; estimated_cost_cny: number };
+    pricing_status?: string;
+    unpriced_rows?: number;
+    unpriced_reasons?: string[];
     pricing_source?: string;
   };
   total_cost?: number;

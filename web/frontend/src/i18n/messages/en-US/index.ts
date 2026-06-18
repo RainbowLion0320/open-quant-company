@@ -2,6 +2,7 @@ import { app } from "./app";
 import { common } from "./common";
 import { errors } from "./errors";
 import { nav } from "./nav";
+import { ceoOffice } from "./ceoOffice";
 import { modules } from "./modules";
 import { market } from "./market";
 import { pipeline } from "./pipeline";
@@ -29,6 +30,7 @@ export const enUS = {
   common,
   errors,
   nav,
+  ceoOffice,
   modules,
   market,
   pipeline,

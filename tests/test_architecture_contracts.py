@@ -610,6 +610,29 @@ def test_rate_limited_market_event_freshness_is_warning_until_required():
     assert required_gate["stale"] == ["stock_limit_list"]
 
 
+def test_registry_warning_freshness_is_observable_but_not_global_blocker():
+    from data.quality.freshness_gate import freshness_gate, health_result_to_gate_data
+
+    rows = health_result_to_gate_data([
+        {
+            "table": "stock_moneyflow_daily",
+            "registry_key": "moneyflow_daily",
+            "freshness_status": "stale",
+            "freshness_severity": "warning",
+            "freshness_reason": "source_unavailable",
+        }
+    ])
+
+    global_gate = freshness_gate(rows)
+    required_gate = freshness_gate(rows, required=["stock_moneyflow_daily"])
+
+    assert global_gate["ok"] is True
+    assert global_gate["warnings"] == ["stock_moneyflow_daily"]
+    assert global_gate["details"][0]["severity"] == "warning"
+    assert required_gate["ok"] is False
+    assert required_gate["stale"] == ["stock_moneyflow_daily"]
+
+
 def test_formal_lifecycle_does_not_silently_fill_core_evidence_gaps():
     price_service = Path("data/market/price_service.py").read_text(encoding="utf-8")
     competition = Path("research/strategy_competition.py").read_text(encoding="utf-8")
@@ -814,7 +837,7 @@ def test_web_docs_match_current_api_pipeline_and_schema_contracts():
 
     required_by_source = {
         "web spec": (
-            "routes/ (13 domain modules)",
+            "routes/ (14 domain modules)",
             "`elkjs` layered + orthogonal routing",
             "GET /api/stocks",
             "POST /api/stocks/dcf",
@@ -830,15 +853,15 @@ def test_web_docs_match_current_api_pipeline_and_schema_contracts():
         "acceptance matrix": (
             "GET /api/system/db-health",
             "GET /api/strategies/buffett",
-            "WARN",
-            "vendor / ECharts / DWP chunk",
+            "ECharts、Vue ECharts adapter、Three、ELK、Vue/Pinia/Router",
+            "当前无 Vite chunk warning",
         ),
         "schema reference": (
             "`web/api/schemas/*` 分域 schema",
             "路由 response models",
         ),
         "api init": (
-            "13个业务路由模块",
+            "14个业务路由模块",
             "Pydantic 类型分域定义",
         ),
     }
@@ -856,6 +879,28 @@ def test_web_docs_match_current_api_pipeline_and_schema_contracts():
         missing.extend(f"{source}:{token}" for token in tokens if token not in text)
 
     assert missing == []
+
+
+def test_frontend_vite_splits_heavy_runtime_vendor_chunks():
+    vite_config = Path("web/frontend/vite.config.ts").read_text(encoding="utf-8")
+    acceptance = Path("docs/product/acceptance-matrix.md").read_text(encoding="utf-8")
+
+    required_chunk_rules = (
+        'id.includes("/echarts/")',
+        'id.includes("/vue-echarts/")',
+        'id.includes("/three/")',
+        'id.includes("/elkjs/")',
+        'id.includes("/@vue/")',
+        'id.includes("/pinia/")',
+        'id.includes("/vue-router/")',
+    )
+
+    missing = [rule for rule in required_chunk_rules if rule not in vite_config]
+    assert missing == []
+    assert "chunkSizeWarningLimit: 1500" in vite_config
+    assert "vendor / ECharts / DWP chunk 仍超过 Vite warning threshold" not in acceptance
+    assert "| 5.13 | 前端构建通过且 bundle 体积可追踪" in acceptance
+    assert "| OK | — |" in acceptance
 
 
 def test_backtest_entrypoint_no_longer_exposes_legacy_runner():

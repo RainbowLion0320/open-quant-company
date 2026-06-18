@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Open Quant Company</h1>
-  <h3>A local-first quant company OS where humans act as CEO and agents operate research, data, risk, and engineering desks.</h3>
+  <h3>A local-first quant company OS where humans act as CEO and agents operate data, research, portfolio, risk, execution, engineering, and reporting desks.</h3>
   <p>
     <img src="https://img.shields.io/badge/python-3.11+-blue" alt="Python">
     <img src="https://img.shields.io/badge/version-2.0.0-orange" alt="Version">
@@ -15,7 +15,7 @@
 
 ---
 
-Open Quant Company is not a single strategy script and not a hosted trading platform. It is a local-first operating system for running a small quant company: the human sets direction as CEO, while agents operate data, research, risk, engineering, and reporting desks. The Web UI makes the work inspectable. The `astroq` CLI makes it automatable.
+Open Quant Company is not a single strategy script and not a hosted trading platform. It is a local-first operating system for running a small quant company: the human sets direction as CEO, while agents operate data, research, portfolio, risk, execution, engineering, and reporting desks. The Web UI makes the work inspectable. The `astroq` CLI makes it automatable.
 
 The current system focuses on daily-frequency quant research, backtesting, evidence governance, and paper execution. Important conclusions should trace back to data health, configuration, strategy evidence, backtest artifacts, and local runtime records instead of living only in a temporary script or screenshot.
 
@@ -67,8 +67,10 @@ The core metaphor is a local quant company workspace, not a black-box strategy.
 | Desk | Current capabilities |
 |------|----------------------|
 | Data Desk | DataHub, source capability registry, Tushare/AKShare audits, local coverage, and freshness gates |
-| Research Desk | Strategy Catalog, factor evidence, OOS/IC/ICIR, strategy competition, and candidate governance |
+| Research Desk | Technical, sentiment, fundamental, factor, and ML research capabilities, plus Strategy Catalog, OOS/IC/ICIR, strategy competition, and candidate governance |
+| Portfolio Desk | Consumes research evidence and risk constraints to review weights, exposure, rebalance cadence, and strategy-mix priority |
 | Risk Desk | Market regime, risk budget, position limits, drawdown breakers, and pre-execution gates |
+| Execution Desk | PaperBroker / MiniQMT-QMT readiness, order previews, execution dry-runs, reconciliation, and kill switch state |
 | Engineering Desk | CodeGraph, AST duplicate diagnostics, test design diagnostics, and docs/spec/wiki consistency checks |
 | Reporting Desk | Lifecycle evidence, backtest artifacts, model artifacts, paper ledger, and system diagnostics |
 
@@ -92,16 +94,21 @@ flowchart LR
   CEO --> CLI["astroq CLI\nagent / cron / JSON"]
 
   Data["Data Desk\nsource capability / DataHub / coverage"] --> Research["Research Desk\nsignals / evidence / strategy catalog"]
-  Research --> Risk["Risk Desk\nregime / position / gates"]
-  Risk --> Execution["PaperBroker\norders / ledger / NAV"]
+  Research --> Portfolio["Portfolio Desk\nweights / position / rebalance"]
+  Portfolio --> Risk["Risk Desk\nregime / limits / gates"]
+  Risk --> Execution["Execution Desk\npreview / orders / reconciliation"]
+  Execution --> Broker["PaperBroker / MiniQMT-QMT\nledger / NAV"]
   Engineering["Engineering Desk\nCodeGraph / AST / tests / docs"] --> Research
+  Engineering --> Portfolio
   Reporting["Reporting Desk\nartifacts / lifecycle / reports"] --> UI
 
   CLI --> Data
   CLI --> Research
+  CLI --> Portfolio
   CLI --> Engineering
   UI --> Data
   UI --> Research
+  UI --> Portfolio
   UI --> Risk
   UI --> Execution
 ```

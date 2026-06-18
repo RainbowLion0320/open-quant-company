@@ -1,4 +1,5 @@
 export const nav = {
+      ceoOffice: "CEO Office",
       market: "Market",
       research: "Research",
       strategyLab: "Strategy Lab",

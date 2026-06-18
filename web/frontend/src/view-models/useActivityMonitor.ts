@@ -42,6 +42,9 @@ export function useActivityMonitor() {
     costUsd: number;
     balanceText: string;
     balanceStatus: string;
+    pricingStatus: string;
+    unpricedRows: number;
+    unpricedReasons: string[];
   } | null>(null);
 
   const apiHealth = ref<{ items: { name: string; status: string; detail: string }[]; summary: string; all_ok: boolean } | null>(null);
@@ -234,6 +237,9 @@ export function useActivityMonitor() {
           costUsd: d.usage?.totals?.estimated_cost_usd || 0,
           balanceText,
           balanceStatus,
+          pricingStatus: d.usage?.pricing_status || "ok",
+          unpricedRows: Number(d.usage?.unpriced_rows || 0),
+          unpricedReasons: d.usage?.unpriced_reasons || [],
         };
         return;
       }
@@ -262,6 +268,9 @@ export function useActivityMonitor() {
         costUsd: d.usage?.totals?.estimated_cost_usd || rows.reduce((s: number, r: any) => s + (r.estimated_cost_usd||0), 0),
         balanceText,
         balanceStatus,
+        pricingStatus: d.usage?.pricing_status || "ok",
+        unpricedRows: Number(d.usage?.unpriced_rows || 0),
+        unpricedReasons: d.usage?.unpriced_reasons || [],
       };
 
       const palettes = [

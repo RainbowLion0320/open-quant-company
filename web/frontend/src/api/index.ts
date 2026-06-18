@@ -1,4 +1,5 @@
 import { assetsApi } from "./modules/assets";
+import { agentApi } from "./modules/agent";
 import { dataSourcesApi } from "./modules/dataSources";
 import { marketApi } from "./modules/market";
 import { portfolioApi } from "./modules/portfolio";
@@ -13,6 +14,7 @@ export * from "./types";
 
 export const api = {
   ...marketApi,
+  ...agentApi,
   ...strategyApi,
   ...assetsApi,
   ...dataSourcesApi,

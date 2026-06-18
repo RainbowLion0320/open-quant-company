@@ -82,6 +82,20 @@ def backtest_strategy_names() -> list[str]:
     return sorted(names)
 
 
+def _current_champion_name(results: dict[str, dict], strategy_items: dict[str, dict]) -> str | None:
+    """Select the current production peer used by evidence reports as champion baseline."""
+    production = [
+        name
+        for name, item in strategy_items.items()
+        if item.get("status") == "production" and name in results
+    ]
+    if "multifactor" in production:
+        return "multifactor"
+    if not production:
+        return None
+    return max(production, key=lambda name: float(results[name].get("sharpe", 0.0) or 0.0))
+
+
 def _strategy_alpha_model(name: str, label: str, scorer_fn, alpha_min_score: int):
     from pipeline.alpha import StrategyAlphaAdapter
 
@@ -197,6 +211,7 @@ def run_strategy_comparison(strategy: str = "") -> dict:
         enabled_strategies = [item for item in enabled_strategies if item["name"] == strategy]
         if not enabled_strategies:
             raise SystemExit(f"Unknown or disabled strategy: {strategy}")
+    strategy_items = {item["name"]: dict(item) for item in enabled_strategies}
 
     results = {}
     for item in enabled_strategies:
@@ -227,15 +242,24 @@ def run_strategy_comparison(strategy: str = "") -> dict:
             cash=float(bt_cfg.get("initial_cash", 1_000_000)),
             label=item.get("label", name),
         )
-        results[name]["data_readiness"] = strategy_data_readiness(item)
+        results[name]["data_readiness"] = strategy_data_readiness(item, as_of=end)
         with open(BACKTEST_ARTIFACT_DIR / f"backtest_{name}.pkl", "wb") as f:
             pickle.dump(results[name], f)
+
+    current_champion = _current_champion_name(results, strategy_items)
+    for item in enabled_strategies:
+        name = item["name"]
+        if name not in results:
+            continue
         write_backtest_evidence(
             name,
             item.get("status", "candidate"),
             results[name],
             start=start,
             end=end,
+            price_matrix=prices,
+            peer_results=results,
+            current_champion=current_champion,
         )
 
     comparison = {

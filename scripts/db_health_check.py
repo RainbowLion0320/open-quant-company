@@ -411,10 +411,18 @@ def _quarter_label(day: date) -> str:
     return f"{day.year}Q{((day.month - 1) // 3) + 1}"
 
 
+def _month_label(day: date) -> str:
+    return f"{day.year}-{day.month:02d}"
+
+
 def _quarter_end(year: int, quarter: int) -> date:
     month = quarter * 3
     day = 31 if month in {3, 12} else 30
     return date(year, month, day)
+
+
+def _month_end(year: int, month: int) -> date:
+    return pd.Timestamp(year=year, month=month, day=1).to_period("M").end_time.date()
 
 
 def _latest_due_quarter_end(today: date, release_lag_days: int = 45) -> Optional[date]:
@@ -425,6 +433,43 @@ def _latest_due_quarter_end(today: date, release_lag_days: int = 45) -> Optional
     ]
     due = [item for item in candidates if item + timedelta(days=release_lag_days) <= today]
     return max(due) if due else None
+
+
+def _latest_due_month_start(today: date, release_lag_days: int = 20) -> Optional[date]:
+    candidates = [
+        date(year, month, 1)
+        for year in range(today.year - 1, today.year + 1)
+        for month in range(1, 13)
+    ]
+    due = [
+        item
+        for item in candidates
+        if _month_end(item.year, item.month) + timedelta(days=release_lag_days) <= today
+    ]
+    return max(due) if due else None
+
+
+def _macro_monthly_freshness_status(row: dict, today: date) -> tuple[str, dict[str, str]]:
+    expected = _latest_due_month_start(today)
+    latest = pd.to_datetime(row.get("freshness_date"), errors="coerce")
+    detail = {
+        "reason": "month_available",
+        "expected_period": _month_label(expected) if expected else "",
+        "expected_date": expected.isoformat() if expected else "",
+        "latest_period": "",
+        "latest_date": "",
+        "release_lag_days": "20",
+    }
+    if pd.isna(latest):
+        return "unknown", {**detail, "reason": "latest_date_unavailable"}
+    latest_date = latest.date().replace(day=1)
+    detail["latest_date"] = latest_date.isoformat()
+    detail["latest_period"] = _month_label(latest_date)
+    if expected is None:
+        return "fresh", {**detail, "reason": "no_due_month"}
+    if latest_date >= expected:
+        return "fresh", detail
+    return "stale", {**detail, "reason": "source_not_updated"}
 
 
 def _macro_gdp_freshness_status(row: dict, today: date) -> tuple[str, dict[str, str]]:
@@ -466,6 +511,8 @@ def _freshness_status(
         return "missing", {"reason": "no_files"}
     if row.get("error"):
         return "error", {"reason": "scan_error"}
+    if meta.registry_key in {"macro_money_supply", "macro_pmi", "macro_cpi", "macro_ppi"}:
+        return _macro_monthly_freshness_status(row, today or date.today())
     if meta.registry_key == "macro_gdp":
         return _macro_gdp_freshness_status(row, today or date.today())
     days = row.get("freshness_days")
@@ -563,6 +610,7 @@ def run_health_check(output_path: Optional[Path] = None) -> pd.DataFrame:
         r["freshness_sla_days"] = meta.freshness_sla_days
         r["repair_policy"] = meta.repair_policy
         r["partition_key"] = meta.partition_key
+        r["freshness_severity"] = meta.freshness_severity
         r["data_domain"] = _freshness_scope(meta)
         r["freshness_status"] = status
         r["freshness_reason"] = detail.get("reason", "")

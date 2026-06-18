@@ -29,6 +29,7 @@ Use current code, specs, tests, and generated artifacts as the source of truth. 
 - Canonical environment variables include:
   - `TUSHARE_TOKEN`
   - `DEEPSEEK_API_KEY`
+  - Other LLM provider variables referenced by `config/settings.yaml: llm.providers.<provider>.api_key_env`
   - `ASTROLABE_API_KEY`
   - `ASTROLABE_VAR`
   - notification variables such as `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `WECHAT_WEBHOOK_URL`, and `FEISHU_WEBHOOK_URL`
@@ -45,6 +46,49 @@ Use `astroq` for automation and JSON-readable operations:
 | 命令 | 用途 |
 |------|------|
 | `astroq health --json` | 检查项目版本、DataHub 路径和本地健康状态 |
+| `astroq agent sessions --json` | 查看本地 Agent Company OS 会话 ledger |
+| `astroq agent session create --title "Daily CEO Brief" --json` | 创建 CEO Office / desk agent 会话 |
+| `astroq agent session update <session_id> --title "..." --tag daily --json` | 重命名、归档或更新本地 agent 会话标签 |
+| `astroq agent autonomy step --session <session_id> --text "..." --json` | 运行一次 bounded autonomy：创建 CEO message，只执行本轮新增 read_only/dry_run 固定工具行动，审批/写入/交易行动只跳过并记录；可加 `--semantic-draft-file draft.json` 或 `--provider-semantic --planner-provider <provider> --planner-model <model>`，语义草案仍只作为不可信规划输入 |
+| `astroq agent autonomy run --session <session_id> --text "..." --max-steps 2 --json` | 运行一个有上限的 bounded autonomy loop：每一步都沿用 step 的固定工具白名单和 read_only/dry_run 边界，遇到无安全动作、步骤未就绪或达到上限即停机 |
+| `astroq agent program create --session <session_id> --goal "..." --max-steps 6 --json` | 把开放式 CEO 目标持久化为 autonomy program；安全项成为 fixed-registry read_only/dry_run 阶段，未知/写入/代码/交易项成为 blocker、审批项或工单 |
+| `astroq agent programs --session <session_id> --json` | 查看本地 autonomy program ledger |
+| `astroq agent program run <program_id> --dry-run --json` | 预览 program 待运行安全阶段，不写 action/run ledger |
+| `astroq agent program run <program_id> --json` | 运行 program 中待执行的安全 fixed-registry 阶段；仍不会自动执行写入、代码、paper/live 交易或未知工具 |
+| `astroq agent message --session <session_id> --desk reporting --text "..." --json` | 写入 CEO 消息并生成 desk response；可加 `--semantic-draft-file draft.json` 或 `--provider-semantic --planner-provider <provider> --planner-model <model>` 让语义草案进入安全过滤 |
+| `astroq agent plan --desk reporting --text "..." --json` | 只预览 workflow plan，不写 ledger；可加 `--semantic-draft-file draft.json` 或 `--provider-semantic --planner-provider <provider> --planner-model <model>` 预览安全过滤后的语义计划 |
+| `astroq agent run <action_id> --json` | Dispatch 安全或已批准 agent action 并写入 run ledger |
+| `astroq agent cancel <action_id> --reason "..." --json` | 取消尚未完成的 agent action |
+| `astroq agent expire --session <session_id> --json` | 标记已过期的 queued agent action，防止继续审批或执行 |
+| `astroq agent report daily --session <session_id> --json` | 生成带 evidence 引用的 CEO brief 报告 artifact |
+| `astroq agent report data_quality|risk|execution|engineering|release --session <session_id> --json` | 生成 Data/Risk/Execution/Engineering/Release 专用 operating-rhythm 报告 |
+| `astroq agent rhythm --session <session_id> --json` | 显式运行到期 operating-rhythm 报告模板并写审计 artifact |
+| `astroq agent rhythm --all-active --json` | 扫描所有 active sessions，运行到期报告节奏并写 scheduled audit artifact，适合 cron 调用 |
+| `astroq agent reports --session <session_id> --json` | 查看本地已生成的 agent reports |
+| `astroq agent notify report <report_id> --dry-run --json` | 对已生成报告做通知演练；去掉 `--dry-run` 后只通过系统环境变量配置的渠道发送并写通知审计 artifact |
+| `astroq agent paper propose --session <session_id> --symbol 000001 --side buy --quantity 100 --limit-price 10 --evidence <evidence_id> --json` | 生成 PaperBroker 订单预览和审批卡，不提交订单 |
+| `astroq agent paper submit <action_id> --json` | 提交已批准的 PaperBroker order action；提交前重新预览/风控，写 run 与 reconciliation evidence |
+| `astroq agent paper cancel <action_id> --reason "..." --json` | 取消 queued paper approval request，或记录 broker-confirmed active paper order 撤单 |
+| `astroq agent live readiness --json` | 检查 MiniQMT/QMT 实盘 readiness；默认关闭且不会回退到 PaperBroker |
+| `astroq agent live environment --json` | 只读验证本机 MiniQMT/QMT SDK、账号、userdata、gateway 和终端查询能力；不下单、不回退 PaperBroker |
+| `astroq agent live smoke --json` | 运行不下单 MiniQMT/QMT smoke test；live ready 时只调用只读 reconciliation 探测并写 smoke evidence |
+| `astroq agent live preview --symbol 600000.SH --side buy --quantity 100 --limit-price 10 --evidence <evidence_id> --json` | 预览实盘限价单，不提交订单；输出 approval、扩展 risk gate、现金/持仓影响和 blocker |
+| `astroq agent live propose --session <session_id> --symbol 600000.SH --side buy --quantity 100 --limit-price 10 --evidence <evidence_id> --json` | 生成实盘订单审批卡；默认 live disabled 时返回 blocked，不创建 action |
+| `astroq agent live submit <action_id> --json` | 提交已批准的 live_order action；默认 MiniQMT/QMT adapter fail closed，不会回退到 PaperBroker |
+| `astroq agent live reconcile --json` | 扫描已提交 live_order 对账证据，调用 live adapter reconciliation，并写 scheduled reconciliation artifact |
+| `astroq agent live monitor --json` | 运行 cron-callable live monitor tick，汇总 readiness、kill switch 和 reconciliation，并写 monitor evidence artifact |
+| `astroq agent live kill-switch activate --reason "..." --json` | 激活本地实盘 kill switch，取消 queued live_order actions，对已提交实盘证据请求 broker-side 撤单，并阻断后续 live preview/propose/submit |
+| `astroq agent live kill-switch status --json` | 查看本地实盘 kill switch 状态 |
+| `astroq agent handoffs --json` | 查看跨 desk 交接 ledger |
+| `astroq agent handoff resolve <handoff_id> --json` | 标记跨 desk 交接事项已完成 |
+| `astroq agent work-orders --session <session_id> --json` | 查看 Engineering Desk 创建的工程工单 |
+| `astroq agent work-order create --session <session_id> --title "..." --summary "..." --impact "..." --file path --verify "pytest ..." --evidence <evidence_id> --json` | 创建带证据、影响范围、影响文件和建议验证命令的工程工单；Web runtime 不直接改仓库 |
+| `astroq agent work-order update <work_order_id> --status resolved --resolution "..." --json` | 更新工程工单状态，`resolved/canceled` 会写终态审计时间 |
+| `astroq agent memory export --json` | 导出本地透明 memory ledger 到 `var/artifacts/agent/memory/` |
+| `astroq agent memory prune --dry-run --json` | 预览或清理已归档 session 的本地 agent memory |
+| `astroq agent memory clear --confirm --json` | 显式确认后清空本地 agent memory ledger |
+| `astroq agent desks --json` | 查看 Data / Research / Portfolio / Risk / Execution / Engineering / Reporting desk agents |
+| `astroq agent policies --json` | 查看每个 risk level 的显式审批策略、默认决策和过期窗口 |
 | `astroq config env --json` | 检查当前进程环境变量密钥状态（脱敏输出） |
 | `astroq config validate --json` | 校验 settings 和策略注册表 |
 | `astroq data status --json` | 扫描本地数据健康 |
@@ -97,6 +141,7 @@ cd web/frontend && npm run dev
 - Put security reporting in `SECURITY.md`.
 - Update specs, wiki, acceptance matrix, and tests when behavior changes.
 - When adding an external data source, fetcher, provider adapter, or new data dimension, update the Source Capability Registry and verify `astroq data sources diff-registry --json`.
+- When adding an OpenAI-compatible LLM provider, add it under `llm.providers.<provider>` with `protocol: openai_compatible`, `api_key_env`, `base_url`, `default_model`, optional `request.*`, and provider-specific `pricing.models`. Then point `llm.use_cases.agent_planning` or `factor_hypothesis` at that provider/model and verify `astroq config env --json` plus `astroq config validate --json`.
 - Do not preserve deprecated compatibility paths unless the current design explicitly requires them.
 - Do not revert user changes. If the worktree is dirty, inspect changes and stage only files that belong to the task.
 
@@ -141,6 +186,8 @@ astroq lifecycle check --json
 - Production backtests use `backtest/pipeline_runner.py` plus shared modules under `pipeline/`.
 - Strategy state is owned by Strategy Catalog and separated into production, paper, and candidate layers.
 - Web System visualizations include CodeGraph, AST diagnostics, architecture diagnostics, test design intelligence, and lifecycle readiness.
+- Agent Company OS has a foundation runtime for session metadata, messages, deterministic desk responses, structured deterministic reasoning rows, CEO Office target-desk message selection, provider semantic usage accounting in the generic LLM usage ledger under `agent_planning`, semantic-assisted submitted messages and bounded autonomy steps/runs that write sanitized `Semantic planner audit` artifact evidence while previews write no agent ledger/evidence, persisted autonomy programs for open-ended CEO goals with safe fixed-registry phases and explicit blockers for unknown or state-changing items, CEO Office target-desk message selection, attention-filtered action queue, approval handling, action detail, ordered run event timelines, message-linked evidence/action refs, evidence resolution/snapshots, desk registry, fixed-registry tool permission checks, desk-declared fixed tool coverage, intent-aware deterministic routing to safe tools, Data Desk repair requests that create a safe dry-run action plus an approval-required write action, Research strategy-blocker reviews that orchestrate Research/Data/Risk evidence actions, Research sub-capabilities for technical, sentiment, fundamental, factor, and ML analysis, Portfolio Desk portfolio-decision reviews that consume Research evidence before Risk and Execution gates, Engineering Desk code/bug requests that create auditable work orders plus AST/test-design diagnostic actions without editing the repo, daily-brief cross-desk read-only orchestration, portfolio review cross-desk Research/Portfolio/Risk/Execution orchestration, deterministic multi-intent CEO review planning across Data/Research/Portfolio/Risk/Execution/Engineering safe tools, artifact-aware deterministic priority planning from fixed local evidence, bounded session-backlog adaptive planning for follow-up CEO requests, bounded adaptive artifact planning that fuses session backlog with local artifact root causes, open-ended deterministic company-wide diagnostic planning, opt-in semantic planner draft filtering to safe fixed-registry tools, explicit API/CLI semantic-draft and provider-semantic intake with server-side safety filtering, bounded semantic autonomy that dispatches only accepted safe fixed-registry actions from the current step, capped autonomy loops that repeat the same safety boundary until no safe action remains, a step is not ready, or max steps are reached, open/resolved cross-desk handoffs, Engineering Desk work-order creation/listing/status updates through CLI/API rather than persistent CEO Office panels, transparent memory inspect/export/prune/clear, evidence-cited CEO report artifacts, fixed local artifact-context aggregation, deterministic semantic synthesis, deterministic desk-level domain scorecards, deterministic source-specific narratives, deterministic artifact-specific timelines, deterministic cross-session trend synthesis, deterministic causal-chain synthesis, and recurring causal-chain escalation for reports, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, report notification triggers with env-only Telegram/WeChat/Feishu channels and notification audit artifacts, non-mutating PaperBroker order proposal cards, approved PaperBroker submit with re-preview/re-risk and reconciliation evidence, dedicated PaperBroker cancellation runs for queued approval requests and broker-cancelable active orders, inline paper reconciliation summaries, default-disabled MiniQMT/QMT readiness probing, no-submit live broker environment validation and smoke tests, non-submitting live order preview with cash, exposure, drawdown, VaR/CVaR, sector, intraday state, freshness, and broker consistency gates, approval-gated live submit/reconciliation contracts with no PaperBroker fallback, runtime preview-derived project ledger snapshots for live submit and scheduled reconciliation, explicit MiniQMT/QMT SDK gateway bridge with config factory loading and masked hashed responses, scheduled live reconciliation artifact scans, cron-callable live monitor ticks that aggregate readiness/kill-switch/reconciliation into evidence, and local live kill switch operations that cancel queued live actions, request broker-side cancellations for submitted live evidence when supported, record unsupported/failed broker cancellation as blocked evidence, and block future live paths before broker calls. CEO Office is the human-facing conversation, approval, and evidence surface; work orders, handoffs, approval policies, report rhythm, live readiness/monitoring, autonomy programs, semantic drafts, and provider planner controls remain internal CLI/API or system surfaces rather than persistent CEO Office panels. Arbitrary unknown-tool autonomy beyond fixed-registry safety boundaries is intentionally not a supported execution mode; it must surface as blockers, approvals, or engineering work orders.
+- LLM provider routing is fail-closed: unknown providers, disabled providers, missing `api_key_env`, missing `base_url`, missing model, or unsupported protocols must surface as blockers. Missing pricing may not block calls, but usage/cost views must mark the row as unpriced instead of borrowing another provider's price table.
 - Formal strategy promotion depends on score panels, alpha evidence, data readiness, and execution assumptions. Missing data, missing source capability, missing score panels, and insufficient evidence must be reported as blocked/not_applicable states, not filled with placeholder values.
 - The project is local-first. Network access, provider permissions, and data completeness must be explicit, observable, and never hidden behind fake defaults.
 

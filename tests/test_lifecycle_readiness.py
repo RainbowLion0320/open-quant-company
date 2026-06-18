@@ -50,6 +50,73 @@ def test_lifecycle_check_writes_readiness_artifact(monkeypatch, tmp_path):
     assert saved["status"] == "blocked"
 
 
+def test_lifecycle_freshness_uses_source_capability_permission_context(monkeypatch):
+    from astrolabe_cli.commands import lifecycle
+
+    monkeypatch.setattr(
+        lifecycle,
+        "sources_summary_payload",
+        lambda: {
+            "status": "ok",
+            "capabilities": [
+                {
+                    "source": "tushare",
+                    "interface": "sw_daily",
+                    "mapped_dimensions": ["sector_sw_daily"],
+                    "access_status": "no_permission",
+                    "probe_status": "no_permission",
+                    "message": "no permission",
+                },
+                {
+                    "source": "tushare",
+                    "interface": "moneyflow_mkt_dc",
+                    "mapped_dimensions": ["moneyflow_mkt_dc"],
+                    "access_status": "no_permission",
+                    "probe_status": "no_permission",
+                    "message": "no permission",
+                }
+            ],
+            "diff": {"summary": {}, "registry_missing_source": []},
+        },
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "freshness_gate_from_health_check",
+        lambda: (
+            {
+                "ok": False,
+                "stale": ["sector_sw_daily", "stock_moneyflow_mkt_dc", "macro_gdp"],
+                "missing": [],
+                "warnings": [],
+                "details": [
+                    {"key": "sector_sw_daily", "status": "stale", "reason": "sla_exceeded"},
+                    {"key": "stock_moneyflow_mkt_dc", "status": "stale", "reason": "sla_exceeded"},
+                    {"key": "macro_gdp", "status": "stale", "reason": "source_not_updated"},
+                ],
+            },
+            10,
+        ),
+    )
+
+    check, blockers, warnings = lifecycle._freshness_check()
+
+    assert warnings == []
+    assert "missing_capability:sector_sw_daily:no_permission" in blockers
+    assert "stale_data:sector_sw_daily" not in blockers
+    assert "missing_capability:stock_moneyflow_mkt_dc:no_permission" in blockers
+    assert "stale_data:stock_moneyflow_mkt_dc" not in blockers
+    assert "source_not_updated:macro_gdp" in blockers
+    details = check["freshness_gate"]["details"]
+    sector = next(item for item in details if item["key"] == "sector_sw_daily")
+    mkt = next(item for item in details if item["key"] == "stock_moneyflow_mkt_dc")
+    gdp = next(item for item in details if item["key"] == "macro_gdp")
+    assert sector["reason"] == "no_permission"
+    assert sector["capability_status"] == "no_permission"
+    assert mkt["reason"] == "no_permission"
+    assert mkt["capability_status"] == "no_permission"
+    assert gdp["reason"] == "source_not_updated"
+
+
 def test_lifecycle_cli_command_renders_json(monkeypatch, tmp_path, capsys):
     import astrolabe_cli.main as main
     from astrolabe_cli.main import run_cli

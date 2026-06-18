@@ -44,6 +44,9 @@ def freshness_gate(audit_rows: list[dict[str, Any]], *, required: list[str] | No
 def _freshness_severity(row: dict[str, Any], *, required: bool) -> str:
     if required:
         return "blocker"
+    configured = str(row.get("freshness_severity") or "").lower()
+    if configured == "warning":
+        return "warning"
     repair_policy = str(row.get("repair_policy") or "").lower()
     data_domain = str(row.get("data_domain") or row.get("scope") or "").lower()
     registry_key = str(row.get("registry_key") or row.get("key") or row.get("dimension") or "").lower()
@@ -87,6 +90,7 @@ def health_result_to_gate_data(result: object) -> list[dict[str, str]]:
                 "repair_policy": str(row.get("repair_policy") or ""),
                 "data_domain": str(row.get("data_domain") or row.get("scope") or ""),
                 "freshness_reason": str(row.get("freshness_reason") or row.get("reason") or ""),
+                "freshness_severity": str(row.get("freshness_severity") or ""),
             }
         )
     return gate_data

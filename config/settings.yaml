@@ -40,6 +40,21 @@ risk_control:
   max_single_order_amount:
     enabled: true
     max_amount: 500000
+execution:
+  live:
+    enabled: false
+    broker: miniqmt
+    require_manual_approval: true
+    kill_switch: true
+    sdk_modules:
+    - xtquant.xttrader
+    - xtquant.xttype
+    sdk_gateway_factory: broker.live.xtquant_gateway:build_gateway
+    sdk_gateway_config:
+      userdata_path: ''
+      account_type: STOCK
+      strategy_name: open_quant_company
+      remark_prefix: approval
 backtest:
   benchmark: sh000001
   benchmark_name: 上证指数
@@ -303,18 +318,27 @@ project:
   english_name: Open Quant Company
   description: 开源量化公司操作系统：用户作为 CEO，多个 agent 负责数据、研究、风控、工程与报告，所有结论可回溯到 Web UI、CLI 和 evidence artifacts。
 llm:
-  default_provider: deepseek
+  default_provider: mimo
   use_cases:
     factor_hypothesis:
-      provider: deepseek
-      model: deepseek-v4-pro
+      provider: mimo
+      model: mimo-v2.5-pro
+    agent_planning:
+      provider: mimo
+      model: mimo-v2.5-pro
   providers:
     deepseek:
       enabled: true
       label: DeepSeek
+      protocol: openai_compatible
       api_key_env: DEEPSEEK_API_KEY
       base_url: https://api.deepseek.com/v1
       default_model: deepseek-v4-flash
+      request:
+        chat_path: /chat/completions
+        response_format_json: true
+        temperature: 0.1
+        timeout_seconds: 20
       balance_url: https://api.deepseek.com/user/balance
       pricing_source: https://api-docs.deepseek.com/quick_start/pricing
       usage_schema: openai_cache
@@ -332,6 +356,23 @@ llm:
             input_cache_hit: 0.003625
             input_cache_miss: 0.435
             output: 0.87
+    mimo:
+      enabled: true
+      label: Mimo
+      protocol: openai_compatible
+      api_key_env: MIMO_API_KEY
+      base_url: https://token-plan-cn.xiaomimimo.com/v1
+      default_model: mimo-v2.5-pro
+      request:
+        chat_path: /chat/completions
+        response_format_json: true
+        temperature: 0.1
+        reasoning_level: thinking_enabled
+        context_window_tokens: 1048576
+        timeout_seconds: 20
+        extra_body:
+          thinking:
+            type: enabled
 signals:
   multifactor:
     buy_threshold: 52
@@ -716,7 +757,6 @@ strategies:
         flow: 0.2
     data_requirements:
     - stock_daily
-    - moneyflow
   regime_gated:
     color: '#fb7185'
     config_key: strategies.regime_gated
@@ -934,6 +974,8 @@ data_registry:
     label: 日频资金流向 (近120日)
     cache: stock/moneyflow/{symbol}.parquet
     description: 同花顺个股资金流向, 近100交易日
+    health:
+      freshness_severity: warning
   moneyflow_tushare_daily:
     source: tushare_free
     asset: stock

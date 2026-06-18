@@ -6,6 +6,56 @@ from collections.abc import Sequence
 
 from astrolabe_cli.commands.config import env_status
 from astrolabe_cli.commands.config import validate_config
+from astrolabe_cli.commands.agent import actions as agent_actions
+from astrolabe_cli.commands.agent import add_message as agent_add_message
+from astrolabe_cli.commands.agent import autonomy_run as agent_autonomy_run
+from astrolabe_cli.commands.agent import autonomy_step as agent_autonomy_step
+from astrolabe_cli.commands.agent import approve as agent_approve
+from astrolabe_cli.commands.agent import cancel as agent_cancel
+from astrolabe_cli.commands.agent import create_session as agent_create_session
+from astrolabe_cli.commands.agent import create_program as agent_create_program
+from astrolabe_cli.commands.agent import create_work_order as agent_create_work_order
+from astrolabe_cli.commands.agent import desks as agent_desks
+from astrolabe_cli.commands.agent import evidence as agent_evidence
+from astrolabe_cli.commands.agent import expire_actions as agent_expire_actions
+from astrolabe_cli.commands.agent import generate_report as agent_generate_report
+from astrolabe_cli.commands.agent import handoffs as agent_handoffs
+from astrolabe_cli.commands.agent import live_kill_switch_activate as agent_live_kill_switch_activate
+from astrolabe_cli.commands.agent import live_kill_switch_deactivate as agent_live_kill_switch_deactivate
+from astrolabe_cli.commands.agent import live_kill_switch_status as agent_live_kill_switch_status
+from astrolabe_cli.commands.agent import live_environment as agent_live_environment
+from astrolabe_cli.commands.agent import live_preview as agent_live_preview
+from astrolabe_cli.commands.agent import live_propose as agent_live_propose
+from astrolabe_cli.commands.agent import live_readiness as agent_live_readiness
+from astrolabe_cli.commands.agent import live_reconcile as agent_live_reconcile
+from astrolabe_cli.commands.agent import live_monitor as agent_live_monitor
+from astrolabe_cli.commands.agent import live_smoke as agent_live_smoke
+from astrolabe_cli.commands.agent import live_submit as agent_live_submit
+from astrolabe_cli.commands.agent import memory_clear as agent_memory_clear
+from astrolabe_cli.commands.agent import memory_export as agent_memory_export
+from astrolabe_cli.commands.agent import memory_prune as agent_memory_prune
+from astrolabe_cli.commands.agent import memory_summary as agent_memory_summary
+from astrolabe_cli.commands.agent import notify_report as agent_notify_report
+from astrolabe_cli.commands.agent import paper_cancel as agent_paper_cancel
+from astrolabe_cli.commands.agent import paper_propose as agent_paper_propose
+from astrolabe_cli.commands.agent import paper_submit as agent_paper_submit
+from astrolabe_cli.commands.agent import policies as agent_policies
+from astrolabe_cli.commands.agent import plan as agent_plan
+from astrolabe_cli.commands.agent import programs as agent_programs
+from astrolabe_cli.commands.agent import reject as agent_reject
+from astrolabe_cli.commands.agent import reports as agent_reports
+from astrolabe_cli.commands.agent import resolve_handoff as agent_resolve_handoff
+from astrolabe_cli.commands.agent import run_report_rhythm as agent_run_report_rhythm
+from astrolabe_cli.commands.agent import run_scheduled_report_rhythm as agent_run_scheduled_report_rhythm
+from astrolabe_cli.commands.agent import run_action as agent_run_action
+from astrolabe_cli.commands.agent import run_program as agent_run_program
+from astrolabe_cli.commands.agent import sessions as agent_sessions
+from astrolabe_cli.commands.agent import show_action as agent_show_action
+from astrolabe_cli.commands.agent import show_program as agent_show_program
+from astrolabe_cli.commands.agent import show_session as agent_show_session
+from astrolabe_cli.commands.agent import update_session as agent_update_session
+from astrolabe_cli.commands.agent import update_work_order as agent_update_work_order
+from astrolabe_cli.commands.agent import work_orders as agent_work_orders
 from astrolabe_cli.commands.backtest import check as backtest_check
 from astrolabe_cli.commands.backtest import run_backtest
 from astrolabe_cli.commands.data import repair as data_repair
@@ -50,6 +100,539 @@ def build_parser() -> argparse.ArgumentParser:
     health = sub.add_parser("health", help="Check CLI and local project health")
     add_common_flags(health)
     health.set_defaults(handler=_health_command)
+
+    agent = sub.add_parser("agent", help="Operate the local Agent Company OS runtime")
+    agent_sub = agent.add_subparsers(dest="agent_command", required=True)
+
+    agent_sessions_cmd = agent_sub.add_parser("sessions", help="List agent sessions")
+    add_common_flags(agent_sessions_cmd)
+    agent_sessions_cmd.set_defaults(handler=lambda args: agent_sessions())
+
+    agent_session_cmd = agent_sub.add_parser("session", help="Create or inspect one agent session")
+    agent_session_sub = agent_session_cmd.add_subparsers(dest="agent_session_command", required=True)
+    agent_session_create = agent_session_sub.add_parser("create", help="Create an agent session")
+    agent_session_create.add_argument("--title", required=True)
+    agent_session_create.add_argument("--default-desk", default="reporting")
+    add_common_flags(agent_session_create)
+    agent_session_create.set_defaults(handler=lambda args: agent_create_session(args.title, args.default_desk))
+    agent_session_show = agent_session_sub.add_parser("show", help="Show an agent session")
+    agent_session_show.add_argument("session_id")
+    add_common_flags(agent_session_show)
+    agent_session_show.set_defaults(handler=lambda args: agent_show_session(args.session_id))
+    agent_session_update = agent_session_sub.add_parser("update", help="Update an agent session")
+    agent_session_update.add_argument("session_id")
+    agent_session_update.add_argument("--title", default=None)
+    agent_session_update.add_argument("--status", choices=["active", "archived", "blocked"], default=None)
+    agent_session_update.add_argument("--default-desk", default=None)
+    agent_session_update.add_argument("--tag", action="append", dest="tags", default=None)
+    add_common_flags(agent_session_update)
+    agent_session_update.set_defaults(
+        handler=lambda args: agent_update_session(
+            args.session_id,
+            title=args.title,
+            status=args.status,
+            default_desk=args.default_desk,
+            tags=args.tags,
+        )
+    )
+    agent_autonomy_cmd = agent_sub.add_parser("autonomy", help="Run bounded Agent Company OS autonomy steps")
+    agent_autonomy_sub = agent_autonomy_cmd.add_subparsers(dest="agent_autonomy_command", required=True)
+    agent_autonomy_step_cmd = agent_autonomy_sub.add_parser(
+        "step",
+        help="Plan once and run only new read-only/dry-run fixed-registry actions",
+    )
+    agent_autonomy_step_cmd.add_argument("--session", required=True)
+    agent_autonomy_step_cmd.add_argument("--desk", default="reporting")
+    agent_autonomy_step_cmd.add_argument("--text", default="")
+    agent_autonomy_step_cmd.add_argument(
+        "--semantic-draft-file",
+        default="",
+        help="JSON semantic planner draft to filter through bounded autonomy",
+    )
+    agent_autonomy_step_cmd.add_argument(
+        "--provider-semantic",
+        action="store_true",
+        help="Ask the configured LLM provider to draft a bounded autonomy plan, then server-filter it",
+    )
+    agent_autonomy_step_cmd.add_argument("--planner-provider", default="")
+    agent_autonomy_step_cmd.add_argument("--planner-model", default="")
+    add_common_flags(agent_autonomy_step_cmd)
+    agent_autonomy_step_cmd.set_defaults(
+        handler=lambda args: agent_autonomy_step(
+            args.session,
+            args.text,
+            args.desk,
+            args.semantic_draft_file,
+            provider_semantic=args.provider_semantic,
+            planner_provider=args.planner_provider,
+            planner_model=args.planner_model,
+        )
+    )
+    agent_autonomy_run_cmd = agent_autonomy_sub.add_parser(
+        "run",
+        help="Run multiple bounded autonomy steps up to a fixed max step limit",
+    )
+    agent_autonomy_run_cmd.add_argument("--session", required=True)
+    agent_autonomy_run_cmd.add_argument("--desk", default="reporting")
+    agent_autonomy_run_cmd.add_argument("--text", default="")
+    agent_autonomy_run_cmd.add_argument("--max-steps", type=int, default=2)
+    agent_autonomy_run_cmd.add_argument(
+        "--semantic-draft-file",
+        default="",
+        help="JSON semantic planner draft to filter through bounded autonomy",
+    )
+    agent_autonomy_run_cmd.add_argument(
+        "--provider-semantic",
+        action="store_true",
+        help="Ask the configured LLM provider to draft bounded autonomy plans, then server-filter them",
+    )
+    agent_autonomy_run_cmd.add_argument("--planner-provider", default="")
+    agent_autonomy_run_cmd.add_argument("--planner-model", default="")
+    add_common_flags(agent_autonomy_run_cmd)
+    agent_autonomy_run_cmd.set_defaults(
+        handler=lambda args: agent_autonomy_run(
+            args.session,
+            args.text,
+            args.desk,
+            args.semantic_draft_file,
+            max_steps=args.max_steps,
+            provider_semantic=args.provider_semantic,
+            planner_provider=args.planner_provider,
+            planner_model=args.planner_model,
+        )
+    )
+
+    agent_message_cmd = agent_sub.add_parser("message", help="Add a CEO message to a session")
+    agent_message_cmd.add_argument("--session", required=True)
+    agent_message_cmd.add_argument("--desk", default="reporting")
+    agent_message_cmd.add_argument("--text", required=True)
+    agent_message_cmd.add_argument(
+        "--semantic-draft-file",
+        default="",
+        help="JSON semantic planner draft to filter through the fixed agent tool registry",
+    )
+    agent_message_cmd.add_argument(
+        "--provider-semantic",
+        action="store_true",
+        help="Ask the configured LLM provider to draft a semantic plan, then server-filter it",
+    )
+    agent_message_cmd.add_argument("--planner-provider", default="")
+    agent_message_cmd.add_argument("--planner-model", default="")
+    add_common_flags(agent_message_cmd)
+    agent_message_cmd.set_defaults(
+        handler=lambda args: agent_add_message(
+            args.session,
+            args.desk,
+            args.text,
+            args.semantic_draft_file,
+            provider_semantic=args.provider_semantic,
+            planner_provider=args.planner_provider,
+            planner_model=args.planner_model,
+        )
+    )
+
+    agent_plan_cmd = agent_sub.add_parser("plan", help="Preview an agent workflow without ledger writes")
+    agent_plan_cmd.add_argument("--desk", default="reporting")
+    agent_plan_cmd.add_argument("--text", required=True)
+    agent_plan_cmd.add_argument(
+        "--semantic-draft-file",
+        default="",
+        help="JSON semantic planner draft to filter through the fixed agent tool registry",
+    )
+    agent_plan_cmd.add_argument(
+        "--provider-semantic",
+        action="store_true",
+        help="Ask the configured LLM provider to draft a semantic plan, then server-filter it",
+    )
+    agent_plan_cmd.add_argument("--planner-provider", default="")
+    agent_plan_cmd.add_argument("--planner-model", default="")
+    add_common_flags(agent_plan_cmd)
+    agent_plan_cmd.set_defaults(
+        handler=lambda args: agent_plan(
+            args.desk,
+            args.text,
+            args.semantic_draft_file,
+            provider_semantic=args.provider_semantic,
+            planner_provider=args.planner_provider,
+            planner_model=args.planner_model,
+        )
+    )
+
+    agent_programs_cmd = agent_sub.add_parser("programs", help="List autonomy programs")
+    agent_programs_cmd.add_argument("--session", default="")
+    add_common_flags(agent_programs_cmd)
+    agent_programs_cmd.set_defaults(handler=lambda args: agent_programs(args.session))
+
+    agent_program_cmd = agent_sub.add_parser("program", help="Create, inspect, or run one autonomy program")
+    agent_program_sub = agent_program_cmd.add_subparsers(dest="agent_program_command", required=True)
+    agent_program_create = agent_program_sub.add_parser("create", help="Create an auditable autonomy program")
+    agent_program_create.add_argument("--session", required=True)
+    agent_program_create.add_argument("--goal", required=True)
+    agent_program_create.add_argument("--desk", default="reporting")
+    agent_program_create.add_argument("--max-steps", type=int, default=6)
+    agent_program_create.add_argument(
+        "--semantic-draft-file",
+        default="",
+        help="JSON semantic planner draft to filter into a program",
+    )
+    agent_program_create.add_argument(
+        "--provider-semantic",
+        action="store_true",
+        help="Ask the configured LLM provider to draft a program, then server-filter it",
+    )
+    agent_program_create.add_argument("--planner-provider", default="")
+    agent_program_create.add_argument("--planner-model", default="")
+    add_common_flags(agent_program_create)
+    agent_program_create.set_defaults(
+        handler=lambda args: agent_create_program(
+            args.session,
+            args.goal,
+            desk=args.desk,
+            max_steps=args.max_steps,
+            semantic_draft_file=args.semantic_draft_file,
+            provider_semantic=args.provider_semantic,
+            planner_provider=args.planner_provider,
+            planner_model=args.planner_model,
+        )
+    )
+    agent_program_show = agent_program_sub.add_parser("show", help="Show one autonomy program")
+    agent_program_show.add_argument("program_id")
+    add_common_flags(agent_program_show)
+    agent_program_show.set_defaults(handler=lambda args: agent_show_program(args.program_id))
+    agent_program_run = agent_program_sub.add_parser("run", help="Run pending safe phases in one autonomy program")
+    agent_program_run.add_argument("program_id")
+    agent_program_run.add_argument("--dry-run", action="store_true")
+    add_common_flags(agent_program_run)
+    agent_program_run.set_defaults(handler=lambda args: agent_run_program(args.program_id, dry_run=args.dry_run))
+
+    agent_actions_cmd = agent_sub.add_parser("actions", help="List agent actions")
+    agent_actions_cmd.add_argument("--session", default="")
+    agent_actions_cmd.add_argument("--status", default="")
+    agent_actions_cmd.add_argument("--desk", default="")
+    agent_actions_cmd.add_argument("--risk-level", default="")
+    add_common_flags(agent_actions_cmd)
+    agent_actions_cmd.set_defaults(
+        handler=lambda args: agent_actions(args.session, args.status, args.desk, args.risk_level)
+    )
+
+    agent_expire_cmd = agent_sub.add_parser("expire", help="Mark expired queued agent actions")
+    agent_expire_cmd.add_argument("--session", default="")
+    add_common_flags(agent_expire_cmd)
+    agent_expire_cmd.set_defaults(handler=lambda args: agent_expire_actions(args.session))
+
+    agent_reports_cmd = agent_sub.add_parser("reports", help="List generated agent reports")
+    agent_reports_cmd.add_argument("--session", default="")
+    add_common_flags(agent_reports_cmd)
+    agent_reports_cmd.set_defaults(handler=lambda args: agent_reports(args.session))
+
+    agent_report_cmd = agent_sub.add_parser("report", help="Generate an agent report")
+    agent_report_cmd.add_argument(
+        "kind",
+        choices=[
+            "daily",
+            "daily_brief",
+            "weekly",
+            "weekly_review",
+            "audit",
+            "audit_pack",
+            "data_quality",
+            "data_quality_review",
+            "risk",
+            "risk_review",
+            "execution",
+            "execution_reconciliation",
+            "engineering",
+            "engineering_digest",
+            "release",
+            "release_audit",
+        ],
+    )
+    agent_report_cmd.add_argument("--session", required=True)
+    add_common_flags(agent_report_cmd)
+    agent_report_cmd.set_defaults(handler=lambda args: agent_generate_report(args.kind, args.session))
+
+    agent_rhythm_cmd = agent_sub.add_parser("rhythm", help="Run due agent report operating rhythm")
+    agent_rhythm_target = agent_rhythm_cmd.add_mutually_exclusive_group(required=True)
+    agent_rhythm_target.add_argument("--session")
+    agent_rhythm_target.add_argument("--all-active", action="store_true")
+    agent_rhythm_cmd.add_argument("--force", action="store_true")
+    agent_rhythm_cmd.add_argument("--notify", action="store_true", help="Notify generated reports after writing artifacts")
+    agent_rhythm_cmd.add_argument("--notification-channel", action="append", dest="notification_channels", default=None)
+    agent_rhythm_cmd.add_argument("--dry-run-notify", action="store_true", help="Record notification plan without sending provider requests")
+    add_common_flags(agent_rhythm_cmd)
+    agent_rhythm_cmd.set_defaults(
+        handler=lambda args: (
+            agent_run_scheduled_report_rhythm(
+                force=args.force,
+                notify=args.notify,
+                notification_channels=args.notification_channels,
+                dry_run_notifications=args.dry_run_notify,
+            )
+            if args.all_active
+            else agent_run_report_rhythm(
+                args.session,
+                force=args.force,
+                notify=args.notify,
+                notification_channels=args.notification_channels,
+                dry_run_notifications=args.dry_run_notify,
+            )
+        )
+    )
+
+    agent_notify_cmd = agent_sub.add_parser("notify", help="Send or dry-run Agent Company OS notifications")
+    agent_notify_sub = agent_notify_cmd.add_subparsers(dest="agent_notify_command", required=True)
+    agent_notify_report_cmd = agent_notify_sub.add_parser("report", help="Notify a generated report")
+    agent_notify_report_cmd.add_argument("report_id")
+    agent_notify_report_cmd.add_argument("--channel", action="append", dest="channels", default=None)
+    agent_notify_report_cmd.add_argument("--dry-run", action="store_true")
+    add_common_flags(agent_notify_report_cmd)
+    agent_notify_report_cmd.set_defaults(
+        handler=lambda args: agent_notify_report(args.report_id, channels=args.channels, dry_run=args.dry_run)
+    )
+
+    agent_handoffs_cmd = agent_sub.add_parser("handoffs", help="List cross-desk handoffs")
+    agent_handoffs_cmd.add_argument("--session", default="")
+    add_common_flags(agent_handoffs_cmd)
+    agent_handoffs_cmd.set_defaults(handler=lambda args: agent_handoffs(args.session))
+
+    agent_work_orders_cmd = agent_sub.add_parser("work-orders", help="List engineering work orders")
+    agent_work_orders_cmd.add_argument("--session", default="")
+    add_common_flags(agent_work_orders_cmd)
+    agent_work_orders_cmd.set_defaults(handler=lambda args: agent_work_orders(args.session))
+
+    agent_work_order_cmd = agent_sub.add_parser("work-order", help="Create one engineering work order")
+    agent_work_order_sub = agent_work_order_cmd.add_subparsers(dest="agent_work_order_command", required=True)
+    agent_work_order_create = agent_work_order_sub.add_parser("create", help="Create one engineering work order")
+    agent_work_order_create.add_argument("--session", required=True)
+    agent_work_order_create.add_argument("--title", required=True)
+    agent_work_order_create.add_argument("--summary", required=True)
+    agent_work_order_create.add_argument("--impact", required=True)
+    agent_work_order_create.add_argument("--file", action="append", dest="affected_files", default=[])
+    agent_work_order_create.add_argument("--verify", action="append", dest="suggested_verification", default=[])
+    agent_work_order_create.add_argument("--evidence", action="append", dest="evidence_refs", default=[])
+    add_common_flags(agent_work_order_create)
+    agent_work_order_create.set_defaults(
+        handler=lambda args: agent_create_work_order(
+            session_id=args.session,
+            title=args.title,
+            summary=args.summary,
+            impact=args.impact,
+            affected_files=args.affected_files,
+            suggested_verification=args.suggested_verification,
+            evidence_refs=args.evidence_refs,
+        )
+    )
+    agent_work_order_update = agent_work_order_sub.add_parser("update", help="Update one engineering work order status")
+    agent_work_order_update.add_argument("work_order_id")
+    agent_work_order_update.add_argument("--status", required=True, choices=["open", "in_progress", "resolved", "canceled"])
+    agent_work_order_update.add_argument("--resolution", default="")
+    add_common_flags(agent_work_order_update)
+    agent_work_order_update.set_defaults(
+        handler=lambda args: agent_update_work_order(
+            args.work_order_id,
+            status=args.status,
+            resolution=args.resolution,
+        )
+    )
+
+    agent_handoff_cmd = agent_sub.add_parser("handoff", help="Inspect or update one cross-desk handoff")
+    agent_handoff_sub = agent_handoff_cmd.add_subparsers(dest="agent_handoff_command", required=True)
+    agent_handoff_resolve = agent_handoff_sub.add_parser("resolve", help="Mark one handoff as resolved")
+    agent_handoff_resolve.add_argument("handoff_id")
+    add_common_flags(agent_handoff_resolve)
+    agent_handoff_resolve.set_defaults(handler=lambda args: agent_resolve_handoff(args.handoff_id))
+
+    agent_action_cmd = agent_sub.add_parser("action", help="Inspect one agent action")
+    agent_action_sub = agent_action_cmd.add_subparsers(dest="agent_action_command", required=True)
+    agent_action_show = agent_action_sub.add_parser("show", help="Show one agent action")
+    agent_action_show.add_argument("action_id")
+    add_common_flags(agent_action_show)
+    agent_action_show.set_defaults(handler=lambda args: agent_show_action(args.action_id))
+
+    agent_approve_cmd = agent_sub.add_parser("approve", help="Approve an agent action")
+    agent_approve_cmd.add_argument("action_id")
+    add_common_flags(agent_approve_cmd)
+    agent_approve_cmd.set_defaults(handler=lambda args: agent_approve(args.action_id))
+
+    agent_reject_cmd = agent_sub.add_parser("reject", help="Reject an agent action")
+    agent_reject_cmd.add_argument("action_id")
+    agent_reject_cmd.add_argument("--reason", default="")
+    add_common_flags(agent_reject_cmd)
+    agent_reject_cmd.set_defaults(handler=lambda args: agent_reject(args.action_id, args.reason))
+
+    agent_cancel_cmd = agent_sub.add_parser("cancel", help="Cancel a queued or proposed agent action")
+    agent_cancel_cmd.add_argument("action_id")
+    agent_cancel_cmd.add_argument("--reason", default="")
+    add_common_flags(agent_cancel_cmd)
+    agent_cancel_cmd.set_defaults(handler=lambda args: agent_cancel(args.action_id, args.reason))
+
+    agent_run_cmd = agent_sub.add_parser("run", help="Dispatch an approved or safe agent action")
+    agent_run_cmd.add_argument("action_id")
+    add_common_flags(agent_run_cmd)
+    agent_run_cmd.set_defaults(handler=lambda args: agent_run_action(args.action_id))
+
+    agent_evidence_cmd = agent_sub.add_parser("evidence", help="Resolve an agent evidence reference")
+    agent_evidence_cmd.add_argument("evidence_id")
+    add_common_flags(agent_evidence_cmd)
+    agent_evidence_cmd.set_defaults(handler=lambda args: agent_evidence(args.evidence_id))
+
+    agent_desks_cmd = agent_sub.add_parser("desks", help="List desk agents")
+    add_common_flags(agent_desks_cmd)
+    agent_desks_cmd.set_defaults(handler=lambda args: agent_desks())
+
+    agent_policies_cmd = agent_sub.add_parser("policies", help="List agent approval policies")
+    add_common_flags(agent_policies_cmd)
+    agent_policies_cmd.set_defaults(handler=lambda args: agent_policies())
+
+    agent_live_cmd = agent_sub.add_parser("live", help="Inspect live broker readiness")
+    agent_live_sub = agent_live_cmd.add_subparsers(dest="agent_live_command", required=True)
+    agent_live_readiness_cmd = agent_live_sub.add_parser("readiness", help="Check MiniQMT/QMT live readiness")
+    add_common_flags(agent_live_readiness_cmd)
+    agent_live_readiness_cmd.set_defaults(handler=lambda args: agent_live_readiness())
+    agent_live_environment_cmd = agent_live_sub.add_parser(
+        "environment",
+        help="Validate local MiniQMT/QMT SDK, account, and terminal environment without submitting orders",
+    )
+    add_common_flags(agent_live_environment_cmd)
+    agent_live_environment_cmd.set_defaults(handler=lambda args: agent_live_environment())
+    agent_live_smoke_cmd = agent_live_sub.add_parser(
+        "smoke",
+        help="Run a no-submit MiniQMT/QMT live broker smoke test",
+    )
+    add_common_flags(agent_live_smoke_cmd)
+    agent_live_smoke_cmd.set_defaults(handler=lambda args: agent_live_smoke())
+    agent_live_preview_cmd = agent_live_sub.add_parser("preview", help="Preview a live order without submitting it")
+    agent_live_preview_cmd.add_argument("--symbol", required=True)
+    agent_live_preview_cmd.add_argument("--side", choices=["buy", "sell"], required=True)
+    agent_live_preview_cmd.add_argument("--quantity", type=int, required=True)
+    agent_live_preview_cmd.add_argument("--limit-price", type=float, required=True)
+    agent_live_preview_cmd.add_argument("--strategy", default="manual")
+    agent_live_preview_cmd.add_argument("--reason", default="")
+    agent_live_preview_cmd.add_argument("--evidence", action="append", dest="evidence_refs", default=[])
+    add_common_flags(agent_live_preview_cmd)
+    agent_live_preview_cmd.set_defaults(
+        handler=lambda args: agent_live_preview(
+            symbol=args.symbol,
+            side=args.side,
+            quantity=args.quantity,
+            limit_price=args.limit_price,
+            strategy=args.strategy,
+            reason=args.reason,
+            evidence_refs=args.evidence_refs,
+        )
+    )
+    agent_live_propose_cmd = agent_live_sub.add_parser("propose", help="Preview and propose a live order")
+    agent_live_propose_cmd.add_argument("--session", required=True)
+    agent_live_propose_cmd.add_argument("--symbol", required=True)
+    agent_live_propose_cmd.add_argument("--side", choices=["buy", "sell"], required=True)
+    agent_live_propose_cmd.add_argument("--quantity", type=int, required=True)
+    agent_live_propose_cmd.add_argument("--limit-price", type=float, required=True)
+    agent_live_propose_cmd.add_argument("--strategy", default="manual")
+    agent_live_propose_cmd.add_argument("--reason", default="")
+    agent_live_propose_cmd.add_argument("--evidence", action="append", dest="evidence_refs", default=[])
+    add_common_flags(agent_live_propose_cmd)
+    agent_live_propose_cmd.set_defaults(
+        handler=lambda args: agent_live_propose(
+            session_id=args.session,
+            symbol=args.symbol,
+            side=args.side,
+            quantity=args.quantity,
+            limit_price=args.limit_price,
+            strategy=args.strategy,
+            reason=args.reason,
+            evidence_refs=args.evidence_refs,
+        )
+    )
+    agent_live_submit_cmd = agent_live_sub.add_parser("submit", help="Submit an approved live order action")
+    agent_live_submit_cmd.add_argument("action_id")
+    add_common_flags(agent_live_submit_cmd)
+    agent_live_submit_cmd.set_defaults(handler=lambda args: agent_live_submit(args.action_id))
+    agent_live_reconcile_cmd = agent_live_sub.add_parser("reconcile", help="Run live order reconciliation scan")
+    agent_live_reconcile_cmd.add_argument("--session", default="")
+    add_common_flags(agent_live_reconcile_cmd)
+    agent_live_reconcile_cmd.set_defaults(handler=lambda args: agent_live_reconcile(args.session))
+    agent_live_monitor_cmd = agent_live_sub.add_parser("monitor", help="Run cron-callable live readiness and reconciliation monitor")
+    agent_live_monitor_cmd.add_argument("--session", default="")
+    add_common_flags(agent_live_monitor_cmd)
+    agent_live_monitor_cmd.set_defaults(handler=lambda args: agent_live_monitor(args.session))
+    agent_live_kill_switch_cmd = agent_live_sub.add_parser("kill-switch", help="Inspect or change the live kill switch")
+    agent_live_kill_switch_sub = agent_live_kill_switch_cmd.add_subparsers(
+        dest="agent_live_kill_switch_command",
+        required=True,
+    )
+    agent_live_kill_switch_status_cmd = agent_live_kill_switch_sub.add_parser("status", help="Show live kill switch status")
+    add_common_flags(agent_live_kill_switch_status_cmd)
+    agent_live_kill_switch_status_cmd.set_defaults(handler=lambda args: agent_live_kill_switch_status())
+    agent_live_kill_switch_activate_cmd = agent_live_kill_switch_sub.add_parser(
+        "activate",
+        help="Activate the live kill switch and cancel queued live actions",
+    )
+    agent_live_kill_switch_activate_cmd.add_argument("--reason", default="")
+    add_common_flags(agent_live_kill_switch_activate_cmd)
+    agent_live_kill_switch_activate_cmd.set_defaults(
+        handler=lambda args: agent_live_kill_switch_activate(args.reason)
+    )
+    agent_live_kill_switch_deactivate_cmd = agent_live_kill_switch_sub.add_parser(
+        "deactivate",
+        help="Deactivate the live kill switch",
+    )
+    agent_live_kill_switch_deactivate_cmd.add_argument("--reason", default="")
+    add_common_flags(agent_live_kill_switch_deactivate_cmd)
+    agent_live_kill_switch_deactivate_cmd.set_defaults(
+        handler=lambda args: agent_live_kill_switch_deactivate(args.reason)
+    )
+
+    agent_paper_cmd = agent_sub.add_parser("paper", help="Create approval-gated paper execution proposals")
+    agent_paper_sub = agent_paper_cmd.add_subparsers(dest="agent_paper_command", required=True)
+    agent_paper_propose_cmd = agent_paper_sub.add_parser("propose", help="Preview and propose a PaperBroker order")
+    agent_paper_propose_cmd.add_argument("--session", required=True)
+    agent_paper_propose_cmd.add_argument("--symbol", required=True)
+    agent_paper_propose_cmd.add_argument("--side", choices=["buy", "sell"], required=True)
+    agent_paper_propose_cmd.add_argument("--quantity", type=int, required=True)
+    agent_paper_propose_cmd.add_argument("--limit-price", type=float, required=True)
+    agent_paper_propose_cmd.add_argument("--strategy", default="manual")
+    agent_paper_propose_cmd.add_argument("--reason", default="")
+    agent_paper_propose_cmd.add_argument("--evidence", action="append", dest="evidence_refs", default=[])
+    add_common_flags(agent_paper_propose_cmd)
+    agent_paper_propose_cmd.set_defaults(
+        handler=lambda args: agent_paper_propose(
+            session_id=args.session,
+            symbol=args.symbol,
+            side=args.side,
+            quantity=args.quantity,
+            limit_price=args.limit_price,
+            strategy=args.strategy,
+            reason=args.reason,
+            evidence_refs=args.evidence_refs,
+        )
+    )
+    agent_paper_submit_cmd = agent_paper_sub.add_parser("submit", help="Submit an approved PaperBroker order action")
+    agent_paper_submit_cmd.add_argument("action_id")
+    add_common_flags(agent_paper_submit_cmd)
+    agent_paper_submit_cmd.set_defaults(handler=lambda args: agent_paper_submit(args.action_id))
+    agent_paper_cancel_cmd = agent_paper_sub.add_parser("cancel", help="Cancel a queued or active PaperBroker order action")
+    agent_paper_cancel_cmd.add_argument("action_id")
+    agent_paper_cancel_cmd.add_argument("--reason", default="")
+    add_common_flags(agent_paper_cancel_cmd)
+    agent_paper_cancel_cmd.set_defaults(handler=lambda args: agent_paper_cancel(args.action_id, args.reason))
+
+    agent_memory_cmd = agent_sub.add_parser("memory", help="Inspect, export, or maintain local transparent memory")
+    agent_memory_sub = agent_memory_cmd.add_subparsers(dest="agent_memory_command", required=True)
+    agent_memory_show = agent_memory_sub.add_parser("show", help="Show local memory summary")
+    add_common_flags(agent_memory_show)
+    agent_memory_show.set_defaults(handler=lambda args: agent_memory_summary())
+    agent_memory_export_cmd = agent_memory_sub.add_parser("export", help="Export local memory to an artifact")
+    add_common_flags(agent_memory_export_cmd)
+    agent_memory_export_cmd.set_defaults(handler=lambda args: agent_memory_export())
+    agent_memory_prune_cmd = agent_memory_sub.add_parser("prune", help="Prune archived session memory")
+    agent_memory_prune_cmd.add_argument("--dry-run", action="store_true")
+    add_common_flags(agent_memory_prune_cmd)
+    agent_memory_prune_cmd.set_defaults(handler=lambda args: agent_memory_prune(args.dry_run))
+    agent_memory_clear_cmd = agent_memory_sub.add_parser("clear", help="Clear all local agent memory with confirmation")
+    agent_memory_clear_cmd.add_argument("--confirm", action="store_true")
+    agent_memory_clear_cmd.add_argument("--dry-run", action="store_true")
+    add_common_flags(agent_memory_clear_cmd)
+    agent_memory_clear_cmd.set_defaults(handler=lambda args: agent_memory_clear(args.confirm, args.dry_run))
 
     config = sub.add_parser("config", help="Inspect and validate project configuration")
     config_sub = config.add_subparsers(dest="config_command", required=True)

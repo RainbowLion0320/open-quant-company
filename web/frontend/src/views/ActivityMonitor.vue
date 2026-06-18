@@ -78,7 +78,10 @@
           <div class="usage-cost">
             <span>{{ t('activity.estimatedCost') }}</span>
             <strong>{{ fmtMoney(llmTotals?.costCny ?? 0, "CNY") }}</strong>
-            <small>${{ (llmTotals?.costUsd ?? 0).toFixed(4) }}</small>
+            <small v-if="llmTotals?.pricingStatus === 'partial'">
+              {{ t('activity.unpricedUsage', { count: fmtNum(llmTotals?.unpricedRows ?? 0) }) }}
+            </small>
+            <small v-else>${{ (llmTotals?.costUsd ?? 0).toFixed(4) }}</small>
           </div>
         </div>
 

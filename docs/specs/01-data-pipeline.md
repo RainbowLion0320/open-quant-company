@@ -88,7 +88,7 @@ Web DataHub 的 `Sources` 页签只读消费 `var/artifacts/data-sources/latest.
 - `status`: available / rate_limited / paid / planned
 - `freq`: daily / monthly / quarterly / event / minute
 - `cache`: 相对路径模板，如 `stock/daily/{symbol}.parquet`
-- `health`: table / label / freshness_sla_days / repair_policy / partition_key
+- `health`: table / label / freshness_sla_days / repair_policy / partition_key / freshness_severity
 
 `DataRegistry.validate()` 在启动时运行合约检验，确保所有 enabled 维度 source/asset/status/freq/cache 字段合法。
 
@@ -96,10 +96,13 @@ Web DataHub 的 `Sources` 页签只读消费 `var/artifacts/data-sources/latest.
 
 DB Health 负责把本地文件日期、缺失率、异常值和 registry 元数据归一成 `freshness_status`。研究、竞赛、生命周期和执行链路只消费这个结构化状态，不用默认值掩盖缺口。
 
+`freshness_severity` 默认是 `blocker`。只有在 registry 明确声明为 `warning` 的维度，才会在全局 lifecycle 中作为可观测 warning；一旦策略、执行或命令显式把该维度列为 required，仍必须升级为 blocker。这个字段只用于区分“当前正式链路必需输入”和“候选补源/观测源”，不能用来隐藏真实生产依赖缺口。
+
 特殊口径：
 
 - `macro_gdp` 是季度宏观表，按“季度结束 + 45 天披露窗口”判断。到期后如果最新季度仍缺失，状态为 `stale`，原因写为 `source_not_updated`，报告必须展示 `expected_period` 和 `latest_period`。
 - `stock_limit_list` 是涨跌停/炸板日频事件表，Tushare 端存在限频。全局生命周期只把它作为 `market_event` warning；只有明确依赖涨跌停、短线情绪或交易约束的策略才把它作为硬阻断。
+- `moneyflow_daily` 是 AKShare/东方财富单股资金流观测源。当前正式策略链路使用 `stock_daily` 的成交额/换手率代理量能确认，并有 `moneyflow_tushare_daily` 作为全市场资金流正式维度；因此该表 stale 时先作为 warning 暴露，不阻断不依赖它的全局生命周期。
 
 行业/板块相关维度同样通过注册表管理，包括行业指数行情、行业成员映射、行业动量快照、行业信号聚合和组合行业敞口。上层代码不应硬编码任何 `var/store/*` 深层路径，而应使用 `DataHub.dimension_root()` 或 `DataHub.dimension_path()`。
 

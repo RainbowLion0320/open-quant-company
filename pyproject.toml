@@ -66,6 +66,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = [
+    "agent_os*",
     "astrolabe_cli*",
     "backtest*",
     "broker*",

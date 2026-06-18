@@ -154,6 +154,8 @@ strategies:
     FastAPI ← DuckDB(:memory:) + read_parquet() views → Vue 3 SPA
 ```
 
+LLM provider routing is configured under `config/settings.yaml: llm`. OpenAI-compatible providers must declare `llm.providers.<provider>.protocol=openai_compatible`, `api_key_env`, `base_url`, `default_model`, optional `request.*`, and provider-specific `pricing.models`; use cases such as `agent_planning` and `factor_hypothesis` point to a provider/model pair. Secrets are read only from process environment variables. Unknown providers, disabled providers, missing secrets/base URLs/models, or unsupported protocols fail closed; missing pricing is reported as unpriced usage rather than estimated with another provider's pricing table.
+
 ## 关键模块
 
 | 模块 | 文件 | 角色 |
