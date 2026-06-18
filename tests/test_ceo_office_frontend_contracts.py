@@ -123,6 +123,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "message-action-list" in view
     assert "inline-action-card" in view
     assert "inline-detail" in view
+    assert "class=\"message-row\" :class=\"message.role\"" in view
+    assert "justify-self: start" in css
+    assert "justify-self: end" in css
+    assert "max-width: min(760px, 88%)" in css
+    assert "min-width: min(280px, 100%)" in css
     assert "modelRuntimeSegments" not in view
     assert "agentRuntimeSegments" in app
     assert "formatTokenK" not in view

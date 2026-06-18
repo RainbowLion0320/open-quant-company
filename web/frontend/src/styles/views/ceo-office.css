@@ -154,7 +154,15 @@
   padding: 10px;
 }
 
+.message-row {
+  width: fit-content;
+  min-width: min(280px, 100%);
+  max-width: min(760px, 88%);
+  justify-self: start;
+}
+
 .message-row.ceo {
+  justify-self: end;
   background: rgba(6, 182, 212, 0.07);
 }
 
