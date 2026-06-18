@@ -147,6 +147,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert ".composer-input-row" in css
     assert ".composer-status-line" not in css
     assert ".agent-runtime-line" in workspace_css
+    assert "overflow: hidden;" in workspace_css
+    assert "overflow-x: auto" not in workspace_css
     assert "position: sticky" in css
     assert "bottom: 0" in css
     assert "flex: 1 1 auto" in css
