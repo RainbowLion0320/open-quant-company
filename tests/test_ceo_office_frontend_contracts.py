@@ -210,7 +210,14 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
 
     assert "ceoOffice" in zh_index
     assert "ceoOffice" in en_index
-    assert "目标 Desk" in zh_ceo
+    assert "目标部门" in zh_ceo
+    assert "数据工程部" in zh_ceo
+    assert "量化研究部" in zh_ceo
+    assert "组合管理部" in zh_ceo
+    assert "风险管理部" in zh_ceo
+    assert "交易执行部" in zh_ceo
+    assert "技术平台部" in zh_ceo
+    assert "运营报告部" in zh_ceo
     assert "证据详情" in zh_ceo
     assert "提交纸面订单" in zh_ceo
     assert "纸面订单预览" in zh_ceo
