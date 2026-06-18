@@ -4675,11 +4675,15 @@ def test_agent_runtime_auto_routes_ceo_messages_when_desk_is_missing(tmp_path, m
     runtime = AgentRuntime()
     cases = [
         ("帮我补齐 Tushare 数据缺口", "data"),
+        ("数据源能力页面为什么只展示300条", "data"),
         ("分析 12 个策略为什么 IC 不够", "research"),
         ("当前仓位该怎么调", "portfolio"),
         ("检查最大回撤和风险阻断", "risk"),
         ("提交纸面订单并检查 QMT readiness", "execution"),
+        ("我想买入平安银行", "execution"),
         ("前端页面报错，测试失败，代码冗余", "engineering"),
+        ("为什么每条消息都是运营报告部回复", "engineering"),
+        ("输入框时间怎么每条都显示", "engineering"),
         ("今天系统重点是什么，给我总结", "reporting"),
     ]
     for index, (content, expected_desk) in enumerate(cases):
@@ -4701,6 +4705,14 @@ def test_agent_runtime_auto_routes_ceo_messages_when_desk_is_missing(tmp_path, m
     fallback_routing = next(row for row in fallback["desk_response"].reasoning if row["kind"] == "desk_routing")
     assert fallback["message"].desk == "reporting"
     assert fallback_routing["reason"] == "low_confidence_default_to_reporting"
+
+    greeting_session = runtime.create_session(title="Auto route greeting", default_desk="data")
+    greeting = runtime.submit_ceo_message(greeting_session.session_id, content="hello")
+    assert greeting["message"].desk == "reporting"
+    assert greeting["desk_response"].message.desk == "reporting"
+    assert greeting["desk_response"].proposed_actions == []
+    assert greeting["desk_response"].planning_mode == "conversation"
+    assert "你好" in greeting["desk_response"].answer
     reset_datahub()
 
 
@@ -6499,6 +6511,89 @@ def test_agent_provider_semantic_planner_api_and_cli_are_explicit_opt_in(tmp_pat
         "semantic_plan_requires_manual_review",
         "unsafe_semantic_actions_filtered",
     ]
+    reset_datahub()
+
+
+def test_agent_message_provider_semantic_can_fallback_to_deterministic_for_web(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+    _use_deepseek_agent_planning_settings(monkeypatch)
+
+    from agent_os.runtime import AgentRuntime
+    from web.api.app import create_app
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Web semantic fallback", default_desk="reporting")
+
+    res = TestClient(create_app()).post(
+        f"/api/agent/sessions/{session.session_id}/messages",
+        json={
+            "role": "ceo",
+            "content": "为什么每条消息都是运营报告部回复",
+            "planner_mode": "provider_semantic",
+            "planner_fallback": "deterministic",
+        },
+    )
+    payload = res.json()
+
+    assert res.status_code == 200
+    assert payload["message"]["desk"] == "engineering"
+    assert payload["desk_response"]["message"]["desk"] == "engineering"
+    assert payload["desk_response"]["planning_mode"] != "semantic_assisted"
+    assert "semantic_provider_missing_secret" not in payload["desk_response"]["blockers"]
+    assert "CEO Office 对话/分诊/UI 问题" in payload["desk_response"]["answer"]
+    reset_datahub()
+
+
+def test_agent_provider_semantic_accepts_answer_without_actions(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "answer-only-secret")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+    _use_deepseek_agent_planning_settings(monkeypatch)
+
+    from agent_os.runtime import AgentRuntime
+    from agent_os.semantic_planner import ProviderSemanticPlanner
+
+    def answer_only_transport(_request: dict[str, object]) -> dict[str, object]:
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "answer": "你好，我可以按部门帮你检查数据、研究、组合、风险、交易和工程问题。",
+                                "confidence": 0.88,
+                                "actions": [],
+                                "reasoning": [],
+                                "blockers": [],
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Answer-only semantic", default_desk="reporting")
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        content="hello",
+        semantic_planner=ProviderSemanticPlanner(transport=answer_only_transport),
+    )
+    response = routed["desk_response"]
+    semantic_reasoning = next(row for row in response.reasoning if row["kind"] == "semantic_planner")
+
+    assert response.planning_mode == "semantic_assisted"
+    assert response.answer.startswith("你好")
+    assert response.proposed_actions == []
+    assert response.blockers == []
+    assert semantic_reasoning["manual_review_required"] is False
     reset_datahub()
 
 

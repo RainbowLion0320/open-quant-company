@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -60,11 +61,13 @@ class ProviderSemanticPlanner:
         model: str | None = None,
         transport: Any | None = None,
         timeout_seconds: float = 20.0,
+        fallback_to_deterministic: bool = False,
     ):
         self._provider = provider
         self._model = model
         self._transport = transport or _openai_compatible_chat_completion
         self._timeout_seconds = float(timeout_seconds)
+        self.fallback_to_deterministic = bool(fallback_to_deterministic)
 
     def plan(
         self,
@@ -192,6 +195,7 @@ def semantic_planner_from_payload(payload: dict[str, Any]) -> SemanticDraftPlann
         return ProviderSemanticPlanner(
             provider=str(payload.get("planner_provider") or "") or None,
             model=str(payload.get("planner_model") or "") or None,
+            fallback_to_deterministic=str(payload.get("planner_fallback") or "").strip() == "deterministic",
         )
     raise ValueError(f"Unsupported planner_mode: {mode}")
 
@@ -379,7 +383,13 @@ def _parse_json_object(text: str) -> dict[str, Any]:
         cleaned = cleaned.strip("`").strip()
         if cleaned.lower().startswith("json"):
             cleaned = cleaned[4:].strip()
-    return json.loads(cleaned)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if not match:
+            raise
+        return json.loads(match.group(0))
 
 
 def _provider_usage(response: Any) -> dict[str, Any]:

@@ -79,6 +79,10 @@ class DeskRoutingDecision:
 _DESK_ROUTING_TERMS: dict[str, tuple[str, ...]] = {
     "data": (
         "数据源",
+        "数据源能力",
+        "数据源矩阵",
+        "能力目录",
+        "能力页面",
         "补数",
         "补齐",
         "datahub",
@@ -94,6 +98,9 @@ _DESK_ROUTING_TERMS: dict[str, tuple[str, ...]] = {
         "data registry",
         "data source",
         "backfill",
+        "全量探测",
+        "样本探测",
+        "300条",
     ),
     "research": (
         "策略",
@@ -144,13 +151,18 @@ _DESK_ROUTING_TERMS: dict[str, tuple[str, ...]] = {
         "订单",
         "成交",
         "撤单",
+        "买入",
+        "卖出",
+        "委托",
+        "交易",
         "paper",
         "live",
         "qmt",
         "miniqmt",
         "券商",
         "交易执行",
-        "执行",
+        "执行链路",
+        "执行演练",
         "order",
         "broker",
         "submit",
@@ -167,6 +179,28 @@ _DESK_ROUTING_TERMS: dict[str, tuple[str, ...]] = {
         "工程诊断",
         "冗余",
         "报错",
+        "ceo office",
+        "ceo办公室",
+        "ceo 办公室",
+        "ui",
+        "ux",
+        "界面",
+        "交互",
+        "消息",
+        "对话",
+        "回复",
+        "气泡",
+        "标签",
+        "输入框",
+        "时间",
+        "斜杠",
+        "按钮",
+        "状态卡",
+        "状态栏",
+        "右侧",
+        "左侧",
+        "标记",
+        "显示",
         "typecheck",
         "build",
         "docs",
@@ -187,17 +221,65 @@ _DESK_ROUTING_TERMS: dict[str, tuple[str, ...]] = {
         "brief",
         "summary",
         "priority",
+        "hello",
+        "hi",
+        "你好",
+        "帮助",
+        "你能做什么",
     ),
+}
+
+_DESK_ROUTING_TERM_WEIGHTS: dict[str, float] = {
+    "数据源": 2.5,
+    "数据源能力": 3.0,
+    "数据源矩阵": 3.0,
+    "能力目录": 2.5,
+    "能力页面": 2.5,
+    "全量探测": 2.5,
+    "样本探测": 2.5,
+    "300条": 2.0,
+    "买入": 2.5,
+    "卖出": 2.5,
+    "委托": 2.5,
+    "交易": 1.8,
+    "执行链路": 2.2,
+    "执行演练": 2.2,
+    "ceo office": 2.5,
+    "ceo办公室": 2.5,
+    "ceo 办公室": 2.5,
+    "消息": 1.6,
+    "对话": 1.8,
+    "回复": 1.8,
+    "气泡": 1.6,
+    "标签": 1.4,
+    "输入框": 1.8,
+    "斜杠": 1.8,
+    "状态卡": 1.8,
+    "状态栏": 1.8,
+    "按钮": 1.4,
+    "界面": 1.2,
+    "交互": 1.2,
+    "显示": 0.8,
+    "右侧": 0.8,
+    "左侧": 0.8,
+    "标记": 1.0,
+    "hello": 1.5,
+    "hi": 1.5,
+    "你好": 1.5,
+    "帮助": 1.5,
+    "你能做什么": 2.0,
 }
 
 
 def route_ceo_message_desk(content: str) -> DeskRoutingDecision:
     normalized = content.lower()
     matches: dict[str, list[str]] = {}
+    scores: dict[str, float] = {}
     for desk, terms in _DESK_ROUTING_TERMS.items():
         desk_matches = [term for term in terms if term.lower() in normalized]
         if desk_matches:
             matches[desk] = desk_matches
+            scores[desk] = sum(_DESK_ROUTING_TERM_WEIGHTS.get(term.lower(), _DESK_ROUTING_TERM_WEIGHTS.get(term, 1.0)) for term in desk_matches)
 
     if not matches:
         return DeskRoutingDecision(
@@ -207,10 +289,10 @@ def route_ceo_message_desk(content: str) -> DeskRoutingDecision:
             reason="low_confidence_default_to_reporting",
         )
 
-    ranked = sorted(matches.items(), key=lambda item: (-len(item[1]), item[0]))
+    ranked = sorted(matches.items(), key=lambda item: (-scores[item[0]], -len(item[1]), item[0]))
     top_desk, top_terms = ranked[0]
-    top_score = len(top_terms)
-    tied_desks = [desk for desk, terms in ranked if len(terms) == top_score]
+    top_score = scores[top_desk]
+    tied_desks = [desk for desk, _terms in ranked if abs(scores[desk] - top_score) < 1e-9]
     if len(tied_desks) > 1:
         all_terms: list[str] = []
         for desk in tied_desks:
@@ -222,7 +304,7 @@ def route_ceo_message_desk(content: str) -> DeskRoutingDecision:
             reason=f"cross_desk_tie:{','.join(tied_desks)}",
         )
 
-    confidence = min(0.9, 0.56 + top_score * 0.08)
+    confidence = min(0.9, 0.54 + top_score * 0.06)
     return DeskRoutingDecision(
         assigned_desk=top_desk,
         confidence=round(confidence, 2),
@@ -448,6 +530,20 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
     ],
     "engineering": [
         (
+            ("ceo office", "ceo办公室", "ceo 办公室", "消息", "对话", "回复", "运营报告部", "分诊", "路由", "标签", "输入框", "时间", "斜杠", "按钮", "状态卡", "状态栏", "ui", "ux", "界面", "交互", "显示"),
+            {
+                "answer": "Engineering Desk 已识别到 CEO Office 对话/分诊/UI 问题。下一步应检查前端消息展示、自动部门分诊、API 返回的 desk_response，以及 provider semantic 是否被启用或失败；Web runtime 不直接改仓库。",
+                "evidence_label": "CEO Office engineering diagnostics",
+                "evidence_uri": "/system?tab=ast",
+                "evidence_summary": "Open engineering diagnostics for CEO Office routing and message rendering.",
+                "action_type": "ceo_office_diagnostics",
+                "tool_id": "astroq.architecture.ast",
+                "risk_level": "read_only",
+                "action_summary": "Inspect CEO Office routing and message rendering diagnostics.",
+                "expected_effect": "Records engineering diagnostics without editing repository files.",
+            },
+        ),
+        (
             ("bug", "修", "修复", "改代码", "实现", "工单", "codex", "代码"),
             {
                 "answer": "Engineering Desk 已识别到代码/bug 请求。Web runtime 不会直接改仓库；下一步会创建工程工单，并附带 AST 与测试设计诊断动作，交给 Codex、Claude 或人工维护者处理。",
@@ -526,6 +622,10 @@ def build_desk_workflow_plan(
     )
     if semantic_plan is not None:
         return semantic_plan
+
+    conversation_plan = _conversation_plan(desk=desk, content=content)
+    if conversation_plan is not None:
+        return conversation_plan
 
     hybrid_plan = _adaptive_artifact_plan(
         desk=desk,
@@ -621,6 +721,30 @@ def build_desk_workflow_plan(
         reasoning=reasoning,
         handoffs=handoffs,
         work_orders=work_orders,
+    )
+
+
+def _conversation_plan(*, desk: str, content: str) -> DeskWorkflowPlan | None:
+    normalized = content.lower().strip()
+    if desk != "reporting" or not _is_general_conversation(normalized):
+        return None
+    return DeskWorkflowPlan(
+        desk="reporting",
+        answer=(
+            "你好，我在。你可以直接描述要处理的数据、策略、组合、风险、交易或工程问题；"
+            "CEO Office 会自动分配给对应部门，并把证据引用和需要你审批的行动挂在对话里。"
+        ),
+        confidence=0.7,
+        actions=[],
+        planning_mode="conversation",
+        reasoning=[
+            {
+                "kind": "conversation",
+                "intent": "greeting_or_help",
+                "tool_count": 0,
+                "writes_blocked_by_policy": False,
+            }
+        ],
     )
 
 
@@ -1431,7 +1555,24 @@ def _semantic_assisted_plan(
     )
     normalized = _normalize_semantic_draft(draft)
     actions, rejected = _safe_semantic_actions(normalized.actions)
-    has_semantic_state = bool(normalized.blockers or normalized.reasoning or rejected)
+    provider_unavailable = {
+        "semantic_context_overflow",
+        "semantic_provider_not_configured",
+        "semantic_provider_disabled",
+        "semantic_provider_unsupported_protocol",
+        "semantic_provider_missing_secret",
+        "semantic_provider_base_url_missing",
+        "semantic_provider_model_missing",
+        "semantic_provider_error",
+    }
+    if (
+        getattr(semantic_planner, "fallback_to_deterministic", False)
+        and not actions
+        and normalized.blockers
+        and all(blocker in provider_unavailable for blocker in normalized.blockers)
+    ):
+        return None
+    has_semantic_state = bool(normalized.answer.strip() or normalized.blockers or normalized.reasoning or rejected)
     if not actions and not has_semantic_state:
         return None
 
@@ -1459,14 +1600,15 @@ def _semantic_assisted_plan(
             "rejected_action_count": len(rejected),
             "accepted_tool_ids": [action.tool_id for action in actions],
             "rejected": rejected,
-            "manual_review_required": True,
+            "manual_review_required": bool(actions or rejected),
         }
     )
     reasoning.extend(dict(row) for row in normalized.reasoning if isinstance(row, dict))
+    manual_review_required = bool(actions or rejected)
     blockers = _ordered_unique(
         [
             *[str(blocker) for blocker in normalized.blockers if str(blocker).strip()],
-            "semantic_plan_requires_manual_review",
+            *(["semantic_plan_requires_manual_review"] if manual_review_required else []),
             *(["unsafe_semantic_actions_filtered"] if rejected else []),
         ]
     )
@@ -1960,6 +2102,32 @@ def _work_orders_for(desk: str, content: str) -> list[WorkflowWorkOrderSpec]:
 def _is_daily_brief_request(normalized: str) -> bool:
     tokens = ("今天", "日常", "简报", "daily", "brief", "should do", "what should")
     return any(token in normalized for token in tokens)
+
+
+def _is_general_conversation(normalized: str) -> bool:
+    text = normalized.strip()
+    if not text:
+        return False
+    greeting_tokens = ("hello", "hi", "你好", "在吗", "帮助", "help", "你能做什么")
+    domain_tokens = (
+        "数据",
+        "策略",
+        "组合",
+        "仓位",
+        "风险",
+        "下单",
+        "订单",
+        "交易",
+        "bug",
+        "报错",
+        "代码",
+        "前端",
+        "页面",
+        "测试",
+        "文档",
+        "回测",
+    )
+    return any(token in text for token in greeting_tokens) and not any(token in text for token in domain_tokens)
 
 
 def _is_portfolio_review_request(normalized: str) -> bool:

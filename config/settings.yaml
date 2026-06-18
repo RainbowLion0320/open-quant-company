@@ -373,6 +373,7 @@ llm:
         context_window_tokens: 1048576
         timeout_seconds: 20
         extra_body:
+          max_completion_tokens: 1200
           thinking:
             type: enabled
 signals:

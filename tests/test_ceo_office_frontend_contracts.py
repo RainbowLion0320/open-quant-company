@@ -176,6 +176,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'if (text.startsWith("/"))' in view
     assert 'await runSlashCommand(text.toLowerCase())' in view
     assert view.index('if (text.startsWith("/"))') < view.index("api.agentAddMessage")
+    assert 'planner_mode: "provider_semantic"' not in view
+    assert 'planner_fallback: "deterministic"' not in view
     assert 'status: "archived"' in view
     assert "clear_memory" not in view
     assert "memory/clear" not in view

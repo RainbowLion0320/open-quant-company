@@ -129,6 +129,7 @@ export const agentApi = {
       evidence_refs?: string[];
       action_refs?: string[];
       planner_mode?: "deterministic" | "semantic_draft" | "provider_semantic";
+      planner_fallback?: "deterministic";
       semantic_draft?: Record<string, unknown>;
       planner_provider?: string;
       planner_model?: string;
