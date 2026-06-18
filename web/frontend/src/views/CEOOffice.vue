@@ -172,31 +172,6 @@
               {{ t("ceoOffice.send") }}
             </button>
           </div>
-          <div v-if="modelRuntime" class="model-runtime-line composer-status-line" :aria-label="t('ceoOffice.modelRuntimeA11y')">
-            <template v-for="(segment, index) in modelRuntimeSegments" :key="segment.key">
-              <span v-if="index" class="runtime-separator">·</span>
-              <span :class="['runtime-segment', `runtime-segment-${segment.kind}`]">
-                <span
-                  v-if="segment.kind === 'context-progress'"
-                  class="runtime-progress"
-                  :class="`runtime-progress-${segment.status}`"
-                  role="meter"
-                  :aria-valuenow="segment.progress"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  :aria-label="`${t('ceoOffice.contextShort')} ${segment.progress}%`"
-                >
-                  <span
-                    v-for="cell in runtimeBatteryCells"
-                    :key="cell"
-                    class="runtime-progress-cell"
-                    :class="{ active: cell <= segment.cells }"
-                  ></span>
-                </span>
-                <template v-else>{{ segment.text }}</template>
-              </span>
-            </template>
-          </div>
         </form>
       </article>
 
@@ -206,7 +181,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentEvidenceSnapshot, type AgentMessage, type AgentModelRuntimeResponse, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentEvidenceSnapshot, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -221,7 +196,6 @@ const lastStreamSignature = ref("");
 const runStream = ref<AbortController | null>(null);
 const runStreamId = ref("");
 const lastRunStreamSignature = ref("");
-const modelRuntime = ref<AgentModelRuntimeResponse | null>(null);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
 const selectedEvidenceSnapshot = ref<AgentEvidenceSnapshot | null>(null);
@@ -236,29 +210,6 @@ const error = ref("");
 const paperOrderPreview = computed(() => objectParam(selectedAction.value?.action.parameters.paper_order_preview));
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
 const paperRiskGatePassed = computed(() => Boolean(paperRiskGate.value?.passed));
-const modelRuntimeSegments = computed(() => {
-  if (!modelRuntime.value) return [];
-  const label = modelRuntime.value.runtime.label || modelRuntime.value.runtime.provider;
-  const model = modelRuntime.value.runtime.model || "—";
-  return [
-    { key: "provider", kind: "provider", text: label },
-    { key: "model", kind: "model", text: model },
-    { key: "reasoning", kind: "reasoning", text: `${t("ceoOffice.reasoningShort")} ${reasoningLevelShort(modelRuntime.value.reasoning.level)}` },
-    { key: "context", kind: "context", text: t("ceoOffice.contextShort") },
-    { key: "context-progress", kind: "context-progress", text: "", progress: contextUsagePct.value, cells: contextBatteryCells.value, status: contextStatusKind(modelRuntime.value.context.status) },
-    { key: "context-max", kind: "context", text: formatTokenK(modelRuntime.value.context.max_tokens) },
-  ];
-});
-const draftContextTokens = computed(() => estimateTextTokens(draft.value));
-const contextUsedTokens = computed(() => (modelRuntime.value?.context.used_tokens || 0) + draftContextTokens.value);
-const contextUsagePct = computed(() => {
-  const maxTokens = modelRuntime.value?.context.max_tokens || 0;
-  if (!maxTokens) return 0;
-  return Math.min(100, Math.round((contextUsedTokens.value / maxTokens) * 10000) / 100);
-});
-const runtimeBatteryCells = [1, 2, 3, 4, 5, 6, 7, 8];
-const contextBatteryCells = computed(() => Math.min(runtimeBatteryCells.length, Math.max(0, Math.ceil((contextUsagePct.value / 100) * runtimeBatteryCells.length))));
-
 const deskNames = computed<Record<string, string>>(() => ({
   data: t("ceoOffice.dataDesk"),
   research: t("ceoOffice.researchDesk"),
@@ -309,14 +260,6 @@ function messageHasSelectedEvidence(message: AgentMessage) {
   return selectedAction.value.action.evidence_refs.includes(evidenceId);
 }
 
-function contextStatusKind(status: string) {
-  const normalized = (status || "ok").toLowerCase();
-  if (normalized === "warn") return "warn";
-  if (normalized === "compacted") return "compacted";
-  if (normalized === "blocked") return "blocked";
-  return "ok";
-}
-
 function formatJson(value: Record<string, unknown>) {
   return JSON.stringify(value || {}, null, 2);
 }
@@ -350,31 +293,6 @@ function formatNumber(value: unknown) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "—";
   return numeric.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
-function estimateTextTokens(value: string) {
-  const text = value.trim();
-  if (!text) return 0;
-  return Math.max(1, Math.ceil(text.length / 4));
-}
-
-function formatTokenK(value: number) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric < 0) return "—";
-  return `${(numeric / 1000).toFixed(1)}k`;
-}
-
-function reasoningLevelShort(level: string) {
-  if (level === "max") return t("ceoOffice.reasoningMaxShort");
-  if (level === "xhigh") return t("ceoOffice.reasoningXHighShort");
-  if (level === "high") return t("ceoOffice.reasoningHighShort");
-  if (level === "mid") return t("ceoOffice.reasoningMidShort");
-  if (level === "medium") return t("ceoOffice.reasoningMidShort");
-  if (level === "low") return t("ceoOffice.reasoningLowShort");
-  if (level === "thinking_enabled") return t("ceoOffice.reasoningThinkingShort");
-  if (level === "thinking_disabled") return t("ceoOffice.reasoningOffShort");
-  if (!level || level === "default") return t("ceoOffice.reasoningDefaultShort");
-  return level;
 }
 
 function closeSessionStream() {
@@ -457,23 +375,21 @@ async function loadSession(sessionId: string, options: { connectStream?: boolean
   activeSession.value = detail.session;
   messages.value = detail.messages || [];
   actions.value = detail.actions || [];
+  notifyModelRuntimeSession(sessionId);
   if (options.connectStream !== false) {
     connectSessionStream(sessionId);
   }
-  await loadModelRuntime(sessionId);
 }
 
 async function loadOfficeState() {
   error.value = "";
   try {
-    const [sessionPayload, actionPayload, modelRuntimePayload] = await Promise.all([
+    const [sessionPayload, actionPayload] = await Promise.all([
       api.agentSessions(),
       api.agentActions(),
-      api.agentModelRuntime(),
     ]);
     sessions.value = sessionPayload.sessions || [];
     actions.value = actionPayload.actions || [];
-    modelRuntime.value = modelRuntimePayload;
     if (sessions.value.length) {
       await loadSession(activeSession.value?.session_id || sessions.value[0].session_id);
     }
@@ -485,8 +401,8 @@ async function loadOfficeState() {
   }
 }
 
-async function loadModelRuntime(sessionId = "") {
-  modelRuntime.value = await api.agentModelRuntime(sessionId);
+function notifyModelRuntimeSession(sessionId: string) {
+  window.dispatchEvent(new CustomEvent("oqc-agent-runtime-session", { detail: { sessionId } }));
 }
 
 async function ensureSession(): Promise<AgentSession> {

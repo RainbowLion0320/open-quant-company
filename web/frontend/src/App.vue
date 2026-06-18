@@ -73,6 +73,31 @@
             <strong>{{ marketMeta.freshness?.market || '—' }}</strong>
           </div>
         </div>
+        <div v-if="agentRuntimeVisible" class="agent-runtime-line" :aria-label="t('app.modelRuntimeA11y')">
+          <template v-for="(segment, index) in agentRuntimeSegments" :key="segment.key">
+            <span v-if="index" class="runtime-separator">·</span>
+            <span :class="['runtime-segment', `runtime-segment-${segment.kind}`]">
+              <span
+                v-if="segment.kind === 'context-progress'"
+                class="runtime-progress"
+                :class="`runtime-progress-${segment.status}`"
+                role="meter"
+                :aria-valuenow="segment.progress"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                :aria-label="`${t('app.contextShort')} ${segment.progress}%`"
+              >
+                <span
+                  v-for="cell in runtimeBatteryCells"
+                  :key="cell"
+                  class="runtime-progress-cell"
+                  :class="{ active: cell <= segment.cells }"
+                ></span>
+              </span>
+              <template v-else>{{ segment.text }}</template>
+            </span>
+          </template>
+        </div>
         <div class="statusbar-health" :title="systemLabel">
           <span class="status-dot" :style="{ '--dot-color': systemColor }"></span>
           <strong>{{ systemLabel }}</strong>
@@ -83,11 +108,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useParticles } from "./charts/particles";
 import { api } from "./api";
-import type { RegimeResponse } from "./api";
+import type { AgentModelRuntimeResponse, RegimeResponse } from "./api";
 import { useI18n } from "./i18n";
 import logoUrl from "./assets/open-quant-company-logo.svg";
 
@@ -95,10 +120,13 @@ const route = useRoute();
 const { currentLocale, t, toggleLocale } = useI18n();
 const hovered = ref("");
 let regimeTimer = 0;
+let agentRuntimeTimer = 0;
 const regime = ref<{ value: string; score?: number }>({ value: "sideways" });
 const marketMeta = ref<Partial<RegimeResponse>>({});
 const runMode = ref("research");
 const systemHealth = ref<{ all_ok: boolean; ok_count: number; total: number }>({ all_ok: true, ok_count: 0, total: 0 });
+const agentRuntimeSessionId = ref("");
+const agentModelRuntime = ref<AgentModelRuntimeResponse | null>(null);
 
 const nav = [
   { path: "/", labelKey: "nav.ceoOffice", pathData: "M4 18V8l8-5 8 5v10l-8 3-8-3Zm4-2.5 4 1.5 4-1.5V9.5L12 7 8 9.5v6Zm2-1.5h4M9.5 11h5M12 7v10" },
@@ -160,6 +188,37 @@ const buildVersion = computed(() => {
   const version = (marketMeta.value.config as any)?.project?.version;
   return version ? `v${version}` : "v—";
 });
+const isCeoOfficeRoute = computed(() => activeSectionPath.value === "/");
+const agentRuntimeVisible = computed(() => isCeoOfficeRoute.value && Boolean(agentModelRuntime.value));
+const runtimeBatteryCells = [1, 2, 3, 4, 5, 6, 7, 8];
+const agentContextUsagePct = computed(() => {
+  const raw = Number(agentModelRuntime.value?.context.usage_pct || 0);
+  if (!Number.isFinite(raw)) return 0;
+  return Math.min(100, Math.max(0, Math.round(raw * 100) / 100));
+});
+const agentContextBatteryCells = computed(() =>
+  Math.min(runtimeBatteryCells.length, Math.max(0, Math.ceil((agentContextUsagePct.value / 100) * runtimeBatteryCells.length))),
+);
+const agentRuntimeSegments = computed(() => {
+  if (!agentModelRuntime.value) return [];
+  const label = agentModelRuntime.value.runtime.label || agentModelRuntime.value.runtime.provider;
+  const model = agentModelRuntime.value.runtime.model || "—";
+  return [
+    { key: "provider", kind: "provider", text: label },
+    { key: "model", kind: "model", text: model },
+    { key: "reasoning", kind: "reasoning", text: `${t("app.reasoningShort")} ${reasoningLevelShort(agentModelRuntime.value.reasoning.level)}` },
+    { key: "context", kind: "context", text: t("app.contextShort") },
+    {
+      key: "context-progress",
+      kind: "context-progress",
+      text: "",
+      progress: agentContextUsagePct.value,
+      cells: agentContextBatteryCells.value,
+      status: contextStatusKind(agentModelRuntime.value.context.status),
+    },
+    { key: "context-max", kind: "context", text: formatTokenK(agentModelRuntime.value.context.max_tokens) },
+  ];
+});
 
 function isActive(path: string) {
   return activeSectionPath.value === path;
@@ -188,6 +247,57 @@ async function fetchSystemHealth() {
   } catch {}
 }
 
+async function fetchAgentModelRuntime(sessionId = agentRuntimeSessionId.value) {
+  if (!isCeoOfficeRoute.value) {
+    agentModelRuntime.value = null;
+    return;
+  }
+  let resolvedSessionId = sessionId;
+  try {
+    if (!resolvedSessionId) {
+      const payload = await api.agentSessions();
+      resolvedSessionId = payload.sessions?.[0]?.session_id || "";
+      agentRuntimeSessionId.value = resolvedSessionId;
+    }
+    agentModelRuntime.value = await api.agentModelRuntime(resolvedSessionId);
+  } catch {
+    agentModelRuntime.value = null;
+  }
+}
+
+function handleAgentRuntimeSession(event: Event) {
+  const detail = (event as CustomEvent<{ sessionId?: string }>).detail || {};
+  agentRuntimeSessionId.value = detail.sessionId || "";
+  void fetchAgentModelRuntime(agentRuntimeSessionId.value);
+}
+
+function contextStatusKind(status: string) {
+  const normalized = (status || "ok").toLowerCase();
+  if (normalized === "warn") return "warn";
+  if (normalized === "compacted") return "compacted";
+  if (normalized === "blocked") return "blocked";
+  return "ok";
+}
+
+function formatTokenK(value: number) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) return "—";
+  return `${(numeric / 1000).toFixed(1)}k`;
+}
+
+function reasoningLevelShort(level: string) {
+  if (level === "max") return t("app.reasoningMaxShort");
+  if (level === "xhigh") return t("app.reasoningXHighShort");
+  if (level === "high") return t("app.reasoningHighShort");
+  if (level === "mid") return t("app.reasoningMidShort");
+  if (level === "medium") return t("app.reasoningMidShort");
+  if (level === "low") return t("app.reasoningLowShort");
+  if (level === "thinking_enabled") return t("app.reasoningThinkingShort");
+  if (level === "thinking_disabled") return t("app.reasoningOffShort");
+  if (!level || level === "default") return t("app.reasoningDefaultShort");
+  return level;
+}
+
 // Particles
 useParticles();
 
@@ -195,11 +305,20 @@ onMounted(() => {
   fetchRegime();
   fetchMode();
   fetchSystemHealth();
+  fetchAgentModelRuntime();
+  window.addEventListener("oqc-agent-runtime-session", handleAgentRuntimeSession);
   regimeTimer = window.setInterval(fetchRegime, 60000);
+  agentRuntimeTimer = window.setInterval(() => fetchAgentModelRuntime(), 30000);
 });
 
 onUnmounted(() => {
   clearInterval(regimeTimer);
+  clearInterval(agentRuntimeTimer);
+  window.removeEventListener("oqc-agent-runtime-session", handleAgentRuntimeSession);
+});
+
+watch(activeSectionPath, () => {
+  void fetchAgentModelRuntime();
 });
 </script>
 

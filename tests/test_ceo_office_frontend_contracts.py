@@ -30,12 +30,16 @@ def test_app_shell_nav_exposes_ceo_office_and_market_separately():
 
 def test_ceo_office_view_uses_agent_api_and_i18n():
     view = read_frontend("views/CEOOffice.vue")
+    app = read_frontend("App.vue")
     api_client = read_frontend("api/client.ts")
     zh_index = read_frontend("i18n/messages/zh-CN/index.ts")
     en_index = read_frontend("i18n/messages/en-US/index.ts")
+    zh_app = read_frontend("i18n/messages/zh-CN/app.ts")
+    en_app = read_frontend("i18n/messages/en-US/app.ts")
     zh_ceo = read_frontend("i18n/messages/zh-CN/ceoOffice.ts")
     en_ceo = read_frontend("i18n/messages/en-US/ceoOffice.ts")
     css = read_frontend("styles/views/ceo-office.css")
+    workspace_css = read_frontend("styles/layout/workspace.css")
 
     assert "useI18n" in view
     assert "api.agentSessions" in view
@@ -64,7 +68,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.messageDesk" not in view
     assert "selectedAction" in view
     assert "api.agentAction" in view
-    assert "api.agentModelRuntime" in view
+    assert "api.agentModelRuntime" not in view
+    assert "api.agentModelRuntime" in app
     assert "api.agentApproveAction" in view
     assert "api.agentRejectAction" in view
     assert "api.agentPaperSubmitAction" in view
@@ -84,32 +89,37 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "message-action-list" in view
     assert "inline-action-card" in view
     assert "inline-detail" in view
-    assert "modelRuntimeSegments" in view
-    assert "formatTokenK" in view
+    assert "modelRuntimeSegments" not in view
+    assert "agentRuntimeSegments" in app
+    assert "formatTokenK" not in view
+    assert "formatTokenK" in app
     assert "composer-input-row" in view
-    assert "composer-status-line" in view
-    assert "runtime-segment" in view
-    assert "runtime-progress" in view
-    assert "runtimeBatteryCells" in view
-    assert "contextBatteryCells" in view
-    assert "context-progress" in view
-    assert "contextStatusKind" in view
-    assert "runtime-progress-cell" in css
-    assert "runtime-progress::after" not in css
-    assert "runtime-progress-compacted" in css
-    assert "runtime-progress-blocked" in css
-    assert "contextUsedTokens" in view
-    assert "contextUsagePct" in view
-    assert "ceoOffice.modelRuntimeA11y" in view
-    assert "ceoOffice.reasoningShort" in view
-    assert "ceoOffice.contextShort" in view
+    assert "composer-status-line" not in view
+    assert "agent-runtime-line" in app
+    assert "runtime-segment" in app
+    assert "runtime-progress" in app
+    assert "runtimeBatteryCells" in app
+    assert "agentContextBatteryCells" in app
+    assert "context-progress" in app
+    assert "contextStatusKind" in app
+    assert "runtime-progress-cell" in workspace_css
+    assert "runtime-progress::after" not in workspace_css
+    assert "runtime-progress-compacted" in workspace_css
+    assert "runtime-progress-blocked" in workspace_css
+    assert "contextUsedTokens" not in view
+    assert "contextUsagePct" not in view
+    assert "app.modelRuntimeA11y" in app
+    assert "app.reasoningShort" in app
+    assert "app.contextShort" in app
+    assert "oqc-agent-runtime-session" in view
+    assert "handleAgentRuntimeSession" in app
     for reasoning_level in ["max", "xhigh", "high", "mid", "medium", "low"]:
-        assert f'level === "{reasoning_level}"' in view
+        assert f'level === "{reasoning_level}"' in app
     assert "formatTokenCount(contextUsedTokens" not in view
-    assert "formatTokenCount(modelRuntime.value.context.max_tokens)" not in view
+    assert "formatTokenCount(agentModelRuntime.value.context.max_tokens)" not in app
     assert '{ key: "usage"' not in view
     assert '{ key: "context-status"' not in view
-    assert "contextStatusShort" not in view
+    assert "contextStatusShort" not in app
     assert "formatTokenK(contextUsedTokens.value)" not in view
     assert "ceoOffice.openEvidence" in view
     assert "ceoOffice.viewDetails" in view
@@ -117,7 +127,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "inline-action-card" in css
     assert "inline-detail" in css
     assert ".composer-input-row" in css
-    assert ".composer-status-line" in css
+    assert ".composer-status-line" not in css
+    assert ".agent-runtime-line" in workspace_css
     assert "position: sticky" in css
     assert "bottom: 0" in css
     assert "flex: 1 1 auto" in css
@@ -239,21 +250,22 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Paper Order Preview" in en_ceo
     assert "Run Evidence" in en_ceo
     assert "Run Timeline" in en_ceo
-    assert "modelRuntimeA11y" in zh_ceo
-    assert 'reasoningShort: "R"' in zh_ceo
-    assert 'reasoningMaxShort: "最大"' in zh_ceo
-    assert 'reasoningXHighShort: "极高"' in zh_ceo
-    assert 'reasoningHighShort: "高"' in zh_ceo
-    assert 'reasoningMidShort: "中"' in zh_ceo
-    assert 'reasoningLowShort: "低"' in zh_ceo
-    assert 'contextShort: "CTX"' in zh_ceo
-    assert 'reasoningShort: "R"' in en_ceo
-    assert 'reasoningMaxShort: "Max"' in en_ceo
-    assert 'reasoningXHighShort: "XHigh"' in en_ceo
-    assert 'reasoningHighShort: "High"' in en_ceo
-    assert 'reasoningMidShort: "Mid"' in en_ceo
-    assert 'reasoningLowShort: "Low"' in en_ceo
-    assert 'contextShort: "CTX"' in en_ceo
+    assert "modelRuntimeA11y" not in zh_ceo
+    assert 'reasoningShort: "R"' in zh_app
+    assert 'reasoningMaxShort: "最大"' in zh_app
+    assert 'reasoningXHighShort: "极高"' in zh_app
+    assert 'reasoningHighShort: "高"' in zh_app
+    assert 'reasoningMidShort: "中"' in zh_app
+    assert 'reasoningLowShort: "低"' in zh_app
+    assert 'contextShort: "CTX"' in zh_app
+    assert "modelRuntimeA11y" not in en_ceo
+    assert 'reasoningShort: "R"' in en_app
+    assert 'reasoningMaxShort: "Max"' in en_app
+    assert 'reasoningXHighShort: "XHigh"' in en_app
+    assert 'reasoningHighShort: "High"' in en_app
+    assert 'reasoningMidShort: "Mid"' in en_app
+    assert 'reasoningLowShort: "Low"' in en_app
+    assert 'contextShort: "CTX"' in en_app
     assert "已用上下文" not in zh_ceo
     assert "最大上下文" not in zh_ceo
     assert "Context Used" not in en_ceo
