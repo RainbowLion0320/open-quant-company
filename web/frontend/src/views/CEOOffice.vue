@@ -18,7 +18,7 @@
               <time>{{ formatTime(message.created_at) }}</time>
             </div>
             <p>{{ message.content }}</p>
-            <div v-if="message.evidence_refs.length || message.action_refs.length" class="message-ref-list">
+            <div v-if="message.evidence_refs.length" class="message-ref-list">
               <button
                 v-for="evidenceId in message.evidence_refs"
                 :key="`${message.message_id}-evidence-${evidenceId}`"
@@ -28,15 +28,139 @@
               >
                 {{ t("ceoOffice.openEvidence") }}
               </button>
-              <button
+            </div>
+            <div v-if="message.action_refs.length" class="message-action-list">
+              <div
                 v-for="actionId in message.action_refs"
-                :key="`${message.message_id}-action-${actionId}`"
-                class="btn btn-xs btn-ghost"
-                type="button"
-                @click="selectAction(actionId)"
+                :key="`${message.message_id}-inline-action-${actionId}`"
+                class="inline-action-card"
+                :class="{ selected: selectedAction?.action.action_id === actionId }"
               >
-                {{ t("ceoOffice.viewAction") }}
-              </button>
+                <template v-if="actionById(actionId)">
+                  <div class="action-title">
+                    <strong>{{ actionById(actionId)?.summary }}</strong>
+                    <span :class="['action-status', actionById(actionId)?.status || 'unknown']">
+                      {{ statusLabel(actionById(actionId)?.status || "unknown") }}
+                    </span>
+                  </div>
+                  <small>{{ deskLabel(actionById(actionId)?.desk || "") }} · {{ actionById(actionId)?.risk_level }}</small>
+                  <div class="approval-buttons">
+                    <button v-if="actionById(actionId)?.status === 'approval_required'" class="btn btn-xs" type="button" @click="approveAction(actionId)">
+                      {{ t("ceoOffice.approved") }}
+                    </button>
+                    <button v-if="actionById(actionId)?.status === 'approval_required'" class="btn btn-xs btn-danger" type="button" @click="rejectAction(actionId)">
+                      {{ t("ceoOffice.rejected") }}
+                    </button>
+                    <button
+                      v-if="canSubmitPaperAction(actionById(actionId))"
+                      class="btn btn-xs btn-primary"
+                      type="button"
+                      :disabled="submittingPaperAction === actionId"
+                      @click="submitPaperAction(actionId)"
+                    >
+                      {{ t("ceoOffice.submitPaperOrder") }}
+                    </button>
+                    <button
+                      v-if="canCancelAction(actionById(actionId))"
+                      class="btn btn-xs btn-ghost"
+                      type="button"
+                      :disabled="cancelingAction === actionId"
+                      @click="cancelAction(actionId)"
+                    >
+                      {{ t("ceoOffice.cancelAction") }}
+                    </button>
+                    <button class="btn btn-xs btn-ghost" type="button" @click="selectAction(actionId)">
+                      {{ t("ceoOffice.viewDetails") }}
+                    </button>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div v-if="selectedAction && message.action_refs.includes(selectedAction.action.action_id)" class="inline-detail detail-stack">
+              <div class="detail-row">
+                <span>{{ t("ceoOffice.expectedEffect") }}</span>
+                <p>{{ selectedAction.action.expected_effect || "—" }}</p>
+              </div>
+              <div class="detail-row">
+                <span>{{ t("ceoOffice.expiresAt") }}</span>
+                <code>{{ formatTime(selectedAction.action.expires_at) }}</code>
+              </div>
+              <details class="detail-row">
+                <summary>{{ t("ceoOffice.parameters") }}</summary>
+                <pre>{{ formatJson(selectedAction.action.parameters) }}</pre>
+              </details>
+              <div v-if="paperOrderPreview" class="detail-row">
+                <span>{{ t("ceoOffice.paperOrderPreview") }}</span>
+                <div class="paper-preview-grid">
+                  <div class="paper-preview-cell">
+                    <small>{{ t("ceoOffice.status") }}</small>
+                    <strong>{{ statusLabel(String(paperOrderPreview.status || "unknown")) }}</strong>
+                  </div>
+                  <div class="paper-preview-cell">
+                    <small>{{ t("ceoOffice.riskGate") }}</small>
+                    <strong>{{ paperRiskGatePassed ? t("ceoOffice.passed") : t("ceoOffice.blocked") }}</strong>
+                  </div>
+                  <div class="paper-preview-cell">
+                    <small>{{ t("ceoOffice.cashEffect") }}</small>
+                    <strong>{{ formatNumber(paperOrderPreview.estimated_cash_effect) }}</strong>
+                  </div>
+                </div>
+              </div>
+              <div v-if="selectedAction.action.evidence_refs.length" class="detail-row">
+                <span>{{ t("ceoOffice.evidenceRefs") }}</span>
+                <div class="evidence-ref-list">
+                  <button
+                    v-for="evidenceId in selectedAction.action.evidence_refs"
+                    :key="`${selectedAction.action.action_id}-${evidenceId}`"
+                    class="btn btn-xs"
+                    type="button"
+                    @click="loadEvidence(evidenceId)"
+                  >
+                    {{ t("ceoOffice.openEvidence") }}
+                  </button>
+                </div>
+              </div>
+              <details v-if="selectedAction.runs.length" class="detail-row">
+                <summary>{{ t("ceoOffice.runHistory") }}</summary>
+                <div class="run-list">
+                  <div v-for="run in selectedAction.runs" :key="run.run_id" class="run-row">
+                    <strong>{{ statusLabel(run.status) }}</strong>
+                    <small>{{ run.tool_name }} · {{ run.return_code ?? "—" }}</small>
+                    <code>{{ run.command.join(" ") }}</code>
+                    <p v-if="run.stdout_summary">{{ t("ceoOffice.stdout") }}: {{ run.stdout_summary }}</p>
+                    <p v-if="run.stderr_summary">{{ t("ceoOffice.stderr") }}: {{ run.stderr_summary }}</p>
+                    <div v-if="run.artifact_refs.length" class="run-evidence-list">
+                      <small>{{ t("ceoOffice.runEvidence") }}</small>
+                      <button
+                        v-for="evidenceId in run.artifact_refs"
+                        :key="`${run.run_id}-${evidenceId}`"
+                        class="btn btn-xs"
+                        type="button"
+                        @click="loadEvidence(evidenceId)"
+                      >
+                        {{ t("ceoOffice.openEvidence") }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            </div>
+            <div v-if="selectedEvidence && messageHasSelectedEvidence(message)" class="inline-detail detail-stack">
+              <strong>{{ selectedEvidence.label }}</strong>
+              <p>{{ selectedEvidence.summary }}</p>
+              <div v-if="selectedEvidenceNavigation" class="detail-row">
+                <span>{{ t("ceoOffice.linkedView") }}</span>
+                <a class="evidence-link" :href="selectedEvidenceNavigation.href">
+                  {{ t("ceoOffice.openLinkedView") }}
+                </a>
+              </div>
+              <details class="detail-row">
+                <summary>{{ t("ceoOffice.evidenceDetail") }}</summary>
+                <code>{{ selectedEvidence.uri }}</code>
+                <code>{{ selectedEvidenceStatus || selectedEvidence.freshness_status }}</code>
+                <code v-if="selectedEvidence.hash">{{ selectedEvidence.hash }}</code>
+                <code v-if="selectedEvidenceSnapshot">{{ selectedEvidenceSnapshot.uri }}</code>
+              </details>
             </div>
           </div>
         </div>
@@ -82,257 +206,6 @@
         </form>
       </article>
 
-      <aside class="ceo-side">
-        <article class="ceo-panel">
-          <header class="panel-head">
-            <span>{{ t("ceoOffice.actionQueue") }}</span>
-            <small>{{ attentionActions.length }}</small>
-          </header>
-          <div v-if="!attentionActions.length" class="ceo-empty">{{ t("ceoOffice.noActions") }}</div>
-          <div v-else class="action-list">
-            <div
-              v-for="action in attentionActions"
-              :key="action.action_id"
-              class="action-row"
-              :class="{ selected: selectedAction?.action.action_id === action.action_id }"
-            >
-              <div class="action-title">
-                <strong>{{ action.summary }}</strong>
-                <span :class="['action-status', action.status]">{{ statusLabel(action.status) }}</span>
-              </div>
-              <small>{{ deskLabel(action.desk) }} · {{ action.risk_level }}</small>
-              <button class="btn btn-xs" type="button" @click="selectAction(action.action_id)">
-                {{ t("ceoOffice.viewDetails") }}
-              </button>
-              <div v-if="action.status === 'approval_required' || canCancelAction(action)" class="approval-buttons">
-                <button v-if="action.status === 'approval_required'" class="btn btn-xs" type="button" @click="approveAction(action.action_id)">
-                  {{ t("ceoOffice.approved") }}
-                </button>
-                <button v-if="action.status === 'approval_required'" class="btn btn-xs btn-danger" type="button" @click="rejectAction(action.action_id)">
-                  {{ t("ceoOffice.rejected") }}
-                </button>
-                <button
-                  v-if="canSubmitPaperAction(action)"
-                  class="btn btn-xs btn-primary"
-                  type="button"
-                  :disabled="submittingPaperAction === action.action_id"
-                  @click="submitPaperAction(action.action_id)"
-                >
-                  {{ t("ceoOffice.submitPaperOrder") }}
-                </button>
-                <button
-                  v-if="canCancelAction(action)"
-                  class="btn btn-xs btn-ghost"
-                  type="button"
-                  :disabled="cancelingAction === action.action_id"
-                  @click="cancelAction(action.action_id)"
-                >
-                  {{ t("ceoOffice.cancelAction") }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <article class="ceo-panel">
-          <header class="panel-head">
-            <span>{{ t("ceoOffice.actionDetail") }}</span>
-            <small>{{ selectedAction?.action.action_id || "—" }}</small>
-          </header>
-          <div v-if="!selectedAction" class="ceo-empty">{{ t("ceoOffice.noActions") }}</div>
-          <div v-else class="detail-stack">
-            <div class="detail-row">
-              <span>{{ t("ceoOffice.expectedEffect") }}</span>
-              <p>{{ selectedAction.action.expected_effect || "—" }}</p>
-            </div>
-            <div class="detail-row">
-              <span>{{ t("ceoOffice.expiresAt") }}</span>
-              <code>{{ formatTime(selectedAction.action.expires_at) }}</code>
-            </div>
-            <div class="detail-row">
-              <span>{{ t("ceoOffice.parameters") }}</span>
-              <pre>{{ formatJson(selectedAction.action.parameters) }}</pre>
-            </div>
-            <div v-if="paperOrderPreview" class="detail-row">
-              <span>{{ t("ceoOffice.paperOrderPreview") }}</span>
-              <div class="paper-preview-grid">
-                <div class="paper-preview-cell">
-                  <small>{{ t("ceoOffice.status") }}</small>
-                  <strong>{{ statusLabel(String(paperOrderPreview.status || "unknown")) }}</strong>
-                </div>
-                <div class="paper-preview-cell">
-                  <small>{{ t("ceoOffice.riskGate") }}</small>
-                  <strong>{{ paperRiskGatePassed ? t("ceoOffice.passed") : t("ceoOffice.blocked") }}</strong>
-                </div>
-                <div class="paper-preview-cell">
-                  <small>{{ t("ceoOffice.cashEffect") }}</small>
-                  <strong>{{ formatNumber(paperOrderPreview.estimated_cash_effect) }}</strong>
-                </div>
-              </div>
-              <div class="paper-blockers">
-                <small>{{ t("ceoOffice.blockers") }}</small>
-                <span v-if="!paperRiskBlockers.length">{{ t("ceoOffice.noBlockers") }}</span>
-                <code v-for="blocker in paperRiskBlockers" :key="blocker">{{ blocker }}</code>
-              </div>
-            </div>
-            <div v-if="paperReconciliationSummary" class="detail-row">
-              <span>{{ t("ceoOffice.paperReconciliation") }}</span>
-              <div class="paper-preview-grid paper-reconciliation-grid">
-                <div class="paper-preview-cell">
-                  <small>{{ t("ceoOffice.status") }}</small>
-                  <strong>{{ statusLabel(paperReconciliationSummary.status) }}</strong>
-                </div>
-                <div class="paper-preview-cell">
-                  <small>{{ t("ceoOffice.orderId") }}</small>
-                  <strong>{{ paperReconciliationSummary.orderId || "—" }}</strong>
-                </div>
-                <div class="paper-preview-cell">
-                  <small>{{ t("ceoOffice.cashAfter") }}</small>
-                  <strong>{{ formatNumber(paperReconciliationSummary.cashAfter) }}</strong>
-                </div>
-                <div class="paper-preview-cell">
-                  <small>{{ t("ceoOffice.marketValueAfter") }}</small>
-                  <strong>{{ formatNumber(paperReconciliationSummary.marketValueAfter) }}</strong>
-                </div>
-              </div>
-              <div v-if="paperReconciliationSummary.error" class="paper-blockers">
-                <small>{{ t("ceoOffice.stderr") }}</small>
-                <code>{{ paperReconciliationSummary.error }}</code>
-              </div>
-            </div>
-            <div class="detail-row">
-              <span>{{ t("ceoOffice.evidenceRefs") }}</span>
-              <div v-if="!selectedAction.action.evidence_refs.length" class="ceo-empty compact">
-                {{ t("ceoOffice.noEvidence") }}
-              </div>
-              <div v-else class="evidence-ref-list">
-                <button
-                  v-for="evidenceId in selectedAction.action.evidence_refs"
-                  :key="evidenceId"
-                  class="btn btn-xs"
-                  type="button"
-                  @click="loadEvidence(evidenceId)"
-                >
-                  {{ t("ceoOffice.openEvidence") }}
-                </button>
-              </div>
-            </div>
-            <div v-if="selectedAction.action.status === 'approval_required' || canSubmitPaperAction(selectedAction.action) || canCancelAction(selectedAction.action)" class="approval-buttons">
-              <button
-                v-if="selectedAction.action.status === 'approval_required'"
-                class="btn btn-xs"
-                type="button"
-                @click="approveAction(selectedAction.action.action_id)"
-              >
-                {{ t("ceoOffice.approved") }}
-              </button>
-              <button
-                v-if="selectedAction.action.status === 'approval_required'"
-                class="btn btn-xs btn-danger"
-                type="button"
-                @click="rejectAction(selectedAction.action.action_id)"
-              >
-                {{ t("ceoOffice.rejected") }}
-              </button>
-              <button
-                v-if="canSubmitPaperAction(selectedAction.action)"
-                class="btn btn-xs btn-primary"
-                type="button"
-                :disabled="submittingPaperAction === selectedAction.action.action_id"
-                @click="submitPaperAction(selectedAction.action.action_id)"
-              >
-                {{ t("ceoOffice.submitPaperOrder") }}
-              </button>
-              <button
-                v-if="canCancelAction(selectedAction.action)"
-                class="btn btn-xs btn-ghost"
-                type="button"
-                :disabled="cancelingAction === selectedAction.action.action_id"
-                @click="cancelAction(selectedAction.action.action_id)"
-              >
-                {{ t("ceoOffice.cancelAction") }}
-              </button>
-            </div>
-            <div class="detail-row">
-              <span>{{ t("ceoOffice.runHistory") }}</span>
-              <small v-if="selectedAction.runs.length">
-                {{ t("ceoOffice.runStream") }} {{ statusLabel(runStreamStatus) }}
-              </small>
-              <div v-if="!selectedAction.runs.length" class="ceo-empty compact">
-                {{ t("ceoOffice.noRuns") }}
-              </div>
-              <div v-else class="run-list">
-                <div v-for="run in selectedAction.runs" :key="run.run_id" class="run-row">
-                  <strong>{{ statusLabel(run.status) }}</strong>
-                  <small>{{ run.tool_name }} · {{ run.return_code ?? "—" }}</small>
-                  <code>{{ run.command.join(" ") }}</code>
-                  <p v-if="run.stdout_summary">{{ t("ceoOffice.stdout") }}: {{ run.stdout_summary }}</p>
-                  <p v-if="run.stderr_summary">{{ t("ceoOffice.stderr") }}: {{ run.stderr_summary }}</p>
-                  <div v-if="run.events?.length" class="run-timeline">
-                    <small>{{ t("ceoOffice.runTimeline") }}</small>
-                    <div v-for="event in run.events" :key="event.event_id" class="run-event-row">
-                      <code>#{{ event.sequence }}</code>
-                      <strong>{{ statusLabel(event.event_type) }}</strong>
-                      <span>{{ statusLabel(event.status) }}</span>
-                      <p>{{ event.message }}</p>
-                    </div>
-                  </div>
-                  <div v-if="run.artifact_refs.length" class="run-evidence-list">
-                    <small>{{ t("ceoOffice.runEvidence") }}</small>
-                    <button
-                      v-for="evidenceId in run.artifact_refs"
-                      :key="`${run.run_id}-${evidenceId}`"
-                      class="btn btn-xs"
-                      type="button"
-                      @click="loadEvidence(evidenceId)"
-                    >
-                      {{ t("ceoOffice.openEvidence") }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <article class="ceo-panel">
-          <header class="panel-head">
-            <span>{{ t("ceoOffice.evidenceDetail") }}</span>
-            <small>{{ selectedEvidence?.evidence_id || "—" }}</small>
-          </header>
-          <div v-if="!selectedEvidence" class="ceo-empty">{{ t("ceoOffice.noEvidence") }}</div>
-          <div v-else class="detail-stack">
-            <strong>{{ selectedEvidence.label }}</strong>
-            <p>{{ selectedEvidence.summary }}</p>
-            <div class="detail-row">
-              <span>{{ t("ceoOffice.uri") }}</span>
-              <code>{{ selectedEvidence.uri }}</code>
-            </div>
-            <div v-if="selectedEvidenceNavigation" class="detail-row">
-              <span>{{ t("ceoOffice.linkedView") }}</span>
-              <a class="evidence-link" :href="selectedEvidenceNavigation.href">
-                {{ t("ceoOffice.openLinkedView") }}
-              </a>
-            </div>
-            <div class="detail-row">
-              <span>{{ t("ceoOffice.freshness") }}</span>
-              <code>{{ selectedEvidenceStatus || selectedEvidence.freshness_status }}</code>
-            </div>
-            <div v-if="selectedEvidence.hash" class="detail-row">
-              <span>{{ t("ceoOffice.sourceHash") }}</span>
-              <code>{{ selectedEvidence.hash }}</code>
-            </div>
-            <div v-if="selectedEvidence.current_hash" class="detail-row">
-              <span>{{ t("ceoOffice.currentHash") }}</span>
-              <code>{{ selectedEvidence.current_hash }}</code>
-            </div>
-            <div v-if="selectedEvidenceSnapshot" class="detail-row">
-              <span>{{ t("ceoOffice.evidenceSnapshot") }}</span>
-              <code>{{ selectedEvidenceSnapshot.uri }}</code>
-            </div>
-          </div>
-        </article>
-      </aside>
     </section>
   </div>
 </template>
@@ -353,7 +226,6 @@ const sessionStreamId = ref("");
 const lastStreamSignature = ref("");
 const runStream = ref<AbortController | null>(null);
 const runStreamId = ref("");
-const runStreamStatus = ref("inactive");
 const lastRunStreamSignature = ref("");
 const desks = ref<AgentDesk[]>([]);
 const modelRuntime = ref<AgentModelRuntimeResponse | null>(null);
@@ -369,25 +241,9 @@ const draft = ref("");
 const sending = ref(false);
 const error = ref("");
 
-const attentionStatuses = new Set(["proposed", "approval_required", "approved", "running", "blocked", "failed"]);
-const attentionActions = computed(() => actions.value.filter(action => attentionStatuses.has(action.status) || canSubmitPaperAction(action) || canCancelPaperOrder(action)));
 const paperOrderPreview = computed(() => objectParam(selectedAction.value?.action.parameters.paper_order_preview));
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
 const paperRiskGatePassed = computed(() => Boolean(paperRiskGate.value?.passed));
-const paperRiskBlockers = computed(() => arrayParam(paperRiskGate.value?.blockers));
-const paperReconciliation = computed(() => selectedAction.value?.paper_reconciliations?.[0] || null);
-const paperReconciliationSummary = computed(() => {
-  const reconciliation = paperReconciliation.value;
-  const account = objectParam(reconciliation?.account_after);
-  if (!reconciliation || !account) return null;
-  return {
-    status: String(reconciliation.status || "unknown"),
-    orderId: String(reconciliation.order_id || ""),
-    cashAfter: account.cash,
-    marketValueAfter: account.market_value,
-    error: String(reconciliation.error || ""),
-  };
-});
 const modelRuntimeSegments = computed(() => {
   if (!modelRuntime.value) return [];
   const label = modelRuntime.value.runtime.label || modelRuntime.value.runtime.provider;
@@ -449,6 +305,18 @@ function statusLabel(status: string) {
   return status;
 }
 
+function actionById(actionId: string) {
+  return actions.value.find(action => action.action_id === actionId) || null;
+}
+
+function messageHasSelectedEvidence(message: AgentMessage) {
+  const evidenceId = selectedEvidence.value?.evidence_id;
+  if (!evidenceId) return false;
+  if (message.evidence_refs.includes(evidenceId)) return true;
+  if (!selectedAction.value || !message.action_refs.includes(selectedAction.value.action.action_id)) return false;
+  return selectedAction.value.action.evidence_refs.includes(evidenceId);
+}
+
 function contextStatusKind(status: string) {
   const normalized = (status || "ok").toLowerCase();
   if (normalized === "warn") return "warn";
@@ -465,16 +333,16 @@ function isPaperAction(action: AgentAction | null | undefined) {
   return action?.action_type === "paper_order" && action?.risk_level === "paper_order";
 }
 
-function canSubmitPaperAction(action: AgentAction) {
-  return isPaperAction(action) && action.status === "approved";
+function canSubmitPaperAction(action: AgentAction | null | undefined) {
+  return Boolean(action && isPaperAction(action) && action.status === "approved");
 }
 
-function canCancelPaperOrder(action: AgentAction) {
-  return isPaperAction(action) && action.status === "succeeded";
+function canCancelPaperOrder(action: AgentAction | null | undefined) {
+  return Boolean(action && isPaperAction(action) && action.status === "succeeded");
 }
 
-function canCancelAction(action: AgentAction) {
-  return ["proposed", "approval_required", "approved"].includes(action.status) || canCancelPaperOrder(action);
+function canCancelAction(action: AgentAction | null | undefined) {
+  return Boolean(action && (["proposed", "approval_required", "approved"].includes(action.status) || canCancelPaperOrder(action)));
 }
 
 function formatTime(value: string) {
@@ -484,10 +352,6 @@ function formatTime(value: string) {
 
 function objectParam(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-function arrayParam(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : [];
 }
 
 function formatNumber(value: unknown) {
@@ -532,7 +396,6 @@ function closeRunStream() {
   runStream.value?.abort();
   runStream.value = null;
   runStreamId.value = "";
-  runStreamStatus.value = "inactive";
   lastRunStreamSignature.value = "";
 }
 
@@ -568,14 +431,12 @@ function connectRunStream(runId: string) {
   const controller = new AbortController();
   runStream.value = controller;
   runStreamId.value = runId;
-  runStreamStatus.value = "connecting";
   void api.agentRunStream(
     runId,
     {
       onSnapshot: snapshot => {
         if (snapshot.signature === lastRunStreamSignature.value) return;
         lastRunStreamSignature.value = snapshot.signature;
-        runStreamStatus.value = "connected";
         if (!selectedAction.value || selectedAction.value.action.action_id !== snapshot.action_id) return;
         const nextRun = { ...snapshot.run, events: snapshot.events };
         const currentRuns = selectedAction.value.runs || [];
@@ -589,7 +450,6 @@ function connectRunStream(runId: string) {
       },
       onMissing: () => {
         closeRunStream();
-        runStreamStatus.value = "blocked";
       },
     },
     { signal: controller.signal },
@@ -597,7 +457,6 @@ function connectRunStream(runId: string) {
     if (controller.signal.aborted) return;
     const name = err instanceof Error ? err.name : "";
     if (name === "AbortError") return;
-    runStreamStatus.value = "blocked";
   });
 }
 

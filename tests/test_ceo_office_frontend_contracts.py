@@ -61,8 +61,6 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'v-for="desk in desks"' in view
     assert "desk: selectedDraftDesk.value" in view
     assert "ceoOffice.messageDesk" in view
-    assert "attentionActions" in view
-    assert "attentionStatuses" in view
     assert "selectedAction" in view
     assert "api.agentAction" in view
     assert "api.agentModelRuntime" in view
@@ -80,6 +78,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentEvidence" in view
     assert "message.evidence_refs" in view
     assert "message.action_refs" in view
+    assert "actionById" in view
+    assert "messageHasSelectedEvidence" in view
+    assert "message-action-list" in view
+    assert "inline-action-card" in view
+    assert "inline-detail" in view
     assert "modelRuntimeSegments" in view
     assert "formatTokenK" in view
     assert "runtime-segment" in view
@@ -106,10 +109,17 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "contextStatusShort" not in view
     assert "formatTokenK(contextUsedTokens.value)" not in view
     assert "ceoOffice.openEvidence" in view
-    assert "ceoOffice.viewAction" in view
+    assert "ceoOffice.viewDetails" in view
+    assert "message-action-list" in css
+    assert "inline-action-card" in css
+    assert "inline-detail" in css
 
     # The CEO page must not become a runtime/ops control panel again.
     forbidden_view_tokens = [
+        "ceo-side",
+        "actionQueue",
+        "attentionActions",
+        "attentionStatuses",
         "api.agentApprovalPolicies",
         "api.agentHandoffs",
         "api.agentResolveHandoff",
@@ -200,22 +210,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
 
     assert "ceoOffice" in zh_index
     assert "ceoOffice" in en_index
-    assert "行动队列" in zh_ceo
     assert "目标 Desk" in zh_ceo
-    assert "查看行动" in zh_ceo
     assert "证据详情" in zh_ceo
     assert "提交纸面订单" in zh_ceo
     assert "纸面订单预览" in zh_ceo
-    assert "纸面订单对账" in zh_ceo
     assert "运行证据" in zh_ceo
     assert "运行时间线" in zh_ceo
-    assert "Action Queue" in en_ceo
     assert "Target Desk" in en_ceo
-    assert "View Action" in en_ceo
     assert "Evidence Detail" in en_ceo
     assert "Submit Paper Order" in en_ceo
     assert "Paper Order Preview" in en_ceo
-    assert "Paper Reconciliation" in en_ceo
     assert "Run Evidence" in en_ceo
     assert "Run Timeline" in en_ceo
     assert "modelRuntimeA11y" in zh_ceo
@@ -239,6 +243,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Max Context" not in en_ceo
 
     forbidden_zh_phrases = [
+        "行动队列",
+        "行动详情",
+        "查看行动",
+        "纸面订单对账",
         "Desk 状态",
         "审批策略",
         "交接事项",
@@ -266,6 +274,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
         assert phrase not in zh_ceo
 
     forbidden_en_phrases = [
+        "Action Queue",
+        "Action Detail",
+        "View Action",
+        "Paper Reconciliation",
         "Desk Status",
         "Approval Policies",
         "Handoffs",
