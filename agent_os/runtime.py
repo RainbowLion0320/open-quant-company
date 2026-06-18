@@ -638,6 +638,9 @@ class AgentRuntime:
         current = self.ledger.get_action(action_id)
         if not current:
             raise KeyError(f"Agent action not found: {action_id}")
+        current = self._refresh_action_expiry(current)
+        if current.get("status") == "expired":
+            return AgentAction(**current)
         if current.get("status") not in {"proposed", "approval_required", "approved"}:
             raise ValueError(f"Agent action cannot be canceled from status: {current['status']}")
         return self._decide_action(action_id, "canceled", decided_by=decided_by, reason=reason)

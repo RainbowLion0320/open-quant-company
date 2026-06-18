@@ -7044,6 +7044,47 @@ def test_agent_runtime_cancels_action_and_blocks_dispatch(tmp_path, monkeypatch)
     reset_datahub()
 
 
+def test_agent_cancel_expired_action_is_idempotent(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from web.api.app import create_app
+
+    now = {"value": "2026-06-14T00:00:00Z"}
+    monkeypatch.setattr("agent_os.runtime._now", lambda: now["value"])
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Cancel expired action")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="engineering",
+        action_type="health_check",
+        risk_level="read_only",
+        summary="Expired action that CEO tries to cancel.",
+        parameters={"tool_id": "astroq.health"},
+    )
+
+    now["value"] = "2026-06-14T00:16:00Z"
+    canceled = runtime.cancel_action(action.action_id, decided_by="ceo", reason="No longer needed")
+
+    assert canceled.status == "expired"
+    assert canceled.approval_decision is None
+    assert runtime.get_action(action.action_id)["status"] == "expired"
+
+    response = TestClient(create_app()).post(
+        f"/api/agent/actions/{action.action_id}/cancel",
+        json={"reason": "Canceled from CEO Office"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["action"]["status"] == "expired"
+    reset_datahub()
+
+
 def test_agent_cli_and_api_cancel_action(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
