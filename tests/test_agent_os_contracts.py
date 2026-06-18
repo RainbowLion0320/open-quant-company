@@ -7,6 +7,38 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 
+def _use_deepseek_agent_planning_settings(monkeypatch):
+    import data.llm.usage as llm_usage
+
+    monkeypatch.setattr(
+        llm_usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "default_provider": "deepseek",
+                "use_cases": {"agent_planning": {"provider": "deepseek", "model": "deepseek-v4-pro"}},
+                "providers": {
+                    "deepseek": {
+                        "enabled": True,
+                        "label": "DeepSeek",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "DEEPSEEK_API_KEY",
+                        "base_url": "https://api.deepseek.com/v1",
+                        "default_model": "deepseek-v4-pro",
+                        "request": {
+                            "chat_path": "/chat/completions",
+                            "response_format_json": True,
+                            "temperature": 0.1,
+                            "timeout_seconds": 20,
+                        },
+                        "pricing": {"models": {"deepseek-v4-pro": {"total": 1.0}}},
+                    }
+                },
+            }
+        },
+    )
+
+
 def test_agent_runtime_creates_session_message_and_action(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
@@ -5718,6 +5750,7 @@ def test_agent_provider_semantic_planner_fails_closed_without_secret(tmp_path, m
     from data.storage.datahub import reset_datahub
 
     reset_datahub()
+    _use_deepseek_agent_planning_settings(monkeypatch)
 
     from agent_os.runtime import AgentRuntime
     from agent_os.semantic_planner import ProviderSemanticPlanner
@@ -5962,6 +5995,7 @@ def test_agent_provider_semantic_planner_uses_transport_then_filters_safe_action
     from data.storage.datahub import reset_datahub
 
     reset_datahub()
+    _use_deepseek_agent_planning_settings(monkeypatch)
 
     from agent_os.runtime import AgentRuntime
     from agent_os.semantic_planner import ProviderSemanticPlanner
@@ -6053,6 +6087,7 @@ def test_agent_provider_semantic_planner_redacts_secret_like_context_before_tran
     from data.storage.datahub import reset_datahub
 
     reset_datahub()
+    _use_deepseek_agent_planning_settings(monkeypatch)
 
     from agent_os.semantic_planner import ProviderSemanticPlanner
 
@@ -6119,6 +6154,7 @@ def test_agent_provider_semantic_planner_api_and_cli_are_explicit_opt_in(tmp_pat
     from data.storage.datahub import reset_datahub
 
     reset_datahub()
+    _use_deepseek_agent_planning_settings(monkeypatch)
 
     from astrolabe_cli.main import run_cli
     from web.api.app import create_app
