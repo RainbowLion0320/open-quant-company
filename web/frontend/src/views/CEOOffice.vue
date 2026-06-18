@@ -176,10 +176,12 @@
         <form class="message-composer" @submit.prevent="sendMessage">
           <div v-if="showSlashMenu && filteredSlashCommands.length" class="slash-command-menu">
             <button
-              v-for="command in filteredSlashCommands"
+              v-for="(command, index) in filteredSlashCommands"
               :key="command.name"
               type="button"
               class="slash-command-option"
+              :class="{ selected: index === selectedSlashIndex }"
+              :aria-selected="index === selectedSlashIndex"
               @click="selectSlashCommand(command.name)"
             >
               <code>{{ command.name }}</code>
@@ -187,7 +189,7 @@
             </button>
           </div>
           <div class="composer-input-row">
-            <input v-model="draft" type="text" :placeholder="t('ceoOffice.messagePlaceholder')" />
+            <input v-model="draft" type="text" :placeholder="t('ceoOffice.messagePlaceholder')" @keydown="handleComposerKeydown" />
             <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
               {{ t("ceoOffice.send") }}
             </button>
@@ -200,7 +202,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
@@ -228,6 +230,7 @@ const draft = ref("");
 const sending = ref(false);
 const error = ref("");
 const slashNotice = ref("");
+const selectedSlashIndex = ref(0);
 
 const paperOrderPreview = computed(() => objectParam(selectedAction.value?.action.parameters.paper_order_preview));
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
@@ -277,14 +280,39 @@ const deskStatusCards = computed(() =>
   }),
 );
 const slashCommandQuery = computed(() => draft.value.trim().toLowerCase());
+const slashSearchText = computed(() => slashCommandQuery.value.replace(/^\/+/, ""));
 const showSlashMenu = computed(() => slashCommandQuery.value.startsWith("/"));
 const filteredSlashCommands = computed(() => {
-  const query = slashCommandQuery.value;
-  return slashCommands.value.filter(command => command.name.startsWith(query));
+  const query = slashSearchText.value;
+  return slashCommands.value
+    .map(command => ({ command, rank: slashCommandRank(command, query) }))
+    .filter(row => slashMatchesCommand(row.command, query))
+    .sort((left, right) => left.rank - right.rank || left.command.name.localeCompare(right.command.name))
+    .map(row => row.command);
 });
+const selectedSlashCommand = computed(() => filteredSlashCommands.value[selectedSlashIndex.value] || null);
 
 function deskLabel(desk: string) {
   return deskNames.value[desk] || desk;
+}
+
+function slashMatchesCommand(command: { name: string; description: string }, query: string) {
+  return Number.isFinite(slashCommandRank(command, query));
+}
+
+function slashCommandRank(command: { name: string; description: string }, query: string) {
+  if (!query) return 0;
+  const name = command.name.toLowerCase().replace(/^\/+/, "");
+  const description = command.description.toLowerCase();
+  if (name.startsWith(query)) return 1;
+  if (name.includes(query)) return 2;
+  let cursor = 0;
+  for (const char of name) {
+    if (char === query[cursor]) cursor += 1;
+    if (cursor === query.length) return 3;
+  }
+  if (description.includes(query)) return 4;
+  return Number.POSITIVE_INFINITY;
 }
 
 function deskCardState(deskId: string) {
@@ -486,6 +514,20 @@ function notifyModelRuntimeSession(sessionId: string) {
   window.dispatchEvent(new CustomEvent("oqc-agent-runtime-session", { detail: { sessionId } }));
 }
 
+watch(slashCommandQuery, () => {
+  selectedSlashIndex.value = 0;
+});
+
+watch(filteredSlashCommands, commands => {
+  if (!commands.length) {
+    selectedSlashIndex.value = 0;
+    return;
+  }
+  if (selectedSlashIndex.value >= commands.length) {
+    selectedSlashIndex.value = commands.length - 1;
+  }
+});
+
 async function createFreshSession() {
   const payload = await api.agentCreateSession({
     title: t("ceoOffice.defaultControlTitle"),
@@ -511,6 +553,43 @@ async function ensureSession(): Promise<AgentSession> {
 
 function selectSlashCommand(commandName: string) {
   draft.value = commandName;
+}
+
+function completeSlashCommand() {
+  if (!selectedSlashCommand.value) return false;
+  draft.value = selectedSlashCommand.value.name;
+  return true;
+}
+
+function moveSlashSelection(delta: number) {
+  const count = filteredSlashCommands.value.length;
+  if (!count) return;
+  selectedSlashIndex.value = (selectedSlashIndex.value + delta + count) % count;
+}
+
+function handleComposerKeydown(event: KeyboardEvent) {
+  if (!showSlashMenu.value) return;
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    moveSlashSelection(1);
+    return;
+  }
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    moveSlashSelection(-1);
+    return;
+  }
+  if (event.key === "Tab") {
+    if (!selectedSlashCommand.value) return;
+    event.preventDefault();
+    completeSlashCommand();
+    return;
+  }
+  if (event.key === "Enter" && selectedSlashCommand.value && slashCommandQuery.value !== selectedSlashCommand.value.name) {
+    event.preventDefault();
+    draft.value = selectedSlashCommand.value.name;
+    void sendMessage();
+  }
 }
 
 async function runSlashCommand(commandName: string) {

@@ -511,10 +511,10 @@
 
 .slash-command-menu {
   display: grid;
-  gap: 5px;
+  gap: 2px;
   border: 1px solid rgba(125, 211, 252, 0.18);
-  border-radius: 8px;
-  padding: 6px;
+  border-radius: 7px;
+  padding: 4px;
   background: rgba(3, 10, 18, 0.92);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
 }
@@ -523,31 +523,37 @@
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr);
   align-items: center;
-  gap: 9px;
+  gap: 7px;
   border: 0;
-  border-radius: 6px;
-  padding: 7px 8px;
+  border-left: 2px solid transparent;
+  border-radius: 5px;
+  padding: 4px 7px 4px 6px;
   background: transparent;
   color: var(--text-tertiary);
   text-align: left;
   cursor: pointer;
 }
 
-.slash-command-option:hover {
+.slash-command-option:hover,
+.slash-command-option.selected {
   background: rgba(125, 211, 252, 0.07);
+}
+
+.slash-command-option.selected {
+  border-left-color: var(--accent-primary);
 }
 
 .slash-command-option code {
   color: var(--accent-primary);
   font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .slash-command-option span {
   min-width: 0;
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

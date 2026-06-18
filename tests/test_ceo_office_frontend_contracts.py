@@ -136,11 +136,31 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "slashCommandQuery" in view
     assert "filteredSlashCommands" in view
     assert "showSlashMenu" in view
+    assert "selectedSlashIndex" in view
+    assert "slashSearchText" in view
+    assert "slashMatchesCommand" in view
+    assert "slashCommandRank" in view
+    assert "selectedSlashCommand" in view
+    assert "handleComposerKeydown" in view
+    assert "completeSlashCommand" in view
+    assert "moveSlashSelection" in view
     assert "runSlashCommand" in view
     assert "createFreshSession" in view
     assert "selectSlashCommand" in view
     assert "slash-command-menu" in view
     assert "slash-command-option" in css
+    assert '@keydown="handleComposerKeydown"' in view
+    assert ':class="{ selected: index === selectedSlashIndex }"' in view
+    assert ':aria-selected="index === selectedSlashIndex"' in view
+    assert 'event.key === "ArrowDown"' in view
+    assert 'event.key === "ArrowUp"' in view
+    assert 'event.key === "Tab"' in view
+    assert 'event.key === "Enter"' in view
+    assert "completeSlashCommand()" in view
+    assert "moveSlashSelection(1)" in view
+    assert "moveSlashSelection(-1)" in view
+    assert "slashCommandRank(command, query)" in view
+    assert "description.includes(query)" in view
     assert 'name: "/new"' in view
     assert 'name: "/clear"' in view
     assert 'name: "/help"' in view
@@ -150,6 +170,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'status: "archived"' in view
     assert "clear_memory" not in view
     assert "memory/clear" not in view
+    assert "gap: 2px" in css
+    assert "padding: 4px" in css
+    assert "padding: 4px 7px 4px 6px" in css
+    assert ".slash-command-option.selected" in css
+    assert "border-left-color: var(--accent-primary)" in css
     assert "class=\"message-row\" :class=\"message.role\"" in view
     assert "justify-self: start" in css
     assert "justify-self: end" in css
