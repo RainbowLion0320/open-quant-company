@@ -821,7 +821,7 @@ def test_web_docs_match_current_market_regime_layout_contract():
         "Raw",
         "Pending",
         "Dwell",
-        "MODE / REGIME / FRESH",
+        "REGIME / FRESH",
     )
 
     missing = [token for token in required_tokens if token not in combined]

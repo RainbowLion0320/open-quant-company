@@ -7,7 +7,6 @@
         <small>{{ t('settings.subtitle') }}</small>
       </div>
       <div class="surface-actions">
-        <span :class="['mode-badge', `mode-${mode}`]">{{ modeLabel }}</span>
         <button @click="saveWithConfirm" class="btn btn-primary btn-sm">{{ t('common.save') }}</button>
       </div>
     </div>
@@ -15,31 +14,6 @@
     <div v-if="saveError" class="inline-alert danger">
       <span>{{ saveError }}</span>
       <button class="btn btn-xs" @click="saveError = ''">{{ t('common.close') }}</button>
-    </div>
-
-    <!-- Run Mode -->
-    <div class="glass-card card-pad-lg">
-      <div class="section-heading mb-4">{{ t('settings.runMode') }}</div>
-      <div class="settings-list">
-        <div>
-          <span>{{ t('settings.currentMode') }}</span>
-          <span :class="['badge', modeBadgeClass]">{{ modeLabel }}</span>
-        </div>
-        <div>
-          <span>{{ t('settings.settingsWrite') }}</span>
-          <span v-if="modeStatus.allows_settings_write" class="badge badge-green">{{ t('common.allowed') }}</span>
-          <span v-else class="badge badge-red">{{ t('common.readonly') }}</span>
-        </div>
-        <div>
-          <span>{{ t('settings.paperTrading') }}</span>
-          <span v-if="modeStatus.allows_paper_trading" class="badge badge-green">{{ t('common.allowed') }}</span>
-          <span v-else class="badge badge-red">{{ t('common.forbidden') }}</span>
-        </div>
-        <div v-if="modeStatus.readonly_sections?.length">
-          <span>{{ t('settings.readonlySections') }}</span>
-          <span class="badge badge-amber">{{ modeStatus.readonly_sections.join(", ") }}</span>
-        </div>
-      </div>
     </div>
 
     <!-- Session token -->
@@ -173,7 +147,7 @@
 <script setup lang="ts">
 import { useSettingsView } from "../view-models/useSettingsView";
 
-const { currentLocale, t, settings, showConfirm, confirmSnapshot, mode, modeStatus, apiKeyInput, strategyStatuses, auditEntries, saveError, modeLabel, modeBadgeClass, apiKeyStatus, risk, hasRiskConfig, notificationText, sourceItems, fmtPct, fmtAuditTime, fetchStrategyStatuses, fetchAudit, sourceBadgeClass, statusBadgeClass, toggleNotify, saveWithConfirm, cloneConfig, restoreConfig, cancelConfirm, doSave, saveApiKey, loadMode } = useSettingsView();
+const { currentLocale, t, settings, showConfirm, confirmSnapshot, apiKeyInput, strategyStatuses, auditEntries, saveError, apiKeyStatus, risk, hasRiskConfig, notificationText, sourceItems, fmtPct, fmtAuditTime, fetchStrategyStatuses, fetchAudit, sourceBadgeClass, statusBadgeClass, toggleNotify, saveWithConfirm, cloneConfig, restoreConfig, cancelConfirm, doSave, saveApiKey } = useSettingsView();
 </script>
 
 <style scoped src="../styles/views/settings.css"></style>

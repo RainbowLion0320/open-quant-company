@@ -4,7 +4,7 @@
 
 ## 1. 概述
 
-信号系统是量化策略的核心——从原始数据生成交易信号（买/卖/持有）。策略元数据以 Strategy Catalog 为 UI 和研究工作流的权威目录，生产策略和候选策略共享统一运行契约，但生命周期和运行模式严格隔离：Buffett 是质量过滤层，Multifactor 是主 Alpha，ML 是辅助 Alpha，Cybernetic 是 regime 风险覆盖层；新增候选策略只允许研究扫描、回测和证据沉淀。每日生产扫描输出信号到 `var/store/signals/{strategy}.parquet`，供回测引擎和执行层消费。
+信号系统是量化策略的核心——从原始数据生成交易信号（买/卖/持有）。策略元数据以 Strategy Catalog 为 UI 和研究工作流的权威目录，生产策略和候选策略共享统一运行契约，但生命周期层级严格隔离：Buffett 是质量过滤层，Multifactor 是主 Alpha，ML 是辅助 Alpha，Cybernetic 是 regime 风险覆盖层；新增候选策略只允许研究扫描、回测和证据沉淀。每日生产扫描输出信号到 `var/store/signals/{strategy}.parquet`，供回测引擎和执行层消费。
 
 **设计原则：**
 - **策略独立性** — 每种策略可独立运行、独立回测、独立对比（锦标赛模式）
@@ -157,7 +157,7 @@ Market Regime 规则评分层保持确定性和可解释性，但不再只能靠
 
 晋级到 paper / production 前需要通过 `evaluate_promotion()` 门槛：OOS 月数、交易次数、Sharpe、最大回撤、换手、IC、ICIR。ML 当前默认为 `paper` 状态，除非 OOS 和 IC 证据达标，否则不标记 production。
 
-### 2.6.1 Strategy Catalog 与运行模式
+### 2.6.1 Strategy Catalog 与生命周期层级
 
 `research/strategy_catalog.py` 是策略元数据权威目录，前端 Strategy Lab、研究治理和候选策略扩展均以该目录为准。目录项至少包含：
 

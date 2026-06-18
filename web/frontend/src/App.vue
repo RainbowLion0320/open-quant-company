@@ -61,10 +61,6 @@
       <footer class="system-statusbar" :aria-label="t('app.statusAria')">
         <div class="statusbar-telemetry">
           <div class="telemetry-tag">
-            <span>{{ t('app.mode') }}</span>
-            <strong :style="{ color: modeColor }">{{ runMode }}</strong>
-          </div>
-          <div class="telemetry-tag">
             <span>{{ t('app.regime') }}</span>
             <strong :style="{ color: regimeColor }">{{ regimeLabel }}</strong>
           </div>
@@ -123,7 +119,6 @@ let regimeTimer = 0;
 let agentRuntimeTimer = 0;
 const regime = ref<{ value: string; score?: number }>({ value: "sideways" });
 const marketMeta = ref<Partial<RegimeResponse>>({});
-const runMode = ref("research");
 const systemHealth = ref<{ all_ok: boolean; ok_count: number; total: number }>({ all_ok: true, ok_count: 0, total: 0 });
 const agentRuntimeSessionId = ref("");
 const agentModelRuntime = ref<AgentModelRuntimeResponse | null>(null);
@@ -166,11 +161,6 @@ const regimeColor = computed(() => {
   if (regime.value.value === "bull") return "var(--positive)";
   if (regime.value.value === "bear") return "var(--negative)";
   return "var(--warning)";
-});
-const modeColor = computed(() => {
-  if (runMode.value === "live") return "var(--negative)";
-  if (runMode.value === "paper") return "var(--warning)";
-  return "var(--positive)";
 });
 const systemLabel = computed(() => {
   if (systemHealth.value.total === 0) return t("app.health.unknown");
@@ -229,13 +219,6 @@ async function fetchRegime() {
     const data = await api.marketRegime();
     regime.value = data.regime;
     marketMeta.value = data;
-  } catch {}
-}
-
-async function fetchMode() {
-  try {
-    const data = await api.systemMode();
-    runMode.value = data.mode;
   } catch {}
 }
 
@@ -303,7 +286,6 @@ useParticles();
 
 onMounted(() => {
   fetchRegime();
-  fetchMode();
   fetchSystemHealth();
   fetchAgentModelRuntime();
   window.addEventListener("oqc-agent-runtime-session", handleAgentRuntimeSession);

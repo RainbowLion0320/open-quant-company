@@ -7,29 +7,15 @@ disabled so the local dashboard keeps working in the default single-user setup.
 Whitelist: /api/health, static /assets, and SPA fallback paths are public.
 All other /api/* routes require Authorization: Bearer <key> when a key exists.
 
-Also provides run_mode guard: research (full), paper (partial), live (read-only).
 """
 
 from __future__ import annotations
 
 import os
 import secrets
-from pathlib import Path
-
-from core.settings import load_yaml_config, resolve_settings_path
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-
-
-# ── Config path resolution ──
-
-def _settings_path() -> Path:
-    return resolve_settings_path()
-
-
-def _read_settings() -> dict:
-    return load_yaml_config(_settings_path(), default={})
 
 
 # ── API Key management ──
@@ -37,18 +23,6 @@ def _read_settings() -> dict:
 def get_api_key() -> str:
     """Read API key from the process environment only."""
     return os.environ.get("ASTROLABE_API_KEY", "").strip()
-
-
-def get_run_mode() -> str:
-    """Read current run mode: research | paper | live."""
-    cfg = _read_settings()
-    project = cfg.get("project") or {}
-    return project.get("run_mode", "research")
-
-
-def is_readonly_mode() -> bool:
-    """True if current mode restricts settings writes."""
-    return get_run_mode() == "live"
 
 
 # ── Whitelisted paths (no auth required) ──
@@ -86,7 +60,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         token = get_api_key()
         if not token:
-            # No API key configured — local open mode.
+            # No API key configured: local requests are accepted without auth.
             return await call_next(request)
 
         auth = request.headers.get("Authorization", "")

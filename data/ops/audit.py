@@ -2,7 +2,7 @@
 ConfigAuditLedger — append-only audit trail for config/settings.yaml changes.
 
 Every PUT/PATCH to the settings API records a ConfigAuditEntry:
-who (source_ip), what (section + diff), when, and under which run_mode.
+who (source_ip), what (section + diff), and when.
 
 Storage: var/store/_audit/config_changes.parquet (via DataHub)
 
@@ -16,7 +16,6 @@ Usage:
         old_data={"max_pct": 0.25},
         new_data={"max_pct": 0.30},
         source_ip="127.0.0.1",
-        run_mode="research",
     )
 """
 
@@ -46,7 +45,6 @@ class ConfigAuditEntry:
     changed_keys: list[str]
     source_ip: str
     user_agent: str = ""
-    run_mode: str = "research"
 
     def to_row(self) -> dict:
         return {
@@ -59,7 +57,6 @@ class ConfigAuditEntry:
             "changed_keys": ",".join(self.changed_keys),
             "source_ip": self.source_ip,
             "user_agent": self.user_agent,
-            "run_mode": self.run_mode,
         }
 
     @classmethod
@@ -78,7 +75,6 @@ class ConfigAuditEntry:
             changed_keys=_split("changed_keys"),
             source_ip=str(row.get("source_ip", "")),
             user_agent=str(row.get("user_agent", "")),
-            run_mode=str(row.get("run_mode", "research")),
         )
 
 
@@ -99,7 +95,6 @@ class ConfigAuditLedger:
         new_data: dict | None = None,
         source_ip: str = "",
         user_agent: str = "",
-        run_mode: str = "research",
     ) -> str:
         """Record a config change. Returns change_id."""
         old = old_data or {}
@@ -127,7 +122,6 @@ class ConfigAuditLedger:
             changed_keys=changed,
             source_ip=source_ip,
             user_agent=user_agent,
-            run_mode=run_mode,
         )
         self._append(entry)
         return change_id

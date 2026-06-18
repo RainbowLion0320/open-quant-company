@@ -1,9 +1,9 @@
-"""Contract tests for API auth middleware and run mode enforcement."""
+"""Contract tests for API auth middleware and settings write contracts."""
 
 import os
 import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from starlette.testclient import TestClient
 
@@ -27,7 +27,6 @@ def app(monkeypatch):
         "project": {
             "name": "test",
             "version": "1.0.0",
-            "run_mode": "research",
         },
         "strategies": {},
         "risk_control": {},
@@ -35,9 +34,7 @@ def app(monkeypatch):
     with open(config_file, "w") as f:
         yaml.dump(test_config, f)
 
-    # Patch the settings path used by auth.py
-    with patch("web.api.auth._settings_path", return_value=config_file), \
-         patch("web.api.routes.settings._config_path", return_value=str(config_file)):
+    with patch("web.api.routes.settings._config_path", return_value=str(config_file)):
         from web.api.app import create_app
         app = create_app()
         yield app
@@ -107,7 +104,7 @@ class TestAuthMiddleware:
         config_file = tmp_path / "settings.yaml"
         config_file.write_text(
             yaml.safe_dump({
-                "project": {"name": "test", "run_mode": "research"},
+                "project": {"name": "test"},
                 "strategies": {},
                 "risk_control": {},
                 "data": {"fetcher": {"min_interval": 3.0, "max_retries": 3}},
@@ -116,7 +113,6 @@ class TestAuthMiddleware:
         )
 
         with patch.dict(os.environ, {"ASTROLABE_API_KEY": "test-secret-key"}), \
-             patch("web.api.auth._settings_path", return_value=config_file), \
              patch("web.api.routes.settings._config_path", return_value=str(config_file)):
             from web.api.app import create_app
             client = TestClient(create_app())
@@ -134,106 +130,36 @@ class TestAuthMiddleware:
         assert "ingestion.fetcher" not in saved
 
 
-class TestRunModeEnforcement:
-    @pytest.fixture
-    def config_with_mode(self, monkeypatch):
-        """Return a fresh app with a specific run mode."""
+class TestSettingsWriteContracts:
+    def test_stale_project_runtime_flag_does_not_gate_settings_write(self, tmp_path, monkeypatch):
         import yaml
-        import tempfile
 
         monkeypatch.setenv("ASTROLABE_API_KEY", "test-key")
-        tmpdir = tempfile.mkdtemp()
-        config_dir = Path(tmpdir) / "config"
-        config_dir.mkdir(parents=True, exist_ok=True)
-        config_file = config_dir / "settings.yaml"
-
-        def _make_app(run_mode: str):
-            test_config = {
-                "project": {
-                    "name": "test",
-                    "version": "1.0.0",
-                    "run_mode": run_mode,
+        config_file = tmp_path / "settings.yaml"
+        stale_runtime_key = "run" + "_mode"
+        config_file.write_text(
+            yaml.safe_dump(
+                {
+                    "project": {"name": "test", stale_runtime_key: "live"},
+                    "strategies": {},
+                    "risk_control": {"max_pct": 0.25},
                 },
-                "strategies": {},
-                "risk_control": {},
-                "paper_trading": {},
-            }
-            with open(config_file, "w") as f:
-                yaml.dump(test_config, f)
-            return config_file
+                allow_unicode=True,
+            ),
+            encoding="utf-8",
+        )
 
-        yield _make_app, config_file
-
-        import shutil
-        shutil.rmtree(tmpdir, ignore_errors=True)
-
-    def test_live_mode_blocks_put(self, config_with_mode):
-        make_app, config_file = config_with_mode
-        config_path = make_app("live")
-
-        with patch("web.api.auth._settings_path", return_value=config_path), \
-             patch("web.api.routes.settings._config_path", return_value=str(config_path)):
+        with patch("web.api.routes.settings._config_path", return_value=str(config_file)):
             from web.api.app import create_app
-            app = create_app()
-            client = TestClient(app)
 
-            resp = client.put(
-                "/api/settings",
-                json={"strategies": {}, "risk_control": {}, "extra": {}},
-                headers={"Authorization": "Bearer test-key"},
-            )
-            assert resp.status_code == 403
-
-    def test_paper_mode_blocks_non_paper_section(self, config_with_mode):
-        make_app, config_file = config_with_mode
-        config_path = make_app("paper")
-
-        with patch("web.api.auth._settings_path", return_value=config_path), \
-             patch("web.api.routes.settings._config_path", return_value=str(config_path)):
-            from web.api.app import create_app
-            app = create_app()
-            client = TestClient(app)
-
+            client = TestClient(create_app())
             resp = client.patch(
                 "/api/settings/section/risk_control",
                 json={"max_pct": 0.5},
                 headers={"Authorization": "Bearer test-key"},
             )
-            assert resp.status_code == 403
 
-    def test_paper_mode_allows_paper_trading_section(self, config_with_mode):
-        make_app, config_file = config_with_mode
-        config_path = make_app("paper")
-
-        with patch("web.api.auth._settings_path", return_value=config_path), \
-             patch("web.api.routes.settings._config_path", return_value=str(config_path)):
-            from web.api.app import create_app
-            app = create_app()
-            client = TestClient(app)
-
-            resp = client.patch(
-                "/api/settings/section/paper_trading",
-                json={"auto_execute": True},
-                headers={"Authorization": "Bearer test-key"},
-            )
-            assert resp.status_code == 200
-
-    def test_research_mode_allows_all(self, config_with_mode):
-        make_app, config_file = config_with_mode
-        config_path = make_app("research")
-
-        with patch("web.api.auth._settings_path", return_value=config_path), \
-             patch("web.api.routes.settings._config_path", return_value=str(config_path)):
-            from web.api.app import create_app
-            app = create_app()
-            client = TestClient(app)
-
-            resp = client.patch(
-                "/api/settings/section/risk_control",
-                json={"max_pct": 0.5},
-                headers={"Authorization": "Bearer test-key"},
-            )
-            assert resp.status_code == 200
+        assert resp.status_code == 200
 
 
 class TestAuditOnSettingsWrite:
@@ -252,7 +178,6 @@ class TestAuditOnSettingsWrite:
             "project": {
                 "name": "test",
                 "version": "1.0.0",
-                "run_mode": "research",
             },
             "strategies": {"test_strategy": {"enabled": True}},
             "risk_control": {"max_pct": 0.25},
@@ -260,9 +185,7 @@ class TestAuditOnSettingsWrite:
         with open(config_file, "w") as f:
             yaml.dump(test_config, f)
 
-        # Need to patch both auth and settings path
-        with patch("web.api.auth._settings_path", return_value=config_file), \
-             patch("web.api.routes.settings._config_path", return_value=str(config_file)):
+        with patch("web.api.routes.settings._config_path", return_value=str(config_file)):
             from web.api.app import create_app
             app = create_app()
             yield TestClient(app), config_file
@@ -291,18 +214,26 @@ class TestAuditOnSettingsWrite:
         finally:
             ledger.clear()
 
-    def test_system_mode_endpoint(self, research_app):
+    def test_system_mode_endpoint_removed(self, research_app):
         client, _ = research_app
 
         resp = client.get(
-            "/api/system/mode",
+            "/api/system/" + "mode",
+            headers={"Authorization": "Bearer test-key"},
+        )
+        assert resp.status_code == 404
+
+    def test_system_auth_endpoint_reports_api_key(self, research_app):
+        client, _ = research_app
+
+        resp = client.get(
+            "/api/system/auth",
             headers={"Authorization": "Bearer test-key"},
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["mode"] == "research"
         assert data["has_api_key"] is True
-        assert data["allows_settings_write"] is True
+        assert data["status"] == "ok"
 
     def test_audit_endpoint(self, research_app):
         client, _ = research_app
@@ -331,11 +262,10 @@ class TestAuthHelpers:
         import yaml
 
         cfg_path = tmp_path / "settings.yaml"
-        cfg = {"project": {"name": "test", "run_mode": "research"}, "strategies": {}, "risk_control": {}}
+        cfg = {"project": {"name": "test"}, "strategies": {}, "risk_control": {}}
         cfg_path.write_text(yaml.dump(cfg), encoding="utf-8")
 
-        with patch("web.api.auth._settings_path", return_value=cfg_path), \
-             patch("web.api.routes.settings._config_path", return_value=str(cfg_path)):
+        with patch("web.api.routes.settings._config_path", return_value=str(cfg_path)):
             from web.api.auth import get_api_key
             from web.api.app import create_app
 
@@ -357,8 +287,7 @@ class TestAuthHelpers:
         monkeypatch.delenv("ASTROLABE_API_KEY", raising=False)
         from web.api.auth import get_api_key
 
-        with patch("web.api.auth._read_settings", return_value={"project": {"api_key": "yaml-secret"}}):
-            assert get_api_key() == ""
+        assert get_api_key() == ""
 
     def test_renamed_project_env_aliases_are_not_read(self, monkeypatch):
         old_quant_env = "QUANT" + "_AGENT_API_KEY"
@@ -370,17 +299,8 @@ class TestAuthHelpers:
 
         assert get_api_key() == ""
 
-    def test_get_run_mode_default(self):
-        """get_run_mode returns 'research' when no config."""
-        with patch("web.api.auth._read_settings", return_value={}):
-            from web.api.auth import get_run_mode
-            assert get_run_mode() == "research"
+    def test_global_runtime_mode_helpers_do_not_exist(self):
+        import web.api.auth as auth
 
-    def test_is_readonly_mode(self):
-        with patch("web.api.auth.get_run_mode", return_value="live"):
-            from web.api.auth import is_readonly_mode
-            assert is_readonly_mode() is True
-
-        with patch("web.api.auth.get_run_mode", return_value="research"):
-            from web.api.auth import is_readonly_mode
-            assert is_readonly_mode() is False
+        assert not hasattr(auth, "get_" + "run" + "_" + "mode")
+        assert not hasattr(auth, "is_readonly_" + "mode")

@@ -37,8 +37,8 @@ Out of scope:
 | Principle | Requirement |
 | --- | --- |
 | Default disabled | Live mode is off unless explicitly enabled in configuration and runtime readiness passes. |
-| SDK explicit | Missing MiniQMT/QMT SDK blocks live mode. |
-| Account explicit | Missing login/account/permission blocks live mode. |
+| SDK explicit | Missing MiniQMT/QMT SDK blocks live execution. |
+| Account explicit | Missing login/account/permission blocks live execution. |
 | No fallback | A live action cannot fall back to PaperBroker. |
 | Preview first | Every order requires a preview with price, quantity, cost, risk, and broker account impact. |
 | Approval required | Every live order requires CEO approval. |
@@ -287,6 +287,6 @@ These questions must be resolved during implementation, not by weakening safety 
 
 - Exact MiniQMT/QMT SDK package and import path in the user's environment.
 - Whether account login state can be detected reliably.
-- Which order types should be allowed in v1 live mode.
+- Which order types should be allowed in v1 live execution.
 - How broker rejects expose error codes and messages.
 - How to mask account identifiers while keeping reconciliation usable.

@@ -73,7 +73,7 @@ CEO Office 也不展示 autonomy step/run/program、semantic draft JSON 或 prov
 - 顶部为 animated regime orb + confirmed regime 名称 + 居中纯数字 score；不再额外显示分数字段标题或卡片边框。
 - 中部保留 4 个核心小仪表盘：Risk Buffer、A-share Breadth、Index Trend、Above MA20。
 - 稳定性状态以紧凑状态卡展示 Confirmed / Raw / Pending / Dwell；Pending 空闲时显示 `—`，有候选时显示 `x/y`。
-- 全局页脚只展示 MODE / REGIME / FRESH 与系统健康状态，不再承担行情 ticker 或点位/日涨跌展示。
+- 全局页脚只展示 REGIME / FRESH、CEO 会话模型上下文和系统健康状态，不再承担行情 ticker 或点位/日涨跌展示。
 
 **市场研究行业雷达契约：**
 
@@ -115,7 +115,7 @@ CEO Office 也不展示 autonomy step/run/program、semantic draft JSON 或 prov
 | Assets | `routes/assets.py` | `GET /api/assets/overview` |
 | Data Sources | `routes/data_sources.py` | `GET /api/data-sources/capabilities` |
 | Settings | `routes/settings.py` | `GET /api/settings`, `GET /api/settings/schema`, `PUT /api/settings`, `PATCH /api/settings/section/{section}` |
-| System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/llm-usage`, `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/mode`, `GET /api/system/tests/design`, `GET /api/system/ast-intelligence` |
+| System | `routes/system.py` | `GET /api/system/monitor`, `GET /api/system/history`, `GET /api/system/llm-usage`, `GET /api/system/db-health`, `POST /api/system/db-health/repair/{table_name}`, `GET /api/system/db-health/repair-status/{job_id}`, `GET /api/system/api-health`, `GET /api/system/auth`, `GET /api/system/cron-jobs`, `GET /api/system/quality-gate`, `GET /api/system/runs`, `GET /api/system/runs/{run_id}`, `GET /api/system/orders`, `GET /api/system/orders/{order_id}/trace`, `GET /api/system/backfill`, `GET /api/system/backfill/{dimension}/last`, `GET /api/system/providers/health`, `GET /api/system/contracts`, `GET /api/system/audit`, `GET /api/system/tests/design`, `GET /api/system/ast-intelligence` |
 | CodeGraph | `routes/codegraph.py` | `GET /api/codegraph/status`, `GET /api/codegraph/graph`, `GET /api/codegraph/search`, `GET /api/codegraph/neighborhood`, `GET /api/codegraph/diagnostics`, `POST /api/codegraph/sync` |
 | Agent Company OS | `routes/agent.py` | `GET /api/agent/sessions`, `POST /api/agent/sessions`, `GET /api/agent/sessions/{session_id}`, `PATCH /api/agent/sessions/{session_id}`, `GET /api/agent/sessions/{session_id}/context`, `POST /api/agent/sessions/{session_id}/context/compact`, `GET /api/agent/model-runtime`, `POST /api/agent/sessions/{session_id}/messages`, `GET /api/agent/actions`, `GET /api/agent/handoffs`, `POST /api/agent/handoffs/{handoff_id}/resolve`, `GET /api/agent/actions/{action_id}`, `POST /api/agent/actions/{action_id}/approve`, `POST /api/agent/actions/{action_id}/reject`, `POST /api/agent/actions/{action_id}/cancel`, `POST /api/agent/actions/expire`, `POST /api/agent/actions/{action_id}/run`, `GET /api/agent/runs/{run_id}`, `GET /api/agent/evidence/{evidence_id}`, `GET /api/agent/desks`, `GET /api/agent/live/readiness`, `GET /api/agent/reports`, `POST /api/agent/reports`, `GET /api/agent/memory`, `POST /api/agent/memory/export`, `POST /api/agent/memory/prune`, `POST /api/agent/memory/clear` |
 | Auth | `auth.py` | Bearer token 中间件 + CORS/OPTIONS 放行 |
@@ -269,7 +269,7 @@ REQUIRED_SECTIONS = {"strategies", "risk_control"}
 - **422：** Pydantic 校验失败 → FastAPI 自动返回字段级错误
 - **500：** 未捕获异常 → `errors.py` 全局处理器统一格式化
 - **WebSocket 断连：** 前端显示进度连接失败并停止当前运行态；后续可补指数退避重连
-- **Settings 更新非法：** 更新端点校验 run mode、schema 字段类型和范围，非法配置返回 4xx/422
+- **Settings 更新非法：** 更新端点校验认证、schema 字段类型和范围，非法配置返回 4xx/422
 
 ## 7. 测试策略
 

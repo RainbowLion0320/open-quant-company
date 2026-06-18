@@ -51,7 +51,7 @@ def main():
     parser.add_argument('--limit', type=int, default=0, help='Limit to N stocks (0=all)')
     parser.add_argument('--skip-quality-gate', action='store_true', help='Skip pre-scan data freshness check')
     parser.add_argument('--allow-candidate', action='store_true', help='Allow candidate/validated strategies (dev/testing)')
-    parser.add_argument('--mode', choices=['production', 'research'], default='production', help='Strategy runtime mode')
+    parser.add_argument('--mode', choices=['production', 'research'], default='production', help='Strategy run scope')
     args = parser.parse_args()
     if args.allow_candidate:
         args.mode = 'research'

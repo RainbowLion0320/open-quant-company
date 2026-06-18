@@ -70,7 +70,7 @@ export const modules = {
           settings: {
             label: "系统设置",
             meta: "Config writes",
-            description: "集中管理运行模式、认证、通知、数据源、策略状态和风控参数",
+            description: "集中管理认证、通知、数据源、策略状态和风控参数",
           },
           config: {
             label: "配置中心",

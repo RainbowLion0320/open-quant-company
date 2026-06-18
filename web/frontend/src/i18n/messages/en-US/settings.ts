@@ -1,12 +1,7 @@
 export const settings = {
       eyebrow: "CONFIG CONTROL",
-      title: "Run Mode & Config Writes",
+      title: "Config Center",
       subtitle: "Central management for auth, notifications, data sources, strategy state, risk, and recent config changes",
-      runMode: "Run Mode",
-      currentMode: "Current Mode",
-      settingsWrite: "Settings Write",
-      paperTrading: "Paper Trading",
-      readonlySections: "Read-only Sections",
       apiKey: "Session Auth",
       authStatus: "Auth Status",
       apiKeyPlaceholder: "Enter ASTROLABE_API_KEY for this page session",

@@ -64,15 +64,15 @@ def test_research_mode_can_include_candidate_strategies(monkeypatch):
     assert names == ["prod_alpha", "candidate_alpha"]
 
 
-def test_invalid_strategy_runtime_mode_is_rejected():
+def test_invalid_strategy_run_scope_is_rejected():
     from data.strategy.plugins import iter_strategy_plugins
 
     try:
         list(iter_strategy_plugins("all", mode="paper"))
     except ValueError as exc:
-        assert "Invalid strategy runtime mode" in str(exc)
+        assert "Invalid strategy run scope" in str(exc)
     else:
-        raise AssertionError("invalid runtime mode should fail")
+        raise AssertionError("invalid strategy run scope should fail")
 
 
 def test_strategy_run_api_accepts_research_mode(monkeypatch):

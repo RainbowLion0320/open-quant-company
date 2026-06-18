@@ -1,1 +1,1 @@
-"""Candidate strategy runners for Strategy Lab research mode."""
+"""Candidate strategy runners for Strategy Lab research scope."""

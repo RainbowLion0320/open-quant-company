@@ -9,7 +9,6 @@ def record_settings_change(request: Request, section: str, method: str, old_data
     """Record a config change without letting audit storage failures block writes."""
     try:
         from data.ops.audit import ConfigAuditLedger
-        from web.api.auth import get_run_mode
 
         ledger = ConfigAuditLedger()
         ledger.record(
@@ -19,7 +18,6 @@ def record_settings_change(request: Request, section: str, method: str, old_data
             new_data=new_data,
             source_ip=request.client.host if request.client else "",
             user_agent=request.headers.get("user-agent", ""),
-            run_mode=get_run_mode(),
         )
     except Exception:
         return

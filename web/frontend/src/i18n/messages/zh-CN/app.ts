@@ -4,7 +4,6 @@ export const app = {
       fallbackTitle: "Open Quant Company 控制台",
       navAria: "主导航",
       statusAria: "系统状态",
-      mode: "MODE",
       regime: "REGIME",
       fresh: "FRESH",
       modelRuntimeA11y: "当前 CEO 会话模型运行配置",

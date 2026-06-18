@@ -98,7 +98,7 @@ def iter_strategy_plugins(selected: str = "all", mode: str = "production") -> It
     if selected not in valid:
         raise ValueError(f"Invalid strategy: {selected}. Choose from: {', '.join(sorted(valid))}")
     if mode not in {"production", "research"}:
-        raise ValueError(f"Invalid strategy runtime mode: {mode}")
+        raise ValueError(f"Invalid strategy run scope: {mode}")
 
     for item in get_enabled_strategies():
         name = item["name"]

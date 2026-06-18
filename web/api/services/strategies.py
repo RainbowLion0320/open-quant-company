@@ -75,7 +75,7 @@ async def start_strategy_run(strategy: str, limit: int, params: dict | None, mod
     if strategy not in valid:
         raise StrategyRunError(strategy, f"Invalid strategy. Choose from: {', '.join(sorted(valid))}")
     if mode not in {"production", "research"}:
-        raise StrategyRunError(strategy, f"Invalid runtime mode: {mode}")
+        raise StrategyRunError(strategy, f"Invalid strategy run scope: {mode}")
     return await run_strategy_async(strategy, limit, params, mode=mode)
 
 

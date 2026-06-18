@@ -21,7 +21,7 @@ export const systemApi = {
   dbHealthRepairStatus: (jobId: string) => get<DbRepairResponse>(`/api/system/db-health/repair-status/${encodeURIComponent(jobId)}`),
   auditHistory: (section = "", limit = 50) =>
     get<{ entries: any[]; summary: any; total: number }>(`/api/system/audit?section=${encodeURIComponent(section)}&limit=${limit}`),
-  systemMode: () => get<{ mode: string; has_api_key: boolean; allows_settings_write: boolean; allows_paper_trading: boolean; readonly_sections: string[] }>("/api/system/mode"),
+  authStatus: () => get<{ has_api_key: boolean; status: string }>("/api/system/auth"),
   testDesign: () => get<TestDesignResponse>("/api/system/tests/design"),
   astIntelligence: () => get<AstIntelligenceResponse>("/api/system/ast-intelligence"),
   lifecycle: () => get<LifecycleResponse>("/api/system/lifecycle"),

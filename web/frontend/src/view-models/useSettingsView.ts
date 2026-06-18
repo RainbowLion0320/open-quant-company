@@ -10,26 +10,15 @@ export function useSettingsView() {
   const settings = reactive<Record<string, any>>({});
   const showConfirm = ref(false);
   const confirmSnapshot = ref<Record<string, any> | null>(null);
-  const mode = ref("research");
-  const modeStatus = ref<Record<string, any>>({});
+  const authStatus = ref<Record<string, any>>({});
   const apiKeyInput = ref("");
   const strategyStatuses = ref<{ name: string; label: string; status: string; status_label: string; color: string }[]>([]);
   const auditEntries = ref<any[]>([]);
   const saveError = ref("");
 
-  const modeLabel = computed(() => {
-    if (mode.value === "live") return "LIVE";
-    if (mode.value === "paper") return "PAPER";
-    return "RESEARCH";
-  });
-  const modeBadgeClass = computed(() => {
-    if (mode.value === "live") return "badge-red";
-    if (mode.value === "paper") return "badge-amber";
-    return "badge-green";
-  });
   const apiKeyStatus = computed(() => {
     if (hasAuthToken()) return t("settings.apiKeySessionSet");
-    const has = modeStatus.value?.has_api_key;
+    const has = authStatus.value?.has_api_key;
     if (has === undefined) return t("settings.checking");
     return has ? t("settings.apiKeyRequired") : t("settings.apiKeyOpen");
   });
@@ -147,18 +136,16 @@ export function useSettingsView() {
     if (!token) return;
     setAuthToken(token);
     apiKeyInput.value = "";
-    await loadMode();
+    await loadAuthStatus();
     try {
       const data = await api.settings();
       Object.assign(settings, data);
     } catch {}
   }
 
-  async function loadMode() {
+  async function loadAuthStatus() {
     try {
-      const data = await api.systemMode();
-      mode.value = data.mode;
-      modeStatus.value = data;
+      authStatus.value = await api.authStatus();
     } catch {}
   }
 
@@ -167,7 +154,7 @@ export function useSettingsView() {
       const data = await api.settings();
       Object.assign(settings, data);
     } catch {}
-    await loadMode();
+    await loadAuthStatus();
     fetchStrategyStatuses();
     fetchAudit();
   });
@@ -178,14 +165,11 @@ export function useSettingsView() {
     settings,
     showConfirm,
     confirmSnapshot,
-    mode,
-    modeStatus,
+    authStatus,
     apiKeyInput,
     strategyStatuses,
     auditEntries,
     saveError,
-    modeLabel,
-    modeBadgeClass,
     apiKeyStatus,
     risk,
     hasRiskConfig,
@@ -204,6 +188,6 @@ export function useSettingsView() {
     cancelConfirm,
     doSave,
     saveApiKey,
-    loadMode,
+    loadAuthStatus,
   };
 }

@@ -24,7 +24,6 @@ def test_project_meta_uses_pyproject_version_and_hides_config_secrets(tmp_path, 
                     "english_name": "Open Quant Company Test",
                     "version": "1.2.3",
                     "api_key": "secret",
-                    "run_mode": "live",
                 }
             },
             allow_unicode=True,
@@ -39,7 +38,6 @@ def test_project_meta_uses_pyproject_version_and_hides_config_secrets(tmp_path, 
     assert meta["version"] == "9.8.7"
     assert meta["display_name"] == "Open Quant Company测试"
     assert "api_key" not in meta
-    assert "run_mode" not in meta
 
 
 def test_project_version_ignores_settings_version_without_pyproject(tmp_path, monkeypatch):

@@ -4,7 +4,6 @@ export const app = {
       fallbackTitle: "Open Quant Company Console",
       navAria: "Primary navigation",
       statusAria: "System status",
-      mode: "MODE",
       regime: "REGIME",
       fresh: "FRESH",
       modelRuntimeA11y: "Current CEO session model runtime configuration",

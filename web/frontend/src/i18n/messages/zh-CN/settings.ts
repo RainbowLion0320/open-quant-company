@@ -1,12 +1,7 @@
 export const settings = {
       eyebrow: "CONFIG CONTROL",
-      title: "运行模式与配置写入",
+      title: "配置中心",
       subtitle: "认证、通知、数据源、策略状态、风控和最近配置变更集中管理",
-      runMode: "运行模式",
-      currentMode: "当前模式",
-      settingsWrite: "Settings 写入",
-      paperTrading: "Paper Trading",
-      readonlySections: "只读段",
       apiKey: "会话认证",
       authStatus: "认证状态",
       apiKeyPlaceholder: "输入 ASTROLABE_API_KEY，本次页面会话有效",

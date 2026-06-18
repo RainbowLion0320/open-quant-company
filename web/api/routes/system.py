@@ -174,7 +174,7 @@ async def get_contracts(dimension: str = Query(default="", description="Filter b
     return contracts_payload(dimension)
 
 
-# ── P1-11: Audit Log & Run Mode ──
+# ── P1-11: Audit Log & API Auth ──
 
 
 @router.get("/audit")
@@ -185,27 +185,18 @@ async def get_audit_history(
     """查询配置变更审计日志 — 从 ConfigAuditLedger 读取。
 
     每次 PUT/PATCH /api/settings 都会记录变更:
-    哪个 section, 哪些 key 变了, 来自哪个 IP, 在什么 run_mode 下。
+    哪个 section, 哪些 key 变了, 来自哪个 IP。
     """
     return audit_history_payload(section=section, limit=limit)
 
 
-@router.get("/mode")
-async def get_system_mode():
-    """当前系统运行模式 — research | paper | live。"""
-    from web.api.auth import get_run_mode, get_api_key
-    mode = get_run_mode()
-    has_key = bool(get_api_key())
+@router.get("/auth")
+async def get_auth_status():
+    """当前 API 认证状态。"""
+    from web.api.auth import get_api_key
+
     return {
-        "mode": mode,
-        "has_api_key": has_key,
-        "allows_settings_write": mode != "live",
-        "allows_paper_trading": mode in ("research", "paper"),
-        "readonly_sections": sorted({
-            "live": ["all"],
-            "paper": ["all except paper_trading"],
-            "research": [],
-        }.get(mode, [])),
+        "has_api_key": bool(get_api_key()),
         "status": "ok",
     }
 

@@ -57,25 +57,6 @@ def _write_config(data: dict):
         os.remove(bak)
 
 
-def _check_writable(section: str) -> None:
-    """Raise 403 if current run mode disallows writing to this section."""
-    from web.api.auth import get_run_mode
-
-    mode = get_run_mode()
-    if mode == "live":
-        raise HTTPException(
-            status_code=403,
-            detail="Settings are read-only in live mode. "
-                   "Switch to research or paper mode in config file."
-        )
-    if mode == "paper" and section != "paper_trading":
-        raise HTTPException(
-            status_code=403,
-            detail=f"Only 'paper_trading' section is writable in paper mode. "
-                   f"Section '{section}' requires research mode."
-        )
-
-
 def _audit_change(request: Request, section: str, method: str, old_data: dict, new_data: dict):
     """Record config change to audit ledger."""
     record_settings_change(request, section, method, old_data, new_data)
@@ -122,9 +103,6 @@ async def update_settings(config: dict, request: Request):
                    f"Use PATCH /api/settings/section for partial updates.",
         )
 
-    # Check run mode
-    _check_writable("*")
-
     old_config = _read_config()
 
     try:
@@ -146,8 +124,6 @@ async def update_settings(config: dict, request: Request):
 @router.patch("/section/{section}")
 async def update_section(section: str, data: dict, request: Request):
     """部分更新：只修改指定配置段，不影响其他段"""
-    _check_writable(section)
-
     # Validate against schema if available
     errors = validate_settings_section(section, data)
     if errors:

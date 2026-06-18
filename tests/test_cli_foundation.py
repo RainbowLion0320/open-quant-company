@@ -70,9 +70,9 @@ def test_validate_runtime_mode_rejects_invalid_mode():
     try:
         validate_runtime_mode("paper")
     except ValueError as exc:
-        assert "Invalid runtime mode" in str(exc)
+        assert "Invalid strategy run scope" in str(exc)
     else:
-        raise AssertionError("invalid runtime mode should fail")
+        raise AssertionError("invalid strategy run scope should fail")
 
 
 def test_docs_describe_astroq_as_agent_control_plane():

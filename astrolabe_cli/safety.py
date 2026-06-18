@@ -8,7 +8,7 @@ VALID_RUNTIME_MODES = {"production", "research"}
 
 def validate_runtime_mode(mode: str) -> str:
     if mode not in VALID_RUNTIME_MODES:
-        raise ValueError(f"Invalid runtime mode: {mode}. Expected production or research.")
+        raise ValueError(f"Invalid strategy run scope: {mode}. Expected production or research.")
     return mode
 
 

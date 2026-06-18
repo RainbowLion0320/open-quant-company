@@ -54,13 +54,11 @@ class TestConfigAuditRecord:
             method="PUT",
             source_ip="192.168.1.1",
             user_agent="test-agent",
-            run_mode="paper",
         )
         last = ledger.last_change()
         assert last.method == "PUT"
         assert last.source_ip == "192.168.1.1"
         assert last.user_agent == "test-agent"
-        assert last.run_mode == "paper"
 
 
 class TestConfigAuditQueries:
@@ -130,11 +128,10 @@ class TestConfigAuditEntry:
             changed_keys=["max_pct"],
             source_ip="127.0.0.1",
             user_agent="test/1.0",
-            run_mode="research",
         )
         row = entry.to_row()
         restored = ConfigAuditEntry.from_row(row)
         assert restored.change_id == entry.change_id
         assert restored.section == entry.section
         assert restored.changed_keys == ["max_pct"]
-        assert restored.run_mode == "research"
+        assert "run" + "_mode" not in row

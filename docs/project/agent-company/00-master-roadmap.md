@@ -81,7 +81,7 @@ The full target includes:
 5. Evidence references that resolve to Web pages, CLI commands, artifact paths, code locations, and report sections.
 6. Transparent memory that is inspectable, exportable, and clearable.
 7. Paper execution proposals with approval, risk gates, ledger writes, and reconciliation.
-8. MiniQMT/QMT live execution behind default-disabled live mode, readiness gates, explicit approval, reconciliation, and kill switch.
+8. MiniQMT/QMT live execution behind default-disabled live adapter configuration, readiness gates, explicit approval, reconciliation, and kill switch.
 9. Reports and operating-rhythm artifacts for daily, weekly, risk, execution, engineering, release, and audit workflows.
 10. Tests for action policies, evidence resolution, live execution boundaries, Web rendering, API contracts, and CLI JSON contracts.
 

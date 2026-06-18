@@ -70,7 +70,7 @@ export const modules = {
           settings: {
             label: "Settings",
             meta: "Config writes",
-            description: "Manage run mode, auth, notifications, data sources, strategy state, and risk parameters",
+            description: "Manage auth, notifications, data sources, strategy state, and risk parameters",
           },
           config: {
             label: "Config Center",

@@ -596,8 +596,8 @@ blocked run without calling the tool runner.
 
 Readiness mode semantics:
 
-- `live_disabled`: live mode is explicitly off or absent from config.
-- `blocked`: live mode is enabled but SDK, login, permission, or kill-switch checks fail.
+- `live_disabled`: live execution is explicitly off or absent from config.
+- `blocked`: live execution is enabled but SDK, login, permission, or kill-switch checks fail.
 - `live_ready`: all readiness checks pass. This does not bypass order preview, risk gate, or CEO approval.
 - `execution.live.sdk_gateway_factory` may point to `module:callable` or `module.callable`. When configured, the factory is called with `config`, `account_id`, and `broker`. Load failures, missing `submit_order`, or missing `reconcile` become `sdk_gateway_load_failed` readiness blockers.
 

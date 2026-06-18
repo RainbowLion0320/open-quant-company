@@ -127,7 +127,6 @@ def audit_history_payload(section: str = "", limit: int = 50) -> dict:
                 "method": entry.method,
                 "changed_keys": entry.changed_keys,
                 "source_ip": entry.source_ip,
-                "run_mode": entry.run_mode,
             }
             for entry in entries
         ],
