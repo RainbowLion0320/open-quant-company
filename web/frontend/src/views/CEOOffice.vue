@@ -166,14 +166,6 @@
         </div>
 
         <form class="message-composer" @submit.prevent="sendMessage">
-          <label class="desk-target-control">
-            <span>{{ t("ceoOffice.messageDesk") }}</span>
-            <select v-model="selectedDraftDesk">
-              <option v-for="desk in desks" :key="desk.desk_id" :value="desk.desk_id">
-                {{ deskLabel(desk.desk_id) }}
-              </option>
-            </select>
-          </label>
           <input v-model="draft" type="text" :placeholder="t('ceoOffice.messagePlaceholder')" />
           <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
             {{ t("ceoOffice.send") }}
@@ -212,7 +204,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentMessage, type AgentModelRuntimeResponse, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import { api, type AgentAction, type AgentActionDetail, type AgentEvidenceSnapshot, type AgentMessage, type AgentModelRuntimeResponse, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
@@ -227,7 +219,6 @@ const lastStreamSignature = ref("");
 const runStream = ref<AbortController | null>(null);
 const runStreamId = ref("");
 const lastRunStreamSignature = ref("");
-const desks = ref<AgentDesk[]>([]);
 const modelRuntime = ref<AgentModelRuntimeResponse | null>(null);
 const selectedAction = ref<AgentActionDetail | null>(null);
 const selectedEvidence = ref<EvidenceRef | null>(null);
@@ -236,7 +227,6 @@ const selectedEvidenceNavigation = ref<EvidenceNavigation | null>(null);
 const selectedEvidenceStatus = ref("");
 const submittingPaperAction = ref("");
 const cancelingAction = ref("");
-const selectedDraftDesk = ref("reporting");
 const draft = ref("");
 const sending = ref(false);
 const error = ref("");
@@ -463,9 +453,6 @@ function connectRunStream(runId: string) {
 async function loadSession(sessionId: string, options: { connectStream?: boolean } = {}) {
   const detail = await api.agentSession(sessionId);
   activeSession.value = detail.session;
-  if (!desks.value.some(desk => desk.desk_id === selectedDraftDesk.value)) {
-    selectedDraftDesk.value = detail.session.default_desk || "reporting";
-  }
   messages.value = detail.messages || [];
   actions.value = detail.actions || [];
   if (options.connectStream !== false) {
@@ -477,14 +464,12 @@ async function loadSession(sessionId: string, options: { connectStream?: boolean
 async function loadOfficeState() {
   error.value = "";
   try {
-    const [sessionPayload, deskPayload, actionPayload, modelRuntimePayload] = await Promise.all([
+    const [sessionPayload, actionPayload, modelRuntimePayload] = await Promise.all([
       api.agentSessions(),
-      api.agentDesks(),
       api.agentActions(),
       api.agentModelRuntime(),
     ]);
     sessions.value = sessionPayload.sessions || [];
-    desks.value = deskPayload.desks || [];
     actions.value = actionPayload.actions || [];
     modelRuntime.value = modelRuntimePayload;
     if (sessions.value.length) {
@@ -522,7 +507,6 @@ async function sendMessage() {
     const session = await ensureSession();
     await api.agentAddMessage(session.session_id, {
       role: "ceo",
-      desk: selectedDraftDesk.value,
       content: text,
     });
     draft.value = "";

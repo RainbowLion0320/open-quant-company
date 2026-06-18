@@ -1,9 +1,8 @@
 export const ceoOffice = {
       status: "运行状态",
-      messagePlaceholder: "输入要交给各部门 agent 的问题或任务",
+      messagePlaceholder: "输入问题或任务，系统会自动分配主责部门",
       send: "发送",
       evidence: "证据",
-      messageDesk: "目标部门",
       messages: "消息",
       noMessages: "暂无消息",
       modelRuntimeA11y: "当前模型运行配置",

@@ -4664,6 +4664,71 @@ def test_agent_runtime_routes_ceo_message_to_deterministic_desk_response(tmp_pat
     reset_datahub()
 
 
+def test_agent_runtime_auto_routes_ceo_messages_when_desk_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    cases = [
+        ("帮我补齐 Tushare 数据缺口", "data"),
+        ("分析 12 个策略为什么 IC 不够", "research"),
+        ("当前仓位该怎么调", "portfolio"),
+        ("检查最大回撤和风险阻断", "risk"),
+        ("提交纸面订单并检查 QMT readiness", "execution"),
+        ("前端页面报错，测试失败，代码冗余", "engineering"),
+        ("今天系统重点是什么，给我总结", "reporting"),
+    ]
+    for index, (content, expected_desk) in enumerate(cases):
+        session = runtime.create_session(title=f"Auto route {index}", default_desk="reporting")
+        routed = runtime.submit_ceo_message(session.session_id, content=content)
+        message = routed["message"]
+        response = routed["desk_response"]
+        routing = next(row for row in response.reasoning if row["kind"] == "desk_routing")
+
+        assert message.desk == expected_desk
+        assert response.message.desk == expected_desk
+        assert routing["assigned_desk"] == expected_desk
+        assert routing["explicit"] is False
+        assert routing["confidence"] >= 0.4
+        assert routing["reason"]
+
+    fallback_session = runtime.create_session(title="Auto route fallback", default_desk="data")
+    fallback = runtime.submit_ceo_message(fallback_session.session_id, content="随便看看这个问题")
+    fallback_routing = next(row for row in fallback["desk_response"].reasoning if row["kind"] == "desk_routing")
+    assert fallback["message"].desk == "reporting"
+    assert fallback_routing["reason"] == "low_confidence_default_to_reporting"
+    reset_datahub()
+
+
+def test_agent_runtime_explicit_desk_overrides_auto_routing(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Explicit routing", default_desk="reporting")
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        desk="data",
+        content="前端页面报错，测试失败，代码冗余",
+    )
+    routing = next(row for row in routed["desk_response"].reasoning if row["kind"] == "desk_routing")
+
+    assert routed["message"].desk == "data"
+    assert routed["desk_response"].message.desk == "data"
+    assert routing["assigned_desk"] == "data"
+    assert routing["explicit"] is True
+    assert routing["reason"] == "explicit_desk"
+    reset_datahub()
+
+
 def test_agent_desk_response_exposes_structured_reasoning_context(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
@@ -4829,6 +4894,10 @@ def test_agent_cli_and_api_message_return_desk_response(tmp_path, monkeypatch, c
         f"/api/agent/sessions/{session.session_id}/messages",
         json={"role": "ceo", "desk": "data", "content": "检查一下数据缺口"},
     )
+    api_auto_res = TestClient(create_app()).post(
+        f"/api/agent/sessions/{session.session_id}/messages",
+        json={"role": "ceo", "content": "检查最大回撤和风险阻断"},
+    )
 
     assert cli_code == 0
     assert cli_payload["data"]["message"]["role"] == "ceo"
@@ -4838,6 +4907,9 @@ def test_agent_cli_and_api_message_return_desk_response(tmp_path, monkeypatch, c
     assert api_res.json()["message"]["role"] == "ceo"
     assert api_res.json()["desk_response"]["message"]["desk"] == "data"
     assert api_res.json()["desk_response"]["evidence_refs"]
+    assert api_auto_res.status_code == 200
+    assert api_auto_res.json()["message"]["desk"] == "risk"
+    assert api_auto_res.json()["desk_response"]["message"]["desk"] == "risk"
     reset_datahub()
 
 

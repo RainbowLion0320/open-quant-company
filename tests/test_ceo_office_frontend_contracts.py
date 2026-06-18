@@ -39,7 +39,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
 
     assert "useI18n" in view
     assert "api.agentSessions" in view
-    assert "api.agentDesks" in view
+    assert "api.agentDesks" not in view
     assert "api.agentActions" in view
     assert "api.agentCreateSession" in view
     assert "api.agentAddMessage" in view
@@ -56,11 +56,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "onBeforeUnmount(closeRunStream)" in view
 
     # CEO Office remains a conversation, decision, and evidence surface.
-    assert "selectedDraftDesk" in view
-    assert 'v-model="selectedDraftDesk"' in view
-    assert 'v-for="desk in desks"' in view
-    assert "desk: selectedDraftDesk.value" in view
-    assert "ceoOffice.messageDesk" in view
+    assert "deskLabel(message.desk)" in view
+    assert "selectedDraftDesk" not in view
+    assert 'v-model="selectedDraftDesk"' not in view
+    assert 'v-for="desk in desks"' not in view
+    assert "desk: selectedDraftDesk.value" not in view
+    assert "ceoOffice.messageDesk" not in view
     assert "selectedAction" in view
     assert "api.agentAction" in view
     assert "api.agentModelRuntime" in view
@@ -117,6 +118,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     # The CEO page must not become a runtime/ops control panel again.
     forbidden_view_tokens = [
         "ceo-side",
+        "desk-target-control",
         "actionQueue",
         "attentionActions",
         "attentionStatuses",
@@ -210,7 +212,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
 
     assert "ceoOffice" in zh_index
     assert "ceoOffice" in en_index
-    assert "目标部门" in zh_ceo
+    assert "自动分配主责部门" in zh_ceo
     assert "数据工程部" in zh_ceo
     assert "量化研究部" in zh_ceo
     assert "组合管理部" in zh_ceo
@@ -223,7 +225,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "纸面订单预览" in zh_ceo
     assert "运行证据" in zh_ceo
     assert "运行时间线" in zh_ceo
-    assert "Target Desk" in en_ceo
+    assert "assigns the responsible desk" in en_ceo
     assert "Evidence Detail" in en_ceo
     assert "Submit Paper Order" in en_ceo
     assert "Paper Order Preview" in en_ceo

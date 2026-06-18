@@ -192,7 +192,7 @@ async def run_agent_program(program_id: str, payload: dict[str, Any] | None = No
 @router.post("/sessions/{session_id}/messages")
 async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     role = str(payload.get("role") or "ceo")
-    desk = str(payload.get("desk") or "reporting")
+    desk = str(payload.get("desk") or "").strip()
     try:
         if role == "ceo":
             routed = AgentRuntime().submit_ceo_message(

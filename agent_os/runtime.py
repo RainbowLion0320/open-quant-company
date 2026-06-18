@@ -44,7 +44,7 @@ from agent_os.schemas import (
     EvidenceRef,
 )
 from agent_os.tools import AgentToolRegistry
-from agent_os.workflows import build_desk_workflow_plan
+from agent_os.workflows import DeskRoutingDecision, build_desk_workflow_plan, route_ceo_message_desk
 from broker import PaperBroker
 from broker.live.qmt import MiniQmtLiveBroker
 from data.llm.usage import resolve_llm_use_case
@@ -413,14 +413,26 @@ class AgentRuntime:
         self,
         session_id: str,
         *,
-        desk: str,
+        desk: str | None = None,
         content: str,
         semantic_planner: Any | None = None,
     ) -> dict[str, AgentMessage | DeskResponse]:
         session = self.ledger.get_session(session_id)
         if not session:
             raise KeyError(f"Agent session not found: {session_id}")
-        target_desk = (desk or str(session.get("default_desk") or "reporting")).strip()
+        explicit_desk = (desk or "").strip()
+        if explicit_desk:
+            target_desk = explicit_desk
+            routing_decision = DeskRoutingDecision(
+                assigned_desk=target_desk,
+                confidence=1.0,
+                matched_terms=[],
+                reason="explicit_desk",
+                explicit=True,
+            )
+        else:
+            routing_decision = route_ceo_message_desk(content)
+            target_desk = routing_decision.assigned_desk
         if get_desk(target_desk) is None:
             raise ValueError(f"Unknown desk: {target_desk}")
         message = self.add_message(session_id, role="ceo", desk=target_desk, content=content)
@@ -429,6 +441,7 @@ class AgentRuntime:
             source_message_id=message.message_id,
             desk=target_desk,
             content=content,
+            routing_decision=routing_decision,
             semantic_planner=semantic_planner,
         )
         return {"message": message, "desk_response": desk_response}
@@ -3292,6 +3305,7 @@ class AgentRuntime:
         source_message_id: str,
         desk: str,
         content: str,
+        routing_decision: DeskRoutingDecision | None = None,
         semantic_planner: Any | None = None,
     ) -> DeskResponse:
         plan = build_desk_workflow_plan(
@@ -3353,7 +3367,11 @@ class AgentRuntime:
             proposed_actions=proposed_actions,
             blockers=plan.blockers,
             handoffs=plan.handoffs,
-            reasoning=[*plan.reasoning, self._session_context_reasoning(session_id)],
+            reasoning=[
+                *([routing_decision.to_reasoning()] if routing_decision is not None else []),
+                *plan.reasoning,
+                self._session_context_reasoning(session_id),
+            ],
             planning_mode=plan.planning_mode,
         )
 

@@ -57,6 +57,180 @@ class SemanticWorkflowDraft:
     blockers: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class DeskRoutingDecision:
+    assigned_desk: str
+    confidence: float
+    matched_terms: list[str]
+    reason: str
+    explicit: bool = False
+
+    def to_reasoning(self) -> dict[str, Any]:
+        return {
+            "kind": "desk_routing",
+            "assigned_desk": self.assigned_desk,
+            "confidence": self.confidence,
+            "matched_terms": self.matched_terms,
+            "reason": self.reason,
+            "explicit": self.explicit,
+        }
+
+
+_DESK_ROUTING_TERMS: dict[str, tuple[str, ...]] = {
+    "data": (
+        "数据源",
+        "补数",
+        "补齐",
+        "datahub",
+        "tushare",
+        "akshare",
+        "coverage",
+        "freshness",
+        "字段缺失",
+        "表缺失",
+        "数据缺口",
+        "数据不全",
+        "source capability",
+        "data registry",
+        "data source",
+        "backfill",
+    ),
+    "research": (
+        "策略",
+        "因子",
+        "回测",
+        "oos",
+        "ic/icir",
+        "icir",
+        "技术面",
+        "情绪面",
+        "基本面",
+        "机器学习",
+        "ml",
+        "alpha",
+        "factor",
+        "backtest",
+        "strategy",
+    ),
+    "portfolio": (
+        "组合",
+        "持仓",
+        "仓位",
+        "权重",
+        "调仓",
+        "策略组合",
+        "rebalance",
+        "allocation",
+        "position sizing",
+        "portfolio",
+        "weights",
+    ),
+    "risk": (
+        "风险",
+        "回撤",
+        "最大回撤",
+        "var",
+        "cvar",
+        "暴露",
+        "风控门",
+        "生命周期阻断",
+        "风险阻断",
+        "risk",
+        "drawdown",
+        "exposure",
+    ),
+    "execution": (
+        "下单",
+        "订单",
+        "成交",
+        "撤单",
+        "paper",
+        "live",
+        "qmt",
+        "miniqmt",
+        "券商",
+        "交易执行",
+        "执行",
+        "order",
+        "broker",
+        "submit",
+        "cancel order",
+    ),
+    "engineering": (
+        "bug",
+        "代码",
+        "前端",
+        "页面",
+        "测试",
+        "构建",
+        "文档",
+        "工程诊断",
+        "冗余",
+        "报错",
+        "typecheck",
+        "build",
+        "docs",
+        "test",
+        "frontend",
+    ),
+    "reporting": (
+        "日报",
+        "总结",
+        "全局状态",
+        "优先级",
+        "下一步",
+        "今天",
+        "简报",
+        "复盘",
+        "汇总",
+        "daily",
+        "brief",
+        "summary",
+        "priority",
+    ),
+}
+
+
+def route_ceo_message_desk(content: str) -> DeskRoutingDecision:
+    normalized = content.lower()
+    matches: dict[str, list[str]] = {}
+    for desk, terms in _DESK_ROUTING_TERMS.items():
+        desk_matches = [term for term in terms if term.lower() in normalized]
+        if desk_matches:
+            matches[desk] = desk_matches
+
+    if not matches:
+        return DeskRoutingDecision(
+            assigned_desk="reporting",
+            confidence=0.4,
+            matched_terms=[],
+            reason="low_confidence_default_to_reporting",
+        )
+
+    ranked = sorted(matches.items(), key=lambda item: (-len(item[1]), item[0]))
+    top_desk, top_terms = ranked[0]
+    top_score = len(top_terms)
+    tied_desks = [desk for desk, terms in ranked if len(terms) == top_score]
+    if len(tied_desks) > 1:
+        all_terms: list[str] = []
+        for desk in tied_desks:
+            all_terms.extend(matches[desk])
+        return DeskRoutingDecision(
+            assigned_desk="reporting",
+            confidence=0.52,
+            matched_terms=sorted(set(all_terms)),
+            reason=f"cross_desk_tie:{','.join(tied_desks)}",
+        )
+
+    confidence = min(0.9, 0.56 + top_score * 0.08)
+    return DeskRoutingDecision(
+        assigned_desk=top_desk,
+        confidence=round(confidence, 2),
+        matched_terms=top_terms,
+        reason=f"matched_{top_desk}_routing_terms",
+    )
+
+
 _DESK_PROFILES: dict[str, dict[str, str]] = {
     "data": {
         "answer": "Data Desk 已记录 CEO 问题。下一步应先读取本地 DataHub 健康状态，确认缺失、过期和 provider 权限状态后再提出修复。",

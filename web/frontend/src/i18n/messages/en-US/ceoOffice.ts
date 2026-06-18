@@ -1,9 +1,8 @@
 export const ceoOffice = {
       status: "Runtime Status",
-      messagePlaceholder: "Ask the desk agents a question or task",
+      messagePlaceholder: "Describe a question or task; the system assigns the responsible desk",
       send: "Send",
       evidence: "Evidence",
-      messageDesk: "Target Desk",
       messages: "Messages",
       noMessages: "No messages",
       modelRuntimeA11y: "Current model runtime configuration",
