@@ -86,6 +86,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "inline-detail" in view
     assert "modelRuntimeSegments" in view
     assert "formatTokenK" in view
+    assert "composer-input-row" in view
+    assert "composer-status-line" in view
     assert "runtime-segment" in view
     assert "runtime-progress" in view
     assert "runtimeBatteryCells" in view
@@ -114,6 +116,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "message-action-list" in css
     assert "inline-action-card" in css
     assert "inline-detail" in css
+    assert ".composer-input-row" in css
+    assert ".composer-status-line" in css
+    assert "position: sticky" in css
+    assert "bottom: 0" in css
+    assert "flex: 1 1 auto" in css
+    assert "grid-template-rows: auto minmax(0, 1fr) auto" in css
 
     # The CEO page must not become a runtime/ops control panel again.
     forbidden_view_tokens = [

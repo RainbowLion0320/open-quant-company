@@ -1,6 +1,9 @@
 .ceo-office {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+  height: 100%;
+  min-height: 0;
 }
 
 .panel-head,
@@ -22,10 +25,12 @@
 }
 
 .ceo-grid {
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
 }
 
 .message-list,
@@ -43,9 +48,11 @@
 }
 
 .conversation-panel {
-  min-height: 520px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   display: grid;
-  grid-template-rows: auto minmax(280px, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
 }
 
@@ -71,7 +78,10 @@
 
 .message-list {
   align-content: start;
+  min-height: 0;
   overflow: auto;
+  padding-right: 2px;
+  padding-bottom: 4px;
 }
 
 .message-row,
@@ -155,9 +165,22 @@
 }
 
 .message-composer {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 7px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(125, 211, 252, 0.12);
+  background: linear-gradient(180deg, rgba(3, 10, 18, 0), var(--bg-panel) 24%, var(--bg-panel));
+}
+
+.composer-input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
+  align-items: center;
   gap: 10px;
 }
 
@@ -166,9 +189,9 @@
 }
 
 .model-runtime-line {
-  grid-column: 1 / -1;
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
   min-height: 18px;
   min-width: 0;
@@ -178,6 +201,11 @@
   font-size: 10px;
   line-height: 1.35;
   white-space: nowrap;
+}
+
+.composer-status-line {
+  border-top: 1px solid rgba(125, 211, 252, 0.08);
+  padding-top: 5px;
 }
 
 .runtime-segment {
@@ -475,8 +503,7 @@
 }
 
 @media (max-width: 700px) {
-  .message-composer {
-    align-items: stretch;
+  .composer-input-row {
     grid-template-columns: 1fr;
   }
 

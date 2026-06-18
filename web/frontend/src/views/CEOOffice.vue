@@ -166,11 +166,13 @@
         </div>
 
         <form class="message-composer" @submit.prevent="sendMessage">
-          <input v-model="draft" type="text" :placeholder="t('ceoOffice.messagePlaceholder')" />
-          <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
-            {{ t("ceoOffice.send") }}
-          </button>
-          <div v-if="modelRuntime" class="model-runtime-line" :aria-label="t('ceoOffice.modelRuntimeA11y')">
+          <div class="composer-input-row">
+            <input v-model="draft" type="text" :placeholder="t('ceoOffice.messagePlaceholder')" />
+            <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
+              {{ t("ceoOffice.send") }}
+            </button>
+          </div>
+          <div v-if="modelRuntime" class="model-runtime-line composer-status-line" :aria-label="t('ceoOffice.modelRuntimeA11y')">
             <template v-for="(segment, index) in modelRuntimeSegments" :key="segment.key">
               <span v-if="index" class="runtime-separator">·</span>
               <span :class="['runtime-segment', `runtime-segment-${segment.kind}`]">
