@@ -65,6 +65,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentActions" in view
     assert "api.agentCreateSession" in view
     assert "api.agentAddMessage" in view
+    assert "api.agentUpdateSession" in view
     assert "api.agentSessionStream" in view
     assert "AbortController" in view
     assert "EventSource" not in view
@@ -131,6 +132,24 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "message-action-list" in view
     assert "inline-action-card" in view
     assert "inline-detail" in view
+    assert "slashCommands" in view
+    assert "slashCommandQuery" in view
+    assert "filteredSlashCommands" in view
+    assert "showSlashMenu" in view
+    assert "runSlashCommand" in view
+    assert "createFreshSession" in view
+    assert "selectSlashCommand" in view
+    assert "slash-command-menu" in view
+    assert "slash-command-option" in css
+    assert 'name: "/new"' in view
+    assert 'name: "/clear"' in view
+    assert 'name: "/help"' in view
+    assert 'if (text.startsWith("/"))' in view
+    assert 'await runSlashCommand(text.toLowerCase())' in view
+    assert view.index('if (text.startsWith("/"))') < view.index("api.agentAddMessage")
+    assert 'status: "archived"' in view
+    assert "clear_memory" not in view
+    assert "memory/clear" not in view
     assert "class=\"message-row\" :class=\"message.role\"" in view
     assert "justify-self: start" in css
     assert "justify-self: end" in css
@@ -305,6 +324,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "纸面订单预览" in zh_ceo
     assert "运行证据" in zh_ceo
     assert "运行时间线" in zh_ceo
+    assert "开启新对话" in zh_ceo
+    assert "归档当前对话并开启新对话" in zh_ceo
+    assert "未知斜杠命令" in zh_ceo
     assert "assigns the responsible desk" in en_ceo
     assert "Sources, backfills, coverage" in en_ceo
     assert "Strategies, factors, evidence" in en_ceo
@@ -318,6 +340,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Paper Order Preview" in en_ceo
     assert "Run Evidence" in en_ceo
     assert "Run Timeline" in en_ceo
+    assert "Start a new conversation" in en_ceo
+    assert "Archive this conversation and start a new one" in en_ceo
+    assert "Unknown slash command" in en_ceo
     assert "modelRuntimeA11y" not in zh_ceo
     assert 'reasoningShort: "R"' in zh_app
     assert 'reasoningMaxShort: "最大"' in zh_app

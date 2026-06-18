@@ -1,6 +1,7 @@
 <template>
   <div class="ceo-office view-page">
     <section v-if="error" class="ceo-alert">{{ error }}</section>
+    <section v-if="slashNotice" class="ceo-notice">{{ slashNotice }}</section>
 
     <section class="desk-status-strip" :aria-label="t('ceoOffice.departmentStatusAria')">
       <article
@@ -173,6 +174,18 @@
         </div>
 
         <form class="message-composer" @submit.prevent="sendMessage">
+          <div v-if="showSlashMenu && filteredSlashCommands.length" class="slash-command-menu">
+            <button
+              v-for="command in filteredSlashCommands"
+              :key="command.name"
+              type="button"
+              class="slash-command-option"
+              @click="selectSlashCommand(command.name)"
+            >
+              <code>{{ command.name }}</code>
+              <span>{{ command.description }}</span>
+            </button>
+          </div>
           <div class="composer-input-row">
             <input v-model="draft" type="text" :placeholder="t('ceoOffice.messagePlaceholder')" />
             <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
@@ -214,11 +227,17 @@ const cancelingAction = ref("");
 const draft = ref("");
 const sending = ref(false);
 const error = ref("");
+const slashNotice = ref("");
 
 const paperOrderPreview = computed(() => objectParam(selectedAction.value?.action.parameters.paper_order_preview));
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
 const paperRiskGatePassed = computed(() => Boolean(paperRiskGate.value?.passed));
 const deskOrder = ["data", "research", "portfolio", "risk", "execution", "engineering", "reporting"];
+const slashCommands = computed(() => [
+  { name: "/new", description: t("ceoOffice.slashNewDescription") },
+  { name: "/clear", description: t("ceoOffice.slashClearDescription") },
+  { name: "/help", description: t("ceoOffice.slashHelpDescription") },
+]);
 const deskNames = computed<Record<string, string>>(() => ({
   data: t("ceoOffice.dataDesk"),
   research: t("ceoOffice.researchDesk"),
@@ -257,6 +276,12 @@ const deskStatusCards = computed(() =>
     };
   }),
 );
+const slashCommandQuery = computed(() => draft.value.trim().toLowerCase());
+const showSlashMenu = computed(() => slashCommandQuery.value.startsWith("/"));
+const filteredSlashCommands = computed(() => {
+  const query = slashCommandQuery.value;
+  return slashCommands.value.filter(command => command.name.startsWith(query));
+});
 
 function deskLabel(desk: string) {
   return deskNames.value[desk] || desk;
@@ -461,15 +486,55 @@ function notifyModelRuntimeSession(sessionId: string) {
   window.dispatchEvent(new CustomEvent("oqc-agent-runtime-session", { detail: { sessionId } }));
 }
 
-async function ensureSession(): Promise<AgentSession> {
-  if (activeSession.value) return activeSession.value;
+async function createFreshSession() {
   const payload = await api.agentCreateSession({
     title: t("ceoOffice.defaultControlTitle"),
     default_desk: "reporting",
   });
   activeSession.value = payload.session;
   sessions.value = [payload.session, ...sessions.value];
+  messages.value = [];
+  actions.value = [];
+  selectedAction.value = null;
+  selectedEvidence.value = null;
+  selectedEvidenceSnapshot.value = null;
+  selectedEvidenceNavigation.value = null;
+  selectedEvidenceStatus.value = "";
+  await loadSession(payload.session.session_id);
   return payload.session;
+}
+
+async function ensureSession(): Promise<AgentSession> {
+  if (activeSession.value) return activeSession.value;
+  return createFreshSession();
+}
+
+function selectSlashCommand(commandName: string) {
+  draft.value = commandName;
+}
+
+async function runSlashCommand(commandName: string) {
+  if (commandName === "/new") {
+    await createFreshSession();
+    draft.value = "";
+    return true;
+  }
+  if (commandName === "/clear") {
+    if (activeSession.value) {
+      await api.agentUpdateSession(activeSession.value.session_id, { status: "archived" });
+    }
+    await createFreshSession();
+    draft.value = "";
+    return true;
+  }
+  if (commandName === "/help") {
+    slashNotice.value = t("ceoOffice.slashHelpMessage");
+    draft.value = "";
+    return true;
+  }
+  error.value = `${t("ceoOffice.unknownSlashCommand")}: ${commandName}`;
+  slashNotice.value = "";
+  return true;
 }
 
 async function sendMessage() {
@@ -477,7 +542,12 @@ async function sendMessage() {
   if (!text) return;
   sending.value = true;
   error.value = "";
+  slashNotice.value = "";
   try {
+    if (text.startsWith("/")) {
+      await runSlashCommand(text.toLowerCase());
+      return;
+    }
     const session = await ensureSession();
     await api.agentAddMessage(session.session_id, {
       role: "ceo",

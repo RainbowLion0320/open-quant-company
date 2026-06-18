@@ -16,7 +16,8 @@
   gap: 12px;
 }
 
-.ceo-alert {
+.ceo-alert,
+.ceo-notice {
   border: 1px solid var(--border-default);
   border-radius: 8px;
   background: var(--bg-panel);
@@ -499,6 +500,56 @@
 .ceo-alert {
   padding: 10px 12px;
   color: var(--negative);
+}
+
+.ceo-notice {
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.slash-command-menu {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  border-radius: 8px;
+  padding: 6px;
+  background: rgba(3, 10, 18, 0.92);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+}
+
+.slash-command-option {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--text-tertiary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.slash-command-option:hover {
+  background: rgba(125, 211, 252, 0.07);
+}
+
+.slash-command-option code {
+  color: var(--accent-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
+
+.slash-command-option span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 1100px) {
