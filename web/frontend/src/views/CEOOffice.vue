@@ -3,12 +3,7 @@
     <section v-if="error" class="ceo-alert">{{ error }}</section>
 
     <section class="ceo-grid">
-      <article class="ceo-panel conversation-panel">
-        <header class="panel-head">
-          <span>{{ t("ceoOffice.messages") }}</span>
-          <small>{{ messages.length }}</small>
-        </header>
-
+      <article class="conversation-panel">
         <div v-if="!messages.length" class="ceo-empty">{{ t("ceoOffice.noMessages") }}</div>
         <div v-else class="message-list">
           <div v-for="message in messages" :key="message.message_id" class="message-row" :class="message.role">

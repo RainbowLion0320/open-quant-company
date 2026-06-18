@@ -6,7 +6,6 @@
   min-height: 0;
 }
 
-.panel-head,
 .message-meta,
 .action-title,
 .approval-buttons,
@@ -17,7 +16,6 @@
   gap: 12px;
 }
 
-.ceo-panel,
 .ceo-alert {
   border: 1px solid var(--border-default);
   border-radius: 8px;
@@ -43,32 +41,25 @@
   gap: 10px;
 }
 
-.ceo-panel {
-  padding: 14px;
-}
-
 .conversation-panel {
   height: 100%;
   min-height: 0;
   overflow: hidden;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
 }
 
-.panel-head {
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.panel-head span,
 .message-meta,
 .action-row small {
   color: var(--text-tertiary);
   font-size: 11px;
 }
 
-.panel-head small,
 .message-meta time {
   color: var(--text-disabled);
   font-family: "JetBrains Mono", monospace;
@@ -174,7 +165,7 @@
   gap: 7px;
   padding-top: 10px;
   border-top: 1px solid rgba(125, 211, 252, 0.12);
-  background: linear-gradient(180deg, rgba(3, 10, 18, 0), var(--bg-panel) 24%, var(--bg-panel));
+  background: linear-gradient(180deg, rgba(3, 10, 18, 0), rgba(3, 10, 18, 0.9) 28%, rgba(3, 10, 18, 0.96));
 }
 
 .composer-input-row {

@@ -104,6 +104,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "message.action_refs" in view
     assert "actionById" in view
     assert "messageHasSelectedEvidence" in view
+    assert 'class="ceo-panel conversation-panel"' not in view
+    assert '<header class="panel-head">' not in view
+    assert 't("ceoOffice.messages")' not in view
     assert "message-action-list" in view
     assert "inline-action-card" in view
     assert "inline-detail" in view
@@ -146,13 +149,18 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "inline-detail" in css
     assert ".composer-input-row" in css
     assert ".composer-status-line" not in css
+    assert ".ceo-panel" not in css
+    assert ".panel-head" not in css
+    assert "grid-template-rows: minmax(0, 1fr) auto" in css
+    assert "background: transparent" in css
+    assert "var(--bg-panel) 24%" not in css
     assert ".agent-runtime-line" in workspace_css
     assert "overflow: hidden;" in workspace_css
     assert "overflow-x: auto" not in workspace_css
     assert "position: sticky" in css
     assert "bottom: 0" in css
     assert "flex: 1 1 auto" in css
-    assert "grid-template-rows: auto minmax(0, 1fr) auto" in css
+    assert "grid-template-rows: auto minmax(0, 1fr) auto" not in css
 
     # The CEO page must not become a runtime/ops control panel again.
     forbidden_view_tokens = [
