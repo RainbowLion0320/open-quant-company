@@ -6,7 +6,7 @@
       <article
         v-for="card in deskStatusCards"
         :key="card.deskId"
-        :class="['desk-status-card', `desk-status-${card.state}`]"
+        :class="['desk-status-card', `desk-status-${card.state}`, `desk-color-${card.deskId}`]"
         :aria-label="`${card.label}: ${card.statusLabel}`"
       >
         <strong>{{ card.label }}</strong>
@@ -21,7 +21,7 @@
           <div v-for="message in messages" :key="message.message_id" class="message-row" :class="message.role">
             <div class="message-meta">
               <strong>{{ message.role }}</strong>
-              <span>{{ deskLabel(message.desk) }}</span>
+              <span :class="['message-desk-label', `desk-color-${message.desk}`]">{{ deskLabel(message.desk) }}</span>
               <time>{{ formatTime(message.created_at) }}</time>
             </div>
             <p>{{ message.content }}</p>

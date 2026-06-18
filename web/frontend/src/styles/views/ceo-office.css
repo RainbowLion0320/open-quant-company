@@ -33,16 +33,16 @@
 
 .desk-status-strip {
   flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(112px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
-  overflow-x: auto;
   padding-bottom: 2px;
 }
 
 .desk-status-card {
-  min-width: 0;
+  flex: 0 0 auto;
+  width: clamp(112px, 10.5vw, 148px);
   display: grid;
   gap: 4px;
   border: 1px solid rgba(125, 211, 252, 0.24);
@@ -51,8 +51,16 @@
   background: rgba(3, 10, 18, 0.22);
 }
 
+.desk-status-card.desk-color-data { --desk-color: rgba(56, 189, 248, 0.9); }
+.desk-status-card.desk-color-research { --desk-color: rgba(167, 139, 250, 0.92); }
+.desk-status-card.desk-color-portfolio { --desk-color: rgba(45, 212, 191, 0.9); }
+.desk-status-card.desk-color-risk { --desk-color: rgba(251, 146, 60, 0.92); }
+.desk-status-card.desk-color-execution { --desk-color: rgba(34, 197, 94, 0.9); }
+.desk-status-card.desk-color-engineering { --desk-color: rgba(96, 165, 250, 0.92); }
+.desk-status-card.desk-color-reporting { --desk-color: rgba(244, 114, 182, 0.9); }
+
 .desk-status-card strong {
-  color: var(--text-primary);
+  color: var(--desk-color, var(--text-primary));
   font-size: 11px;
   line-height: 1;
   overflow: hidden;
@@ -71,7 +79,7 @@
 }
 
 .desk-status-standby {
-  border-color: rgba(125, 211, 252, 0.26);
+  border-color: color-mix(in srgb, var(--desk-color, rgb(125, 211, 252)) 38%, transparent);
 }
 
 .desk-status-running {
@@ -81,7 +89,7 @@
 }
 
 .desk-status-running strong {
-  color: rgba(187, 247, 208, 0.95);
+  color: var(--desk-color, rgba(187, 247, 208, 0.95));
 }
 
 .desk-status-failed {
@@ -135,6 +143,19 @@
   font-size: 10px;
   overflow-wrap: anywhere;
 }
+
+.message-desk-label {
+  color: var(--desk-color, var(--text-tertiary));
+  font-weight: 600;
+}
+
+.message-desk-label.desk-color-data { --desk-color: rgba(56, 189, 248, 0.9); }
+.message-desk-label.desk-color-research { --desk-color: rgba(167, 139, 250, 0.92); }
+.message-desk-label.desk-color-portfolio { --desk-color: rgba(45, 212, 191, 0.9); }
+.message-desk-label.desk-color-risk { --desk-color: rgba(251, 146, 60, 0.92); }
+.message-desk-label.desk-color-execution { --desk-color: rgba(34, 197, 94, 0.9); }
+.message-desk-label.desk-color-engineering { --desk-color: rgba(96, 165, 250, 0.92); }
+.message-desk-label.desk-color-reporting { --desk-color: rgba(244, 114, 182, 0.9); }
 
 .message-list {
   align-content: start;

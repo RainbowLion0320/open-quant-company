@@ -109,10 +109,18 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "deskCardState" in view
     assert "deskStateLabel" in view
     assert "desk-status-card" in view
+    assert "`desk-color-${card.deskId}`" in view
+    assert "message-desk-label" in view
+    assert "`desk-color-${message.desk}`" in view
+    assert "grid-template-columns: repeat(7" not in css
+    assert "width: clamp(112px, 10.5vw, 148px)" in css
     assert "desk-status-standby" in css
     assert "desk-status-running" in css
     assert "desk-status-unavailable" in css
     assert "desk-status-failed" in css
+    for desk_id in ["data", "research", "portfolio", "risk", "execution", "engineering", "reporting"]:
+        assert f".desk-status-card.desk-color-{desk_id}" in css
+        assert f".message-desk-label.desk-color-{desk_id}" in css
     assert "@keyframes desk-running-pulse" in css
     assert "allowed_tools" not in view
     assert "handoff_targets" not in view
