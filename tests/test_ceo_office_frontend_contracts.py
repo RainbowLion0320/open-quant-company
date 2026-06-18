@@ -87,6 +87,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.modelRuntimeA11y" in view
     assert "ceoOffice.reasoningShort" in view
     assert "ceoOffice.contextShort" in view
+    for reasoning_level in ["max", "xhigh", "high", "mid", "medium", "low"]:
+        assert f'level === "{reasoning_level}"' in view
     assert "formatTokenCount(contextUsedTokens" not in view
     assert "formatTokenCount(modelRuntime.value.context.max_tokens)" not in view
     assert "ceoOffice.openEvidence" in view
@@ -204,8 +206,18 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "Run Timeline" in en_ceo
     assert "modelRuntimeA11y" in zh_ceo
     assert 'reasoningShort: "R"' in zh_ceo
+    assert 'reasoningMaxShort: "最大"' in zh_ceo
+    assert 'reasoningXHighShort: "极高"' in zh_ceo
+    assert 'reasoningHighShort: "高"' in zh_ceo
+    assert 'reasoningMidShort: "中"' in zh_ceo
+    assert 'reasoningLowShort: "低"' in zh_ceo
     assert 'contextShort: "CTX"' in zh_ceo
     assert 'reasoningShort: "R"' in en_ceo
+    assert 'reasoningMaxShort: "Max"' in en_ceo
+    assert 'reasoningXHighShort: "XHigh"' in en_ceo
+    assert 'reasoningHighShort: "High"' in en_ceo
+    assert 'reasoningMidShort: "Mid"' in en_ceo
+    assert 'reasoningLowShort: "Low"' in en_ceo
     assert 'contextShort: "CTX"' in en_ceo
     assert "已用上下文" not in zh_ceo
     assert "最大上下文" not in zh_ceo

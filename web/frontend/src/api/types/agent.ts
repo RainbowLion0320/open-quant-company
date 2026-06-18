@@ -35,6 +35,8 @@ export interface AgentModelRuntimeResponse {
   };
   reasoning: {
     level: string;
+    provider_parameter: string;
+    provider_value: string;
     temperature: number;
     response_format_json: boolean;
   };

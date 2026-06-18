@@ -309,6 +309,8 @@ class AgentRuntime:
             },
             "reasoning": {
                 "level": str(runtime.get("reasoning_level") or "default"),
+                "provider_parameter": str(runtime.get("reasoning_provider_parameter") or ""),
+                "provider_value": str(runtime.get("reasoning_provider_value") or ""),
                 "temperature": float(runtime.get("temperature", 0.1) or 0.1),
                 "response_format_json": bool(runtime.get("response_format_json", True)),
             },

@@ -481,6 +481,12 @@ function formatTokenK(value: number) {
 }
 
 function reasoningLevelShort(level: string) {
+  if (level === "max") return t("ceoOffice.reasoningMaxShort");
+  if (level === "xhigh") return t("ceoOffice.reasoningXHighShort");
+  if (level === "high") return t("ceoOffice.reasoningHighShort");
+  if (level === "mid") return t("ceoOffice.reasoningMidShort");
+  if (level === "medium") return t("ceoOffice.reasoningMidShort");
+  if (level === "low") return t("ceoOffice.reasoningLowShort");
   if (level === "thinking_enabled") return t("ceoOffice.reasoningThinkingShort");
   if (level === "thinking_disabled") return t("ceoOffice.reasoningOffShort");
   if (!level || level === "default") return t("ceoOffice.reasoningDefaultShort");

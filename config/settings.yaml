@@ -367,7 +367,9 @@ llm:
         chat_path: /chat/completions
         response_format_json: true
         temperature: 0.1
-        reasoning_level: thinking_enabled
+        reasoning_level: max
+        reasoning_provider_parameter: extra_body.thinking.type
+        reasoning_provider_value: enabled
         context_window_tokens: 1048576
         timeout_seconds: 20
         extra_body:

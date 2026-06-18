@@ -101,7 +101,9 @@ def test_agent_model_runtime_reports_llm_config_and_context_usage(tmp_path, monk
     assert payload["runtime"]["provider"] == "mimo"
     assert payload["runtime"]["model"] == "mimo-v2.5-pro"
     assert payload["runtime"]["credential_env"] == "MIMO_API_KEY"
-    assert payload["reasoning"]["level"] == "thinking_enabled"
+    assert payload["reasoning"]["level"] == "max"
+    assert payload["reasoning"]["provider_parameter"] == "extra_body.thinking.type"
+    assert payload["reasoning"]["provider_value"] == "enabled"
     assert payload["reasoning"]["temperature"] == 0.1
     assert payload["context"]["max_tokens"] == 1048576
     assert payload["context"]["used_tokens"] > 0
