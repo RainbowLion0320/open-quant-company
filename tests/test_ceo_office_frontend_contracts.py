@@ -112,6 +112,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "desk-status-card" in view
     assert "`desk-color-${card.deskId}`" in view
     assert "message-desk-label" in view
+    assert 'v-if="message.role !== \'ceo\'"' in view
     assert "`desk-color-${message.desk}`" in view
     assert "grid-template-columns: repeat(7" not in css
     assert "width: clamp(112px, 10.5vw, 148px)" in css

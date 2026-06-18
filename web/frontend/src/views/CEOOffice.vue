@@ -22,7 +22,7 @@
           <div v-for="message in messages" :key="message.message_id" class="message-row" :class="message.role">
             <div class="message-meta">
               <strong>{{ message.role }}</strong>
-              <span :class="['message-desk-label', `desk-color-${message.desk}`]">{{ deskLabel(message.desk) }}</span>
+              <span v-if="message.role !== 'ceo'" :class="['message-desk-label', `desk-color-${message.desk}`]">{{ deskLabel(message.desk) }}</span>
               <time>{{ formatTime(message.created_at) }}</time>
             </div>
             <p>{{ message.content }}</p>
