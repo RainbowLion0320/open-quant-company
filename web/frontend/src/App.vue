@@ -442,6 +442,15 @@ function handleAgentRuntimeSession(event: Event) {
   void fetchAgentModelRuntime(agentRuntimeSessionId.value);
 }
 
+function handleRuntimeOutsidePointer(event: PointerEvent) {
+  if (!runtimeMenuKind.value) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest(".runtime-popover") || target.closest(".agent-runtime-line")) return;
+  runtimeMenuKind.value = "";
+  runtimeMenuError.value = "";
+}
+
 function contextStatusKind(status: string) {
   const normalized = (status || "ok").toLowerCase();
   if (normalized === "warn") return "warn";
@@ -484,6 +493,7 @@ onMounted(() => {
   fetchSystemHealth();
   fetchAgentModelRuntime();
   window.addEventListener("oqc-agent-runtime-session", handleAgentRuntimeSession);
+  document.addEventListener("pointerdown", handleRuntimeOutsidePointer);
   regimeTimer = window.setInterval(fetchRegime, 60000);
   agentRuntimeTimer = window.setInterval(() => fetchAgentModelRuntime(), 30000);
 });
@@ -492,6 +502,7 @@ onUnmounted(() => {
   clearInterval(regimeTimer);
   clearInterval(agentRuntimeTimer);
   window.removeEventListener("oqc-agent-runtime-session", handleAgentRuntimeSession);
+  document.removeEventListener("pointerdown", handleRuntimeOutsidePointer);
 });
 
 watch(activeSectionPath, () => {

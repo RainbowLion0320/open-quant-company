@@ -190,7 +190,7 @@
 .runtime-popover {
   position: absolute;
   left: clamp(126px, var(--runtime-popover-x, 50vw), calc(100vw - 126px));
-  bottom: 18px;
+  bottom: 32px;
   transform: translateX(-50%);
   z-index: 40;
   min-width: 220px;
