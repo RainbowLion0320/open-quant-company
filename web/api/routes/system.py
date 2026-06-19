@@ -89,6 +89,41 @@ async def db_health():
     return db_health_payload()
 
 
+@router.post("/db-health/repair")
+async def repair_tables(payload: dict | None = None):
+    """触发一批可修复数据表修复任务。"""
+    requested = (payload or {}).get("tables") or []
+    if not isinstance(requested, list):
+        raise InvalidParameterError("tables", requested, "Expected a list of table names")
+
+    allowed = _repairable_tables()
+    jobs = []
+    seen: set[str] = set()
+    for raw_table in requested:
+        table = str(raw_table).strip()
+        if not table or table in seen:
+            continue
+        seen.add(table)
+        if table not in allowed:
+            jobs.append({"table": table, "status": "skipped", "message": "Not a repairable table"})
+            continue
+        jobs.append(start_repair_job(table))
+
+    started = sum(1 for job in jobs if job.get("status") in {"started", "conflict"})
+    if not jobs:
+        status = "empty"
+    elif started:
+        status = "started"
+    else:
+        status = "failed"
+    return {
+        "status": status,
+        "total": len(seen),
+        "started": started,
+        "jobs": jobs,
+    }
+
+
 @router.post("/db-health/repair/{table_name}")
 async def repair_table(table_name: str):
     """触发单表数据修复 (后台异步)"""

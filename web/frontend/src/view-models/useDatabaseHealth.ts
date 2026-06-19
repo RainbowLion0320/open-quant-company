@@ -38,6 +38,13 @@ export function useDatabaseHealth() {
     checked_at: string;
   }
 
+  interface RepairJob {
+    status: string;
+    job_id?: string;
+    table?: string;
+    message?: string;
+  }
+
   const rows = ref<HealthRow[]>([]);
   const { currentLocale, t } = useI18n();
   const summary = ref<HealthSummary | null>(null);
@@ -45,7 +52,8 @@ export function useDatabaseHealth() {
   const statusMessage = ref("");
   const expanded = ref<string | null>(null);
   const apiFallback = ref(false);
-  const repairing = ref<Record<string, string>>({});  // table -> status
+  const repairAllState = ref<"idle" | "running" | "done" | "failed">("idle");
+  const repairAllMessage = ref("");
 
   const sortedRows = computed(() => {
     const arr = [...rows.value];
@@ -59,6 +67,11 @@ export function useDatabaseHealth() {
   });
 
   const statusClass = computed(() => `dot-${status.value}`);
+  const repairableRows = computed(() => sortedRows.value.filter((row) => row.repairable));
+  const repairAllDisabled = computed(() => repairAllState.value === "running" || repairableRows.value.length === 0);
+  const repairAllLabel = computed(() => (
+    repairAllState.value === "running" ? t("database.repairAllRunning") : t("database.repairAll")
+  ));
   const statusText = computed(() => {
     if (status.value === "loading") return t("database.loading");
     if (status.value === "no_data") return statusMessage.value || t("database.noData");
@@ -187,39 +200,49 @@ export function useDatabaseHealth() {
     expanded.value = expanded.value === table ? null : table;
   }
 
-  async function startRepair(table: string) {
-    repairing.value[table] = 'running';
+  async function waitRepairJob(job: RepairJob): Promise<boolean> {
+    if (!job.job_id) return false;
+    for (let attempt = 0; attempt < 3600; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 500 : 1000));
+      const status = await api.dbHealthRepairStatus(job.job_id);
+      if (status.status === "done") return true;
+      if (status.status === "failed" || status.status === "not_found") return false;
+    }
+    return false;
+  }
+
+  async function startRepairAll() {
+    const tables = repairableRows.value.map((row) => row.table);
+    if (!tables.length || repairAllState.value === "running") {
+      repairAllMessage.value = t("database.repairAllNone");
+      return;
+    }
+
+    repairAllState.value = "running";
+    repairAllMessage.value = "";
     try {
-      const data = await api.dbHealthRepair(table);
-      if (data.status !== 'started') {
-        repairing.value[table] = 'failed';
+      const batch = await api.dbHealthRepairAll(tables);
+      const jobs = (batch.jobs || []).filter((job) => job.job_id && (job.status === "started" || job.status === "conflict"));
+      if (!jobs.length) {
+        repairAllState.value = "failed";
+        repairAllMessage.value = batch.status === "empty" ? t("database.repairAllNone") : t("database.repairAllFailed");
         return;
       }
-      // Poll for completion
-      const jobId = data.job_id;
-      if (!jobId) {
-        repairing.value[table] = 'failed';
+
+      const results = await Promise.all(jobs.map(waitRepairJob));
+      const done = results.filter(Boolean).length;
+      if (done === jobs.length) {
+        repairAllState.value = "done";
+        repairAllMessage.value = t("database.repairAllDone", { count: done });
+        await fetchData();
         return;
       }
-      const poll = async () => {
-        const sd = await api.dbHealthRepairStatus(jobId);
-        if (sd.status === 'done') {
-          repairing.value[table] = 'done';
-          await fetchData();
-          setTimeout(() => { delete repairing.value[table]; }, 3000);
-        } else if (sd.status === 'failed') {
-          repairing.value[table] = 'failed';
-          setTimeout(() => { delete repairing.value[table]; }, 5000);
-        } else if (sd.status === 'running' || sd.status === 'pending') {
-          setTimeout(poll, 1000);
-        } else {
-          repairing.value[table] = 'failed';
-        }
-      };
-      setTimeout(poll, 500);
-    } catch {
-      repairing.value[table] = 'failed';
-      setTimeout(() => { delete repairing.value[table]; }, 5000);
+
+      repairAllState.value = "failed";
+      repairAllMessage.value = t("database.repairAllPartial", { done, total: jobs.length });
+    } catch (e: any) {
+      repairAllState.value = "failed";
+      repairAllMessage.value = e?.message || t("database.repairAllFailed");
     }
   }
 
@@ -263,7 +286,11 @@ export function useDatabaseHealth() {
     statusMessage,
     expanded,
     apiFallback,
-    repairing,
+    repairAllState,
+    repairAllMessage,
+    repairableRows,
+    repairAllDisabled,
+    repairAllLabel,
     sortedRows,
     statusClass,
     statusText,
@@ -284,7 +311,7 @@ export function useDatabaseHealth() {
     bdMissingClass,
     hasDetail,
     toggleDetail,
-    startRepair,
+    startRepairAll,
     fetchData,
   };
 }

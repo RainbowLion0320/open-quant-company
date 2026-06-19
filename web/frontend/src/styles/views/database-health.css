@@ -41,8 +41,8 @@
 }
 
 table {
-  width: max(100%, 1324px);
-  min-width: 1324px;
+  width: max(100%, 1252px);
+  min-width: 1252px;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 13px;
@@ -191,26 +191,35 @@ td.mono { font-family: var(--font-mono, "JetBrains Mono", monospace); }
   color: var(--text-secondary);
 }
 
-.repair-cell { text-align: center; }
-.repair-btn {
+.repair-all-btn {
   background: none;
   border: 1px solid rgba(0,212,255,0.2);
   color: var(--accent);
   font-size: 11px;
-  padding: 2px 10px;
+  padding: 4px 10px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
-.repair-btn:hover:not(:disabled) {
+.repair-all-btn:hover:not(:disabled) {
   background: rgba(0,212,255,0.08);
   border-color: var(--accent);
 }
-.repair-btn:disabled {
+.repair-all-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.repair-na { color: var(--text-muted); font-size: 11px; }
+.repair-all-message {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.repair-all-done { color: var(--positive); }
+.repair-all-failed { color: var(--negative); }
 .spinning { display: inline-block; animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 

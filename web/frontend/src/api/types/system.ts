@@ -122,6 +122,13 @@ export interface DbRepairResponse {
   message?: string;
 }
 
+export interface DbRepairBatchResponse {
+  status: "started" | "empty" | "failed" | string;
+  total: number;
+  started: number;
+  jobs: DbRepairResponse[];
+}
+
 export interface CodeGraphStatusResponse {
   initialized: boolean;
   file_count: number;

@@ -45,6 +45,13 @@
       <span v-if="summary?.checked_at" class="checked-at">
         {{ t('database.lastChecked', { time: fmtTime(summary.checked_at) }) }}
       </span>
+      <button class="repair-all-btn" :disabled="repairAllDisabled" @click="startRepairAll">
+        <span v-if="repairAllState === 'running'" class="spinning">...</span>
+        <span>{{ repairAllLabel }}</span>
+      </button>
+      <span v-if="repairAllMessage" class="repair-all-message" :class="`repair-all-${repairAllState}`">
+        {{ repairAllMessage }}
+      </span>
     </div>
 
     <!-- Table -->
@@ -63,7 +70,6 @@
           <col style="width:92px">
           <col style="width:92px">
           <col style="width:72px">
-          <col style="width:72px">
         </colgroup>
         <thead>
           <tr>
@@ -79,7 +85,6 @@
             <th class="num" style="opacity:0.5">{{ t('database.outlier10yPlus') }}</th>
             <th class="num">{{ t('database.freshness') }}</th>
             <th>{{ t('database.detail') }}</th>
-            <th>{{ t('database.repair') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -118,25 +123,11 @@
                   @click="toggleDetail(row.table)"
                 >{{ expanded === row.table ? t('common.collapse') : t('common.expand') }}</button>
               </td>
-              <td class="repair-cell">
-                <button
-                  v-if="row.repairable"
-                  class="repair-btn"
-                  :disabled="repairing[row.table] === 'running'"
-                  @click="startRepair(row.table)"
-                >
-                  <span v-if="repairing[row.table] === 'running'" class="spinning">...</span>
-                  <span v-else-if="repairing[row.table] === 'done'">OK</span>
-                  <span v-else-if="repairing[row.table] === 'failed'">ERR</span>
-                  <span v-else>{{ t('database.repair') }}</span>
-                </button>
-                <span v-else class="repair-na">—</span>
-              </td>
             </tr>
 
             <!-- Expanded detail row -->
             <tr v-if="expanded === row.table" class="detail-row">
-              <td :colspan="13">
+              <td colspan="12">
                 <div class="detail-panel">
                   <div v-if="row.missing_cols && Object.keys(row.missing_cols).length" class="detail-section">
                     <strong>{{ t('database.missingByColumn') }}</strong>
@@ -185,7 +176,7 @@
 <script setup lang="ts">
 import { useDatabaseHealth } from "../view-models/useDatabaseHealth";
 
-const { rows, currentLocale, t, summary, status, statusMessage, expanded, apiFallback, repairing, sortedRows, statusClass, statusText, missingColor, outlierColor, fmtSize, fmtPercent, fmtCountOk, fmtCount, fmtTime, fmtMiss10y, fmtMiss10yPlus, freshnessLabel, missingClass, okClass, outlierClass, freshnessClass, bdMissingClass, hasDetail, toggleDetail, startRepair, fetchData } = useDatabaseHealth();
+const { rows, currentLocale, t, summary, status, statusMessage, expanded, apiFallback, repairAllState, repairAllMessage, repairAllDisabled, repairAllLabel, sortedRows, statusClass, statusText, missingColor, outlierColor, fmtSize, fmtPercent, fmtCountOk, fmtCount, fmtTime, fmtMiss10y, fmtMiss10yPlus, freshnessLabel, missingClass, okClass, outlierClass, freshnessClass, bdMissingClass, hasDetail, toggleDetail, startRepairAll, fetchData } = useDatabaseHealth();
 </script>
 
 <style scoped src="../styles/views/database-health.css"></style>

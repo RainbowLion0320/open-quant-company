@@ -124,6 +124,57 @@ def test_db_health_freshness_color_uses_backend_sla_status():
     assert "freshnessClass(row.freshness_days)" not in health
 
 
+def test_db_health_repair_is_bulk_action_not_per_row_control():
+    health = Path("web/frontend/src/views/DatabaseHealth.vue").read_text(encoding="utf-8")
+    logic = Path("web/frontend/src/view-models/useDatabaseHealth.ts").read_text(encoding="utf-8")
+    system_api = Path("web/frontend/src/api/modules/system.ts").read_text(encoding="utf-8")
+    css = Path("web/frontend/src/styles/views/database-health.css").read_text(encoding="utf-8")
+
+    assert "startRepairAll" in health
+    assert "startRepairAll" in logic
+    assert "dbHealthRepairAll" in system_api
+    assert "dbHealthRepair: (table" not in system_api
+    assert "repairAllDisabled" in health
+    assert "<th>{{ t('database.repair') }}</th>" not in health
+    assert 'class="repair-cell"' not in health
+    assert "startRepair(row.table)" not in health
+    assert "repairing[row.table]" not in health
+    assert 'colspan="12"' in health
+    assert 'colspan="13"' not in health
+    assert ".repair-cell" not in css
+    assert ".repair-btn" not in css
+
+
+def test_db_health_bulk_repair_api_starts_only_requested_repairable_tables(monkeypatch):
+    from web.api.app import create_app
+    from web.api.routes import system as system_routes
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    monkeypatch.setattr(system_routes, "_repairable_tables", lambda: {"macro_gdp", "stock_limit_list"})
+    started: list[str] = []
+
+    def fake_start(table: str) -> dict:
+        started.append(table)
+        return {"status": "started", "job_id": f"job-{table}", "table": table}
+
+    monkeypatch.setattr(system_routes, "start_repair_job", fake_start)
+
+    res = TestClient(create_app()).post(
+        "/api/system/db-health/repair",
+        json={"tables": ["macro_gdp", "not_repairable", "stock_limit_list"]},
+    )
+
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["status"] == "started"
+    assert payload["total"] == 3
+    assert payload["started"] == 2
+    assert started == ["macro_gdp", "stock_limit_list"]
+    assert [job["table"] for job in payload["jobs"]] == ["macro_gdp", "not_repairable", "stock_limit_list"]
+    assert payload["jobs"][1]["status"] == "skipped"
+    assert payload["jobs"][1]["message"] == "Not a repairable table"
+
+
 def test_data_sources_capabilities_api_reads_latest_artifact(monkeypatch, tmp_path):
     import json
     from data.storage.datahub import get_datahub, reset_datahub

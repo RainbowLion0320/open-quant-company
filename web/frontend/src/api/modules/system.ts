@@ -1,5 +1,5 @@
 import { get, patch, post } from "../client";
-import type { AstIntelligenceResponse, CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LifecycleResponse, LlmUsageResponse, SystemHistoryResponse, SystemLlmModelDiscoveryResponse, SystemLlmRuntimeResponse, SystemMonitor, TestDesignResponse } from "../types";
+import type { AstIntelligenceResponse, CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairBatchResponse, DbRepairResponse, LifecycleResponse, LlmUsageResponse, SystemHistoryResponse, SystemLlmModelDiscoveryResponse, SystemLlmRuntimeResponse, SystemMonitor, TestDesignResponse } from "../types";
 
 function queryString(params: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams();
@@ -22,7 +22,7 @@ export const systemApi = {
   apiHealth: () => get<{ items: { name: string; status: string; detail: string }[]; summary: string; all_ok: boolean }>("/api/system/api-health"),
   cronJobs: () => get<{ jobs: { name: string; schedule: string; last_run: string | null; last_status: string | null; next_run: string | null; enabled: boolean; state: string; no_agent: boolean }[]; summary: string }>("/api/system/cron-jobs"),
   dbHealth: () => get<DbHealthResponse>("/api/system/db-health"),
-  dbHealthRepair: (table: string) => post<DbRepairResponse>(`/api/system/db-health/repair/${encodeURIComponent(table)}`),
+  dbHealthRepairAll: (tables: string[]) => post<DbRepairBatchResponse>("/api/system/db-health/repair", { tables }),
   dbHealthRepairStatus: (jobId: string) => get<DbRepairResponse>(`/api/system/db-health/repair-status/${encodeURIComponent(jobId)}`),
   auditHistory: (section = "", limit = 50) =>
     get<{ entries: any[]; summary: any; total: number }>(`/api/system/audit?section=${encodeURIComponent(section)}&limit=${limit}`),
