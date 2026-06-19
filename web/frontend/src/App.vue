@@ -70,8 +70,13 @@
           </div>
         </div>
         <div v-if="agentRuntimeVisible" class="agent-runtime-line" :aria-label="t('app.modelRuntimeA11y')">
-          <template v-for="(segment, index) in agentRuntimeSegments" :key="segment.key">
-            <span v-if="index" class="runtime-separator">·</span>
+          <template v-for="segment in agentRuntimeSegments" :key="segment.key">
+            <span
+              v-if="segment.separator"
+              :class="['runtime-separator', `runtime-separator-${segment.separator}`]"
+            >
+              {{ segment.separator === "slash" ? "/" : "·" }}
+            </span>
             <span :class="['runtime-segment', `runtime-segment-${segment.kind}`]">
               <span
                 v-if="segment.kind === 'context-progress'"
@@ -194,8 +199,13 @@ const agentRuntimeSegments = computed(() => {
   return [
     { key: "provider", kind: "provider", text: label },
     { key: "model", kind: "model", text: model },
-    { key: "reasoning", kind: "reasoning", text: `${t("app.reasoningShort")} ${reasoningLevelShort(agentModelRuntime.value.reasoning.level)}` },
-    { key: "context", kind: "context", text: t("app.contextShort") },
+    {
+      key: "reasoning",
+      kind: "reasoning",
+      separator: "dot",
+      text: `${t("app.reasoningShort")} ${reasoningLevelShort(agentModelRuntime.value.reasoning.level)}`,
+    },
+    { key: "context", kind: "context", separator: "dot", text: t("app.contextShort") },
     {
       key: "context-progress",
       kind: "context-progress",
@@ -205,7 +215,7 @@ const agentRuntimeSegments = computed(() => {
       status: contextStatusKind(agentModelRuntime.value.context.status),
     },
     { key: "context-percent", kind: "context-percent", text: contextUsagePercentText.value },
-    { key: "context-max", kind: "context", text: formatTokenK(agentModelRuntime.value.context.max_tokens) },
+    { key: "context-max", kind: "context", separator: "slash", text: formatTokenK(agentModelRuntime.value.context.max_tokens) },
   ];
 });
 

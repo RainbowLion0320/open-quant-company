@@ -103,6 +103,13 @@
   flex: 0 0 auto;
   color: var(--text-disabled);
 }
+.runtime-separator-dot {
+  margin: 0 1px;
+}
+.runtime-separator-slash {
+  margin: 0 -1px;
+  color: rgba(148, 163, 184, 0.5);
+}
 .runtime-segment-provider,
 .runtime-segment-model {
   color: var(--text-secondary);
