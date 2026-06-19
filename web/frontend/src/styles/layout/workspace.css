@@ -45,6 +45,8 @@
   letter-spacing: 0.02em;
 }
 .system-statusbar {
+  position: relative;
+  z-index: 30;
   height: 30px;
   flex-shrink: 0;
   display: flex;
@@ -116,6 +118,12 @@
   border-color: rgba(125, 211, 252, 0.42);
   background: rgba(14, 165, 233, 0.12);
 }
+.runtime-segment-model-runtime .runtime-tab {
+  max-width: clamp(128px, 20vw, 280px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .runtime-separator {
   flex: 0 0 auto;
   color: var(--text-disabled);
@@ -128,7 +136,8 @@
   color: rgba(148, 163, 184, 0.5);
 }
 .runtime-segment-provider,
-.runtime-segment-model {
+.runtime-segment-model,
+.runtime-segment-model-runtime {
   color: var(--text-secondary);
 }
 .runtime-segment-reasoning {
@@ -180,7 +189,7 @@
 }
 .runtime-popover {
   position: absolute;
-  right: 0;
+  right: 42px;
   bottom: 18px;
   z-index: 40;
   min-width: 220px;

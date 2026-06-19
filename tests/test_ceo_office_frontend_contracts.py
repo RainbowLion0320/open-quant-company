@@ -278,6 +278,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "openRuntimeMenu" in app
     assert "saveRuntimeModel" in app
     assert "saveRuntimeReasoning" in app
+    assert 'key: "model-runtime"' in app
+    assert 'kind: "model-runtime"' in app
+    assert 'text: `${label} / ${model}`' in app
+    assert 'key: "provider"' not in app
+    assert 'key: "model", kind: "model"' not in app
     assert "updateSystemLlmRuntime" in system_api
     assert "runtime-progress" in app
     assert '<span v-if="index" class="runtime-separator">·</span>' not in app
@@ -299,7 +304,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "contextStatusKind" in app
     assert "runtime-segment-context-percent" in workspace_css
     assert ".runtime-tab" in workspace_css
+    assert ".runtime-segment-model-runtime .runtime-tab" in workspace_css
     assert ".runtime-popover" in workspace_css
+    assert app.index('class="agent-runtime-line"') < app.index('</div>\n        <div v-if="runtimeMenuKind" class="runtime-popover"')
     assert ".runtime-menu-option" in workspace_css
     assert "runtime-progress-cell" in workspace_css
     assert "runtime-progress::after" not in workspace_css

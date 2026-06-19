@@ -107,40 +107,40 @@
               <template v-else>{{ segment.text }}</template>
             </span>
           </template>
-          <div v-if="runtimeMenuKind" class="runtime-popover" role="menu">
-            <div v-if="runtimeMenuKind === 'model'" class="runtime-menu">
-              <template v-for="provider in runtimeProviderOptions" :key="provider.provider">
-                <div class="runtime-menu-provider">{{ provider.label }}</div>
-                <button
-                  v-for="model in provider.models"
-                  :key="`${provider.provider}:${model}`"
-                  type="button"
-                  class="runtime-menu-option"
-                  :class="{ active: provider.provider === agentModelRuntime?.runtime.provider && model === agentModelRuntime?.runtime.model }"
-                  :disabled="!runtimeProviderSelectable(provider)"
-                  @click="saveRuntimeModel(provider.provider, model)"
-                >
-                  <span>{{ model }}</span>
-                  <small>{{ provider.secret_status }}</small>
-                </button>
-              </template>
-            </div>
-            <div v-else class="runtime-menu">
+        </div>
+        <div v-if="runtimeMenuKind" class="runtime-popover" role="menu">
+          <div v-if="runtimeMenuKind === 'model'" class="runtime-menu">
+            <template v-for="provider in runtimeProviderOptions" :key="provider.provider">
+              <div class="runtime-menu-provider">{{ provider.label }}</div>
               <button
-                v-for="mode in currentReasoningModes"
-                :key="mode.key"
+                v-for="model in provider.models"
+                :key="`${provider.provider}:${model}`"
                 type="button"
                 class="runtime-menu-option"
-                :class="{ active: mode.key === currentReasoningMode }"
-                :disabled="!mode.enabled"
-                @click="saveRuntimeReasoning(mode.key)"
+                :class="{ active: provider.provider === agentModelRuntime?.runtime.provider && model === agentModelRuntime?.runtime.model }"
+                :disabled="!runtimeProviderSelectable(provider)"
+                @click="saveRuntimeModel(provider.provider, model)"
               >
-                <span>{{ mode.label }}</span>
-                <small>{{ mode.key }}</small>
+                <span>{{ model }}</span>
+                <small>{{ provider.secret_status }}</small>
               </button>
-            </div>
-            <div v-if="runtimeMenuError" class="runtime-menu-error">{{ runtimeMenuError }}</div>
+            </template>
           </div>
+          <div v-else class="runtime-menu">
+            <button
+              v-for="mode in currentReasoningModes"
+              :key="mode.key"
+              type="button"
+              class="runtime-menu-option"
+              :class="{ active: mode.key === currentReasoningMode }"
+              :disabled="!mode.enabled"
+              @click="saveRuntimeReasoning(mode.key)"
+            >
+              <span>{{ mode.label }}</span>
+              <small>{{ mode.key }}</small>
+            </button>
+          </div>
+          <div v-if="runtimeMenuError" class="runtime-menu-error">{{ runtimeMenuError }}</div>
         </div>
         <div class="statusbar-health" :aria-label="systemHealthLabel">
           <span class="status-dot" :style="{ '--dot-color': systemColor }"></span>
@@ -270,8 +270,7 @@ const agentRuntimeSegments = computed<RuntimeSegment[]>(() => {
   const label = agentModelRuntime.value.runtime.label || agentModelRuntime.value.runtime.provider;
   const model = agentModelRuntime.value.runtime.model || "—";
   return [
-    { key: "provider", kind: "provider", text: label, interactive: true, menu: "model" },
-    { key: "model", kind: "model", text: model, interactive: true, menu: "model" },
+    { key: "model-runtime", kind: "model-runtime", text: `${label} / ${model}`, interactive: true, menu: "model" },
     {
       key: "reasoning",
       kind: "reasoning",
