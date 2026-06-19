@@ -59,53 +59,6 @@
     </div>
 
     <section class="system-grid">
-      <div class="llm-panel glass-card">
-        <div class="panel-head">
-          <span>{{ t('activity.llmUsage') }}</span>
-        </div>
-
-        <div class="usage-summary">
-          <div class="usage-balance">
-            <span>{{ t('activity.apiBalance') }}</span>
-            <strong>{{ llmTotals?.balanceText ?? "—" }}</strong>
-            <small>{{ llmTotals?.balanceStatus ?? t('activity.notChecked') }}</small>
-          </div>
-          <div class="usage-tokens">
-            <span>{{ t('activity.projectTokens') }}</span>
-            <strong>{{ fmtNum(llmTotals?.tokens ?? 0) }}</strong>
-            <small>{{ t('activity.calls', { count: fmtNum(llmTotals?.requests ?? 0) }) }}</small>
-          </div>
-          <div class="usage-cost">
-            <span>{{ t('activity.estimatedCost') }}</span>
-            <strong>{{ fmtMoney(llmTotals?.costCny ?? 0, "CNY") }}</strong>
-            <small v-if="llmTotals?.pricingStatus === 'partial'">
-              {{ t('activity.unpricedUsage', { count: fmtNum(llmTotals?.unpricedRows ?? 0) }) }}
-            </small>
-            <small v-else>${{ (llmTotals?.costUsd ?? 0).toFixed(4) }}</small>
-          </div>
-        </div>
-
-        <div v-if="llmHasUsage" class="chart-stack">
-          <div v-for="series in llmChartSeries" :key="series.key" class="chart-block">
-            <div class="llm-chart-label">{{ t('activity.modelTokenStack', { model: series.label }) }}</div>
-            <canvas :ref="el => setLlmModelCanvas(series.key, el)"></canvas>
-          </div>
-          <div class="chart-block cost">
-            <div class="llm-chart-label">{{ t('activity.estimatedDailyCost') }}</div>
-            <canvas ref="llmCostRef"></canvas>
-          </div>
-        </div>
-        <div v-else class="usage-empty">
-          {{ t('activity.usageEmpty') }}
-        </div>
-        <div v-if="llmHasUsage" class="chart-legend">
-          <span><span class="legend-swatch" style="background:rgba(6,95,107,0.85)"></span>{{ t('activity.billableInput') }}</span>
-          <span><span class="legend-swatch" style="background:rgba(6,182,212,0.85)"></span>{{ t('activity.output') }}</span>
-          <span><span class="legend-swatch" style="background:rgba(6,182,212,0.25);border:1px dashed rgba(6,182,212,0.3)"></span>{{ t('activity.cacheHit') }}</span>
-          <span><span class="legend-swatch" style="background:rgba(61,21,120,0.85)"></span>{{ t('activity.balanceLedger') }}</span>
-        </div>
-      </div>
-
       <aside class="system-side">
         <div class="glass-card side-card">
           <div class="panel-head">
@@ -193,7 +146,7 @@
 <script setup lang="ts">
 import { useActivityMonitor } from "../view-models/useActivityMonitor";
 
-const { monitor, currentLocale, t, monitorError, lastFetch, elapsed, historyHours, cpuColor, memColor, loadText, batteryText, cpuChartId, memChartId, llmCostRef, llmHasUsage, llmChartSeries, llmTotals, setLlmModelCanvas, apiHealth, API_HEALTH_ORDER, apiHealthOrdered, cronJobs, cronSummary, cronSummaryBadge, jobLabel, jobNextRun, jobLastRun, cronBadgeClass, fetchCronJobs, apiBadgeClass, fetchApiHealth, fmtNum, fmtMoney, fmtGb, fmtPercent, pctWidth, fetchData, fetchSlowData, drawCharts, drawLlmUsageChart } = useActivityMonitor();
+const { monitor, currentLocale, t, monitorError, lastFetch, elapsed, historyHours, cpuColor, memColor, loadText, batteryText, cpuChartId, memChartId, apiHealth, API_HEALTH_ORDER, apiHealthOrdered, cronJobs, cronSummary, cronSummaryBadge, jobLabel, jobNextRun, jobLastRun, cronBadgeClass, fetchCronJobs, apiBadgeClass, fetchApiHealth, fmtGb, fmtPercent, pctWidth, fetchData, fetchSlowData, drawCharts } = useActivityMonitor();
 </script>
 
 <style scoped src="../styles/views/activity-monitor.css"></style>

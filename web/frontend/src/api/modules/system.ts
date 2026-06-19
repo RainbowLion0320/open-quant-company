@@ -1,5 +1,5 @@
 import { get, patch, post } from "../client";
-import type { AstIntelligenceResponse, CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairBatchResponse, DbRepairResponse, LifecycleResponse, LlmUsageResponse, SystemHistoryResponse, SystemLlmModelDiscoveryResponse, SystemLlmRuntimeResponse, SystemMonitor, TestDesignResponse } from "../types";
+import type { AstIntelligenceResponse, CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairBatchResponse, DbRepairResponse, LifecycleResponse, SystemHistoryResponse, SystemLlmModelDiscoveryResponse, SystemLlmRuntimeResponse, SystemMonitor, TestDesignResponse } from "../types";
 
 function queryString(params: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams();
@@ -13,7 +13,6 @@ function queryString(params: Record<string, string | number | boolean | undefine
 export const systemApi = {
   systemMonitor: () => get<SystemMonitor>("/api/system/monitor"),
   systemHistory: (hours = 24) => get<SystemHistoryResponse>(`/api/system/history?hours=${hours}`),
-  llmUsage: () => get<LlmUsageResponse>("/api/system/llm-usage"),
   systemLlmRuntime: () => get<SystemLlmRuntimeResponse>("/api/system/llm-runtime"),
   updateSystemLlmRuntime: (payload: { provider?: string; model?: string; reasoning_mode?: string; reset?: boolean }) =>
     patch<SystemLlmRuntimeResponse>("/api/system/llm-runtime", payload),

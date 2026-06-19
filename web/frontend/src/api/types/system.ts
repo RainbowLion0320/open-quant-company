@@ -19,43 +19,6 @@ export interface SystemHistoryResponse {
   data: any[];
 }
 
-export interface LlmUsageResponse {
-  data: any[];
-  source?: string;
-  provider?: string;
-  providers?: string[];
-  balances?: Record<string, {
-    provider?: string;
-    label?: string;
-    status: string;
-    is_available: boolean;
-    balance_infos: { currency: string; total_balance: string; granted_balance: string; topped_up_balance: string }[];
-    message?: string;
-  }>;
-  balance?: {
-    provider?: string;
-    label?: string;
-    status: string;
-    is_available: boolean;
-    balance_infos: { currency: string; total_balance: string; granted_balance: string; topped_up_balance: string }[];
-    message?: string;
-  };
-  usage?: {
-    status: string;
-    daily: any[];
-    models: string[];
-    dates: string[];
-    totals: { tokens: number; requests: number; estimated_cost_usd: number; estimated_cost_cny: number };
-    pricing_status?: string;
-    unpriced_rows?: number;
-    unpriced_reasons?: string[];
-    pricing_source?: string;
-  };
-  total_cost?: number;
-  status?: string;
-  message?: string;
-}
-
 export interface SystemLlmRuntimeProfile {
   source: "settings" | "global_override" | string;
   provider: string;

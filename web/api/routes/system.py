@@ -14,7 +14,6 @@ from web.api.services.system_integrations import (
     cron_jobs_payload,
 )
 from web.api.services.system_monitor import (
-    llm_usage_payload,
     system_history_payload,
     system_monitor_payload,
 )
@@ -52,12 +51,6 @@ async def system_monitor():
 async def system_history(hours: int = Query(default=24, ge=1, le=720)):
     """历史趋势数据 — CPU/内存/Token 时间序列"""
     return system_history_payload(hours)
-
-@router.get("/llm-usage")
-async def llm_usage(provider: str | None = Query(default=None)):
-    """Generic LLM provider balance and project-local API response usage ledger."""
-    return llm_usage_payload(provider=provider)
-
 
 @router.get("/llm-runtime")
 async def llm_runtime():
