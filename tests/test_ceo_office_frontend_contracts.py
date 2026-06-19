@@ -278,6 +278,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "openRuntimeMenu" in app
     assert "runtimeMenuAnchorX" in app
     assert "runtimePopoverStyle" in app
+    assert ':class="`runtime-popover-${runtimeMenuKind}`"' in app
     assert "handleRuntimeOutsidePointer" in app
     assert 'document.addEventListener("pointerdown", handleRuntimeOutsidePointer)' in app
     assert 'document.removeEventListener("pointerdown", handleRuntimeOutsidePointer)' in app
@@ -290,6 +291,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.discoverSystemLlmRuntimeModels" in app
     assert "saveRuntimeModel" in app
     assert "saveRuntimeReasoning" in app
+    assert "<small>{{ mode.key }}</small>" not in app
     assert 'key: "model-runtime"' in app
     assert 'kind: "model-runtime"' in app
     assert 'text: `${label} / ${model}`' in app
@@ -320,13 +322,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert ".runtime-tab" in workspace_css
     assert ".runtime-segment-model-runtime .runtime-tab" in workspace_css
     assert ".runtime-popover" in workspace_css
+    assert ".runtime-popover-reasoning" in workspace_css
+    assert "max-width: 144px" in workspace_css
+    assert ".runtime-popover-reasoning .runtime-menu-option" in workspace_css
     assert "--runtime-popover-x" in workspace_css
     assert "bottom: 32px" in workspace_css
     assert "bottom: 18px" not in workspace_css
     assert "transform: translateX(-50%)" in workspace_css
     assert "calc(var(--runtime-popover-x, 50vw) - 112px)" not in workspace_css
     assert "right: 42px" not in workspace_css
-    assert app.index('class="agent-runtime-line"') < app.index('</div>\n        <div v-if="runtimeMenuKind" class="runtime-popover"')
+    assert app.index('class="agent-runtime-line"') < app.index('class="runtime-popover"')
     assert ".runtime-menu-option" in workspace_css
     assert ".runtime-menu-option.discovering" in workspace_css
     assert "runtime-progress-cell" in workspace_css

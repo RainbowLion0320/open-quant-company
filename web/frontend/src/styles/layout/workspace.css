@@ -201,6 +201,11 @@
   background: rgba(7, 12, 24, 0.96);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
 }
+.runtime-popover-reasoning {
+  min-width: 112px;
+  max-width: 144px;
+  padding: 6px;
+}
 .runtime-menu {
   display: grid;
   gap: 3px;
@@ -227,6 +232,11 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+.runtime-popover-reasoning .runtime-menu-option {
+  justify-content: flex-start;
+  gap: 0;
+  padding: 5px 7px;
 }
 .runtime-menu-option small {
   color: var(--text-disabled);

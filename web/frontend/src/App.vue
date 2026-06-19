@@ -108,7 +108,13 @@
             </span>
           </template>
         </div>
-        <div v-if="runtimeMenuKind" class="runtime-popover" :style="runtimePopoverStyle" role="menu">
+        <div
+          v-if="runtimeMenuKind"
+          class="runtime-popover"
+          :class="`runtime-popover-${runtimeMenuKind}`"
+          :style="runtimePopoverStyle"
+          role="menu"
+        >
           <div v-if="runtimeMenuKind === 'model'" class="runtime-menu">
             <template v-for="provider in runtimeProviderOptions" :key="provider.provider">
               <div class="runtime-menu-provider">{{ provider.label }}</div>
@@ -140,7 +146,6 @@
               @click="saveRuntimeReasoning(mode.key)"
             >
               <span>{{ mode.label }}</span>
-              <small>{{ mode.key }}</small>
             </button>
           </div>
           <div v-if="runtimeMenuError" class="runtime-menu-error">{{ runtimeMenuError }}</div>
