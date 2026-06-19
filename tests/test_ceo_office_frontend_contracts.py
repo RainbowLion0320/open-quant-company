@@ -123,7 +123,13 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "shouldShowMessageTimeSeparator" in view
     assert "formatChatTime" in view
     assert "for (const message of displayMessages.value)" in view
+    assert 'class="message-block" :class="item.message.role"' in view
+    assert "message-speaker" in view
+    assert "message-meta" not in view
+    assert "{{ item.message.role }}" not in view
+    assert "<strong>{{ item.message.role }}</strong>" not in view
     assert '<time>{{ formatTime(message.created_at) }}</time>' not in view
+    assert ".message-meta" not in css
     assert ".message-meta time" not in css
     assert "formatTime(selectedAction.action.expires_at)" in view
     assert "desk-status-strip" in view
@@ -132,9 +138,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "deskStateLabel" in view
     assert "desk-status-card" in view
     assert "`desk-color-${card.deskId}`" in view
-    assert "message-desk-label" in view
+    assert "message-desk-label" not in view
     assert 'v-if="item.message.role !== \'ceo\'"' in view
     assert "`desk-color-${item.message.desk}`" in view
+    assert "deskLabel(item.message.desk)" in view
     assert "message-time-separator" in view
     assert ".message-time-separator" in css
     assert "grid-template-columns: repeat(7" not in css
@@ -146,6 +153,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     for desk_id in ["data", "research", "portfolio", "risk", "execution", "engineering", "reporting"]:
         assert f".desk-status-card.desk-color-{desk_id}" in css
         assert f".message-desk-label.desk-color-{desk_id}" in css
+        assert f".message-speaker.desk-color-{desk_id}" in css
     assert "@keyframes desk-running-pulse" in css
     assert "allowed_tools" not in view
     assert "handoff_targets" not in view
@@ -208,6 +216,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert ".slash-command-option.selected" in css
     assert "border-left-color: var(--accent-primary)" in css
     assert "class=\"message-row\" :class=\"item.message.role\"" in view
+    assert ".message-block" in css
+    assert ".message-block.ceo" in css
+    assert ".message-speaker" in css
     assert "justify-self: start" in css
     assert "justify-self: end" in css
     assert "max-width: min(760px, 88%)" in css

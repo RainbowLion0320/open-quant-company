@@ -23,11 +23,9 @@
             <div v-if="item.type === 'time'" class="message-time-separator">
               <time>{{ item.label }}</time>
             </div>
-            <div v-else class="message-row" :class="item.message.role">
-              <div class="message-meta">
-                <strong>{{ item.message.role }}</strong>
-                <span v-if="item.message.role !== 'ceo'" :class="['message-desk-label', `desk-color-${item.message.desk}`]">{{ deskLabel(item.message.desk) }}</span>
-              </div>
+            <div v-else class="message-block" :class="item.message.role">
+              <span v-if="item.message.role !== 'ceo'" :class="['message-speaker', `desk-color-${item.message.desk}`]">{{ deskLabel(item.message.desk) }}</span>
+              <div class="message-row" :class="item.message.role">
               <p>{{ item.message.content }}</p>
               <div v-if="item.message.evidence_refs.length" class="message-ref-list">
                 <button
@@ -173,6 +171,7 @@
                   <code v-if="selectedEvidenceSnapshot">{{ selectedEvidenceSnapshot.uri }}</code>
                 </details>
               </div>
+            </div>
             </div>
           </template>
         </div>

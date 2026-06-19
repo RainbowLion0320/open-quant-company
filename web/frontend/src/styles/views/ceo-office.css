@@ -6,7 +6,6 @@
   min-height: 0;
 }
 
-.message-meta,
 .action-title,
 .approval-buttons,
 .message-ref-list {
@@ -132,13 +131,13 @@
   padding: 0;
 }
 
-.message-meta,
 .action-row small {
   color: var(--text-tertiary);
   font-size: 11px;
 }
 
-.message-desk-label {
+.message-desk-label,
+.message-speaker {
   color: var(--desk-color, var(--text-tertiary));
   font-weight: 600;
 }
@@ -150,6 +149,13 @@
 .message-desk-label.desk-color-execution { --desk-color: rgba(34, 197, 94, 0.9); }
 .message-desk-label.desk-color-engineering { --desk-color: rgba(96, 165, 250, 0.92); }
 .message-desk-label.desk-color-reporting { --desk-color: rgba(244, 114, 182, 0.9); }
+.message-speaker.desk-color-data { --desk-color: rgba(56, 189, 248, 0.9); }
+.message-speaker.desk-color-research { --desk-color: rgba(167, 139, 250, 0.92); }
+.message-speaker.desk-color-portfolio { --desk-color: rgba(45, 212, 191, 0.9); }
+.message-speaker.desk-color-risk { --desk-color: rgba(251, 146, 60, 0.92); }
+.message-speaker.desk-color-execution { --desk-color: rgba(34, 197, 94, 0.9); }
+.message-speaker.desk-color-engineering { --desk-color: rgba(96, 165, 250, 0.92); }
+.message-speaker.desk-color-reporting { --desk-color: rgba(244, 114, 182, 0.9); }
 
 .message-list {
   align-content: start;
@@ -174,6 +180,25 @@
   white-space: nowrap;
 }
 
+.message-block {
+  display: grid;
+  gap: 5px;
+  width: fit-content;
+  min-width: min(280px, 100%);
+  max-width: min(760px, 88%);
+  justify-self: start;
+}
+
+.message-block.ceo {
+  justify-self: end;
+}
+
+.message-speaker {
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1;
+}
+
 .message-row,
 .action-row,
 .run-row,
@@ -185,25 +210,20 @@
 }
 
 .message-row {
-  width: fit-content;
-  min-width: min(280px, 100%);
-  max-width: min(760px, 88%);
-  justify-self: start;
+  width: 100%;
 }
 
 .message-row.ceo {
-  justify-self: end;
   background: rgba(6, 182, 212, 0.07);
 }
 
-.message-row p {
-  margin: 8px 0 0;
+.message-row > p {
+  margin: 0;
   color: var(--text-secondary);
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
-.message-meta strong,
 .action-title strong {
   color: var(--text-primary);
   font-size: 12px;
