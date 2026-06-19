@@ -5639,6 +5639,11 @@ def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monke
         desk="data",
         content="检查数据源能力和项目 registry 有哪些差异",
     )
+    data_list_result = runtime.submit_ceo_message(
+        session.session_id,
+        desk="data",
+        content="我们现在数据源有哪些",
+    )
     research_result = runtime.submit_ceo_message(
         session.session_id,
         desk="research",
@@ -5656,11 +5661,13 @@ def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monke
     )
 
     data_action = runtime.get_action(data_result["desk_response"].proposed_actions[0])
+    data_list_action = runtime.get_action(data_list_result["desk_response"].proposed_actions[0])
     research_action = runtime.get_action(research_result["desk_response"].proposed_actions[0])
     engineering_action = runtime.get_action(engineering_result["desk_response"].proposed_actions[0])
     docs_action = runtime.get_action(docs_result["desk_response"].proposed_actions[0])
 
     assert data_action["parameters"]["tool_id"] == "astroq.data.sources.diff_registry"
+    assert data_list_action["parameters"]["tool_id"] == "astroq.data.sources"
     assert research_action["parameters"]["tool_id"] == "astroq.strategy.compete"
     assert engineering_action["parameters"]["tool_id"] == "astroq.test.design"
     assert docs_action["parameters"]["tool_id"] == "astroq.docs.check"

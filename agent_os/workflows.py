@@ -442,6 +442,20 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
             },
         ),
         (
+            ("数据源有哪些", "有哪些数据源", "数据源列表", "数据源清单", "source list", "sources list", "list sources"),
+            {
+                "answer": "data_sources_summary_plan",
+                "evidence_label": "Data source capability summary",
+                "evidence_uri": "/datahub?tab=sources",
+                "evidence_summary": "Open discovered, probed, contracted, and integrated data source capability summary.",
+                "action_type": "data_sources_summary",
+                "tool_id": "astroq.data.sources",
+                "risk_level": "read_only",
+                "action_summary": "List data source capability summary from the latest local registry artifact.",
+                "expected_effect": "Reads local data source capability summary without probing providers or downloading data.",
+            },
+        ),
+        (
             ("数据源", "source", "capability", "registry", "能力", "diff", "差异"),
             {
                 "answer": "data_sources_diff_plan",
