@@ -83,7 +83,7 @@
                 type="button"
                 class="runtime-tab"
                 :class="{ active: runtimeMenuKind === segment.menu }"
-                @click="openRuntimeMenu(segment.menu)"
+                @click="openRuntimeMenu(segment.menu, $event)"
               >
                 {{ segment.text }}
               </button>
@@ -108,7 +108,7 @@
             </span>
           </template>
         </div>
-        <div v-if="runtimeMenuKind" class="runtime-popover" role="menu">
+        <div v-if="runtimeMenuKind" class="runtime-popover" :style="runtimePopoverStyle" role="menu">
           <div v-if="runtimeMenuKind === 'model'" class="runtime-menu">
             <template v-for="provider in runtimeProviderOptions" :key="provider.provider">
               <div class="runtime-menu-provider">{{ provider.label }}</div>
@@ -189,6 +189,7 @@ const runtimeMenuKind = ref<"" | RuntimeMenuKind>("");
 const runtimeMenuError = ref("");
 const runtimeSaving = ref(false);
 const runtimeModelDiscoveryProvider = ref("");
+const runtimeMenuAnchorX = ref(0);
 
 const nav = [
   { path: "/", labelKey: "nav.ceoOffice", pathData: "M4 18V8l8-5 8 5v10l-8 3-8-3Zm4-2.5 4 1.5 4-1.5V9.5L12 7 8 9.5v6Zm2-1.5h4M9.5 11h5M12 7v10" },
@@ -269,6 +270,12 @@ const currentReasoningModes = computed<SystemLlmReasoningMode[]>(() =>
     : [{ key: "default", label: "Default", description: "", enabled: true }],
 );
 const currentReasoningMode = computed(() => agentModelRuntime.value?.profile?.reasoning_mode || agentModelRuntime.value?.reasoning.level || "default");
+const runtimePopoverStyle = computed(() => {
+  const anchor = runtimeMenuAnchorX.value || 0;
+  return {
+    "--runtime-popover-x": `${Math.round(anchor)}px`,
+  };
+});
 const agentRuntimeSegments = computed<RuntimeSegment[]>(() => {
   if (!agentModelRuntime.value) return [];
   const label = agentModelRuntime.value.runtime.label || agentModelRuntime.value.runtime.provider;
@@ -342,9 +349,15 @@ async function fetchAgentModelRuntime(sessionId = agentRuntimeSessionId.value) {
   }
 }
 
-function openRuntimeMenu(kind: RuntimeMenuKind | undefined) {
+function openRuntimeMenu(kind: RuntimeMenuKind | undefined, event?: MouseEvent) {
   if (!kind) return;
   runtimeMenuError.value = "";
+  const target = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  if (target) {
+    const rect = target.getBoundingClientRect();
+    const containerRect = target.closest(".system-statusbar")?.getBoundingClientRect();
+    runtimeMenuAnchorX.value = rect.left + rect.width / 2 - (containerRect?.left || 0);
+  }
   runtimeMenuKind.value = runtimeMenuKind.value === kind ? "" : kind;
   if (runtimeMenuKind.value === "model") void discoverRuntimeModels();
 }
