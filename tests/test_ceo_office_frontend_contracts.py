@@ -323,8 +323,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert ".runtime-segment-model-runtime .runtime-tab" in workspace_css
     assert ".runtime-popover" in workspace_css
     assert ".runtime-popover-reasoning" in workspace_css
-    assert "max-width: 144px" in workspace_css
+    assert "min-width: 74px" in workspace_css
+    assert "max-width: 96px" in workspace_css
     assert ".runtime-popover-reasoning .runtime-menu-option" in workspace_css
+    assert "max-height: 180px" in workspace_css
     assert "padding: 5px" in workspace_css
     assert "padding: 4px" in workspace_css
     assert "gap: 1px" in workspace_css
