@@ -117,12 +117,15 @@
                 :key="`${provider.provider}:${model}`"
                 type="button"
                 class="runtime-menu-option"
-                :class="{ active: provider.provider === agentModelRuntime?.runtime.provider && model === agentModelRuntime?.runtime.model }"
+                :class="{
+                  active: provider.provider === agentModelRuntime?.runtime.provider && model === agentModelRuntime?.runtime.model,
+                  discovering: runtimeModelDiscoveryProvider === provider.provider,
+                }"
                 :disabled="!runtimeProviderSelectable(provider)"
                 @click="saveRuntimeModel(provider.provider, model)"
               >
                 <span>{{ model }}</span>
-                <small>{{ provider.secret_status }}</small>
+                <small>{{ runtimeModelDiscoveryProvider === provider.provider ? 'probe' : provider.secret_status }}</small>
               </button>
             </template>
           </div>
@@ -185,6 +188,7 @@ const agentModelRuntime = ref<AgentModelRuntimeResponse | null>(null);
 const runtimeMenuKind = ref<"" | RuntimeMenuKind>("");
 const runtimeMenuError = ref("");
 const runtimeSaving = ref(false);
+const runtimeModelDiscoveryProvider = ref("");
 
 const nav = [
   { path: "/", labelKey: "nav.ceoOffice", pathData: "M4 18V8l8-5 8 5v10l-8 3-8-3Zm4-2.5 4 1.5 4-1.5V9.5L12 7 8 9.5v6Zm2-1.5h4M9.5 11h5M12 7v10" },
@@ -342,6 +346,7 @@ function openRuntimeMenu(kind: RuntimeMenuKind | undefined) {
   if (!kind) return;
   runtimeMenuError.value = "";
   runtimeMenuKind.value = runtimeMenuKind.value === kind ? "" : kind;
+  if (runtimeMenuKind.value === "model") void discoverRuntimeModels();
 }
 
 function runtimeProviderSelectable(provider: SystemLlmProviderOption) {
@@ -353,6 +358,31 @@ function normalizedRuntimeReasoningMode(provider: string, candidate: string) {
   const modes = option?.reasoning_modes || [];
   if (modes.some(mode => mode.key === candidate && mode.enabled)) return candidate;
   return modes.some(mode => mode.key === "default") ? "default" : (modes.find(mode => mode.enabled)?.key || "default");
+}
+
+async function discoverRuntimeModels(provider = agentModelRuntime.value?.runtime.provider || "") {
+  if (!provider || runtimeModelDiscoveryProvider.value) return;
+  runtimeModelDiscoveryProvider.value = provider;
+  try {
+    const payload = await api.discoverSystemLlmRuntimeModels(provider);
+    if (agentModelRuntime.value) {
+      agentModelRuntime.value = {
+        ...agentModelRuntime.value,
+        profile: payload.runtime.profile,
+        options: {
+          providers: payload.runtime.providers,
+          controlled_use_cases: payload.runtime.controlled_use_cases,
+        },
+      };
+    }
+    if (payload.discovery.status !== "ok") {
+      runtimeMenuError.value = `model discovery: ${payload.discovery.status}`;
+    }
+  } catch (error: any) {
+    runtimeMenuError.value = error?.message || "LLM model discovery failed";
+  } finally {
+    runtimeModelDiscoveryProvider.value = "";
+  }
 }
 
 async function saveRuntimeModel(provider: string, model: string) {

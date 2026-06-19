@@ -276,6 +276,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "runtime-tab" in app
     assert "runtimeMenuKind" in app
     assert "openRuntimeMenu" in app
+    assert "discoverRuntimeModels" in app
+    assert "runtimeModelDiscoveryProvider" in app
+    assert "api.discoverSystemLlmRuntimeModels" in app
     assert "saveRuntimeModel" in app
     assert "saveRuntimeReasoning" in app
     assert 'key: "model-runtime"' in app
@@ -284,6 +287,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'key: "provider"' not in app
     assert 'key: "model", kind: "model"' not in app
     assert "updateSystemLlmRuntime" in system_api
+    assert "discoverSystemLlmRuntimeModels" in system_api
+    assert "/api/system/llm-runtime/providers/" in system_api
     assert "runtime-progress" in app
     assert '<span v-if="index" class="runtime-separator">·</span>' not in app
     assert "segment.separator" in app
@@ -308,6 +313,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert ".runtime-popover" in workspace_css
     assert app.index('class="agent-runtime-line"') < app.index('</div>\n        <div v-if="runtimeMenuKind" class="runtime-popover"')
     assert ".runtime-menu-option" in workspace_css
+    assert ".runtime-menu-option.discovering" in workspace_css
     assert "runtime-progress-cell" in workspace_css
     assert "runtime-progress::after" not in workspace_css
     assert "runtime-progress-compacted" in workspace_css
@@ -587,6 +593,9 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentUpdateSession" in agent_api
     assert "AgentModelRuntimeResponse" in agent_types
     assert "SystemLlmRuntimeResponse" in system_types
+    assert "SystemLlmModelDiscovery" in system_types
+    assert "model_discovery: SystemLlmModelDiscovery" in system_types
+    assert "SystemLlmModelDiscoveryResponse" in system_types
     assert "agentModelRuntime" in agent_api
     assert "get<AgentModelRuntimeResponse>" in agent_api
     assert "/api/agent/model-runtime" in agent_api

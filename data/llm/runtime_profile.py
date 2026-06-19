@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import copy
+import json
 import sqlite3
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from core.env_secrets import read_env_secret
 from core.env_secrets import secret_status
 from core.settings import get_settings
 from data.storage.datahub import get_datahub
@@ -46,6 +50,18 @@ def _connect() -> sqlite3.Connection:
             model TEXT NOT NULL,
             reasoning_mode TEXT NOT NULL,
             updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS llm_provider_model_discovery (
+            provider TEXT PRIMARY KEY,
+            models_json TEXT NOT NULL,
+            status TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            error TEXT NOT NULL,
+            discovered_at TEXT NOT NULL
         )
         """
     )
@@ -144,7 +160,7 @@ def _provider_map() -> dict[str, dict[str, Any]]:
     return providers if isinstance(providers, dict) else {}
 
 
-def model_options(provider: str) -> list[str]:
+def _configured_model_options(provider: str) -> list[str]:
     provider_cfg = _provider_map().get(provider, {})
     if not isinstance(provider_cfg, dict):
         return []
@@ -163,6 +179,167 @@ def model_options(provider: str) -> list[str]:
                 model = str(raw.get("model") or "").strip()
                 if model:
                     models.add(model)
+    return sorted(models)
+
+
+def cached_model_discovery(provider: str) -> dict[str, Any]:
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT models_json, status, endpoint, error, discovered_at
+            FROM llm_provider_model_discovery
+            WHERE provider = ?
+            """,
+            (str(provider),),
+        ).fetchone()
+    if row is None:
+        return {
+            "status": "not_checked",
+            "endpoint": "",
+            "error": "",
+            "discovered_at": "",
+            "discovered_models": [],
+        }
+    try:
+        models = json.loads(str(row["models_json"] or "[]"))
+    except json.JSONDecodeError:
+        models = []
+    if not isinstance(models, list):
+        models = []
+    return {
+        "status": str(row["status"] or "not_checked"),
+        "endpoint": str(row["endpoint"] or ""),
+        "error": str(row["error"] or ""),
+        "discovered_at": str(row["discovered_at"] or ""),
+        "discovered_models": sorted({str(model).strip() for model in models if str(model).strip()}),
+    }
+
+
+def _save_model_discovery(
+    provider: str,
+    *,
+    status: str,
+    endpoint: str,
+    discovered_models: list[str] | None = None,
+    error: str = "",
+) -> dict[str, Any]:
+    models = sorted({str(model).strip() for model in (discovered_models or []) if str(model).strip()})
+    payload = {
+        "provider": str(provider),
+        "models_json": json.dumps(models, ensure_ascii=False),
+        "status": str(status),
+        "endpoint": str(endpoint),
+        "error": str(error),
+        "discovered_at": _now(),
+    }
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO llm_provider_model_discovery(provider, models_json, status, endpoint, error, discovered_at)
+            VALUES(:provider, :models_json, :status, :endpoint, :error, :discovered_at)
+            ON CONFLICT(provider) DO UPDATE SET
+                models_json = excluded.models_json,
+                status = excluded.status,
+                endpoint = excluded.endpoint,
+                error = excluded.error,
+                discovered_at = excluded.discovered_at
+            """,
+            payload,
+        )
+    return {
+        "provider": str(provider),
+        "status": payload["status"],
+        "endpoint": payload["endpoint"],
+        "error": payload["error"],
+        "discovered_at": payload["discovered_at"],
+        "discovered_models": models,
+    }
+
+
+def _models_endpoint(provider_cfg: dict[str, Any]) -> str:
+    base_url = str(provider_cfg.get("base_url") or "").strip().rstrip("/")
+    request_cfg = provider_cfg.get("request") if isinstance(provider_cfg.get("request"), dict) else {}
+    path = str(provider_cfg.get("models_path") or request_cfg.get("models_path") or "/models").strip() or "/models"
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{base_url}{path}"
+
+
+def _model_discovery_timeout(provider_cfg: dict[str, Any]) -> float:
+    request_cfg = provider_cfg.get("request") if isinstance(provider_cfg.get("request"), dict) else {}
+    raw = provider_cfg.get("model_discovery_timeout_seconds", request_cfg.get("model_discovery_timeout_seconds", 10.0))
+    try:
+        return max(1.0, min(float(raw), 30.0))
+    except (TypeError, ValueError):
+        return 10.0
+
+
+def _parse_openai_models_payload(payload: Any) -> list[str]:
+    rows = payload.get("data") if isinstance(payload, dict) else payload
+    if not isinstance(rows, list):
+        return []
+    models: set[str] = set()
+    for row in rows:
+        if isinstance(row, dict):
+            model = str(row.get("id") or "").strip()
+        else:
+            model = str(row or "").strip()
+        if model:
+            models.add(model)
+    return sorted(models)
+
+
+def discover_provider_models(provider: str) -> dict[str, Any]:
+    provider = str(provider or "").strip()
+    providers = _provider_map()
+    cfg = providers.get(provider)
+    if not isinstance(cfg, dict):
+        raise RuntimeProfileError("provider_not_configured")
+    endpoint = _models_endpoint(cfg)
+    if not cfg.get("enabled", True):
+        return _save_model_discovery(provider, status="provider_disabled", endpoint=endpoint)
+    if str(cfg.get("protocol") or "openai_compatible") != "openai_compatible":
+        return _save_model_discovery(provider, status="unsupported_protocol", endpoint=endpoint)
+    if not str(cfg.get("base_url") or "").strip():
+        return _save_model_discovery(provider, status="base_url_missing", endpoint=endpoint)
+    credential_env = str(cfg.get("api_key_env") or "")
+    if not credential_env:
+        return _save_model_discovery(provider, status="api_key_env_missing", endpoint=endpoint)
+    api_key = read_env_secret(credential_env)
+    if not api_key:
+        return _save_model_discovery(provider, status="missing_secret", endpoint=endpoint)
+
+    request = urllib.request.Request(
+        endpoint,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=_model_discovery_timeout(cfg)) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        return _save_model_discovery(provider, status="http_error", endpoint=endpoint, error=str(exc.code))
+    except urllib.error.URLError as exc:
+        return _save_model_discovery(provider, status="network_error", endpoint=endpoint, error=str(exc.reason))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        return _save_model_discovery(provider, status="invalid_response", endpoint=endpoint, error=exc.__class__.__name__)
+
+    discovered = _parse_openai_models_payload(payload)
+    discovery = _save_model_discovery(provider, status="ok", endpoint=endpoint, discovered_models=discovered)
+    discovery["models"] = model_options(provider)
+    return discovery
+
+
+def model_options(provider: str) -> list[str]:
+    models = set(_configured_model_options(provider))
+    discovery = cached_model_discovery(provider)
+    if discovery.get("status") == "ok":
+        models.update(str(model) for model in discovery.get("discovered_models", []) if str(model).strip())
     return sorted(models)
 
 
@@ -211,6 +388,7 @@ def provider_options() -> list[dict[str, Any]]:
                 "credential_env": credential_env,
                 "secret_status": str(status.get("status") or "missing"),
                 "models": model_options(str(provider)),
+                "model_discovery": cached_model_discovery(str(provider)),
                 "reasoning_modes": reasoning_mode_options(str(provider)),
             }
         )
@@ -286,4 +464,3 @@ def apply_reasoning_mode(request_cfg: dict[str, Any], *, provider: str, reasonin
         current_extra = merged.get("extra_body") if isinstance(merged.get("extra_body"), dict) else {}
         merged["extra_body"] = _deep_merge(current_extra, extra_body)
     return merged
-

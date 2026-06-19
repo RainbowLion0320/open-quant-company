@@ -80,6 +80,7 @@ export interface SystemLlmProviderOption {
   credential_env: string;
   secret_status: string;
   models: string[];
+  model_discovery: SystemLlmModelDiscovery;
   reasoning_modes: SystemLlmReasoningMode[];
 }
 
@@ -87,6 +88,22 @@ export interface SystemLlmRuntimeResponse {
   profile: SystemLlmRuntimeProfile;
   providers: SystemLlmProviderOption[];
   controlled_use_cases: string[];
+}
+
+export interface SystemLlmModelDiscovery {
+  status: string;
+  endpoint: string;
+  error: string;
+  discovered_at: string;
+  discovered_models: string[];
+}
+
+export interface SystemLlmModelDiscoveryResponse {
+  discovery: SystemLlmModelDiscovery & {
+    provider: string;
+    models?: string[];
+  };
+  runtime: SystemLlmRuntimeResponse;
 }
 
 export interface DbHealthResponse {

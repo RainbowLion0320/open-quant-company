@@ -32,7 +32,12 @@ from web.api.services.system_tests import (
 )
 from web.api.services.system_ast import ast_intelligence_payload
 from web.api.services.system_lifecycle import lifecycle_payload
-from web.api.services.system_llm_runtime import RuntimeProfileError, llm_runtime_payload, update_llm_runtime_payload
+from web.api.services.system_llm_runtime import (
+    RuntimeProfileError,
+    discover_llm_provider_models_payload,
+    llm_runtime_payload,
+    update_llm_runtime_payload,
+)
 
 router = APIRouter(prefix="/api/system", tags=["System"])
 
@@ -67,6 +72,15 @@ async def update_llm_runtime(payload: dict):
         return update_llm_runtime_payload(payload)
     except RuntimeProfileError as exc:
         raise InvalidParameterError("llm_runtime", "profile", str(exc))
+
+
+@router.post("/llm-runtime/providers/{provider}/models/discover")
+async def discover_llm_provider_models(provider: str):
+    """Probe an OpenAI-compatible provider's standard /models endpoint."""
+    try:
+        return discover_llm_provider_models_payload(provider)
+    except RuntimeProfileError as exc:
+        raise InvalidParameterError("llm_runtime_provider", provider, str(exc))
 
 
 @router.get("/db-health")

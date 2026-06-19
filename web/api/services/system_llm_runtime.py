@@ -4,6 +4,7 @@ from typing import Any
 
 from data.llm.runtime_profile import RuntimeProfileError
 from data.llm.runtime_profile import clear_active_profile
+from data.llm.runtime_profile import discover_provider_models
 from data.llm.runtime_profile import effective_profile
 from data.llm.runtime_profile import runtime_options
 from data.llm.runtime_profile import save_active_profile
@@ -31,3 +32,10 @@ def update_llm_runtime_payload(payload: dict[str, Any]) -> dict[str, Any]:
     save_active_profile(provider=provider, model=model, reasoning_mode=reasoning_mode)
     return llm_runtime_payload()
 
+
+def discover_llm_provider_models_payload(provider: str) -> dict[str, Any]:
+    discovery = discover_provider_models(provider)
+    return {
+        "discovery": discovery,
+        "runtime": llm_runtime_payload(),
+    }

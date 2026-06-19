@@ -555,6 +555,144 @@ def test_system_llm_runtime_api_updates_global_runtime_profile(tmp_path, monkeyp
     reset_datahub()
 
 
+def test_system_llm_runtime_discovers_openai_compatible_models(tmp_path, monkeypatch):
+    import json
+    import urllib.request
+
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_RESPONSE_API_KEY", "unit-secret")
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+    import data.llm.runtime_profile as runtime_profile
+    import data.llm.usage as llm_usage
+
+    reset_datahub()
+    settings = {
+        "llm": {
+            "default_provider": "unit_response",
+            "use_cases": {"agent_response": {"provider": "unit_response", "model": "unit-default"}},
+            "providers": {
+                "unit_response": {
+                    "enabled": True,
+                    "label": "Unit Response",
+                    "protocol": "openai_compatible",
+                    "api_key_env": "UNIT_RESPONSE_API_KEY",
+                    "base_url": "https://unit.example/v1",
+                    "default_model": "unit-default",
+                    "pricing": {"models": {"unit-priced": {"input": 0.1, "output": 0.2}}},
+                }
+            },
+        }
+    }
+    monkeypatch.setattr(llm_usage, "get_settings", lambda: settings)
+    monkeypatch.setattr(runtime_profile, "get_settings", lambda: settings)
+    seen: dict[str, str] = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "object": "list",
+                    "data": [
+                        {"id": "unit-fast"},
+                        {"id": "unit-pro"},
+                        {"id": ""},
+                        {"object": "model"},
+                    ],
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(request, timeout=0):
+        seen["url"] = request.full_url
+        seen["auth"] = request.headers.get("Authorization", "")
+        seen["method"] = request.get_method()
+        seen["timeout"] = str(timeout)
+        return FakeResponse()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    from web.api.app import create_app
+
+    client = TestClient(create_app())
+    response = client.post("/api/system/llm-runtime/providers/unit_response/models/discover")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["discovery"]["status"] == "ok"
+    assert payload["discovery"]["endpoint"] == "https://unit.example/v1/models"
+    assert payload["discovery"]["discovered_models"] == ["unit-fast", "unit-pro"]
+    assert seen == {
+        "url": "https://unit.example/v1/models",
+        "auth": "Bearer unit-secret",
+        "method": "GET",
+        "timeout": "10.0",
+    }
+    provider = next(row for row in payload["runtime"]["providers"] if row["provider"] == "unit_response")
+    assert provider["model_discovery"]["status"] == "ok"
+    assert provider["models"] == ["unit-default", "unit-fast", "unit-priced", "unit-pro"]
+
+    saved = client.patch(
+        "/api/system/llm-runtime",
+        json={"provider": "unit_response", "model": "unit-pro", "reasoning_mode": "default"},
+    )
+    assert saved.status_code == 200
+    assert saved.json()["profile"]["model"] == "unit-pro"
+    reset_datahub()
+
+
+def test_system_llm_runtime_model_discovery_requires_secret(tmp_path, monkeypatch):
+    import urllib.request
+
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.delenv("UNIT_RESPONSE_API_KEY", raising=False)
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+    import data.llm.runtime_profile as runtime_profile
+    import data.llm.usage as llm_usage
+
+    reset_datahub()
+    settings = {
+        "llm": {
+            "providers": {
+                "unit_response": {
+                    "enabled": True,
+                    "label": "Unit Response",
+                    "protocol": "openai_compatible",
+                    "api_key_env": "UNIT_RESPONSE_API_KEY",
+                    "base_url": "https://unit.example/v1",
+                    "default_model": "unit-default",
+                }
+            }
+        }
+    }
+    monkeypatch.setattr(llm_usage, "get_settings", lambda: settings)
+    monkeypatch.setattr(runtime_profile, "get_settings", lambda: settings)
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not call provider without secret")),
+    )
+
+    from web.api.app import create_app
+
+    response = TestClient(create_app()).post("/api/system/llm-runtime/providers/unit_response/models/discover")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["discovery"]["status"] == "missing_secret"
+    assert payload["discovery"]["discovered_models"] == []
+    provider = next(row for row in payload["runtime"]["providers"] if row["provider"] == "unit_response")
+    assert provider["models"] == ["unit-default"]
+    assert provider["model_discovery"]["status"] == "missing_secret"
+    reset_datahub()
+
+
 def test_agent_context_status_and_compact_preserve_raw_messages(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.delenv("UNIT_API_KEY", raising=False)
