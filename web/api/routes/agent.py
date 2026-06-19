@@ -11,7 +11,6 @@ from fastapi.responses import StreamingResponse
 
 from agent_os.evidence import EvidenceResolver
 from agent_os.runtime import AgentRuntime
-from agent_os.semantic_planner import semantic_planner_from_payload
 from web.api.errors import DataNotFoundError, InvalidParameterError
 
 router = APIRouter(prefix="/api/agent", tags=["Agent"])
@@ -123,7 +122,6 @@ async def run_agent_autonomy_step(session_id: str, payload: dict[str, Any] | Non
             session_id,
             content=str(body.get("content") or body.get("text") or ""),
             desk=str(body.get("desk") or "reporting"),
-            semantic_planner=semantic_planner_from_payload(body),
         )
     except KeyError:
         raise DataNotFoundError("agent session", session_id)
@@ -141,7 +139,6 @@ async def run_agent_autonomy_run(session_id: str, payload: dict[str, Any] | None
             content=str(body.get("content") or body.get("text") or ""),
             desk=str(body.get("desk") or "reporting"),
             max_steps=int(body.get("max_steps") or 2),
-            semantic_planner=semantic_planner_from_payload(body),
         )
     except KeyError:
         raise DataNotFoundError("agent session", session_id)
@@ -163,7 +160,6 @@ async def create_agent_program(session_id: str, payload: dict[str, Any]) -> dict
             goal=str(payload.get("goal") or payload.get("content") or payload.get("text") or ""),
             desk=str(payload.get("desk") or "reporting"),
             max_steps=int(payload.get("max_steps") or 6),
-            semantic_planner=semantic_planner_from_payload(payload),
         )
     except KeyError:
         raise DataNotFoundError("agent session", session_id)
@@ -203,7 +199,6 @@ async def add_agent_message(session_id: str, payload: dict[str, Any], background
                 session_id,
                 desk=desk,
                 content=str(payload.get("content") or ""),
-                semantic_planner=semantic_planner_from_payload(payload),
             )
             action_ids = list(routed["desk_response"].proposed_actions)
             if action_ids:
@@ -234,7 +229,6 @@ async def preview_agent_workflow_plan(payload: dict[str, Any]) -> dict[str, Any]
         plan = AgentRuntime().preview_workflow_plan(
             desk=desk,
             content=content,
-            semantic_planner=semantic_planner_from_payload(payload),
         )
     except ValueError as exc:
         raise InvalidParameterError("agent_plan", desk, str(exc))

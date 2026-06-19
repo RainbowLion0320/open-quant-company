@@ -93,10 +93,6 @@ export const agentApi = {
       content?: string;
       text?: string;
       desk?: string;
-      planner_mode?: string;
-      semantic_draft?: Record<string, unknown>;
-      planner_provider?: string;
-      planner_model?: string;
     } = {},
   ) =>
     post<AgentAutonomyStepResponse>(
@@ -110,10 +106,6 @@ export const agentApi = {
       text?: string;
       desk?: string;
       max_steps?: number;
-      planner_mode?: string;
-      semantic_draft?: Record<string, unknown>;
-      planner_provider?: string;
-      planner_model?: string;
     } = {},
   ) =>
     post<AgentAutonomyRunResponse>(
@@ -128,20 +120,11 @@ export const agentApi = {
       content: string;
       evidence_refs?: string[];
       action_refs?: string[];
-      planner_mode?: "deterministic" | "semantic_draft" | "provider_semantic";
-      planner_fallback?: "deterministic";
-      semantic_draft?: Record<string, unknown>;
-      planner_provider?: string;
-      planner_model?: string;
     },
   ) => post<AgentAddMessageResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/messages`, payload),
   agentPlan: (payload: {
     desk: string;
     content: string;
-    planner_mode?: "deterministic" | "semantic_draft" | "provider_semantic";
-    semantic_draft?: Record<string, unknown>;
-    planner_provider?: string;
-    planner_model?: string;
   }) => post<AgentWorkflowPlanResponse>("/api/agent/plans", payload),
   agentPrograms: (sessionId = "") =>
     get<AgentProgramsResponse>(`/api/agent/programs${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
@@ -151,10 +134,6 @@ export const agentApi = {
       goal: string;
       desk?: string;
       max_steps?: number;
-      planner_mode?: "deterministic" | "semantic_draft" | "provider_semantic";
-      semantic_draft?: Record<string, unknown>;
-      planner_provider?: string;
-      planner_model?: string;
     },
   ) => post<AgentProgramResponse>(`/api/agent/sessions/${encodeURIComponent(sessionId)}/programs`, payload),
   agentRunProgram: (programId: string, payload: { dry_run?: boolean } = {}) =>

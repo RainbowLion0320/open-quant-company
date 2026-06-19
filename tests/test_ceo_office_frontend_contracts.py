@@ -210,7 +210,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'if (!draft.value.trim()) draft.value = text;' in view
     assert ':disabled="sending || !draft.trim()"' not in view
     assert ':disabled="!draft.trim()" :aria-busy="sending"' in view
-    assert 'planner_mode: "provider_semantic"' not in view
+    assert ('planner_mode: "provider' + '_semantic"') not in view
     assert 'planner_fallback: "deterministic"' not in view
     assert 'status: "archived"' in view
     assert "clear_memory" not in view
@@ -550,8 +550,10 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentAutonomyRun" in agent_api
     assert "/api/agent/sessions/${encodeURIComponent(sessionId)}/autonomy-run" in agent_api
     assert "max_steps?: number" in agent_api
-    assert "planner_mode?: string" in agent_api
-    assert "semantic_draft?: Record<string, unknown>" in agent_api
+    assert ("planner" + "_mode") not in agent_api
+    assert ("semantic" + "_draft") not in agent_api
+    assert ("planner" + "_provider") not in agent_api
+    assert ("planner" + "_model") not in agent_api
     assert "planning_mode: string" in agent_types
     assert "agentPrograms" in agent_api
     assert "/api/agent/programs" in agent_api

@@ -3,7 +3,6 @@ from __future__ import annotations
 from astrolabe_cli.results import CliResult
 from agent_os.evidence import EvidenceResolver
 from agent_os.runtime import AgentRuntime
-from agent_os.semantic_planner import semantic_planner_from_cli
 
 
 def sessions() -> CliResult:
@@ -70,23 +69,12 @@ def autonomy_step(
     session_id: str,
     text: str,
     desk: str = "reporting",
-    semantic_draft_file: str = "",
-    *,
-    provider_semantic: bool = False,
-    planner_provider: str = "",
-    planner_model: str = "",
 ) -> CliResult:
     try:
         step = AgentRuntime().run_autonomy_step(
             session_id,
             content=text,
             desk=desk,
-            semantic_planner=semantic_planner_from_cli(
-                semantic_draft_file=semantic_draft_file,
-                provider_semantic=provider_semantic,
-                planner_provider=planner_provider,
-                planner_model=planner_model,
-            ),
         )
     except KeyError as exc:
         return CliResult(False, "agent autonomy step", {"session_id": session_id}, "Agent session missing", [str(exc)])
@@ -109,12 +97,8 @@ def autonomy_run(
     session_id: str,
     text: str,
     desk: str = "reporting",
-    semantic_draft_file: str = "",
     *,
     max_steps: int = 2,
-    provider_semantic: bool = False,
-    planner_provider: str = "",
-    planner_model: str = "",
 ) -> CliResult:
     try:
         run = AgentRuntime().run_autonomy_loop(
@@ -122,12 +106,6 @@ def autonomy_run(
             content=text,
             desk=desk,
             max_steps=max_steps,
-            semantic_planner=semantic_planner_from_cli(
-                semantic_draft_file=semantic_draft_file,
-                provider_semantic=provider_semantic,
-                planner_provider=planner_provider,
-                planner_model=planner_model,
-            ),
         )
     except KeyError as exc:
         return CliResult(False, "agent autonomy run", {"session_id": session_id}, "Agent session missing", [str(exc)])
@@ -157,23 +135,12 @@ def add_message(
     session_id: str,
     desk: str,
     text: str,
-    semantic_draft_file: str = "",
-    *,
-    provider_semantic: bool = False,
-    planner_provider: str = "",
-    planner_model: str = "",
 ) -> CliResult:
     try:
         routed = AgentRuntime().submit_ceo_message(
             session_id,
             desk=desk,
             content=text,
-            semantic_planner=semantic_planner_from_cli(
-                semantic_draft_file=semantic_draft_file,
-                provider_semantic=provider_semantic,
-                planner_provider=planner_provider,
-                planner_model=planner_model,
-            ),
         )
     except KeyError as exc:
         return CliResult(False, "agent message", {"session_id": session_id}, "Agent session missing", [str(exc)])
@@ -192,22 +159,11 @@ def add_message(
 def plan(
     desk: str,
     text: str,
-    semantic_draft_file: str = "",
-    *,
-    provider_semantic: bool = False,
-    planner_provider: str = "",
-    planner_model: str = "",
 ) -> CliResult:
     try:
         workflow_plan = AgentRuntime().preview_workflow_plan(
             desk=desk,
             content=text,
-            semantic_planner=semantic_planner_from_cli(
-                semantic_draft_file=semantic_draft_file,
-                provider_semantic=provider_semantic,
-                planner_provider=planner_provider,
-                planner_model=planner_model,
-            ),
         )
     except ValueError as exc:
         return CliResult(False, "agent plan", {"desk": desk}, "Agent workflow plan invalid", [str(exc)])
@@ -264,10 +220,6 @@ def create_program(
     *,
     desk: str = "reporting",
     max_steps: int = 6,
-    semantic_draft_file: str = "",
-    provider_semantic: bool = False,
-    planner_provider: str = "",
-    planner_model: str = "",
 ) -> CliResult:
     try:
         program = AgentRuntime().create_autonomy_program(
@@ -275,12 +227,6 @@ def create_program(
             goal=goal,
             desk=desk,
             max_steps=max_steps,
-            semantic_planner=semantic_planner_from_cli(
-                semantic_draft_file=semantic_draft_file,
-                provider_semantic=provider_semantic,
-                planner_provider=planner_provider,
-                planner_model=planner_model,
-            ),
         )
     except KeyError as exc:
         return CliResult(False, "agent program create", {"session_id": session_id}, "Agent session missing", [str(exc)])

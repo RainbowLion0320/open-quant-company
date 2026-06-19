@@ -146,28 +146,12 @@ def build_parser() -> argparse.ArgumentParser:
     agent_autonomy_step_cmd.add_argument("--session", required=True)
     agent_autonomy_step_cmd.add_argument("--desk", default="reporting")
     agent_autonomy_step_cmd.add_argument("--text", default="")
-    agent_autonomy_step_cmd.add_argument(
-        "--semantic-draft-file",
-        default="",
-        help="JSON semantic planner draft to filter through bounded autonomy",
-    )
-    agent_autonomy_step_cmd.add_argument(
-        "--provider-semantic",
-        action="store_true",
-        help="Ask the configured LLM provider to draft a bounded autonomy plan, then server-filter it",
-    )
-    agent_autonomy_step_cmd.add_argument("--planner-provider", default="")
-    agent_autonomy_step_cmd.add_argument("--planner-model", default="")
     add_common_flags(agent_autonomy_step_cmd)
     agent_autonomy_step_cmd.set_defaults(
         handler=lambda args: agent_autonomy_step(
             args.session,
             args.text,
             args.desk,
-            args.semantic_draft_file,
-            provider_semantic=args.provider_semantic,
-            planner_provider=args.planner_provider,
-            planner_model=args.planner_model,
         )
     )
     agent_autonomy_run_cmd = agent_autonomy_sub.add_parser(
@@ -178,29 +162,13 @@ def build_parser() -> argparse.ArgumentParser:
     agent_autonomy_run_cmd.add_argument("--desk", default="reporting")
     agent_autonomy_run_cmd.add_argument("--text", default="")
     agent_autonomy_run_cmd.add_argument("--max-steps", type=int, default=2)
-    agent_autonomy_run_cmd.add_argument(
-        "--semantic-draft-file",
-        default="",
-        help="JSON semantic planner draft to filter through bounded autonomy",
-    )
-    agent_autonomy_run_cmd.add_argument(
-        "--provider-semantic",
-        action="store_true",
-        help="Ask the configured LLM provider to draft bounded autonomy plans, then server-filter them",
-    )
-    agent_autonomy_run_cmd.add_argument("--planner-provider", default="")
-    agent_autonomy_run_cmd.add_argument("--planner-model", default="")
     add_common_flags(agent_autonomy_run_cmd)
     agent_autonomy_run_cmd.set_defaults(
         handler=lambda args: agent_autonomy_run(
             args.session,
             args.text,
             args.desk,
-            args.semantic_draft_file,
             max_steps=args.max_steps,
-            provider_semantic=args.provider_semantic,
-            planner_provider=args.planner_provider,
-            planner_model=args.planner_model,
         )
     )
 
@@ -208,55 +176,23 @@ def build_parser() -> argparse.ArgumentParser:
     agent_message_cmd.add_argument("--session", required=True)
     agent_message_cmd.add_argument("--desk", default="reporting")
     agent_message_cmd.add_argument("--text", required=True)
-    agent_message_cmd.add_argument(
-        "--semantic-draft-file",
-        default="",
-        help="JSON semantic planner draft to filter through the fixed agent tool registry",
-    )
-    agent_message_cmd.add_argument(
-        "--provider-semantic",
-        action="store_true",
-        help="Ask the configured LLM provider to draft a semantic plan, then server-filter it",
-    )
-    agent_message_cmd.add_argument("--planner-provider", default="")
-    agent_message_cmd.add_argument("--planner-model", default="")
     add_common_flags(agent_message_cmd)
     agent_message_cmd.set_defaults(
         handler=lambda args: agent_add_message(
             args.session,
             args.desk,
             args.text,
-            args.semantic_draft_file,
-            provider_semantic=args.provider_semantic,
-            planner_provider=args.planner_provider,
-            planner_model=args.planner_model,
         )
     )
 
     agent_plan_cmd = agent_sub.add_parser("plan", help="Preview an agent workflow without ledger writes")
     agent_plan_cmd.add_argument("--desk", default="reporting")
     agent_plan_cmd.add_argument("--text", required=True)
-    agent_plan_cmd.add_argument(
-        "--semantic-draft-file",
-        default="",
-        help="JSON semantic planner draft to filter through the fixed agent tool registry",
-    )
-    agent_plan_cmd.add_argument(
-        "--provider-semantic",
-        action="store_true",
-        help="Ask the configured LLM provider to draft a semantic plan, then server-filter it",
-    )
-    agent_plan_cmd.add_argument("--planner-provider", default="")
-    agent_plan_cmd.add_argument("--planner-model", default="")
     add_common_flags(agent_plan_cmd)
     agent_plan_cmd.set_defaults(
         handler=lambda args: agent_plan(
             args.desk,
             args.text,
-            args.semantic_draft_file,
-            provider_semantic=args.provider_semantic,
-            planner_provider=args.planner_provider,
-            planner_model=args.planner_model,
         )
     )
 
@@ -272,18 +208,6 @@ def build_parser() -> argparse.ArgumentParser:
     agent_program_create.add_argument("--goal", required=True)
     agent_program_create.add_argument("--desk", default="reporting")
     agent_program_create.add_argument("--max-steps", type=int, default=6)
-    agent_program_create.add_argument(
-        "--semantic-draft-file",
-        default="",
-        help="JSON semantic planner draft to filter into a program",
-    )
-    agent_program_create.add_argument(
-        "--provider-semantic",
-        action="store_true",
-        help="Ask the configured LLM provider to draft a program, then server-filter it",
-    )
-    agent_program_create.add_argument("--planner-provider", default="")
-    agent_program_create.add_argument("--planner-model", default="")
     add_common_flags(agent_program_create)
     agent_program_create.set_defaults(
         handler=lambda args: agent_create_program(
@@ -291,10 +215,6 @@ def build_parser() -> argparse.ArgumentParser:
             args.goal,
             desk=args.desk,
             max_steps=args.max_steps,
-            semantic_draft_file=args.semantic_draft_file,
-            provider_semantic=args.provider_semantic,
-            planner_provider=args.planner_provider,
-            planner_model=args.planner_model,
         )
     )
     agent_program_show = agent_program_sub.add_parser("show", help="Show one autonomy program")

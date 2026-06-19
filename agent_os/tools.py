@@ -134,7 +134,7 @@ DEFAULT_TOOLS: dict[str, ToolDescriptor] = {
         risk_level="write_artifact",
         desk_scopes=["reporting"],
         requires_approved_action=True,
-        parameter_patterns={"session_id": r"^ses_[A-Za-z0-9]+$"},
+        parameter_patterns={"session_id": r"^(agt_sess|ses)_[A-Za-z0-9]+$"},
     ),
     "astroq.data.repair": ToolDescriptor(
         tool_id="astroq.data.repair",

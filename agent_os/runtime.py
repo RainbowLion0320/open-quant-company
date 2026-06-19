@@ -367,7 +367,7 @@ class AgentRuntime:
             messages = list(session_payload.get("messages") or [])
         else:
             messages = []
-        runtime = resolve_llm_use_case("agent_planning")
+        runtime = resolve_llm_use_case("agent_response")
         max_tokens = int(runtime.get("context_window_tokens") or 0)
         status = (
             build_context_status(session_id=session_id, messages=messages, runtime=runtime)
@@ -388,7 +388,7 @@ class AgentRuntime:
         )
         return {
             "runtime": {
-                "use_case": runtime.get("use_case", "agent_planning"),
+                "use_case": runtime.get("use_case", "agent_response"),
                 "provider": runtime.get("provider", ""),
                 "label": runtime.get("label", ""),
                 "model": runtime.get("model", ""),
@@ -426,7 +426,7 @@ class AgentRuntime:
         session_payload = self.get_session(session_id)
         if session_payload is None:
             raise KeyError(f"Agent session not found: {session_id}")
-        runtime = resolve_llm_use_case("agent_planning")
+        runtime = resolve_llm_use_case("agent_response")
         messages = list(session_payload.get("messages") or [])
         return build_context_status(session_id=session_id, messages=messages, runtime=runtime)
 
@@ -434,7 +434,7 @@ class AgentRuntime:
         session_payload = self.get_session(session_id)
         if session_payload is None:
             raise KeyError(f"Agent session not found: {session_id}")
-        runtime = resolve_llm_use_case("agent_planning")
+        runtime = resolve_llm_use_case("agent_response")
         messages = list(session_payload.get("messages") or [])
         pack = build_context_pack(
             session_id=session_id,
@@ -491,7 +491,6 @@ class AgentRuntime:
         *,
         desk: str | None = None,
         content: str,
-        semantic_planner: Any | None = None,
     ) -> dict[str, AgentMessage | DeskResponse]:
         session = self.ledger.get_session(session_id)
         if not session:
@@ -509,9 +508,22 @@ class AgentRuntime:
             router_reasoning = None
         else:
             router_decision = RouterAgent().route(content)
+            router_reasoning = router_decision.to_reasoning()
+            if router_decision.router_source == "blocked" or not router_decision.primary_desk:
+                target_desk = "reporting"
+                message = self.add_message(session_id, role="ceo", desk=target_desk, content=content)
+                desk_response = self._blocked_desk_response(
+                    session_id=session_id,
+                    source_message_id=message.message_id,
+                    desk=target_desk,
+                    answer=f"模型路由不可用：agent_routing_{router_decision.block_reason}。没有生成业务回答。",
+                    blockers=[f"agent_routing_{router_decision.block_reason}"],
+                    reasoning=[router_reasoning, self._session_context_reasoning(session_id)],
+                    planning_mode="routing_blocked",
+                )
+                return {"message": message, "desk_response": desk_response}
             routing_decision = router_decision.to_routing_decision()
             target_desk = routing_decision.assigned_desk
-            router_reasoning = router_decision.to_reasoning()
         if get_desk(target_desk) is None:
             raise ValueError(f"Unknown desk: {target_desk}")
         message = self.add_message(session_id, role="ceo", desk=target_desk, content=content)
@@ -522,7 +534,6 @@ class AgentRuntime:
             content=content,
             routing_decision=routing_decision,
             router_reasoning=router_reasoning,
-            semantic_planner=semantic_planner,
         )
         return {"message": message, "desk_response": desk_response}
 
@@ -532,12 +543,12 @@ class AgentRuntime:
         desk: str,
         content: str,
         session_id: str | None = None,
-        semantic_planner: Any | None = None,
     ) -> dict[str, Any]:
         session_context = (
             self._workflow_session_context(
                 session_id,
-                compact_for_provider=bool(getattr(semantic_planner, "requires_context_pack", False)),
+                compact_for_provider=True,
+                llm_use_case="agent_tool_planning",
             )
             if session_id
             else None
@@ -547,7 +558,6 @@ class AgentRuntime:
             content=content,
             artifact_context=collect_report_artifact_context(),
             session_context=session_context,
-            semantic_planner=semantic_planner,
         )
         actions: list[dict[str, Any]] = []
         for action_spec in plan.actions:
@@ -1287,7 +1297,6 @@ class AgentRuntime:
         *,
         content: str = "",
         desk: str = "reporting",
-        semantic_planner: Any | None = None,
         runner: Any | None = None,
         timeout_seconds: int = 120,
         tool_registry: AgentToolRegistry | None = None,
@@ -1308,7 +1317,6 @@ class AgentRuntime:
             session_id,
             desk=desk,
             content=normalized_content,
-            semantic_planner=semantic_planner,
         )
         desk_response = routed["desk_response"]
         new_action_ids = list(desk_response.proposed_actions)
@@ -1371,9 +1379,7 @@ class AgentRuntime:
         planning_mode = str(desk_response.planning_mode or "")
         return {
             "status": status,
-            "mode": "bounded_semantic_fixed_registry"
-            if planning_mode == "semantic_assisted"
-            else "bounded_fixed_registry",
+            "mode": "bounded_llm_fixed_registry" if planning_mode == "llm_tool_planning" else "bounded_fixed_registry",
             "session_id": session_id,
             "desk": desk,
             "checked_at": _now(),
@@ -1402,7 +1408,6 @@ class AgentRuntime:
         content: str = "",
         desk: str = "reporting",
         max_steps: int = 2,
-        semantic_planner: Any | None = None,
         runner: Any | None = None,
         timeout_seconds: int = 120,
         tool_registry: AgentToolRegistry | None = None,
@@ -1425,7 +1430,6 @@ class AgentRuntime:
                 session_id,
                 content=content,
                 desk=desk,
-                semantic_planner=semantic_planner,
                 runner=runner,
                 timeout_seconds=timeout_seconds,
                 tool_registry=tool_registry,
@@ -1445,10 +1449,9 @@ class AgentRuntime:
         skipped_count = sum(int(step.get("skipped_count") or 0) for step in steps)
         action_count = sum(int(step.get("action_count") or 0) for step in steps)
         status = "ready" if failed_count == 0 and blocked_count == 0 else "partial"
-        semantic = any(str(step.get("mode") or "") == "bounded_semantic_fixed_registry" for step in steps)
         return {
             "status": status,
-            "mode": "bounded_semantic_fixed_registry_loop" if semantic else "bounded_fixed_registry_loop",
+            "mode": "bounded_llm_fixed_registry_loop",
             "session_id": session_id,
             "desk": desk,
             "checked_at": _now(),
@@ -1477,7 +1480,6 @@ class AgentRuntime:
         goal: str,
         desk: str = "reporting",
         max_steps: int = 6,
-        semantic_planner: Any | None = None,
     ) -> dict[str, Any]:
         """Persist a multi-stage autonomous operating program.
 
@@ -1504,9 +1506,9 @@ class AgentRuntime:
             artifact_context=collect_report_artifact_context(),
             session_context=self._workflow_session_context(
                 session_id,
-                compact_for_provider=bool(getattr(semantic_planner, "requires_context_pack", False)),
+                compact_for_provider=True,
+                llm_use_case="agent_tool_planning",
             ),
-            semantic_planner=semantic_planner,
         )
         registry = AgentToolRegistry()
         phases: list[dict[str, Any]] = []
@@ -1520,7 +1522,6 @@ class AgentRuntime:
                 blocked_items.append(self._program_blocked_item(action_spec, reason="max_step_limit_exceeded"))
                 continue
             phases.append(self._program_phase(action_spec, index=len(phases) + 1))
-        blocked_items.extend(self._program_semantic_rejections(plan.reasoning))
         for item in blocked_items:
             if item["reason"] == "unknown_or_out_of_scope_tool":
                 self.create_work_order(
@@ -1859,6 +1860,31 @@ class AgentRuntime:
             blockers=list(blockers or []),
             handoffs=handoff_rows,
             reasoning=[dict(row) for row in reasoning or []],
+            planning_mode=planning_mode,
+        )
+
+    def _blocked_desk_response(
+        self,
+        *,
+        session_id: str,
+        source_message_id: str,
+        desk: str,
+        answer: str,
+        blockers: list[str],
+        reasoning: list[dict[str, Any]],
+        planning_mode: str,
+    ) -> DeskResponse:
+        return self.respond_as_desk(
+            session_id=session_id,
+            source_message_id=source_message_id,
+            desk=desk,
+            answer=answer,
+            confidence=0.0,
+            evidence_refs=[],
+            proposed_actions=[],
+            blockers=blockers,
+            handoffs=[],
+            reasoning=reasoning,
             planning_mode=planning_mode,
         )
 
@@ -3543,30 +3569,22 @@ class AgentRuntime:
         content: str,
         routing_decision: DeskRoutingDecision | None = None,
         router_reasoning: dict[str, Any] | None = None,
-        semantic_planner: Any | None = None,
     ) -> DeskResponse:
         workflow_session_context = self._workflow_session_context(
             session_id,
-            compact_for_provider=bool(getattr(semantic_planner, "requires_context_pack", False)),
+            compact_for_provider=True,
+            llm_use_case="agent_tool_planning",
         )
         plan = build_desk_workflow_plan(
             desk=desk,
             content=content,
             artifact_context=collect_report_artifact_context(),
             session_context=workflow_session_context,
-            semantic_planner=semantic_planner,
+            router_reasoning=router_reasoning or {},
         )
         evidence_refs: list[str] = []
         proposed_actions: list[str] = []
         action_context: list[dict[str, Any]] = []
-        semantic_audit = self._write_semantic_planner_audit_evidence(
-            session_id=session_id,
-            source_message_id=source_message_id,
-            content=content,
-            plan=plan,
-        )
-        if semantic_audit is not None:
-            evidence_refs.append(semantic_audit.evidence_id)
         for action_spec in plan.actions:
             evidence = self.create_evidence(
                 kind="web_route",
@@ -3611,6 +3629,16 @@ class AgentRuntime:
             *plan.reasoning,
             self._session_context_reasoning(session_id),
         ]
+        if plan.blockers and not plan.actions:
+            return self._blocked_desk_response(
+                session_id=session_id,
+                source_message_id=source_message_id,
+                desk=plan.desk,
+                answer=f"工具规划不可用：{'; '.join(plan.blockers)}。没有生成业务回答。",
+                blockers=list(plan.blockers),
+                reasoning=base_reasoning,
+                planning_mode=plan.planning_mode,
+            )
         synthesis = synthesize_agent_response(
             desk=plan.desk,
             ceo_message=content,
@@ -3650,63 +3678,6 @@ class AgentRuntime:
             planning_mode=plan.planning_mode,
         )
 
-    def _write_semantic_planner_audit_evidence(
-        self,
-        *,
-        session_id: str,
-        source_message_id: str,
-        content: str,
-        plan: Any,
-    ) -> EvidenceRef | None:
-        if str(getattr(plan, "planning_mode", "")) != "semantic_assisted":
-            return None
-        reasoning = list(getattr(plan, "reasoning", []) or [])
-        semantic_row = next(
-            (row for row in reasoning if isinstance(row, dict) and row.get("kind") == "semantic_planner"),
-            {},
-        )
-        actions = list(getattr(plan, "actions", []) or [])
-        payload = {
-            "generated_at": _now(),
-            "session_id": session_id,
-            "source_message_id": source_message_id,
-            "desk": str(getattr(plan, "desk", "")),
-            "planning_mode": str(getattr(plan, "planning_mode", "")),
-            "confidence": float(getattr(plan, "confidence", 0.0) or 0.0),
-            "content_length": len(content),
-            "accepted_action_count": int(semantic_row.get("accepted_action_count") or len(actions)),
-            "rejected_action_count": int(semantic_row.get("rejected_action_count") or 0),
-            "blockers": _safe_agent_payload(list(getattr(plan, "blockers", []) or [])),
-            "reasoning": _safe_agent_payload(reasoning),
-            "actions": _safe_agent_payload(
-                [
-                    {
-                        "desk": getattr(action, "desk", ""),
-                        "tool_id": getattr(action, "tool_id", ""),
-                        "risk_level": getattr(action, "risk_level", ""),
-                        "action_type": getattr(action, "action_type", ""),
-                        "summary": getattr(action, "summary", ""),
-                        "parameters": getattr(action, "parameters", {}),
-                    }
-                    for action in actions
-                ]
-            ),
-        }
-        root = get_datahub().artifact_dir("agent") / "semantic_plans"
-        root.mkdir(parents=True, exist_ok=True)
-        filename_ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        path = root / f"semantic_plan-{filename_ts}-{uuid.uuid4().hex[:8]}.json"
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
-        return self.create_evidence(
-            kind="artifact",
-            label="Semantic planner audit",
-            uri=str(path),
-            summary=(
-                f"Semantic planner accepted {payload['accepted_action_count']} action(s) "
-                f"and rejected {payload['rejected_action_count']} action(s)."
-            ),
-        )
-
     def _session_context_reasoning(self, session_id: str) -> dict[str, Any]:
         context = self._workflow_session_context(session_id)
         active_actions = context["active_actions"]
@@ -3731,7 +3702,7 @@ class AgentRuntime:
         session_id: str,
         *,
         compact_for_provider: bool = False,
-        llm_use_case: str = "agent_planning",
+        llm_use_case: str = "agent_response",
     ) -> dict[str, Any]:
         actions = self.ledger.list_actions(session_id)
         handoffs = self.ledger.list_handoffs(session_id)
@@ -3958,32 +3929,6 @@ class AgentRuntime:
             "summary": str(getattr(action_spec, "summary", "")),
             "reason": reason,
         }
-
-    @staticmethod
-    def _program_semantic_rejections(reasoning: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        blocked: list[dict[str, Any]] = []
-        for row in reasoning:
-            if not isinstance(row, dict) or row.get("kind") != "semantic_planner":
-                continue
-            for item in row.get("rejected", []) or []:
-                if not isinstance(item, dict):
-                    continue
-                reason = str(item.get("reason") or "")
-                if reason in {"unsafe_risk_level", "missing_tool_parameter", "invalid_tool_parameter"} or reason.startswith(("missing_tool_parameter:", "invalid_tool_parameter:")):
-                    mapped_reason = "approval_required_or_state_changing"
-                else:
-                    mapped_reason = "unknown_or_out_of_scope_tool"
-                blocked.append(
-                    {
-                        "desk": str(item.get("desk") or ""),
-                        "tool_id": str(item.get("tool_id") or ""),
-                        "risk_level": "",
-                        "summary": "Semantic planner item was not accepted into the fixed safe program.",
-                        "reason": mapped_reason,
-                        "raw_reason": reason,
-                    }
-                )
-        return blocked
 
     def _validate_desk_action_scope(
         self,

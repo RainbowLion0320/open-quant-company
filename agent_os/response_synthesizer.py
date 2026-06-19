@@ -4,16 +4,17 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from agent_os.semantic_planner import _openai_compatible_chat_completion
-from agent_os.semantic_planner import _parse_json_object
-from agent_os.semantic_planner import _provider_message_content
-from agent_os.semantic_planner import _provider_usage
+from agent_os.llm_transport import openai_compatible_chat_completion
+from agent_os.llm_transport import parse_json_object
+from agent_os.llm_transport import provider_message_content
+from agent_os.llm_transport import provider_usage
 from data.llm.usage import load_provider_api_key
 from data.llm.usage import record_llm_response_usage
 from data.llm.usage import resolve_llm_use_case
 
 
 AGENT_RESPONSE_USE_CASE = "agent_response"
+_openai_compatible_chat_completion = openai_compatible_chat_completion
 
 
 @dataclass(frozen=True)
@@ -111,7 +112,7 @@ def synthesize_agent_response(
         reasoning={
             **base_reasoning,
             "status": "ok",
-            "usage": _provider_usage(raw_response),
+                "usage": provider_usage(raw_response),
             "usage_recorded": bool(usage_record.get("recorded")),
             **({"usage_error_class": usage_record["error_class"]} if usage_record.get("error_class") else {}),
         },
@@ -217,13 +218,13 @@ def _is_secret_like_key(key: str) -> bool:
 def _answer_from_provider_response(response: Any) -> str:
     if not isinstance(response, dict):
         raise ValueError("agent response provider response must be an object")
-    content = _provider_message_content(response)
+    content = provider_message_content(response)
     if isinstance(content, dict):
         answer = str(content.get("answer") or "").strip()
     else:
         text = str(content or "").strip()
         try:
-            parsed = _parse_json_object(text)
+            parsed = parse_json_object(text)
         except Exception:
             answer = text
         else:

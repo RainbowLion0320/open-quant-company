@@ -352,6 +352,16 @@ llm:
         timeout_seconds: 6
         extra_body:
           max_completion_tokens: 512
+    agent_tool_planning:
+      provider: mimo
+      model: mimo-v2.5-pro
+      request:
+        chat_path: /chat/completions
+        response_format_json: true
+        temperature: 0.0
+        timeout_seconds: 30
+        extra_body:
+          max_completion_tokens: 1024
   providers:
     deepseek:
       enabled: true
