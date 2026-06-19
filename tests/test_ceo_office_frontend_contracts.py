@@ -325,6 +325,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert ".runtime-popover-reasoning" in workspace_css
     assert "max-width: 144px" in workspace_css
     assert ".runtime-popover-reasoning .runtime-menu-option" in workspace_css
+    assert "padding: 5px" in workspace_css
+    assert "padding: 4px" in workspace_css
+    assert "gap: 1px" in workspace_css
+    assert "font-size: 9px" in workspace_css
+    assert "padding: 3px 5px" in workspace_css
     assert "--runtime-popover-x" in workspace_css
     assert "bottom: 32px" in workspace_css
     assert "bottom: 18px" not in workspace_css

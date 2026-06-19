@@ -195,7 +195,7 @@
   z-index: 40;
   min-width: 220px;
   max-width: min(360px, calc(100vw - 32px));
-  padding: 8px;
+  padding: 5px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 6px;
   background: rgba(7, 12, 24, 0.96);
@@ -204,27 +204,29 @@
 .runtime-popover-reasoning {
   min-width: 112px;
   max-width: 144px;
-  padding: 6px;
+  padding: 4px;
 }
 .runtime-menu {
   display: grid;
-  gap: 3px;
+  gap: 1px;
   max-height: 280px;
   overflow-y: auto;
+  font-size: 9px;
+  line-height: 1.15;
 }
 .runtime-menu-provider {
-  padding: 5px 6px 2px;
+  padding: 3px 5px 1px;
   color: var(--text-disabled);
-  font-size: 9px;
+  font-size: 8px;
   text-transform: uppercase;
 }
 .runtime-menu-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
-  padding: 5px 6px;
+  padding: 3px 5px;
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
@@ -236,7 +238,7 @@
 .runtime-popover-reasoning .runtime-menu-option {
   justify-content: flex-start;
   gap: 0;
-  padding: 5px 7px;
+  padding: 3px 5px;
 }
 .runtime-menu-option small {
   color: var(--text-disabled);
