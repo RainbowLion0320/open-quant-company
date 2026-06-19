@@ -4600,6 +4600,7 @@ def test_agent_runtime_routes_ceo_message_to_agent_response_provider(tmp_path, m
 
     planner_calls: list[dict[str, object]] = []
     response_calls: list[dict[str, object]] = []
+    dispatched_actions: list[str] = []
 
     def fake_planner(request):
         planner_calls.append(request)
@@ -4631,6 +4632,8 @@ def test_agent_runtime_routes_ceo_message_to_agent_response_provider(tmp_path, m
 
     def fake_completion(request):
         response_calls.append(request)
+        prompt = json.dumps(request.get("messages") or [], ensure_ascii=False)
+        assert "safe_action_initial_dispatch" in prompt
         return {
             "choices": [
                 {
@@ -4653,6 +4656,24 @@ def test_agent_runtime_routes_ceo_message_to_agent_response_provider(tmp_path, m
 
     runtime = AgentRuntime()
     session = runtime.create_session(title="Daily CEO Brief", default_desk="reporting")
+
+    def fake_dispatch_action(action_id: str, **_: object):
+        action = runtime.get_action(action_id)
+        dispatched_actions.append(action_id)
+        runtime.ledger.update_action_status(action_id, "succeeded", "2026-06-19T00:00:00Z")
+        return runtime.record_run(
+            action_id=action_id,
+            tool_name=str((action or {}).get("parameters", {}).get("tool_id") or "unknown"),
+            command=[".venv/bin/astroq", "mock", "--json"],
+            status="succeeded",
+            return_code=0,
+            stdout_summary='{"ok": true}',
+            stderr_summary="",
+            run_id=f"run_{len(dispatched_actions)}",
+            started_at="2026-06-19T00:00:00Z",
+        )
+
+    monkeypatch.setattr(runtime, "dispatch_action", fake_dispatch_action)
 
     routed = runtime.submit_ceo_message(
         session.session_id,
@@ -4678,6 +4699,7 @@ def test_agent_runtime_routes_ceo_message_to_agent_response_provider(tmp_path, m
     assert OLD_NEXT_TEMPLATE not in desk_response.answer
     assert desk_response.confidence >= 0.6
     assert len(actions) == 3
+    assert dispatched_actions == desk_response.proposed_actions
     assert {action["risk_level"] for action in actions} == {"read_only"}
     assert {action["parameters"]["tool_id"] for action in actions} == {
         "astroq.data.status",
@@ -4685,7 +4707,7 @@ def test_agent_runtime_routes_ceo_message_to_agent_response_provider(tmp_path, m
         "astroq.lifecycle.check",
     }
     assert {action["desk"] for action in actions} == {"reporting"}
-    assert {action["status"] for action in actions} == {"proposed"}
+    assert {action["status"] for action in actions} == {"succeeded"}
     assert {evidence["kind"] for evidence in evidence_rows} == {"web_route"}
     assert {evidence["uri"] for evidence in evidence_rows} == {"/datahub", "/strategy-lab", "/system?tab=lifecycle"}
     assert desk_response.handoffs == []
@@ -5115,6 +5137,7 @@ def test_agent_tool_planner_selects_data_sources_tool_without_keyword_rules(tmp_
     router_calls: list[dict[str, object]] = []
     planner_calls: list[dict[str, object]] = []
     response_calls: list[dict[str, object]] = []
+    dispatched_actions: list[str] = []
 
     def fake_router(request: dict[str, object]) -> dict[str, object]:
         router_calls.append(request)
@@ -5174,9 +5197,11 @@ def test_agent_tool_planner_selects_data_sources_tool_without_keyword_rules(tmp_
         prompt = json.dumps(request.get("messages") or [], ensure_ascii=False)
         assert "astroq.data.sources" in prompt
         assert "list_data_sources" in prompt
+        assert "safe_action_initial_dispatch" in prompt
+        assert "run_data_sources" in prompt
         return {
             "choices": [
-                {"message": {"content": json.dumps({"answer": "模型回答：我会读取数据源能力摘要后回答。"}, ensure_ascii=False)}}
+                {"message": {"content": json.dumps({"answer": "模型回答：当前数据源摘要已经读取完成。"}, ensure_ascii=False)}}
             ],
             "usage": {"prompt_tokens": 100, "completion_tokens": 16, "total_tokens": 116},
         }
@@ -5187,23 +5212,44 @@ def test_agent_tool_planner_selects_data_sources_tool_without_keyword_rules(tmp_
 
     runtime = AgentRuntime()
     session = runtime.create_session(title="LLM-first data sources")
+
+    def fake_dispatch_action(action_id: str, **_: object):
+        dispatched_actions.append(action_id)
+        runtime.ledger.update_action_status(action_id, "succeeded", "2026-06-19T00:00:00Z")
+        return runtime.record_run(
+            action_id=action_id,
+            tool_name="astroq.data.sources",
+            command=[".venv/bin/astroq", "data", "sources", "--json"],
+            status="succeeded",
+            return_code=0,
+            stdout_summary='{"message":"Data source capability summary","ok":true}',
+            stderr_summary="",
+            run_id="run_data_sources",
+            started_at="2026-06-19T00:00:00Z",
+        )
+
+    monkeypatch.setattr(runtime, "dispatch_action", fake_dispatch_action)
+
     routed = runtime.submit_ceo_message(session.session_id, content="我们现在数据源都有哪些")
     response = routed["desk_response"]
     action = runtime.get_action(response.proposed_actions[0])
     planner_reasoning = next(row for row in response.reasoning if row["kind"] == "agent_tool_planner")
+    loaded = runtime.get_session(session.session_id)
 
     assert router_calls
     assert planner_calls
     assert response_calls
+    assert dispatched_actions == response.proposed_actions
     assert routed["message"].desk == "data"
     assert response.message.desk == "data"
     assert response.planning_mode == "llm_tool_planning"
-    assert response.answer == "模型回答：我会读取数据源能力摘要后回答。"
+    assert response.answer == "模型回答：当前数据源摘要已经读取完成。"
     assert action["parameters"]["tool_id"] == "astroq.data.sources"
     assert action["risk_level"] == "read_only"
-    assert action["status"] == "proposed"
+    assert action["status"] == "succeeded"
     assert planner_reasoning["provider"] == "unit_planner"
     assert planner_reasoning["accepted_tool_count"] == 1
+    assert [message["role"] for message in loaded["messages"]] == ["ceo", "desk_agent"]
     reset_datahub()
 
 
@@ -5335,7 +5381,7 @@ def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, mon
     assert len(actions) == 2
     assert set(by_tool) == {"astroq.data.repair.dry_run", "astroq.data.repair"}
     assert by_tool["astroq.data.repair.dry_run"]["risk_level"] == "dry_run"
-    assert by_tool["astroq.data.repair.dry_run"]["status"] == "proposed"
+    assert by_tool["astroq.data.repair.dry_run"]["status"] == "succeeded"
     assert by_tool["astroq.data.repair.dry_run"]["parameters"]["table"] == "stock_limit_list"
     assert by_tool["astroq.data.repair"]["risk_level"] == "write_data"
     assert by_tool["astroq.data.repair"]["status"] == "approval_required"

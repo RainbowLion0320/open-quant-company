@@ -6,7 +6,7 @@ import asyncio
 import json
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from agent_os.evidence import EvidenceResolver
@@ -14,10 +14,6 @@ from agent_os.runtime import AgentRuntime
 from web.api.errors import DataNotFoundError, InvalidParameterError
 
 router = APIRouter(prefix="/api/agent", tags=["Agent"])
-
-
-def _dispatch_safe_message_actions(action_ids: list[str]) -> None:
-    AgentRuntime().dispatch_safe_proposed_actions_and_synthesize(action_ids)
 
 
 @router.get("/sessions")
@@ -190,7 +186,7 @@ async def run_agent_program(program_id: str, payload: dict[str, Any] | None = No
 
 
 @router.post("/sessions/{session_id}/messages")
-async def add_agent_message(session_id: str, payload: dict[str, Any], background_tasks: BackgroundTasks) -> dict[str, Any]:
+async def add_agent_message(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     role = str(payload.get("role") or "ceo")
     desk = str(payload.get("desk") or "").strip()
     try:
@@ -200,9 +196,6 @@ async def add_agent_message(session_id: str, payload: dict[str, Any], background
                 desk=desk,
                 content=str(payload.get("content") or ""),
             )
-            action_ids = list(routed["desk_response"].proposed_actions)
-            if action_ids:
-                background_tasks.add_task(_dispatch_safe_message_actions, action_ids)
             return {"message": routed["message"].to_dict(), "desk_response": routed["desk_response"].to_dict()}
         message = AgentRuntime().add_message(
             session_id,

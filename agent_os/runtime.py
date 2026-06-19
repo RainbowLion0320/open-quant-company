@@ -491,6 +491,7 @@ class AgentRuntime:
         *,
         desk: str | None = None,
         content: str,
+        auto_dispatch_safe_actions: bool = True,
     ) -> dict[str, AgentMessage | DeskResponse]:
         session = self.ledger.get_session(session_id)
         if not session:
@@ -534,6 +535,7 @@ class AgentRuntime:
             content=content,
             routing_decision=routing_decision,
             router_reasoning=router_reasoning,
+            auto_dispatch_safe_actions=auto_dispatch_safe_actions,
         )
         return {"message": message, "desk_response": desk_response}
 
@@ -1317,6 +1319,7 @@ class AgentRuntime:
             session_id,
             desk=desk,
             content=normalized_content,
+            auto_dispatch_safe_actions=False,
         )
         desk_response = routed["desk_response"]
         new_action_ids = list(desk_response.proposed_actions)
@@ -3569,6 +3572,7 @@ class AgentRuntime:
         content: str,
         routing_decision: DeskRoutingDecision | None = None,
         router_reasoning: dict[str, Any] | None = None,
+        auto_dispatch_safe_actions: bool = True,
     ) -> DeskResponse:
         workflow_session_context = self._workflow_session_context(
             session_id,
@@ -3623,6 +3627,32 @@ class AgentRuntime:
                 suggested_verification=work_order_spec.suggested_verification,
                 evidence_refs=evidence_refs,
             )
+        initial_dispatch = (
+            self.dispatch_safe_proposed_actions(proposed_actions)
+            if auto_dispatch_safe_actions and proposed_actions
+            else {"status": "ready", "run_count": 0, "skipped_count": 0, "runs": [], "skipped": []}
+        )
+        if initial_dispatch.get("runs") or initial_dispatch.get("skipped"):
+            refreshed_actions = {action_id: self.get_action(action_id) for action_id in proposed_actions}
+            action_context = [
+                {
+                    **context,
+                    "status": str((refreshed_actions.get(str(context.get("action_id") or "")) or {}).get("status") or context["status"]),
+                    "evidence_refs": list(
+                        (refreshed_actions.get(str(context.get("action_id") or "")) or {}).get("evidence_refs")
+                        or [context["evidence_id"]]
+                    ),
+                }
+                for context in action_context
+            ]
+            evidence_refs = _dedupe_preserving_order(
+                evidence_refs
+                + [
+                    str(evidence_id)
+                    for run in initial_dispatch.get("runs", [])
+                    for evidence_id in (run.get("artifact_refs") or [])
+                ]
+            )
         base_reasoning = [
             *([routing_decision.to_reasoning()] if routing_decision is not None else []),
             *([router_reasoning] if router_reasoning is not None else []),
@@ -3659,6 +3689,10 @@ class AgentRuntime:
             ),
             evidence_refs=evidence_refs,
             action_refs=proposed_actions,
+            run_context={
+                "phase": "safe_action_initial_dispatch",
+                **initial_dispatch,
+            },
             phase="initial_response",
         )
         return self.respond_as_desk(
