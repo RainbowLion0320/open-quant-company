@@ -51,6 +51,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     markdown_message = read_frontend("components/MarkdownMessage.vue")
     app = read_frontend("App.vue")
     api_client = read_frontend("api/client.ts")
+    system_api = read_frontend("api/modules/system.ts")
     zh_index = read_frontend("i18n/messages/zh-CN/index.ts")
     en_index = read_frontend("i18n/messages/en-US/index.ts")
     zh_app = read_frontend("i18n/messages/zh-CN/app.ts")
@@ -118,6 +119,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "api.agentAction" in view
     assert "api.agentModelRuntime" not in view
     assert "api.agentModelRuntime" in app
+    assert "api.systemLlmRuntime" in app
+    assert "api.updateSystemLlmRuntime" in app
+    assert "/api/system/llm-runtime" in system_api
     assert "api.agentApproveAction" in view
     assert "api.agentRejectAction" in view
     assert "api.agentPaperSubmitAction" in view
@@ -266,6 +270,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "composer-status-line" not in view
     assert "agent-runtime-line" in app
     assert "runtime-segment" in app
+    assert "runtime-tab" in app
+    assert "runtimeMenuKind" in app
+    assert "openRuntimeMenu" in app
+    assert "saveRuntimeModel" in app
+    assert "saveRuntimeReasoning" in app
+    assert "updateSystemLlmRuntime" in system_api
     assert "runtime-progress" in app
     assert '<span v-if="index" class="runtime-separator">·</span>' not in app
     assert "segment.separator" in app
@@ -285,6 +295,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "context-progress" in app
     assert "contextStatusKind" in app
     assert "runtime-segment-context-percent" in workspace_css
+    assert ".runtime-tab" in workspace_css
+    assert ".runtime-popover" in workspace_css
+    assert ".runtime-menu-option" in workspace_css
     assert "runtime-progress-cell" in workspace_css
     assert "runtime-progress::after" not in workspace_css
     assert "runtime-progress-compacted" in workspace_css
@@ -552,7 +565,9 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     api_index = read_frontend("api/index.ts")
     api_types = read_frontend("api/types.ts")
     agent_api = read_frontend("api/modules/agent.ts")
+    system_api = read_frontend("api/modules/system.ts")
     agent_types = read_frontend("api/types/agent.ts")
+    system_types = read_frontend("api/types/system.ts")
 
     assert "agentApi" in api_index
     assert 'export * from "./types/agent";' in api_types
@@ -561,9 +576,13 @@ def test_frontend_agent_api_module_exports_runtime_types_and_calls():
     assert "agentCreateSession" in agent_api
     assert "agentUpdateSession" in agent_api
     assert "AgentModelRuntimeResponse" in agent_types
+    assert "SystemLlmRuntimeResponse" in system_types
     assert "agentModelRuntime" in agent_api
     assert "get<AgentModelRuntimeResponse>" in agent_api
     assert "/api/agent/model-runtime" in agent_api
+    assert "systemLlmRuntime" in system_api
+    assert "updateSystemLlmRuntime" in system_api
+    assert "/api/system/llm-runtime" in system_api
     assert "agentRunSession" + "ReadOnlyActions" not in agent_api
     assert "run-" + "readonly" not in agent_api
     assert "agentApprovalPolicies" in agent_api

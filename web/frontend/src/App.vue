@@ -78,8 +78,17 @@
               {{ segment.separator === "slash" ? "/" : "·" }}
             </span>
             <span :class="['runtime-segment', `runtime-segment-${segment.kind}`]">
+              <button
+                v-if="segment.interactive"
+                type="button"
+                class="runtime-tab"
+                :class="{ active: runtimeMenuKind === segment.menu }"
+                @click="openRuntimeMenu(segment.menu)"
+              >
+                {{ segment.text }}
+              </button>
               <span
-                v-if="segment.kind === 'context-progress'"
+                v-else-if="segment.kind === 'context-progress'"
                 class="runtime-progress"
                 :class="`runtime-progress-${segment.status}`"
                 role="meter"
@@ -98,6 +107,40 @@
               <template v-else>{{ segment.text }}</template>
             </span>
           </template>
+          <div v-if="runtimeMenuKind" class="runtime-popover" role="menu">
+            <div v-if="runtimeMenuKind === 'model'" class="runtime-menu">
+              <template v-for="provider in runtimeProviderOptions" :key="provider.provider">
+                <div class="runtime-menu-provider">{{ provider.label }}</div>
+                <button
+                  v-for="model in provider.models"
+                  :key="`${provider.provider}:${model}`"
+                  type="button"
+                  class="runtime-menu-option"
+                  :class="{ active: provider.provider === agentModelRuntime?.runtime.provider && model === agentModelRuntime?.runtime.model }"
+                  :disabled="!runtimeProviderSelectable(provider)"
+                  @click="saveRuntimeModel(provider.provider, model)"
+                >
+                  <span>{{ model }}</span>
+                  <small>{{ provider.secret_status }}</small>
+                </button>
+              </template>
+            </div>
+            <div v-else class="runtime-menu">
+              <button
+                v-for="mode in currentReasoningModes"
+                :key="mode.key"
+                type="button"
+                class="runtime-menu-option"
+                :class="{ active: mode.key === currentReasoningMode }"
+                :disabled="!mode.enabled"
+                @click="saveRuntimeReasoning(mode.key)"
+              >
+                <span>{{ mode.label }}</span>
+                <small>{{ mode.key }}</small>
+              </button>
+            </div>
+            <div v-if="runtimeMenuError" class="runtime-menu-error">{{ runtimeMenuError }}</div>
+          </div>
         </div>
         <div class="statusbar-health" :aria-label="systemHealthLabel">
           <span class="status-dot" :style="{ '--dot-color': systemColor }"></span>
@@ -112,9 +155,22 @@ import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useParticles } from "./charts/particles";
 import { api } from "./api";
-import type { AgentModelRuntimeResponse, RegimeResponse } from "./api";
+import type { AgentModelRuntimeResponse, RegimeResponse, SystemLlmProviderOption, SystemLlmReasoningMode } from "./api";
 import { useI18n } from "./i18n";
 import logoUrl from "./assets/open-quant-company-logo.svg";
+
+type RuntimeMenuKind = "model" | "reasoning";
+type RuntimeSegment = {
+  key: string;
+  kind: string;
+  text: string;
+  separator?: "dot" | "slash";
+  interactive?: boolean;
+  menu?: RuntimeMenuKind;
+  progress?: number;
+  cells?: number;
+  status?: string;
+};
 
 const route = useRoute();
 const { currentLocale, t, toggleLocale } = useI18n();
@@ -126,6 +182,9 @@ const marketMeta = ref<Partial<RegimeResponse>>({});
 const systemHealth = ref<{ all_ok: boolean; ok_count: number; total: number }>({ all_ok: true, ok_count: 0, total: 0 });
 const agentRuntimeSessionId = ref("");
 const agentModelRuntime = ref<AgentModelRuntimeResponse | null>(null);
+const runtimeMenuKind = ref<"" | RuntimeMenuKind>("");
+const runtimeMenuError = ref("");
+const runtimeSaving = ref(false);
 
 const nav = [
   { path: "/", labelKey: "nav.ceoOffice", pathData: "M4 18V8l8-5 8 5v10l-8 3-8-3Zm4-2.5 4 1.5 4-1.5V9.5L12 7 8 9.5v6Zm2-1.5h4M9.5 11h5M12 7v10" },
@@ -196,18 +255,31 @@ const agentContextBatteryCells = computed(() =>
   ),
 );
 const contextUsagePercentText = computed(() => formatContextUsagePercent(agentContextUsagePct.value));
-const agentRuntimeSegments = computed(() => {
+const runtimeProviderOptions = computed<SystemLlmProviderOption[]>(() => agentModelRuntime.value?.options?.providers || []);
+const currentProviderOption = computed<SystemLlmProviderOption | null>(() => {
+  const current = agentModelRuntime.value?.runtime.provider || "";
+  return runtimeProviderOptions.value.find(provider => provider.provider === current) || null;
+});
+const currentReasoningModes = computed<SystemLlmReasoningMode[]>(() =>
+  currentProviderOption.value?.reasoning_modes?.length
+    ? currentProviderOption.value.reasoning_modes
+    : [{ key: "default", label: "Default", description: "", enabled: true }],
+);
+const currentReasoningMode = computed(() => agentModelRuntime.value?.profile?.reasoning_mode || agentModelRuntime.value?.reasoning.level || "default");
+const agentRuntimeSegments = computed<RuntimeSegment[]>(() => {
   if (!agentModelRuntime.value) return [];
   const label = agentModelRuntime.value.runtime.label || agentModelRuntime.value.runtime.provider;
   const model = agentModelRuntime.value.runtime.model || "—";
   return [
-    { key: "provider", kind: "provider", text: label },
-    { key: "model", kind: "model", text: model },
+    { key: "provider", kind: "provider", text: label, interactive: true, menu: "model" },
+    { key: "model", kind: "model", text: model, interactive: true, menu: "model" },
     {
       key: "reasoning",
       kind: "reasoning",
       separator: "dot",
       text: `${t("app.reasoningShort")} ${reasoningLevelShort(agentModelRuntime.value.reasoning.level)}`,
+      interactive: true,
+      menu: "reasoning",
     },
     { key: "context", kind: "context", separator: "dot", text: t("app.contextShort") },
     {
@@ -255,9 +327,75 @@ async function fetchAgentModelRuntime(sessionId = agentRuntimeSessionId.value) {
       resolvedSessionId = payload.sessions?.[0]?.session_id || "";
       agentRuntimeSessionId.value = resolvedSessionId;
     }
-    agentModelRuntime.value = await api.agentModelRuntime(resolvedSessionId);
+    const [runtimePayload, systemRuntime] = await Promise.all([
+      api.agentModelRuntime(resolvedSessionId),
+      api.systemLlmRuntime(),
+    ]);
+    agentModelRuntime.value = {
+      ...runtimePayload,
+      profile: systemRuntime.profile,
+      options: {
+        providers: systemRuntime.providers,
+        controlled_use_cases: systemRuntime.controlled_use_cases,
+      },
+    };
   } catch {
     agentModelRuntime.value = null;
+  }
+}
+
+function openRuntimeMenu(kind: RuntimeMenuKind | undefined) {
+  if (!kind) return;
+  runtimeMenuError.value = "";
+  runtimeMenuKind.value = runtimeMenuKind.value === kind ? "" : kind;
+}
+
+function runtimeProviderSelectable(provider: SystemLlmProviderOption) {
+  return provider.enabled && provider.configured && provider.protocol === "openai_compatible" && provider.secret_status === "ok" && provider.models.length > 0;
+}
+
+function normalizedRuntimeReasoningMode(provider: string, candidate: string) {
+  const option = runtimeProviderOptions.value.find(row => row.provider === provider);
+  const modes = option?.reasoning_modes || [];
+  if (modes.some(mode => mode.key === candidate && mode.enabled)) return candidate;
+  return modes.some(mode => mode.key === "default") ? "default" : (modes.find(mode => mode.enabled)?.key || "default");
+}
+
+async function saveRuntimeModel(provider: string, model: string) {
+  if (runtimeSaving.value) return;
+  runtimeSaving.value = true;
+  runtimeMenuError.value = "";
+  try {
+    await api.updateSystemLlmRuntime({
+      provider,
+      model,
+      reasoning_mode: normalizedRuntimeReasoningMode(provider, currentReasoningMode.value),
+    });
+    await fetchAgentModelRuntime(agentRuntimeSessionId.value);
+    runtimeMenuKind.value = "";
+  } catch (error: any) {
+    runtimeMenuError.value = error?.message || "LLM runtime update failed";
+  } finally {
+    runtimeSaving.value = false;
+  }
+}
+
+async function saveRuntimeReasoning(reasoningMode: string) {
+  if (!agentModelRuntime.value || runtimeSaving.value) return;
+  runtimeSaving.value = true;
+  runtimeMenuError.value = "";
+  try {
+    await api.updateSystemLlmRuntime({
+      provider: agentModelRuntime.value.runtime.provider,
+      model: agentModelRuntime.value.runtime.model,
+      reasoning_mode: reasoningMode,
+    });
+    await fetchAgentModelRuntime(agentRuntimeSessionId.value);
+    runtimeMenuKind.value = "";
+  } catch (error: any) {
+    runtimeMenuError.value = error?.message || "LLM runtime update failed";
+  } finally {
+    runtimeSaving.value = false;
   }
 }
 

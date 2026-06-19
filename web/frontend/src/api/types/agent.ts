@@ -1,3 +1,5 @@
+import type { SystemLlmProviderOption, SystemLlmRuntimeProfile } from "./system";
+
 export interface AgentSession {
   session_id: string;
   title: string;
@@ -53,6 +55,11 @@ export interface AgentModelRuntimeResponse {
     thresholds: Record<string, number>;
     unknown_window: boolean;
     latest_pack: Record<string, unknown> | null;
+  };
+  profile: SystemLlmRuntimeProfile;
+  options: {
+    providers: SystemLlmProviderOption[];
+    controlled_use_cases: string[];
   };
 }
 

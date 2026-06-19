@@ -14,6 +14,9 @@ import pandas as pd
 
 from core.env_secrets import read_env_secret
 from core.settings import get_settings
+from data.llm.runtime_profile import active_profile
+from data.llm.runtime_profile import apply_reasoning_mode
+from data.llm.runtime_profile import controlled_use_case
 from data.storage.datahub import get_datahub
 
 
@@ -100,9 +103,36 @@ def provider_config(provider: str = DEFAULT_PROVIDER) -> dict[str, Any]:
     return {}
 
 
-def _provider_request_config(provider_cfg: dict[str, Any], use_case_cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+def _filtered_runtime_extra_body(extra_body: Any) -> dict[str, Any]:
+    if not isinstance(extra_body, dict):
+        return {}
+    allowed: dict[str, Any] = {}
+    for key, value in extra_body.items():
+        if str(key) == "thinking":
+            continue
+        allowed[str(key)] = copy.deepcopy(value)
+    return allowed
+
+
+def _provider_request_config(
+    provider_cfg: dict[str, Any],
+    use_case_cfg: dict[str, Any] | None = None,
+    *,
+    runtime_provider_override: bool = False,
+) -> dict[str, Any]:
     use_case_request = use_case_cfg.get("request") if isinstance(use_case_cfg, dict) else None
-    request = use_case_request if isinstance(use_case_request, dict) else provider_cfg.get("request", {})
+    if runtime_provider_override:
+        request = copy.deepcopy(provider_cfg.get("request", {}) if isinstance(provider_cfg.get("request", {}), dict) else {})
+        if isinstance(use_case_request, dict):
+            for key in ("chat_path", "response_format_json", "temperature", "timeout_seconds", "context_window_tokens"):
+                if key in use_case_request:
+                    request[key] = copy.deepcopy(use_case_request[key])
+            runtime_extra = _filtered_runtime_extra_body(use_case_request.get("extra_body"))
+            if runtime_extra:
+                provider_extra = request.get("extra_body") if isinstance(request.get("extra_body"), dict) else {}
+                request["extra_body"] = {**copy.deepcopy(provider_extra), **runtime_extra}
+    else:
+        request = use_case_request if isinstance(use_case_request, dict) else provider_cfg.get("request", {})
     request = request if isinstance(request, dict) else {}
     try:
         temperature = float(request.get("temperature", 0.1))
@@ -162,16 +192,29 @@ def resolve_llm_use_case(use_case: str, *, provider: str | None = None, model: s
     use_cases = cfg.get("use_cases", {})
     use_case_cfg = use_cases.get(use_case, {}) if isinstance(use_cases, dict) else {}
     providers = cfg.get("providers", {})
-    candidate_provider = str(provider or use_case_cfg.get("provider") or default_provider())
-    candidate_model = str(model or use_case_cfg.get("model") or "")
+    profile = active_profile() if controlled_use_case(use_case) and provider is None and model is None else None
+    profile_provider = str((profile or {}).get("provider") or "").strip()
+    profile_model = str((profile or {}).get("model") or "").strip()
+    candidate_provider = str(provider or profile_provider or use_case_cfg.get("provider") or default_provider())
+    candidate_model = str(model or profile_model or use_case_cfg.get("model") or "")
     if not isinstance(providers, dict) or candidate_provider not in providers or not isinstance(providers.get(candidate_provider), dict):
         return _blocked_runtime(use_case, candidate_provider, candidate_model, "provider_not_configured")
     resolved_provider = candidate_provider
     pcfg = provider_config(resolved_provider)
-    request_cfg = _provider_request_config(pcfg, use_case_cfg)
+    request_cfg = _provider_request_config(
+        pcfg,
+        use_case_cfg,
+        runtime_provider_override=bool(profile_provider and profile_provider != str(use_case_cfg.get("provider") or "")),
+    )
+    if profile:
+        request_cfg = apply_reasoning_mode(
+            request_cfg,
+            provider=resolved_provider,
+            reasoning_mode=str(profile.get("reasoning_mode") or "default"),
+        )
     protocol = str(pcfg.get("protocol") or DEFAULT_LLM_PROTOCOL)
     enabled = bool(pcfg.get("enabled", True))
-    resolved_model = str(model or use_case_cfg.get("model") or pcfg.get("default_model") or "")
+    resolved_model = str(model or profile_model or use_case_cfg.get("model") or pcfg.get("default_model") or "")
     block_reason = ""
     if not enabled:
         block_reason = "provider_disabled"

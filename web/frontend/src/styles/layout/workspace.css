@@ -83,6 +83,7 @@
   font-weight: 600;
 }
 .agent-runtime-line {
+  position: relative;
   flex: 1 1 auto;
   display: inline-flex;
   align-items: center;
@@ -98,6 +99,22 @@
 }
 .runtime-segment {
   flex: 0 0 auto;
+}
+.runtime-tab {
+  appearance: none;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.2);
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.runtime-tab:hover,
+.runtime-tab.active {
+  border-color: rgba(125, 211, 252, 0.42);
+  background: rgba(14, 165, 233, 0.12);
 }
 .runtime-separator {
   flex: 0 0 auto;
@@ -160,6 +177,66 @@
 }
 .runtime-progress-blocked .runtime-progress-cell.active {
   background: rgba(248, 113, 113, 0.86);
+}
+.runtime-popover {
+  position: absolute;
+  right: 0;
+  bottom: 18px;
+  z-index: 40;
+  min-width: 220px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 6px;
+  background: rgba(7, 12, 24, 0.96);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+}
+.runtime-menu {
+  display: grid;
+  gap: 3px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.runtime-menu-provider {
+  padding: 5px 6px 2px;
+  color: var(--text-disabled);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.runtime-menu-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.runtime-menu-option small {
+  color: var(--text-disabled);
+  font-size: 9px;
+}
+.runtime-menu-option:hover,
+.runtime-menu-option.active {
+  border-color: rgba(125, 211, 252, 0.3);
+  background: rgba(14, 165, 233, 0.1);
+}
+.runtime-menu-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+.runtime-menu-error {
+  margin-top: 6px;
+  color: var(--negative);
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: normal;
 }
 .statusbar-health {
   display: flex;

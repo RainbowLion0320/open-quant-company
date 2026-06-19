@@ -5,6 +5,8 @@ import sys
 from collections.abc import Sequence
 
 from astrolabe_cli.commands.config import env_status
+from astrolabe_cli.commands.config import llm_runtime_reset
+from astrolabe_cli.commands.config import llm_runtime_status
 from astrolabe_cli.commands.config import validate_config
 from astrolabe_cli.commands.agent import actions as agent_actions
 from astrolabe_cli.commands.agent import add_message as agent_add_message
@@ -577,6 +579,14 @@ def build_parser() -> argparse.ArgumentParser:
     config_env = config_sub.add_parser("env", help="Inspect required environment secrets")
     add_common_flags(config_env)
     config_env.set_defaults(handler=lambda args: env_status())
+
+    config_llm_runtime = config_sub.add_parser("llm-runtime", help="Inspect the local global LLM runtime profile")
+    add_common_flags(config_llm_runtime)
+    config_llm_runtime.set_defaults(handler=lambda args: llm_runtime_status())
+    config_llm_runtime_sub = config_llm_runtime.add_subparsers(dest="config_llm_runtime_command")
+    config_llm_runtime_reset = config_llm_runtime_sub.add_parser("reset", help="Reset the local global LLM runtime profile")
+    add_common_flags(config_llm_runtime_reset)
+    config_llm_runtime_reset.set_defaults(handler=lambda args: llm_runtime_reset())
 
     strategy = sub.add_parser("strategy", help="Inspect and run registered strategies")
     strategy_sub = strategy.add_subparsers(dest="strategy_command", required=True)

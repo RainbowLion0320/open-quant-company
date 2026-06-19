@@ -50,6 +50,8 @@ from agent_os.tools import AgentToolRegistry
 from agent_os.workflows import DeskRoutingDecision, build_desk_workflow_plan
 from broker import PaperBroker
 from broker.live.qmt import MiniQmtLiveBroker
+from data.llm.runtime_profile import effective_profile
+from data.llm.runtime_profile import runtime_options
 from data.llm.usage import resolve_llm_use_case
 from data.storage.datahub import get_datahub
 
@@ -421,6 +423,8 @@ class AgentRuntime:
                 "unknown_window": bool(status.get("unknown_window")),
                 "latest_pack": status.get("latest_pack"),
             },
+            "profile": effective_profile("agent_response"),
+            "options": runtime_options(),
         }
 
     def context_status(self, session_id: str) -> dict[str, Any]:

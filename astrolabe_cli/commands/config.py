@@ -106,3 +106,36 @@ def env_status() -> CliResult:
         },
         errors=[f"missing secret: {key}" for key in missing],
     )
+
+
+def llm_runtime_status() -> CliResult:
+    from data.llm.runtime_profile import effective_profile, runtime_options
+
+    options = runtime_options()
+    return CliResult(
+        ok=True,
+        command="config llm-runtime",
+        message="LLM runtime profile loaded",
+        data={
+            "profile": effective_profile("agent_response"),
+            "providers": options["providers"],
+            "controlled_use_cases": options["controlled_use_cases"],
+        },
+    )
+
+
+def llm_runtime_reset() -> CliResult:
+    from data.llm.runtime_profile import clear_active_profile, effective_profile, runtime_options
+
+    clear_active_profile()
+    options = runtime_options()
+    return CliResult(
+        ok=True,
+        command="config llm-runtime reset",
+        message="LLM runtime profile reset",
+        data={
+            "profile": effective_profile("agent_response"),
+            "providers": options["providers"],
+            "controlled_use_cases": options["controlled_use_cases"],
+        },
+    )

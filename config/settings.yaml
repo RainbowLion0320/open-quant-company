@@ -399,6 +399,27 @@ llm:
       api_key_env: MIMO_API_KEY
       base_url: https://token-plan-cn.xiaomimimo.com/v1
       default_model: mimo-v2.5-pro
+      reasoning_modes:
+        max:
+          label: Max
+          description: Enable provider thinking with the maximum local default.
+          request:
+            reasoning_level: max
+            reasoning_provider_parameter: extra_body.thinking.type
+            reasoning_provider_value: enabled
+            extra_body:
+              thinking:
+                type: enabled
+        "off":
+          label: "Off"
+          description: Disable provider thinking for lower latency calls.
+          request:
+            reasoning_level: off
+            reasoning_provider_parameter: extra_body.thinking.type
+            reasoning_provider_value: disabled
+            extra_body:
+              thinking:
+                type: disabled
       request:
         chat_path: /chat/completions
         response_format_json: true

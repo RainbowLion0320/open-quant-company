@@ -56,6 +56,39 @@ export interface LlmUsageResponse {
   message?: string;
 }
 
+export interface SystemLlmRuntimeProfile {
+  source: "settings" | "global_override" | string;
+  provider: string;
+  model: string;
+  reasoning_mode: string;
+  updated_at: string;
+}
+
+export interface SystemLlmReasoningMode {
+  key: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+}
+
+export interface SystemLlmProviderOption {
+  provider: string;
+  label: string;
+  enabled: boolean;
+  configured: boolean;
+  protocol: string;
+  credential_env: string;
+  secret_status: string;
+  models: string[];
+  reasoning_modes: SystemLlmReasoningMode[];
+}
+
+export interface SystemLlmRuntimeResponse {
+  profile: SystemLlmRuntimeProfile;
+  providers: SystemLlmProviderOption[];
+  controlled_use_cases: string[];
+}
+
 export interface DbHealthResponse {
   data: any[];
   summary: any | null;

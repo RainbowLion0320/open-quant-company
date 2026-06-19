@@ -465,6 +465,96 @@ def test_agent_model_runtime_reports_llm_config_and_context_usage(tmp_path, monk
     reset_datahub()
 
 
+def test_system_llm_runtime_api_updates_global_runtime_profile(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_RESPONSE_API_KEY", "unit-secret")
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+    import data.llm.runtime_profile as runtime_profile
+    import data.llm.usage as llm_usage
+
+    reset_datahub()
+    settings = {
+            "llm": {
+                "default_provider": "mimo",
+                "use_cases": {
+                    "agent_routing": {"provider": "mimo", "model": "mimo-v2.5-pro", "request": {"timeout_seconds": 6}},
+                    "agent_response": {"provider": "mimo", "model": "mimo-v2.5-pro", "request": {"timeout_seconds": 120}},
+                    "factor_hypothesis": {"provider": "mimo", "model": "mimo-v2.5-pro"},
+                },
+                "providers": {
+                    "mimo": {
+                        "enabled": True,
+                        "label": "Mimo",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "MIMO_API_KEY",
+                        "base_url": "https://mimo.example/v1",
+                        "default_model": "mimo-v2.5-pro",
+                    },
+                    "unit_response": {
+                        "enabled": True,
+                        "label": "Unit Response",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "UNIT_RESPONSE_API_KEY",
+                        "base_url": "https://unit.example/v1",
+                        "default_model": "unit-response",
+                        "pricing": {"models": {"unit-response": {"input": 0.1, "output": 0.2}}},
+                        "reasoning_modes": {
+                            "max": {
+                                "label": "Max",
+                                "request": {
+                                    "reasoning_level": "max",
+                                    "reasoning_provider_parameter": "extra_body.thinking.type",
+                                    "reasoning_provider_value": "enabled",
+                                    "extra_body": {"thinking": {"type": "enabled"}},
+                                },
+                            },
+                            "off": {
+                                "label": "Off",
+                                "request": {
+                                    "reasoning_level": "off",
+                                    "reasoning_provider_parameter": "extra_body.thinking.type",
+                                    "reasoning_provider_value": "disabled",
+                                    "extra_body": {"thinking": {"type": "disabled"}},
+                                },
+                            },
+                        },
+                    },
+                },
+            }
+        }
+    monkeypatch.setattr(llm_usage, "get_settings", lambda: settings)
+    monkeypatch.setattr(runtime_profile, "get_settings", lambda: settings)
+
+    from web.api.app import create_app
+
+    client = TestClient(create_app())
+    initial = client.get("/api/system/llm-runtime").json()
+    assert initial["profile"]["source"] == "settings"
+    assert "agent_response" in initial["controlled_use_cases"]
+    assert "agent_routing" in initial["controlled_use_cases"]
+
+    response = client.patch(
+        "/api/system/llm-runtime",
+        json={"provider": "unit_response", "model": "unit-response", "reasoning_mode": "off"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["profile"]["source"] == "global_override"
+    assert payload["profile"]["provider"] == "unit_response"
+    assert payload["profile"]["model"] == "unit-response"
+    assert payload["profile"]["reasoning_mode"] == "off"
+
+    runtime = client.get("/api/agent/model-runtime").json()
+    assert runtime["runtime"]["provider"] == "unit_response"
+    assert runtime["runtime"]["model"] == "unit-response"
+    assert runtime["reasoning"]["level"] == "off"
+
+    reset = client.patch("/api/system/llm-runtime", json={"reset": True}).json()
+    assert reset["profile"]["source"] == "settings"
+    reset_datahub()
+
+
 def test_agent_context_status_and_compact_preserve_raw_messages(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.delenv("UNIT_API_KEY", raising=False)

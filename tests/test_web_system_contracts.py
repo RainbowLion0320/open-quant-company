@@ -465,6 +465,114 @@ def test_llm_use_case_request_overrides_provider_request_without_inheriting_extr
     assert routing["extra_body"] == {"max_completion_tokens": 512}
 
 
+def test_global_llm_runtime_profile_overrides_controlled_use_cases(tmp_path, monkeypatch):
+    import data.llm.runtime_profile as runtime_profile
+    import data.llm.usage as usage
+
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_API_KEY", "unit-secret")
+    settings = {
+            "llm": {
+                "default_provider": "mimo",
+                "use_cases": {
+                    "agent_routing": {
+                        "provider": "mimo",
+                        "model": "mimo-v2.5-pro",
+                        "request": {"temperature": 0.0, "timeout_seconds": 6, "extra_body": {"max_completion_tokens": 512}},
+                    },
+                    "agent_tool_planning": {
+                        "provider": "mimo",
+                        "model": "mimo-v2.5-pro",
+                        "request": {"temperature": 0.0, "timeout_seconds": 30, "extra_body": {"max_completion_tokens": 1024}},
+                    },
+                    "agent_response": {
+                        "provider": "mimo",
+                        "model": "mimo-v2.5-pro",
+                        "request": {
+                            "temperature": 0.1,
+                            "timeout_seconds": 120,
+                            "context_window_tokens": 1048576,
+                            "reasoning_level": "max",
+                            "reasoning_provider_parameter": "extra_body.thinking.type",
+                            "reasoning_provider_value": "enabled",
+                            "extra_body": {"max_completion_tokens": 4096, "thinking": {"type": "enabled"}},
+                        },
+                    },
+                    "factor_hypothesis": {"provider": "mimo", "model": "mimo-v2.5-pro"},
+                },
+                "providers": {
+                    "mimo": {
+                        "enabled": True,
+                        "label": "Mimo",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "MIMO_API_KEY",
+                        "base_url": "https://token-plan-cn.xiaomimimo.com/v1",
+                        "default_model": "mimo-v2.5-pro",
+                        "request": {"temperature": 0.1, "timeout_seconds": 20},
+                    },
+                    "unit": {
+                        "enabled": True,
+                        "label": "Unit",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "UNIT_API_KEY",
+                        "base_url": "https://unit.example/v1",
+                        "default_model": "unit-large",
+                        "request": {
+                            "temperature": 0.3,
+                            "timeout_seconds": 18,
+                            "context_window_tokens": 32000,
+                            "reasoning_level": "max",
+                            "reasoning_provider_parameter": "extra_body.thinking.type",
+                            "reasoning_provider_value": "enabled",
+                            "extra_body": {"thinking": {"type": "enabled"}},
+                        },
+                        "reasoning_modes": {
+                            "max": {
+                                "label": "Max",
+                                "request": {
+                                    "reasoning_level": "max",
+                                    "reasoning_provider_parameter": "extra_body.thinking.type",
+                                    "reasoning_provider_value": "enabled",
+                                    "extra_body": {"thinking": {"type": "enabled"}},
+                                },
+                            },
+                            "off": {
+                                "label": "Off",
+                                "request": {
+                                    "reasoning_level": "off",
+                                    "reasoning_provider_parameter": "extra_body.thinking.type",
+                                    "reasoning_provider_value": "disabled",
+                                    "extra_body": {"thinking": {"type": "disabled"}},
+                                },
+                            },
+                        },
+                        "pricing": {"models": {"unit-large": {"input": 1, "output": 2}}},
+                    },
+                },
+            }
+        }
+    monkeypatch.setattr(usage, "get_settings", lambda: settings)
+    monkeypatch.setattr(runtime_profile, "get_settings", lambda: settings)
+
+    runtime_profile.save_active_profile(provider="unit", model="unit-large", reasoning_mode="off")
+
+    routing = usage.resolve_llm_use_case("agent_routing")
+    planning = usage.resolve_llm_use_case("agent_tool_planning")
+    response = usage.resolve_llm_use_case("agent_response")
+    factor = usage.resolve_llm_use_case("factor_hypothesis")
+
+    assert {routing["provider"], planning["provider"], response["provider"], factor["provider"]} == {"unit"}
+    assert {routing["model"], planning["model"], response["model"], factor["model"]} == {"unit-large"}
+    assert routing["temperature"] == 0.0
+    assert routing["timeout_seconds"] == 6.0
+    assert routing["extra_body"]["max_completion_tokens"] == 512
+    assert routing["extra_body"]["thinking"] == {"type": "disabled"}
+    assert response["timeout_seconds"] == 120.0
+    assert response["context_window_tokens"] == 1048576
+    assert response["reasoning_level"] == "off"
+    assert response["extra_body"]["thinking"] == {"type": "disabled"}
+
+
 def test_llm_runtime_unknown_provider_fails_closed_without_default_fallback(monkeypatch):
     import data.llm.usage as usage
 

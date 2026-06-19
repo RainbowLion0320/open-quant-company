@@ -1,5 +1,5 @@
-import { get, post } from "../client";
-import type { AstIntelligenceResponse, CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LifecycleResponse, LlmUsageResponse, SystemHistoryResponse, SystemMonitor, TestDesignResponse } from "../types";
+import { get, patch, post } from "../client";
+import type { AstIntelligenceResponse, CodeGraphDiagnosticsResponse, CodeGraphGraphResponse, CodeGraphNode, CodeGraphStatusResponse, DbHealthResponse, DbRepairResponse, LifecycleResponse, LlmUsageResponse, SystemHistoryResponse, SystemLlmRuntimeResponse, SystemMonitor, TestDesignResponse } from "../types";
 
 function queryString(params: Record<string, string | number | boolean | undefined>) {
   const search = new URLSearchParams();
@@ -14,6 +14,9 @@ export const systemApi = {
   systemMonitor: () => get<SystemMonitor>("/api/system/monitor"),
   systemHistory: (hours = 24) => get<SystemHistoryResponse>(`/api/system/history?hours=${hours}`),
   llmUsage: () => get<LlmUsageResponse>("/api/system/llm-usage"),
+  systemLlmRuntime: () => get<SystemLlmRuntimeResponse>("/api/system/llm-runtime"),
+  updateSystemLlmRuntime: (payload: { provider?: string; model?: string; reasoning_mode?: string; reset?: boolean }) =>
+    patch<SystemLlmRuntimeResponse>("/api/system/llm-runtime", payload),
   apiHealth: () => get<{ items: { name: string; status: string; detail: string }[]; summary: string; all_ok: boolean }>("/api/system/api-health"),
   cronJobs: () => get<{ jobs: { name: string; schedule: string; last_run: string | null; last_status: string | null; next_run: string | null; enabled: boolean; state: string; no_agent: boolean }[]; summary: string }>("/api/system/cron-jobs"),
   dbHealth: () => get<DbHealthResponse>("/api/system/db-health"),

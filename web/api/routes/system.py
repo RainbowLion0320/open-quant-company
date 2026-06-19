@@ -32,6 +32,7 @@ from web.api.services.system_tests import (
 )
 from web.api.services.system_ast import ast_intelligence_payload
 from web.api.services.system_lifecycle import lifecycle_payload
+from web.api.services.system_llm_runtime import RuntimeProfileError, llm_runtime_payload, update_llm_runtime_payload
 
 router = APIRouter(prefix="/api/system", tags=["System"])
 
@@ -51,6 +52,21 @@ async def system_history(hours: int = Query(default=24, ge=1, le=720)):
 async def llm_usage(provider: str | None = Query(default=None)):
     """Generic LLM provider balance and project-local API response usage ledger."""
     return llm_usage_payload(provider=provider)
+
+
+@router.get("/llm-runtime")
+async def llm_runtime():
+    """Current local global LLM runtime profile and selectable options."""
+    return llm_runtime_payload()
+
+
+@router.patch("/llm-runtime")
+async def update_llm_runtime(payload: dict):
+    """Update or reset the local global LLM runtime profile."""
+    try:
+        return update_llm_runtime_payload(payload)
+    except RuntimeProfileError as exc:
+        raise InvalidParameterError("llm_runtime", "profile", str(exc))
 
 
 @router.get("/db-health")

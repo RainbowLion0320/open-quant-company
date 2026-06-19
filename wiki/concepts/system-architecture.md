@@ -154,7 +154,7 @@ strategies:
     FastAPI ← DuckDB(:memory:) + read_parquet() views → Vue 3 SPA
 ```
 
-LLM provider routing is configured under `config/settings.yaml: llm`. OpenAI-compatible providers must declare `llm.providers.<provider>.protocol=openai_compatible`, `api_key_env`, `base_url`, `default_model`, optional `request.*`, and provider-specific `pricing.models`; use cases such as `agent_planning` and `factor_hypothesis` point to a provider/model pair. Secrets are read only from process environment variables. Unknown providers, disabled providers, missing secrets/base URLs/models, or unsupported protocols fail closed; missing pricing is reported as unpriced usage rather than estimated with another provider's pricing table.
+LLM provider routing starts from `config/settings.yaml: llm`, but the active local provider/model/reasoning choice is controlled by the LLM runtime profile under `var/db/llm_runtime.sqlite`. OpenAI-compatible providers must declare `llm.providers.<provider>.protocol=openai_compatible`, `api_key_env`, `base_url`, `default_model`, optional `request.*`, optional `reasoning_modes`, and provider-specific `pricing.models`. `GET/PATCH /api/system/llm-runtime` and `astroq config llm-runtime --json` expose the active profile. The active profile unifies `agent_routing`, `agent_tool_planning`, `agent_response`, `agent_planning`, and `factor_hypothesis` provider/model/reasoning while preserving each use case's timeout, temperature, and JSON-output shape. Secrets are read only from process environment variables. Unknown providers, disabled providers, missing secrets/base URLs/models, or unsupported protocols fail closed; missing pricing is reported as unpriced usage rather than estimated with another provider's pricing table.
 
 ## 关键模块
 

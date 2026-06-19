@@ -151,8 +151,40 @@ def test_settings_registers_mimo_provider_without_secret_literal():
     assert mimo["api_key_env"] == "MIMO_API_KEY"
     assert mimo["base_url"] == "https://token-plan-cn.xiaomimimo.com/v1"
     assert mimo["default_model"] == "mimo-v2.5-pro"
+    assert "off" in mimo["reasoning_modes"]
+    assert mimo["reasoning_modes"]["off"]["label"] == "Off"
+    assert "False" not in mimo["reasoning_modes"]
     assert "token-plan-cn.xiaomimimo.com" in text
     assert re.search(r"\btp-[a-z0-9]{20,}\b", text) is None
+
+
+def test_config_llm_runtime_cli_reports_and_resets_global_profile(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("MIMO_API_KEY", "mimo-secret-value")
+    from astrolabe_cli.main import run_cli
+    from data.llm.runtime_profile import save_active_profile
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+    save_active_profile(provider="mimo", model="mimo-v2.5-pro", reasoning_mode="off")
+
+    code = run_cli(["config", "llm-runtime", "--json"])
+    rendered = capsys.readouterr().out
+    data = json.loads(rendered)
+    assert code == 0
+    assert data["ok"] is True
+    assert data["data"]["profile"]["source"] == "global_override"
+    assert data["data"]["profile"]["provider"] == "mimo"
+    assert data["data"]["profile"]["reasoning_mode"] == "off"
+    assert "mimo-secret-value" not in rendered
+
+    reset_code = run_cli(["config", "llm-runtime", "reset", "--json"])
+    reset_rendered = capsys.readouterr().out
+    reset_data = json.loads(reset_rendered)
+    assert reset_code == 0
+    assert reset_data["ok"] is True
+    assert reset_data["data"]["profile"]["source"] == "settings"
+    reset_datahub()
 
 
 def test_config_env_cli_reports_custom_llm_provider_secret(monkeypatch, capsys):
