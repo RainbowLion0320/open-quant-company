@@ -219,6 +219,7 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert ".message-block" in css
     assert ".message-block.ceo" in css
     assert ".message-speaker" in css
+    assert ".message-block.ceo {\n  min-width: 0;" in css
     assert "justify-self: start" in css
     assert "justify-self: end" in css
     assert "max-width: min(760px, 88%)" in css

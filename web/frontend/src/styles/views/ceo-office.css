@@ -190,6 +190,7 @@
 }
 
 .message-block.ceo {
+  min-width: 0;
   justify-self: end;
 }
 
