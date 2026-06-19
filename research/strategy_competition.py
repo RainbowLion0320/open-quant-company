@@ -117,22 +117,28 @@ def _alpha_evidence_from_result(result: dict[str, Any], *, layer: str, horizon_d
 
     ics: list[float] = []
     pair_count = 0
+    constant_group_count = 0
     for _, group in valid.groupby("as_of_date"):
         if len(group) < 2:
+            continue
+        if group["score"].nunique(dropna=True) < 2 or group[forward_col].nunique(dropna=True) < 2:
+            constant_group_count += 1
             continue
         corr = group["score"].corr(group[forward_col], method="spearman")
         if pd.notna(corr) and np.isfinite(float(corr)):
             ics.append(float(corr))
             pair_count += int(len(group))
     if len(ics) < MIN_ALPHA_EVIDENCE_DATES or pair_count < MIN_ALPHA_EVIDENCE_PAIRS:
+        reason = "constant_cross_sectional_input" if constant_group_count and not ics else "insufficient_cross_sectional_evidence"
         return {
             "status": "insufficient_samples",
-            "reason": "insufficient_cross_sectional_evidence",
+            "reason": reason,
             "ic": None,
             "icir": None,
             "horizon_days": horizon_days,
             "n_dates": len(ics),
             "n_pairs": pair_count,
+            "skipped_constant_dates": constant_group_count,
         }
 
     series = pd.Series(ics, dtype=float)
@@ -147,6 +153,7 @@ def _alpha_evidence_from_result(result: dict[str, Any], *, layer: str, horizon_d
         "horizon_days": horizon_days,
         "n_dates": int(len(series)),
         "n_pairs": int(pair_count),
+        "skipped_constant_dates": constant_group_count,
     }
 
 

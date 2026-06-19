@@ -89,6 +89,69 @@ def _summary(value: str, *, limit: int = 4000) -> str:
     return value[:limit] + "\n...[truncated]"
 
 
+def _cli_stdout_summary(value: str, *, limit: int = 4000) -> str:
+    if len(value) <= limit:
+        return value
+    payload = _json_object_from_stdout(value)
+    if not payload:
+        return _summary(value, limit=limit)
+
+    compact: dict[str, Any] = {}
+    for key in ("ok", "command", "message"):
+        if key in payload:
+            compact[key] = payload[key]
+
+    errors = payload.get("errors")
+    if isinstance(errors, list):
+        compact["errors"] = errors[:20]
+        if len(errors) > 20:
+            compact["errors_truncated_count"] = len(errors) - 20
+
+    data = payload.get("data")
+    if isinstance(data, dict):
+        compact_data: dict[str, Any] = {}
+        for key in ("status", "artifact_path", "recommended_command"):
+            if key in data:
+                compact_data[key] = data[key]
+        blockers = data.get("blockers")
+        if isinstance(blockers, list):
+            compact_data["blockers"] = blockers[:20]
+            if len(blockers) > 20:
+                compact_data["blockers_truncated_count"] = len(blockers) - 20
+        warnings = data.get("warnings")
+        if isinstance(warnings, list):
+            compact_data["warnings"] = warnings[:20]
+            if len(warnings) > 20:
+                compact_data["warnings_truncated_count"] = len(warnings) - 20
+        compact["data"] = compact_data
+
+    text = json.dumps(compact, ensure_ascii=False, sort_keys=True)
+    return text if len(text) <= limit else _summary(text, limit=limit)
+
+
+def _dispatch_status_from_cli_result(return_code: int | None, stdout: str) -> str:
+    if return_code == 0:
+        return "succeeded"
+    payload = _json_object_from_stdout(stdout)
+    if payload.get("ok") is False:
+        return "blocked"
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    if str(data.get("status") or "").strip().lower() in {"blocked", "not_integrated", "missing", "no_permission"}:
+        return "blocked"
+    return "failed"
+
+
+def _json_object_from_stdout(stdout: str) -> dict[str, Any]:
+    text = (stdout or "").strip()
+    if not text:
+        return {}
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def _dedupe_preserving_order(values: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -906,7 +969,11 @@ class AgentRuntime:
                 timeout=timeout_seconds,
                 check=False,
             )
-            status = "succeeded" if result.returncode == 0 else "failed"
+            stdout_text = result.stdout or ""
+            stderr_text = result.stderr or ""
+            status = _dispatch_status_from_cli_result(result.returncode, stdout_text)
+            stdout_summary = _cli_stdout_summary(stdout_text)
+            stderr_summary = _summary(stderr_text)
             self.ledger.update_action_status(action_id, status, _now())
             return self.record_run(
                 action_id=action_id,
@@ -914,8 +981,8 @@ class AgentRuntime:
                 command=command,
                 status=status,
                 return_code=result.returncode,
-                stdout_summary=_summary(result.stdout or ""),
-                stderr_summary=_summary(result.stderr or ""),
+                stdout_summary=stdout_summary,
+                stderr_summary=stderr_summary,
                 run_id=run_id,
                 started_at=started_at,
             )
@@ -927,7 +994,7 @@ class AgentRuntime:
                 command=command,
                 status="failed",
                 return_code=None,
-                stdout_summary=_summary(str(exc.stdout or "")),
+                stdout_summary=_cli_stdout_summary(str(exc.stdout or "")),
                 stderr_summary=f"timeout after {timeout_seconds}s",
                 run_id=run_id,
                 started_at=started_at,
@@ -1174,14 +1241,18 @@ class AgentRuntime:
                     command=command,
                     status="failed",
                     return_code=None,
-                    stdout_summary=_summary("\n".join(stdout_chunks)),
+                    stdout_summary=_cli_stdout_summary("\n".join(stdout_chunks)),
                     stderr_summary=f"timeout after {timeout_seconds}s",
                     run_id=run_id,
                     started_at=started_at,
                     record_output_events=False,
                 )
 
-            status = "succeeded" if return_code == 0 else "failed"
+            stdout_text = "\n".join(stdout_chunks)
+            stderr_text = "\n".join(stderr_chunks)
+            status = _dispatch_status_from_cli_result(return_code, stdout_text)
+            stdout_summary = _cli_stdout_summary(stdout_text)
+            stderr_summary = _summary(stderr_text)
             self.ledger.update_action_status(action_id, status, _now())
             return self.record_run(
                 action_id=action_id,
@@ -1189,8 +1260,8 @@ class AgentRuntime:
                 command=command,
                 status=status,
                 return_code=return_code,
-                stdout_summary=_summary("\n".join(stdout_chunks)),
-                stderr_summary=_summary("\n".join(stderr_chunks)),
+                stdout_summary=stdout_summary,
+                stderr_summary=stderr_summary,
                 run_id=run_id,
                 started_at=started_at,
                 record_output_events=False,
@@ -1203,7 +1274,7 @@ class AgentRuntime:
                 command=command,
                 status="failed",
                 return_code=None,
-                stdout_summary=_summary("\n".join(stdout_chunks)),
+                stdout_summary=_cli_stdout_summary("\n".join(stdout_chunks)),
                 stderr_summary=str(exc),
                 run_id=run_id,
                 started_at=started_at,

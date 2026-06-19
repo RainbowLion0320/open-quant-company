@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pickle
+import warnings
 from pathlib import Path
 
 import pandas as pd
@@ -49,6 +50,34 @@ def _score_panel(days: int = 80) -> pd.DataFrame:
             ]
         )
     return pd.DataFrame(rows)
+
+
+def test_alpha_evidence_constant_cross_section_does_not_emit_warning():
+    from research.strategy_competition import _alpha_evidence_from_result
+
+    rows = []
+    for dt in pd.bdate_range("2024-01-02", periods=40):
+        for symbol, fwd in [("AAA", 0.03), ("BBB", -0.01), ("CCC", 0.02)]:
+            rows.append(
+                {
+                    "as_of_date": dt.date().isoformat(),
+                    "symbol": symbol,
+                    "score": 1.0,
+                    "forward_return_20d": fwd,
+                }
+            )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        evidence = _alpha_evidence_from_result(
+            {"score_panel": pd.DataFrame(rows)},
+            layer="candidate_alpha",
+        )
+
+    assert evidence["status"] == "insufficient_samples"
+    assert evidence["reason"] == "constant_cross_sectional_input"
+    assert evidence["ic"] is None
+    assert evidence["icir"] is None
 
 
 def test_strategy_competition_recommends_from_oos_not_previous_status(monkeypatch, tmp_path):

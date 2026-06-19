@@ -7492,6 +7492,65 @@ def test_agent_dispatch_runs_read_only_tool_and_updates_ledger(tmp_path, monkeyp
     reset_datahub()
 
 
+def test_agent_dispatch_classifies_structured_cli_blocker_as_blocked_not_failed(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    warning = (
+        "/Users/fushao/quant-agent/.venv/lib/python3.11/site-packages/pandas/core/nanops.py:1673: "
+        "ConstantInputWarning: An input array is constant; the correlation coefficient is not defined."
+    )
+
+    blockers = ["source_not_updated:macro_gdp"] + [f"missing_data:dimension_{idx}" for idx in range(350)]
+
+    def fake_run(command, **kwargs):
+        return CompletedProcess(
+            command,
+            1,
+            stdout=json.dumps(
+                {
+                    "ok": False,
+                    "command": "lifecycle check",
+                    "message": "Lifecycle readiness blocked",
+                    "errors": blockers,
+                    "data": {"status": "blocked", "blockers": blockers},
+                },
+                ensure_ascii=False,
+            ),
+            stderr=warning,
+        )
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Structured blocker dispatch")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="risk",
+        action_type="lifecycle_check",
+        risk_level="read_only",
+        summary="Run lifecycle check",
+        parameters={"tool_id": "astroq.lifecycle.check"},
+        expected_effect="Records lifecycle readiness.",
+    )
+
+    run = runtime.dispatch_action(action.action_id, runner=fake_run)
+    loaded = runtime.get_run(run.run_id)
+
+    assert run.status == "blocked"
+    assert run.return_code == 1
+    stdout_summary = json.loads(run.stdout_summary)
+    assert stdout_summary["message"] == "Lifecycle readiness blocked"
+    assert stdout_summary["data"]["status"] == "blocked"
+    assert stdout_summary["errors_truncated_count"] > 0
+    assert "ConstantInputWarning" in run.stderr_summary
+    assert runtime.get_action(action.action_id)["status"] == "blocked"
+    assert loaded["events"][-1]["status"] == "blocked"
+    reset_datahub()
+
+
 def test_agent_runtime_auto_dispatches_only_safe_proposed_actions(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
