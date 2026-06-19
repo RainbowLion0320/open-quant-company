@@ -172,7 +172,10 @@ must be JSON with `primary_desk`, `supporting_desks`, `intent`, `confidence`,
 `reason`, and `needs_tool`. Unknown desks, missing secrets, timeouts, invalid
 JSON, disabled providers, missing model/base URL, or unsupported protocols fail
 closed back to deterministic routing and are recorded as reasoning rows. The
-Router never executes tools or answers factual business questions.
+Router never executes tools or answers factual business questions. Routing
+latency/JSON parameters are configured on `llm.use_cases.agent_routing.request`;
+the provider key remains vendor-specific and must not be duplicated as a
+router-only alias.
 
 Desk answers may be fact-backed when the question is a direct status/catalog
 query. For example, Research strategy count/catalog questions read

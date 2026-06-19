@@ -113,10 +113,17 @@ def test_settings_registers_mimo_provider_without_secret_literal():
     text = Path("config/settings.yaml").read_text(encoding="utf-8")
     cfg = yaml.safe_load(text)
     mimo = cfg["llm"]["providers"]["mimo"]
+    agent_routing = cfg["llm"]["use_cases"]["agent_routing"]
 
     assert cfg["llm"]["default_provider"] == "mimo"
     assert cfg["llm"]["use_cases"]["agent_planning"] == {"provider": "mimo", "model": "mimo-v2.5-pro"}
     assert cfg["llm"]["use_cases"]["factor_hypothesis"] == {"provider": "mimo", "model": "mimo-v2.5-pro"}
+    assert agent_routing["provider"] == "mimo"
+    assert agent_routing["model"] == "mimo-v2.5-pro"
+    assert agent_routing["request"]["temperature"] == 0.0
+    assert agent_routing["request"]["timeout_seconds"] == 6
+    assert agent_routing["request"]["extra_body"] == {"max_completion_tokens": 512}
+    assert "mimo_router" not in cfg["llm"]["providers"]
     assert mimo["enabled"] is True
     assert mimo["label"] == "Mimo"
     assert mimo["protocol"] == "openai_compatible"

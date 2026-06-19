@@ -99,8 +99,9 @@ def provider_config(provider: str = DEFAULT_PROVIDER) -> dict[str, Any]:
     return {}
 
 
-def _provider_request_config(provider_cfg: dict[str, Any]) -> dict[str, Any]:
-    request = provider_cfg.get("request", {})
+def _provider_request_config(provider_cfg: dict[str, Any], use_case_cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+    use_case_request = use_case_cfg.get("request") if isinstance(use_case_cfg, dict) else None
+    request = use_case_request if isinstance(use_case_request, dict) else provider_cfg.get("request", {})
     request = request if isinstance(request, dict) else {}
     try:
         temperature = float(request.get("temperature", 0.1))
@@ -166,7 +167,7 @@ def resolve_llm_use_case(use_case: str, *, provider: str | None = None, model: s
         return _blocked_runtime(use_case, candidate_provider, candidate_model, "provider_not_configured")
     resolved_provider = candidate_provider
     pcfg = provider_config(resolved_provider)
-    request_cfg = _provider_request_config(pcfg)
+    request_cfg = _provider_request_config(pcfg, use_case_cfg)
     protocol = str(pcfg.get("protocol") or DEFAULT_LLM_PROTOCOL)
     enabled = bool(pcfg.get("enabled", True))
     resolved_model = str(model or use_case_cfg.get("model") or pcfg.get("default_model") or "")

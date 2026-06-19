@@ -396,6 +396,75 @@ def test_llm_runtime_resolves_custom_openai_compatible_provider(monkeypatch):
     assert runtime["block_reason"] == ""
 
 
+def test_llm_use_case_request_overrides_provider_request_without_inheriting_extra_body(monkeypatch):
+    import data.llm.usage as usage
+
+    monkeypatch.setattr(
+        usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "default_provider": "mimo",
+                "use_cases": {
+                    "agent_planning": {"provider": "mimo", "model": "mimo-v2.5-pro"},
+                    "agent_routing": {
+                        "provider": "mimo",
+                        "model": "mimo-v2.5-pro",
+                        "request": {
+                            "chat_path": "/chat/completions",
+                            "response_format_json": True,
+                            "temperature": 0.0,
+                            "timeout_seconds": 6,
+                            "extra_body": {"max_completion_tokens": 512},
+                        },
+                    },
+                },
+                "providers": {
+                    "mimo": {
+                        "enabled": True,
+                        "label": "Mimo",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "MIMO_API_KEY",
+                        "base_url": "https://token-plan-cn.xiaomimimo.com/v1",
+                        "default_model": "mimo-v2.5-pro",
+                        "request": {
+                            "chat_path": "/chat/completions",
+                            "response_format_json": True,
+                            "temperature": 0.1,
+                            "reasoning_level": "max",
+                            "reasoning_provider_parameter": "extra_body.thinking.type",
+                            "reasoning_provider_value": "enabled",
+                            "context_window_tokens": 1048576,
+                            "timeout_seconds": 20,
+                            "extra_body": {
+                                "max_completion_tokens": 1200,
+                                "thinking": {"type": "enabled"},
+                            },
+                        },
+                    }
+                },
+            }
+        },
+    )
+
+    planning = usage.resolve_llm_use_case("agent_planning")
+    routing = usage.resolve_llm_use_case("agent_routing")
+
+    assert planning["provider"] == "mimo"
+    assert planning["temperature"] == 0.1
+    assert planning["timeout_seconds"] == 20.0
+    assert planning["reasoning_level"] == "max"
+    assert planning["extra_body"]["thinking"] == {"type": "enabled"}
+    assert routing["provider"] == "mimo"
+    assert routing["model"] == "mimo-v2.5-pro"
+    assert routing["temperature"] == 0.0
+    assert routing["timeout_seconds"] == 6.0
+    assert routing["reasoning_level"] == ""
+    assert routing["reasoning_provider_parameter"] == ""
+    assert routing["context_window_tokens"] == 0
+    assert routing["extra_body"] == {"max_completion_tokens": 512}
+
+
 def test_llm_runtime_unknown_provider_fails_closed_without_default_fallback(monkeypatch):
     import data.llm.usage as usage
 

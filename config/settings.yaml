@@ -327,8 +327,15 @@ llm:
       provider: mimo
       model: mimo-v2.5-pro
     agent_routing:
-      provider: mimo_router
+      provider: mimo
       model: mimo-v2.5-pro
+      request:
+        chat_path: /chat/completions
+        response_format_json: true
+        temperature: 0.0
+        timeout_seconds: 6
+        extra_body:
+          max_completion_tokens: 512
   providers:
     deepseek:
       enabled: true
@@ -379,20 +386,6 @@ llm:
           max_completion_tokens: 1200
           thinking:
             type: enabled
-    mimo_router:
-      enabled: true
-      label: Mimo Router
-      protocol: openai_compatible
-      api_key_env: MIMO_API_KEY
-      base_url: https://token-plan-cn.xiaomimimo.com/v1
-      default_model: mimo-v2.5-pro
-      request:
-        chat_path: /chat/completions
-        response_format_json: true
-        temperature: 0.0
-        timeout_seconds: 6
-        extra_body:
-          max_completion_tokens: 512
 signals:
   multifactor:
     buy_threshold: 52
