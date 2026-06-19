@@ -134,10 +134,10 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  width: 50px;
+  gap: 1px;
+  width: 68px;
   height: 10px;
-  padding: 1px 3px;
+  padding: 1px 2px;
   border: 1px solid rgba(148, 163, 184, 0.26);
   border-radius: 3px;
 }

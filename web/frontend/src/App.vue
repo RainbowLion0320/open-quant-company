@@ -182,14 +182,18 @@ const buildVersion = computed(() => {
 });
 const isCeoOfficeRoute = computed(() => activeSectionPath.value === "/");
 const agentRuntimeVisible = computed(() => isCeoOfficeRoute.value && Boolean(agentModelRuntime.value));
-const runtimeBatteryCells = [1, 2, 3, 4, 5, 6, 7, 8];
+const runtimeBatteryCellCount = 20;
+const runtimeBatteryCells = Array.from({ length: runtimeBatteryCellCount }, (_, index) => index + 1);
 const agentContextUsagePct = computed(() => {
   const raw = Number(agentModelRuntime.value?.context.usage_pct || 0);
   if (!Number.isFinite(raw)) return 0;
   return Math.min(100, Math.max(0, Math.round(raw * 100) / 100));
 });
 const agentContextBatteryCells = computed(() =>
-  Math.min(runtimeBatteryCells.length, Math.max(0, Math.ceil((agentContextUsagePct.value / 100) * runtimeBatteryCells.length))),
+  Math.min(
+    runtimeBatteryCellCount,
+    Math.max(0, Math.floor((agentContextUsagePct.value / 100) * runtimeBatteryCellCount)),
+  ),
 );
 const contextUsagePercentText = computed(() => formatContextUsagePercent(agentContextUsagePct.value));
 const agentRuntimeSegments = computed(() => {

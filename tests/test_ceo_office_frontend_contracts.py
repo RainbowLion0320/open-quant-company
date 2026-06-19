@@ -272,7 +272,10 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "runtime-separator-dot" in workspace_css
     assert "runtime-separator-slash" in workspace_css
     assert "runtimeBatteryCells" in app
+    assert "runtimeBatteryCellCount = 20" in app
     assert "agentContextBatteryCells" in app
+    assert "Math.floor" in app
+    assert "Math.ceil((agentContextUsagePct.value / 100) * runtimeBatteryCells.length)" not in app
     assert "contextUsagePercentText" in app
     assert "formatContextUsagePercent(agentContextUsagePct.value)" in app
     assert 'return "<0.1%";' in app
