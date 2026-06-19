@@ -45,6 +45,7 @@ from agent_os.schemas import (
     DeskResponse,
     EvidenceRef,
 )
+from agent_os.tool_result_context import build_tool_result_context
 from agent_os.tools import AgentToolRegistry
 from agent_os.workflows import DeskRoutingDecision, build_desk_workflow_plan
 from broker import PaperBroker
@@ -3669,6 +3670,11 @@ class AgentRuntime:
                 reasoning=base_reasoning,
                 planning_mode=plan.planning_mode,
             )
+        response_phase = "safe_action_initial_dispatch" if proposed_actions else "no_tool_required_response"
+        tool_result_context = build_tool_result_context(
+            action_context=action_context,
+            dispatch_result=initial_dispatch,
+        )
         synthesis = synthesize_agent_response(
             desk=plan.desk,
             ceo_message=content,
@@ -3690,8 +3696,9 @@ class AgentRuntime:
             evidence_refs=evidence_refs,
             action_refs=proposed_actions,
             run_context={
-                "phase": "safe_action_initial_dispatch",
+                "phase": response_phase,
                 **initial_dispatch,
+                "tool_result_context": tool_result_context,
             },
             phase="initial_response",
         )

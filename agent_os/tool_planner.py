@@ -118,6 +118,7 @@ class ToolPlanningAgent:
             record_llm_response_usage(response, provider=provider, model=model, source=TOOL_PLANNING_USE_CASE)
         except Exception:
             pass
+        planning_mode = "llm_tool_planning" if result["actions"] else "llm_no_tool_required"
         return ToolPlanningResult(
             desk=desk,
             intent=result["intent"],
@@ -126,7 +127,7 @@ class ToolPlanningAgent:
             blockers=result["blockers"],
             reasoning={
                 **base_reasoning,
-                "status": "ok" if result["actions"] and not result["blockers"] else "blocked",
+                "status": "ok" if not result["blockers"] else "blocked",
                 "intent": result["intent"],
                 "reason": result["reason"],
                 "accepted_tool_ids": [action.tool_id for action in result["actions"]],
@@ -134,7 +135,7 @@ class ToolPlanningAgent:
                 "rejected_tool_count": len(result["rejected"]),
                 "rejected": result["rejected"],
             },
-            planning_mode="llm_tool_planning" if result["actions"] else "tool_planning_blocked",
+            planning_mode=planning_mode if not result["blockers"] else "tool_planning_blocked",
         )
 
     def _validate_payload(self, payload: dict[str, Any], *, desk: str) -> dict[str, Any]:
@@ -192,8 +193,6 @@ class ToolPlanningAgent:
                     parameters=parameters,
                 )
             )
-        if not actions and not blockers:
-            blockers.append("agent_tool_planning_no_tool_calls")
         return {
             "intent": intent,
             "confidence": _bounded_confidence(payload.get("confidence")),

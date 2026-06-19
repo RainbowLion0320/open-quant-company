@@ -4808,6 +4808,95 @@ def test_agent_runtime_auto_routes_ceo_messages_when_desk_is_missing(tmp_path, m
     reset_datahub()
 
 
+def test_agent_runtime_no_tool_plan_still_generates_agent_response(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_ROUTER_API_KEY", "router-secret")
+    monkeypatch.setenv("UNIT_PLANNER_API_KEY", "planner-secret")
+    monkeypatch.setenv("UNIT_RESPONSE_API_KEY", "response-secret")
+    _use_unit_agent_llm_first_settings(monkeypatch)
+    from data.storage.datahub import reset_datahub
+    import agent_os.router as router
+    import agent_os.tool_planner as tool_planner
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    response_calls: list[dict[str, object]] = []
+
+    def fake_router(_request: dict[str, object]) -> dict[str, object]:
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "primary_desk": "reporting",
+                                "supporting_desks": [],
+                                "intent": "small_talk",
+                                "confidence": 0.88,
+                                "reason": "Greeting does not require a tool.",
+                                "needs_tool": False,
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18},
+        }
+
+    def fake_planner(_request: dict[str, object]) -> dict[str, object]:
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "primary_desk": "reporting",
+                                "intent": "small_talk",
+                                "tool_calls": [],
+                                "requires_approval": False,
+                                "clarifying_question": "",
+                                "reason": "No fixed registry tool is needed.",
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 20, "completion_tokens": 8, "total_tokens": 28},
+        }
+
+    def fake_response(request: dict[str, object]) -> dict[str, object]:
+        response_calls.append(request)
+        payload = _message_payload(request.get("messages"))
+        assert payload["phase"] == "initial_response"
+        assert payload["run_context"]["phase"] == "no_tool_required_response"
+        assert payload["plan_context"]["actions"] == []
+        return {
+            "choices": [{"message": {"content": json.dumps({"answer": "你好，我在。"}, ensure_ascii=False)}}],
+            "usage": {"prompt_tokens": 30, "completion_tokens": 6, "total_tokens": 36},
+        }
+
+    monkeypatch.setattr(router, "_openai_compatible_chat_completion", fake_router)
+    monkeypatch.setattr(tool_planner, "_openai_compatible_chat_completion", fake_planner)
+    monkeypatch.setattr("agent_os.response_synthesizer._openai_compatible_chat_completion", fake_response)
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="No tool small talk")
+    routed = runtime.submit_ceo_message(session.session_id, content="hello")
+    response = routed["desk_response"]
+
+    assert response_calls
+    assert response.answer == "你好，我在。"
+    assert response.blockers == []
+    assert response.proposed_actions == []
+    assert response.planning_mode == "llm_no_tool_required"
+    assert "agent_tool_planning_no_tool_calls" not in response.answer
+    reset_datahub()
+
+
 def test_ceo_desk_default_reply_missing_provider_fails_closed(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setenv("UNIT_ROUTER_API_KEY", "router-secret")
@@ -5250,6 +5339,203 @@ def test_agent_tool_planner_selects_data_sources_tool_without_keyword_rules(tmp_
     assert planner_reasoning["provider"] == "unit_planner"
     assert planner_reasoning["accepted_tool_count"] == 1
     assert [message["role"] for message in loaded["messages"]] == ["ceo", "desk_agent"]
+    reset_datahub()
+
+
+def test_agent_data_sources_response_receives_structured_tool_result_context(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_ROUTER_API_KEY", "router-secret")
+    monkeypatch.setenv("UNIT_PLANNER_API_KEY", "planner-secret")
+    monkeypatch.setenv("UNIT_RESPONSE_API_KEY", "response-secret")
+    _use_unit_agent_llm_first_settings(monkeypatch)
+    from data.storage.datahub import get_datahub
+    from data.storage.datahub import reset_datahub
+    import agent_os.router as router
+    import agent_os.tool_planner as tool_planner
+
+    reset_datahub()
+    hub = get_datahub()
+    artifact = hub.artifact_path("data-sources", "latest.json")
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "generated_at": "2026-06-19T00:00:00Z",
+                "recommended_command": "astroq data sources audit --source all --discovery-depth catalog --json",
+                "summary": {
+                    "source_count": 9,
+                    "capability_count": 1485,
+                    "discovered_count": 1485,
+                    "project_integrated_count": 41,
+                    "candidate_count": 365,
+                    "sample_probed_count": 0,
+                    "sources": {
+                        "akshare": 1089,
+                        "tushare": 29,
+                        "tencent_finance": 5,
+                        "eastmoney": 254,
+                        "sina_finance": 61,
+                        "tonghuashun": 43,
+                        "exchange_official": 1,
+                        "cninfo": 1,
+                        "computed": 2,
+                    },
+                },
+                "sources": [
+                    {
+                        "source": "akshare",
+                        "label": "AKShare",
+                        "status": "active",
+                        "capability_count": 1089,
+                        "discovered_count": 1089,
+                        "project_integrated_count": 10,
+                        "sample_probed_count": 0,
+                        "requires_token": False,
+                    },
+                    {
+                        "source": "tushare",
+                        "label": "Tushare",
+                        "status": "active",
+                        "capability_count": 29,
+                        "discovered_count": 29,
+                        "project_integrated_count": 29,
+                        "sample_probed_count": 0,
+                        "requires_token": True,
+                    },
+                    {
+                        "source": "tencent_finance",
+                        "label": "Tencent Finance",
+                        "status": "candidate",
+                        "capability_count": 5,
+                        "discovered_count": 5,
+                        "project_integrated_count": 0,
+                        "sample_probed_count": 0,
+                        "requires_token": False,
+                    },
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    from agent_os.runtime import AgentRuntime
+
+    response_calls: list[dict[str, object]] = []
+
+    def fake_router(_request: dict[str, object]) -> dict[str, object]:
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "primary_desk": "data",
+                                "supporting_desks": [],
+                                "intent": "list_data_sources",
+                                "confidence": 0.91,
+                                "reason": "The CEO asks for current data sources.",
+                                "needs_tool": True,
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30},
+        }
+
+    def fake_planner(_request: dict[str, object]) -> dict[str, object]:
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "primary_desk": "data",
+                                "intent": "list_data_sources",
+                                "tool_calls": [
+                                    {
+                                        "tool_id": "astroq.data.sources",
+                                        "summary": "Read current data source capability summary.",
+                                        "expected_effect": "Reads local data source capability artifact only.",
+                                        "parameters": {},
+                                    }
+                                ],
+                                "requires_approval": False,
+                                "clarifying_question": "",
+                                "reason": "The registered data source summary tool answers the question.",
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 40, "completion_tokens": 12, "total_tokens": 52},
+        }
+
+    def fake_response(request: dict[str, object]) -> dict[str, object]:
+        response_calls.append(request)
+        payload = _message_payload(request.get("messages"))
+        tool_context = payload["run_context"]["tool_result_context"]
+        assert tool_context["context_count"] == 1
+        data_context = tool_context["items"][0]
+        assert data_context["tool_id"] == "astroq.data.sources"
+        assert data_context["facts"]["source_count"] == 9
+        assert data_context["facts"]["capability_count"] == 1485
+        assert data_context["facts"]["project_integrated_count"] == 41
+        assert data_context["facts"]["candidate_count"] == 365
+        assert data_context["facts"]["sources"][0]["source"] == "akshare"
+        assert data_context["facts"]["sources"][0]["project_integrated_count"] == 10
+        assert data_context["facts"]["sources"][2]["source"] == "tencent_finance"
+        assert data_context["facts"]["sources"][2]["status"] == "candidate"
+        assert any("Do not call discovered capabilities integrated" in rule for rule in data_context["wording_rules"])
+        prompt = json.dumps(request.get("messages") or [], ensure_ascii=False)
+        assert "Data source discovered/sample/candidate statuses are not production integration" in prompt
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {"answer": "模型回答：已区分已发现能力和项目已接入能力。"},
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 16, "total_tokens": 116},
+        }
+
+    monkeypatch.setattr(router, "_openai_compatible_chat_completion", fake_router)
+    monkeypatch.setattr(tool_planner, "_openai_compatible_chat_completion", fake_planner)
+    monkeypatch.setattr("agent_os.response_synthesizer._openai_compatible_chat_completion", fake_response)
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Structured data source facts")
+
+    def fake_dispatch_action(action_id: str, **_: object):
+        runtime.ledger.update_action_status(action_id, "succeeded", "2026-06-19T00:00:00Z")
+        return runtime.record_run(
+            action_id=action_id,
+            tool_name="astroq.data.sources",
+            command=[".venv/bin/astroq", "data", "sources", "--json"],
+            status="succeeded",
+            return_code=0,
+            stdout_summary='{"message":"Data source capability summary","ok":true}',
+            stderr_summary="",
+            run_id="run_data_sources",
+            started_at="2026-06-19T00:00:00Z",
+        )
+
+    monkeypatch.setattr(runtime, "dispatch_action", fake_dispatch_action)
+
+    routed = runtime.submit_ceo_message(session.session_id, content="我们现在数据源都有哪些")
+    response = routed["desk_response"]
+
+    assert response_calls
+    assert response.answer == "模型回答：已区分已发现能力和项目已接入能力。"
+    assert "所有接口均已集成" not in response.answer
     reset_datahub()
 
 

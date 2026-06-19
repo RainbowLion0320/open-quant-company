@@ -177,6 +177,8 @@ def _response_messages(
                 "You are the desk response writer for Open Quant Company. "
                 "Use only the supplied local facts, action results, blockers, and evidence references. "
                 "Do not invent local system state, strategy metrics, data coverage, approvals, or tool results. "
+                "When run_context.tool_result_context is present, treat it as the primary factual payload. "
+                "Data source discovered/sample/candidate statuses are not production integration; do not call them integrated or production-ready unless project_integrated_count supports that wording. "
                 "If evidence is missing or a tool failed, say exactly what is missing and what command or artifact is needed. "
                 "Write a direct, natural answer to the CEO in Chinese unless the CEO wrote in English. "
                 "Return only a JSON object with an answer field and optional title/evidence_summary fields."
@@ -190,13 +192,13 @@ def _response_messages(
 
 
 def _compact_provider_value(value: Any, *, depth: int = 0) -> Any:
-    if depth > 6:
+    if depth > 8:
         return "[truncated-depth]"
     if isinstance(value, dict):
         out: dict[str, Any] = {}
         for key, item in value.items():
             key_text = str(key)
-            if _is_secret_like_key(key_text):
+            if _is_secret_like_key(key_text) and not isinstance(item, (bool, int, float, type(None))):
                 out[key_text] = "***REDACTED***"
             else:
                 out[key_text] = _compact_provider_value(item, depth=depth + 1)
