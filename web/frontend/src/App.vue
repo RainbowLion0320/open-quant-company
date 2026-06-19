@@ -186,6 +186,7 @@ const agentContextUsagePct = computed(() => {
 const agentContextBatteryCells = computed(() =>
   Math.min(runtimeBatteryCells.length, Math.max(0, Math.ceil((agentContextUsagePct.value / 100) * runtimeBatteryCells.length))),
 );
+const contextUsagePercentText = computed(() => `${agentContextUsagePct.value.toFixed(1)}%`);
 const agentRuntimeSegments = computed(() => {
   if (!agentModelRuntime.value) return [];
   const label = agentModelRuntime.value.runtime.label || agentModelRuntime.value.runtime.provider;
@@ -203,6 +204,7 @@ const agentRuntimeSegments = computed(() => {
       cells: agentContextBatteryCells.value,
       status: contextStatusKind(agentModelRuntime.value.context.status),
     },
+    { key: "context-percent", kind: "context-percent", text: contextUsagePercentText.value },
     { key: "context-max", kind: "context", text: formatTokenK(agentModelRuntime.value.context.max_tokens) },
   ];
 });

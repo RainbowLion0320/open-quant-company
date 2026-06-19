@@ -26,7 +26,7 @@
             <div v-else class="message-block" :class="item.message.role">
               <span v-if="item.message.role !== 'ceo'" :class="['message-speaker', `desk-color-${item.message.desk}`]">{{ deskLabel(item.message.desk) }}</span>
               <div class="message-row" :class="item.message.role">
-              <p>{{ item.message.content }}</p>
+              <MarkdownMessage :content="item.message.content" />
               <div v-if="item.message.evidence_refs.length" class="message-ref-list">
                 <button
                   v-for="evidenceId in item.message.evidence_refs"
@@ -216,6 +216,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
+import MarkdownMessage from "../components/MarkdownMessage.vue";
 import { useI18n } from "../i18n";
 
 const { currentLocale, t } = useI18n();

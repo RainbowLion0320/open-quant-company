@@ -48,6 +48,7 @@ def test_app_shell_nav_exposes_ceo_office_and_market_separately():
 
 def test_ceo_office_view_uses_agent_api_and_i18n():
     view = read_frontend("views/CEOOffice.vue")
+    markdown_message = read_frontend("components/MarkdownMessage.vue")
     app = read_frontend("App.vue")
     api_client = read_frontend("api/client.ts")
     zh_index = read_frontend("i18n/messages/zh-CN/index.ts")
@@ -58,8 +59,36 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     en_ceo = read_frontend("i18n/messages/en-US/ceoOffice.ts")
     css = read_frontend("styles/views/ceo-office.css")
     workspace_css = read_frontend("styles/layout/workspace.css")
+    frontend_package = Path("web/frontend/package.json").read_text(encoding="utf-8")
 
     assert "useI18n" in view
+    assert 'import MarkdownMessage from "../components/MarkdownMessage.vue";' in view
+    assert '<MarkdownMessage :content="item.message.content" />' in view
+    assert "<p>{{ item.message.content }}</p>" not in view
+    assert 'from "markdown-it"' in markdown_message
+    assert 'from "dompurify"' in markdown_message
+    assert "html: false" in markdown_message
+    assert "breaks: true" in markdown_message
+    assert "linkify: true" in markdown_message
+    assert "DOMPurify.sanitize" in markdown_message
+    assert 'token.attrSet("target", "_blank")' in markdown_message
+    assert 'token.attrSet("rel", "noopener noreferrer")' in markdown_message
+    assert '"markdown-it"' in frontend_package
+    assert '"dompurify"' in frontend_package
+    assert '"@types/markdown-it"' in frontend_package
+    for selector in [
+        ".markdown-message",
+        ".markdown-message p",
+        ".markdown-message :where(ul, ol)",
+        ".markdown-message li",
+        ".markdown-message strong",
+        ".markdown-message code",
+        ".markdown-message pre",
+        ".markdown-message blockquote",
+        ".markdown-message a",
+        ".markdown-message table",
+    ]:
+        assert selector in css
     assert "api.agentSessions" in view
     assert "api.agentDesks" in view
     assert "api.agentActions" in view
@@ -240,8 +269,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "runtime-progress" in app
     assert "runtimeBatteryCells" in app
     assert "agentContextBatteryCells" in app
+    assert "contextUsagePercentText" in app
+    assert 'key: "context-percent"' in app
+    assert "text: contextUsagePercentText.value" in app
     assert "context-progress" in app
     assert "contextStatusKind" in app
+    assert "runtime-segment-context-percent" in workspace_css
     assert "runtime-progress-cell" in workspace_css
     assert "runtime-progress::after" not in workspace_css
     assert "runtime-progress-compacted" in workspace_css
