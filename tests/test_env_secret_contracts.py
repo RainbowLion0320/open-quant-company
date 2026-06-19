@@ -121,11 +121,12 @@ def test_settings_registers_mimo_provider_without_secret_literal():
     assert agent_response["provider"] == "mimo"
     assert agent_response["model"] == "mimo-v2.5-pro"
     assert agent_response["request"]["response_format_json"] is True
-    assert agent_response["request"]["timeout_seconds"] == 30
+    assert agent_response["request"]["reasoning_level"] == "max"
+    assert agent_response["request"]["timeout_seconds"] == 120
     assert agent_response["request"]["context_window_tokens"] == 1048576
     assert agent_response["request"]["extra_body"] == {
-        "max_completion_tokens": 1600,
-        "thinking": {"type": "disabled"},
+        "max_completion_tokens": 4096,
+        "thinking": {"type": "enabled"},
     }
     assert cfg["llm"]["use_cases"]["factor_hypothesis"] == {"provider": "mimo", "model": "mimo-v2.5-pro"}
     assert agent_routing["provider"] == "mimo"
@@ -139,8 +140,9 @@ def test_settings_registers_mimo_provider_without_secret_literal():
     response_runtime = resolve_llm_use_case("agent_response")
     planning_runtime = resolve_llm_use_case("agent_planning")
     assert response_runtime["provider"] == "mimo"
-    assert response_runtime["extra_body"]["thinking"]["type"] == "disabled"
-    assert response_runtime["timeout_seconds"] == 30
+    assert response_runtime["reasoning_level"] == "max"
+    assert response_runtime["extra_body"]["thinking"]["type"] == "enabled"
+    assert response_runtime["timeout_seconds"] == 120
     assert response_runtime["context_window_tokens"] == 1048576
     assert planning_runtime["extra_body"]["thinking"]["type"] == "enabled"
     assert mimo["enabled"] is True

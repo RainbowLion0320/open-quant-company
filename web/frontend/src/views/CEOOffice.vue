@@ -174,6 +174,15 @@
             </div>
             </div>
           </template>
+          <div v-if="waitingForDeskReply" class="message-block desk-agent pending-reply-block" aria-live="polite">
+            <span class="message-speaker">{{ t("ceoOffice.replying") }}</span>
+            <div class="message-row pending-reply-row">
+              <span class="typing-dots" aria-hidden="true">
+                <i v-for="index in typingDotIndex" :key="`typing-dot-${index}`"></i>
+              </span>
+              <span class="sr-only">{{ t("ceoOffice.replying") }}</span>
+            </div>
+          </div>
         </div>
 
         <form class="message-composer" @submit.prevent="sendMessage">
@@ -303,6 +312,10 @@ const filteredSlashCommands = computed(() => {
 });
 const selectedSlashCommand = computed(() => filteredSlashCommands.value[selectedSlashIndex.value] || null);
 const sending = computed(() => pendingSendCount.value > 0);
+const waitingForDeskReply = computed(() =>
+  sending.value && optimisticMessages.value.some(message => message.role === "ceo"),
+);
+const typingDotIndex = [1, 2, 3];
 const displayMessages = computed(() => {
   const sessionId = activeSession.value?.session_id || "";
   const pending = optimisticMessages.value.filter(message =>

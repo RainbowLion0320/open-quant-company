@@ -112,6 +112,11 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "removeOptimisticMessage" in view
     assert "hasServerEchoForOptimisticMessage" in view
     assert "pendingSendCount" in view
+    assert "waitingForDeskReply" in view
+    assert "pending-reply-block" in view
+    assert "typing-dots" in view
+    assert "typingDotIndex" in view
+    assert "ceoOffice.replying" in view
     assert "displayMessages" in view
     assert "messageScrollSignature" in view
     assert "scrollMessagesToBottom" in view
@@ -259,6 +264,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "ceoOffice.openEvidence" in view
     assert "ceoOffice.viewDetails" in view
     assert "message-action-list" in css
+    assert ".pending-reply-block" in css
+    assert ".typing-dots" in css
+    assert "@keyframes typingPulse" in css
     assert "inline-action-card" in css
     assert "inline-detail" in css
     assert ".composer-input-row" in css
@@ -396,12 +404,14 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "开启新对话" in zh_ceo
     assert "归档当前对话并开启新对话" in zh_ceo
     assert "未知斜杠命令" in zh_ceo
+    assert "正在回复" in zh_ceo
     assert "assigns the responsible desk" in en_ceo
     assert "Sources, backfills, coverage" in en_ceo
     assert "Strategies, factors, evidence" in en_ceo
     assert "Positions, weights, rebalance" in en_ceo
     assert "Gates, exposure, blockers" in en_ceo
     assert "Orders, broker, reconcile" in en_ceo
+    assert "Replying" in en_ceo
     assert "Code, tests, diagnostics" in en_ceo
     assert "Briefs, summaries, routing" in en_ceo
     assert "Evidence Detail" in en_ceo

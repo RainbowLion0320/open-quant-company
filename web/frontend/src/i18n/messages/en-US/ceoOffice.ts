@@ -2,6 +2,7 @@ export const ceoOffice = {
       status: "Runtime Status",
       messagePlaceholder: "Describe a question or task; the system assigns the responsible desk",
       send: "Send",
+      replying: "Replying",
       evidence: "Evidence",
       messages: "Messages",
       noMessages: "No messages",

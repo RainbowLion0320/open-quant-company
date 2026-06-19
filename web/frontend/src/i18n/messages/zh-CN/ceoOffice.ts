@@ -2,6 +2,7 @@ export const ceoOffice = {
       status: "运行状态",
       messagePlaceholder: "输入问题或任务，系统会自动分配主责部门",
       send: "发送",
+      replying: "正在回复",
       evidence: "证据",
       messages: "消息",
       noMessages: "暂无消息",

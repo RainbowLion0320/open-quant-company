@@ -333,12 +333,15 @@ llm:
         chat_path: /chat/completions
         response_format_json: true
         temperature: 0.1
-        timeout_seconds: 30
+        reasoning_level: max
+        reasoning_provider_parameter: extra_body.thinking.type
+        reasoning_provider_value: enabled
+        timeout_seconds: 120
         context_window_tokens: 1048576
         extra_body:
-          max_completion_tokens: 1600
+          max_completion_tokens: 4096
           thinking:
-            type: disabled
+            type: enabled
     agent_routing:
       provider: mimo
       model: mimo-v2.5-pro
