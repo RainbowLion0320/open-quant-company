@@ -17,8 +17,8 @@
 
     <section class="ceo-grid">
       <article class="conversation-panel">
-        <div v-if="!messages.length" class="ceo-empty">{{ t("ceoOffice.noMessages") }}</div>
-        <div v-else class="message-list">
+        <div v-if="!displayMessages.length" class="ceo-empty">{{ t("ceoOffice.noMessages") }}</div>
+        <div v-else ref="messageListRef" class="message-list">
           <template v-for="item in messageTimelineItems" :key="item.key">
             <div v-if="item.type === 'time'" class="message-time-separator">
               <time>{{ item.label }}</time>
@@ -194,7 +194,7 @@
           </div>
           <div class="composer-input-row">
             <input v-model="draft" type="text" :placeholder="t('ceoOffice.messagePlaceholder')" @keydown="handleComposerKeydown" />
-            <button class="btn btn-primary" type="submit" :disabled="sending || !draft.trim()">
+            <button class="btn btn-primary" type="submit" :disabled="!draft.trim()" :aria-busy="sending">
               {{ t("ceoOffice.send") }}
             </button>
           </div>
@@ -206,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, type AgentAction, type AgentActionDetail, type AgentDesk, type AgentEvidenceSnapshot, type AgentMessage, type AgentSession, type EvidenceNavigation, type EvidenceRef } from "../api";
 import { useI18n } from "../i18n";
 
@@ -219,6 +219,8 @@ type MessageTimelineItem =
 const sessions = ref<AgentSession[]>([]);
 const activeSession = ref<AgentSession | null>(null);
 const messages = ref<AgentMessage[]>([]);
+const optimisticMessages = ref<AgentMessage[]>([]);
+const messageListRef = ref<HTMLElement | null>(null);
 const actions = ref<AgentAction[]>([]);
 const agentDesks = ref<AgentDesk[]>([]);
 const sessionStream = ref<AbortController | null>(null);
@@ -235,10 +237,11 @@ const selectedEvidenceStatus = ref("");
 const submittingPaperAction = ref("");
 const cancelingAction = ref("");
 const draft = ref("");
-const sending = ref(false);
+const pendingSendCount = ref(0);
 const error = ref("");
 const slashNotice = ref("");
 const selectedSlashIndex = ref(0);
+let optimisticMessageSeq = 0;
 
 const paperOrderPreview = computed(() => objectParam(selectedAction.value?.action.parameters.paper_order_preview));
 const paperRiskGate = computed(() => objectParam(paperOrderPreview.value?.risk_gate));
@@ -300,11 +303,25 @@ const filteredSlashCommands = computed(() => {
     .map(row => row.command);
 });
 const selectedSlashCommand = computed(() => filteredSlashCommands.value[selectedSlashIndex.value] || null);
+const sending = computed(() => pendingSendCount.value > 0);
+const displayMessages = computed(() => {
+  const sessionId = activeSession.value?.session_id || "";
+  const pending = optimisticMessages.value.filter(message =>
+    message.session_id === sessionId
+    && !hasServerEchoForOptimisticMessage(message),
+  );
+  return [...messages.value, ...pending];
+});
+const messageScrollSignature = computed(() =>
+  displayMessages.value
+    .map(message => `${message.message_id}:${message.evidence_refs.length}:${message.action_refs.length}`)
+    .join("|"),
+);
 const messageTimelineItems = computed<MessageTimelineItem[]>(() => {
   const items: MessageTimelineItem[] = [];
   let previousMessageDate: Date | null = null;
 
-  for (const message of messages.value) {
+  for (const message of displayMessages.value) {
     const messageDate = parseMessageDate(message.created_at);
     if (messageDate && shouldShowMessageTimeSeparator(previousMessageDate, messageDate)) {
       items.push({ type: "time", key: `time-${message.message_id}`, label: formatChatTime(messageDate) });
@@ -457,6 +474,46 @@ function formatNumber(value: unknown) {
   return numeric.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+function scrollMessagesToBottom(behavior: ScrollBehavior = "smooth") {
+  void nextTick(() => {
+    const container = messageListRef.value;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior });
+  });
+}
+
+function hasServerEchoForOptimisticMessage(optimisticMessage: AgentMessage) {
+  const optimisticTime = Date.parse(optimisticMessage.created_at);
+  return messages.value.some(message => {
+    if (message.message_id.startsWith("optimistic-ceo-")) return false;
+    if (message.session_id !== optimisticMessage.session_id) return false;
+    if (message.role !== optimisticMessage.role || message.content !== optimisticMessage.content) return false;
+    const messageTime = Date.parse(message.created_at);
+    return Number.isFinite(optimisticTime)
+      && Number.isFinite(messageTime)
+      && messageTime >= optimisticTime - 1000;
+  });
+}
+
+function appendOptimisticCeoMessage(sessionId: string, content: string) {
+  const message: AgentMessage = {
+    message_id: `optimistic-ceo-${Date.now()}-${++optimisticMessageSeq}`,
+    session_id: sessionId,
+    role: "ceo",
+    desk: "",
+    content,
+    evidence_refs: [],
+    action_refs: [],
+    created_at: new Date().toISOString(),
+  };
+  optimisticMessages.value = [...optimisticMessages.value, message];
+  return message.message_id;
+}
+
+function removeOptimisticMessage(messageId: string) {
+  optimisticMessages.value = optimisticMessages.value.filter(message => message.message_id !== messageId);
+}
+
 function closeSessionStream() {
   sessionStream.value?.abort();
   sessionStream.value = null;
@@ -583,6 +640,10 @@ watch(filteredSlashCommands, commands => {
   }
 });
 
+watch(messageScrollSignature, () => {
+  scrollMessagesToBottom();
+});
+
 async function createFreshSession() {
   const payload = await api.agentCreateSession({
     title: t("ceoOffice.defaultControlTitle"),
@@ -591,6 +652,7 @@ async function createFreshSession() {
   activeSession.value = payload.session;
   sessions.value = [payload.session, ...sessions.value];
   messages.value = [];
+  optimisticMessages.value = [];
   actions.value = [];
   selectedAction.value = null;
   selectedEvidence.value = null;
@@ -674,25 +736,30 @@ async function runSlashCommand(commandName: string) {
 async function sendMessage() {
   const text = draft.value.trim();
   if (!text) return;
-  sending.value = true;
+  pendingSendCount.value += 1;
   error.value = "";
   slashNotice.value = "";
+  let optimisticMessageId = "";
   try {
     if (text.startsWith("/")) {
       await runSlashCommand(text.toLowerCase());
       return;
     }
     const session = await ensureSession();
+    draft.value = "";
+    optimisticMessageId = appendOptimisticCeoMessage(session.session_id, text);
     await api.agentAddMessage(session.session_id, {
       role: "ceo",
       content: text,
     });
-    draft.value = "";
+    removeOptimisticMessage(optimisticMessageId);
     await loadSession(session.session_id);
   } catch (err: any) {
+    if (optimisticMessageId) removeOptimisticMessage(optimisticMessageId);
+    if (!draft.value.trim()) draft.value = text;
     error.value = `${t("ceoOffice.writeFailed")}: ${err?.message || err}`;
   } finally {
-    sending.value = false;
+    pendingSendCount.value = Math.max(0, pendingSendCount.value - 1);
   }
 }
 

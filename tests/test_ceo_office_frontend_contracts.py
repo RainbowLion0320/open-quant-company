@@ -105,9 +105,24 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "message.action_refs" in view
     assert "actionById" in view
     assert "messageHasSelectedEvidence" in view
+    assert "optimisticMessages" in view
+    assert "messageListRef" in view
+    assert 'ref="messageListRef"' in view
+    assert "appendOptimisticCeoMessage" in view
+    assert "removeOptimisticMessage" in view
+    assert "hasServerEchoForOptimisticMessage" in view
+    assert "pendingSendCount" in view
+    assert "displayMessages" in view
+    assert "messageScrollSignature" in view
+    assert "scrollMessagesToBottom" in view
+    assert "nextTick" in view
+    assert "container.scrollTo({ top: container.scrollHeight, behavior })" in view
+    assert "watch(messageScrollSignature" in view
+    assert 'v-if="!displayMessages.length"' in view
     assert "messageTimelineItems" in view
     assert "shouldShowMessageTimeSeparator" in view
     assert "formatChatTime" in view
+    assert "for (const message of displayMessages.value)" in view
     assert '<time>{{ formatTime(message.created_at) }}</time>' not in view
     assert ".message-meta time" not in css
     assert "formatTime(selectedAction.action.expires_at)" in view
@@ -176,6 +191,12 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert 'if (text.startsWith("/"))' in view
     assert 'await runSlashCommand(text.toLowerCase())' in view
     assert view.index('if (text.startsWith("/"))') < view.index("api.agentAddMessage")
+    assert 'draft.value = "";' in view
+    assert "optimisticMessageId = appendOptimisticCeoMessage(session.session_id, text)" in view
+    assert "removeOptimisticMessage(optimisticMessageId)" in view
+    assert 'if (!draft.value.trim()) draft.value = text;' in view
+    assert ':disabled="sending || !draft.trim()"' not in view
+    assert ':disabled="!draft.trim()" :aria-busy="sending"' in view
     assert 'planner_mode: "provider_semantic"' not in view
     assert 'planner_fallback: "deterministic"' not in view
     assert 'status: "archived"' in view
