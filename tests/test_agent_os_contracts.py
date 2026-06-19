@@ -39,6 +39,37 @@ def _use_deepseek_agent_planning_settings(monkeypatch):
     )
 
 
+def _use_unit_agent_routing_settings(monkeypatch):
+    import data.llm.usage as llm_usage
+
+    monkeypatch.setattr(
+        llm_usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "default_provider": "unit_router",
+                "use_cases": {"agent_routing": {"provider": "unit_router", "model": "unit-router"}},
+                "providers": {
+                    "unit_router": {
+                        "enabled": True,
+                        "label": "Unit Router",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "UNIT_ROUTER_API_KEY",
+                        "base_url": "https://unit-router.example/v1",
+                        "default_model": "unit-router",
+                        "request": {
+                            "chat_path": "/chat/completions",
+                            "response_format_json": True,
+                            "temperature": 0.0,
+                            "timeout_seconds": 6,
+                        },
+                    }
+                },
+            }
+        },
+    )
+
+
 def test_agent_runtime_creates_session_message_and_action(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
@@ -4666,6 +4697,7 @@ def test_agent_runtime_routes_ceo_message_to_deterministic_desk_response(tmp_pat
 
 def test_agent_runtime_auto_routes_ceo_messages_when_desk_is_missing(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.delenv("MIMO_API_KEY", raising=False)
     from data.storage.datahub import reset_datahub
 
     reset_datahub()
@@ -4677,6 +4709,7 @@ def test_agent_runtime_auto_routes_ceo_messages_when_desk_is_missing(tmp_path, m
         ("帮我补齐 Tushare 数据缺口", "data"),
         ("数据源能力页面为什么只展示300条", "data"),
         ("分析 12 个策略为什么 IC 不够", "research"),
+        ("我们现在有几个策略", "research"),
         ("当前仓位该怎么调", "portfolio"),
         ("检查最大回撤和风险阻断", "risk"),
         ("提交纸面订单并检查 QMT readiness", "execution"),
@@ -4713,6 +4746,140 @@ def test_agent_runtime_auto_routes_ceo_messages_when_desk_is_missing(tmp_path, m
     assert greeting["desk_response"].proposed_actions == []
     assert greeting["desk_response"].planning_mode == "conversation"
     assert "你好" in greeting["desk_response"].answer
+    reset_datahub()
+
+
+def test_agent_runtime_answers_strategy_catalog_fact_queries_from_real_catalog(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.delenv("MIMO_API_KEY", raising=False)
+    from data.storage.datahub import reset_datahub
+    from research.strategy_catalog import catalog_items
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Strategy fact query", default_desk="reporting")
+    routed = runtime.submit_ceo_message(session.session_id, content="我们现在有几个策略")
+    response = routed["desk_response"]
+    catalog_total = len(catalog_items())
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+
+    assert routed["message"].desk == "research"
+    assert response.message.desk == "research"
+    assert response.planning_mode == "fact_answer"
+    assert str(catalog_total) in response.answer
+    assert "策略" in response.answer
+    assert "research.strategy_catalog.catalog_items" in response.answer
+    assert response.proposed_actions == []
+    assert response.evidence_refs == []
+    assert reasoning_by_kind["fact_answer"]["source"] == "research.strategy_catalog.catalog_items"
+    assert reasoning_by_kind["fact_answer"]["total"] == catalog_total
+    assert reasoning_by_kind["agent_router"]["router_source"] in {"fallback", "local"}
+    reset_datahub()
+
+
+def test_agent_router_provider_can_classify_low_confidence_ceo_messages(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_ROUTER_API_KEY", "router-secret")
+    from data.storage.datahub import reset_datahub
+    import agent_os.router as router
+
+    reset_datahub()
+    _use_unit_agent_routing_settings(monkeypatch)
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[dict[str, object]] = []
+
+    def fake_transport(request: dict[str, object]) -> dict[str, object]:
+        calls.append(request)
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "primary_desk": "research",
+                                "supporting_desks": ["data"],
+                                "intent": "strategy_catalog_fact_query",
+                                "confidence": 0.86,
+                                "reason": "The user asks about strategy count.",
+                                "needs_tool": True,
+                            }
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 9, "completion_tokens": 11, "total_tokens": 20},
+        }
+
+    monkeypatch.setattr(router, "_openai_compatible_chat_completion", fake_transport)
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Provider router", default_desk="reporting")
+    routed = runtime.submit_ceo_message(session.session_id, content="现在有多少个系统打法？")
+    response = routed["desk_response"]
+    reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
+
+    assert calls
+    assert calls[0]["use_case"] == "agent_routing"
+    assert calls[0]["provider"] == "unit_router"
+    assert calls[0]["api_key"] == "router-secret"
+    assert routed["message"].desk == "research"
+    assert response.message.desk == "research"
+    assert reasoning_by_kind["agent_router"]["router_source"] == "provider"
+    assert reasoning_by_kind["agent_router"]["intent"] == "strategy_catalog_fact_query"
+    assert reasoning_by_kind["agent_router"]["supporting_desks"] == ["data"]
+    reset_datahub()
+
+
+def test_agent_router_falls_back_when_provider_result_is_invalid(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_ROUTER_API_KEY", "router-secret")
+    from data.storage.datahub import reset_datahub
+    import agent_os.router as router
+
+    reset_datahub()
+    _use_unit_agent_routing_settings(monkeypatch)
+
+    from agent_os.runtime import AgentRuntime
+
+    def invalid_transport(_request: dict[str, object]) -> dict[str, object]:
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "primary_desk": "quant_oracle",
+                                "supporting_desks": [],
+                                "intent": "invalid",
+                                "confidence": 0.99,
+                                "reason": "Invalid desk must be rejected.",
+                                "needs_tool": False,
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+
+    monkeypatch.setattr(router, "_openai_compatible_chat_completion", invalid_transport)
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Invalid provider router", default_desk="reporting")
+    routed = runtime.submit_ceo_message(session.session_id, content="现在有多少个系统打法？")
+    response = routed["desk_response"]
+    routing = next(row for row in response.reasoning if row["kind"] == "desk_routing")
+    router_reasoning = next(row for row in response.reasoning if row["kind"] == "agent_router")
+
+    assert routed["message"].desk == "reporting"
+    assert response.message.desk == "reporting"
+    assert routing["assigned_desk"] == "reporting"
+    assert router_reasoning["router_source"] == "fallback"
+    assert router_reasoning["fallback_reason"] == "invalid_provider_primary_desk"
     reset_datahub()
 
 

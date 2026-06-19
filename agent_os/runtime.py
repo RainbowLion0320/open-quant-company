@@ -30,6 +30,7 @@ from agent_os.reports import (
     report_rhythm_templates,
     write_report_index,
 )
+from agent_os.router import RouterAgent
 from agent_os.schemas import (
     AgentAction,
     AgentHandoff,
@@ -44,7 +45,7 @@ from agent_os.schemas import (
     EvidenceRef,
 )
 from agent_os.tools import AgentToolRegistry
-from agent_os.workflows import DeskRoutingDecision, build_desk_workflow_plan, route_ceo_message_desk
+from agent_os.workflows import DeskRoutingDecision, build_desk_workflow_plan
 from broker import PaperBroker
 from broker.live.qmt import MiniQmtLiveBroker
 from data.llm.usage import resolve_llm_use_case
@@ -430,9 +431,12 @@ class AgentRuntime:
                 reason="explicit_desk",
                 explicit=True,
             )
+            router_reasoning = None
         else:
-            routing_decision = route_ceo_message_desk(content)
+            router_decision = RouterAgent().route(content)
+            routing_decision = router_decision.to_routing_decision()
             target_desk = routing_decision.assigned_desk
+            router_reasoning = router_decision.to_reasoning()
         if get_desk(target_desk) is None:
             raise ValueError(f"Unknown desk: {target_desk}")
         message = self.add_message(session_id, role="ceo", desk=target_desk, content=content)
@@ -442,6 +446,7 @@ class AgentRuntime:
             desk=target_desk,
             content=content,
             routing_decision=routing_decision,
+            router_reasoning=router_reasoning,
             semantic_planner=semantic_planner,
         )
         return {"message": message, "desk_response": desk_response}
@@ -3306,6 +3311,7 @@ class AgentRuntime:
         desk: str,
         content: str,
         routing_decision: DeskRoutingDecision | None = None,
+        router_reasoning: dict[str, Any] | None = None,
         semantic_planner: Any | None = None,
     ) -> DeskResponse:
         plan = build_desk_workflow_plan(
@@ -3369,6 +3375,7 @@ class AgentRuntime:
             handoffs=plan.handoffs,
             reasoning=[
                 *([routing_decision.to_reasoning()] if routing_decision is not None else []),
+                *([router_reasoning] if router_reasoning is not None else []),
                 *plan.reasoning,
                 self._session_context_reasoning(session_id),
             ],

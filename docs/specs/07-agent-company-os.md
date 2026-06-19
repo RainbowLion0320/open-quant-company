@@ -1,7 +1,7 @@
 # Spec: Agent Company OS
 
 > Version: 0.1
-> Updated: 2026-06-16
+> Updated: 2026-06-19
 > Status: phased implementation contract
 > Related: [PRD](../product/prd.md), [Web Platform](05-web-platform.md), [Master Roadmap](../project/agent-company/00-master-roadmap.md)
 
@@ -9,7 +9,7 @@
 
 Agent Company OS is the planned local-first operating layer for Open Quant Company. It lets the human user act as CEO while desk agents coordinate data, research, portfolio, risk, execution, engineering, and reporting work.
 
-This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, deterministic desk auto-routing, bounded fixed-command dispatch, run event timelines, session snapshot SSE streaming, run event snapshot SSE streaming, active subprocess stdout/stderr chunk event recording, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, fixed cross-artifact report context aggregation, deterministic semantic report synthesis, deterministic cross-session report trend synthesis, deterministic causal-chain report synthesis with recurring-chain escalation, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, env-only report notification triggers, paper order preview/proposal/approved-submit/cancel cards with reconciliation evidence, default-disabled live readiness probing, no-submit live broker environment validation and smoke tests, live order preview risk gating, approval-gated live submit/reconciliation contracts, runtime project-ledger snapshot wiring for live reconciliation, scheduled live reconciliation scans, cron-callable live monitor evidence ticks, live kill-switch queued-action cancellation plus broker-side cancellation requests for submitted live evidence, explicit MiniQMT/QMT SDK gateway bridge with config-based factory loading, desk-declared fixed tool registry coverage, deterministic intent-to-tool routing, deterministic multi-intent workflow planning, artifact-aware deterministic priority planning from local evidence, bounded session-backlog adaptive planning, bounded artifact-plus-session adaptive planning, deterministic open-ended company-wide diagnostic planning, autonomy programs for durable multi-stage CEO goals, opt-in semantic planner draft filtering, API/CLI semantic-draft intake with server-side safety filtering, Data Desk repair dry-run plus approval workflow, Research strategy-blocker cross-desk diagnosis, Research sub-capability handling for technical/sentiment/fundamental/factor/ML analysis, Portfolio Desk evidence review for portfolio-level decisions, Engineering Desk code/bug work-order triage, daily-brief cross-desk orchestration, and portfolio review cross-desk orchestration are implemented. Open-ended planning is allowed only as auditable program metadata; execution remains bounded to fixed-registry `read_only` / `dry_run` tools, with unknown or state-changing items preserved as blockers, approvals, or work orders.
+This spec defines behavior contracts for the Agent Company OS rollout. Foundation runtime pieces, the first CEO Office page, hybrid desk routing through `RouterAgent`, desk fact answers backed by local catalogs/artifacts, bounded fixed-command dispatch, run event timelines, session snapshot SSE streaming, run event snapshot SSE streaming, active subprocess stdout/stderr chunk event recording, transparent memory governance, evidence-cited report artifacts with CEO Office template selection, fixed cross-artifact report context aggregation, deterministic semantic report synthesis, deterministic cross-session report trend synthesis, deterministic causal-chain report synthesis with recurring-chain escalation, explicit operating-rhythm report runs, cron-callable scheduled report rhythm ticks, env-only report notification triggers, paper order preview/proposal/approved-submit/cancel cards with reconciliation evidence, default-disabled live readiness probing, no-submit live broker environment validation and smoke tests, live order preview risk gating, approval-gated live submit/reconciliation contracts, runtime project-ledger snapshot wiring for live reconciliation, scheduled live reconciliation scans, cron-callable live monitor evidence ticks, live kill-switch queued-action cancellation plus broker-side cancellation requests for submitted live evidence, explicit MiniQMT/QMT SDK gateway bridge with config-based factory loading, desk-declared fixed tool registry coverage, deterministic intent-to-tool routing, deterministic multi-intent workflow planning, artifact-aware deterministic priority planning from local evidence, bounded session-backlog adaptive planning, bounded artifact-plus-session adaptive planning, deterministic open-ended company-wide diagnostic planning, autonomy programs for durable multi-stage CEO goals, opt-in semantic planner draft filtering, API/CLI semantic-draft intake with server-side safety filtering, Data Desk repair dry-run plus approval workflow, Research strategy-blocker cross-desk diagnosis, Research sub-capability handling for technical/sentiment/fundamental/factor/ML analysis, Portfolio Desk evidence review for portfolio-level decisions, Engineering Desk code/bug work-order triage, daily-brief cross-desk orchestration, and portfolio review cross-desk orchestration are implemented. Open-ended planning is allowed only as auditable program metadata; execution remains bounded to fixed-registry `read_only` / `dry_run` tools, with unknown or state-changing items preserved as blockers, approvals, or work orders.
 
 ## 2. Product Contract
 
@@ -164,9 +164,24 @@ All commands must support `--json`.
 }
 ```
 
-The first implementation is deterministic: it does not call an LLM. It creates
-safe local evidence references, proposes only desk-scoped fixed-registry actions,
-and records any required cross-desk handoffs in the ledger.
+CEO message routing uses a hybrid `RouterAgent`: explicit API/CLI `desk` values
+are respected; Web messages that omit `desk` first use deterministic local
+single-desk matches; no-match and cross-desk ambiguity may call the configured
+`llm.use_cases.agent_routing` OpenAI-compatible provider. Router provider output
+must be JSON with `primary_desk`, `supporting_desks`, `intent`, `confidence`,
+`reason`, and `needs_tool`. Unknown desks, missing secrets, timeouts, invalid
+JSON, disabled providers, missing model/base URL, or unsupported protocols fail
+closed back to deterministic routing and are recorded as reasoning rows. The
+Router never executes tools or answers factual business questions.
+
+Desk answers may be fact-backed when the question is a direct status/catalog
+query. For example, Research strategy count/catalog questions read
+`research.strategy_catalog.catalog_items()` and return real totals and layer /
+lifecycle counts without running a backtest or creating actions. Data, Risk, and
+Engineering status answers may summarize fixed local artifacts; missing artifacts
+must be reported as missing with a recommended `astroq` command, never filled
+with invented values. Tool execution remains explicit through desk-scoped
+fixed-registry actions.
 
 Semantic-assisted plans are still filtered through the fixed tool registry. A
 deskless semantic action may be accepted only when the selected safe tool has
@@ -1065,5 +1080,5 @@ As of 2026-06-15:
 - Runtime live submit and scheduled reconciliation attach preview-derived project ledger snapshots to ack payloads before adapter reconciliation. Missing cash, position quantity, position delta, symbol, or broker order id is preserved as structured `project_snapshot.missing`, and the xtquant gateway treats incomplete snapshots as `needs_review`.
 - Existing Web System pages already provide CodeGraph, AST diagnostics, test design intelligence, lifecycle readiness, and data source capability evidence.
 - Existing CLI commands already provide many deterministic tools that future desk agents can call.
-- CEO Office is implemented as the default `/` route with session creation, message entry, deterministic desk auto-routing for Web messages that omit `desk`, message-linked evidence/action references, inline approval/reject/cancel/paper-submit decisions, expandable message-local run event timelines, and message-local evidence details. It intentionally does not expose a target-desk selector, persistent action queues, right-side action/evidence detail panels, desk drill-down, approval policy tables, handoff/work-order ledgers, report rhythm controls, live readiness/kill-switch/monitor panels, autonomy step/run/program controls, or semantic-planner debug inputs; those remain CLI/API/system/internal runtime mechanisms. `/market` carries the market overview.
+- CEO Office is implemented as the default `/` route with session creation, message entry, hybrid `RouterAgent` desk routing for Web messages that omit `desk`, message-linked evidence/action references, inline approval/reject/cancel/paper-submit decisions, expandable message-local run event timelines, and message-local evidence details. It intentionally does not expose a target-desk selector, persistent action queues, right-side action/evidence detail panels, desk drill-down, approval policy tables, handoff/work-order ledgers, report rhythm controls, live readiness/kill-switch/monitor panels, autonomy step/run/program controls, or semantic-planner debug inputs; those remain CLI/API/system/internal runtime mechanisms. `/market` carries the market overview.
 - An opt-in semantic planner adapter can draft ambiguous plans, and API/CLI callers can pass an explicit semantic draft object/file for server-side filtering in plan preview, message submission, bounded autonomy steps, capped autonomy runs, and persisted autonomy programs. Draft output is treated as untrusted input, filtered to known `read_only` / `dry_run` fixed-registry tools, scoped to allowed desks, and marked for manual review. Open-ended goals may be persisted as programs, but execution remains inside fixed-registry safety boundaries; arbitrary unknown tools, writes, code changes, and trading do not auto-run.

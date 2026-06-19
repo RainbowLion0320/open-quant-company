@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -627,6 +628,14 @@ def build_desk_workflow_plan(
     if conversation_plan is not None:
         return conversation_plan
 
+    fact_plan = _fact_answer_plan(
+        desk=desk,
+        content=content,
+        artifact_context=artifact_context or {},
+    )
+    if fact_plan is not None:
+        return fact_plan
+
     hybrid_plan = _adaptive_artifact_plan(
         desk=desk,
         content=content,
@@ -746,6 +755,134 @@ def _conversation_plan(*, desk: str, content: str) -> DeskWorkflowPlan | None:
             }
         ],
     )
+
+
+def _fact_answer_plan(*, desk: str, content: str, artifact_context: dict[str, Any]) -> DeskWorkflowPlan | None:
+    normalized = content.lower().strip()
+    if desk == "research" and _is_strategy_catalog_fact_query(normalized):
+        return _strategy_catalog_fact_answer()
+    if desk in {"data", "risk", "engineering"} and _is_status_fact_query(normalized):
+        return _artifact_status_fact_answer(desk=desk, artifact_context=artifact_context)
+    return None
+
+
+def _strategy_catalog_fact_answer() -> DeskWorkflowPlan:
+    from research.strategy_catalog import catalog_items
+
+    items = catalog_items()
+    layer_counts = Counter(item.layer for item in items)
+    lifecycle_counts = Counter(item.lifecycle for item in items)
+    layer_text = _counter_text(layer_counts)
+    lifecycle_text = _counter_text(lifecycle_counts)
+    preview = "、".join(item.name for item in items[:8])
+    suffix = " 等" if len(items) > 8 else ""
+    answer = (
+        f"量化研究部读取 research.strategy_catalog.catalog_items() 后，当前策略目录共有 {len(items)} 个策略。"
+        f"按 layer 分布：{layer_text}；按 lifecycle 分布：{lifecycle_text}。"
+        f"策略包括：{preview}{suffix}。本次只读取策略目录，没有运行回测、补数或创建交易/修复行动。"
+    )
+    return DeskWorkflowPlan(
+        desk="research",
+        answer=answer,
+        confidence=0.9,
+        actions=[],
+        planning_mode="fact_answer",
+        reasoning=[
+            {
+                "kind": "fact_answer",
+                "source": "research.strategy_catalog.catalog_items",
+                "total": len(items),
+                "layer_counts": dict(sorted(layer_counts.items())),
+                "lifecycle_counts": dict(sorted(lifecycle_counts.items())),
+                "side_effects": "read_only",
+            }
+        ],
+    )
+
+
+def _artifact_status_fact_answer(*, desk: str, artifact_context: dict[str, Any]) -> DeskWorkflowPlan:
+    command_by_desk = {
+        "data": "astroq data status --json 或 astroq data sources --json",
+        "risk": "astroq lifecycle check --json",
+        "engineering": "astroq architecture ast --json 或 astroq test design --json",
+    }
+    label_by_desk = {
+        "data": "数据工程部",
+        "risk": "风险管理部",
+        "engineering": "技术平台部",
+    }
+    evidence_summary = _artifact_evidence_summary(artifact_context)
+    if evidence_summary:
+        answer = f"{label_by_desk[desk]}读取本地 artifact 摘要后看到：{'；'.join(evidence_summary[:5])}。"
+    else:
+        answer = (
+            f"{label_by_desk[desk]}当前没有可用的本地 artifact 摘要，不能编造状态。"
+            f"请先运行 {command_by_desk[desk]} 生成证据产物后再查看。"
+        )
+    return DeskWorkflowPlan(
+        desk=desk,
+        answer=answer,
+        confidence=0.76 if evidence_summary else 0.58,
+        actions=[],
+        planning_mode="fact_answer",
+        reasoning=[
+            {
+                "kind": "fact_answer",
+                "source": "local_artifact_context",
+                "artifact_summary_count": len(evidence_summary),
+                "recommended_command": command_by_desk[desk],
+                "side_effects": "read_only",
+            }
+        ],
+        blockers=[] if evidence_summary else ["missing_local_artifact_summary"],
+    )
+
+
+def _is_strategy_catalog_fact_query(normalized: str) -> bool:
+    subject_terms = ("策略", "strategy", "strategies", "打法", "系统打法", "策略目录", "strategy catalog")
+    question_terms = ("几个", "多少", "几种", "哪些", "列表", "目录", "catalog", "how many", "what strategies")
+    return any(term in normalized for term in subject_terms) and any(term in normalized for term in question_terms)
+
+
+def _is_status_fact_query(normalized: str) -> bool:
+    if any(
+        term in normalized
+        for term in (
+            "检查",
+            "跑一次",
+            "运行",
+            "修复",
+            "补数",
+            "补齐",
+            "diff",
+            "差异",
+            "repair",
+            "run",
+            "check",
+        )
+    ):
+        return False
+    return any(
+        term in normalized
+        for term in (
+            "状态",
+            "健康",
+            "摘要",
+            "几个",
+            "多少",
+            "有没有",
+            "status",
+            "summary",
+            "health",
+            "how many",
+        )
+    )
+
+
+def _counter_text(counter: Counter[str]) -> str:
+    if not counter:
+        return "无"
+    return "、".join(f"{key} {value}" for key, value in sorted(counter.items()))
 
 
 def _adaptive_artifact_plan(
