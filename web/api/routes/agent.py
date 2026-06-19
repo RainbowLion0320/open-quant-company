@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/agent", tags=["Agent"])
 
 
 def _dispatch_safe_message_actions(action_ids: list[str]) -> None:
-    AgentRuntime().dispatch_safe_proposed_actions(action_ids)
+    AgentRuntime().dispatch_safe_proposed_actions_and_synthesize(action_ids)
 
 
 @router.get("/sessions")

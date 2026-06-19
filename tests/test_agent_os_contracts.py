@@ -4,7 +4,19 @@ import types
 from subprocess import CompletedProcess
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
+
+
+OLD_RECORDED_TEMPLATE = "已记录 " + "CEO 问题"
+OLD_NEXT_TEMPLATE = "下一步" + "应"
+OLD_SAFE_ACTION_TEMPLATE = "我" + "查完" + "策略目录"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_llm_provider_env(monkeypatch):
+    for name in ("MIMO_API_KEY", "DEEPSEEK_API_KEY", "UNIT_API_KEY", "UNIT_ROUTER_API_KEY", "UNIT_RESPONSE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
 
 
 def _use_deepseek_agent_planning_settings(monkeypatch):
@@ -70,6 +82,45 @@ def _use_unit_agent_routing_settings(monkeypatch):
     )
 
 
+def _use_unit_agent_response_settings(monkeypatch):
+    import data.llm.usage as llm_usage
+
+    monkeypatch.setattr(
+        llm_usage,
+        "get_settings",
+        lambda: {
+            "llm": {
+                "default_provider": "unit_response",
+                "use_cases": {
+                    "agent_response": {"provider": "unit_response", "model": "unit-response"},
+                },
+                "providers": {
+                    "unit_response": {
+                        "enabled": True,
+                        "label": "Unit Response",
+                        "protocol": "openai_compatible",
+                        "api_key_env": "UNIT_RESPONSE_API_KEY",
+                        "base_url": "https://unit-response.example/v1",
+                        "default_model": "unit-response",
+                        "request": {
+                            "chat_path": "/chat/completions",
+                            "response_format_json": True,
+                            "temperature": 0.2,
+                            "timeout_seconds": 8,
+                        },
+                        "pricing": {"models": {"unit-response": {"total": 1.0}}},
+                    }
+                },
+            }
+        },
+    )
+
+
+def _assert_agent_response_unavailable(response):
+    assert "模型回复不可用" in response.answer
+    assert any(str(blocker).startswith("agent_response_") for blocker in response.blockers)
+
+
 def test_agent_runtime_creates_session_message_and_action(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
@@ -107,6 +158,55 @@ def test_agent_runtime_creates_session_message_and_action(tmp_path, monkeypatch)
     assert loaded["messages"][0]["content"] == "今天系统该做什么？"
     assert loaded["actions"][0]["risk_level"] == "write_data"
     reset_datahub()
+
+
+def test_agent_sessions_sort_by_recent_message_activity(tmp_path):
+    from agent_os.ledger import AgentLedger
+
+    ledger = AgentLedger(tmp_path / "agent.sqlite")
+    ledger.insert_session(
+        {
+            "session_id": "old_session",
+            "title": "Older session",
+            "status": "active",
+            "created_by": "human",
+            "default_desk": "reporting",
+            "tags": [],
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+        }
+    )
+    ledger.insert_session(
+        {
+            "session_id": "new_session",
+            "title": "Newer empty session",
+            "status": "active",
+            "created_by": "human",
+            "default_desk": "reporting",
+            "tags": [],
+            "created_at": "2026-01-02T00:00:00Z",
+            "updated_at": "2026-01-02T00:00:00Z",
+        }
+    )
+
+    ledger.insert_message(
+        {
+            "message_id": "msg_latest",
+            "session_id": "old_session",
+            "role": "ceo",
+            "desk": "research",
+            "content": "这才是最新对话",
+            "evidence_refs": [],
+            "action_refs": [],
+            "created_at": "2026-01-03T00:00:00Z",
+        }
+    )
+
+    sessions = ledger.list_sessions()
+
+    assert sessions[0]["session_id"] == "old_session"
+    assert sessions[0]["updated_at"] == "2026-01-03T00:00:00Z"
+    assert sessions[1]["session_id"] == "new_session"
 
 
 def test_agent_model_runtime_reports_llm_config_and_context_usage(tmp_path, monkeypatch):
@@ -1206,7 +1306,7 @@ def test_engineering_code_request_creates_work_order_and_safe_diagnostics(tmp_pa
     }
     assert all(action["risk_level"] == "read_only" for action in actions)
     assert all(action["status"] == "proposed" for action in actions)
-    assert "工单" in response.answer or "work order" in response.answer.lower()
+    _assert_agent_response_unavailable(response)
     assert runtime.memory_snapshot()["summary"]["work_order_count"] == 1
     reset_datahub()
 
@@ -4647,13 +4747,38 @@ def test_agent_api_reads_local_ledger_without_running_tools(tmp_path, monkeypatc
     reset_datahub()
 
 
-def test_agent_runtime_routes_ceo_message_to_deterministic_desk_response(tmp_path, monkeypatch):
+def test_agent_runtime_routes_ceo_message_to_agent_response_provider(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_RESPONSE_API_KEY", "unit-secret")
+    _use_unit_agent_response_settings(monkeypatch)
     from data.storage.datahub import reset_datahub
 
     reset_datahub()
 
     from agent_os.runtime import AgentRuntime
+
+    calls: list[dict[str, object]] = []
+
+    def fake_completion(request):
+        calls.append(request)
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "answer": "模型回答：我会按数据、研究和风险三块给你汇总，并引用本地证据。",
+                                "title": "CEO brief",
+                            },
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120},
+        }
+
+    monkeypatch.setattr("agent_os.response_synthesizer._openai_compatible_chat_completion", fake_completion)
 
     runtime = AgentRuntime()
     session = runtime.create_session(title="Daily CEO Brief", default_desk="reporting")
@@ -4674,7 +4799,11 @@ def test_agent_runtime_routes_ceo_message_to_deterministic_desk_response(tmp_pat
     assert ceo_message.role == "ceo"
     assert desk_response.message.role == "desk_agent"
     assert desk_response.message.desk == "reporting"
-    assert "Reporting Desk" in desk_response.answer
+    assert calls
+    assert calls[0]["use_case"] == "agent_response"
+    assert desk_response.answer == "模型回答：我会按数据、研究和风险三块给你汇总，并引用本地证据。"
+    assert OLD_RECORDED_TEMPLATE not in desk_response.answer
+    assert OLD_NEXT_TEMPLATE not in desk_response.answer
     assert desk_response.confidence >= 0.6
     assert len(actions) == 3
     assert {action["risk_level"] for action in actions} == {"read_only"}
@@ -4745,7 +4874,35 @@ def test_agent_runtime_auto_routes_ceo_messages_when_desk_is_missing(tmp_path, m
     assert greeting["desk_response"].message.desk == "reporting"
     assert greeting["desk_response"].proposed_actions == []
     assert greeting["desk_response"].planning_mode == "conversation"
-    assert "你好" in greeting["desk_response"].answer
+    assert "模型回复不可用" in greeting["desk_response"].answer
+    reset_datahub()
+
+
+def test_ceo_desk_default_reply_missing_provider_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.delenv("UNIT_RESPONSE_API_KEY", raising=False)
+    _use_unit_agent_response_settings(monkeypatch)
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Natural data reply")
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        content="检查一下数据缺口",
+    )
+    response = routed["desk_response"]
+
+    assert routed["message"].desk == "data"
+    assert response.message.desk == "data"
+    assert "模型回复不可用" in response.answer
+    assert "agent_response_missing_secret" in response.blockers
+    assert "我先" not in response.answer
+    assert OLD_RECORDED_TEMPLATE not in response.answer
+    assert OLD_NEXT_TEMPLATE not in response.answer
     reset_datahub()
 
 
@@ -4769,9 +4926,7 @@ def test_agent_runtime_answers_strategy_catalog_fact_queries_from_real_catalog(t
     assert routed["message"].desk == "research"
     assert response.message.desk == "research"
     assert response.planning_mode == "fact_answer"
-    assert str(catalog_total) in response.answer
-    assert "策略" in response.answer
-    assert "research.strategy_catalog.catalog_items" in response.answer
+    _assert_agent_response_unavailable(response)
     assert response.proposed_actions == []
     assert response.evidence_refs == []
     assert reasoning_by_kind["fact_answer"]["source"] == "research.strategy_catalog.catalog_items"
@@ -5037,7 +5192,7 @@ def test_agent_follow_up_uses_session_state_for_adaptive_workflow(tmp_path, monk
     assert all(action["status"] == "proposed" for action in actions)
     assert any(handoff["target_desk"] == "data" for handoff in response.handoffs)
     assert any(handoff["target_desk"] == "engineering" for handoff in response.handoffs)
-    assert "session" in response.answer.lower() or "未完成" in response.answer
+    _assert_agent_response_unavailable(response)
     reset_datahub()
 
 
@@ -5106,9 +5261,16 @@ def test_agent_api_message_schedules_safe_action_dispatch(tmp_path, monkeypatch)
 
     def fake_dispatch_safe(self, action_ids, **kwargs):
         dispatched.append(list(action_ids))
-        return {"status": "ready", "run_count": len(action_ids), "skipped_count": 0, "runs": [], "skipped": []}
+        return {
+            "status": "ready",
+            "run_count": len(action_ids),
+            "skipped_count": 0,
+            "runs": [],
+            "skipped": [],
+            "summary_message": None,
+        }
 
-    monkeypatch.setattr(AgentRuntime, "dispatch_safe_proposed_actions", fake_dispatch_safe, raising=False)
+    monkeypatch.setattr(AgentRuntime, "dispatch_safe_proposed_actions_and_synthesize", fake_dispatch_safe, raising=False)
 
     runtime = AgentRuntime()
     session = runtime.create_session(title="API safe dispatch", default_desk="reporting")
@@ -5253,8 +5415,7 @@ def test_portfolio_desk_reviews_portfolio_decisions_without_fake_weights(tmp_pat
     assert actions[0]["risk_level"] == "read_only"
     evidence = runtime.ledger.get_evidence(actions[0]["evidence_refs"][0])
     assert evidence["uri"] == "/portfolio"
-    assert "Portfolio Desk" in response.answer
-    assert "不生成假组合建议" in response.answer
+    _assert_agent_response_unavailable(response)
     assert {handoff["target_desk"] for handoff in response.handoffs} == {"research", "risk", "execution"}
     reset_datahub()
 
@@ -5282,13 +5443,14 @@ def test_research_capability_requests_stay_under_research_desk(tmp_path, monkeyp
     assert len(actions) == 1
     assert actions[0]["desk"] == "research"
     assert actions[0]["parameters"]["tool_id"] == "astroq.strategy.catalog"
-    assert "子能力" in response.answer
-    assert "不把这些研究来源拆成新的一级 desk" in response.answer
+    _assert_agent_response_unavailable(response)
     reset_datahub()
 
 
 def test_research_best_strategy_question_reads_competition_evidence(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_RESPONSE_API_KEY", "unit-secret")
+    _use_unit_agent_response_settings(monkeypatch)
     from data.storage.datahub import get_datahub, reset_datahub
 
     reset_datahub()
@@ -5340,6 +5502,30 @@ def test_research_best_strategy_question_reads_competition_evidence(tmp_path, mo
 
     from agent_os.runtime import AgentRuntime
 
+    calls: list[dict[str, object]] = []
+
+    def fake_completion(request):
+        calls.append(request)
+        prompt = json.dumps(request.get("messages") or [], ensure_ascii=False)
+        assert "strategy_competition_latest" in prompt
+        assert "alpha_one" in prompt
+        assert "Alpha One" in prompt
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {"answer": "模型回答：当前证据里 Alpha One 排名第一，但仍要看 paper 状态和 IC/ICIR。"},
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150},
+        }
+
+    monkeypatch.setattr("agent_os.response_synthesizer._openai_compatible_chat_completion", fake_completion)
+
     runtime = AgentRuntime()
     session = runtime.create_session(title="Best strategy", default_desk="research")
     routed = runtime.submit_ceo_message(
@@ -5352,11 +5538,65 @@ def test_research_best_strategy_question_reads_competition_evidence(tmp_path, mo
     assert response.message.desk == "research"
     assert response.planning_mode == "fact_answer"
     assert response.proposed_actions == []
-    assert "Alpha One" in response.answer
-    assert "alpha_one" in response.answer
-    assert "排名第 1" in response.answer
-    assert "strategy_competition_latest.json" in response.answer
-    assert response.reasoning[2]["source"] == "strategy_competition_latest"
+    assert calls
+    assert response.answer == "模型回答：当前证据里 Alpha One 排名第一，但仍要看 paper 状态和 IC/ICIR。"
+    assert "量化研究部读取" not in response.answer
+    assert OLD_NEXT_TEMPLATE not in response.answer
+    assert any(row.get("source") == "strategy_competition_latest" for row in response.reasoning)
+    reset_datahub()
+
+
+def test_research_strategy_catalog_question_passes_real_catalog_to_agent_response(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_RESPONSE_API_KEY", "unit-secret")
+    _use_unit_agent_response_settings(monkeypatch)
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[dict[str, object]] = []
+
+    def fake_completion(request):
+        calls.append(request)
+        prompt = json.dumps(request.get("messages") or [], ensure_ascii=False)
+        assert "research.strategy_catalog.catalog_items" in prompt
+        assert "multifactor" in prompt
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {"answer": "模型回答：当前策略目录共有 12 个策略，我会按生命周期和层级解释。"},
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120},
+        }
+
+    monkeypatch.setattr("agent_os.response_synthesizer._openai_compatible_chat_completion", fake_completion)
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Strategy catalog question", default_desk="research")
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        content="我们当前策略都有什么",
+    )
+    response = routed["desk_response"]
+
+    assert routed["message"].desk == "research"
+    assert response.message.desk == "research"
+    assert response.planning_mode == "fact_answer"
+    assert response.proposed_actions == []
+    assert calls
+    assert response.answer == "模型回答：当前策略目录共有 12 个策略，我会按生命周期和层级解释。"
+    assert "当前策略目录共有 12 个策略" in response.answer
+    assert "本次只读取策略目录" not in response.answer
+    assert OLD_NEXT_TEMPLATE not in response.answer
+    assert OLD_RECORDED_TEMPLATE not in response.answer
     reset_datahub()
 
 
@@ -5424,25 +5664,20 @@ def test_agent_desk_workflow_routes_ceo_intent_to_specific_tools(tmp_path, monke
     assert research_action["parameters"]["tool_id"] == "astroq.strategy.compete"
     assert engineering_action["parameters"]["tool_id"] == "astroq.test.design"
     assert docs_action["parameters"]["tool_id"] == "astroq.docs.check"
-    assert "source capability" in data_result["desk_response"].answer.lower()
-    assert "17" in data_result["desk_response"].answer
-    assert "stock_limit_list" in data_result["desk_response"].answer
+    _assert_agent_response_unavailable(data_result["desk_response"])
     data_reasoning = {row["kind"]: row for row in data_result["desk_response"].reasoning}
     assert data_reasoning["artifact_context"]["evidence_summary"][:2] == [
         "lifecycle: stock_limit_list rate_limited",
         "data: 17 unmapped source capabilities",
     ]
-    assert "IC/ICIR" in research_result["desk_response"].answer
-    assert "test design" in engineering_result["desk_response"].answer.lower()
-    assert "2 AST" in engineering_result["desk_response"].answer
-    assert "P1=1" in engineering_result["desk_response"].answer
-    assert "4 test design" in engineering_result["desk_response"].answer
+    _assert_agent_response_unavailable(research_result["desk_response"])
+    _assert_agent_response_unavailable(engineering_result["desk_response"])
     engineering_reasoning = {row["kind"]: row for row in engineering_result["desk_response"].reasoning}
     assert "engineering: 2 AST issue(s), P1=1, P2=1" in engineering_reasoning["artifact_context"][
         "evidence_summary"
     ]
     assert "testing: 4 test design risk(s)" in engineering_reasoning["artifact_context"]["evidence_summary"]
-    assert "docs check" in docs_result["desk_response"].answer.lower()
+    _assert_agent_response_unavailable(docs_result["desk_response"])
     reset_datahub()
 
 
@@ -5568,11 +5803,7 @@ def test_agent_dynamic_workflow_plan_orchestrates_mixed_ceo_request(tmp_path, mo
         "execution",
         "engineering",
     }
-    assert "dynamic" in preview["answer"].lower() or "多意图" in preview["answer"]
-    assert "stock_limit_list" in preview["answer"]
-    assert "rate_limited" in preview["answer"]
-    assert "7" in preview["answer"]
-    assert "6/12" in preview["answer"]
+    assert preview["answer"] == "dynamic_multi_intent_plan"
     reasoning_by_kind = {row["kind"]: row for row in preview["reasoning"]}
     assert reasoning_by_kind["artifact_context"]["evidence_summary"][:4] == [
         "lifecycle: stock_limit_list rate_limited",
@@ -5612,8 +5843,7 @@ def test_reporting_daily_report_request_creates_approval_required_report_action(
         "session_id": session.session_id,
         "tool_id": "astroq.agent.report.daily",
     }
-    assert "report artifact" in response.answer
-    assert "审批" in response.answer
+    _assert_agent_response_unavailable(response)
     assert reasoning_by_kind["tool_plan"]["tool_ids"] == ["astroq.agent.report.daily"]
     reset_datahub()
 
@@ -5699,11 +5929,7 @@ def test_agent_workflow_plan_uses_artifact_context_for_broad_ceo_priority_reques
         "engineering_quality_risk",
         "test_design_risk",
     ]
-    assert "macro_gdp" in response.answer
-    assert "source_not_updated" in response.answer
-    assert "21" in response.answer
-    assert "9/12" in response.answer
-    assert "P1" in response.answer
+    _assert_agent_response_unavailable(response)
     assert reasoning_by_kind["artifact_context"]["evidence_summary"][:4] == [
         "lifecycle: macro_gdp source_not_updated",
         "data: 21 unmapped source capabilities",
@@ -5812,11 +6038,7 @@ def test_agent_workflow_plan_combines_artifact_context_with_session_backlog(tmp_
         ("research", "astroq.strategy.compete"),
         ("portfolio", "astroq.strategy.compete"),
     ]
-    assert "risk_free_curve" in response.answer
-    assert "missing_data" in response.answer
-    assert "5" in response.answer
-    assert "4/12" in response.answer
-    assert "P1" in response.answer
+    _assert_agent_response_unavailable(response)
     assert reasoning_by_kind["intent_match"]["planning_mode"] == "adaptive_artifact"
     assert reasoning_by_kind["session_backlog"]["approval_required_count"] >= 1
     assert reasoning_by_kind["artifact_context"]["root_causes"] == [
@@ -5912,12 +6134,8 @@ def test_agent_open_ended_ceo_request_gets_safe_company_wide_plan(tmp_path, monk
     ]
     assert reasoning_by_kind["safety"]["approval_required_count"] == 0
     assert all(action["risk_level"] in {"read_only", "dry_run"} for action in response_actions)
-    assert response.blockers == ["open_ended_plan_is_diagnostic_only"]
-    assert "risk_free_curve" in response.answer
-    assert "missing_data" in response.answer
-    assert "12" in response.answer
-    assert "5/12" in response.answer
-    assert "2 test design" in response.answer
+    assert "open_ended_plan_is_diagnostic_only" in response.blockers
+    _assert_agent_response_unavailable(response)
     assert reasoning_by_kind["artifact_context"]["evidence_summary"][:4] == [
         "lifecycle: risk_free_curve missing_data",
         "data: 12 unmapped source capabilities",
@@ -6022,7 +6240,8 @@ def test_agent_semantic_planner_is_opt_in_and_filtered_to_safe_known_tools(tmp_p
         "astroq.architecture.ast",
     ]
     assert all(action["risk_level"] in {"read_only", "dry_run"} for action in response_actions)
-    assert response.blockers == semantic["blockers"]
+    assert set(response.blockers) >= set(semantic["blockers"])
+    assert "agent_response_missing_secret" in response.blockers
     reset_datahub()
 
 
@@ -6284,7 +6503,8 @@ def test_agent_semantic_draft_plan_api_cli_and_message_intake_are_filtered(tmp_p
 
     assert message_res.status_code == 200
     response = message_res.json()["desk_response"]
-    assert response["blockers"] == api_plan["blockers"]
+    assert set(response["blockers"]) >= set(api_plan["blockers"])
+    assert "agent_response_missing_secret" in response["blockers"]
     persisted_actions = [runtime.get_action(action_id) for action_id in response["proposed_actions"]]
     assert [action["parameters"]["tool_id"] for action in persisted_actions] == [
         "astroq.data.status",
@@ -6817,7 +7037,8 @@ def test_agent_message_provider_semantic_can_fallback_to_deterministic_for_web(t
     assert payload["desk_response"]["message"]["desk"] == "engineering"
     assert payload["desk_response"]["planning_mode"] != "semantic_assisted"
     assert "semantic_provider_missing_secret" not in payload["desk_response"]["blockers"]
-    assert "CEO Office 对话/分诊/UI 问题" in payload["desk_response"]["answer"]
+    assert "模型回复不可用" in payload["desk_response"]["answer"]
+    assert "agent_response_missing_secret" in payload["desk_response"]["blockers"]
     reset_datahub()
 
 
@@ -6851,6 +7072,20 @@ def test_agent_provider_semantic_accepts_answer_without_actions(tmp_path, monkey
             ]
         }
 
+    def final_response_transport(_request: dict[str, object]) -> dict[str, object]:
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps({"answer": "模型最终回复：我可以按部门帮你检查。"}, ensure_ascii=False)
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30},
+        }
+
+    monkeypatch.setattr("agent_os.response_synthesizer._openai_compatible_chat_completion", final_response_transport)
+
     runtime = AgentRuntime()
     session = runtime.create_session(title="Answer-only semantic", default_desk="reporting")
     routed = runtime.submit_ceo_message(
@@ -6862,7 +7097,7 @@ def test_agent_provider_semantic_accepts_answer_without_actions(tmp_path, monkey
     semantic_reasoning = next(row for row in response.reasoning if row["kind"] == "semantic_planner")
 
     assert response.planning_mode == "semantic_assisted"
-    assert response.answer.startswith("你好")
+    assert response.answer == "模型最终回复：我可以按部门帮你检查。"
     assert response.proposed_actions == []
     assert response.blockers == []
     assert semantic_reasoning["manual_review_required"] is False
@@ -6898,7 +7133,7 @@ def test_data_repair_request_proposes_dry_run_and_approval_actions(tmp_path, mon
     assert by_tool["astroq.data.repair"]["status"] == "approval_required"
     assert by_tool["astroq.data.repair"]["approval_required"] is True
     assert by_tool["astroq.data.repair"]["parameters"]["table"] == "stock_limit_list"
-    assert "dry-run" in response.answer.lower() or "演练" in response.answer
+    _assert_agent_response_unavailable(response)
     assert len(response.evidence_refs) == 2
     reset_datahub()
 
@@ -6952,11 +7187,7 @@ def test_research_strategy_blocker_review_orchestrates_research_data_risk_action
     assert all(action["risk_level"] == "read_only" for action in actions)
     assert len(response.evidence_refs) == 3
     assert {handoff["target_desk"] for handoff in response.handoffs} == {"data", "risk"}
-    assert "blocked" in response.answer.lower() or "阻断" in response.answer
-    assert "daily_raw" in response.answer
-    assert "stale" in response.answer
-    assert "9" in response.answer
-    assert "12/12" in response.answer
+    _assert_agent_response_unavailable(response)
     reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
     assert reasoning_by_kind["artifact_context"]["evidence_summary"][:3] == [
         "lifecycle: daily_raw stale",
@@ -7007,9 +7238,7 @@ def test_risk_lifecycle_review_cites_current_artifact_blockers(tmp_path, monkeyp
     assert actions[0]["desk"] == "risk"
     assert actions[0]["risk_level"] == "read_only"
     assert actions[0]["parameters"]["tool_id"] == "astroq.lifecycle.check"
-    assert "risk_free_curve" in response.answer
-    assert "missing_data" in response.answer
-    assert "3" in response.answer
+    _assert_agent_response_unavailable(response)
     assert reasoning_by_kind["artifact_context"]["evidence_summary"][:2] == [
         "lifecycle: risk_free_curve missing_data",
         "data: 3 unmapped source capabilities",
@@ -7058,9 +7287,7 @@ def test_execution_dry_run_review_cites_current_lifecycle_blockers(tmp_path, mon
     assert actions[0]["desk"] == "execution"
     assert actions[0]["risk_level"] == "dry_run"
     assert actions[0]["parameters"]["tool_id"] == "astroq.execution.dry_run"
-    assert "raw_price" in response.answer
-    assert "missing_execution_price" in response.answer
-    assert "2" in response.answer
+    _assert_agent_response_unavailable(response)
     assert reasoning_by_kind["artifact_context"]["evidence_summary"][:2] == [
         "lifecycle: raw_price missing_execution_price",
         "data: 2 unmapped source capabilities",
@@ -7091,8 +7318,7 @@ def test_execution_live_readiness_review_routes_to_read_only_live_tool(tmp_path,
     assert actions[0]["desk"] == "execution"
     assert actions[0]["risk_level"] == "read_only"
     assert actions[0]["parameters"]["tool_id"] == "astroq.agent.live.readiness"
-    assert "live readiness" in response.answer
-    assert "不会提交" in response.answer
+    _assert_agent_response_unavailable(response)
     reset_datahub()
 
 
@@ -7145,11 +7371,7 @@ def test_reporting_daily_brief_orchestrates_multiple_desk_actions(tmp_path, monk
     assert all(action["risk_level"] == "read_only" for action in actions)
     assert len(response.evidence_refs) == 3
     assert {handoff["target_desk"] for handoff in response.handoffs} == {"data", "research", "risk"}
-    assert "daily" in response.answer.lower() or "简报" in response.answer
-    assert "macro_gdp" in response.answer
-    assert "source_not_updated" in response.answer
-    assert "21" in response.answer
-    assert "9/12" in response.answer
+    _assert_agent_response_unavailable(response)
     reasoning_by_kind = {row["kind"]: row for row in response.reasoning}
     assert reasoning_by_kind["artifact_context"]["evidence_summary"][:3] == [
         "lifecycle: macro_gdp source_not_updated",
@@ -7189,7 +7411,7 @@ def test_reporting_portfolio_review_orchestrates_research_portfolio_risk_executi
     assert {action["risk_level"] for action in actions} == {"read_only", "dry_run"}
     assert len(response.evidence_refs) == 4
     assert {handoff["target_desk"] for handoff in response.handoffs} == {"research", "portfolio", "risk", "execution"}
-    assert "portfolio" in response.answer.lower() or "组合" in response.answer
+    _assert_agent_response_unavailable(response)
     reset_datahub()
 
 
@@ -7326,6 +7548,87 @@ def test_agent_runtime_auto_dispatches_only_safe_proposed_actions(tmp_path, monk
     assert runtime.get_action(dry_run_action.action_id)["status"] == "succeeded"
     assert runtime.get_action(write_action.action_id)["status"] == "approval_required"
     assert {item["reason"] for item in result["skipped"]} == {"not_safe_auto_dispatch_action", "missing_action"}
+    reset_datahub()
+
+
+def test_agent_runtime_synthesizes_safe_action_results_as_chat_message(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("UNIT_RESPONSE_API_KEY", "unit-secret")
+    _use_unit_agent_response_settings(monkeypatch)
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    def fake_run(command, **kwargs):
+        return CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps(
+                {
+                    "command": "strategy catalog",
+                    "data": {
+                        "items": [
+                            {"name": "multifactor", "label": "多因子月度调仓", "lifecycle": "production", "layer": "primary_alpha"},
+                            {"name": "ml_lgbm", "label": "LightGBM ML", "lifecycle": "paper", "layer": "auxiliary_alpha"},
+                        ]
+                    },
+                    "ok": True,
+                },
+                ensure_ascii=False,
+            ),
+            stderr="",
+        )
+
+    calls: list[dict[str, object]] = []
+
+    def fake_completion(request):
+        calls.append(request)
+        prompt = json.dumps(request.get("messages") or [], ensure_ascii=False)
+        assert "strategy catalog" in prompt
+        assert "multifactor" in prompt
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {"answer": "模型总结：策略目录安全检查已完成，返回了 multifactor 和 ml_lgbm 两个样例。"},
+                            ensure_ascii=False,
+                        )
+                    }
+                }
+            ],
+            "usage": {"prompt_tokens": 80, "completion_tokens": 18, "total_tokens": 98},
+        }
+
+    monkeypatch.setattr("agent_os.response_synthesizer._openai_compatible_chat_completion", fake_completion)
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Human summary")
+    action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="research",
+        action_type="strategy_catalog",
+        risk_level="read_only",
+        summary="Read strategy catalog",
+        parameters={"tool_id": "astroq.strategy.catalog"},
+    )
+
+    result = runtime.dispatch_safe_proposed_actions_and_synthesize([action.action_id], runner=fake_run)
+    messages = runtime.get_session(session.session_id)["messages"]
+    follow_up = messages[-1]
+
+    assert calls
+    assert calls[0]["use_case"] == "agent_response"
+    assert result["summary_message"]["message_id"] == follow_up["message_id"]
+    assert follow_up["role"] == "desk_agent"
+    assert follow_up["desk"] == "research"
+    assert follow_up["action_refs"] == [action.action_id]
+    assert follow_up["content"] == "模型总结：策略目录安全检查已完成，返回了 multifactor 和 ml_lgbm 两个样例。"
+    assert OLD_SAFE_ACTION_TEMPLATE not in follow_up["content"]
+    assert OLD_NEXT_TEMPLATE not in follow_up["content"]
+    assert OLD_RECORDED_TEMPLATE not in follow_up["content"]
     reset_datahub()
 
 

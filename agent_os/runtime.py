@@ -31,6 +31,7 @@ from agent_os.reports import (
     write_report_index,
 )
 from agent_os.router import RouterAgent
+from agent_os.response_synthesizer import synthesize_agent_response
 from agent_os.schemas import (
     AgentAction,
     AgentHandoff,
@@ -86,6 +87,17 @@ def _summary(value: str, *, limit: int = 4000) -> str:
     if len(value) <= limit:
         return value
     return value[:limit] + "\n...[truncated]"
+
+
+def _dedupe_preserving_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        out.append(value)
+    return out
 
 
 def _estimate_context_tokens(messages: list[dict[str, Any]]) -> int:
@@ -999,6 +1011,87 @@ class AgentRuntime:
             "skipped_count": len(skipped),
             "runs": runs,
             "skipped": skipped,
+        }
+
+    def dispatch_safe_proposed_actions_and_synthesize(
+        self,
+        action_ids: list[str],
+        *,
+        runner: Any | None = None,
+        timeout_seconds: int = 120,
+        tool_registry: AgentToolRegistry | None = None,
+    ) -> dict[str, Any]:
+        result = self.dispatch_safe_proposed_actions(
+            action_ids,
+            runner=runner,
+            timeout_seconds=timeout_seconds,
+            tool_registry=tool_registry,
+        )
+        action_rows = [self.get_action(action_id) for action_id in action_ids]
+        actions = [action for action in action_rows if action]
+        if not actions or not result.get("runs"):
+            return {**result, "summary_message": None}
+
+        session_ids = {str(action.get("session_id") or "") for action in actions}
+        session_ids.discard("")
+        if len(session_ids) != 1:
+            return {**result, "summary_message": None}
+
+        desk_ids = {str(action.get("desk") or "") for action in actions}
+        desk_ids.discard("")
+        desk = next(iter(desk_ids)) if len(desk_ids) == 1 else "reporting"
+        evidence_refs = _dedupe_preserving_order(
+            [
+                str(evidence_id)
+                for action in actions
+                for evidence_id in (action.get("evidence_refs") or [])
+            ]
+            + [
+                str(evidence_id)
+                for run in result.get("runs", [])
+                for evidence_id in (run.get("artifact_refs") or [])
+            ]
+        )
+        session_id = next(iter(session_ids))
+        synthesis = synthesize_agent_response(
+            desk=desk,
+            ceo_message="",
+            plan_context={
+                "phase": "safe_action_followup",
+                "actions": actions,
+                "blockers": [],
+                "reasoning": [
+                    {
+                        "kind": "safe_action_dispatch",
+                        "status": result.get("status"),
+                        "run_count": result.get("run_count"),
+                        "skipped_count": result.get("skipped_count"),
+                    }
+                ],
+            },
+            session_context=self._workflow_session_context(
+                session_id,
+                compact_for_provider=True,
+                llm_use_case="agent_response",
+            ),
+            evidence_refs=evidence_refs,
+            action_refs=[str(action.get("action_id") or "") for action in actions if action.get("action_id")],
+            run_context=result,
+            phase="safe_action_followup",
+        )
+        message = self.add_message(
+            session_id,
+            role="desk_agent",
+            desk=desk,
+            content=synthesis.answer,
+            evidence_refs=evidence_refs,
+            action_refs=[str(action.get("action_id") or "") for action in actions if action.get("action_id")],
+        )
+        return {
+            **result,
+            "summary_message": message.to_dict(),
+            "summary_blockers": synthesis.blockers,
+            "summary_reasoning": synthesis.reasoning,
         }
 
     def _dispatch_subprocess_action(
@@ -3381,18 +3474,20 @@ class AgentRuntime:
         router_reasoning: dict[str, Any] | None = None,
         semantic_planner: Any | None = None,
     ) -> DeskResponse:
+        workflow_session_context = self._workflow_session_context(
+            session_id,
+            compact_for_provider=bool(getattr(semantic_planner, "requires_context_pack", False)),
+        )
         plan = build_desk_workflow_plan(
             desk=desk,
             content=content,
             artifact_context=collect_report_artifact_context(),
-            session_context=self._workflow_session_context(
-                session_id,
-                compact_for_provider=bool(getattr(semantic_planner, "requires_context_pack", False)),
-            ),
+            session_context=workflow_session_context,
             semantic_planner=semantic_planner,
         )
         evidence_refs: list[str] = []
         proposed_actions: list[str] = []
+        action_context: list[dict[str, Any]] = []
         semantic_audit = self._write_semantic_planner_audit_evidence(
             session_id=session_id,
             source_message_id=source_message_id,
@@ -3420,6 +3515,15 @@ class AgentRuntime:
             )
             evidence_refs.append(evidence.evidence_id)
             proposed_actions.append(action.action_id)
+            action_context.append(
+                {
+                    "action_id": action.action_id,
+                    "approval_required": action.approval_required,
+                    "status": action.status,
+                    "spec": asdict(action_spec),
+                    "evidence_id": evidence.evidence_id,
+                }
+            )
         for work_order_spec in plan.work_orders:
             self.create_work_order(
                 session_id=session_id,
@@ -3430,21 +3534,47 @@ class AgentRuntime:
                 suggested_verification=work_order_spec.suggested_verification,
                 evidence_refs=evidence_refs,
             )
+        base_reasoning = [
+            *([routing_decision.to_reasoning()] if routing_decision is not None else []),
+            *([router_reasoning] if router_reasoning is not None else []),
+            *plan.reasoning,
+            self._session_context_reasoning(session_id),
+        ]
+        synthesis = synthesize_agent_response(
+            desk=plan.desk,
+            ceo_message=content,
+            plan_context={
+                "desk": plan.desk,
+                "planning_mode": plan.planning_mode,
+                "confidence": plan.confidence,
+                "actions": action_context,
+                "handoffs": list(plan.handoffs),
+                "work_orders": [asdict(work_order) for work_order in plan.work_orders],
+                "blockers": list(plan.blockers),
+                "reasoning": [dict(row) for row in plan.reasoning],
+            },
+            session_context=self._workflow_session_context(
+                session_id,
+                compact_for_provider=True,
+                llm_use_case="agent_response",
+            ),
+            evidence_refs=evidence_refs,
+            action_refs=proposed_actions,
+            phase="initial_response",
+        )
         return self.respond_as_desk(
             session_id=session_id,
             source_message_id=source_message_id,
             desk=plan.desk,
-            answer=plan.answer,
+            answer=synthesis.answer,
             confidence=plan.confidence,
             evidence_refs=evidence_refs,
             proposed_actions=proposed_actions,
-            blockers=plan.blockers,
+            blockers=[*plan.blockers, *synthesis.blockers],
             handoffs=plan.handoffs,
             reasoning=[
-                *([routing_decision.to_reasoning()] if routing_decision is not None else []),
-                *([router_reasoning] if router_reasoning is not None else []),
-                *plan.reasoning,
-                self._session_context_reasoning(session_id),
+                *base_reasoning,
+                synthesis.reasoning,
             ],
             planning_mode=plan.planning_mode,
         )
@@ -3525,12 +3655,18 @@ class AgentRuntime:
             ),
         }
 
-    def _workflow_session_context(self, session_id: str, *, compact_for_provider: bool = False) -> dict[str, Any]:
+    def _workflow_session_context(
+        self,
+        session_id: str,
+        *,
+        compact_for_provider: bool = False,
+        llm_use_case: str = "agent_planning",
+    ) -> dict[str, Any]:
         actions = self.ledger.list_actions(session_id)
         handoffs = self.ledger.list_handoffs(session_id)
         work_orders = self.ledger.list_work_orders(session_id)
         messages = self.ledger.list_messages(session_id)
-        runtime = resolve_llm_use_case("agent_planning")
+        runtime = resolve_llm_use_case(llm_use_case)
         context_pack = build_context_pack(
             session_id=session_id,
             messages=messages,

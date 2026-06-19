@@ -317,7 +317,7 @@ def route_ceo_message_desk(content: str) -> DeskRoutingDecision:
 
 _DESK_PROFILES: dict[str, dict[str, str]] = {
     "data": {
-        "answer": "Data Desk 已记录 CEO 问题。下一步应先读取本地 DataHub 健康状态，确认缺失、过期和 provider 权限状态后再提出修复。",
+        "answer": "data_status_plan",
         "evidence_label": "DataHub status view",
         "evidence_uri": "/datahub",
         "evidence_summary": "Open DataHub health and source capability details.",
@@ -328,7 +328,7 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
         "expected_effect": "Records current data health without writing data.",
     },
     "research": {
-        "answer": "Research Desk 已记录 CEO 问题。下一步应读取策略目录和证据状态，在技术面、情绪面、基本面、因子和 ML 研究能力内判断哪些策略有足够 OOS、IC/ICIR 或 overlay evidence。",
+        "answer": "research_strategy_plan",
         "evidence_label": "Strategy Lab",
         "evidence_uri": "/strategy-lab",
         "evidence_summary": "Open strategy catalog and evidence views.",
@@ -339,7 +339,7 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
         "expected_effect": "Records current strategy catalog state without running backtests.",
     },
     "portfolio": {
-        "answer": "Portfolio Desk 已记录 CEO 问题。下一步应读取策略证据、生命周期门禁和执行 dry-run 预览，用现有 evidence 判断组合权重、仓位约束、调仓节奏和策略组合优先级；不会生成假目标权重或直接下单。",
+        "answer": "portfolio_decision_plan",
         "evidence_label": "Portfolio decision workspace",
         "evidence_uri": "/portfolio",
         "evidence_summary": "Open portfolio, risk, and execution review context.",
@@ -350,7 +350,7 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
         "expected_effect": "Records strategy and signal evidence for portfolio decisions without creating target weights or orders.",
     },
     "risk": {
-        "answer": "Risk Desk 已记录 CEO 问题。下一步应读取 lifecycle readiness，确认数据、策略、风险和执行门禁是否阻断。",
+        "answer": "risk_lifecycle_plan",
         "evidence_label": "Lifecycle readiness",
         "evidence_uri": "/system?tab=lifecycle",
         "evidence_summary": "Open lifecycle readiness and blocker details.",
@@ -361,7 +361,7 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
         "expected_effect": "Records current lifecycle readiness without changing configuration or data.",
     },
     "execution": {
-        "answer": "Execution Desk 已记录 CEO 问题。下一步只能做 dry-run readiness，不会提交 paper/live order。",
+        "answer": "execution_readiness_plan",
         "evidence_label": "Portfolio and execution",
         "evidence_uri": "/portfolio",
         "evidence_summary": "Open portfolio and execution readiness views.",
@@ -372,7 +372,7 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
         "expected_effect": "Produces an execution preview without submitting orders.",
     },
     "engineering": {
-        "answer": "Engineering Desk 已记录 CEO 问题。下一步应读取 AST diagnostics，识别是否存在真实重复实现或架构风险；Web runtime 不直接改代码。",
+        "answer": "engineering_diagnostics_plan",
         "evidence_label": "AST Intelligence",
         "evidence_uri": "/system?tab=ast",
         "evidence_summary": "Open AST duplicate implementation diagnostics.",
@@ -383,7 +383,7 @@ _DESK_PROFILES: dict[str, dict[str, str]] = {
         "expected_effect": "Records architecture diagnostics without editing repository files.",
     },
     "reporting": {
-        "answer": "Reporting Desk 已记录 CEO 问题。下一步应先运行生命周期 readiness 只读检查，再把数据、研究和风险 desk 的阻断点汇总成 CEO 简报。",
+        "answer": "reporting_brief_plan",
         "evidence_label": "Lifecycle readiness",
         "evidence_uri": "/system?tab=lifecycle",
         "evidence_summary": "Open lifecycle readiness and blocker details.",
@@ -400,7 +400,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("generate report", "report artifact", "生成报告", "生成 daily", "生成 ceo 简报", "生成简报"),
             {
-                "answer": "Reporting Desk 已识别到 daily CEO brief report artifact 生成请求。下一步会创建写本地 report artifact 的审批动作；未获 CEO 审批前不会自动写报告。",
+                "answer": "daily_report_artifact_plan",
                 "evidence_label": "CEO report artifacts",
                 "evidence_uri": "/",
                 "evidence_summary": "Open CEO Office report cards and artifact evidence.",
@@ -414,7 +414,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("组合", "portfolio", "持仓", "风险复盘", "执行复盘", "execution review"),
             {
-                "answer": "Reporting Desk 已识别到 portfolio operating review。下一步会并行读取 Research 策略证据、Risk 生命周期门禁和 Execution dry-run 预览，再汇总组合层面的 CEO 复盘。",
+                "answer": "portfolio_operating_review_plan",
                 "evidence_label": "Portfolio operating review",
                 "evidence_uri": "/portfolio",
                 "evidence_summary": "Open portfolio, risk, and execution review context.",
@@ -430,7 +430,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("补", "修复", "repair", "backfill", "补齐"),
             {
-                "answer": "Data Desk 已识别到补数据请求。下一步会先生成 dry-run 演练动作，确认 provider、权限、覆盖率和写入影响；正式写入动作会进入 CEO 审批队列，不会自动执行。",
+                "answer": "data_repair_plan",
                 "evidence_label": "Data repair workflow",
                 "evidence_uri": "/datahub",
                 "evidence_summary": "Open DataHub health, coverage, and repair workflow context.",
@@ -444,7 +444,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("数据源", "source", "capability", "registry", "能力", "diff", "差异"),
             {
-                "answer": "Data Desk 已识别到数据源能力治理问题。下一步应对比 Source Capability Registry 与项目 data_registry，确认是未接入、权限缺失还是字段/频率口径不一致。",
+                "answer": "data_sources_diff_plan",
                 "evidence_label": "Data source capability matrix",
                 "evidence_uri": "/datahub?tab=sources",
                 "evidence_summary": "Open data source capability matrix and registry diff.",
@@ -460,7 +460,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("技术面", "technical", "技术指标", "趋势", "动量", "均线", "量价", "突破", "情绪", "sentiment", "资金流", "涨跌停", "龙虎榜", "基本面", "fundamental", "因子", "factor", "ml", "机器学习"),
             {
-                "answer": "Research Desk 已识别到研究能力请求。技术面、情绪面、基本面、因子和 ML 都是 Research Desk 的子能力；下一步读取策略目录和证据状态，不把这些研究来源拆成新的一级 desk。",
+                "answer": "research_capability_review_plan",
                 "evidence_label": "Strategy Lab",
                 "evidence_uri": "/strategy-lab",
                 "evidence_summary": "Open strategy catalog, factor evidence, and research views.",
@@ -474,7 +474,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("阻断", "blocked", "blocker", "missing", "缺数据", "coverage", "lifecycle"),
             {
-                "answer": "Research Desk 已识别到 strategy blocker review。下一步会同时读取 strategy competition evidence、DataHub coverage 和 lifecycle gates，用证据区分策略质量不足、数据缺口、样本不足或系统门禁阻断。",
+                "answer": "strategy_blocker_review_plan",
                 "evidence_label": "Strategy blocker review",
                 "evidence_uri": "/strategy-lab",
                 "evidence_summary": "Open strategy evidence, data coverage, and lifecycle blocker context.",
@@ -488,7 +488,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("竞争", "compete", "competition", "公平", "12", "oos", "ic/icir", "icir"),
             {
-                "answer": "Research Desk 已识别到策略公平竞争问题。下一步应读取统一 strategy competition evidence，检查 OOS、IC/ICIR、样本数和阻断原因。",
+                "answer": "strategy_competition_plan",
                 "evidence_label": "Strategy competition evidence",
                 "evidence_uri": "/strategy-lab",
                 "evidence_summary": "Open strategy competition and evidence views.",
@@ -502,7 +502,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("回测", "backtest", "dry-run"),
             {
-                "answer": "Research Desk 已识别到回测请求。下一步先创建 backtest dry-run action，确认命令、策略范围和写入影响，再决定是否进入正式回测。",
+                "answer": "backtest_dry_run_plan",
                 "evidence_label": "Backtest evidence",
                 "evidence_uri": "/research",
                 "evidence_summary": "Open research and backtest evidence views.",
@@ -518,7 +518,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("组合", "portfolio", "持仓", "权重", "调仓", "仓位", "策略组合", "rebalance", "allocation", "weight", "weights", "position sizing"),
             {
-                "answer": "Portfolio Desk 已识别到组合决策请求。下一步只读取策略证据、风险门禁和执行演练，判断组合层面的权重、仓位、调仓节奏和策略优先级；缺 evidence 时会返回阻断，不生成假组合建议。",
+                "answer": "portfolio_decision_review_plan",
                 "evidence_label": "Portfolio decision workspace",
                 "evidence_uri": "/portfolio",
                 "evidence_summary": "Open portfolio, strategy evidence, risk gates, and execution readiness.",
@@ -534,7 +534,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("ceo office", "ceo办公室", "ceo 办公室", "消息", "对话", "回复", "运营报告部", "分诊", "路由", "标签", "输入框", "时间", "斜杠", "按钮", "状态卡", "状态栏", "ui", "ux", "界面", "交互", "显示"),
             {
-                "answer": "Engineering Desk 已识别到 CEO Office 对话/分诊/UI 问题。下一步应检查前端消息展示、自动部门分诊、API 返回的 desk_response，以及 provider semantic 是否被启用或失败；Web runtime 不直接改仓库。",
+                "answer": "ceo_office_diagnostics_plan",
                 "evidence_label": "CEO Office engineering diagnostics",
                 "evidence_uri": "/system?tab=ast",
                 "evidence_summary": "Open engineering diagnostics for CEO Office routing and message rendering.",
@@ -548,7 +548,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("bug", "修", "修复", "改代码", "实现", "工单", "codex", "代码"),
             {
-                "answer": "Engineering Desk 已识别到代码/bug 请求。Web runtime 不会直接改仓库；下一步会创建工程工单，并附带 AST 与测试设计诊断动作，交给 Codex、Claude 或人工维护者处理。",
+                "answer": "engineering_work_order_triage_plan",
                 "evidence_label": "Engineering work-order triage",
                 "evidence_uri": "/system?tab=ast",
                 "evidence_summary": "Open engineering diagnostics and work-order context.",
@@ -562,7 +562,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("文档", "docs", "doc", "旧描述", "stale"),
             {
-                "answer": "Engineering Desk 已识别到文档一致性问题。下一步应运行 docs check，定位陈旧设计词和文档治理风险；Web runtime 仍不直接改仓库。",
+                "answer": "docs_check_plan",
                 "evidence_label": "Documentation hygiene",
                 "evidence_uri": "/system?tab=tests",
                 "evidence_summary": "Open system quality views and documentation hygiene evidence.",
@@ -576,7 +576,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("测试设计", "test design", "test", "测试", "fixture", "mock"),
             {
-                "answer": "Engineering Desk 已识别到测试设计审查问题。下一步应运行 test design intelligence，检查测试风险、目标关联、fixture/mock 和断言强度。",
+                "answer": "test_design_plan",
                 "evidence_label": "Test design intelligence",
                 "evidence_uri": "/system?tab=tests",
                 "evidence_summary": "Open test design intelligence diagnostics.",
@@ -592,7 +592,7 @@ _INTENT_PROFILES: dict[str, list[tuple[tuple[str, ...], dict[str, str]]]] = {
         (
             ("miniqmt", "qmt", "live readiness", "broker readiness", "kill switch", "实盘", "券商", "终端"),
             {
-                "answer": "Execution Desk 已识别到 MiniQMT/QMT live readiness 问题。下一步只读取 live readiness、broker readiness 和 kill switch 状态；不会提交 paper/live order。",
+                "answer": "live_readiness_plan",
                 "evidence_label": "MiniQMT/QMT live readiness",
                 "evidence_uri": "/portfolio",
                 "evidence_summary": "Open broker readiness, live execution, and kill switch context.",
@@ -714,7 +714,7 @@ def build_desk_workflow_plan(
     ):
         evidence_summary = _artifact_evidence_summary(artifact_context or {})
         if evidence_summary:
-            answer = f"{answer} 当前证据摘要：{'；'.join(evidence_summary[:5])}。"
+            answer = f"{answer}|artifact_context"
             reasoning.append(
                 _artifact_context_reasoning(
                     artifact_context=artifact_context or {},
@@ -740,10 +740,7 @@ def _conversation_plan(*, desk: str, content: str) -> DeskWorkflowPlan | None:
         return None
     return DeskWorkflowPlan(
         desk="reporting",
-        answer=(
-            "你好，我在。你可以直接描述要处理的数据、策略、组合、风险、交易或工程问题；"
-            "CEO Office 会自动分配给对应部门，并把证据引用和需要你审批的行动挂在对话里。"
-        ),
+        answer="conversation_greeting_plan",
         confidence=0.7,
         actions=[],
         planning_mode="conversation",
@@ -776,10 +773,7 @@ def _strategy_best_fact_answer() -> DeskWorkflowPlan:
     if not path.exists():
         return DeskWorkflowPlan(
             desk="research",
-            answer=(
-                "量化研究部没有找到最新统一策略竞赛证据，不能凭感觉判断最好的策略。"
-                "下一步应读取或生成 strategy competition evidence，再基于 OOS、IC/ICIR、样本数和阻断状态回答。"
-            ),
+            answer="strategy_competition_evidence_missing",
             confidence=0.58,
             actions=[
                 WorkflowActionSpec(
@@ -814,10 +808,7 @@ def _strategy_best_fact_answer() -> DeskWorkflowPlan:
     except (OSError, json.JSONDecodeError) as exc:
         return DeskWorkflowPlan(
             desk="research",
-            answer=(
-                "量化研究部找到了统一策略竞赛证据文件，但文件不可解析，不能判断最佳策略。"
-                f"请先修复竞赛产物：{path.name}。"
-            ),
+            answer="strategy_competition_evidence_invalid",
             confidence=0.42,
             actions=[],
             planning_mode="fact_answer",
@@ -841,7 +832,7 @@ def _strategy_best_fact_answer() -> DeskWorkflowPlan:
     if not candidate_rows:
         return DeskWorkflowPlan(
             desk="research",
-            answer="量化研究部读取了统一策略竞赛证据，但里面没有可排名策略，不能判断最佳策略。",
+            answer="strategy_competition_rankings_empty",
             confidence=0.45,
             actions=[],
             planning_mode="fact_answer",
@@ -859,7 +850,6 @@ def _strategy_best_fact_answer() -> DeskWorkflowPlan:
 
     best = sorted(candidate_rows, key=lambda row: int(row.get("rank") or 999999))[0]
     strategy = str(best.get("strategy") or "unknown")
-    label = str(best.get("label") or strategy)
     rank = int(best.get("rank") or 0)
     rank_score = _format_optional_number(best.get("rank_score"))
     recommended_status = str(best.get("recommended_status") or "unknown")
@@ -874,16 +864,9 @@ def _strategy_best_fact_answer() -> DeskWorkflowPlan:
     alpha_status = str(alpha.get("status") or "unknown")
     generated_at = str(payload.get("generated_at") or "unknown")
     total = len(ranking_rows)
-    answer = (
-        f"量化研究部读取 {path.name} 后，当前统一竞赛排名第 {rank} 的策略是 {label}（{strategy}）。"
-        f"竞赛共覆盖 {total} 个策略，推荐状态是 {recommended_status}，rank_score={rank_score}。"
-        f"OOS 指标：年化收益 {annual_return}，Sharpe {sharpe}，最大回撤 {max_drawdown}。"
-        f"Alpha evidence：status={alpha_status}，IC {ic}，ICIR {icir}。"
-        f"证据生成时间：{generated_at}。这次只读取现有 evidence，没有运行新回测或改策略状态。"
-    )
     return DeskWorkflowPlan(
         desk="research",
-        answer=answer,
+        answer="strategy_competition_fact_pack",
         confidence=0.88,
         actions=[],
         planning_mode="fact_answer",
@@ -898,6 +881,18 @@ def _strategy_best_fact_answer() -> DeskWorkflowPlan:
                 "rank_score": best.get("rank_score"),
                 "recommended_status": recommended_status,
                 "strategy_count": total,
+                "generated_at": generated_at,
+                "best_row": best,
+                "rankings_preview": ranking_rows[:10],
+                "formatted_metrics": {
+                    "rank_score": rank_score,
+                    "annual_return": annual_return,
+                    "sharpe": sharpe,
+                    "max_drawdown": max_drawdown,
+                    "alpha_status": alpha_status,
+                    "ic": ic,
+                    "icir": icir,
+                },
                 "side_effects": "read_only",
             }
         ],
@@ -910,18 +905,9 @@ def _strategy_catalog_fact_answer() -> DeskWorkflowPlan:
     items = catalog_items()
     layer_counts = Counter(item.layer for item in items)
     lifecycle_counts = Counter(item.lifecycle for item in items)
-    layer_text = _counter_text(layer_counts)
-    lifecycle_text = _counter_text(lifecycle_counts)
-    preview = "、".join(item.name for item in items[:8])
-    suffix = " 等" if len(items) > 8 else ""
-    answer = (
-        f"量化研究部读取 research.strategy_catalog.catalog_items() 后，当前策略目录共有 {len(items)} 个策略。"
-        f"按 layer 分布：{layer_text}；按 lifecycle 分布：{lifecycle_text}。"
-        f"策略包括：{preview}{suffix}。本次只读取策略目录，没有运行回测、补数或创建交易/修复行动。"
-    )
     return DeskWorkflowPlan(
         desk="research",
-        answer=answer,
+        answer="strategy_catalog_fact_pack",
         confidence=0.9,
         actions=[],
         planning_mode="fact_answer",
@@ -932,6 +918,16 @@ def _strategy_catalog_fact_answer() -> DeskWorkflowPlan:
                 "total": len(items),
                 "layer_counts": dict(sorted(layer_counts.items())),
                 "lifecycle_counts": dict(sorted(lifecycle_counts.items())),
+                "items": [
+                    {
+                        "name": item.name,
+                        "label": item.label,
+                        "layer": item.layer,
+                        "lifecycle": item.lifecycle,
+                        "description": str(getattr(item, "description", "") or ""),
+                    }
+                    for item in items
+                ],
                 "side_effects": "read_only",
             }
         ],
@@ -944,19 +940,8 @@ def _artifact_status_fact_answer(*, desk: str, artifact_context: dict[str, Any])
         "risk": "astroq lifecycle check --json",
         "engineering": "astroq architecture ast --json 或 astroq test design --json",
     }
-    label_by_desk = {
-        "data": "数据工程部",
-        "risk": "风险管理部",
-        "engineering": "技术平台部",
-    }
     evidence_summary = _artifact_evidence_summary(artifact_context)
-    if evidence_summary:
-        answer = f"{label_by_desk[desk]}读取本地 artifact 摘要后看到：{'；'.join(evidence_summary[:5])}。"
-    else:
-        answer = (
-            f"{label_by_desk[desk]}当前没有可用的本地 artifact 摘要，不能编造状态。"
-            f"请先运行 {command_by_desk[desk]} 生成证据产物后再查看。"
-        )
+    answer = "artifact_status_fact_pack" if evidence_summary else "artifact_status_missing"
     return DeskWorkflowPlan(
         desk=desk,
         answer=answer,
@@ -978,7 +963,22 @@ def _artifact_status_fact_answer(*, desk: str, artifact_context: dict[str, Any])
 
 def _is_strategy_catalog_fact_query(normalized: str) -> bool:
     subject_terms = ("策略", "strategy", "strategies", "打法", "系统打法", "策略目录", "strategy catalog")
-    question_terms = ("几个", "多少", "几种", "哪些", "列表", "目录", "catalog", "how many", "what strategies")
+    question_terms = (
+        "几个",
+        "多少",
+        "几种",
+        "哪些",
+        "有什么",
+        "都有什么",
+        "都有啥",
+        "是啥",
+        "是什么",
+        "列表",
+        "目录",
+        "catalog",
+        "how many",
+        "what strategies",
+    )
     return any(term in normalized for term in subject_terms) and any(term in normalized for term in question_terms)
 
 
@@ -1039,12 +1039,6 @@ def _is_status_fact_query(normalized: str) -> bool:
             "how many",
         )
     )
-
-
-def _counter_text(counter: Counter[str]) -> str:
-    if not counter:
-        return "无"
-    return "、".join(f"{key} {value}" for key, value in sorted(counter.items()))
 
 
 def _adaptive_artifact_plan(
@@ -1119,11 +1113,7 @@ def _adaptive_artifact_plan(
     )
     return DeskWorkflowPlan(
         desk=desk,
-        answer=(
-            "Reporting Desk 已生成 adaptive artifact / 会话与证据融合计划："
-            f"当前证据摘要：{'；'.join(evidence_summary[:5])}。"
-            "先处理当前 session 未完成事项，再补齐本地 artifact 暴露的数据、策略、风险和工程证据缺口。"
-        ),
+        answer="adaptive_artifact_plan",
         confidence=0.82,
         actions=actions,
         planning_mode="adaptive_artifact",
@@ -1177,10 +1167,7 @@ def _adaptive_session_plan(
     )
     return DeskWorkflowPlan(
         desk=desk,
-        answer=(
-            "Reporting Desk 已根据当前 session 未完成事项生成 adaptive session plan："
-            "先复核待审批动作、跟进 open handoff 和工程工单，再把安全证据汇总给 CEO。"
-        ),
+        answer="adaptive_session_plan",
         confidence=0.76,
         actions=actions,
         planning_mode="adaptive_session",
@@ -1403,14 +1390,9 @@ def _artifact_aware_plan(
             evidence_summary=evidence_summary,
         )
     )
-    summary_text = "；".join(evidence_summary[:5])
     return DeskWorkflowPlan(
         desk=desk,
-        answer=(
-            "Reporting Desk 已根据当前本地 artifact evidence 生成 artifact-aware / 证据感知优先级计划："
-            f"当前证据摘要：{summary_text}。"
-            "先处理数据源、生命周期、策略证据和工程质量链路，再汇总给 CEO。"
-        ),
+        answer="artifact_aware_plan",
         confidence=0.78,
         actions=actions,
         planning_mode="artifact_aware",
@@ -1544,14 +1526,9 @@ def _dynamic_multi_intent_plan(
                 evidence_summary=evidence_summary,
             )
         )
-    summary_suffix = f" 当前证据摘要：{'；'.join(evidence_summary[:5])}。" if evidence_summary else ""
     return DeskWorkflowPlan(
         desk=desk,
-        answer=(
-            "Reporting Desk 已生成 dynamic multi-intent / 多意图计划：按 Data、Research、Portfolio、"
-            "Risk、Execution 和 Engineering 证据链拆分安全动作，再由 CEO Office 汇总结果。"
-            f"{summary_suffix}"
-        ),
+        answer="dynamic_multi_intent_plan",
         confidence=0.72,
         actions=actions,
         planning_mode="dynamic_multi_intent",
@@ -1718,15 +1695,9 @@ def _open_ended_adaptive_plan(
                 evidence_summary=evidence_summary,
             )
         )
-    summary_suffix = f" 当前证据摘要：{'；'.join(evidence_summary[:5])}。" if evidence_summary else ""
     return DeskWorkflowPlan(
         desk=desk,
-        answer=(
-            "Reporting Desk 已生成 open-ended adaptive / 开放式公司运营计划："
-            "先让 Data、Research、Portfolio、Risk、Execution 和 Engineering Desk 读取各自证据，"
-            "只产出诊断和 dry-run，不直接写数据或交易。"
-            f"{summary_suffix}"
-        ),
+        answer="open_ended_adaptive_plan",
         confidence=0.7,
         actions=actions,
         planning_mode="open_ended_adaptive",

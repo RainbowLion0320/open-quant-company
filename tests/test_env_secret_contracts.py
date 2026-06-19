@@ -117,6 +117,7 @@ def test_settings_registers_mimo_provider_without_secret_literal():
 
     assert cfg["llm"]["default_provider"] == "mimo"
     assert cfg["llm"]["use_cases"]["agent_planning"] == {"provider": "mimo", "model": "mimo-v2.5-pro"}
+    assert cfg["llm"]["use_cases"]["agent_response"] == {"provider": "mimo", "model": "mimo-v2.5-pro"}
     assert cfg["llm"]["use_cases"]["factor_hypothesis"] == {"provider": "mimo", "model": "mimo-v2.5-pro"}
     assert agent_routing["provider"] == "mimo"
     assert agent_routing["model"] == "mimo-v2.5-pro"

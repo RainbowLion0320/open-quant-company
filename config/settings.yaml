@@ -326,6 +326,9 @@ llm:
     agent_planning:
       provider: mimo
       model: mimo-v2.5-pro
+    agent_response:
+      provider: mimo
+      model: mimo-v2.5-pro
     agent_routing:
       provider: mimo
       model: mimo-v2.5-pro

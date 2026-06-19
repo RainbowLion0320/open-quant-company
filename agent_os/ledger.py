@@ -214,6 +214,10 @@ class AgentLedger:
                 """,
                 payload,
             )
+            conn.execute(
+                "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
+                (str(row["created_at"]), str(row["session_id"])),
+            )
 
     def insert_action(self, row: dict[str, Any]) -> None:
         payload = {
@@ -396,7 +400,23 @@ class AgentLedger:
 
     def list_sessions(self) -> list[dict[str, Any]]:
         with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM sessions ORDER BY created_at DESC, session_id DESC").fetchall()
+            rows = conn.execute(
+                """
+                SELECT
+                    sessions.session_id,
+                    sessions.title,
+                    sessions.status,
+                    sessions.created_by,
+                    sessions.default_desk,
+                    sessions.tags,
+                    sessions.created_at,
+                    COALESCE(MAX(messages.created_at), sessions.updated_at) AS updated_at
+                FROM sessions
+                LEFT JOIN messages ON messages.session_id = sessions.session_id
+                GROUP BY sessions.session_id
+                ORDER BY updated_at DESC, sessions.created_at DESC, sessions.session_id DESC
+                """
+            ).fetchall()
         return [self._session_row(row) for row in rows]
 
     def list_session_ids_by_status(self, status: str) -> list[str]:
