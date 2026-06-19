@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -759,11 +760,148 @@ def _conversation_plan(*, desk: str, content: str) -> DeskWorkflowPlan | None:
 
 def _fact_answer_plan(*, desk: str, content: str, artifact_context: dict[str, Any]) -> DeskWorkflowPlan | None:
     normalized = content.lower().strip()
+    if desk == "research" and _is_best_strategy_fact_query(normalized):
+        return _strategy_best_fact_answer()
     if desk == "research" and _is_strategy_catalog_fact_query(normalized):
         return _strategy_catalog_fact_answer()
     if desk in {"data", "risk", "engineering"} and _is_status_fact_query(normalized):
         return _artifact_status_fact_answer(desk=desk, artifact_context=artifact_context)
     return None
+
+
+def _strategy_best_fact_answer() -> DeskWorkflowPlan:
+    from data.storage.datahub import get_datahub
+
+    path = get_datahub().artifact_path("tournaments", "strategy_competition_latest.json")
+    if not path.exists():
+        return DeskWorkflowPlan(
+            desk="research",
+            answer=(
+                "量化研究部没有找到最新统一策略竞赛证据，不能凭感觉判断最好的策略。"
+                "下一步应读取或生成 strategy competition evidence，再基于 OOS、IC/ICIR、样本数和阻断状态回答。"
+            ),
+            confidence=0.58,
+            actions=[
+                WorkflowActionSpec(
+                    desk="research",
+                    action_type="strategy_competition",
+                    tool_id="astroq.strategy.compete",
+                    risk_level="read_only",
+                    summary="Read fair strategy competition evidence.",
+                    expected_effect="Records current strategy competition evidence without changing strategy state.",
+                    evidence=WorkflowEvidenceSpec(
+                        label="Strategy competition evidence",
+                        uri="/strategy-lab",
+                        summary="Open strategy competition and evidence views.",
+                    ),
+                )
+            ],
+            planning_mode="evidence_missing",
+            blockers=["missing_strategy_competition_latest"],
+            reasoning=[
+                {
+                    "kind": "fact_answer",
+                    "source": "strategy_competition_latest",
+                    "path": str(path),
+                    "status": "missing",
+                    "side_effects": "read_only",
+                }
+            ],
+        )
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return DeskWorkflowPlan(
+            desk="research",
+            answer=(
+                "量化研究部找到了统一策略竞赛证据文件，但文件不可解析，不能判断最佳策略。"
+                f"请先修复竞赛产物：{path.name}。"
+            ),
+            confidence=0.42,
+            actions=[],
+            planning_mode="fact_answer",
+            blockers=["invalid_strategy_competition_latest"],
+            reasoning=[
+                {
+                    "kind": "fact_answer",
+                    "source": "strategy_competition_latest",
+                    "path": str(path),
+                    "status": "invalid",
+                    "error": str(exc),
+                    "side_effects": "read_only",
+                }
+            ],
+        )
+
+    rankings = payload.get("rankings") if isinstance(payload, dict) else None
+    ranking_rows = [row for row in rankings or [] if isinstance(row, dict)]
+    valid_rows = [row for row in ranking_rows if row.get("competition_valid", True)]
+    candidate_rows = valid_rows or ranking_rows
+    if not candidate_rows:
+        return DeskWorkflowPlan(
+            desk="research",
+            answer="量化研究部读取了统一策略竞赛证据，但里面没有可排名策略，不能判断最佳策略。",
+            confidence=0.45,
+            actions=[],
+            planning_mode="fact_answer",
+            blockers=["empty_strategy_competition_rankings"],
+            reasoning=[
+                {
+                    "kind": "fact_answer",
+                    "source": "strategy_competition_latest",
+                    "path": str(path),
+                    "status": "empty",
+                    "side_effects": "read_only",
+                }
+            ],
+        )
+
+    best = sorted(candidate_rows, key=lambda row: int(row.get("rank") or 999999))[0]
+    strategy = str(best.get("strategy") or "unknown")
+    label = str(best.get("label") or strategy)
+    rank = int(best.get("rank") or 0)
+    rank_score = _format_optional_number(best.get("rank_score"))
+    recommended_status = str(best.get("recommended_status") or "unknown")
+    metrics = best.get("metrics") if isinstance(best.get("metrics"), dict) else {}
+    oos = metrics.get("oos") if isinstance(metrics.get("oos"), dict) else {}
+    annual_return = _format_optional_percent(oos.get("annual_return"))
+    sharpe = _format_optional_number(oos.get("sharpe"))
+    max_drawdown = _format_optional_percent(oos.get("max_drawdown"))
+    alpha = best.get("alpha_evidence") if isinstance(best.get("alpha_evidence"), dict) else {}
+    ic = _format_optional_number(alpha.get("ic"))
+    icir = _format_optional_number(alpha.get("icir"))
+    alpha_status = str(alpha.get("status") or "unknown")
+    generated_at = str(payload.get("generated_at") or "unknown")
+    total = len(ranking_rows)
+    answer = (
+        f"量化研究部读取 {path.name} 后，当前统一竞赛排名第 {rank} 的策略是 {label}（{strategy}）。"
+        f"竞赛共覆盖 {total} 个策略，推荐状态是 {recommended_status}，rank_score={rank_score}。"
+        f"OOS 指标：年化收益 {annual_return}，Sharpe {sharpe}，最大回撤 {max_drawdown}。"
+        f"Alpha evidence：status={alpha_status}，IC {ic}，ICIR {icir}。"
+        f"证据生成时间：{generated_at}。这次只读取现有 evidence，没有运行新回测或改策略状态。"
+    )
+    return DeskWorkflowPlan(
+        desk="research",
+        answer=answer,
+        confidence=0.88,
+        actions=[],
+        planning_mode="fact_answer",
+        reasoning=[
+            {
+                "kind": "fact_answer",
+                "source": "strategy_competition_latest",
+                "path": str(path),
+                "status": "read",
+                "best_strategy": strategy,
+                "rank": rank,
+                "rank_score": best.get("rank_score"),
+                "recommended_status": recommended_status,
+                "strategy_count": total,
+                "side_effects": "read_only",
+            }
+        ],
+    )
 
 
 def _strategy_catalog_fact_answer() -> DeskWorkflowPlan:
@@ -842,6 +980,30 @@ def _is_strategy_catalog_fact_query(normalized: str) -> bool:
     subject_terms = ("策略", "strategy", "strategies", "打法", "系统打法", "策略目录", "strategy catalog")
     question_terms = ("几个", "多少", "几种", "哪些", "列表", "目录", "catalog", "how many", "what strategies")
     return any(term in normalized for term in subject_terms) and any(term in normalized for term in question_terms)
+
+
+def _is_best_strategy_fact_query(normalized: str) -> bool:
+    subject_terms = ("策略", "strategy", "strategies")
+    best_terms = ("最好", "最佳", "最强", "第一", "冠军", "top", "best", "winner", "leading")
+    return any(term in normalized for term in subject_terms) and any(term in normalized for term in best_terms)
+
+
+def _format_optional_number(value: Any) -> str:
+    if value is None:
+        return "缺失"
+    try:
+        return f"{float(value):.3f}".rstrip("0").rstrip(".")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _format_optional_percent(value: Any) -> str:
+    if value is None:
+        return "缺失"
+    try:
+        return f"{float(value) * 100:.2f}%"
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def _is_status_fact_query(normalized: str) -> bool:

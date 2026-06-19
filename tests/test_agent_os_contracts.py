@@ -5092,6 +5092,38 @@ def test_agent_cli_and_api_message_return_desk_response(tmp_path, monkeypatch, c
     reset_datahub()
 
 
+def test_agent_api_message_schedules_safe_action_dispatch(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+    from web.api.app import create_app
+
+    dispatched: list[list[str]] = []
+
+    def fake_dispatch_safe(self, action_ids, **kwargs):
+        dispatched.append(list(action_ids))
+        return {"status": "ready", "run_count": len(action_ids), "skipped_count": 0, "runs": [], "skipped": []}
+
+    monkeypatch.setattr(AgentRuntime, "dispatch_safe_proposed_actions", fake_dispatch_safe, raising=False)
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="API safe dispatch", default_desk="reporting")
+    response = TestClient(create_app()).post(
+        f"/api/agent/sessions/{session.session_id}/messages",
+        json={"role": "ceo", "desk": "data", "content": "检查一下数据缺口"},
+    )
+
+    assert response.status_code == 200
+    action_ids = response.json()["desk_response"]["proposed_actions"]
+    assert action_ids
+    assert dispatched == [action_ids]
+    reset_datahub()
+
+
 def test_agent_runtime_records_run_and_tool_registry_uses_fixed_command_arrays(tmp_path, monkeypatch):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     from data.storage.datahub import reset_datahub
@@ -5252,6 +5284,79 @@ def test_research_capability_requests_stay_under_research_desk(tmp_path, monkeyp
     assert actions[0]["parameters"]["tool_id"] == "astroq.strategy.catalog"
     assert "子能力" in response.answer
     assert "不把这些研究来源拆成新的一级 desk" in response.answer
+    reset_datahub()
+
+
+def test_research_best_strategy_question_reads_competition_evidence(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import get_datahub, reset_datahub
+
+    reset_datahub()
+    hub = get_datahub()
+    competition_path = hub.artifact_path("tournaments", "strategy_competition_latest.json")
+    competition_path.parent.mkdir(parents=True, exist_ok=True)
+    competition_path.write_text(
+        json.dumps(
+            {
+                "generated_at": "2026-06-18T09:00:00",
+                "summary": {"strategy_count": 2},
+                "rankings": [
+                    {
+                        "rank": 1,
+                        "strategy": "alpha_one",
+                        "label": "Alpha One",
+                        "competition_valid": True,
+                        "rank_score": 88.5,
+                        "recommended_status": "paper",
+                        "metrics": {
+                            "oos": {
+                                "annual_return": 0.1234,
+                                "sharpe": 1.23,
+                                "max_drawdown": -0.087,
+                            }
+                        },
+                        "alpha_evidence": {
+                            "status": "measured",
+                            "ic": 0.031,
+                            "icir": 0.42,
+                            "n_dates": 118,
+                        },
+                    },
+                    {
+                        "rank": 2,
+                        "strategy": "alpha_two",
+                        "label": "Alpha Two",
+                        "competition_valid": True,
+                        "rank_score": 61.0,
+                        "metrics": {"oos": {"annual_return": 0.04}},
+                        "alpha_evidence": {"status": "measured", "ic": 0.01, "icir": 0.08},
+                    },
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    from agent_os.runtime import AgentRuntime
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Best strategy", default_desk="research")
+    routed = runtime.submit_ceo_message(
+        session.session_id,
+        content="我们最好的策略现在是什么",
+    )
+    response = routed["desk_response"]
+
+    assert routed["message"].desk == "research"
+    assert response.message.desk == "research"
+    assert response.planning_mode == "fact_answer"
+    assert response.proposed_actions == []
+    assert "Alpha One" in response.answer
+    assert "alpha_one" in response.answer
+    assert "排名第 1" in response.answer
+    assert "strategy_competition_latest.json" in response.answer
+    assert response.reasoning[2]["source"] == "strategy_competition_latest"
     reset_datahub()
 
 
@@ -7162,6 +7267,65 @@ def test_agent_dispatch_runs_read_only_tool_and_updates_ledger(tmp_path, monkeyp
     assert json.loads(run.stdout_summary)["ok"] is True
     assert runtime.get_action(action.action_id)["status"] == "succeeded"
     assert runtime.get_session(session.session_id)["runs"][0]["run_id"] == run.run_id
+    reset_datahub()
+
+
+def test_agent_runtime_auto_dispatches_only_safe_proposed_actions(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        return CompletedProcess(command, 0, stdout='{"ok": true}', stderr="")
+
+    runtime = AgentRuntime()
+    session = runtime.create_session(title="Auto dispatch safe actions")
+    read_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="research",
+        action_type="strategy_catalog",
+        risk_level="read_only",
+        summary="Read strategy catalog",
+        parameters={"tool_id": "astroq.strategy.catalog"},
+    )
+    dry_run_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="execution",
+        action_type="execution_dry_run",
+        risk_level="dry_run",
+        summary="Run execution dry-run",
+        parameters={"tool_id": "astroq.execution.dry_run"},
+    )
+    write_action = runtime.propose_action(
+        session_id=session.session_id,
+        desk="data",
+        action_type="data_repair",
+        risk_level="write_data",
+        summary="Repair data after approval",
+        parameters={"tool_id": "astroq.data.repair", "table": "stock_limit_list"},
+    )
+
+    result = runtime.dispatch_safe_proposed_actions(
+        [read_action.action_id, dry_run_action.action_id, write_action.action_id, "act_missing"],
+        runner=fake_run,
+    )
+
+    assert result["run_count"] == 2
+    assert result["skipped_count"] == 2
+    assert [call[1:] for call in calls] == [
+        ["strategy", "catalog", "--json"],
+        ["execution", "dry-run", "--json"],
+    ]
+    assert runtime.get_action(read_action.action_id)["status"] == "succeeded"
+    assert runtime.get_action(dry_run_action.action_id)["status"] == "succeeded"
+    assert runtime.get_action(write_action.action_id)["status"] == "approval_required"
+    assert {item["reason"] for item in result["skipped"]} == {"not_safe_auto_dispatch_action", "missing_action"}
     reset_datahub()
 
 

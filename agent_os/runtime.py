@@ -934,6 +934,73 @@ class AgentRuntime:
                 started_at=started_at,
             )
 
+    def dispatch_safe_proposed_actions(
+        self,
+        action_ids: list[str],
+        *,
+        runner: Any | None = None,
+        timeout_seconds: int = 120,
+        tool_registry: AgentToolRegistry | None = None,
+    ) -> dict[str, Any]:
+        """Dispatch only newly proposed read-only/dry-run fixed-registry actions."""
+        runs: list[dict[str, Any]] = []
+        skipped: list[dict[str, Any]] = []
+        for action_id in action_ids:
+            action = self.get_action(action_id)
+            if action is None:
+                skipped.append(
+                    {
+                        "action_id": action_id,
+                        "desk": "",
+                        "risk_level": "",
+                        "status": "missing",
+                        "reason": "missing_action",
+                    }
+                )
+                continue
+            risk_level = str(action.get("risk_level") or "")
+            status = str(action.get("status") or "")
+            if risk_level not in {"read_only", "dry_run"} or bool(action.get("approval_required")):
+                skipped.append(
+                    {
+                        "action_id": action_id,
+                        "desk": str(action.get("desk") or ""),
+                        "risk_level": risk_level,
+                        "status": status,
+                        "reason": "not_safe_auto_dispatch_action",
+                    }
+                )
+                continue
+            if status != "proposed":
+                skipped.append(
+                    {
+                        "action_id": action_id,
+                        "desk": str(action.get("desk") or ""),
+                        "risk_level": risk_level,
+                        "status": status,
+                        "reason": "status_not_proposed",
+                    }
+                )
+                continue
+            run = self.dispatch_action(
+                action_id,
+                runner=runner,
+                timeout_seconds=timeout_seconds,
+                tool_registry=tool_registry,
+            )
+            runs.append(self.get_run(run.run_id) or run.to_dict())
+
+        failed_count = sum(1 for run in runs if run.get("status") == "failed")
+        blocked_count = sum(1 for run in runs if run.get("status") == "blocked")
+        status = "ready" if failed_count == 0 and blocked_count == 0 else "partial"
+        return {
+            "status": status,
+            "run_count": len(runs),
+            "skipped_count": len(skipped),
+            "runs": runs,
+            "skipped": skipped,
+        }
+
     def _dispatch_subprocess_action(
         self,
         *,
