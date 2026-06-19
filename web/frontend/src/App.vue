@@ -186,7 +186,7 @@ const agentContextUsagePct = computed(() => {
 const agentContextBatteryCells = computed(() =>
   Math.min(runtimeBatteryCells.length, Math.max(0, Math.ceil((agentContextUsagePct.value / 100) * runtimeBatteryCells.length))),
 );
-const contextUsagePercentText = computed(() => `${agentContextUsagePct.value.toFixed(1)}%`);
+const contextUsagePercentText = computed(() => formatContextUsagePercent(agentContextUsagePct.value));
 const agentRuntimeSegments = computed(() => {
   if (!agentModelRuntime.value) return [];
   const label = agentModelRuntime.value.runtime.label || agentModelRuntime.value.runtime.provider;
@@ -265,6 +265,13 @@ function formatTokenK(value: number) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 0) return "—";
   return `${(numeric / 1000).toFixed(1)}k`;
+}
+
+function formatContextUsagePercent(value: number) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return "0.0%";
+  if (numeric < 0.1) return "<0.1%";
+  return `${numeric.toFixed(1)}%`;
 }
 
 function reasoningLevelShort(level: string) {

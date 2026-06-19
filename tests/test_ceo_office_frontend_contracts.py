@@ -270,6 +270,8 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "runtimeBatteryCells" in app
     assert "agentContextBatteryCells" in app
     assert "contextUsagePercentText" in app
+    assert "formatContextUsagePercent(agentContextUsagePct.value)" in app
+    assert 'return "<0.1%";' in app
     assert 'key: "context-percent"' in app
     assert "text: contextUsagePercentText.value" in app
     assert "context-progress" in app
