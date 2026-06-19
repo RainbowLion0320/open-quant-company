@@ -212,6 +212,25 @@ def test_data_sources_capabilities_api_reads_latest_artifact(monkeypatch, tmp_pa
     reset_datahub()
 
 
+def test_strategy_lab_exposes_strategy_data_coverage_matrix_tab():
+    lab = Path("web/frontend/src/views/StrategyLab.vue").read_text(encoding="utf-8")
+    api = Path("web/frontend/src/api/modules/strategy.ts").read_text(encoding="utf-8")
+    types = Path("web/frontend/src/api/types/strategy.ts").read_text(encoding="utf-8")
+    zh_modules = Path("web/frontend/src/i18n/messages/zh-CN/modules.ts").read_text(encoding="utf-8")
+    en_modules = Path("web/frontend/src/i18n/messages/en-US/modules.ts").read_text(encoding="utf-8")
+    zh_strategies = Path("web/frontend/src/i18n/messages/zh-CN/strategies.ts").read_text(encoding="utf-8")
+    en_strategies = Path("web/frontend/src/i18n/messages/en-US/strategies.ts").read_text(encoding="utf-8")
+
+    assert "StrategyDataCoverage" in lab
+    assert '{ key: "dataCoverage" }' in lab
+    assert "strategyDataCoverage" in api
+    assert "StrategyDataCoverageResponse" in types
+    assert "dataCoverage" in zh_modules
+    assert "dataCoverage" in en_modules
+    assert "coverageMatrix" in zh_strategies
+    assert "coverageMatrix" in en_strategies
+
+
 def test_strategy_evidence_api_lists_catalog_gaps(monkeypatch):
     from web.api.app import create_app
 

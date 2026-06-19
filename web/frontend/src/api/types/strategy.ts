@@ -86,6 +86,56 @@ export interface StrategyEvaluationSummary {
   note: string;
 }
 
+export interface StrategyDataCoverageFamily {
+  key: string;
+  label_zh: string;
+  label_en: string;
+}
+
+export interface StrategyDataCoverageCell {
+  status: "declared" | "observed" | "required_missing" | "optional_missing" | "not_applicable" | string;
+  declared: boolean;
+  observed: boolean;
+  expectation: "required" | "optional" | "not_applicable" | string;
+}
+
+export interface StrategyDataCoverageRow {
+  strategy: string;
+  label: string;
+  strategy_type: string;
+  layer: string;
+  lifecycle: string;
+  declared_dimensions: string[];
+  declared_families: string[];
+  observed_dimensions: string[];
+  observed_families: string[];
+  observed_status: string;
+  required_families: string[];
+  optional_families: string[];
+  not_applicable_families: string[];
+  missing_required_families: string[];
+  optional_missing_families: string[];
+  unused_declared_families: string[];
+  coverage_score: number;
+  cells: Record<string, StrategyDataCoverageCell>;
+}
+
+export interface StrategyDataCoverageResponse {
+  status: string;
+  generated_at: string;
+  recommended_command: string;
+  families: StrategyDataCoverageFamily[];
+  expectations: Record<string, any>;
+  summary: {
+    strategy_count: number;
+    family_count: number;
+    required_gap_count: number;
+    optional_gap_count: number;
+    missing_observed_count: number;
+  };
+  rows: StrategyDataCoverageRow[];
+}
+
 export interface StrategyDetailResponse {
   signals: StrategySignal[];
 }

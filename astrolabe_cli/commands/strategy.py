@@ -19,6 +19,18 @@ def catalog() -> CliResult:
     )
 
 
+def data_coverage() -> CliResult:
+    from research.strategy_data_coverage import write_strategy_data_coverage_payload
+
+    payload, path = write_strategy_data_coverage_payload()
+    return CliResult(
+        ok=True,
+        command="strategy data-coverage",
+        message=f"Strategy data coverage matrix written: {path}",
+        data={**payload, "artifact_path": path.as_posix()},
+    )
+
+
 def run_strategy(strategy: str, mode: str, limit: int, dry_run: bool) -> CliResult:
     from data.strategy.catalog import get_strategy
     from data.strategy.plugins import iter_strategy_plugins, run_registered_strategies

@@ -107,6 +107,7 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq data tushare-audit --json` | 审计 Tushare 权限和本地覆盖率 |
 | `astroq data tushare-backfill --scope missing --resume --json` | 按缺口补齐 Tushare 数据 |
 | `astroq strategy catalog --json` | 查看 production / paper / candidate 策略目录 |
+| `astroq strategy data-coverage --json` | 生成策略数据覆盖矩阵，检查每个策略声明数据族、必需缺口、可选补充和 observed evidence 状态 |
 | `astroq strategy run all --mode production --json` | 运行生产策略扫描 |
 | `astroq strategy run trend_following --mode research --dry-run --json` | 候选策略研究扫描演练 |
 | `astroq strategy compete --json` | 生成 12 策略统一 OOS 公平竞赛报告 |

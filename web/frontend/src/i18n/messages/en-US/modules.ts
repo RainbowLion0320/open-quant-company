@@ -55,6 +55,11 @@ export const modules = {
             meta: "Evidence panel",
             description: "Inspect evidence artifacts, OOS status, cost models, and promotion decisions",
           },
+          dataCoverage: {
+            label: "Data Coverage",
+            meta: "Data matrix",
+            description: "Inspect each strategy's declared data families, required gaps, and optional expansion areas",
+          },
         },
       },
       system: {

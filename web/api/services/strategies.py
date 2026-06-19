@@ -57,6 +57,12 @@ def strategy_catalog_payload() -> dict:
     return {"items": items, "total": len(items)}
 
 
+def strategy_data_coverage_payload() -> dict:
+    from research.strategy_data_coverage import build_strategy_data_coverage
+
+    return build_strategy_data_coverage()
+
+
 def strategy_evaluation_payload() -> dict:
     from research.strategy_evaluation import required_baselines
 

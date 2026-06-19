@@ -16,6 +16,7 @@ from web.api.schemas.strategy import (
 from web.api.services.strategies import (
     start_strategy_run,
     strategy_catalog_payload,
+    strategy_data_coverage_payload,
     strategy_evaluation_payload,
     strategy_evidence_detail_payload,
     strategy_evidence_list_payload,
@@ -52,6 +53,12 @@ async def get_strategy_governance():
 async def get_strategy_catalog():
     """Return the strategy catalog contract used by research and UI surfaces."""
     return strategy_catalog_payload()
+
+
+@router.get("/data-coverage")
+async def get_strategy_data_coverage():
+    """Return strategy data coverage matrix: declared needs vs type expectations."""
+    return strategy_data_coverage_payload()
 
 
 @router.get("/evaluation", response_model=StrategyEvaluationSummaryResponse)

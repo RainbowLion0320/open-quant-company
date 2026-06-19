@@ -55,6 +55,11 @@ export const modules = {
             meta: "Evidence panel",
             description: "查看策略证据制品、OOS状态、成本模型和晋级决策",
           },
+          dataCoverage: {
+            label: "数据覆盖",
+            meta: "Data matrix",
+            description: "查看每个策略声明使用的数据族、必需缺口和可选补充方向",
+          },
         },
       },
       system: {

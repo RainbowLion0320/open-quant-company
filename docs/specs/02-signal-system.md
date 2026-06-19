@@ -169,6 +169,8 @@ Market Regime 规则评分层保持确定性和可解释性，但不再只能靠
 - `data_requirements`
 - `output_contract`: 当前统一为 `StrategySignalRows`
 
+策略数据覆盖矩阵由 `research/strategy_data_coverage.py` 生成，CLI 入口为 `astroq strategy data-coverage --json`，Web 入口为 Strategy Lab 的“数据覆盖”页签。矩阵只回答策略设计问题：每个策略声明了哪些数据族、相对 `strategy_type/layer` 是否缺必需数据、哪些数据族是可选补充、当前 evidence 是否记录了 observed dimensions。它不是全仓逻辑表反查，也不通过代码搜索推断策略依赖；缺少 observed evidence 时必须显示 `missing_evidence`，不能把声明需求伪装成实际消费。
+
 所有策略 runner 输出 `StrategySignalRows`：
 
 ```python

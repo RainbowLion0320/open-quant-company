@@ -46,3 +46,19 @@ def test_strategy_catalog_api_is_not_shadowed(monkeypatch):
     assert "items" in data
     assert data["total"] == len(data["items"])
     assert any(item["name"] == "multifactor" for item in data["items"])
+
+
+def test_strategy_data_coverage_api_returns_matrix(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from web.api.app import create_app
+
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    res = TestClient(create_app()).get("/api/strategies/data-coverage")
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "ok"
+    assert data["summary"]["strategy_count"] == len(data["rows"])
+    assert any(item["key"] == "price" for item in data["families"])
+    assert any(row["strategy"] == "multifactor" for row in data["rows"])

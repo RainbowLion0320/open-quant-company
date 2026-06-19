@@ -23,6 +23,7 @@ import Strategies from "./Strategies.vue";
 import Signals from "./Signals.vue";
 import Backtest from "./Backtest.vue";
 import StrategyEvidence from "./StrategyEvidence.vue";
+import StrategyDataCoverage from "./StrategyDataCoverage.vue";
 
 const { t } = useI18n();
 
@@ -31,6 +32,7 @@ const tabKeys = [
   { key: "signals" },
   { key: "backtest" },
   { key: "evidence" },
+  { key: "dataCoverage" },
 ];
 
 const tabs = computed(() => tabKeys.map(item => ({
@@ -45,6 +47,7 @@ const { activeComponent } = useModuleTabs(tabKeys, "strategies", {
   signals: Signals,
   backtest: Backtest,
   evidence: StrategyEvidence,
+  dataCoverage: StrategyDataCoverage,
 });
 </script>
 

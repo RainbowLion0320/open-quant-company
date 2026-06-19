@@ -80,6 +80,7 @@ from astrolabe_cli.commands.regime import status as regime_status
 from astrolabe_cli.commands.regime import train_profit as regime_train_profit
 from astrolabe_cli.commands.strategy import catalog as strategy_catalog
 from astrolabe_cli.commands.strategy import compete as strategy_compete
+from astrolabe_cli.commands.strategy import data_coverage as strategy_data_coverage
 from astrolabe_cli.commands.strategy import evidence as strategy_evidence
 from astrolabe_cli.commands.strategy import run_strategy
 from astrolabe_cli.commands.test_system import check as test_check
@@ -594,6 +595,10 @@ def build_parser() -> argparse.ArgumentParser:
     strategy_catalog_cmd = strategy_sub.add_parser("catalog", help="Show Strategy Catalog")
     add_common_flags(strategy_catalog_cmd)
     strategy_catalog_cmd.set_defaults(handler=lambda args: strategy_catalog())
+
+    strategy_data_coverage_cmd = strategy_sub.add_parser("data-coverage", help="Show strategy data coverage matrix")
+    add_common_flags(strategy_data_coverage_cmd)
+    strategy_data_coverage_cmd.set_defaults(handler=lambda args: strategy_data_coverage())
 
     strategy_run_cmd = strategy_sub.add_parser("run", help="Run a strategy through runtime gates")
     strategy_run_cmd.add_argument("name", help="Strategy name or all")
