@@ -269,6 +269,9 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "composer-input-row" in view
     assert "composer-status-line" not in view
     assert "agent-runtime-line" in app
+    assert "const agentRuntimeVisible = computed(() => Boolean(agentModelRuntime.value));" in app
+    assert "isCeoOfficeRoute.value && Boolean(agentModelRuntime.value)" not in app
+    assert "if (!isCeoOfficeRoute.value)" not in app
     assert "runtime-segment" in app
     assert "runtime-tab" in app
     assert "runtimeMenuKind" in app

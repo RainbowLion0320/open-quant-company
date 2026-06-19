@@ -239,8 +239,7 @@ const buildVersion = computed(() => {
   const version = (marketMeta.value.config as any)?.project?.version;
   return version ? `v${version}` : "v—";
 });
-const isCeoOfficeRoute = computed(() => activeSectionPath.value === "/");
-const agentRuntimeVisible = computed(() => isCeoOfficeRoute.value && Boolean(agentModelRuntime.value));
+const agentRuntimeVisible = computed(() => Boolean(agentModelRuntime.value));
 const runtimeBatteryCellCount = 20;
 const runtimeBatteryCells = Array.from({ length: runtimeBatteryCellCount }, (_, index) => index + 1);
 const agentContextUsagePct = computed(() => {
@@ -316,10 +315,6 @@ async function fetchSystemHealth() {
 }
 
 async function fetchAgentModelRuntime(sessionId = agentRuntimeSessionId.value) {
-  if (!isCeoOfficeRoute.value) {
-    agentModelRuntime.value = null;
-    return;
-  }
   let resolvedSessionId = sessionId;
   try {
     if (!resolvedSessionId) {
