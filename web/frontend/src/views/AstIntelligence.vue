@@ -10,39 +10,59 @@
       <code>{{ payload.recommended_command }}</code>
     </section>
 
-    <section class="ast-metrics">
-      <article class="ast-metric glass-card risk metric-with-action">
+    <section class="ast-overview">
+      <article class="ast-overview-card risk-summary glass-card">
+        <div class="risk-summary-main">
+          <small>{{ t("astIntelligence.totalRisks") }}</small>
+          <strong>{{ issueTotal }}</strong>
+        </div>
+        <div class="severity-chips">
+          <span v-for="entry in severityEntries" :key="entry.key" class="severity-chip" :class="entry.key.toLowerCase()">
+            <b>{{ entry.key }}</b>
+            <span>{{ entry.count }}</span>
+          </span>
+        </div>
+      </article>
+
+      <article class="ast-overview-card production-impact glass-card">
+        <div class="overview-head">
+          <small>{{ t("astIntelligence.productionRisks") }}</small>
+          <strong>{{ productionIssueCount }}</strong>
+        </div>
+        <div class="impact-split">
+          <span><b>{{ productionIssueCount }}</b>{{ t("astIntelligence.productionCode") }}</span>
+          <span><b>{{ nonProductionIssueCount }}</b>{{ t("astIntelligence.nonProduction") }}</span>
+        </div>
+        <div class="impact-bar" aria-hidden="true">
+          <span :style="{ width: productionSharePercent }"></span>
+        </div>
+      </article>
+
+      <article class="ast-overview-card duplicate-shape glass-card">
+        <small>{{ t("astIntelligence.duplicateShape") }}</small>
+        <div class="shape-grid">
+          <span>
+            <b>{{ payload?.summary.clone_group_count ?? 0 }}</b>
+            {{ t("astIntelligence.similarityGroups") }}
+          </span>
+          <span>
+            <b>{{ canonicalBypassCount }}</b>
+            {{ t("astIntelligence.canonicalBypass") }}
+          </span>
+        </div>
+      </article>
+
+      <article class="ast-overview-card scan-coverage glass-card">
         <button class="artifact-refresh" @click="load" :aria-label="t('astIntelligence.refresh')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
         </button>
-        <small>{{ t("astIntelligence.duplicateRisks") }}</small>
-        <strong>{{ payload?.summary.issue_count ?? payload?.issues.length ?? 0 }}</strong>
-        <em>{{ severityText }}</em>
-      </article>
-      <article class="ast-metric glass-card">
-        <small>{{ t("astIntelligence.similarityGroups") }}</small>
-        <strong>{{ payload?.summary.clone_group_count ?? 0 }}</strong>
-        <em>{{ t("astIntelligence.similarityContext") }}</em>
-      </article>
-      <article class="ast-metric glass-card">
-        <small>{{ t("astIntelligence.productionRisks") }}</small>
-        <strong>{{ productionIssueCount }}</strong>
-        <em>{{ t("astIntelligence.nonProductionRisks", { count: nonProductionIssueCount }) }}</em>
-      </article>
-      <article class="ast-metric glass-card">
-        <small>{{ t("astIntelligence.canonicalBypass") }}</small>
-        <strong>{{ canonicalBypassCount }}</strong>
-        <em>{{ t("astIntelligence.categoryRisk") }}</em>
-      </article>
-      <article class="ast-metric glass-card">
-        <small>{{ t("astIntelligence.units") }}</small>
-        <strong>{{ payload?.summary.unit_count ?? 0 }}</strong>
-        <em>{{ t("astIntelligence.files", { count: payload?.summary.file_count ?? 0 }) }}</em>
-      </article>
-      <article class="ast-metric glass-card">
-        <small>{{ t("astIntelligence.languages") }}</small>
-        <strong>{{ languageEntries.length }}</strong>
-        <em>{{ languageEntries.map(([key, count]) => `${key}:${count}`).join(" · ") || "—" }}</em>
+        <small>{{ t("astIntelligence.scanCoverage") }}</small>
+        <div class="coverage-grid">
+          <span><b>{{ payload?.summary.file_count ?? 0 }}</b>{{ t("astIntelligence.filesShort") }}</span>
+          <span><b>{{ payload?.summary.unit_count ?? 0 }}</b>{{ t("astIntelligence.unitsShort") }}</span>
+          <span><b>{{ languageEntries.length }}</b>{{ t("astIntelligence.languagesShort") }}</span>
+        </div>
+        <em>{{ latestScanMeta }}</em>
       </article>
     </section>
 
@@ -155,9 +175,14 @@ const issueTotal = computed(() => payload.value?.summary.issue_count ?? payload.
 const productionIssueCount = computed(() => (payload.value?.issues || []).filter(issue => issue.paths.some(isProductionPath)).length);
 const nonProductionIssueCount = computed(() => Math.max(0, (payload.value?.summary.issue_count ?? payload.value?.issues.length ?? 0) - productionIssueCount.value));
 const canonicalBypassCount = computed(() => (payload.value?.issues || []).filter(issue => issue.category === "canonical_bypass").length);
-const severityText = computed(() => {
+const severityEntries = computed(() => {
   const counts = payload.value?.summary.severity_counts || {};
-  return ["P0", "P1", "P2"].map(key => `${key}:${counts[key] || 0}`).join(" · ");
+  return ["P0", "P1", "P2"].map(key => ({ key, count: counts[key] || 0 }));
+});
+const productionSharePercent = computed(() => {
+  const total = productionIssueCount.value + nonProductionIssueCount.value;
+  if (!total) return "0%";
+  return `${Math.round((productionIssueCount.value / total) * 100)}%`;
 });
 const latestScanMeta = computed(() => {
   const generatedAt = payload.value?.latest?.generated_at || payload.value?.generated_at || "";

@@ -1105,16 +1105,31 @@ def test_ast_intelligence_metrics_show_auditable_risk_counts_not_black_box_score
     assert "duplicateScore" not in view
     assert "重复风险分" not in zh
     assert "Duplicate Score" not in en
+    assert "ast-metric" not in view
+    assert ".ast-metric" not in Path("web/frontend/src/styles/views/ast-intelligence.css").read_text(encoding="utf-8")
 
-    assert "payload?.summary.issue_count" in view
+    assert "issueTotal" in view
+    assert "severityEntries" in view
     assert "productionIssueCount" in view
+    assert "productionSharePercent" in view
     assert "canonicalBypassCount" in view
-    assert "重复风险点" in zh
+    assert "ast-overview" in view
+    assert "risk-summary" in view
+    assert "production-impact" in view
+    assert "duplicate-shape" in view
+    assert "scan-coverage" in view
+    assert "总风险点" in zh
     assert "生产代码风险" in zh
+    assert "非生产" in zh
+    assert "相似分组" in zh
     assert "绕过统一入口" in zh
-    assert "Duplicate Risks" in en
+    assert "检测时间" in zh
+    assert "Total Risks" in en
     assert "Production Risks" in en
+    assert "Non-production" in en
+    assert "Similarity Groups" in en
     assert "Canonical Bypass" in en
+    assert "Scan time" in en
 
 
 def test_ast_intelligence_page_is_issue_list_first_not_analysis_panels():
@@ -1129,6 +1144,11 @@ def test_ast_intelligence_page_is_issue_list_first_not_analysis_panels():
     assert "formatScanTime" in view
     assert "formatArtifactAge" not in view
     assert "ast-list-meta" in css
+    assert "ast-overview-card" in css
+    assert "severity-chip" in css
+    assert "impact-bar" in css
+    assert "shape-grid" in css
+    assert "coverage-grid" in css
     assert "selectedIssue" in view
     assert "ast-risk-layout" in view
     assert "risk-item" in view
