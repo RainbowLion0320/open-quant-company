@@ -6,8 +6,7 @@
 
 .design-command,
 .panel-head,
-.case-stats,
-.graph-node {
+.case-stats {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -101,8 +100,7 @@
 }
 
 .design-metric em,
-.panel-head small,
-.graph-node em {
+.panel-head small {
   color: var(--text-tertiary);
   font-family: "JetBrains Mono", monospace;
   font-size: 10px;
@@ -195,6 +193,7 @@
 }
 
 .graph-lane {
+  min-width: 0;
   min-height: 320px;
   display: flex;
   flex-direction: column;
@@ -203,6 +202,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.025);
+  overflow: hidden;
 }
 
 .graph-lane h3,
@@ -216,11 +216,20 @@
 
 .graph-lane.cases {
   max-height: 420px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .graph-node {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  justify-content: stretch;
+  gap: 4px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 48px;
   padding: 8px;
   border: 1px solid var(--border-subtle);
@@ -238,9 +247,27 @@
 }
 
 .graph-node strong {
+  min-width: 0;
+  max-width: 100%;
   color: var(--text-secondary);
   font-size: 11px;
+  line-height: 1.35;
   overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.graph-node em {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text-tertiary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .graph-chip {

@@ -1211,6 +1211,34 @@ def test_settings_page_merges_low_value_auth_and_notification_cards():
     assert "grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));" not in css
 
 
+def test_test_design_case_cards_wrap_inside_their_lane():
+    css = Path("web/frontend/src/styles/views/test-design.css").read_text(encoding="utf-8")
+
+    flex_group = css.split(".design-command,", 1)[1].split("{", 1)[0]
+    assert ".graph-node" not in flex_group
+
+    graph_lane_block = css.split(".graph-lane {", 1)[1].split("}", 1)[0]
+    assert "min-width: 0;" in graph_lane_block
+    assert "overflow: hidden;" in graph_lane_block
+
+    graph_node_block = css.split(".graph-node {", 1)[1].split("}", 1)[0]
+    assert "box-sizing: border-box;" in graph_node_block
+    assert "display: grid;" in graph_node_block
+    assert "grid-template-columns: minmax(0, 1fr);" in graph_node_block
+    assert "max-width: 100%;" in graph_node_block
+
+    graph_node_strong_block = css.split(".graph-node strong {", 1)[1].split("}", 1)[0]
+    assert "min-width: 0;" in graph_node_strong_block
+    assert "white-space: normal;" in graph_node_strong_block
+    assert "line-height:" in graph_node_strong_block
+
+    graph_node_meta_block = css.split(".graph-node em {", 1)[1].split("}", 1)[0]
+    assert "display: block;" in graph_node_meta_block
+    assert "min-width: 0;" in graph_node_meta_block
+    assert "overflow-wrap: anywhere;" in graph_node_meta_block
+    assert "white-space: normal;" in graph_node_meta_block
+
+
 def test_market_view_surfaces_regime_stability_state():
     market = Path("web/frontend/src/views/Market.vue").read_text(encoding="utf-8")
 
