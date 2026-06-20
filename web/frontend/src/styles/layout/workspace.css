@@ -84,6 +84,16 @@
   font-size: 10px;
   font-weight: 600;
 }
+.telemetry-version {
+  color: var(--text-tertiary);
+}
+.telemetry-version strong {
+  max-width: 116px;
+  overflow: hidden;
+  color: rgba(148, 163, 184, 0.86);
+  font-size: 9px;
+  text-overflow: ellipsis;
+}
 .agent-runtime-line {
   position: relative;
   flex: 1 1 auto;
@@ -201,11 +211,6 @@
   background: rgba(7, 12, 24, 0.96);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
 }
-.runtime-popover-reasoning {
-  min-width: 74px;
-  max-width: 96px;
-  padding: 4px;
-}
 .runtime-menu {
   display: grid;
   gap: 1px;
@@ -219,6 +224,11 @@
   color: var(--text-disabled);
   font-size: 8px;
   text-transform: uppercase;
+}
+.runtime-menu-provider-reasoning {
+  margin-top: 4px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  padding-top: 5px;
 }
 .runtime-menu-option {
   display: flex;
@@ -235,7 +245,7 @@
   text-align: left;
   cursor: pointer;
 }
-.runtime-popover-reasoning .runtime-menu-option {
+.runtime-menu-option-reasoning {
   justify-content: flex-start;
   gap: 0;
   padding: 3px 4px;

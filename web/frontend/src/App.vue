@@ -35,11 +35,6 @@
         <span :class="{ active: currentLocale === 'zh-CN' }">中</span>
         <span :class="{ active: currentLocale === 'en-US' }">EN</span>
       </button>
-
-      <div class="core-status">
-        <span>{{ t('app.build') }}</span>
-        <strong>{{ buildVersion }}</strong>
-      </div>
     </aside>
 
     <section class="workspace">
@@ -67,6 +62,10 @@
           <div class="telemetry-tag">
             <span>{{ t('app.fresh') }}</span>
             <strong>{{ marketMeta.freshness?.market || '—' }}</strong>
+          </div>
+          <div class="telemetry-tag telemetry-version">
+            <span>{{ t('app.build') }}</span>
+            <strong>{{ buildVersion }}</strong>
           </div>
         </div>
         <div v-if="agentRuntimeVisible" class="agent-runtime-line" :aria-label="t('app.modelRuntimeA11y')">
@@ -115,7 +114,7 @@
           :style="runtimePopoverStyle"
           role="menu"
         >
-          <div v-if="runtimeMenuKind === 'model'" class="runtime-menu">
+          <div class="runtime-menu">
             <template v-for="provider in runtimeProviderOptions" :key="provider.provider">
               <div class="runtime-menu-provider">{{ provider.label }}</div>
               <button
@@ -134,13 +133,12 @@
                 <small>{{ runtimeModelDiscoveryProvider === provider.provider ? 'probe' : provider.secret_status }}</small>
               </button>
             </template>
-          </div>
-          <div v-else class="runtime-menu">
+            <div class="runtime-menu-provider runtime-menu-provider-reasoning">{{ t("app.reasoningShort") }}</div>
             <button
               v-for="mode in currentReasoningModes"
               :key="mode.key"
               type="button"
-              class="runtime-menu-option"
+              class="runtime-menu-option runtime-menu-option-reasoning"
               :class="{ active: mode.key === currentReasoningMode }"
               :disabled="!mode.enabled"
               @click="saveRuntimeReasoning(mode.key)"
@@ -167,7 +165,7 @@ import type { AgentModelRuntimeResponse, RegimeResponse, SystemLlmProviderOption
 import { useI18n } from "./i18n";
 import logoUrl from "./assets/open-quant-company-logo.svg";
 
-type RuntimeMenuKind = "model" | "reasoning";
+type RuntimeMenuKind = "runtime";
 type RuntimeSegment = {
   key: string;
   kind: string;
@@ -285,15 +283,14 @@ const agentRuntimeSegments = computed<RuntimeSegment[]>(() => {
   if (!agentModelRuntime.value) return [];
   const label = agentModelRuntime.value.runtime.label || agentModelRuntime.value.runtime.provider;
   const model = agentModelRuntime.value.runtime.model || "—";
+  const reasoning = reasoningLevelShort(agentModelRuntime.value.reasoning.level);
   return [
-    { key: "model-runtime", kind: "model-runtime", text: `${label} / ${model}`, interactive: true, menu: "model" },
     {
-      key: "reasoning",
-      kind: "reasoning",
-      separator: "dot",
-      text: `${t("app.reasoningShort")} ${reasoningLevelShort(agentModelRuntime.value.reasoning.level)}`,
+      key: "model-runtime",
+      kind: "model-runtime",
+      text: `${label} / ${model} · ${t("app.reasoningShort")} ${reasoning}`,
       interactive: true,
-      menu: "reasoning",
+      menu: "runtime",
     },
     { key: "context", kind: "context", separator: "dot", text: t("app.contextShort") },
     {
@@ -364,7 +361,7 @@ function openRuntimeMenu(kind: RuntimeMenuKind | undefined, event?: MouseEvent) 
     runtimeMenuAnchorX.value = rect.left + rect.width / 2 - (containerRect?.left || 0);
   }
   runtimeMenuKind.value = runtimeMenuKind.value === kind ? "" : kind;
-  if (runtimeMenuKind.value === "model") void discoverRuntimeModels();
+  if (runtimeMenuKind.value === "runtime") void discoverRuntimeModels();
 }
 
 function runtimeProviderSelectable(provider: SystemLlmProviderOption) {

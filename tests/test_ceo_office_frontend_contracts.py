@@ -294,7 +294,16 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert "<small>{{ mode.key }}</small>" not in app
     assert 'key: "model-runtime"' in app
     assert 'kind: "model-runtime"' in app
-    assert 'text: `${label} / ${model}`' in app
+    assert 'type RuntimeMenuKind = "runtime";' in app
+    assert 'menu: "runtime"' in app
+    assert 'text: `${label} / ${model} · ${t("app.reasoningShort")} ${reasoning}`' in app
+    assert 'key: "reasoning"' not in app
+    assert 'menu: "reasoning"' not in app
+    assert "runtimeMenuKind === 'model'" not in app
+    assert "runtimeMenuKind === 'reasoning'" not in app
+    assert 'runtimeMenuKind.value === "runtime"' in app
+    assert 'class="runtime-menu-option runtime-menu-option-reasoning"' in app
+    assert "runtime-menu-provider-reasoning" in app
     assert 'key: "provider"' not in app
     assert 'key: "model", kind: "model"' not in app
     assert "updateSystemLlmRuntime" in system_api
@@ -322,16 +331,15 @@ def test_ceo_office_view_uses_agent_api_and_i18n():
     assert ".runtime-tab" in workspace_css
     assert ".runtime-segment-model-runtime .runtime-tab" in workspace_css
     assert ".runtime-popover" in workspace_css
-    assert ".runtime-popover-reasoning" in workspace_css
-    assert "min-width: 74px" in workspace_css
-    assert "max-width: 96px" in workspace_css
-    assert ".runtime-popover-reasoning .runtime-menu-option" in workspace_css
+    assert ".runtime-popover-reasoning" not in workspace_css
+    assert ".runtime-menu-provider-reasoning" in workspace_css
+    assert ".runtime-menu-option-reasoning" in workspace_css
     assert "max-height: 180px" in workspace_css
     assert "padding: 5px" in workspace_css
-    assert "padding: 4px" in workspace_css
     assert "gap: 1px" in workspace_css
     assert "font-size: 9px" in workspace_css
     assert "padding: 3px 5px" in workspace_css
+    assert "padding: 3px 4px" in workspace_css
     assert "--runtime-popover-x" in workspace_css
     assert "bottom: 32px" in workspace_css
     assert "bottom: 18px" not in workspace_css

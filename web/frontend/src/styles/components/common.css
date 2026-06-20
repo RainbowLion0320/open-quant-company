@@ -442,7 +442,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   }
   .nav-node { width: 44px; height: 44px; }
   .nav-node.active::before { display: none; }
-  .nav-tooltip, .core-status { display: none; }
+  .nav-tooltip { display: none; }
   .command-bar {
     height: 40px;
     min-height: 40px;
