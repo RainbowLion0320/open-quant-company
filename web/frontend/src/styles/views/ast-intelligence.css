@@ -6,8 +6,7 @@
 
 .ast-command,
 .ast-filters,
-.panel-head,
-.group-summary {
+.panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -29,7 +28,8 @@
 .ast-command span,
 .ast-metric small,
 .panel-head span,
-.ast-filters span {
+.ast-filters span,
+.issue-detail-section h3 {
   color: var(--text-disabled);
   font-size: 10px;
   font-weight: 700;
@@ -38,8 +38,10 @@
 }
 
 .ast-command code,
+.path-list code,
 .unit-row code,
-.module-pairs code {
+.module-pairs code,
+.issue-detail-section pre {
   color: var(--text-secondary);
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
@@ -103,8 +105,7 @@
 
 .ast-metric em,
 .panel-head small,
-.group-item em,
-.issue-item em,
+.risk-item em,
 .unit-row span {
   color: var(--text-tertiary);
   font-family: "JetBrains Mono", monospace;
@@ -136,10 +137,9 @@
   padding: 0 8px;
 }
 
-.ast-grid,
-.ast-detail-grid {
+.ast-risk-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+  grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
   gap: 12px;
   align-items: start;
 }
@@ -150,130 +150,161 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.heatmap {
-  min-height: 360px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 8px;
-  align-content: start;
-}
-
-.heatmap-cell,
-.group-item,
-.issue-item {
-  width: 100%;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.heatmap-cell {
-  min-height: 72px;
-  display: grid;
-  gap: 4px;
-  padding: 9px;
-}
-
-.heatmap-cell:hover,
-.heatmap-cell.active,
-.group-item:hover,
-.group-item.active {
-  border-color: rgba(34, 197, 94, 0.58);
-  background: rgba(34, 197, 94, 0.1);
-}
-
-.heatmap-cell strong,
-.group-item strong,
-.issue-item strong,
-.group-summary strong,
-.unit-row strong {
-  color: var(--text-primary);
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-.heatmap-cell span,
-.group-item span,
-.issue-item span {
-  color: var(--text-secondary);
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
-
-.heatmap-cell em {
-  color: var(--positive);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 15px;
-  font-style: normal;
-}
-
-.group-list,
-.issue-list {
-  max-height: 460px;
+.risk-list {
+  max-height: 620px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   overflow: auto;
 }
 
-.group-item,
-.issue-item {
+.risk-item {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.24);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.risk-item:hover,
+.risk-item.active {
+  border-color: rgba(34, 197, 94, 0.58);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.risk-item.p0,
+.issue-detail-summary.p0 {
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+.risk-item.p1,
+.issue-detail-summary.p1 {
+  border-color: rgba(245, 158, 11, 0.48);
+}
+
+.risk-item.p2,
+.issue-detail-summary.p2 {
+  border-color: rgba(56, 189, 248, 0.38);
+}
+
+.risk-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.risk-item-head strong,
+.issue-detail-summary strong,
+.unit-row strong,
+.clone-context strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.risk-item-head span,
+.risk-item p,
+.issue-detail-summary span,
+.clone-context span,
+.issue-detail-section p {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.risk-item p {
+  margin: 0;
+}
+
+.issue-detail-panel {
+  position: sticky;
+  top: 12px;
+}
+
+.issue-detail-summary,
+.issue-detail-section,
+.unit-row {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.issue-detail-summary {
   display: grid;
   gap: 5px;
-  padding: 9px;
-  background: rgba(15, 23, 42, 0.24);
+  padding: 10px;
 }
 
-.issue-item.p0 { border-color: rgba(239, 68, 68, 0.55); }
-.issue-item.p1 { border-color: rgba(245, 158, 11, 0.48); }
-.issue-item.p2 { border-color: rgba(56, 189, 248, 0.38); }
-
-.group-summary {
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-
-.group-summary span {
-  color: var(--text-tertiary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
-}
-
-.unit-list {
+.issue-detail-section {
   display: grid;
   gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+}
+
+.issue-detail-section h3,
+.issue-detail-section p {
+  margin: 0;
+}
+
+.path-list,
+.unit-list {
+  display: grid;
+  gap: 7px;
+}
+
+.path-list code,
+.module-pairs code {
+  display: block;
+  padding: 6px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .unit-row {
   display: grid;
   gap: 4px;
   padding: 9px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.025);
+}
+
+.clone-context {
+  display: grid;
+  gap: 4px;
 }
 
 .module-pairs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 12px;
 }
 
-.module-pairs code {
-  padding: 5px 7px;
+.issue-detail-section pre {
+  max-height: 260px;
+  margin: 0;
+  padding: 8px;
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(0, 0, 0, 0.18);
+  overflow: auto;
+  white-space: pre-wrap;
 }
 
 @media (max-width: 980px) {
   .ast-metrics,
   .ast-filters,
-  .ast-grid,
-  .ast-detail-grid {
+  .ast-risk-layout {
     grid-template-columns: 1fr;
+  }
+
+  .issue-detail-panel {
+    position: static;
   }
 }

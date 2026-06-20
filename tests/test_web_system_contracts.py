@@ -1117,6 +1117,44 @@ def test_ast_intelligence_metrics_show_auditable_risk_counts_not_black_box_score
     assert "Canonical Bypass" in en
 
 
+def test_ast_intelligence_page_is_issue_list_first_not_analysis_panels():
+    view = Path("web/frontend/src/views/AstIntelligence.vue").read_text(encoding="utf-8")
+    css = Path("web/frontend/src/styles/views/ast-intelligence.css").read_text(encoding="utf-8")
+    zh = Path("web/frontend/src/i18n/messages/zh-CN/astIntelligence.ts").read_text(encoding="utf-8")
+    en = Path("web/frontend/src/i18n/messages/en-US/astIntelligence.ts").read_text(encoding="utf-8")
+
+    assert "astIntelligence.riskList" in view
+    assert "astIntelligence.issueDetail" in view
+    assert "selectedIssue" in view
+    assert "ast-risk-layout" in view
+    assert "risk-item" in view
+    assert "issue-detail-panel" in view
+
+    for stale_token in (
+        "astIntelligence.heatmap",
+        "heatmapCells",
+        "heatStyle",
+        "selectCell",
+        "selectedGroup",
+        "selectedGroupId",
+        "AstCloneGroup",
+        "matchesGroup",
+        "astIntelligence.inspector",
+        "astIntelligence.diagnostics",
+        "group-list",
+        "heatmap-cell",
+    ):
+        assert stale_token not in view
+
+    for stale_class in (".heatmap", ".group-list", ".group-item", ".ast-detail-grid", ".ast-grid"):
+        assert stale_class not in css
+
+    assert "重复风险清单" in zh
+    assert "问题详情" in zh
+    assert "Duplicate Risk List" in en
+    assert "Issue Detail" in en
+
+
 def test_datahub_sources_tab_and_api_contract():
     hub = Path("web/frontend/src/views/DataHub.vue").read_text(encoding="utf-8")
     data_sources_view = Path("web/frontend/src/views/DataSources.vue").read_text(encoding="utf-8")

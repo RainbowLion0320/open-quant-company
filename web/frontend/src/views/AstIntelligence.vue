@@ -20,9 +20,9 @@
         <em>{{ severityText }}</em>
       </article>
       <article class="ast-metric glass-card">
-        <small>{{ t("astIntelligence.cloneGroups") }}</small>
+        <small>{{ t("astIntelligence.similarityGroups") }}</small>
         <strong>{{ payload?.summary.clone_group_count ?? 0 }}</strong>
-        <em>{{ t("astIntelligence.filteredGroups", { count: filteredGroups.length }) }}</em>
+        <em>{{ t("astIntelligence.similarityContext") }}</em>
       </article>
       <article class="ast-metric glass-card">
         <small>{{ t("astIntelligence.productionRisks") }}</small>
@@ -79,95 +79,82 @@
       </label>
     </section>
 
-    <section class="ast-grid">
-      <article class="glass-card ast-panel">
+    <section class="ast-risk-layout">
+      <article class="glass-card ast-panel risk-list-panel">
         <div class="panel-head">
-          <span>{{ t("astIntelligence.heatmap") }}</span>
-          <small>{{ t("astIntelligence.heatmapMeta") }}</small>
+          <span>{{ t("astIntelligence.riskList") }}</span>
+          <small>{{ t("astIntelligence.filteredIssues", { count: filteredIssues.length, total: issueTotal }) }}</small>
         </div>
-        <div class="heatmap">
-          <button
-            v-for="cell in heatmapCells"
-            :key="`${cell.module}:${cell.language}`"
-            class="heatmap-cell"
-            :class="{ active: moduleFilter === cell.module || languageFilter === cell.language }"
-            :style="heatStyle(cell.count)"
-            @click="selectCell(cell.module, cell.language)"
-          >
-            <strong>{{ cell.module }}</strong>
-            <span>{{ cell.language }}</span>
-            <em>{{ cell.count }}</em>
-          </button>
-          <p v-if="!heatmapCells.length" class="empty-text">{{ t("astIntelligence.noHeatmap") }}</p>
-        </div>
-      </article>
-
-      <article class="glass-card ast-panel">
-        <div class="panel-head">
-          <span>{{ t("astIntelligence.cloneGroups") }}</span>
-          <small>{{ filteredGroups.length }}</small>
-        </div>
-        <div class="group-list">
-          <button
-            v-for="group in filteredGroups"
-            :key="group.id"
-            class="group-item"
-            :class="{ active: selectedGroupId === group.id }"
-            @click="selectedGroupId = group.id"
-          >
-            <strong>{{ group.category }} · {{ Math.round(group.similarity * 100) }}%</strong>
-            <span>{{ group.units.map(unit => `${unit.path}:${unit.start_line}`).join("  ") }}</span>
-            <em>{{ group.shared_shape }}</em>
-          </button>
-          <p v-if="!filteredGroups.length" class="empty-text">{{ t("astIntelligence.noGroups") }}</p>
-        </div>
-      </article>
-    </section>
-
-    <section class="ast-detail-grid">
-      <article class="glass-card ast-panel inspector">
-        <div class="panel-head">
-          <span>{{ t("astIntelligence.inspector") }}</span>
-          <small>{{ selectedGroup?.id || "—" }}</small>
-        </div>
-        <template v-if="selectedGroup">
-          <div class="group-summary">
-            <strong>{{ selectedGroup.category }}</strong>
-            <span>{{ t("astIntelligence.similarity", { value: Math.round(selectedGroup.similarity * 100) }) }}</span>
-          </div>
-          <div class="unit-list">
-            <div v-for="unit in selectedGroup.units" :key="unit.id" class="unit-row">
-              <strong>{{ unit.name }}</strong>
-              <code>{{ unit.path }}:{{ unit.start_line }}-{{ unit.end_line }}</code>
-              <span>{{ unit.language }} · {{ unit.kind }} · {{ unit.node_count }}</span>
-            </div>
-          </div>
-          <div class="module-pairs" v-if="selectedGroup.module_pairs.length">
-            <code v-for="pair in selectedGroup.module_pairs" :key="pair">{{ pair }}</code>
-          </div>
-        </template>
-        <p v-else class="empty-text">{{ t("astIntelligence.noSelectedGroup") }}</p>
-      </article>
-
-      <article class="glass-card ast-panel issue-panel">
-        <div class="panel-head">
-          <span>{{ t("astIntelligence.diagnostics") }}</span>
-          <small>{{ filteredIssues.length }}</small>
-        </div>
-        <div class="issue-list">
+        <div class="risk-list">
           <button
             v-for="issue in filteredIssues"
             :key="issue.id"
-            class="issue-item"
-            :class="issue.severity.toLowerCase()"
-            @click="selectIssue(issue.id)"
+            class="risk-item"
+            :class="[issue.severity.toLowerCase(), { active: selectedIssue?.id === issue.id }]"
+            @click="selectedIssueId = issue.id"
           >
-            <strong>{{ issue.severity }} · {{ issue.title }}</strong>
-            <span>{{ issue.paths.join("  ") }}</span>
+            <div class="risk-item-head">
+              <strong>{{ issue.severity }} · {{ issue.title }}</strong>
+              <span>{{ issue.category }}</span>
+            </div>
+            <p>{{ issue.paths.join("  ") }}</p>
             <em>{{ issue.recommendation }}</em>
           </button>
           <p v-if="!filteredIssues.length" class="empty-text">{{ t("astIntelligence.noIssues") }}</p>
         </div>
+      </article>
+
+      <article class="glass-card ast-panel issue-detail-panel">
+        <div class="panel-head">
+          <span>{{ t("astIntelligence.issueDetail") }}</span>
+          <small>{{ selectedIssue?.id || "—" }}</small>
+        </div>
+        <template v-if="selectedIssue">
+          <div class="issue-detail-summary" :class="selectedIssue.severity.toLowerCase()">
+            <strong>{{ selectedIssue.severity }} · {{ selectedIssue.title }}</strong>
+            <span>{{ selectedIssue.category }} · {{ selectedIssue.language }}</span>
+          </div>
+
+          <section class="issue-detail-section">
+            <h3>{{ t("astIntelligence.affectedFiles") }}</h3>
+            <div class="path-list">
+              <code v-for="path in selectedIssue.paths" :key="path">{{ path }}</code>
+            </div>
+          </section>
+
+          <section v-if="selectedIssue.units.length" class="issue-detail-section">
+            <h3>{{ t("astIntelligence.involvedUnits") }}</h3>
+            <div class="unit-list">
+              <div v-for="unit in selectedIssue.units" :key="unit.id" class="unit-row">
+                <strong>{{ unit.name }}</strong>
+                <code>{{ unit.path }}:{{ unit.start_line }}-{{ unit.end_line }}</code>
+                <span>{{ unit.language }} · {{ unit.kind }} · {{ unit.node_count }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section v-if="issueClone" class="issue-detail-section">
+            <h3>{{ t("astIntelligence.similarityContext") }}</h3>
+            <div class="clone-context">
+              <strong>{{ issueClone.category }} · {{ t("astIntelligence.similarity", { value: Math.round(issueClone.similarity * 100) }) }}</strong>
+              <span>{{ issueClone.shared_shape }}</span>
+            </div>
+            <div class="module-pairs" v-if="issueClone.module_pairs.length">
+              <code v-for="pair in issueClone.module_pairs" :key="pair">{{ pair }}</code>
+            </div>
+          </section>
+
+          <section class="issue-detail-section">
+            <h3>{{ t("astIntelligence.recommendation") }}</h3>
+            <p>{{ selectedIssue.recommendation }}</p>
+          </section>
+
+          <section v-if="Object.keys(selectedIssue.evidence || {}).length" class="issue-detail-section">
+            <h3>{{ t("astIntelligence.evidence") }}</h3>
+            <pre>{{ JSON.stringify(selectedIssue.evidence, null, 2) }}</pre>
+          </section>
+        </template>
+        <p v-else class="empty-text">{{ t("astIntelligence.noSelectedIssue") }}</p>
       </article>
     </section>
   </div>
@@ -176,26 +163,31 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { api } from "../api";
-import type { AstCloneGroup, AstIntelligenceResponse, AstIssue } from "../api";
+import type { AstIntelligenceResponse, AstIssue } from "../api";
 import { useI18n } from "../i18n";
-import { formatArtifactDate, heatCellStyle, topModule } from "../utils/intelligenceViews";
+import { topModule } from "../utils/intelligenceViews";
 
-const { currentLocale, t } = useI18n();
+const { t } = useI18n();
 const payload = ref<AstIntelligenceResponse | null>(null);
 const error = ref("");
 const severityFilter = ref("all");
 const categoryFilter = ref("all");
 const languageFilter = ref("all");
 const moduleFilter = ref("all");
-const selectedGroupId = ref("");
+const selectedIssueId = ref("");
 
 const languageEntries = computed(() => Object.entries(payload.value?.summary.languages || {}).sort((a, b) => b[1] - a[1]));
 const categories = computed(() => Array.from(new Set((payload.value?.issues || []).map(item => item.category))).sort());
-const modules = computed(() => Array.from(new Set((payload.value?.clone_groups || []).flatMap(group => group.units.map(unit => topModule(unit.path))))).sort());
+const modules = computed(() => Array.from(new Set((payload.value?.issues || []).flatMap(issue => issue.paths.map(path => topModule(path))))).sort());
 const filteredIssues = computed(() => (payload.value?.issues || []).filter(matchesIssue).slice(0, 120));
-const filteredGroups = computed(() => (payload.value?.clone_groups || []).filter(matchesGroup).slice(0, 120));
-const selectedGroup = computed(() => filteredGroups.value.find(item => item.id === selectedGroupId.value) || filteredGroups.value[0] || null);
-const generatedAt = computed(() => formatArtifactDate(payload.value?.generated_at || payload.value?.latest?.generated_at || "", currentLocale.value));
+const selectedIssue = computed(() => filteredIssues.value.find(item => item.id === selectedIssueId.value) || filteredIssues.value[0] || null);
+const issueClone = computed(() => {
+  const issue = selectedIssue.value;
+  if (!issue) return null;
+  const evidenceGroup = typeof issue.evidence?.clone_group_id === "string" ? issue.evidence.clone_group_id : "";
+  return (payload.value?.clone_groups || []).find(item => item.id === evidenceGroup || issue.id.includes(item.id)) || null;
+});
+const issueTotal = computed(() => payload.value?.summary.issue_count ?? payload.value?.issues.length ?? 0);
 const productionIssueCount = computed(() => (payload.value?.issues || []).filter(issue => issue.paths.some(isProductionPath)).length);
 const nonProductionIssueCount = computed(() => Math.max(0, (payload.value?.summary.issue_count ?? payload.value?.issues.length ?? 0) - productionIssueCount.value));
 const canonicalBypassCount = computed(() => (payload.value?.issues || []).filter(issue => issue.category === "canonical_bypass").length);
@@ -203,27 +195,13 @@ const severityText = computed(() => {
   const counts = payload.value?.summary.severity_counts || {};
   return ["P0", "P1", "P2"].map(key => `${key}:${counts[key] || 0}`).join(" · ");
 });
-const heatmapCells = computed(() => {
-  const counts = new Map<string, { module: string; language: string; count: number }>();
-  for (const group of payload.value?.clone_groups || []) {
-    for (const unit of group.units) {
-      const module = topModule(unit.path);
-      const key = `${module}:${unit.language}`;
-      const cell = counts.get(key) || { module, language: unit.language, count: 0 };
-      cell.count += 1;
-      counts.set(key, cell);
-    }
-  }
-  return Array.from(counts.values()).sort((a, b) => b.count - a.count).slice(0, 80);
-});
-const maxHeat = computed(() => Math.max(1, ...heatmapCells.value.map(item => item.count)));
 
 async function load() {
   error.value = "";
   try {
     const next = await api.astIntelligence();
     payload.value = next;
-    selectedGroupId.value = next.clone_groups[0]?.id || "";
+    selectedIssueId.value = next.issues[0]?.id || "";
   } catch (err) {
     error.value = err instanceof Error ? err.message : t("astIntelligence.loadError");
   }
@@ -237,17 +215,6 @@ function matchesIssue(issue: AstIssue) {
   return true;
 }
 
-function matchesGroup(group: AstCloneGroup) {
-  if (categoryFilter.value !== "all" && group.category !== categoryFilter.value) return false;
-  if (languageFilter.value !== "all" && !group.units.some(unit => unit.language === languageFilter.value)) return false;
-  if (moduleFilter.value !== "all" && !group.units.some(unit => topModule(unit.path) === moduleFilter.value)) return false;
-  if (severityFilter.value !== "all") {
-    const matching = (payload.value?.issues || []).some(issue => issue.severity === severityFilter.value && issue.id.includes(group.id));
-    if (!matching) return false;
-  }
-  return true;
-}
-
 function isProductionPath(path: string) {
   const normalized = path.replace(/^\.\/+/, "");
   if (!normalized) return false;
@@ -255,25 +222,6 @@ function isProductionPath(path: string) {
   if (/^(\.github|\.codegraph)\//.test(normalized)) return false;
   if (/^(README(\.en)?|AGENTS|CLAUDE|CONTRIBUTING|SECURITY|SUPPORT|CODE_OF_CONDUCT|CHANGELOG|LICENSE|NOTICE)(\.md)?$/.test(normalized)) return false;
   return true;
-}
-
-function selectCell(module: string, language: string) {
-  moduleFilter.value = moduleFilter.value === module ? "all" : module;
-  languageFilter.value = languageFilter.value === language ? "all" : language;
-}
-
-function selectIssue(issueId: string) {
-  const group = (payload.value?.clone_groups || []).find(item => issueId.includes(item.id));
-  if (group) selectedGroupId.value = group.id;
-}
-
-function heatStyle(value: number) {
-  return heatCellStyle(value, maxHeat.value, "34, 197, 94", {
-    backgroundBase: 0.08,
-    backgroundScale: 0.34,
-    borderBase: 0.18,
-    borderScale: 0.54,
-  });
 }
 
 onMounted(load);
