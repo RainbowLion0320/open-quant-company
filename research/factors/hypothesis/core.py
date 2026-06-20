@@ -28,7 +28,8 @@ def run_research_loop(
     print(f"   IC threshold: {ic_threshold}")
     print(f"   Max rounds: {max_rounds}")
     llm_runtime = resolve_llm_use_case("factor_hypothesis")
-    print(f"   Model: {llm_runtime['provider']}:{llm_runtime['model']}")
+    runtime_configured = bool(llm_runtime.get("provider") and llm_runtime.get("model"))
+    print(f"   LLM runtime: {'configured' if runtime_configured else 'not configured'}")
     print(f"   Save accepted candidates: {save_candidates}")
     print(f"{'='*60}")
 

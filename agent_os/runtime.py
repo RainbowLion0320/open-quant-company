@@ -18,7 +18,7 @@ from agent_os.context import build_context_pack
 from agent_os.context import context_status as build_context_status
 from agent_os.context import estimate_context_tokens
 from agent_os.desks import get_desk, list_desks
-from agent_os.evidence import FILE_EVIDENCE_KINDS, evidence_source_path, hash_file
+from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file, safe_existing_file_path, safe_file_evidence_path
 from agent_os.ledger import AgentLedger
 from agent_os.notifications import NotificationSender, build_report_notification_message, channel_secret_status, send_notification, supported_channels
 from agent_os.reports import (
@@ -767,8 +767,8 @@ class AgentRuntime:
         evidence_id = _id("ev")
         evidence_hash = ""
         snapshot_uri = ""
-        source_path = evidence_source_path(uri)
-        if kind in FILE_EVIDENCE_KINDS and source_path.exists():
+        source_path = safe_file_evidence_path(uri)
+        if kind in FILE_EVIDENCE_KINDS and source_path is not None and source_path.exists() and source_path.is_file():
             evidence_hash = hash_file(source_path)
             snapshot_uri = str(self._snapshot_evidence_file(evidence_id, source_path))
         evidence = EvidenceRef(
@@ -3102,10 +3102,13 @@ class AgentRuntime:
         return {**payload, "path": str(path), "evidence": evidence.to_dict()}
 
     def _snapshot_evidence_file(self, evidence_id: str, source: Path) -> Path:
+        safe_source = safe_existing_file_path(source)
+        if safe_source is None:
+            raise ValueError("Unsafe evidence source path")
         root = get_datahub().artifact_dir("agent") / "evidence" / evidence_id
         root.mkdir(parents=True, exist_ok=True)
-        target = root / (source.name or "evidence")
-        shutil.copy2(source, target)
+        target = root / (safe_source.name or "evidence")
+        shutil.copy2(safe_source, target)
         return target
 
     def _write_report_rhythm_artifact(self, payload: dict[str, Any]) -> Path:

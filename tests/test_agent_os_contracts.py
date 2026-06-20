@@ -1498,6 +1498,66 @@ def test_agent_live_environment_validation_cli_and_api(tmp_path, monkeypatch, ca
     reset_datahub()
 
 
+def test_agent_live_environment_api_sanitizes_adapter_exceptions(monkeypatch):
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from web.api.app import create_app
+
+    class ExplodingRuntime:
+        def live_environment(self) -> dict[str, object]:
+            raise RuntimeError("adapter failed at /Users/alice/qmt-userdata/account-123")
+
+    monkeypatch.setattr("web.api.routes.agent.AgentRuntime", lambda: ExplodingRuntime())
+
+    response = TestClient(create_app()).get("/api/agent/live/environment")
+    rendered = json.dumps(response.json(), ensure_ascii=False)
+
+    assert response.status_code == 200
+    assert response.json()["environment"]["status"] == "blocked"
+    assert response.json()["environment"]["paper_fallback"] is False
+    assert "live_environment_probe_failed" in response.json()["environment"]["blockers"]
+    assert "adapter failed" not in rendered
+    assert "qmt-userdata" not in rendered
+    assert "account-123" not in rendered
+
+
+def test_agent_live_submit_api_sanitizes_adapter_exceptions(monkeypatch):
+    monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
+    from web.api.app import create_app
+
+    class ExplodingRuntime:
+        def submit_live_order_action(self, action_id: str) -> dict[str, object]:
+            raise RuntimeError(f"broker submit failed for {action_id} in /Users/alice/qmt-account")
+
+    monkeypatch.setattr("web.api.routes.agent.AgentRuntime", lambda: ExplodingRuntime())
+
+    response = TestClient(create_app()).post("/api/agent/live/actions/act_secret/submit")
+    rendered = json.dumps(response.json(), ensure_ascii=False)
+
+    assert response.status_code == 200
+    assert response.json()["submission"]["status"] == "failed"
+    assert response.json()["submission"]["action_id"] == "act_secret"
+    assert response.json()["submission"]["paper_fallback"] is False
+    assert "live_submit_failed" in response.json()["submission"]["blockers"]
+    assert "broker submit failed" not in rendered
+    assert "qmt-account" not in rendered
+
+
+def test_unhandled_api_errors_do_not_return_exception_text(monkeypatch):
+    import asyncio
+
+    from web.api.errors import unhandled_error_handler
+
+    response = asyncio.run(unhandled_error_handler(None, RuntimeError("secret failure in /Users/alice/private-account")))
+    payload = json.loads(response.body)
+    rendered = json.dumps(payload, ensure_ascii=False)
+
+    assert response.status_code == 500
+    assert payload["error"] == "Internal server error"
+    assert payload["detail"] is None
+    assert "secret failure" not in rendered
+    assert "private-account" not in rendered
+
+
 def test_agent_live_smoke_cli_and_api_fail_closed_without_submission(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
     monkeypatch.setattr("web.api.auth.get_api_key", lambda: "")
@@ -4648,13 +4708,20 @@ def test_agent_evidence_resolver_returns_safe_file_and_code_navigation(tmp_path,
         kind="file",
         label="Existing external file",
         uri=str(outside_file),
-        summary="Existing external files can be snapshotted but not navigated.",
+        summary="Existing external files must not be read, hashed, snapshotted, or navigated.",
     )
     unsafe = runtime.create_evidence(
         kind="file",
         label="Unsafe external file",
         uri="../outside-secret.txt",
         summary="Should not produce local file navigation.",
+    )
+    git_config = Path(".git/config")
+    git_evidence = runtime.create_evidence(
+        kind="file",
+        label="Git config",
+        uri=str(git_config),
+        summary="Internal repository metadata must not be used as evidence content.",
     )
 
     resolved_code = EvidenceResolver().resolve(code.evidence_id)
@@ -4675,10 +4742,17 @@ def test_agent_evidence_resolver_returns_safe_file_and_code_navigation(tmp_path,
     assert resolved_file["navigation"]["kind"] == "file"
     assert resolved_file["navigation"]["path"] == "AGENTS.md"
     assert resolved_file["navigation"]["href"] == "/system?tab=codegraph&file=AGENTS.md"
-    assert resolved_outside_existing["status"] == "fresh"
-    assert resolved_outside_existing["evidence"]["hash"].startswith("sha256:")
+    assert outside_existing.hash == ""
+    assert outside_existing.snapshot_uri == ""
+    assert resolved_outside_existing["status"] == "unsafe_evidence_uri"
     assert resolved_outside_existing["navigation"] is None
+    assert unsafe.hash == ""
+    assert unsafe.snapshot_uri == ""
+    assert resolved_unsafe["status"] == "unsafe_evidence_uri"
     assert resolved_unsafe["navigation"] is None
+    assert git_evidence.hash == ""
+    assert git_evidence.snapshot_uri == ""
+    assert EvidenceResolver().resolve(git_evidence.evidence_id)["status"] == "unsafe_evidence_uri"
     reset_datahub()
 
 

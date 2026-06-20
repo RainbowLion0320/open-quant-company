@@ -1,6 +1,5 @@
 """统一错误处理 — 生产级日志 + 类型化错误响应"""
 
-import traceback
 import logging
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -52,12 +51,12 @@ async def quant_error_handler(request: Request, exc: QuantError):
 
 
 async def unhandled_error_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled error: {exc}\n{traceback.format_exc()}")
+    logger.exception("Unhandled API error")
     return JSONResponse(
         status_code=500,
         content={
             "error": "Internal server error",
-            "detail": str(exc) if logger.level <= logging.DEBUG else None,
+            "detail": None,
             "timestamp": datetime.now().isoformat(),
         }
     )

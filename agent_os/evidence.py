@@ -11,11 +11,15 @@ from agent_os.ledger import AgentLedger
 
 FILE_EVIDENCE_KINDS = {"artifact", "file", "code", "report", "ledger"}
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FORBIDDEN_EVIDENCE_PATH_PARTS = {".git", ".venv", "node_modules"}
 
 
 def hash_file(path: str | Path) -> str:
+    safe_path = safe_existing_file_path(path)
+    if safe_path is None:
+        raise ValueError("Unsafe evidence file path")
     digest = hashlib.sha256()
-    with Path(path).open("rb") as f:
+    with safe_path.open("rb") as f:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             digest.update(chunk)
     return f"sha256:{digest.hexdigest()}"
@@ -39,7 +43,15 @@ class EvidenceResolver:
         status = evidence.get("freshness_status") or "unknown"
         if evidence.get("kind") in FILE_EVIDENCE_KINDS:
             snapshot = _snapshot_for_evidence(evidence)
-            path = evidence_source_path(str(evidence.get("uri") or ""))
+            path = safe_file_evidence_path(str(evidence.get("uri") or ""))
+            if path is None:
+                return {
+                    "status": "unsafe_evidence_uri",
+                    "evidence_id": evidence_id,
+                    "evidence": evidence,
+                    "snapshot": snapshot,
+                    "navigation": None,
+                }
             if not path.exists():
                 if snapshot is None:
                     return {
@@ -76,7 +88,9 @@ def _snapshot_for_evidence(evidence: dict[str, Any]) -> dict[str, str] | None:
     snapshot_uri = str(evidence.get("snapshot_uri") or "").strip()
     if not snapshot_uri:
         return None
-    path = Path(snapshot_uri)
+    path = safe_existing_file_path(snapshot_uri)
+    if path is None:
+        return None
     if not path.exists():
         return None
     return {
@@ -117,6 +131,47 @@ def evidence_source_path(uri: str) -> Path:
     path_text, _line = split_file_evidence_uri(uri)
     path = Path(path_text)
     return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def safe_file_evidence_path(uri: str) -> Path | None:
+    path_text, _line = split_file_evidence_uri(uri)
+    return safe_existing_file_path(path_text)
+
+
+def safe_existing_file_path(path_text: str | Path) -> Path | None:
+    path_text = str(path_text or "").strip()
+    if not path_text:
+        return None
+    if "://" in path_text:
+        return None
+    path = Path(path_text)
+    resolved = path.resolve() if path.is_absolute() else (PROJECT_ROOT / path).resolve()
+    if not _is_allowed_file_evidence_path(resolved):
+        return None
+    return resolved
+
+
+def _is_allowed_file_evidence_path(path: Path) -> bool:
+    for root in _allowed_file_evidence_roots():
+        try:
+            relative = path.relative_to(root)
+        except ValueError:
+            continue
+        if any(part in FORBIDDEN_EVIDENCE_PATH_PARTS for part in relative.parts):
+            return False
+        return True
+    return False
+
+
+def _allowed_file_evidence_roots() -> tuple[Path, ...]:
+    roots = [PROJECT_ROOT.resolve()]
+    try:
+        from data.storage.datahub import get_datahub
+
+        roots.append(get_datahub().runtime_dir().resolve())
+    except Exception:
+        pass
+    return tuple(dict.fromkeys(roots))
 
 
 def split_file_evidence_uri(uri: str) -> tuple[str, str | None]:
@@ -196,6 +251,6 @@ def _safe_project_relative_path(path_text: str) -> str | None:
         relative = resolved.relative_to(PROJECT_ROOT.resolve())
     except ValueError:
         return None
-    if any(part in {".git", ".venv", "node_modules"} for part in relative.parts):
+    if any(part in FORBIDDEN_EVIDENCE_PATH_PARTS for part in relative.parts):
         return None
     return relative.as_posix()

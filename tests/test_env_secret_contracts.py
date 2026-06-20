@@ -1,6 +1,7 @@
 import json
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -149,13 +150,24 @@ def test_settings_registers_mimo_provider_without_secret_literal():
     assert mimo["label"] == "Mimo"
     assert mimo["protocol"] == "openai_compatible"
     assert mimo["api_key_env"] == "MIMO_API_KEY"
-    assert mimo["base_url"] == "https://token-plan-cn.xiaomimimo.com/v1"
+    parsed_base_url = urlparse(str(mimo["base_url"]))
+    assert parsed_base_url.scheme == "https"
+    assert parsed_base_url.hostname == "token-plan-cn.xiaomimimo.com"
+    assert parsed_base_url.path == "/v1"
     assert mimo["default_model"] == "mimo-v2.5-pro"
     assert "off" in mimo["reasoning_modes"]
     assert mimo["reasoning_modes"]["off"]["label"] == "Off"
     assert "False" not in mimo["reasoning_modes"]
-    assert "token-plan-cn.xiaomimimo.com" in text
     assert re.search(r"\btp-[a-z0-9]{20,}\b", text) is None
+
+
+def test_factor_research_logs_do_not_print_secret_like_runtime_payloads():
+    llm_text = Path("research/factors/hypothesis/llm.py").read_text(encoding="utf-8")
+    core_text = Path("research/factors/hypothesis/core.py").read_text(encoding="utf-8")
+
+    assert "Missing LLM provider credential for {provider}" not in llm_text
+    assert "set {hint}" not in llm_text
+    assert "{llm_runtime['provider']}:{llm_runtime['model']}" not in core_text
 
 
 def test_config_llm_runtime_cli_reports_and_resets_global_profile(tmp_path, monkeypatch, capsys):

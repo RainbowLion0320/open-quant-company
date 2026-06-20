@@ -271,7 +271,18 @@ async def get_agent_live_readiness() -> dict[str, Any]:
 
 @router.get("/live/environment")
 async def get_agent_live_environment() -> dict[str, Any]:
-    return {"environment": AgentRuntime().live_environment()}
+    try:
+        return {"environment": AgentRuntime().live_environment()}
+    except Exception as exc:
+        return {
+            "environment": {
+                "status": "blocked",
+                "broker": "miniqmt",
+                "paper_fallback": False,
+                "blockers": ["live_environment_probe_failed"],
+                "error_class": exc.__class__.__name__,
+            }
+        }
 
 
 @router.post("/live/smoke")
@@ -302,6 +313,14 @@ async def submit_agent_live_order(action_id: str) -> dict[str, Any]:
         submission = AgentRuntime().submit_live_order_action(action_id)
     except KeyError:
         raise DataNotFoundError("agent action", action_id)
+    except Exception as exc:
+        submission = {
+            "status": "failed",
+            "action_id": action_id,
+            "paper_fallback": False,
+            "blockers": ["live_submit_failed"],
+            "error_class": exc.__class__.__name__,
+        }
     return {"submission": submission}
 
 
