@@ -1,6 +1,6 @@
 [project]
 name = "open-quant-company"
-version = "2.0.0"
+version = "2026.6.20.1"
 description = "Open Quant Company：开源量化公司操作系统，用户作为 CEO，多个 agent 负责数据、研究、风控、工程与报告，所有结论可回溯到 Web UI、CLI 和 evidence artifacts"
 readme = "README.md"
 requires-python = ">=3.11"

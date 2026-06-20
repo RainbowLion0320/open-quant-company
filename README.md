@@ -4,7 +4,7 @@
   <p>用户作为 CEO，多个 agent 负责数据、研究、组合、风控、执行、工程与报告，所有结论可回溯到 Web UI、CLI 和 evidence artifacts。</p>
   <p>
     <img src="https://img.shields.io/badge/python-3.11+-blue" alt="Python">
-    <img src="https://img.shields.io/badge/version-2.0.0-orange" alt="Version">
+    <img src="https://img.shields.io/badge/version-2026.6.20.1-orange" alt="Version">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
     <img src="https://img.shields.io/badge/A%20Share-universe-cyan" alt="A Share">
     <img src="https://img.shields.io/badge/local--first-Parquet%20%2B%20DuckDB-0f766e" alt="Local first">

@@ -3,7 +3,7 @@
   <h3>A local-first quant company OS where humans act as CEO and agents operate data, research, portfolio, risk, execution, engineering, and reporting desks.</h3>
   <p>
     <img src="https://img.shields.io/badge/python-3.11+-blue" alt="Python">
-    <img src="https://img.shields.io/badge/version-2.0.0-orange" alt="Version">
+    <img src="https://img.shields.io/badge/version-2026.6.20.1-orange" alt="Version">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
     <img src="https://img.shields.io/badge/A%20Share-universe-cyan" alt="A Share">
     <img src="https://img.shields.io/badge/local--first-Parquet%20%2B%20DuckDB-0f766e" alt="Local first">

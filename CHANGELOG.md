@@ -1,6 +1,13 @@
 # Changelog
 
-All notable changes to Open Quant Company are tracked here. The project uses semantic versioning for public release tags.
+All notable changes to Open Quant Company are tracked here. The project uses PEP 440-compatible calendar versions for public release tags.
+
+## [2026.6.20.1] - 2026-06-20
+
+### Changed
+
+- Switched public release versions from the previous three-part scheme to calendar versions in the `YYYY.M.D.N` format.
+- Made the CLI package version resolve from project metadata instead of a hard-coded string.
 
 ## [2.0.0] - 2026-06-08
 

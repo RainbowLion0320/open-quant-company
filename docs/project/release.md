@@ -1,10 +1,12 @@
 # Release Process
 
-Open Quant Company uses semantic versioning for public tags:
+Open Quant Company uses PEP 440-compatible calendar versions for public tags:
 
-- `MAJOR`: breaking architecture, CLI, API, data layout, or strategy contract changes.
-- `MINOR`: new Web UI, CLI, data, strategy, or diagnostics capabilities that preserve current contracts.
-- `PATCH`: bug fixes, documentation fixes, dependency updates, and small operational improvements.
+- Format: `YYYY.M.D.N`, for example `2026.6.20.1`.
+- `YYYY.M.D` is the release date.
+- `N` is the release sequence for that date, starting at `1`.
+- Breaking changes, new capabilities, fixes, and dependency updates are described in `CHANGELOG.md` instead of encoded into the version number.
+- Git tags use a `v` prefix, for example `v2026.6.20.1`.
 
 ## Release Checklist
 
@@ -24,8 +26,8 @@ Open Quant Company uses semantic versioning for public tags:
 5. Create and push an annotated tag:
 
    ```bash
-   git tag -a v2.0.0 -m "Open Quant Company v2.0.0"
-   git push origin v2.0.0
+   git tag -a v2026.6.20.1 -m "Open Quant Company v2026.6.20.1"
+   git push origin v2026.6.20.1
    ```
 
 6. The `Release` GitHub Actions workflow builds Python artifacts, builds the frontend bundle, and publishes a GitHub Release for the tag.

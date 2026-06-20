@@ -7,8 +7,8 @@ authors:
 repository-code: "https://github.com/RainbowLion0320/open-quant-company"
 url: "https://github.com/RainbowLion0320/open-quant-company"
 license: "MIT"
-version: "2.0.0"
-date-released: "2026-06-08"
+version: "2026.6.20.1"
+date-released: "2026-06-20"
 abstract: "A local-first quant company OS where humans act as CEO and agents operate research, data, risk, and engineering desks."
 keywords:
   - quant

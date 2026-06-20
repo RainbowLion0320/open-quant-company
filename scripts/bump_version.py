@@ -2,7 +2,7 @@
 """Bump the project release version from the pyproject.toml source of truth.
 
 Usage:
-    scripts/bump_version.py 2.1.0
+    scripts/bump_version.py 2026.6.20.2
 
 The canonical version lives in pyproject.toml. This script updates derived
 display references that cannot read pyproject.toml at render time.
@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
+CALVER = re.compile(r"^\d{4}\.\d{1,2}\.\d{1,2}\.\d+$")
 
 
 def _replace_once(path: Path, pattern: str, replacement: str) -> None:
@@ -27,9 +27,23 @@ def _replace_once(path: Path, pattern: str, replacement: str) -> None:
     path.write_text(new_text, encoding="utf-8")
 
 
+def _replace_once_or_append(path: Path, pattern: str, replacement: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    new_text, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
+    if count == 0:
+        suffix = "" if text.endswith("\n") else "\n"
+        new_text = f"{text}{suffix}{replacement}\n"
+    elif count != 1:
+        raise RuntimeError(f"Expected at most one version occurrence in {path}")
+    path.write_text(new_text, encoding="utf-8")
+
+
 def bump(version: str) -> None:
-    if not SEMVER.match(version):
-        raise SystemExit(f"Invalid version '{version}'. Expected semantic version like 2.1.0")
+    match = CALVER.match(version)
+    if not match:
+        raise SystemExit(f"Invalid version '{version}'. Expected calendar version like 2026.6.20.2")
+    year, month, day, _sequence = version.split(".")
+    release_date = f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
 
     _replace_once(
         ROOT / "pyproject.toml",
@@ -40,6 +54,21 @@ def bump(version: str) -> None:
         ROOT / "README.md",
         r"version-[^-]+-orange",
         f"version-{version}-orange",
+    )
+    _replace_once(
+        ROOT / "README.en.md",
+        r"version-[^-]+-orange",
+        f"version-{version}-orange",
+    )
+    _replace_once(
+        ROOT / "CITATION.cff",
+        r'^version: "[^"]+"$',
+        f'version: "{version}"',
+    )
+    _replace_once_or_append(
+        ROOT / "CITATION.cff",
+        r'^date-released: "[^"]+"$',
+        f'date-released: "{release_date}"',
     )
 
 
