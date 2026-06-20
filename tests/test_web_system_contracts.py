@@ -773,8 +773,8 @@ def test_system_settings_absorbs_status_monitor_without_standalone_monitor_tab()
     assert "ActivityMonitor" not in system_hub
     assert '{ key: "monitor" }' not in system_hub
     assert 'default-tab="settings"' in system_hub
-    assert "saveWithConfirm" in settings
-    assert "confirmSnapshot" in settings
+    assert "saveWithConfirm" not in settings
+    assert "confirmSnapshot" not in settings
     assert "API HEALTH" in settings
     assert "CRON JOBS" in settings
     assert "Telegram" in settings
@@ -923,13 +923,53 @@ def test_cron_jobs_payload_coerces_nullable_status_fields(monkeypatch, tmp_path)
     assert payload["jobs"][0]["next_run"] == ""
 
 
-def test_settings_cancel_reverts_pending_toggle():
+def test_settings_page_is_read_only_without_manual_writes():
     settings = Path("web/frontend/src/views/Settings.vue").read_text()
+    settings_logic = Path("web/frontend/src/view-models/useSettingsView.ts").read_text()
+    settings_api = Path("web/frontend/src/api/modules/settings.ts").read_text()
+    zh_settings = Path("web/frontend/src/i18n/messages/zh-CN/settings.ts").read_text()
+    en_settings = Path("web/frontend/src/i18n/messages/en-US/settings.ts").read_text()
+    styles = Path("web/frontend/src/styles/views/settings.css").read_text()
 
-    assert "confirmSnapshot" in settings
-    assert "cancelConfirm" in settings
-    assert "restoreConfig" in settings
-    assert "@click.self=\"cancelConfirm\"" in settings
+    assert "saveWithConfirm" not in settings
+    assert "showConfirm" not in settings
+    assert "doSave" not in settings
+    assert "saveApiKey" not in settings
+    assert "toggleNotify" not in settings
+    assert "settings-toggle" not in settings
+    assert "key-input" not in settings
+    assert "Teleport" not in settings
+    assert "api.saveSettings" not in settings_logic
+    assert "setAuthToken" not in settings_logic
+    assert "saveSettings:" not in settings_api
+    assert "确认保存" not in zh_settings
+    assert "Confirm Save" not in en_settings
+    assert ".settings-toggle" not in styles
+    assert ".key-input" not in styles
+
+
+def test_settings_page_uses_compact_responsive_layout():
+    settings = Path("web/frontend/src/views/Settings.vue").read_text()
+    settings_logic = Path("web/frontend/src/view-models/useSettingsView.ts").read_text()
+    zh_settings = Path("web/frontend/src/i18n/messages/zh-CN/settings.ts").read_text()
+    en_settings = Path("web/frontend/src/i18n/messages/en-US/settings.ts").read_text()
+    styles = Path("web/frontend/src/styles/views/settings.css").read_text()
+
+    assert "settings-config-grid" in settings
+    assert "settings-card" in settings
+    assert "System Settings" in en_settings
+    assert "系统设置" in zh_settings
+    assert "auditEntries" not in settings
+    assert "api.auditHistory" not in settings_logic
+    assert "最近配置变更" not in zh_settings
+    assert "Recent Config Changes" not in en_settings
+    assert "max-width: none" in styles
+    assert "align-items: start" in styles
+    assert ".ops-card .source-list" in styles
+    assert "max-height: 220px" in styles
+    assert "repeat(auto-fit, minmax(320px, 1fr))" in styles
+    assert "min-height: 32px" in styles
+    assert "padding: 10px 12px" in styles
 
 
 def test_config_center_preserves_dotted_section_paths():
@@ -939,16 +979,16 @@ def test_config_center_preserves_dotted_section_paths():
     settings_api = Path("web/frontend/src/api/modules/settings.ts").read_text()
 
     assert "function getNestedValue" in config_center_logic
-    assert "function setNestedValue" in config_center_logic
     assert "function isSafePathPart" in config_center_logic
     assert '"__proto__"' in config_center_logic
     assert '"prototype"' in config_center_logic
     assert '"constructor"' in config_center_logic
-    assert "setNestedValue(config, sectionKey" in config_center_logic
     assert "config[activeSection.value]" not in config_center_logic
     assert "function patch<T>" in api_client
-    assert "saveSettingsSection" in settings_api
-    assert "patch<Record<string, any>>" in settings_api
+    assert "saveSettingsSection" not in settings_api
+    assert "patch<Record<string, any>>" not in settings_api
+    assert "displayFieldValue" in config_center_logic
+    assert "fieldValueClass" in config_center_logic
 
 
 def test_frontend_auth_token_is_not_persisted_in_browser_storage():
@@ -972,14 +1012,18 @@ def test_config_center_uses_grouped_expandable_settings_model():
     assert "activeGroup" in config_center_logic
     assert "groups.value = schemaData.groups" in config_center_logic
     assert "groupedSections" in config_center_logic
-    assert "sectionHasChanges(section.key)" in config_center
+    assert "sectionHasChanges(section.key)" not in config_center
+    assert "saveSection(section.key)" not in config_center
+    assert "resetSection(section.key)" not in config_center
+    assert "field-readonly-value" in config_center
     assert 'v-for="group in groups"' in config_center
     assert 'v-for="subgroup in groupedSections"' in config_center
     assert 'v-for="section in subgroup.sections"' in config_center
     assert 'v-for="section in schema"' not in config_center
     assert ".config-subgroup" in css
     assert ".section-panel" in css
-    assert ".field-switch" in css
+    assert ".field-readonly-value" in css
+    assert ".field-switch" not in css
 
 
 def test_config_center_strategy_management_has_secondary_navigation():

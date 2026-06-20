@@ -87,30 +87,15 @@
                     <span class="field-range" v-if="field.min !== undefined || field.max !== undefined">{{ field.min ?? '—' }} ~ {{ field.max ?? '—' }}</span>
                     <span class="field-default" v-if="field.default !== undefined">{{ t('configCenter.defaultValue', { value: field.default }) }}</span>
                   </div>
-                  <div class="field-input-wrap">
-                    <label v-if="field.type === 'bool'" class="field-switch">
-                      <input type="checkbox" :checked="!!getFieldValue(section.key, field.key)" @change="setFieldValue(section.key, field.key, ($event.target as HTMLInputElement).checked)" />
-                      <span></span>
-                    </label>
-                    <select v-else-if="field.type === 'select'" class="field-select" :value="getFieldValue(section.key, field.key)" @change="setFieldValue(section.key, field.key, ($event.target as HTMLSelectElement).value)">
-                      <option v-for="option in field.options" :key="option.value ?? option" :value="option.value ?? option">{{ option.label ?? option }}</option>
-                    </select>
-                    <input v-else-if="field.type === 'string'" type="text" class="field-input field-input-wide" :value="getFieldValue(section.key, field.key)" :placeholder="String(field.default ?? '')" @input="setFieldValue(section.key, field.key, ($event.target as HTMLInputElement).value)" />
-                    <template v-else-if="field.min !== undefined && field.max !== undefined">
-                      <input type="range" class="field-slider" :min="field.min" :max="field.max" :step="field.type === 'int' ? 1 : (field.max - field.min) / 100" :value="getFieldValue(section.key, field.key) ?? field.default ?? 0" @input="onSliderInput(section.key, field, $event)" />
-                      <input type="number" class="field-input field-input-small" :step="field.type === 'int' ? 1 : 'any'" :value="getFieldValue(section.key, field.key)" :min="field.min" :max="field.max" @input="setFieldValue(section.key, field.key, coerceNumericField(field, $event))" />
-                    </template>
-                    <input v-else type="number" class="field-input field-input-small" :step="field.type === 'int' ? 1 : 'any'" :value="getFieldValue(section.key, field.key)" :placeholder="String(field.default ?? '')" @input="setFieldValue(section.key, field.key, coerceNumericField(field, $event))" />
+                  <div class="field-readonly-wrap">
+                    <span
+                      class="field-readonly-value"
+                      :class="fieldValueClass(section.key, field)"
+                    >
+                      {{ displayFieldValue(section.key, field) }}
+                    </span>
                   </div>
                 </div>
-              </div>
-
-              <div class="section-actions">
-                <span v-if="saveMsg && saveMsgSection === section.key" class="save-msg" :class="saveOk ? 'ok' : 'err'">{{ saveMsg }}</span>
-                <button class="btn-reset" :disabled="!sectionHasChanges(section.key)" @click="resetSection(section.key)">{{ t('common.reset') }}</button>
-                <button class="btn-save" :disabled="!sectionHasChanges(section.key) || isSaving(section.key)" @click="saveSection(section.key)">
-                  {{ isSaving(section.key) ? t('common.saving') : t('configCenter.saveChanges') }}
-                </button>
               </div>
             </article>
           </section>
@@ -124,7 +109,7 @@
 <script setup lang="ts">
 import { useConfigCenter } from "../view-models/useConfigCenter";
 
-const { groups, t, activeGroup, loading, saveMsgSection, saveMsg, saveOk, editorScrollRef, activeGroupInfo, groupedSections, strategyNavItems, visibleSubgroupKey, setActiveGroup, jumpToSubgroup, subgroupDomId, navItemMeta, strategyStatusLabel, navButtonTitle, subgroupMeta, getFieldValue, setFieldValue, onSliderInput, coerceNumericField, sectionHasChanges, resetSection, saveSection, isSaving } = useConfigCenter();
+const { groups, t, activeGroup, loading, editorScrollRef, activeGroupInfo, groupedSections, strategyNavItems, visibleSubgroupKey, setActiveGroup, jumpToSubgroup, subgroupDomId, navItemMeta, strategyStatusLabel, navButtonTitle, subgroupMeta, displayFieldValue, fieldValueClass } = useConfigCenter();
 </script>
 
 <style scoped src="../styles/views/config-center.css"></style>

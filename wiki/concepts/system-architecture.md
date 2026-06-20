@@ -214,7 +214,7 @@ LLM provider routing starts from `config/settings.yaml: llm`, but the active loc
 | 回测评分 | `backtest/buffett_real_scorer.py` | PIT滚动评分器 |
 | 风险分析 | `backtest/analytics.py` | 15项风险指标 |
 | 回测流水线 | `backtest/pipeline_runner.py` + `pipeline/` | 生产共享 Alpha/Portfolio/Risk/Execution 阶段 |
-| 配置 | `config/settings.yaml` + `web/api/config_schema/` | 全部可调参数；Web Config Center 通过 group/subgroup schema 编辑 dotted section 并写回嵌套 YAML |
+| 配置 | `config/settings.yaml` + `web/api/config_schema/` | 全部可调参数；Web Config Center 通过 group/subgroup schema 只读展示当前值，写入由 agent/CLI/API 执行 |
 
 ## 因子体系
 

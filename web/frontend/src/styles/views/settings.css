@@ -1,21 +1,29 @@
 .settings-page {
-  max-width: 1180px;
+  width: 100%;
+  max-width: none;
+  gap: 10px;
 }
 .ops-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 10px;
 }
 .ops-card {
-  padding: 14px;
+  padding: 12px;
+}
+.ops-card .source-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 .panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-bottom: 10px;
-  margin-bottom: 12px;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
   border-bottom: 1px solid var(--border-subtle);
 }
 .panel-head span {
@@ -50,7 +58,7 @@
 }
 .source-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 .source-list span {
   display: block;
@@ -59,8 +67,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding-bottom: 8px;
+  gap: 8px;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
   font-size: 12px;
@@ -79,23 +87,21 @@
   color: var(--text-disabled);
   font-size: 10px;
 }
-.key-input {
-  padding: 4px 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 5px;
-  background: rgba(0,0,0,0.3);
-  color: var(--text-primary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
-  width: 200px;
+.settings-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 10px;
 }
-.key-input::placeholder { color: var(--text-disabled); }
+.settings-card {
+  min-width: 0;
+  padding: 10px 12px;
+}
 .setting-row,
 .settings-list div {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
 }
 .setting-row strong {
   display: block;
@@ -108,38 +114,12 @@
   color: var(--text-disabled);
   font-size: 11px;
 }
-.settings-toggle {
-  position: relative;
-  width: 42px;
-  height: 22px;
-  flex: 0 0 auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: var(--border-strong);
-  cursor: pointer;
-}
-.settings-toggle span {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform 0.2s ease;
-}
-.settings-toggle.active {
-  background: var(--accent);
-}
-.settings-toggle.active span {
-  transform: translateX(20px);
-}
 .settings-list {
   display: grid;
   gap: 0;
 }
 .settings-list div {
-  min-height: 42px;
+  min-height: 32px;
   border-bottom: 1px solid var(--border-subtle);
 }
 .settings-list div:last-child {
@@ -183,50 +163,11 @@
 }
 .badge-red { background: rgba(239,68,68,0.12); color: var(--negative); border: 1px solid rgba(239,68,68,0.2); }
 
-/* Confirm dialog */
-.confirm-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(4px);
-}
-.confirm-box {
-  max-width: 420px;
-  width: 90%;
-}
-.confirm-box h3 {
-  margin: 0 0 10px;
-  color: var(--text-primary);
-  font-size: 16px;
-}
-.confirm-box p {
-  margin: 0 0 20px;
-  color: var(--text-disabled);
-  font-size: 13px;
-  line-height: 1.5;
-}
-.confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-.audit-time {
-  display: block;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-.audit-summary {
-  display: block;
-  margin-top: 2px;
-  font-size: 10px;
-  color: var(--text-disabled);
-}
 @media (max-width: 720px) {
   .ops-grid {
+    grid-template-columns: 1fr;
+  }
+  .settings-config-grid {
     grid-template-columns: 1fr;
   }
   .panel-head {
@@ -238,11 +179,5 @@
   }
   .setting-row {
     align-items: flex-start;
-  }
-}
-
-@media (max-width: 1180px) {
-  .ops-grid {
-    grid-template-columns: 1fr;
   }
 }

@@ -1,20 +1,15 @@
 import { computed, reactive, ref, onMounted } from "vue";
 import { api } from "../api";
-import { hasAuthToken, setAuthToken } from "../api/client";
+import { hasAuthToken } from "../api/client";
 import { useI18n } from "../i18n";
 import { fmtConfigRatio } from "../utils/format";
 
 export function useSettingsView() {
 
-  const { currentLocale, t } = useI18n();
+  const { t } = useI18n();
   const settings = reactive<Record<string, any>>({});
-  const showConfirm = ref(false);
-  const confirmSnapshot = ref<Record<string, any> | null>(null);
   const authStatus = ref<Record<string, any>>({});
-  const apiKeyInput = ref("");
   const strategyStatuses = ref<{ name: string; label: string; status: string; status_label: string; color: string }[]>([]);
-  const auditEntries = ref<any[]>([]);
-  const saveError = ref("");
 
   const apiKeyStatus = computed(() => {
     if (hasAuthToken()) return t("settings.apiKeySessionSet");
@@ -56,23 +51,10 @@ export function useSettingsView() {
   function fmtPct(v: number | undefined): string {
     return fmtConfigRatio(v);
   }
-  function fmtAuditTime(ts: string): string {
-    if (!ts) return '—';
-    try {
-      const d = new Date(ts);
-      return d.toLocaleDateString(currentLocale.value, { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(currentLocale.value, { hour: "2-digit", minute: "2-digit" });
-    } catch { return ts.slice(0, 16); }
-  }
   async function fetchStrategyStatuses() {
     try {
       const data = await api.strategyStatuses();
       strategyStatuses.value = data.strategies || [];
-    } catch {}
-  }
-  async function fetchAudit() {
-    try {
-      const data = await api.auditHistory("settings", 5);
-      auditEntries.value = data.entries || [];
     } catch {}
   }
 
@@ -89,60 +71,6 @@ export function useSettingsView() {
     return "badge-muted";
   }
 
-  async function toggleNotify() {
-    const snapshot = cloneConfig(settings);
-    const enabled = !settings.trading?.notification?.enabled;
-    settings.trading = settings.trading || {};
-    settings.trading.notification = settings.trading.notification || {};
-    settings.trading.notification.enabled = enabled;
-    saveWithConfirm(snapshot);
-  }
-
-  function saveWithConfirm(snapshot?: Record<string, any> | Event) {
-    const isEvent = snapshot && typeof snapshot === "object" && "target" in snapshot;
-    confirmSnapshot.value = snapshot && !isEvent ? snapshot as Record<string, any> : cloneConfig(settings);
-    showConfirm.value = true;
-  }
-
-  function cloneConfig(value: Record<string, any>) {
-    return JSON.parse(JSON.stringify(value || {}));
-  }
-
-  function restoreConfig(snapshot: Record<string, any>) {
-    for (const key of Object.keys(settings)) delete settings[key];
-    Object.assign(settings, snapshot);
-  }
-
-  function cancelConfirm() {
-    if (confirmSnapshot.value) restoreConfig(confirmSnapshot.value);
-    confirmSnapshot.value = null;
-    showConfirm.value = false;
-  }
-
-  async function doSave() {
-    try {
-      saveError.value = "";
-      await api.saveSettings(settings);
-      confirmSnapshot.value = null;
-      showConfirm.value = false;
-    } catch (e: any) {
-      saveError.value = e?.message || t("settings.saveError");
-      showConfirm.value = false;
-    }
-  }
-
-  async function saveApiKey() {
-    const token = apiKeyInput.value.trim();
-    if (!token) return;
-    setAuthToken(token);
-    apiKeyInput.value = "";
-    await loadAuthStatus();
-    try {
-      const data = await api.settings();
-      Object.assign(settings, data);
-    } catch {}
-  }
-
   async function loadAuthStatus() {
     try {
       authStatus.value = await api.authStatus();
@@ -156,38 +84,22 @@ export function useSettingsView() {
     } catch {}
     await loadAuthStatus();
     fetchStrategyStatuses();
-    fetchAudit();
   });
 
   return {
-    currentLocale,
     t,
     settings,
-    showConfirm,
-    confirmSnapshot,
     authStatus,
-    apiKeyInput,
     strategyStatuses,
-    auditEntries,
-    saveError,
     apiKeyStatus,
     risk,
     hasRiskConfig,
     notificationText,
     sourceItems,
     fmtPct,
-    fmtAuditTime,
     fetchStrategyStatuses,
-    fetchAudit,
     sourceBadgeClass,
     statusBadgeClass,
-    toggleNotify,
-    saveWithConfirm,
-    cloneConfig,
-    restoreConfig,
-    cancelConfirm,
-    doSave,
-    saveApiKey,
     loadAuthStatus,
   };
 }

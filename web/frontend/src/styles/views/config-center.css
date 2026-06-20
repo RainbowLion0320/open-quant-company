@@ -327,113 +327,38 @@
   background: rgba(244, 114, 182, 0.12);
   color: #f472b6;
 }
-.field-input-wrap {
+.field-readonly-wrap {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
   flex-shrink: 0;
+  min-width: 110px;
 }
-.field-slider {
-  width: 120px;
-  height: 4px;
-  appearance: none;
-  -webkit-appearance: none;
-  background: rgba(125, 211, 252, 0.15);
-  border-radius: 2px;
-  outline: none;
-  cursor: pointer;
-}
-.field-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--accent, #6366f1);
-  cursor: pointer;
-  box-shadow: 0 0 6px rgba(99, 102, 241, 0.4);
-}
-.field-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: none;
-  border-radius: 50%;
-  background: var(--accent, #6366f1);
-  cursor: pointer;
-}
-.field-input {
-  width: 70px;
-  padding: 5px 8px;
-  border: 1px solid var(--border, #444);
-  border-radius: 5px;
-  background: rgba(0, 0, 0, 0.3);
-  color: #e2e8f0;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
-  font-weight: 500;
-  outline: none;
-  transition: border-color 0.15s;
-  text-align: right;
-}
-.field-input:focus {
-  border-color: var(--accent, #6366f1);
-}
-.field-select {
-  min-width: 130px;
-  padding: 5px 8px;
-  border: 1px solid var(--border, #444);
-  border-radius: 5px;
-  background: rgba(0, 0, 0, 0.3);
-  color: #e2e8f0;
-  font-size: 12px;
-  outline: none;
-}
-
-.field-input-wide {
-  width: 140px;
-}
-.field-switch {
-  position: relative;
+.field-readonly-value {
   display: inline-flex;
-  width: 38px;
-  height: 20px;
+  align-items: center;
+  max-width: 240px;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 5px;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.field-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+.field-readonly-value.is-enabled {
+  border-color: rgba(34, 197, 94, 0.24);
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--positive);
 }
-.field-switch span {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.24);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.field-switch span::after {
-  content: "";
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  left: 2px;
-  top: 2px;
-  border-radius: 50%;
-  background: #e2e8f0;
-  transition: transform 0.15s;
-}
-.field-switch input:checked + span {
-  background: rgba(34, 197, 94, 0.46);
-}
-.field-switch input:checked + span::after {
-  transform: translateX(18px);
-}
-.field-input::-webkit-inner-spin-button,
-.field-input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-.field-input[type="number"] {
-  -moz-appearance: textfield;
+.field-readonly-value.is-disabled {
+  color: var(--text-disabled);
 }
 .field-range {
   font-size: 10px;
@@ -446,52 +371,6 @@
   color: var(--text-disabled);
   white-space: nowrap;
 }
-.section-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 6px;
-}
-.btn-save {
-  padding: 8px 20px;
-  border: none;
-  border-radius: 6px;
-  background: var(--accent, #6366f1);
-  color: white;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-.btn-save:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.btn-reset {
-  padding: 8px 16px;
-  border: 1px solid var(--border, #444);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-}
-.btn-reset:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-.save-msg {
-  font-size: 12px;
-  font-weight: 500;
-}
-.save-msg.ok {
-  color: var(--positive);
-}
-.save-msg.err {
-  color: var(--negative);
-}
-
 @media (max-width: 1080px) {
   .config-layout {
     grid-template-columns: 1fr;
@@ -555,8 +434,7 @@
     flex-direction: column;
   }
   .field-hints,
-  .field-input-wrap,
-  .section-actions {
+  .field-readonly-wrap {
     justify-content: flex-start;
   }
 }

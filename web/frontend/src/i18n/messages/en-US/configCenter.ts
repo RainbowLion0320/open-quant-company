@@ -9,7 +9,4 @@ export const configCenter = {
       strategyEnabled: "Strategy enabled",
       strategyDisabled: "Strategy disabled",
       strategyJumpTo: "Jump to {label}",
-      saveChanges: "Save Changes",
-      saveSuccess: "Saved",
-      saveError: "Save failed",
     } as const;
