@@ -88,7 +88,7 @@
 | 5.8 | DB Health 注册表维度监控 | `web/api/routes/system.py` | `test_web_system_contracts.py:test_db_health_scans_new_registry_dimensions` | `/datahub?tab=health` → `DatabaseHealth.vue` | DataRegistry 维度状态表格 + 修复操作 | OK | — |
 | 5.9 | CodeGraph 代码图谱 + 架构诊断 | `web/api/routes/codegraph.py`, `web/api/services/codegraph.py`, `web/api/services/codegraph_diagnostics.py` | `test_codegraph_contracts.py` | `/system?tab=codegraph` → `CodeGraph.vue` | 模块/文件/符号图谱可下钻，索引状态和显式 Sync/Rebuild 可用；架构诊断用确定性规则展示循环依赖、跨层调用、热点、孤岛候选等风险 | OK | — |
 | 5.10 | Test Design Intelligence | `web/api/routes/system.py`, `web/api/services/system_tests.py`, `astrolabe_cli/design_intelligence.py`, `astrolabe_cli/commands/test_system` | `test_test_design_intelligence.py`, `test_web_system_contracts.py`, `test_cli_ops_commands.py`, `test_frontend_i18n_contracts.py` | `/system?tab=tests` → `TestDesign.vue` | `astroq test design --json` 写入 `var/artifacts/tests/design/latest.json`；Web 只读展示测试设计分数、风险矩阵、测试图谱、用例审查器和异味诊断 | OK | — |
-| 5.11 | AST Intelligence 重复实现检测 | `astrolabe_cli/ast_intelligence.py`, `scripts/ast_frontend_collector.mjs`, `web/api/services/system_ast.py` | `test_ast_intelligence.py`, `test_web_system_contracts.py` | `/system?tab=ast` → `AstIntelligence.vue` | `astroq architecture ast --json` 写入 `var/artifacts/architecture/ast/latest.json`；Web 只读展示重复风险分、clone groups、模块热力和诊断 inspector | OK | — |
+| 5.11 | AST Intelligence 重复实现检测 | `astrolabe_cli/ast_intelligence.py`, `scripts/ast_frontend_collector.mjs`, `web/api/services/system_ast.py` | `test_ast_intelligence.py`, `test_web_system_contracts.py` | `/system?tab=ast` → `AstIntelligence.vue` | `astroq architecture ast --json` 写入 `var/artifacts/architecture/ast/latest.json`；Web 只读展示可审计重复风险点、相似分组、生产代码风险、canonical 绕行数、重复风险清单和问题详情 | OK | — |
 | 5.12 | Lifecycle Readiness 全周期门禁 | `astrolabe_cli/commands/lifecycle.py`, `web/api/services/system_lifecycle.py`, `LifecycleReadiness.vue` | `test_lifecycle_readiness.py`, `test_strategy_competition.py`, `test_strategy_backtest_evidence.py` | `/system?tab=lifecycle` → `LifecycleReadiness.vue` | `astroq lifecycle check --json` 写入 `var/artifacts/lifecycle/latest.json`；Web 只读展示 source capability、data freshness、strategy evidence、execution readiness 和 blockers | OK | — |
 | 5.13 | 前端构建通过且 bundle 体积可追踪 | `web/frontend/vite.config.ts` | `test_architecture_contracts.py` | — | `npm run build` 通过；ECharts、Vue ECharts adapter、Three、ELK、Vue/Pinia/Router 和轻量 vendor 分包可追踪，当前无 Vite chunk warning | OK | — |
 | 5.14 | System integration status | `web/api/routes/system.py` | `test_web_system_contracts.py` | `/system?tab=settings` → `Settings.vue` | API Health + Cron Jobs 位于系统设置顶部；不展示本机硬件资源、资源历史或进程表 | OK | — |
@@ -134,13 +134,13 @@
 | 能力域 | 总条目 | 功能可验收 | 规划中 | 质量债条目 | 待补自动化测试 |
 |--------|-------|------------|--------|------------|----------------|
 | 数据管道 | 13 | 13 | 0 | 0 | 0 |
-| 信号系统 | 17 | 17 | 0 | 0 | 0 |
+| 信号系统 | 18 | 18 | 0 | 0 | 0 |
 | 回测引擎 | 10 | 10 | 0 | 0 | 0 |
 | 执行层 | 9 | 9 | 0 | 0 | 0 |
 | Web 平台 | 19 | 19 | 0 | 0 | 0 |
 | 多资产架构 | 10 | 10 | 0 | 0 | 0 |
 | Agent Company OS | 11 | 10 | 0 | 1 | 0 |
-| **合计** | **89** | **88** | **0** | **1** | **0** |
+| **合计** | **90** | **89** | **0** | **1** | **0** |
 
 > **说明：** `功能可验收` 表示该能力有完整可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数。`质量债条目` 统计"缺口"列非 `—` 的行，包含已实现能力的质量债和规划能力的未实现缺口。当前剩余缺口只剩 Agent Company OS 的真实 MiniQMT/QMT 终端撤单语义和定时对账人工演练；12 策略 OOS/IC/ICIR 竞赛和 measured baseline evidence 已接入，但大多数策略因收益、换手或 alpha 门槛未达标仍保持 candidate/paper recommendation。开放式 CEO 目标现在通过 autonomy program 持久化为多阶段计划；执行边界仍故意限定为 fixed-registry 的 `read_only` / `dry_run`，写入、代码、paper/live 交易和未知工具必须进入审批、工单或 blocker。
 
