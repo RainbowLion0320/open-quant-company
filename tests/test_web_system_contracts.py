@@ -1125,6 +1125,10 @@ def test_ast_intelligence_page_is_issue_list_first_not_analysis_panels():
 
     assert "astIntelligence.riskList" in view
     assert "astIntelligence.issueDetail" in view
+    assert "latestScanMeta" in view
+    assert "formatScanTime" in view
+    assert "formatArtifactAge" in view
+    assert "ast-list-meta" in css
     assert "selectedIssue" in view
     assert "ast-risk-layout" in view
     assert "risk-item" in view
@@ -1150,8 +1154,10 @@ def test_ast_intelligence_page_is_issue_list_first_not_analysis_panels():
         assert stale_class not in css
 
     assert "重复风险清单" in zh
+    assert "检测 {time}" in zh
     assert "问题详情" in zh
     assert "Duplicate Risk List" in en
+    assert "Scanned {time}" in en
     assert "Issue Detail" in en
 
 

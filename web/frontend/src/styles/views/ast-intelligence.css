@@ -1,7 +1,7 @@
 .ast-intelligence {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .ast-command,
@@ -48,27 +48,36 @@
 
 .ast-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .ast-metric {
   position: relative;
-  min-height: 104px;
+  min-width: 0;
+  min-height: 58px;
   display: grid;
-  align-content: space-between;
+  grid-template-areas:
+    "value label"
+    "value meta";
+  grid-template-columns: minmax(32px, auto) minmax(0, 1fr);
+  align-items: center;
+  align-content: center;
+  column-gap: 9px;
+  row-gap: 2px;
+  padding: 9px 11px;
 }
 
 .metric-with-action {
-  padding-right: 42px;
+  padding-right: 34px;
 }
 
 .artifact-refresh {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 24px;
-  height: 24px;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
   border: 1px solid rgba(34, 197, 94, 0.24);
@@ -84,8 +93,8 @@
 }
 
 .artifact-refresh svg {
-  width: 13px;
-  height: 13px;
+  width: 11px;
+  height: 11px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -94,10 +103,21 @@
 }
 
 .ast-metric strong {
+  grid-area: value;
   color: var(--text-primary);
   font-family: "JetBrains Mono", monospace;
-  font-size: 25px;
+  font-size: clamp(18px, 1.55vw, 24px);
   line-height: 1.1;
+  white-space: nowrap;
+}
+
+.ast-metric small {
+  grid-area: label;
+  min-width: 0;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ast-metric em,
@@ -108,6 +128,15 @@
   font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   font-style: normal;
+}
+
+.ast-metric em {
+  grid-area: meta;
+  min-width: 0;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ast-metric.risk strong {
@@ -125,6 +154,22 @@
   padding-bottom: 10px;
   margin-bottom: 12px;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.ast-list-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 10px;
+  min-width: 0;
+  text-align: right;
+}
+
+.ast-list-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .risk-list {
@@ -274,13 +319,30 @@
   white-space: pre-wrap;
 }
 
+@media (max-width: 1180px) {
+  .ast-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 980px) {
-  .ast-metrics,
   .ast-risk-layout {
     grid-template-columns: 1fr;
   }
 
   .issue-detail-panel {
     position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .ast-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 360px) {
+  .ast-metrics {
+    grid-template-columns: 1fr;
   }
 }

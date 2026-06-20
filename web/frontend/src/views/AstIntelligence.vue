@@ -50,7 +50,11 @@
       <article class="glass-card ast-panel risk-list-panel">
         <div class="panel-head">
           <span>{{ t("astIntelligence.riskList") }}</span>
-          <small>{{ t("astIntelligence.visibleIssues", { count: visibleIssues.length, total: issueTotal }) }}</small>
+          <small class="ast-list-meta">
+            <span>{{ latestScanMeta }}</span>
+            <span aria-hidden="true">·</span>
+            <span>{{ t("astIntelligence.visibleIssues", { count: visibleIssues.length, total: issueTotal }) }}</span>
+          </small>
         </div>
         <div class="risk-list">
           <button
@@ -155,6 +159,13 @@ const severityText = computed(() => {
   const counts = payload.value?.summary.severity_counts || {};
   return ["P0", "P1", "P2"].map(key => `${key}:${counts[key] || 0}`).join(" · ");
 });
+const latestScanMeta = computed(() => {
+  const generatedAt = payload.value?.latest?.generated_at || payload.value?.generated_at || "";
+  if (!generatedAt) return t("astIntelligence.scanTimeUnknown");
+  const age = formatArtifactAge(payload.value?.summary.artifact_age_seconds);
+  const time = formatScanTime(generatedAt);
+  return age ? t("astIntelligence.latestScanWithAge", { time, age }) : t("astIntelligence.latestScan", { time });
+});
 
 async function load() {
   error.value = "";
@@ -174,6 +185,30 @@ function isProductionPath(path: string) {
   if (/^(\.github|\.codegraph)\//.test(normalized)) return false;
   if (/^(README(\.en)?|AGENTS|CLAUDE|CONTRIBUTING|SECURITY|SUPPORT|CODE_OF_CONDUCT|CHANGELOG|LICENSE|NOTICE)(\.md)?$/.test(normalized)) return false;
   return true;
+}
+
+function formatScanTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return t("astIntelligence.scanTimeUnknown");
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  const datePart = sameYear
+    ? t("astIntelligence.scanDateShort", { month: date.getMonth() + 1, day: date.getDate() })
+    : t("astIntelligence.scanDateLong", { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() });
+  return `${datePart} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function formatArtifactAge(value: unknown) {
+  const seconds = typeof value === "number" && Number.isFinite(value) ? value : null;
+  if (seconds === null || seconds < 0) return "";
+  if (seconds < 60) return t("astIntelligence.ageJustNow");
+  if (seconds < 3600) return t("astIntelligence.ageMinutes", { count: Math.floor(seconds / 60) });
+  if (seconds < 86400) return t("astIntelligence.ageHours", { count: Math.floor(seconds / 3600) });
+  return t("astIntelligence.ageDays", { count: Math.floor(seconds / 86400) });
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
 }
 
 onMounted(load);
