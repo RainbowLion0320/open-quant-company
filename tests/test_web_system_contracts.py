@@ -1110,25 +1110,26 @@ def test_ast_intelligence_metrics_show_auditable_risk_counts_not_black_box_score
 
     assert "issueTotal" in view
     assert "severityEntries" in view
-    assert "productionIssueCount" in view
-    assert "productionSharePercent" in view
-    assert "canonicalBypassCount" in view
+    assert "productionIssueCount" not in view
+    assert "productionSharePercent" not in view
+    assert "canonicalBypassCount" not in view
     assert "ast-overview" in view
-    assert "risk-summary" in view
-    assert "production-impact" in view
-    assert "duplicate-shape" in view
-    assert "scan-coverage" in view
+    assert "ast-status-strip" in view
+    assert "risk-summary-main" in view
+    assert "production-impact" not in view
+    assert "duplicate-shape" not in view
+    assert "scan-coverage" not in view
     assert "总风险点" in zh
-    assert "生产代码风险" in zh
-    assert "非生产" in zh
-    assert "相似分组" in zh
-    assert "绕过统一入口" in zh
+    assert "生产代码风险" not in zh
+    assert "非生产" not in zh
+    assert "相似分组" not in zh
+    assert "绕过统一入口" not in zh
     assert "检测时间" in zh
     assert "Total Risks" in en
-    assert "Production Risks" in en
-    assert "Non-production" in en
-    assert "Similarity Groups" in en
-    assert "Canonical Bypass" in en
+    assert "Production Risks" not in en
+    assert "Non-production" not in en
+    assert "Similarity Groups" not in en
+    assert "Canonical Bypass" not in en
     assert "Scan time" in en
 
 
@@ -1145,10 +1146,12 @@ def test_ast_intelligence_page_is_issue_list_first_not_analysis_panels():
     assert "formatArtifactAge" not in view
     assert "ast-list-meta" in css
     assert "ast-overview-card" in css
+    assert "ast-status-strip" in css
     assert "severity-chip" in css
-    assert "impact-bar" in css
-    assert "shape-grid" in css
+    assert "impact-bar" not in css
+    assert "shape-grid" not in css
     assert "coverage-grid" in css
+    assert ".scan-coverage" not in css
     assert "selectedIssue" in view
     assert "ast-risk-layout" in view
     assert "risk-item" in view

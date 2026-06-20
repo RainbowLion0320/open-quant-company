@@ -47,50 +47,51 @@
 }
 
 .ast-overview {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(220px, 1fr) minmax(220px, 0.9fr) minmax(280px, 1.35fr);
-  gap: 8px;
+  display: block;
 }
 
 .ast-overview-card {
   position: relative;
   min-width: 0;
-  min-height: 74px;
+  min-height: 52px;
 }
 
-.risk-summary {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+.ast-status-strip {
+  display: flex;
   align-items: center;
   gap: 14px;
+  padding: 9px 42px 9px 12px;
 }
 
 .risk-summary-main {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .risk-summary-main strong {
   color: var(--warning);
   font-family: "JetBrains Mono", monospace;
-  font-size: clamp(32px, 3vw, 44px);
-  line-height: 0.95;
+  font-size: clamp(22px, 2vw, 30px);
+  line-height: 1;
 }
 
 .severity-chips {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
   gap: 6px;
 }
 
 .severity-chip {
-  min-width: 50px;
+  min-width: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 5px 7px;
+  gap: 6px;
+  padding: 4px 6px;
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.025);
@@ -116,30 +117,16 @@
   border-color: rgba(56, 189, 248, 0.34);
 }
 
-.production-impact {
-  display: grid;
-  gap: 8px;
-}
-
-.overview-head,
-.impact-split,
 .coverage-grid {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 12px;
+  margin-left: auto;
   min-width: 0;
 }
 
-.overview-head strong {
-  color: var(--text-primary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 24px;
-  line-height: 1;
-}
-
-.impact-split span,
-.shape-grid span,
 .coverage-grid span {
   min-width: 0;
   color: var(--text-tertiary);
@@ -148,68 +135,17 @@
   white-space: nowrap;
 }
 
-.impact-split b,
-.shape-grid b,
 .coverage-grid b {
   margin-right: 4px;
   color: var(--text-secondary);
   font-size: 12px;
 }
 
-.impact-bar {
-  height: 6px;
-  border: 1px solid rgba(56, 189, 248, 0.18);
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.12);
-  overflow: hidden;
-}
-
-.impact-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, rgba(56, 189, 248, 0.78), rgba(34, 197, 94, 0.64));
-}
-
-.duplicate-shape {
-  display: grid;
-  align-content: space-between;
-  gap: 9px;
-}
-
-.shape-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-}
-
-.shape-grid span {
-  display: grid;
-  gap: 3px;
-  padding: 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.shape-grid b {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 18px;
-  line-height: 1;
-}
-
-.scan-coverage {
-  display: grid;
-  align-content: space-between;
-  gap: 8px;
-  padding-right: 42px;
-}
-
 .artifact-refresh {
   position: absolute;
-  top: 10px;
+  top: 50%;
   right: 10px;
+  transform: translateY(-50%);
   width: 22px;
   height: 22px;
   display: grid;
@@ -236,13 +172,7 @@
   stroke-width: 1.8;
 }
 
-.coverage-grid {
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-}
-
-.scan-coverage em,
+.ast-status-strip em,
 .panel-head small,
 .risk-item em,
 .unit-row span {
@@ -252,7 +182,8 @@
   font-style: normal;
 }
 
-.scan-coverage em {
+.ast-status-strip em {
+  flex: 0 1 auto;
   min-width: 0;
   line-height: 1.2;
   overflow: hidden;
@@ -437,8 +368,13 @@
 }
 
 @media (max-width: 1180px) {
-  .ast-overview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .ast-status-strip {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .coverage-grid {
+    margin-left: 0;
   }
 }
 
@@ -453,13 +389,16 @@
 }
 
 @media (max-width: 720px) {
-  .ast-overview {
-    grid-template-columns: 1fr;
+  .ast-status-strip {
+    padding-right: 38px;
   }
 
-  .severity-chips,
-  .overview-head,
-  .impact-split {
+  .severity-chips {
     justify-content: flex-start;
+  }
+
+  .coverage-grid {
+    flex-wrap: wrap;
+    gap: 6px 10px;
   }
 }

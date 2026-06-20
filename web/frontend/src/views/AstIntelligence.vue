@@ -11,58 +11,30 @@
     </section>
 
     <section class="ast-overview">
-      <article class="ast-overview-card risk-summary glass-card">
+      <article class="ast-overview-card ast-status-strip glass-card">
         <div class="risk-summary-main">
           <small>{{ t("astIntelligence.totalRisks") }}</small>
           <strong>{{ issueTotal }}</strong>
         </div>
+
         <div class="severity-chips">
           <span v-for="entry in severityEntries" :key="entry.key" class="severity-chip" :class="entry.key.toLowerCase()">
             <b>{{ entry.key }}</b>
             <span>{{ entry.count }}</span>
           </span>
         </div>
-      </article>
 
-      <article class="ast-overview-card production-impact glass-card">
-        <div class="overview-head">
-          <small>{{ t("astIntelligence.productionRisks") }}</small>
-          <strong>{{ productionIssueCount }}</strong>
-        </div>
-        <div class="impact-split">
-          <span><b>{{ productionIssueCount }}</b>{{ t("astIntelligence.productionCode") }}</span>
-          <span><b>{{ nonProductionIssueCount }}</b>{{ t("astIntelligence.nonProduction") }}</span>
-        </div>
-        <div class="impact-bar" aria-hidden="true">
-          <span :style="{ width: productionSharePercent }"></span>
-        </div>
-      </article>
-
-      <article class="ast-overview-card duplicate-shape glass-card">
-        <small>{{ t("astIntelligence.duplicateShape") }}</small>
-        <div class="shape-grid">
-          <span>
-            <b>{{ payload?.summary.clone_group_count ?? 0 }}</b>
-            {{ t("astIntelligence.similarityGroups") }}
-          </span>
-          <span>
-            <b>{{ canonicalBypassCount }}</b>
-            {{ t("astIntelligence.canonicalBypass") }}
-          </span>
-        </div>
-      </article>
-
-      <article class="ast-overview-card scan-coverage glass-card">
-        <button class="artifact-refresh" @click="load" :aria-label="t('astIntelligence.refresh')">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
-        </button>
-        <small>{{ t("astIntelligence.scanCoverage") }}</small>
-        <div class="coverage-grid">
+        <div class="coverage-grid" :aria-label="t('astIntelligence.scanCoverage')">
           <span><b>{{ payload?.summary.file_count ?? 0 }}</b>{{ t("astIntelligence.filesShort") }}</span>
           <span><b>{{ payload?.summary.unit_count ?? 0 }}</b>{{ t("astIntelligence.unitsShort") }}</span>
           <span><b>{{ languageEntries.length }}</b>{{ t("astIntelligence.languagesShort") }}</span>
         </div>
+
         <em>{{ latestScanMeta }}</em>
+
+        <button class="artifact-refresh" @click="load" :aria-label="t('astIntelligence.refresh')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
+        </button>
       </article>
     </section>
 
@@ -172,17 +144,9 @@ const issueClone = computed(() => {
   return (payload.value?.clone_groups || []).find(item => item.id === evidenceGroup || issue.id.includes(item.id)) || null;
 });
 const issueTotal = computed(() => payload.value?.summary.issue_count ?? payload.value?.issues.length ?? 0);
-const productionIssueCount = computed(() => (payload.value?.issues || []).filter(issue => issue.paths.some(isProductionPath)).length);
-const nonProductionIssueCount = computed(() => Math.max(0, (payload.value?.summary.issue_count ?? payload.value?.issues.length ?? 0) - productionIssueCount.value));
-const canonicalBypassCount = computed(() => (payload.value?.issues || []).filter(issue => issue.category === "canonical_bypass").length);
 const severityEntries = computed(() => {
   const counts = payload.value?.summary.severity_counts || {};
   return ["P0", "P1", "P2"].map(key => ({ key, count: counts[key] || 0 }));
-});
-const productionSharePercent = computed(() => {
-  const total = productionIssueCount.value + nonProductionIssueCount.value;
-  if (!total) return "0%";
-  return `${Math.round((productionIssueCount.value / total) * 100)}%`;
 });
 const latestScanMeta = computed(() => {
   const generatedAt = payload.value?.latest?.generated_at || payload.value?.generated_at || "";
@@ -200,15 +164,6 @@ async function load() {
   } catch (err) {
     error.value = err instanceof Error ? err.message : t("astIntelligence.loadError");
   }
-}
-
-function isProductionPath(path: string) {
-  const normalized = path.replace(/^\.\/+/, "");
-  if (!normalized) return false;
-  if (/^(tests|docs|wiki|reports|var|node_modules|web\/frontend\/dist)\//.test(normalized)) return false;
-  if (/^(\.github|\.codegraph)\//.test(normalized)) return false;
-  if (/^(README(\.en)?|AGENTS|CLAUDE|CONTRIBUTING|SECURITY|SUPPORT|CODE_OF_CONDUCT|CHANGELOG|LICENSE|NOTICE)(\.md)?$/.test(normalized)) return false;
-  return true;
 }
 
 function formatScanTime(value: string) {
