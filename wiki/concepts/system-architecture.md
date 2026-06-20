@@ -206,7 +206,7 @@ LLM provider routing starts from `config/settings.yaml: llm`, but the active loc
 | CodeGraph API | `web/api/routes/codegraph.py` + `web/api/services/codegraph.py` + `web/api/services/codegraph_diagnostics.py` | ★ `/api/codegraph/*` — 本地代码图谱数据端点和确定性架构诊断 |
 | AST检测CLI | `astrolabe_cli/ast_intelligence.py` + `scripts/ast_frontend_collector.mjs` | Python/TS/Vue/CSS AST 重复实现和 clone 风险扫描 |
 | AST检测API | `web/api/services/system_ast.py` | `/api/system/ast-intelligence` 只读展示 AST 检测产物 |
-| 系统集成状态 | `web/frontend/src/views/ActivityMonitor.vue` | API Health + Cron Jobs，只读展示关键集成状态 |
+| 系统设置顶部状态 | `web/frontend/src/views/Settings.vue` | API Health + Cron Jobs，只读展示关键集成状态 |
 | AST检测页 | `web/frontend/src/views/AstIntelligence.vue` | `/system?tab=ast` 重复风险分、clone groups、模块热力和 inspector |
 | 代码图谱 | `web/frontend/src/views/CodeGraph.vue` + `web/frontend/src/composables/useCodeGraph.ts` + `useCodeGraphDiagnostics.ts` | ★ Three.js WebGL 3D 图谱, CodeGraph 模块/文件/符号可视化和架构风险叠加 |
 | 模拟交易 | `web/frontend/src/views/Portfolio.vue` | ★ PaperBroker 日频模拟, NAV曲线+持仓+交易记录 |

@@ -761,17 +761,24 @@ def test_llm_provider_balance_reports_unknown_provider_without_default_fallback(
     assert balances["missing-provider"]["message"] == "provider not configured"
 
 
-def test_activity_monitor_removes_local_hardware_monitoring_surface():
-    monitor = Path("web/frontend/src/views/ActivityMonitor.vue").read_text()
+def test_system_settings_absorbs_status_monitor_without_standalone_monitor_tab():
+    system_hub = Path("web/frontend/src/views/SystemHub.vue").read_text()
+    settings = Path("web/frontend/src/views/Settings.vue").read_text()
     monitor_logic = Path("web/frontend/src/view-models/useActivityMonitor.ts").read_text()
     system_api = Path("web/frontend/src/api/modules/system.ts").read_text()
     system_routes = Path("web/api/routes/system.py").read_text()
 
-    assert "api.saveSettings" not in monitor
-    assert "saveWithConfirm" not in monitor
-    assert "API HEALTH" in monitor
-    assert "CRON JOBS" in monitor
-    assert "Telegram" in monitor
+    assert not Path("web/frontend/src/views/ActivityMonitor.vue").exists()
+    assert not Path("web/frontend/src/styles/views/activity-monitor.css").exists()
+    assert "ActivityMonitor" not in system_hub
+    assert '{ key: "monitor" }' not in system_hub
+    assert 'default-tab="settings"' in system_hub
+    assert "saveWithConfirm" in settings
+    assert "confirmSnapshot" in settings
+    assert "API HEALTH" in settings
+    assert "CRON JOBS" in settings
+    assert "Telegram" in settings
+    assert "useActivityMonitor" in settings
     assert "api.apiHealth()" in monitor_logic
     assert "api.cronJobs()" in monitor_logic
     assert "api.systemMonitor()" not in monitor_logic
@@ -780,13 +787,13 @@ def test_activity_monitor_removes_local_hardware_monitoring_surface():
     assert "systemHistory:" not in system_api
     assert '"/monitor"' not in system_routes
     assert '"/history"' not in system_routes
-    assert "CPU" not in monitor
-    assert "MEMORY" not in monitor
-    assert "DISK" not in monitor
-    assert "RESOURCE HISTORY" not in monitor
-    assert "TOP PROCESSES" not in monitor
-    assert "top_processes" not in monitor
-    assert "serviceStatus" not in monitor
+    assert "CPU" not in settings
+    assert "MEMORY" not in settings
+    assert "DISK" not in settings
+    assert "RESOURCE HISTORY" not in settings
+    assert "TOP PROCESSES" not in settings
+    assert "top_processes" not in settings
+    assert "serviceStatus" not in settings
 
 
 def test_legacy_service_status_route_is_removed(monkeypatch):

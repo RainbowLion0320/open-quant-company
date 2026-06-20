@@ -45,7 +45,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 | 组合执行 | `/portfolio` | ★ PaperBroker 日频模拟: NAV权益曲线 + 持仓 + 交易记录 + 手动下单 |
 | 流程图 | `/pipeline` | 关键参数计算透明度入口；四条关键链路 + Market Regime 细粒度 DAG |
 | 数据中台 | `/datahub` | DataRegistry 健康扫描 + 全量大小统计 + 按时间分段 + 单表修复 |
-| 系统控制 | `/system` | 二级 tab: 系统信息 + 系统设置 + 配置中心 + CodeGraph 代码图谱 |
+| 系统控制 | `/system` | 二级 tab: 系统设置 + 配置中心 + CodeGraph 代码图谱 |
 
 旧一级页面 redirect 已移除，避免隐藏入口继续影响导航编排。除 `/stocks/:code` 个股详情外，模块入口以七个一级路由、二级 tab 和 Pipeline 透明度页为准。
 
@@ -67,13 +67,13 @@ Market API 新增字段：
 
 Sectors.vue 在行业排名表上方增加行业资金方块矩阵。每个申万一级行业是独立方块，边长按 `amount_5d_avg`（近 5 日平均成交额）开方映射，保持方形且让面积近似表达资金量；颜色可在资金热力（5日涨跌幅）、动量热力（20日涨跌幅）、信号热力（策略买入集中度）之间切换。`data/market/sectors.py` 从申万行业指数成交额或成员股 OHLCV `amount` 聚合资金字段。行业方块内部不展示具体股票，避免行业雷达变成个股看板；点击行业方块沿用原行业级信号详情展开，不把方块矩阵当作精确数值表替代品。
 
-### 系统信息 (2026-06-20 精简)
+### 系统设置顶部状态 (2026-06-20 精简)
 
-系统信息页只保留对运行决策有直接价值的集成状态：
+系统设置页顶部只保留对运行决策有直接价值的集成状态：
 - API: `/api/system/api-health` (AKShare/Tushare/LLM providers/Telegram 配置状态)
 - API: `/api/system/cron-jobs` (cron job 状态)
-- 前端: ActivityMonitor.vue 展示 API Health + Cron Jobs，不展示本机硬件资源、资源历史或进程表。
-- **职责边界:** Monitor 为只读运行观测页，不调用 `api.saveSettings()`，也不重复展示 Telegram/Data Sources/System Info 等配置摘要；配置读写集中在 `/system?tab=settings`。
+- 前端: `Settings.vue` 展示 API Health + Cron Jobs，不展示本机硬件资源、资源历史或进程表。
+- **职责边界:** Settings 顶部承载只读运行状态，下方管理认证、通知、数据源、策略状态、风控和审计；Config Center 继续承担可调参数 schema 编辑。
 
 ### 代码图谱 (2026-06-06 对齐)
 

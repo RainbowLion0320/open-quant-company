@@ -1,7 +1,7 @@
 export const settings = {
       eyebrow: "CONFIG CONTROL",
       title: "Config Center",
-      subtitle: "Central management for auth, notifications, data sources, strategy state, risk, and recent config changes",
+      subtitle: "Central management for runtime status, auth, notifications, data sources, strategy state, risk, and recent config changes",
       apiKey: "Session Auth",
       authStatus: "Auth Status",
       apiKeyPlaceholder: "Enter ASTROLABE_API_KEY for this page session",

@@ -65,17 +65,12 @@ export const modules = {
       system: {
         title: "系统控制",
         eyebrow: "System",
-        subtitle: "运行观测、配置写入和 AI 记忆工具收敛为系统入口",
+        subtitle: "基础设置、运行状态和系统诊断工具收敛为统一入口",
         tabs: {
-          monitor: {
-            label: "系统信息",
-            meta: "Read-only ops",
-            description: "只读观测系统资源、API 健康、任务计划和服务状态",
-          },
           settings: {
             label: "系统设置",
-            meta: "Config writes",
-            description: "集中管理认证、通知、数据源、策略状态和风控参数",
+            meta: "Status & config",
+            description: "查看 API 健康与任务计划，并管理认证、通知、数据源、策略状态和风控参数",
           },
           config: {
             label: "配置中心",

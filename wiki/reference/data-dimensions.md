@@ -66,7 +66,7 @@ python -c "from data.storage.datahub import get_datahub; print(get_datahub().cat
 | 宏观数据 | GDP、CPI、PMI、SHIBOR、黄金 | 市场总览、regime context |
 | 行业数据 | 行业日线、成员映射、绩效、信号聚合、组合敞口 | 市场总览 Top5 热点、行业雷达、多因子行业动量；组合敞口在组合执行页承载 |
 | 信号和特征 | 策略信号、PIT 特征切片 | Selection、backtest、PaperBroker |
-| 运维元数据 | manifest、cron logs、健康扫描输出 | DB Health、Monitor |
+| 运维元数据 | manifest、cron logs、健康扫描输出 | DB Health、System Settings status |
 
 ## 新增维度
 

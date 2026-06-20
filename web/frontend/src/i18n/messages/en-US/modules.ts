@@ -65,17 +65,12 @@ export const modules = {
       system: {
         title: "System",
         eyebrow: "System",
-        subtitle: "Runtime observation, config writes, and code intelligence tools in one system entry",
+        subtitle: "Base settings, runtime status, and system diagnostics in one system entry",
         tabs: {
-          monitor: {
-            label: "Monitor",
-            meta: "Read-only ops",
-            description: "Read-only view of resources, API health, schedules, and service status",
-          },
           settings: {
             label: "Settings",
-            meta: "Config writes",
-            description: "Manage auth, notifications, data sources, strategy state, and risk parameters",
+            meta: "Status & config",
+            description: "View API health and schedules, and manage auth, notifications, data sources, strategy state, and risk parameters",
           },
           config: {
             label: "Config Center",

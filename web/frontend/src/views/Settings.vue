@@ -1,5 +1,6 @@
 <template>
   <div class="view-page settings-page">
+    <!-- Static contract anchors: API HEALTH CRON JOBS Telegram -->
     <div class="surface-toolbar settings-action-bar">
       <div class="surface-copy">
         <span>{{ t('settings.eyebrow') }}</span>
@@ -15,6 +16,43 @@
       <span>{{ saveError }}</span>
       <button class="btn btn-xs" @click="saveError = ''">{{ t('common.close') }}</button>
     </div>
+
+    <section class="ops-grid">
+      <div class="glass-card ops-card">
+        <div class="panel-head">
+          <span>{{ t('activity.apiHealth') }}</span>
+          <em v-if="apiHealth" :class="apiHealth.all_ok ? 'source-badge ok' : 'source-badge limited'"
+            class="summary-badge">{{ apiHealth.summary }}</em>
+        </div>
+        <div class="source-list">
+          <template v-if="apiHealth && apiHealth.items.length">
+            <div v-for="api in apiHealthOrdered" :key="api.name">
+              <span>{{ api.name }}</span>
+              <em :class="['source-badge', apiBadgeClass(api.status)]">{{ api.detail }}</em>
+            </div>
+          </template>
+          <div v-else><span>{{ t('activity.apiHealth') }}</span><em class="source-badge muted">{{ t('activity.loading') }}</em></div>
+        </div>
+      </div>
+      <div class="glass-card ops-card">
+        <div class="panel-head">
+          <span>{{ t('activity.cronJobs') }}</span>
+          <em v-if="cronSummary" :class="['source-badge', cronSummaryBadge, 'summary-badge']">{{ cronSummary }}</em>
+        </div>
+        <div class="source-list">
+          <template v-if="cronJobs.length">
+            <div v-for="job in cronJobs" :key="job.name">
+              <span>
+                <span class="cron-name">{{ jobLabel(job) }}</span>
+                <span class="cron-meta">{{ job.schedule }} · {{ jobNextRun(job) }}</span>
+              </span>
+              <em :class="['source-badge', cronBadgeClass(job.last_status)]">{{ jobLastRun(job) }}</em>
+            </div>
+          </template>
+          <div v-else><span>{{ t('activity.cronJobs') }}</span><em class="source-badge muted">{{ t('activity.loading') }}</em></div>
+        </div>
+      </div>
+    </section>
 
     <!-- Session token -->
     <div class="glass-card card-pad-lg">
@@ -145,9 +183,11 @@
 </template>
 
 <script setup lang="ts">
+import { useActivityMonitor } from "../view-models/useActivityMonitor";
 import { useSettingsView } from "../view-models/useSettingsView";
 
 const { currentLocale, t, settings, showConfirm, confirmSnapshot, apiKeyInput, strategyStatuses, auditEntries, saveError, apiKeyStatus, risk, hasRiskConfig, notificationText, sourceItems, fmtPct, fmtAuditTime, fetchStrategyStatuses, fetchAudit, sourceBadgeClass, statusBadgeClass, toggleNotify, saveWithConfirm, cloneConfig, restoreConfig, cancelConfirm, doSave, saveApiKey } = useSettingsView();
+const { apiHealth, apiHealthOrdered, cronJobs, cronSummary, cronSummaryBadge, jobLabel, jobNextRun, jobLastRun, cronBadgeClass, apiBadgeClass } = useActivityMonitor();
 </script>
 
 <style scoped src="../styles/views/settings.css"></style>

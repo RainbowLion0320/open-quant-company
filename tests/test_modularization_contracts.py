@@ -149,7 +149,6 @@ def test_p0_p2_modularization_hotspots_are_split():
             "web/frontend/src/view-models/useActivityMonitor.ts",
             "web/frontend/src/view-models/useDatabaseHealth.ts",
             "web/frontend/src/view-models/useSectorsView.ts",
-            "web/frontend/src/styles/views/activity-monitor.css",
             "web/frontend/src/styles/views/database-health.css",
             "web/frontend/src/styles/views/sectors.css",
             "web/frontend/src/styles/base/tokens.css",
@@ -197,7 +196,8 @@ def test_p0_p2_modularization_hotspots_are_split():
         ]
     )
 
-    assert _line_count("web/frontend/src/views/ActivityMonitor.vue") <= 240
+    assert not Path("web/frontend/src/views/ActivityMonitor.vue").exists()
+    assert not Path("web/frontend/src/styles/views/activity-monitor.css").exists()
     assert _line_count("web/frontend/src/views/DatabaseHealth.vue") <= 240
     assert _line_count("web/frontend/src/views/Sectors.vue") <= 240
     assert _line_count("web/frontend/src/views/Strategies.vue") <= 240

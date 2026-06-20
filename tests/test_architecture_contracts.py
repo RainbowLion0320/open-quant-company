@@ -1044,15 +1044,15 @@ def test_deepseek_usage_no_longer_depends_on_platform_scraping_backfills():
     assert not Path("scripts", "ingest_deepseek_" + "cdp.py").exists()
     assert not Path("scripts", "ingest_deepseek_" + "usage.py").exists()
     monitor_logic = Path("web/frontend/src/view-models/useActivityMonitor.ts").read_text(encoding="utf-8")
-    monitor_view = Path("web/frontend/src/views/ActivityMonitor.vue").read_text(encoding="utf-8")
+    settings_view = Path("web/frontend/src/views/Settings.vue").read_text(encoding="utf-8")
     system_api = Path("web/frontend/src/api/modules/system.ts").read_text(encoding="utf-8")
     system_routes = Path("web/api/routes/system.py").read_text(encoding="utf-8")
     datahub = Path("data/storage/datahub.py").read_text(encoding="utf-8")
     factor_llm = Path("research/factors/hypothesis/llm.py").read_text(encoding="utf-8")
 
     assert _joined("api.", "llmUsage()") not in monitor_logic
-    assert _joined("LLM ", "USAGE") not in monitor_view
-    assert "llm-panel" not in monitor_view
+    assert _joined("LLM ", "USAGE") not in settings_view
+    assert "llm-panel" not in settings_view
     assert _joined("/api/system/", "llm-usage") not in system_api
     assert _joined('"/', 'llm-usage"') not in system_routes
     assert "llm_project_usage_path" in datahub

@@ -5,7 +5,7 @@
       :eyebrow="t('modules.system.eyebrow')"
       :subtitle="t('modules.system.subtitle')"
       base-path="/system"
-      default-tab="monitor"
+      default-tab="settings"
       :items="tabs"
     />
     <section class="module-content">
@@ -19,7 +19,6 @@ import { computed } from "vue";
 import SectionTabs from "../components/SectionTabs.vue";
 import { useModuleTabs } from "../composables/useModuleTabs";
 import { useI18n } from "../i18n";
-import ActivityMonitor from "./ActivityMonitor.vue";
 import Settings from "./Settings.vue";
 import ConfigCenter from "./ConfigCenter.vue";
 import TestDesign from "./TestDesign.vue";
@@ -30,7 +29,6 @@ import CodeGraph from "./CodeGraph.vue";
 const { t } = useI18n();
 
 const tabKeys = [
-  { key: "monitor" },
   { key: "settings" },
   { key: "config" },
   { key: "tests" },
@@ -46,8 +44,7 @@ const tabs = computed(() => tabKeys.map(item => ({
   description: t(`modules.system.tabs.${item.key}.description`),
 })));
 
-const { activeComponent } = useModuleTabs(tabKeys, "monitor", {
-  monitor: ActivityMonitor,
+const { activeComponent } = useModuleTabs(tabKeys, "settings", {
   settings: Settings,
   config: ConfigCenter,
   tests: TestDesign,

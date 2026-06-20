@@ -153,9 +153,6 @@ async def get_run(run_id: str):
     return run
 
 
-# ── P1-7: Order Lifecycle ──
-
-
 @router.get("/orders")
 async def get_orders(
     date: str = Query(default="", description="Filter by date YYYY-MM-DD"),
@@ -180,9 +177,6 @@ async def trace_order(order_id: str):
     可以反向追溯到触发该订单的信号。
     """
     return order_trace_payload(order_id)
-
-
-# ── P1-8: Backfill & Provider Health ──
 
 
 @router.get("/backfill")
@@ -215,9 +209,6 @@ async def get_provider_health():
 async def get_contracts(dimension: str = Query(default="", description="Filter by dimension")):
     """数据维度契约列表 — schema/PK/PIT规则/sla。"""
     return contracts_payload(dimension)
-
-
-# ── P1-11: Audit Log & API Auth ──
 
 
 @router.get("/audit")
