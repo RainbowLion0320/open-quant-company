@@ -1,24 +1,3 @@
-export interface SystemMonitor {
-  timestamp: string;
-  cpu: { percent: number; freq_current: number | null; cores_physical: number; cores_logical: number; load_avg: number[] };
-  memory: { total_gb: number; used_gb: number; percent: number };
-  disk: { total_gb: number; used_gb: number; percent: number };
-  battery: { percent: number; charging: boolean; minutes_left: number | null } | null;
-  top_processes: { pid: number; name: string; cpu: number; mem: number }[];
-  token: {
-    hermes: { input_tokens: number; output_tokens: number; total_tokens: number; sessions: number; messages: number; tool_calls: number; api_calls: number; cost_usd: number };
-    external: { input_tokens: number; output_tokens: number; total_tokens: number; calls: number; cost_usd: number; sources: string[] };
-    total: { input_tokens: number; output_tokens: number; total_tokens: number; cost_usd: number };
-    updated_at: string | null;
-  };
-}
-
-export interface SystemHistoryResponse {
-  hours: number;
-  points: number;
-  data: any[];
-}
-
 export interface SystemLlmRuntimeProfile {
   source: "settings" | "global_override" | string;
   provider: string;

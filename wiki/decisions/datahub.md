@@ -37,7 +37,7 @@ DataHub 对外负责统一入口。内部实现拆为小组件，避免单文件
 
 DataHub facade 负责:
 
-- 统一目录: `runtime_root`, `store_root`, `cache_root`, `artifact_root`, `db_root`, `signals`, `features`, `macro`, `paper`, `system_monitor`, token cache。
+- 统一目录: `runtime_root`, `store_root`, `cache_root`, `artifact_root`, `db_root`, `signals`, `features`, `macro`, `paper`。
 - 运行产物 API: `runtime_dir()`, `artifact_dir(kind)`, `artifact_path(kind, name)`, `db_path(name)`。
 - 统一路径: `signal_path(strategy)`, `feature_path(as_of_key)`, `macro_path(name)`, `paper_path(name)`。
 - 注册表路径展开: `dimension_root(key)` / `dimension_path(key, **values)` 从 `data_registry.cache` 占位符模式生成真实路径。**设计理由**: 路径只定义一次（config.yaml），消费脚本不硬编码深层目录。占位符 `{symbol}`/`{YYYYMMDD}` 在调用点展开，`validate()` 拒绝 `..` 和绝对路径。
@@ -76,7 +76,6 @@ var/
 - `data/features/feature_store.py`: PIT as-of 日期视图和 registry enrichment 统一走 DataHub 路径。
 - `broker/persistence.py`: paper trading 状态目录改为 DataHub，并修复相对配置路径解析。
 - `scripts/execute_paper_trades.py`: 使用 `latest_batch` 读取最新信号。
-- `web/api/routes/system.py`, `scripts/collect_system_metrics.py`: 系统监控库和 token cache 不再写死绝对路径。
 - `scripts/db_health_check.py`: 健康扫描从 data registry 注入 source/label/SLA/repair/partition 元数据。
 - 多个离线脚本和 fetcher: 通过 DataHub/registry 解析路径，不依赖固定本机路径。
 

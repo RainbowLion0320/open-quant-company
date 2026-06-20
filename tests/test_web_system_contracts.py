@@ -761,80 +761,31 @@ def test_llm_provider_balance_reports_unknown_provider_without_default_fallback(
     assert balances["missing-provider"]["message"] == "provider not configured"
 
 
-def test_llm_usage_payload_combines_provider_balance_and_project_ledger(monkeypatch):
-    import web.api.services.system_monitor as monitor
-
-    monkeypatch.setattr(
-        monitor,
-        "fetch_provider_balances",
-        lambda provider=None: {
-            provider or "deepseek": {
-                "provider": provider or "deepseek",
-                "label": "DeepSeek",
-                "status": "ok",
-                "is_available": True,
-                "balance_infos": [{"currency": "CNY", "total_balance": "88.00", "granted_balance": "8.00", "topped_up_balance": "80.00"}],
-            }
-        },
-    )
-    monkeypatch.setattr(
-        monitor,
-        "summarize_llm_project_usage",
-        lambda days=30, provider=None: {
-            "daily": [
-                {
-                    "utc_date": "2026-06-02",
-                    "provider": provider or "deepseek",
-                    "model": "deepseek-v4-pro",
-                    "input_cache_hit": 1000,
-                    "input_cache_miss": 2000,
-                    "output_tokens": 3000,
-                    "total_tokens": 6000,
-                    "requests": 1,
-                    "estimated_cost_usd": 0.0009,
-                    "estimated_cost_cny": 0.0065,
-                    "usage_source": "api_response",
-                }
-            ],
-            "providers": [provider or "deepseek"],
-            "models": ["deepseek-v4-pro"],
-            "dates": ["2026-06-02"],
-            "totals": {"tokens": 6000, "requests": 1, "estimated_cost_usd": 0.0009, "estimated_cost_cny": 0.0065},
-            "pricing_status": "ok",
-            "unpriced_rows": 0,
-            "unpriced_reasons": [],
-            "status": "ok",
-        },
-    )
-
-    payload = monitor.llm_usage_payload(provider="deepseek")
-
-    assert payload["status"] == "ok"
-    assert payload["source"] == "provider_balance_api+project_usage_ledger"
-    assert payload["provider"] == "deepseek"
-    assert payload["providers"] == ["deepseek"]
-    assert payload["balance"]["is_available"] is True
-    assert payload["usage"]["totals"]["tokens"] == 6000
-    assert payload["usage"]["pricing_status"] == "ok"
-    assert payload["data"][0]["usage_source"] == "api_response"
-
-
-def test_monitor_is_read_only_but_keeps_system_status_cards():
+def test_activity_monitor_removes_local_hardware_monitoring_surface():
     monitor = Path("web/frontend/src/views/ActivityMonitor.vue").read_text()
     monitor_logic = Path("web/frontend/src/view-models/useActivityMonitor.ts").read_text()
+    system_api = Path("web/frontend/src/api/modules/system.ts").read_text()
+    system_routes = Path("web/api/routes/system.py").read_text()
 
     assert "api.saveSettings" not in monitor
     assert "saveWithConfirm" not in monitor
     assert "API HEALTH" in monitor
     assert "CRON JOBS" in monitor
-    assert "RESOURCE HISTORY" in monitor
-    assert "TOP PROCESSES" in monitor
     assert "Telegram" in monitor
     assert "api.apiHealth()" in monitor_logic
     assert "api.cronJobs()" in monitor_logic
-    assert "activity.unpricedUsage" in monitor
-    assert "pricingStatus" in monitor_logic
-    assert "unpricedRows" in monitor_logic
+    assert "api.systemMonitor()" not in monitor_logic
+    assert "api.systemHistory(" not in monitor_logic
+    assert "systemMonitor:" not in system_api
+    assert "systemHistory:" not in system_api
+    assert '"/monitor"' not in system_routes
+    assert '"/history"' not in system_routes
+    assert "CPU" not in monitor
+    assert "MEMORY" not in monitor
+    assert "DISK" not in monitor
+    assert "RESOURCE HISTORY" not in monitor
+    assert "TOP PROCESSES" not in monitor
+    assert "top_processes" not in monitor
     assert "serviceStatus" not in monitor
 
 

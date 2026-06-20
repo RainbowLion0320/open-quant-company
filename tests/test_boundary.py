@@ -178,7 +178,7 @@ def test_datahub_duckdb_and_results_store_boundary_are_isolated(tmp_path, monkey
     assert row_b["signal"] == "sell"
 
     audit_keys = {item["key"] for item in hub.audit()}
-    assert {"signals", "features", "paper", "token_usage"}.issubset(audit_keys)
+    assert {"signals", "features", "paper", "llm_usage"}.issubset(audit_keys)
 
     db = db_module.get_db()
     db.execute("CREATE TABLE IF NOT EXISTS _test (id INT, name TEXT)")

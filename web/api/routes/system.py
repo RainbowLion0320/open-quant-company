@@ -1,4 +1,4 @@
-"""系统活动监视器 — SQLite 时序库 + 历史趋势"""
+"""System control and operations API routes."""
 from fastapi import APIRouter, Query
 
 from web.api.errors import InvalidParameterError
@@ -12,10 +12,6 @@ from web.api.services.system_data_health import (
 from web.api.services.system_integrations import (
     api_health_payload,
     cron_jobs_payload,
-)
-from web.api.services.system_monitor import (
-    system_history_payload,
-    system_monitor_payload,
 )
 from web.api.services.system_data_ops import (
     audit_history_payload,
@@ -40,17 +36,6 @@ from web.api.services.system_llm_runtime import (
 
 router = APIRouter(prefix="/api/system", tags=["System"])
 
-
-@router.get("/monitor")
-async def system_monitor():
-    """当前快照 (读最新一行 SQLite)"""
-    return system_monitor_payload()
-
-
-@router.get("/history")
-async def system_history(hours: int = Query(default=24, ge=1, le=720)):
-    """历史趋势数据 — CPU/内存/Token 时间序列"""
-    return system_history_payload(hours)
 
 @router.get("/llm-runtime")
 async def llm_runtime():

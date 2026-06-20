@@ -193,15 +193,6 @@ class DataHub:
     def model_path(self, name: str) -> Path:
         return self.paths.model_path(name)
 
-    def system_monitor_path(self) -> Path:
-        return self.paths.system_monitor_path()
-
-    def token_usage_path(self) -> Path:
-        return self.paths.token_usage_path()
-
-    def llm_usage_path(self) -> Path:
-        return self.paths.llm_usage_path()
-
     def llm_project_usage_path(self) -> Path:
         return self.paths.llm_project_usage_path()
 
@@ -326,8 +317,6 @@ class DataHub:
             "paper": DatasetSpec("paper", self.paper_dir(), "directory", "broker", "Paper-trading state, NAV and trades"),
             "macro": DatasetSpec("macro", self.store_path("macro"), "directory", "macro", "Macro and rates datasets"),
             "manifest": DatasetSpec("manifest", self.manifest_path(), "parquet", "datahub", "DataHub parquet write manifest"),
-            "system_monitor": DatasetSpec("system_monitor", self.system_monitor_path(), "sqlite", "system", "System metrics time-series DB"),
-            "token_usage": DatasetSpec("token_usage", self.token_usage_path(), "json", "system", "LLM token usage cache"),
             "llm_usage": DatasetSpec("llm_usage", self.llm_project_usage_path(), "parquet", "system", "Generic LLM provider response usage ledger"),
         }
         try:

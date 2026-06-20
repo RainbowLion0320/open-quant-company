@@ -3,40 +3,18 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
 from typing import Dict, List, Optional
 
-from data.storage.datahub import get_datahub
 from data.storage.dimensions import get_registry
 from data.llm.usage import append_llm_usage, load_provider_api_key, resolve_llm_use_case
 from research.factors.hypothesis.candidates import FactorCandidate
 
-_LLM_USAGE_FILE = get_datahub().llm_usage_path()
-
 def _log_llm_usage(source: str, usage, provider: str, model: str):
-    """记录非 Hermes 网关的 LLM token 用量到共享缓存"""
+    """Record provider response usage in the canonical local LLM ledger."""
     try:
-        ledger_row = append_llm_usage(provider, model, usage, source=source)
-        today = datetime.now().strftime("%Y-%m-%d")
-        data = {}
-        if _LLM_USAGE_FILE.exists():
-            with open(_LLM_USAGE_FILE, encoding="utf-8") as f:
-                data = json.load(f)
-        if data.get("date") != today:
-            data = {"date": today, "items": [], "total_input": 0, "total_output": 0, "total_cost": 0.0, "calls": 0}
-        inp = int(ledger_row.get("input_tokens", 0))
-        out = int(ledger_row.get("output_tokens", 0))
-        cost = float(ledger_row.get("estimated_cost_usd", 0.0))
-        data["items"].append({"source": source, "model": model, "input": inp, "output": out, "cost": round(cost, 6), "time": datetime.now().isoformat()})
-        data["total_input"] += inp
-        data["total_output"] += out
-        data["total_cost"] += cost
-        data["calls"] += 1
-        _LLM_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(_LLM_USAGE_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+        append_llm_usage(provider, model, usage, source=source)
     except Exception:
-        pass  # 静默失败, 不影响主流程
+        pass
 
 # ══════════════════════════════════════════════════════════
 # 1. 扩展 LLM 提示词 — 暴露全部可用数据维度
@@ -153,7 +131,7 @@ def generate_via_llm(n: int, existing: List[str],
     )
     text = response.choices[0].message.content
 
-    # 记录 token 用量到共享缓存 (供活动监视器统计)
+    # 记录 provider response usage 到本地 LLM usage ledger。
     if hasattr(response, 'usage') and response.usage:
         _log_llm_usage("factor_hypothesis", response.usage, provider, model)
 

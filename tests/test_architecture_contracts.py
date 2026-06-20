@@ -443,11 +443,12 @@ def test_system_route_delegates_large_status_domains_to_services():
     import web.api.services.system_data_health as data_health
     import web.api.services.system_data_ops as data_ops
     import web.api.services.system_integrations as integrations
-    import web.api.services.system_monitor as monitor
 
     route_text = Path("web/api/routes/system.py").read_text()
 
-    assert callable(monitor.system_monitor_payload)
+    assert not Path("web/api/services/system_monitor.py").exists()
+    assert "system_monitor_payload" not in route_text
+    assert "system_history_payload" not in route_text
     assert callable(data_health.db_health_payload)
     assert callable(data_ops.quality_gate_payload)
     assert callable(integrations.api_health_payload)
@@ -457,6 +458,33 @@ def test_system_route_delegates_large_status_domains_to_services():
     assert "def _run_repair(" not in route_text
     assert "def _repairable_tables(" not in route_text
     assert "from data.quality.quality import DataQualityGate" not in route_text
+
+
+def test_removed_token_usage_and_system_metric_cron_artifacts_do_not_reappear():
+    stale_tokens = (
+        _joined("update_", "token_cache"),
+        _joined("collect_", "system_metrics"),
+        _joined("ingest_", "deepseek_cdp"),
+        _joined("hind", "sight_", "tokens_path"),
+        _joined("system_", "monitor_path"),
+        _joined("token_", "usage_path"),
+        _joined("llm_", "usage_today"),
+    )
+    tracked = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+    checked_suffixes = (".py", ".md", ".ts", ".vue", ".css", ".json", ".yaml", ".yml")
+    offenders = []
+    for filename in tracked:
+        if not filename.endswith(checked_suffixes):
+            continue
+        path = Path(filename)
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for token in stale_tokens:
+            if token in text:
+                offenders.append(f"{filename}:{token}")
+
+    assert offenders == []
 
 
 def test_web_api_routes_do_not_import_data_layer_directly():
@@ -1022,11 +1050,11 @@ def test_deepseek_usage_no_longer_depends_on_platform_scraping_backfills():
     datahub = Path("data/storage/datahub.py").read_text(encoding="utf-8")
     factor_llm = Path("research/factors/hypothesis/llm.py").read_text(encoding="utf-8")
 
-    assert "api.llmUsage()" not in monitor_logic
-    assert "LLM USAGE" not in monitor_view
+    assert _joined("api.", "llmUsage()") not in monitor_logic
+    assert _joined("LLM ", "USAGE") not in monitor_view
     assert "llm-panel" not in monitor_view
-    assert "/api/system/llm-usage" not in system_api
-    assert '"/llm-usage"' not in system_routes
+    assert _joined("/api/system/", "llm-usage") not in system_api
+    assert _joined('"/', 'llm-usage"') not in system_routes
     assert "llm_project_usage_path" in datahub
     assert "resolve_llm_use_case" in factor_llm
     assert "https://api.deepseek.com/v1" not in factor_llm

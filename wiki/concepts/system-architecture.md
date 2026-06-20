@@ -203,13 +203,10 @@ LLM provider routing starts from `config/settings.yaml: llm`, but the active loc
 | PE/PB补增 | `scripts/enrich_pe_pb.py` | 给特征文件批量补估值列 |
 | 财务预缓存 | `scripts/precache_financials.py` | 磁盘缓存全量财务数据 |
 | 缺月补建 | `scripts/rebuild_missing_months.py` | 精准补建受损特征文件 |
-| Token缓存 | `scripts/update_token_cache.py` | Hermes state.db + project LLM usage ledger → JSON |
-| 系统指标采集 | `scripts/collect_system_metrics.py` | 每分钟写 SQLite 时序数据 |
-| 系统监视API | `web/api/routes/system.py` | /monitor + /history 端点 |
 | CodeGraph API | `web/api/routes/codegraph.py` + `web/api/services/codegraph.py` + `web/api/services/codegraph_diagnostics.py` | ★ `/api/codegraph/*` — 本地代码图谱数据端点和确定性架构诊断 |
 | AST检测CLI | `astrolabe_cli/ast_intelligence.py` + `scripts/ast_frontend_collector.mjs` | Python/TS/Vue/CSS AST 重复实现和 clone 风险扫描 |
 | AST检测API | `web/api/services/system_ast.py` | `/api/system/ast-intelligence` 只读展示 AST 检测产物 |
-| 活动监视器 | `web/frontend/src/views/ActivityMonitor.vue` | 🖥️ CPU/内存/Token 仪表盘 |
+| 系统集成状态 | `web/frontend/src/views/ActivityMonitor.vue` | API Health + Cron Jobs，只读展示关键集成状态 |
 | AST检测页 | `web/frontend/src/views/AstIntelligence.vue` | `/system?tab=ast` 重复风险分、clone groups、模块热力和 inspector |
 | 代码图谱 | `web/frontend/src/views/CodeGraph.vue` + `web/frontend/src/composables/useCodeGraph.ts` + `useCodeGraphDiagnostics.ts` | ★ Three.js WebGL 3D 图谱, CodeGraph 模块/文件/符号可视化和架构风险叠加 |
 | 模拟交易 | `web/frontend/src/views/Portfolio.vue` | ★ PaperBroker 日频模拟, NAV曲线+持仓+交易记录 |

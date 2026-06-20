@@ -1,16 +1,4 @@
 export const activity = {
-      cores: "{count} cores",
-      used: "{value} used",
-      loadAverage: "Load Average",
-      battery: "Battery",
-      updatedAgo: "Updated {seconds}s ago",
-      refresh: "刷新",
-      retryError: "系统监控加载失败",
-      resourceHistory: "RESOURCE HISTORY",
-      topProcesses: "TOP PROCESSES",
-      rows: "{count} rows",
-      process: "Process",
-      noProcessSamples: "暂无进程采样",
       apiHealth: "API HEALTH",
       cronJobs: "CRON JOBS",
       loading: "加载中...",
@@ -20,5 +8,4 @@ export const activity = {
       never: "never",
       agoMinutes: "{count}m ago",
       agoHours: "{count}h ago",
-      charging: "charging",
     } as const;

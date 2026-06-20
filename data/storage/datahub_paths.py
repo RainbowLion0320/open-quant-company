@@ -196,15 +196,6 @@ class DataHubPaths:
     def model_path(self, name: str) -> Path:
         return self.artifact_path("models", f"{safe_leaf(name, 'model dataset')}.parquet")
 
-    def system_monitor_path(self) -> Path:
-        return self.db_path("system_monitor.db")
-
-    def token_usage_path(self) -> Path:
-        return self.cache_root / "token_usage.json"
-
-    def llm_usage_path(self) -> Path:
-        return self.cache_root / "llm_usage_today.json"
-
     def llm_project_usage_path(self) -> Path:
         return self.store_path("llm") / "project_usage_ledger.parquet"
 
