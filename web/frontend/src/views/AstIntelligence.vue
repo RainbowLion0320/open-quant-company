@@ -162,9 +162,8 @@ const severityText = computed(() => {
 const latestScanMeta = computed(() => {
   const generatedAt = payload.value?.latest?.generated_at || payload.value?.generated_at || "";
   if (!generatedAt) return t("astIntelligence.scanTimeUnknown");
-  const age = formatArtifactAge(payload.value?.summary.artifact_age_seconds);
   const time = formatScanTime(generatedAt);
-  return age ? t("astIntelligence.latestScanWithAge", { time, age }) : t("astIntelligence.latestScan", { time });
+  return t("astIntelligence.latestScan", { time });
 });
 
 async function load() {
@@ -196,15 +195,6 @@ function formatScanTime(value: string) {
     ? t("astIntelligence.scanDateShort", { month: date.getMonth() + 1, day: date.getDate() })
     : t("astIntelligence.scanDateLong", { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() });
   return `${datePart} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-}
-
-function formatArtifactAge(value: unknown) {
-  const seconds = typeof value === "number" && Number.isFinite(value) ? value : null;
-  if (seconds === null || seconds < 0) return "";
-  if (seconds < 60) return t("astIntelligence.ageJustNow");
-  if (seconds < 3600) return t("astIntelligence.ageMinutes", { count: Math.floor(seconds / 60) });
-  if (seconds < 86400) return t("astIntelligence.ageHours", { count: Math.floor(seconds / 3600) });
-  return t("astIntelligence.ageDays", { count: Math.floor(seconds / 86400) });
 }
 
 function pad2(value: number) {

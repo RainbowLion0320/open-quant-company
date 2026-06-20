@@ -1127,7 +1127,7 @@ def test_ast_intelligence_page_is_issue_list_first_not_analysis_panels():
     assert "astIntelligence.issueDetail" in view
     assert "latestScanMeta" in view
     assert "formatScanTime" in view
-    assert "formatArtifactAge" in view
+    assert "formatArtifactAge" not in view
     assert "ast-list-meta" in css
     assert "selectedIssue" in view
     assert "ast-risk-layout" in view
