@@ -146,6 +146,7 @@ cd web/frontend && npm run dev
 - Put maintainer decision rules in `docs/project/governance.md`.
 - Put security reporting in `SECURITY.md`.
 - Update specs, wiki, acceptance matrix, and tests when behavior changes.
+- Python dependencies are declared only in `pyproject.toml`; do not add or restore `requirements*.txt` files.
 - When adding an external data source, fetcher, provider adapter, or new data dimension, update the Source Capability Registry and verify `astroq data sources diff-registry --json`.
 - When adding an OpenAI-compatible LLM provider, add it under `llm.providers.<provider>` with `protocol: openai_compatible`, `api_key_env`, `base_url`, `default_model`, optional `request.*`, optional provider-specific `reasoning_modes`, and provider-specific `pricing.models`. `llm.use_cases.*` remains the default routing shape; the active local provider/model/reasoning profile is managed through `GET/PATCH /api/system/llm-runtime` or `astroq config llm-runtime --json`.
 - Do not preserve deprecated compatibility paths unless the current design explicitly requires them.

@@ -1,17 +1,20 @@
 # Open Quant Company — 维护命令
 PYTHON ?= .venv/bin/python
 
-.PHONY: install test lint ci clean scan backtest regime web web-build web-dev web-stop
+.PHONY: install install-min install-dev install-ml test lint ci clean scan backtest regime web web-build web-dev web-stop
 
-# 安装依赖
+# 安装完整本地运行/开发依赖
 install:
-	$(PYTHON) -m pip install -r requirements.txt
+	$(PYTHON) -m pip install -e ".[dev,ml]"
+
+# 安装最小运行依赖
+install-min:
+	$(PYTHON) -m pip install -e .
 
 install-dev: install
-	$(PYTHON) -m pip install -r requirements-dev.txt
 
-install-ml: install
-	$(PYTHON) -m pip install lightgbm scikit-learn optuna
+install-ml:
+	$(PYTHON) -m pip install -e ".[ml]"
 
 # 运行测试
 test:
@@ -22,7 +25,7 @@ test-quick:
 
 # 代码风格检查
 lint:
-	$(PYTHON) -m flake8 data/ signals/ backtest/ broker/ cybernetics/ scripts/ web/api/ --max-line-length=120 --ignore=E203,W503 2>/dev/null || echo "flake8 未安装，跳过 lint"
+	$(PYTHON) -m ruff check astrolabe_cli backtest broker core cybernetics data models notify pipeline research scripts signals tests web/api --select E9,F63,F7,F82
 
 # CI 完整检查
 ci: test web-build

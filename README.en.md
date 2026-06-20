@@ -131,15 +131,13 @@ cd open-quant-company
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -r requirements.txt
-python -m pip install -e .
+python -m pip install -e ".[dev,ml]"
 ```
 
-Optional dependencies:
+For a minimal runtime-only install:
 
 ```bash
-python -m pip install -e ".[ml]"
-python -m pip install -r requirements-dev.txt
+python -m pip install -e .
 ```
 
 The base Web UI and some local features can start without secrets. Full data coverage and AI-assisted factor research need system environment variables:

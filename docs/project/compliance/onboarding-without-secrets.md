@@ -10,8 +10,7 @@ Development checks require Python 3.11+, Node.js 18+, Git, and ripgrep (`rg`).
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -r requirements-dev.txt
-python -m pip install -e .
+python -m pip install -e ".[dev,ml]"
 
 cd web/frontend
 npm ci

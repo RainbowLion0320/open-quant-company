@@ -39,18 +39,16 @@ cd open-quant-company
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -r requirements.txt
-python -m pip install -e .
+python -m pip install -e ".[dev,ml]"
 
 cd web/frontend
 npm install
 ```
 
-Optional development dependencies:
+If you only need the minimal runtime:
 
 ```bash
-python -m pip install -r requirements-dev.txt
-python -m pip install -e ".[ml]"
+python -m pip install -e .
 ```
 
 Install local git hooks if you want the same lightweight checks before every commit:

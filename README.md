@@ -132,15 +132,13 @@ cd open-quant-company
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -r requirements.txt
-python -m pip install -e .
+python -m pip install -e ".[dev,ml]"
 ```
 
-可选依赖：
+如果只需要最小运行环境：
 
 ```bash
-python -m pip install -e ".[ml]"
-python -m pip install -r requirements-dev.txt
+python -m pip install -e .
 ```
 
 基础 Web UI 和部分本地功能不需要密钥。完整数据覆盖和 AI 因子研究需要系统环境变量：
