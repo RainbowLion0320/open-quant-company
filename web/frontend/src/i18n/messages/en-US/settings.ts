@@ -1,7 +1,4 @@
 export const settings = {
-      eyebrow: "SYSTEM STATUS",
-      title: "System Settings",
-      subtitle: "Central management for runtime status, auth, notifications, data sources, strategy state, and risk",
       apiKey: "Session Auth",
       authStatus: "Auth Status",
       telegram: "Telegram Notifications",

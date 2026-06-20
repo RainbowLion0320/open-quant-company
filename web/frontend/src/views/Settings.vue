@@ -1,14 +1,6 @@
 <template>
   <div class="view-page settings-page">
     <!-- Static contract anchors: API HEALTH CRON JOBS Telegram -->
-    <div class="surface-toolbar settings-action-bar">
-      <div class="surface-copy">
-        <span>{{ t('settings.eyebrow') }}</span>
-        <strong>{{ t('settings.title') }}</strong>
-        <small>{{ t('settings.subtitle') }}</small>
-      </div>
-    </div>
-
     <section class="ops-grid">
       <div class="glass-card ops-card">
         <div class="panel-head">

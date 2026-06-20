@@ -957,8 +957,12 @@ def test_settings_page_uses_compact_responsive_layout():
 
     assert "settings-config-grid" in settings
     assert "settings-card" in settings
-    assert "System Settings" in en_settings
-    assert "系统设置" in zh_settings
+    assert "settings-action-bar" not in settings
+    assert "settings.eyebrow" not in settings
+    assert "settings.title" not in settings
+    assert "settings.subtitle" not in settings
+    assert "System Settings" not in en_settings
+    assert "系统设置" not in zh_settings
     assert "auditEntries" not in settings
     assert "api.auditHistory" not in settings_logic
     assert "最近配置变更" not in zh_settings

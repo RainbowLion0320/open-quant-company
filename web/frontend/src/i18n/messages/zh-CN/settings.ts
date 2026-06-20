@@ -1,7 +1,4 @@
 export const settings = {
-      eyebrow: "SYSTEM STATUS",
-      title: "系统设置",
-      subtitle: "运行状态、认证、通知、数据源、策略状态和风控集中管理",
       apiKey: "会话认证",
       authStatus: "认证状态",
       telegram: "Telegram 通知",
