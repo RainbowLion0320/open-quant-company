@@ -4,7 +4,6 @@
   gap: 12px;
 }
 
-.ast-toolbar,
 .ast-command,
 .ast-filters,
 .panel-head,
@@ -15,24 +14,11 @@
   gap: 12px;
 }
 
-.ast-toolbar,
 .ast-command,
 .ast-panel,
 .ast-metric,
 .ast-filters {
   padding: 14px;
-}
-
-.ast-toolbar h2 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 17px;
-}
-
-.ast-toolbar p {
-  margin: 4px 0 0;
-  color: var(--text-tertiary);
-  font-size: 12px;
 }
 
 .ast-command {
@@ -68,9 +54,44 @@
 }
 
 .ast-metric {
+  position: relative;
   min-height: 104px;
   display: grid;
   align-content: space-between;
+}
+
+.metric-with-action {
+  padding-right: 42px;
+}
+
+.artifact-refresh {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(34, 197, 94, 0.24);
+  border-radius: 5px;
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--positive);
+  cursor: pointer;
+}
+
+.artifact-refresh:hover {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.artifact-refresh svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .ast-metric strong {

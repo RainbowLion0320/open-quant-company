@@ -7,6 +7,7 @@
       base-path="/strategy-lab"
       default-tab="strategies"
       :items="tabs"
+      :show-copy="false"
     />
     <section class="module-content">
       <component :is="activeComponent" />

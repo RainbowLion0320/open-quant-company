@@ -1,16 +1,5 @@
 <template>
   <div class="view-page">
-    <div class="surface-toolbar">
-      <div class="surface-copy">
-        <span>{{ t('backtest.eyebrow') }}</span>
-        <strong>{{ overview.start || '2015-01' }} → {{ overview.end || '2026-05' }}</strong>
-        <small>{{ t('backtest.subtitle') }}</small>
-      </div>
-      <div class="surface-actions">
-        <span class="text-2xs" style="color:var(--text-disabled)">{{ t('backtest.count', { count: strategies.length }) }}</span>
-      </div>
-    </div>
-
     <div v-if="error" class="inline-alert danger">
       <span>{{ error }}</span>
     </div>
@@ -90,6 +79,8 @@ const summaryCards = computed(() => {
   const avgSharpe = rows.reduce((sum, s) => sum + (s.data.sharpe || 0), 0) / rows.length;
   const trades = rows.reduce((sum, s) => sum + (s.data.trade_count || 0), 0);
   return [
+    { label: t("backtest.eyebrow"), value: `${overview.value.start || "2015-01"} → ${overview.value.end || "2026-05"}`, color: "var(--text-secondary)" },
+    { label: t("backtest.count", { count: strategies.value.length }), value: String(strategies.value.length), color: "var(--accent)" },
     { label: t("backtest.bestReturn"), value: `${best.label} ${fmtReturn(best.data.total_return || 0)}`, color: "var(--positive)" },
     { label: t("backtest.avgSharpe"), value: avgSharpe.toFixed(2), color: "var(--accent)" },
     { label: t("backtest.deepestDrawdown"), value: fmtReturn(worstDrawdown), color: worstDrawdown < -0.2 ? "var(--negative)" : "var(--warning)" },
@@ -232,7 +223,7 @@ onUnmounted(() => {
 }
 .backtest-summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
 @media (max-width: 900px) {

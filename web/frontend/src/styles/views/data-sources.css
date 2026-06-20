@@ -4,26 +4,6 @@
   gap: 12px;
 }
 
-.sources-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-}
-
-.sources-toolbar h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 650;
-}
-
-.sources-toolbar p {
-  margin: 4px 0 0;
-  color: var(--text-secondary, #8c96a8);
-  font-size: 12px;
-}
-
 .sources-command {
   display: flex;
   align-items: center;
@@ -46,8 +26,43 @@
 }
 
 .source-metric {
+  position: relative;
   min-width: 0;
   padding: 12px;
+}
+
+.metric-with-action {
+  padding-right: 42px;
+}
+
+.artifact-refresh {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  border-radius: 5px;
+  background: rgba(14, 116, 144, 0.1);
+  color: #7dd3fc;
+  cursor: pointer;
+}
+
+.artifact-refresh:hover {
+  border-color: rgba(125, 211, 252, 0.46);
+  background: rgba(14, 116, 144, 0.18);
+}
+
+.artifact-refresh svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .source-metric small,
@@ -390,7 +405,6 @@
 }
 
 @media (max-width: 760px) {
-  .sources-toolbar,
   .sources-command,
   .capability-filter-bar,
   .capability-pagination {

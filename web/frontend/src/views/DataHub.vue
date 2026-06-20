@@ -7,6 +7,7 @@
       base-path="/datahub"
       default-tab="health"
       :items="tabs"
+      :show-copy="false"
     />
     <section class="module-content">
       <component :is="activeComponent" />

@@ -1,15 +1,5 @@
 <template>
   <div class="ast-intelligence view-page">
-    <div class="ast-toolbar glass-card">
-      <div>
-        <h2>{{ t("astIntelligence.title") }}</h2>
-        <p>{{ t("astIntelligence.subtitle") }}</p>
-      </div>
-      <button class="icon-button" @click="load" :aria-label="t('astIntelligence.refresh')">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
-      </button>
-    </div>
-
     <div v-if="error" class="inline-alert danger">
       <span>{{ error }}</span>
       <button class="btn btn-xs" @click="load">{{ t("common.retry") }}</button>
@@ -21,7 +11,10 @@
     </section>
 
     <section class="ast-metrics">
-      <article class="ast-metric glass-card score">
+      <article class="ast-metric glass-card score metric-with-action">
+        <button class="artifact-refresh" @click="load" :aria-label="t('astIntelligence.refresh')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
+        </button>
         <small>{{ t("astIntelligence.duplicateScore") }}</small>
         <strong>{{ payload?.summary.duplicate_score ?? 0 }}</strong>
         <em>{{ generatedAt }}</em>

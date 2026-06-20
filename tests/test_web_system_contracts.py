@@ -971,7 +971,8 @@ def test_settings_page_uses_compact_responsive_layout():
     assert "align-items: start" in styles
     assert ".ops-card .source-list" in styles
     assert "max-height: 220px" in styles
-    assert "repeat(auto-fit, minmax(320px, 1fr))" in styles
+    assert "repeat(auto-fit, minmax(300px, 1fr))" in styles
+    assert "repeat(auto-fit, minmax(260px, 1fr))" in styles
     assert "min-height: 32px" in styles
     assert "padding: 10px 12px" in styles
 
@@ -1137,6 +1138,77 @@ def test_datahub_sources_tab_and_api_contract():
     assert "Source Capabilities" in en_modules
     assert "auditSources" not in data_sources_view
     assert "Web scan" not in data_sources_view
+
+
+def test_module_sections_use_compact_tabs_without_parent_copy():
+    for view_path in (
+        "web/frontend/src/views/SystemHub.vue",
+        "web/frontend/src/views/DataHub.vue",
+        "web/frontend/src/views/StrategyLab.vue",
+    ):
+        view = Path(view_path).read_text(encoding="utf-8")
+        assert ':show-copy="false"' in view
+
+
+def test_system_and_data_artifact_dashboards_drop_redundant_title_toolbars():
+    view_paths = {
+        "web/frontend/src/views/TestDesign.vue": ("design-toolbar", "testDesign.title", "testDesign.subtitle"),
+        "web/frontend/src/views/AstIntelligence.vue": ("ast-toolbar", "astIntelligence.title", "astIntelligence.subtitle"),
+        "web/frontend/src/views/LifecycleReadiness.vue": ("lifecycle-toolbar", "lifecycle.title", "lifecycle.eyebrow"),
+        "web/frontend/src/views/DataSources.vue": ("sources-toolbar", "dataSources.title", "dataSources.subtitle"),
+    }
+    for path, forbidden_tokens in view_paths.items():
+        view = Path(path).read_text(encoding="utf-8")
+        for token in forbidden_tokens:
+            assert token not in view
+        assert "refresh" in view.lower() or "common.refresh" in view
+
+
+def test_strategy_lab_child_views_use_compact_controls_not_surface_title_bars():
+    view_paths = (
+        "web/frontend/src/views/Strategies.vue",
+        "web/frontend/src/views/Signals.vue",
+        "web/frontend/src/views/Backtest.vue",
+        "web/frontend/src/views/StrategyDataCoverage.vue",
+    )
+    for path in view_paths:
+        view = Path(path).read_text(encoding="utf-8")
+        assert "surface-toolbar" not in view
+        assert "surface-copy" not in view
+
+    strategies = Path("web/frontend/src/views/Strategies.vue").read_text(encoding="utf-8")
+    signals = Path("web/frontend/src/views/Signals.vue").read_text(encoding="utf-8")
+    coverage = Path("web/frontend/src/views/StrategyDataCoverage.vue").read_text(encoding="utf-8")
+    assert "runAll" in strategies
+    assert "filter-tabs" in signals
+    assert "coverage-legend compact" in coverage
+
+
+def test_codegraph_canvas_chrome_is_compact_by_default():
+    view = Path("web/frontend/src/views/CodeGraph.vue").read_text(encoding="utf-8")
+    css = Path("web/frontend/src/styles/views/codegraph.css").read_text(encoding="utf-8")
+
+    assert "toolbar-title" not in view
+    assert "graph-subbar glass-card" not in view
+    assert "showDiagnosticsPanel" in view
+    assert 'v-if="showDiagnosticsPanel"' in view
+    assert "showLegend" in view
+    assert 'v-if="showLegend"' in view
+    assert ".graph-toolbar.compact" in css
+    assert ".diagnostics-toggle" in css
+    assert ".legend-toggle" in css
+
+
+def test_settings_page_merges_low_value_auth_and_notification_cards():
+    view = Path("web/frontend/src/views/Settings.vue").read_text(encoding="utf-8")
+    css = Path("web/frontend/src/styles/views/settings.css").read_text(encoding="utf-8")
+
+    assert "settings-basics-card" in view
+    assert "settings.apiKey" not in view
+    assert "settings.telegram" not in view
+    assert view.count("settings-card") <= 3
+    assert "grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));" in css
+    assert "grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));" not in css
 
 
 def test_market_view_surfaces_regime_stability_state():

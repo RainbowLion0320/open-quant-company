@@ -38,32 +38,21 @@
       </div>
     </section>
 
+    <section class="settings-basics-card glass-card">
+      <div class="settings-basics-item">
+        <span>{{ t('settings.authStatus') }}</span>
+        <strong>{{ apiKeyStatus }}</strong>
+      </div>
+      <div class="settings-basics-item">
+        <span>{{ t('settings.enableSignalPush') }}</span>
+        <strong>{{ notificationText }}</strong>
+        <em :class="['badge', settings.trading?.notification?.enabled ? 'badge-green' : 'badge-muted']">
+          {{ settings.trading?.notification?.enabled ? t('common.enabled') : t('common.disabled') }}
+        </em>
+      </div>
+    </section>
+
     <section class="settings-config-grid">
-      <!-- Session token -->
-      <div class="glass-card settings-card">
-        <div class="section-heading mb-4">{{ t('settings.apiKey') }}</div>
-        <div class="setting-row">
-          <div>
-            <strong>{{ t('settings.authStatus') }}</strong>
-            <span>{{ apiKeyStatus }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Notification -->
-      <div class="glass-card settings-card">
-        <div class="section-heading mb-4">{{ t('settings.telegram') }}</div>
-        <div class="setting-row">
-          <div>
-            <strong>{{ t('settings.enableSignalPush') }}</strong>
-            <span>{{ notificationText }}</span>
-          </div>
-          <span :class="['badge', settings.trading?.notification?.enabled ? 'badge-green' : 'badge-muted']">
-            {{ settings.trading?.notification?.enabled ? t('common.enabled') : t('common.disabled') }}
-          </span>
-        </div>
-      </div>
-
       <!-- Data Sources -->
       <div class="glass-card settings-card">
         <div class="section-heading mb-4">{{ t('settings.dataSources') }}</div>

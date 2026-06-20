@@ -1,18 +1,11 @@
 <template>
   <div class="view-page">
     <!-- Static contract anchors: 策略目录 候选策略 生命周期 生产隔离 -->
-    <div class="surface-toolbar">
-      <div class="surface-copy">
-        <span>{{ t('strategies.eyebrow') }}</span>
-        <strong>{{ t('strategies.title') }}</strong>
-        <small>{{ t('strategies.subtitle') }}</small>
-      </div>
-      <div class="surface-actions">
-        <span v-if="loaded" class="text-2xs" style="color:var(--text-disabled)">{{ t('strategies.count', { count: catalog.length }) }}</span>
-        <button @click="runAll" :disabled="store.running" class="btn btn-primary btn-sm">
-          {{ store.running ? t('strategies.running', { progress: store.progress }) : t('strategies.runProduction') }}
-        </button>
-      </div>
+    <div class="compact-action-row">
+      <span v-if="loaded" class="text-2xs" style="color:var(--text-disabled)">{{ t('strategies.count', { count: catalog.length }) }}</span>
+      <button @click="runAll" :disabled="store.running" class="btn btn-primary btn-sm">
+        {{ store.running ? t('strategies.running', { progress: store.progress }) : t('strategies.runProduction') }}
+      </button>
     </div>
 
     <div class="isolation-banner">

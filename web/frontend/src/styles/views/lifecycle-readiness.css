@@ -3,25 +3,6 @@
   gap: 14px;
 }
 
-.lifecycle-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.lifecycle-toolbar h2 {
-  margin: 0;
-  font-size: 20px;
-}
-
-.eyebrow {
-  margin: 0 0 4px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  text-transform: uppercase;
-}
-
 .lifecycle-summary,
 .lifecycle-grid,
 .lifecycle-lists {
@@ -45,9 +26,50 @@
 }
 
 .summary-tile {
+  position: relative;
   display: grid;
   gap: 6px;
   min-width: 0;
+}
+
+.summary-tile.metric-with-action {
+  padding-right: 42px;
+}
+
+.artifact-refresh {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 5px;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.artifact-refresh:hover:not(:disabled) {
+  border-color: rgba(125, 211, 252, 0.42);
+  color: var(--accent);
+  background: rgba(14, 116, 144, 0.12);
+}
+
+.artifact-refresh:disabled {
+  cursor: wait;
+  opacity: 0.48;
+}
+
+.artifact-refresh svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .summary-tile span,
@@ -146,7 +168,6 @@
     grid-template-columns: 1fr;
   }
 
-  .lifecycle-toolbar,
   .lifecycle-empty {
     align-items: flex-start;
     flex-direction: column;

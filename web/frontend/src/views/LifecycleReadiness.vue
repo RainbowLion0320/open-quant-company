@@ -1,19 +1,12 @@
 <template>
   <div class="lifecycle-readiness view-page">
-    <header class="lifecycle-toolbar">
-      <div>
-        <p class="eyebrow">{{ t("lifecycle.eyebrow") }}</p>
-        <h2>{{ t("lifecycle.title") }}</h2>
-      </div>
-      <button class="btn-load" @click="load" :disabled="loading">
-        {{ loading ? t("common.loading") : t("common.refresh") }}
-      </button>
-    </header>
-
     <section v-if="error" class="lifecycle-alert danger">{{ error }}</section>
 
     <section class="lifecycle-summary">
-      <article class="summary-tile" :class="statusClass">
+      <article class="summary-tile metric-with-action" :class="statusClass">
+        <button class="artifact-refresh" @click="load" :disabled="loading" :aria-label="t('common.refresh')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
+        </button>
         <span>{{ t("lifecycle.status") }}</span>
         <strong>{{ payload?.status || "unknown" }}</strong>
       </article>

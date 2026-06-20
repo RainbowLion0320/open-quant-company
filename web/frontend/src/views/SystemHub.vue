@@ -7,6 +7,7 @@
       base-path="/system"
       default-tab="settings"
       :items="tabs"
+      :show-copy="false"
     />
     <section class="module-content">
       <component :is="activeComponent" />

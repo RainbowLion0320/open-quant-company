@@ -1,69 +1,82 @@
 <template>
   <div class="codegraph view-page">
-    <div class="graph-toolbar glass-card">
-      <div class="toolbar-left">
-        <h2 class="toolbar-title">{{ t("codegraph.title") }}</h2>
-        <span class="toolbar-stats" v-if="stats">
-          {{ t("codegraph.stats", { files: stats.file_count, nodes: stats.node_count, edges: stats.edge_count }) }}
-        </span>
-        <span class="status-pill" :class="{ stale: status?.stale, missing: !status?.initialized }">
-          {{ status?.initialized ? (status.stale ? t("codegraph.stale") : t("codegraph.current")) : t("codegraph.missing") }}
-        </span>
-        <span v-if="diagnosticsSummary" class="risk-pill" :class="riskTone">
-          {{ t("codegraph.riskScore", { score: diagnosticsSummary.risk_score, p0: diagnosticsSummary.severity_counts.P0 || 0, p1: diagnosticsSummary.severity_counts.P1 || 0 }) }}
-        </span>
-        <span class="toolbar-error" v-if="loadError">{{ loadError }}</span>
-        <span class="toolbar-error" v-if="diagnosticsError">{{ diagnosticsError }}</span>
-      </div>
-      <div class="toolbar-right">
-        <div class="search-box">
-          <input
-            v-model="searchQuery"
-            :placeholder="t('codegraph.search')"
-            @keyup.enter="runSearch"
-          />
-          <button class="icon-button" @click="runSearch" :aria-label="t('codegraph.searchAction')">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.3-4.3M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z" /></svg>
+    <div class="graph-toolbar compact glass-card">
+      <div class="toolbar-row">
+        <div class="toolbar-left">
+          <span class="toolbar-stats" v-if="stats">
+            {{ t("codegraph.stats", { files: stats.file_count, nodes: stats.node_count, edges: stats.edge_count }) }}
+          </span>
+          <span class="status-pill" :class="{ stale: status?.stale, missing: !status?.initialized }">
+            {{ status?.initialized ? (status.stale ? t("codegraph.stale") : t("codegraph.current")) : t("codegraph.missing") }}
+          </span>
+          <button
+            v-if="diagnosticsSummary"
+            class="risk-pill diagnostics-toggle"
+            :class="riskTone"
+            @click="showDiagnosticsPanel = !showDiagnosticsPanel"
+          >
+            {{ t("codegraph.riskScore", { score: diagnosticsSummary.risk_score, p0: diagnosticsSummary.severity_counts.P0 || 0, p1: diagnosticsSummary.severity_counts.P1 || 0 }) }}
           </button>
-          <div v-if="searchResults.length" class="search-results glass-card">
-            <button v-for="item in searchResults" :key="item.id" @click="openSearchResult(item)">
-              <strong>{{ item.label }}</strong>
-              <span>{{ item.kind }} · {{ item.path }}</span>
+          <span class="toolbar-error" v-if="loadError">{{ loadError }}</span>
+          <span class="toolbar-error" v-if="diagnosticsError">{{ diagnosticsError }}</span>
+        </div>
+        <div class="toolbar-right">
+          <div class="search-box">
+            <input
+              v-model="searchQuery"
+              :placeholder="t('codegraph.search')"
+              @keyup.enter="runSearch"
+            />
+            <button class="icon-button" @click="runSearch" :aria-label="t('codegraph.searchAction')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.3-4.3M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z" /></svg>
             </button>
+            <div v-if="searchResults.length" class="search-results glass-card">
+              <button v-for="item in searchResults" :key="item.id" @click="openSearchResult(item)">
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.kind }} · {{ item.path }}</span>
+              </button>
+            </div>
           </div>
+          <div class="level-control">
+            <button :class="{ active: level === 'module' }" @click="loadGraph('module', '')">{{ t("codegraph.modules") }}</button>
+            <button :class="{ active: level === 'file' }" :disabled="!root" @click="loadGraph('file', root)">{{ t("codegraph.files") }}</button>
+            <button :class="{ active: level === 'symbol' }" :disabled="!root" @click="loadGraph('symbol', root)">{{ t("codegraph.symbols") }}</button>
+          </div>
+          <button class="btn-load" :class="{ loading: isLoading }" @click="loadGraph(level, root)" :disabled="isLoading">
+            <span v-if="isLoading" class="btn-spinner" aria-hidden="true"></span>
+            <svg v-else class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4" />
+            </svg>
+            {{ t("codegraph.refresh") }}
+          </button>
+          <button class="btn-load" @click="syncIndex('sync')" :disabled="isSyncing">{{ isSyncing ? t("codegraph.syncing") : t("codegraph.sync") }}</button>
+          <button class="btn-load danger" @click="syncIndex('rebuild')" :disabled="isSyncing">{{ t("codegraph.rebuild") }}</button>
         </div>
-        <div class="level-control">
-          <button :class="{ active: level === 'module' }" @click="loadGraph('module', '')">{{ t("codegraph.modules") }}</button>
-          <button :class="{ active: level === 'file' }" :disabled="!root" @click="loadGraph('file', root)">{{ t("codegraph.files") }}</button>
-          <button :class="{ active: level === 'symbol' }" :disabled="!root" @click="loadGraph('symbol', root)">{{ t("codegraph.symbols") }}</button>
+      </div>
+      <div class="toolbar-row secondary">
+        <div class="breadcrumb">
+          <button v-for="item in breadcrumb" :key="`${item.level}:${item.root}`" @click="loadGraph(item.level, item.root)">
+            {{ item.label }}
+          </button>
         </div>
-        <button class="btn-load" :class="{ loading: isLoading }" @click="loadGraph(level, root)" :disabled="isLoading">
-          <span v-if="isLoading" class="btn-spinner" aria-hidden="true"></span>
-          <svg v-else class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4" />
-          </svg>
-          {{ t("codegraph.refresh") }}
-        </button>
-        <button class="btn-load" @click="syncIndex('sync')" :disabled="isSyncing">{{ isSyncing ? t("codegraph.syncing") : t("codegraph.sync") }}</button>
-        <button class="btn-load danger" @click="syncIndex('rebuild')" :disabled="isSyncing">{{ t("codegraph.rebuild") }}</button>
-      </div>
-    </div>
-
-    <div class="graph-subbar glass-card">
-      <div class="breadcrumb">
-        <button v-for="item in breadcrumb" :key="`${item.level}:${item.root}`" @click="loadGraph(item.level, item.root)">
-          {{ item.label }}
-        </button>
-      </div>
-      <div class="edge-filters">
-        <button
-          v-for="kind in edgeKinds"
-          :key="kind"
-          :class="{ active: selectedEdges.includes(kind) }"
-          @click="toggleEdgeKind(kind)"
-        >
-          {{ kind }}
-        </button>
+        <div class="edge-filters">
+          <button
+            v-for="kind in edgeKinds"
+            :key="kind"
+            :class="{ active: selectedEdges.includes(kind) }"
+            @click="toggleEdgeKind(kind)"
+          >
+            {{ kind }}
+          </button>
+        </div>
+        <div class="toolbar-toggles">
+          <button class="legend-toggle" :class="{ active: showLegend }" @click="showLegend = !showLegend">
+            {{ t("codegraph.legend") }}
+          </button>
+          <button class="diagnostics-toggle" :class="{ active: showDiagnosticsPanel }" @click="showDiagnosticsPanel = !showDiagnosticsPanel">
+            {{ t("codegraph.diagnostics") }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -114,7 +127,7 @@
         </div>
       </transition>
 
-      <div class="diagnostics-panel glass-card" data-testid="diagnosticsPanel">
+      <div v-if="showDiagnosticsPanel" class="diagnostics-panel glass-card" data-testid="diagnosticsPanel">
         <div class="diagnostics-head">
           <div>
             <span>{{ t("codegraph.diagnostics") }}</span>
@@ -149,7 +162,7 @@
         </div>
       </div>
 
-      <div class="legend glass-card">
+      <div v-if="showLegend" class="legend glass-card">
         <div class="legend-item"><span class="legend-dot module"></span>{{ t("codegraph.module") }}</div>
         <div class="legend-item"><span class="legend-dot file"></span>{{ t("codegraph.file") }}</div>
         <div class="legend-item"><span class="legend-dot symbol"></span>{{ t("codegraph.symbol") }}</div>
@@ -161,11 +174,14 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from "vue";
 import { useCodeGraph } from "../composables/useCodeGraph";
 import { useCodeGraphDiagnostics, type CodeGraphIssue } from "../composables/useCodeGraphDiagnostics";
 import { useI18n } from "../i18n";
 
 const { t } = useI18n();
+const showDiagnosticsPanel = ref(false);
+const showLegend = ref(false);
 const {
   threeRef,
   isLoading,

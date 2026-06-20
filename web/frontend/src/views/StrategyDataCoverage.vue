@@ -1,11 +1,6 @@
 <template>
   <div class="view-page strategy-data-coverage">
-    <div class="surface-toolbar">
-      <div class="surface-copy">
-        <span>{{ t("strategies.coverageEyebrow") }}</span>
-        <strong>{{ t("strategies.coverageMatrix") }}</strong>
-        <small>{{ t("strategies.coverageSubtitle") }}</small>
-      </div>
+    <div class="compact-action-row">
       <button class="btn btn-sm" @click="load" :disabled="loading">
         {{ loading ? t("common.loading") : t("common.refresh") }}
       </button>
@@ -35,7 +30,7 @@
       </div>
     </div>
 
-    <div class="coverage-legend glass-card">
+    <div class="coverage-legend compact">
       <span><i class="coverage-dot status-declared"></i>{{ t("strategies.declared") }}</span>
       <span><i class="coverage-dot status-required_missing"></i>{{ t("strategies.requiredMissing") }}</span>
       <span><i class="coverage-dot status-optional_missing"></i>{{ t("strategies.optionalMissing") }}</span>

@@ -1,20 +1,13 @@
 <template>
   <div class="view-page">
-    <div class="surface-toolbar">
-      <div class="surface-copy">
-        <span>{{ t('signals.eyebrow') }}</span>
-        <strong>{{ t('signals.title', { days }) }}</strong>
-        <small>{{ t('signals.subtitle') }}</small>
-      </div>
-      <div class="surface-actions">
-        <div class="filter-tabs" :aria-label="t('signals.rangeAria')">
-          <button
-            v-for="d in dayOptions"
-            :key="d"
-            :class="{ active: days === d }"
-            @click="selectDays(d)"
-          >{{ d }}D</button>
-        </div>
+    <div class="compact-action-row">
+      <div class="filter-tabs" :aria-label="t('signals.rangeAria')">
+        <button
+          v-for="d in dayOptions"
+          :key="d"
+          :class="{ active: days === d }"
+          @click="selectDays(d)"
+        >{{ d }}D</button>
       </div>
     </div>
 

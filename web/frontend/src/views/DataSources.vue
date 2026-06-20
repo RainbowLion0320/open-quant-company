@@ -1,17 +1,5 @@
 <template>
   <div class="data-sources view-page">
-    <div class="sources-toolbar glass-card">
-      <div>
-        <h2>{{ t("dataSources.title") }}</h2>
-        <p>{{ t("dataSources.subtitle") }}</p>
-      </div>
-      <button class="icon-button" @click="load" :aria-label="t('dataSources.refresh')">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/>
-        </svg>
-      </button>
-    </div>
-
     <div v-if="error" class="inline-alert danger">
       <span>{{ error }}</span>
       <button class="btn btn-xs" @click="load">{{ t("common.retry") }}</button>
@@ -23,7 +11,12 @@
     </section>
 
     <section class="sources-metrics">
-      <article class="source-metric glass-card">
+      <article class="source-metric glass-card metric-with-action">
+        <button class="artifact-refresh" @click="load" :aria-label="t('dataSources.refresh')">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/>
+          </svg>
+        </button>
         <small>{{ t("dataSources.sources") }}</small>
         <strong>{{ payload?.summary.source_count ?? 0 }}</strong>
         <em>{{ t("dataSources.audited", { count: payload?.summary.audited_source_count ?? 0 }) }}</em>

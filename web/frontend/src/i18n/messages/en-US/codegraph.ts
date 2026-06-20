@@ -18,6 +18,7 @@ export const codegraph = {
   modules: "Modules",
   files: "Files",
   symbols: "Symbols",
+  legend: "Legend",
   module: "Module",
   file: "File",
   symbol: "Symbol",

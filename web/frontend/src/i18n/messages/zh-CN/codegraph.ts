@@ -18,6 +18,7 @@ export const codegraph = {
   modules: "模块",
   files: "文件",
   symbols: "符号",
+  legend: "图例",
   module: "Module",
   file: "File",
   symbol: "Symbol",

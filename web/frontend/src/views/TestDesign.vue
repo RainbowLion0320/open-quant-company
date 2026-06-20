@@ -1,15 +1,5 @@
 <template>
   <div class="test-design view-page">
-    <div class="design-toolbar glass-card">
-      <div>
-        <h2>{{ t("testDesign.title") }}</h2>
-        <p>{{ t("testDesign.subtitle") }}</p>
-      </div>
-      <button class="icon-button" @click="load" :aria-label="t('testDesign.refresh')">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
-      </button>
-    </div>
-
     <div v-if="error" class="inline-alert danger">
       <span>{{ error }}</span>
       <button class="btn btn-xs" @click="load">{{ t("common.retry") }}</button>
@@ -21,7 +11,10 @@
     </section>
 
     <section class="design-metrics">
-      <article class="design-metric glass-card score">
+      <article class="design-metric glass-card score metric-with-action">
+        <button class="artifact-refresh" @click="load" :aria-label="t('testDesign.refresh')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
+        </button>
         <small>{{ t("testDesign.designScore") }}</small>
         <strong>{{ design?.summary.design_score ?? 0 }}</strong>
         <em>{{ generatedAt }}</em>

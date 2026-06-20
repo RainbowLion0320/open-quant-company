@@ -1,3 +1,11 @@
+.compact-action-row {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .isolation-banner {
   display: flex;
   align-items: center;
@@ -165,9 +173,14 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 12px;
   color: var(--text-secondary);
   font-size: 11px;
+}
+.coverage-legend.compact {
+  min-height: 24px;
+  padding: 0 2px;
+  background: transparent;
+  border: 0;
 }
 .coverage-legend span {
   display: inline-flex;

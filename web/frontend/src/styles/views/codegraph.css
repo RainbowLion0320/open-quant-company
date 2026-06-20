@@ -5,21 +5,36 @@
   gap: 10px;
 }
 
-.graph-toolbar,
-.graph-subbar {
+.graph-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 10px;
+  flex-shrink: 0;
+}
+
+.graph-toolbar.compact {
+  background: rgba(10, 20, 40, 0.72);
+}
+
+.toolbar-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px;
-  flex-shrink: 0;
+  gap: 10px;
+}
+
+.toolbar-row.secondary {
+  padding-top: 6px;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
 }
 
 .toolbar-left,
 .toolbar-right,
 .breadcrumb,
 .edge-filters,
-.level-control {
+.level-control,
+.toolbar-toggles {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -29,16 +44,6 @@
 .toolbar-right {
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-
-.toolbar-title {
-  margin: 0;
-  color: #00d4ff;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
 }
 
 .toolbar-stats,
@@ -73,6 +78,14 @@
   padding: 4px 8px;
   border-radius: 999px;
   white-space: nowrap;
+}
+
+.risk-pill.diagnostics-toggle {
+  cursor: pointer;
+}
+
+.risk-pill.diagnostics-toggle:hover {
+  filter: brightness(1.12);
 }
 
 .status-pill {
@@ -194,7 +207,8 @@
 }
 
 .level-control,
-.edge-filters {
+.edge-filters,
+.toolbar-toggles {
   padding: 2px;
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 7px;
@@ -203,7 +217,9 @@
 
 .level-control button,
 .edge-filters button,
-.breadcrumb button {
+.breadcrumb button,
+.legend-toggle,
+.toolbar-toggles .diagnostics-toggle {
   min-height: 26px;
   padding: 0 8px;
   color: #94a3b8;
@@ -215,7 +231,9 @@
 
 .level-control button.active,
 .edge-filters button.active,
-.breadcrumb button:hover {
+.breadcrumb button:hover,
+.legend-toggle.active,
+.toolbar-toggles .diagnostics-toggle.active {
   color: #00d4ff;
   background: rgba(0, 212, 255, 0.1);
 }
@@ -655,15 +673,17 @@
 }
 
 @media (max-width: 960px) {
-  .graph-toolbar,
-  .graph-subbar {
+  .toolbar-row {
     align-items: flex-start;
     flex-direction: column;
   }
   .toolbar-right,
-  .edge-filters {
+  .edge-filters,
+  .toolbar-toggles,
+  .breadcrumb {
     justify-content: flex-start;
     width: 100%;
+    flex-wrap: wrap;
   }
   .search-box {
     width: 100%;
