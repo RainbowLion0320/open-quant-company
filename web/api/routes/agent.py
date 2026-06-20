@@ -14,6 +14,19 @@ from agent_os.runtime import AgentRuntime
 from web.api.errors import DataNotFoundError, InvalidParameterError
 
 router = APIRouter(prefix="/api/agent", tags=["Agent"])
+PUBLIC_ERROR_KEYS = {"error_class", "error_message", "traceback", "stack_trace", "exception"}
+
+
+def _public_agent_payload(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            str(key): _public_agent_payload(item)
+            for key, item in value.items()
+            if str(key) not in PUBLIC_ERROR_KEYS
+        }
+    if isinstance(value, list):
+        return [_public_agent_payload(item) for item in value]
+    return value
 
 
 @router.get("/sessions")
@@ -272,15 +285,14 @@ async def get_agent_live_readiness() -> dict[str, Any]:
 @router.get("/live/environment")
 async def get_agent_live_environment() -> dict[str, Any]:
     try:
-        return {"environment": AgentRuntime().live_environment()}
-    except Exception as exc:
+        return {"environment": _public_agent_payload(AgentRuntime().live_environment())}
+    except Exception:
         return {
             "environment": {
                 "status": "blocked",
                 "broker": "miniqmt",
                 "paper_fallback": False,
                 "blockers": ["live_environment_probe_failed"],
-                "error_class": exc.__class__.__name__,
             }
         }
 
@@ -313,15 +325,14 @@ async def submit_agent_live_order(action_id: str) -> dict[str, Any]:
         submission = AgentRuntime().submit_live_order_action(action_id)
     except KeyError:
         raise DataNotFoundError("agent action", action_id)
-    except Exception as exc:
+    except Exception:
         submission = {
             "status": "failed",
             "action_id": action_id,
             "paper_fallback": False,
             "blockers": ["live_submit_failed"],
-            "error_class": exc.__class__.__name__,
         }
-    return {"submission": submission}
+    return {"submission": _public_agent_payload(submission)}
 
 
 @router.get("/live/kill-switch")

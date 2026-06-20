@@ -18,7 +18,7 @@ from agent_os.context import build_context_pack
 from agent_os.context import context_status as build_context_status
 from agent_os.context import estimate_context_tokens
 from agent_os.desks import get_desk, list_desks
-from agent_os.evidence import FILE_EVIDENCE_KINDS, hash_file, safe_existing_file_path, safe_file_evidence_path
+from agent_os.evidence import FILE_EVIDENCE_KINDS, SafeEvidencePath, hash_file, safe_file_evidence_path
 from agent_os.ledger import AgentLedger
 from agent_os.notifications import NotificationSender, build_report_notification_message, channel_secret_status, send_notification, supported_channels
 from agent_os.reports import (
@@ -2049,7 +2049,7 @@ class AgentRuntime:
                 continue
             try:
                 broker_cancellation = dict(cancel_order(ack, reason=reason))
-            except Exception as exc:  # pragma: no cover - defensive adapter boundary
+            except Exception:  # pragma: no cover - defensive adapter boundary
                 cancellations.append(
                     {
                         "action_id": action_id,
@@ -2057,8 +2057,7 @@ class AgentRuntime:
                         "reason": "broker_cancel_failed",
                         "order_id": order_id,
                         "broker_order_id": order_id,
-                        "error_class": exc.__class__.__name__,
-                        "error_message": str(exc)[:300],
+                        "error": "broker_cancel_failed",
                         "broker_cancellation": {},
                         "source_reconciliation": latest,
                         "paper_fallback": False,
@@ -2318,13 +2317,13 @@ class AgentRuntime:
             ack = self._live_ack_with_project_snapshot(preview=preview, ack=ack)
             try:
                 broker_reconciliation = dict(live_broker.reconcile(ack))
-            except Exception as exc:  # pragma: no cover - defensive adapter boundary
+            except Exception:  # pragma: no cover - defensive adapter boundary
                 failed_count += 1
                 items.append(
                     {
                         "action_id": action_id,
                         "status": "failed",
-                        "reason": str(exc),
+                        "reason": "live_reconciliation_failed",
                         "order_id": str(latest.get("order_id") or ack.get("broker_order_id") or ""),
                         "ack": ack,
                         "broker_reconciliation": {},
@@ -2383,14 +2382,13 @@ class AgentRuntime:
         kill_switch = self.live_kill_switch_status()
         try:
             readiness = dict(live_broker.health())
-        except Exception as exc:  # pragma: no cover - defensive adapter boundary
+        except Exception:  # pragma: no cover - defensive adapter boundary
             readiness = {
                 "broker": "miniqmt",
                 "mode": "blocked",
                 "blockers": ["live_health_probe_failed"],
                 "paper_fallback": False,
-                "error_class": exc.__class__.__name__,
-                "error_message": str(exc)[:300],
+                "error": "live_health_probe_failed",
             }
         if kill_switch.get("active"):
             blockers = list(readiness.get("blockers") or [])
@@ -2402,7 +2400,7 @@ class AgentRuntime:
 
         try:
             reconciliation = self.run_live_reconciliation(session_id=session_id, broker=live_broker)
-        except Exception as exc:  # pragma: no cover - defensive adapter boundary
+        except Exception:  # pragma: no cover - defensive adapter boundary
             reconciliation = {
                 "status": "failed",
                 "checked_at": _now(),
@@ -2413,8 +2411,7 @@ class AgentRuntime:
                 "blocked_count": 0,
                 "failed_count": 1,
                 "items": [],
-                "error_class": exc.__class__.__name__,
-                "error_message": str(exc)[:300],
+                "error": "live_reconciliation_failed",
                 "paper_fallback": False,
             }
 
@@ -2461,17 +2458,16 @@ class AgentRuntime:
 
         try:
             health = dict(live_broker.health())
-        except Exception as exc:  # pragma: no cover - defensive adapter boundary
+        except Exception:  # pragma: no cover - defensive adapter boundary
             health = {
                 "broker": "miniqmt",
                 "mode": "blocked",
                 "blockers": ["live_health_probe_failed"],
                 "paper_fallback": False,
-                "error_class": exc.__class__.__name__,
-                "error_message": str(exc)[:300],
+                "error": "live_health_probe_failed",
             }
             status = "failed"
-            error = str(exc)
+            error = "live_health_probe_failed"
         else:
             status = "blocked"
             if str(health.get("mode") or "") == "live_ready":
@@ -2479,21 +2475,19 @@ class AgentRuntime:
                     broker_reconciliation = dict(
                         live_broker.reconcile({"smoke_test": True, "broker_order_id": ""})
                     )
-                except Exception as exc:  # pragma: no cover - defensive adapter boundary
+                except Exception:  # pragma: no cover - defensive adapter boundary
                     broker_reconciliation = {
                         "status": "blocked",
                         "mismatches": [
                             {
                                 "reason": "live_smoke_reconciliation_failed",
-                                "error_class": exc.__class__.__name__,
-                                "error_message": str(exc)[:300],
                             }
                         ],
                         "paper_fallback": False,
                     }
                     broker_reconciliation_status = "blocked"
                     status = "failed"
-                    error = str(exc)
+                    error = "live_smoke_reconciliation_failed"
                 else:
                     broker_reconciliation_status = str(broker_reconciliation.get("status") or "")
                     status = (
@@ -3101,14 +3095,13 @@ class AgentRuntime:
         )
         return {**payload, "path": str(path), "evidence": evidence.to_dict()}
 
-    def _snapshot_evidence_file(self, evidence_id: str, source: Path) -> Path:
-        safe_source = safe_existing_file_path(source)
-        if safe_source is None:
-            raise ValueError("Unsafe evidence source path")
+    def _snapshot_evidence_file(self, evidence_id: str, source: SafeEvidencePath) -> Path:
+        if not isinstance(source, SafeEvidencePath):
+            raise TypeError("_snapshot_evidence_file requires SafeEvidencePath")
         root = get_datahub().artifact_dir("agent") / "evidence" / evidence_id
         root.mkdir(parents=True, exist_ok=True)
-        target = root / (safe_source.name or "evidence")
-        shutil.copy2(safe_source, target)
+        target = root / "evidence.bin"
+        shutil.copy2(source.path, target)
         return target
 
     def _write_report_rhythm_artifact(self, payload: dict[str, Any]) -> Path:

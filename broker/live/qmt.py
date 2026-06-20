@@ -226,12 +226,12 @@ class MiniQmtLiveBroker:
             }
         try:
             probe = _safe_payload(validate(account_id=self.account_id))
-        except Exception as exc:
+        except Exception:
             return {
                 "check": _validation_check(
                     passed=False,
                     blocker="terminal_validation_failed",
-                    details={"error_class": exc.__class__.__name__, "error_message": str(exc)[:300]},
+                    details={"error": "terminal_validation_failed"},
                 ),
                 "probe": {},
             }
@@ -346,7 +346,7 @@ class MiniQmtLiveBroker:
                 approval_id=approval_id,
                 account_id=self.account_id,
             )
-        except Exception as exc:
+        except Exception:
             return {
                 "status": "blocked",
                 "submitted": False,
@@ -356,8 +356,6 @@ class MiniQmtLiveBroker:
                 "raw_response_hash": "",
                 "ledger_id": approval_id,
                 "error": "live_submission_failed",
-                "error_class": exc.__class__.__name__,
-                "error_message": str(exc)[:300],
                 "paper_fallback": False,
                 "intent": normalized,
                 "preview": preview,
@@ -404,7 +402,7 @@ class MiniQmtLiveBroker:
         if self.sdk_gateway is not None and hasattr(self.sdk_gateway, "reconcile"):
             try:
                 response = self.sdk_gateway.reconcile(ack, account_id=self.account_id)
-            except Exception as exc:
+            except Exception:
                 return {
                     "status": "blocked",
                     "as_of": _now(),
@@ -415,8 +413,6 @@ class MiniQmtLiveBroker:
                     "mismatches": [
                         {
                             "reason": "live_reconciliation_failed",
-                            "error_class": exc.__class__.__name__,
-                            "error_message": str(exc)[:300],
                         }
                     ],
                     "recommended_actions": ["review_live_reconciliation_failure"],
@@ -494,7 +490,7 @@ class MiniQmtLiveBroker:
 
         try:
             response = self.sdk_gateway.cancel_order(ack, account_id=self.account_id, reason=reason)
-        except Exception as exc:
+        except Exception:
             return {
                 "status": "blocked",
                 "broker_order_id": broker_order_id,
@@ -503,8 +499,6 @@ class MiniQmtLiveBroker:
                 "canceled_at": "",
                 "raw_response_hash": "",
                 "error": "live_cancel_failed",
-                "error_class": exc.__class__.__name__,
-                "error_message": str(exc)[:300],
                 "paper_fallback": False,
             }
 
@@ -857,8 +851,8 @@ def _build_sdk_gateway(
         if missing:
             return None, f"AttributeError: sdk gateway missing methods {','.join(missing)}"
         return gateway, ""
-    except Exception as exc:
-        return None, f"{exc.__class__.__name__}: {str(exc)[:240]}"
+    except Exception:
+        return None, "sdk_gateway_load_failed"
 
 
 def _load_factory(factory_path: str) -> Callable[..., Any]:

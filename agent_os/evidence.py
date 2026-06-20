@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import shlex
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -14,12 +15,38 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_EVIDENCE_PATH_PARTS = {".git", ".venv", "node_modules"}
 
 
-def hash_file(path: str | Path) -> str:
-    safe_path = safe_existing_file_path(path)
-    if safe_path is None:
-        raise ValueError("Unsafe evidence file path")
+@dataclass(frozen=True)
+class SafeEvidencePath:
+    root: Path
+    relative_parts: tuple[str, ...]
+    root_kind: str
+
+    @property
+    def path(self) -> Path:
+        return self.root.joinpath(*self.relative_parts)
+
+    @property
+    def name(self) -> str:
+        return self.relative_parts[-1] if self.relative_parts else "evidence"
+
+    def exists(self) -> bool:
+        return self.path.exists()
+
+    def is_file(self) -> bool:
+        return self.path.is_file()
+
+    def open_binary(self):
+        return self.path.open("rb")
+
+    def __str__(self) -> str:
+        return str(self.path)
+
+
+def hash_file(path: SafeEvidencePath) -> str:
+    if not isinstance(path, SafeEvidencePath):
+        raise TypeError("hash_file requires SafeEvidencePath")
     digest = hashlib.sha256()
-    with safe_path.open("rb") as f:
+    with path.open_binary() as f:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             digest.update(chunk)
     return f"sha256:{digest.hexdigest()}"
@@ -88,7 +115,7 @@ def _snapshot_for_evidence(evidence: dict[str, Any]) -> dict[str, str] | None:
     snapshot_uri = str(evidence.get("snapshot_uri") or "").strip()
     if not snapshot_uri:
         return None
-    path = safe_existing_file_path(snapshot_uri)
+    path = safe_file_evidence_path(snapshot_uri)
     if path is None:
         return None
     if not path.exists():
@@ -127,51 +154,69 @@ def _is_safe_local_route(uri: str) -> bool:
     return "\\" not in uri
 
 
-def evidence_source_path(uri: str) -> Path:
+def safe_file_evidence_path(uri: str) -> SafeEvidencePath | None:
     path_text, _line = split_file_evidence_uri(uri)
-    path = Path(path_text)
-    return path if path.is_absolute() else PROJECT_ROOT / path
-
-
-def safe_file_evidence_path(uri: str) -> Path | None:
-    path_text, _line = split_file_evidence_uri(uri)
-    return safe_existing_file_path(path_text)
-
-
-def safe_existing_file_path(path_text: str | Path) -> Path | None:
     path_text = str(path_text or "").strip()
+    if not _is_safe_evidence_path_text(path_text):
+        return None
+    if path_text.startswith("/"):
+        return _safe_absolute_evidence_path(path_text)
+    parts = _safe_relative_parts(path_text)
+    if parts is None:
+        return None
+    return SafeEvidencePath(root=PROJECT_ROOT.resolve(), relative_parts=parts, root_kind="project")
+
+
+def _is_safe_evidence_path_text(path_text: str) -> bool:
     if not path_text:
-        return None
+        return False
     if "://" in path_text:
-        return None
-    path = Path(path_text)
-    resolved = path.resolve() if path.is_absolute() else (PROJECT_ROOT / path).resolve()
-    if not _is_allowed_file_evidence_path(resolved):
-        return None
-    return resolved
+        return False
+    if "\x00" in path_text or "\\" in path_text:
+        return False
+    if path_text.startswith("~"):
+        return False
+    return True
 
 
-def _is_allowed_file_evidence_path(path: Path) -> bool:
-    for root in _allowed_file_evidence_roots():
-        try:
-            relative = path.relative_to(root)
-        except ValueError:
+def _safe_absolute_evidence_path(path_text: str) -> SafeEvidencePath | None:
+    candidate = path_text.rstrip("/")
+    for root_kind, root in _allowed_file_evidence_roots():
+        root_text = root.as_posix().rstrip("/")
+        prefix = f"{root_text}/"
+        if not candidate.startswith(prefix):
             continue
-        if any(part in FORBIDDEN_EVIDENCE_PATH_PARTS for part in relative.parts):
-            return False
-        return True
-    return False
+        relative_text = candidate[len(prefix):]
+        parts = _safe_relative_parts(relative_text)
+        if parts is None:
+            return None
+        return SafeEvidencePath(root=root, relative_parts=parts, root_kind=root_kind)
+    return None
 
 
-def _allowed_file_evidence_roots() -> tuple[Path, ...]:
-    roots = [PROJECT_ROOT.resolve()]
+def _safe_relative_parts(path_text: str) -> tuple[str, ...] | None:
+    parts = tuple(part for part in path_text.split("/") if part)
+    if not parts:
+        return None
+    if any(part in {".", ".."} for part in parts):
+        return None
+    if any(part in FORBIDDEN_EVIDENCE_PATH_PARTS for part in parts):
+        return None
+    return parts
+
+
+def _allowed_file_evidence_roots() -> tuple[tuple[str, Path], ...]:
+    roots = [("project", PROJECT_ROOT.resolve())]
     try:
         from data.storage.datahub import get_datahub
 
-        roots.append(get_datahub().runtime_dir().resolve())
+        roots.append(("runtime", get_datahub().runtime_dir().resolve()))
     except Exception:
         pass
-    return tuple(dict.fromkeys(roots))
+    unique: dict[str, Path] = {}
+    for root_kind, root in roots:
+        unique[root.as_posix()] = root
+    return tuple((("runtime" if root != PROJECT_ROOT.resolve() else "project"), root) for root in unique.values())
 
 
 def split_file_evidence_uri(uri: str) -> tuple[str, str | None]:
@@ -243,14 +288,7 @@ def _has_shell_syntax(command: str) -> bool:
 
 
 def _safe_project_relative_path(path_text: str) -> str | None:
-    if not path_text:
+    safe_path = safe_file_evidence_path(path_text)
+    if safe_path is None or safe_path.root_kind != "project":
         return None
-    path = Path(path_text)
-    resolved = path.resolve() if path.is_absolute() else (PROJECT_ROOT / path).resolve()
-    try:
-        relative = resolved.relative_to(PROJECT_ROOT.resolve())
-    except ValueError:
-        return None
-    if any(part in FORBIDDEN_EVIDENCE_PATH_PARTS for part in relative.parts):
-        return None
-    return relative.as_posix()
+    return "/".join(safe_path.relative_parts)

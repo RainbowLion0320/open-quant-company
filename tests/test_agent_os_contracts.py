@@ -1515,6 +1515,8 @@ def test_agent_live_environment_api_sanitizes_adapter_exceptions(monkeypatch):
     assert response.json()["environment"]["status"] == "blocked"
     assert response.json()["environment"]["paper_fallback"] is False
     assert "live_environment_probe_failed" in response.json()["environment"]["blockers"]
+    assert "error_class" not in response.json()["environment"]
+    assert "error_message" not in response.json()["environment"]
     assert "adapter failed" not in rendered
     assert "qmt-userdata" not in rendered
     assert "account-123" not in rendered
@@ -1538,8 +1540,36 @@ def test_agent_live_submit_api_sanitizes_adapter_exceptions(monkeypatch):
     assert response.json()["submission"]["action_id"] == "act_secret"
     assert response.json()["submission"]["paper_fallback"] is False
     assert "live_submit_failed" in response.json()["submission"]["blockers"]
+    assert "error_class" not in response.json()["submission"]
+    assert "error_message" not in response.json()["submission"]
     assert "broker submit failed" not in rendered
     assert "qmt-account" not in rendered
+
+
+def test_agent_live_runtime_payloads_do_not_expose_adapter_exception_text(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.runtime import AgentRuntime
+
+    class ExplodingHealthBroker:
+        def health(self) -> dict[str, object]:
+            raise RuntimeError("live health failed at /Users/alice/qmt-userdata/account-secret")
+
+    payload = AgentRuntime().run_live_smoke(broker=ExplodingHealthBroker())
+    rendered = json.dumps(payload, ensure_ascii=False)
+
+    assert payload["status"] == "failed"
+    assert payload["health"]["blockers"] == ["live_health_probe_failed"]
+    assert "error_class" not in payload["health"]
+    assert "error_message" not in payload["health"]
+    assert payload["error"] == "live_health_probe_failed"
+    assert "live health failed" not in rendered
+    assert "qmt-userdata" not in rendered
+    assert "account-secret" not in rendered
+    reset_datahub()
 
 
 def test_unhandled_api_errors_do_not_return_exception_text(monkeypatch):
@@ -2254,7 +2284,7 @@ execution:
     assert health["mode"] == "blocked"
     assert "sdk_gateway_load_failed" in health["blockers"]
     assert health["sdk_gateway_configured"] is False
-    assert health["sdk_gateway_error"].startswith("ModuleNotFoundError:")
+    assert health["sdk_gateway_error"] == "sdk_gateway_load_failed"
     assert submitted["status"] == "blocked"
     assert submitted["error"] == "live_sdk_gateway_unavailable"
     assert submitted["broker_status"] == "gateway_unavailable"
@@ -2312,7 +2342,7 @@ execution:
     assert health["mode"] == "blocked"
     assert "sdk_gateway_load_failed" in health["blockers"]
     assert health["sdk_gateway_configured"] is False
-    assert "userdata_path" in health["sdk_gateway_error"]
+    assert health["sdk_gateway_error"] == "sdk_gateway_load_failed"
     clear_settings_cache()
 
 
@@ -4753,6 +4783,33 @@ def test_agent_evidence_resolver_returns_safe_file_and_code_navigation(tmp_path,
     assert git_evidence.hash == ""
     assert git_evidence.snapshot_uri == ""
     assert EvidenceResolver().resolve(git_evidence.evidence_id)["status"] == "unsafe_evidence_uri"
+    reset_datahub()
+
+
+def test_agent_evidence_file_operations_require_safe_evidence_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    from data.storage.datahub import reset_datahub
+
+    reset_datahub()
+
+    from agent_os.evidence import SafeEvidencePath, hash_file, safe_file_evidence_path
+    from agent_os.runtime import AgentRuntime
+
+    safe_project_path = safe_file_evidence_path("AGENTS.md")
+    assert isinstance(safe_project_path, SafeEvidencePath)
+    assert hash_file(safe_project_path).startswith("sha256:")
+
+    runtime_artifact = tmp_path / "runtime" / "artifacts" / "agent" / "safe.txt"
+    runtime_artifact.parent.mkdir(parents=True, exist_ok=True)
+    runtime_artifact.write_text("runtime evidence", encoding="utf-8")
+    safe_runtime_path = safe_file_evidence_path(str(runtime_artifact))
+    assert isinstance(safe_runtime_path, SafeEvidencePath)
+    assert hash_file(safe_runtime_path).startswith("sha256:")
+
+    with pytest.raises(TypeError):
+        hash_file("AGENTS.md")
+    with pytest.raises(TypeError):
+        AgentRuntime()._snapshot_evidence_file("ev_manual", Path("AGENTS.md"))
     reset_datahub()
 
 
