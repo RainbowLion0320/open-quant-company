@@ -46,48 +46,15 @@
       </article>
     </section>
 
-    <section class="ast-filters glass-card">
-      <label>
-        <span>{{ t("astIntelligence.severity") }}</span>
-        <select v-model="severityFilter">
-          <option value="all">{{ t("astIntelligence.all") }}</option>
-          <option value="P0">P0</option>
-          <option value="P1">P1</option>
-          <option value="P2">P2</option>
-        </select>
-      </label>
-      <label>
-        <span>{{ t("astIntelligence.category") }}</span>
-        <select v-model="categoryFilter">
-          <option value="all">{{ t("astIntelligence.all") }}</option>
-          <option v-for="category in categories" :key="category" :value="category">{{ category }}</option>
-        </select>
-      </label>
-      <label>
-        <span>{{ t("astIntelligence.language") }}</span>
-        <select v-model="languageFilter">
-          <option value="all">{{ t("astIntelligence.all") }}</option>
-          <option v-for="[language] in languageEntries" :key="language" :value="language">{{ language }}</option>
-        </select>
-      </label>
-      <label>
-        <span>{{ t("astIntelligence.module") }}</span>
-        <select v-model="moduleFilter">
-          <option value="all">{{ t("astIntelligence.all") }}</option>
-          <option v-for="module in modules" :key="module" :value="module">{{ module }}</option>
-        </select>
-      </label>
-    </section>
-
     <section class="ast-risk-layout">
       <article class="glass-card ast-panel risk-list-panel">
         <div class="panel-head">
           <span>{{ t("astIntelligence.riskList") }}</span>
-          <small>{{ t("astIntelligence.filteredIssues", { count: filteredIssues.length, total: issueTotal }) }}</small>
+          <small>{{ t("astIntelligence.visibleIssues", { count: visibleIssues.length, total: issueTotal }) }}</small>
         </div>
         <div class="risk-list">
           <button
-            v-for="issue in filteredIssues"
+            v-for="issue in visibleIssues"
             :key="issue.id"
             class="risk-item"
             :class="[issue.severity.toLowerCase(), { active: selectedIssue?.id === issue.id }]"
@@ -100,7 +67,7 @@
             <p>{{ issue.paths.join("  ") }}</p>
             <em>{{ issue.recommendation }}</em>
           </button>
-          <p v-if="!filteredIssues.length" class="empty-text">{{ t("astIntelligence.noIssues") }}</p>
+          <p v-if="!visibleIssues.length" class="empty-text">{{ t("astIntelligence.noIssues") }}</p>
         </div>
       </article>
 
@@ -163,24 +130,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { api } from "../api";
-import type { AstIntelligenceResponse, AstIssue } from "../api";
+import type { AstIntelligenceResponse } from "../api";
 import { useI18n } from "../i18n";
-import { topModule } from "../utils/intelligenceViews";
 
 const { t } = useI18n();
 const payload = ref<AstIntelligenceResponse | null>(null);
 const error = ref("");
-const severityFilter = ref("all");
-const categoryFilter = ref("all");
-const languageFilter = ref("all");
-const moduleFilter = ref("all");
 const selectedIssueId = ref("");
 
 const languageEntries = computed(() => Object.entries(payload.value?.summary.languages || {}).sort((a, b) => b[1] - a[1]));
-const categories = computed(() => Array.from(new Set((payload.value?.issues || []).map(item => item.category))).sort());
-const modules = computed(() => Array.from(new Set((payload.value?.issues || []).flatMap(issue => issue.paths.map(path => topModule(path))))).sort());
-const filteredIssues = computed(() => (payload.value?.issues || []).filter(matchesIssue).slice(0, 120));
-const selectedIssue = computed(() => filteredIssues.value.find(item => item.id === selectedIssueId.value) || filteredIssues.value[0] || null);
+const visibleIssues = computed(() => (payload.value?.issues || []).slice(0, 120));
+const selectedIssue = computed(() => visibleIssues.value.find(item => item.id === selectedIssueId.value) || visibleIssues.value[0] || null);
 const issueClone = computed(() => {
   const issue = selectedIssue.value;
   if (!issue) return null;
@@ -205,14 +165,6 @@ async function load() {
   } catch (err) {
     error.value = err instanceof Error ? err.message : t("astIntelligence.loadError");
   }
-}
-
-function matchesIssue(issue: AstIssue) {
-  if (severityFilter.value !== "all" && issue.severity !== severityFilter.value) return false;
-  if (categoryFilter.value !== "all" && issue.category !== categoryFilter.value) return false;
-  if (languageFilter.value !== "all" && issue.language !== languageFilter.value) return false;
-  if (moduleFilter.value !== "all" && !issue.paths.some(path => topModule(path) === moduleFilter.value)) return false;
-  return true;
 }
 
 function isProductionPath(path: string) {

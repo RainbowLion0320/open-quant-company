@@ -5,7 +5,6 @@
 }
 
 .ast-command,
-.ast-filters,
 .panel-head {
   display: flex;
   align-items: center;
@@ -15,8 +14,7 @@
 
 .ast-command,
 .ast-panel,
-.ast-metric,
-.ast-filters {
+.ast-metric {
   padding: 14px;
 }
 
@@ -28,7 +26,6 @@
 .ast-command span,
 .ast-metric small,
 .panel-head span,
-.ast-filters span,
 .issue-detail-section h3 {
   color: var(--text-disabled);
   font-size: 10px;
@@ -115,26 +112,6 @@
 
 .ast-metric.risk strong {
   color: var(--warning);
-}
-
-.ast-filters {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.ast-filters label {
-  display: grid;
-  gap: 6px;
-}
-
-.ast-filters select {
-  min-width: 0;
-  height: 34px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: rgba(15, 23, 42, 0.42);
-  color: var(--text-secondary);
-  padding: 0 8px;
 }
 
 .ast-risk-layout {
@@ -299,7 +276,6 @@
 
 @media (max-width: 980px) {
   .ast-metrics,
-  .ast-filters,
   .ast-risk-layout {
     grid-template-columns: 1fr;
   }
