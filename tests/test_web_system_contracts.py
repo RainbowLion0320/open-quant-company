@@ -1096,6 +1096,27 @@ def test_system_ast_intelligence_tab_and_api_contract():
     assert "AST Intelligence" in en_modules
 
 
+def test_ast_intelligence_metrics_show_auditable_risk_counts_not_black_box_score():
+    view = Path("web/frontend/src/views/AstIntelligence.vue").read_text(encoding="utf-8")
+    zh = Path("web/frontend/src/i18n/messages/zh-CN/astIntelligence.ts").read_text(encoding="utf-8")
+    en = Path("web/frontend/src/i18n/messages/en-US/astIntelligence.ts").read_text(encoding="utf-8")
+
+    assert "duplicate_score" not in view
+    assert "duplicateScore" not in view
+    assert "重复风险分" not in zh
+    assert "Duplicate Score" not in en
+
+    assert "payload?.summary.issue_count" in view
+    assert "productionIssueCount" in view
+    assert "canonicalBypassCount" in view
+    assert "重复风险点" in zh
+    assert "生产代码风险" in zh
+    assert "绕过统一入口" in zh
+    assert "Duplicate Risks" in en
+    assert "Production Risks" in en
+    assert "Canonical Bypass" in en
+
+
 def test_datahub_sources_tab_and_api_contract():
     hub = Path("web/frontend/src/views/DataHub.vue").read_text(encoding="utf-8")
     data_sources_view = Path("web/frontend/src/views/DataSources.vue").read_text(encoding="utf-8")
@@ -1217,6 +1238,17 @@ def test_test_design_case_cards_wrap_inside_their_lane():
     flex_group = css.split(".design-command,", 1)[1].split("{", 1)[0]
     assert ".graph-node" not in flex_group
 
+    design_grid_block = css.split(".design-grid {", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns: minmax(0, 1fr);" in design_grid_block
+
+    detail_grid_block = css.split(".design-detail-grid {", 1)[1].split("}", 1)[0]
+    assert "minmax(360px, 0.92fr)" in detail_grid_block
+
+    graph_lanes_block = css.split(".graph-lanes {", 1)[1].split("}", 1)[0]
+    assert "minmax(150px, 0.55fr)" in graph_lanes_block
+    assert "minmax(360px, 1.45fr)" in graph_lanes_block
+    assert "minmax(260px, 1fr)" in graph_lanes_block
+
     graph_lane_block = css.split(".graph-lane {", 1)[1].split("}", 1)[0]
     assert "min-width: 0;" in graph_lane_block
     assert "overflow: hidden;" in graph_lane_block
@@ -1237,6 +1269,37 @@ def test_test_design_case_cards_wrap_inside_their_lane():
     assert "min-width: 0;" in graph_node_meta_block
     assert "overflow-wrap: anywhere;" in graph_node_meta_block
     assert "white-space: normal;" in graph_node_meta_block
+
+    panel_head_block = css.split(".panel-head {", 1)[1].split("}", 1)[0]
+    assert "min-width: 0;" in panel_head_block
+
+    panel_head_small_block = css.split(".panel-head small {", 1)[1].split("}", 1)[0]
+    assert "min-width: 0;" in panel_head_small_block
+    assert "overflow: hidden;" in panel_head_small_block
+    assert "text-overflow: ellipsis;" in panel_head_small_block
+
+    graph_chip_block = css.split(".graph-chip {", 1)[1].split("}", 1)[0]
+    assert "box-sizing: border-box;" in graph_chip_block
+    assert "max-width: 100%;" in graph_chip_block
+    assert "overflow-wrap: anywhere;" in graph_chip_block
+
+    inspector_code_block = css.split(".inspector code {", 1)[1].split("}", 1)[0]
+    assert "box-sizing: border-box;" in inspector_code_block
+    assert "max-width: 100%;" in inspector_code_block
+    assert "overflow-wrap: anywhere;" in inspector_code_block
+
+    case_title_block = css.split(".case-title strong {", 1)[1].split("}", 1)[0]
+    assert "overflow-wrap: anywhere;" in case_title_block
+
+    smell_item_block = css.split(".smell-item {", 1)[1].split("}", 1)[0]
+    assert "min-width: 0;" in smell_item_block
+    assert "max-width: 100%;" in smell_item_block
+
+    smell_item_title_block = css.split(".smell-item strong {", 1)[1].split("}", 1)[0]
+    assert "overflow-wrap: anywhere;" in smell_item_title_block
+
+    smell_item_body_block = css.split(".smell-item em {", 1)[1].split("}", 1)[0]
+    assert "overflow-wrap: anywhere;" in smell_item_body_block
 
 
 def test_market_view_surfaces_regime_stability_state():

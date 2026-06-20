@@ -11,23 +11,28 @@
     </section>
 
     <section class="ast-metrics">
-      <article class="ast-metric glass-card score metric-with-action">
+      <article class="ast-metric glass-card risk metric-with-action">
         <button class="artifact-refresh" @click="load" :aria-label="t('astIntelligence.refresh')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
         </button>
-        <small>{{ t("astIntelligence.duplicateScore") }}</small>
-        <strong>{{ payload?.summary.duplicate_score ?? 0 }}</strong>
-        <em>{{ generatedAt }}</em>
-      </article>
-      <article class="ast-metric glass-card">
-        <small>{{ t("astIntelligence.issues") }}</small>
-        <strong>{{ filteredIssues.length }}</strong>
+        <small>{{ t("astIntelligence.duplicateRisks") }}</small>
+        <strong>{{ payload?.summary.issue_count ?? payload?.issues.length ?? 0 }}</strong>
         <em>{{ severityText }}</em>
       </article>
       <article class="ast-metric glass-card">
         <small>{{ t("astIntelligence.cloneGroups") }}</small>
-        <strong>{{ filteredGroups.length }}</strong>
-        <em>{{ t("astIntelligence.totalGroups", { count: payload?.summary.clone_group_count ?? 0 }) }}</em>
+        <strong>{{ payload?.summary.clone_group_count ?? 0 }}</strong>
+        <em>{{ t("astIntelligence.filteredGroups", { count: filteredGroups.length }) }}</em>
+      </article>
+      <article class="ast-metric glass-card">
+        <small>{{ t("astIntelligence.productionRisks") }}</small>
+        <strong>{{ productionIssueCount }}</strong>
+        <em>{{ t("astIntelligence.nonProductionRisks", { count: nonProductionIssueCount }) }}</em>
+      </article>
+      <article class="ast-metric glass-card">
+        <small>{{ t("astIntelligence.canonicalBypass") }}</small>
+        <strong>{{ canonicalBypassCount }}</strong>
+        <em>{{ t("astIntelligence.categoryRisk") }}</em>
       </article>
       <article class="ast-metric glass-card">
         <small>{{ t("astIntelligence.units") }}</small>
@@ -191,6 +196,9 @@ const filteredIssues = computed(() => (payload.value?.issues || []).filter(match
 const filteredGroups = computed(() => (payload.value?.clone_groups || []).filter(matchesGroup).slice(0, 120));
 const selectedGroup = computed(() => filteredGroups.value.find(item => item.id === selectedGroupId.value) || filteredGroups.value[0] || null);
 const generatedAt = computed(() => formatArtifactDate(payload.value?.generated_at || payload.value?.latest?.generated_at || "", currentLocale.value));
+const productionIssueCount = computed(() => (payload.value?.issues || []).filter(issue => issue.paths.some(isProductionPath)).length);
+const nonProductionIssueCount = computed(() => Math.max(0, (payload.value?.summary.issue_count ?? payload.value?.issues.length ?? 0) - productionIssueCount.value));
+const canonicalBypassCount = computed(() => (payload.value?.issues || []).filter(issue => issue.category === "canonical_bypass").length);
 const severityText = computed(() => {
   const counts = payload.value?.summary.severity_counts || {};
   return ["P0", "P1", "P2"].map(key => `${key}:${counts[key] || 0}`).join(" · ");
@@ -237,6 +245,15 @@ function matchesGroup(group: AstCloneGroup) {
     const matching = (payload.value?.issues || []).some(issue => issue.severity === severityFilter.value && issue.id.includes(group.id));
     if (!matching) return false;
   }
+  return true;
+}
+
+function isProductionPath(path: string) {
+  const normalized = path.replace(/^\.\/+/, "");
+  if (!normalized) return false;
+  if (/^(tests|docs|wiki|reports|var|node_modules|web\/frontend\/dist)\//.test(normalized)) return false;
+  if (/^(\.github|\.codegraph)\//.test(normalized)) return false;
+  if (/^(README(\.en)?|AGENTS|CLAUDE|CONTRIBUTING|SECURITY|SUPPORT|CODE_OF_CONDUCT|CHANGELOG|LICENSE|NOTICE)(\.md)?$/.test(normalized)) return false;
   return true;
 }
 

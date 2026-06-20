@@ -34,9 +34,7 @@
   text-transform: uppercase;
 }
 
-.design-command code,
-.graph-chip,
-.inspector code {
+.design-command code {
   display: block;
   color: var(--text-secondary);
   font-family: "JetBrains Mono", monospace;
@@ -99,8 +97,7 @@
   line-height: 1.1;
 }
 
-.design-metric em,
-.panel-head small {
+.design-metric em {
   color: var(--text-tertiary);
   font-family: "JetBrains Mono", monospace;
   font-size: 10px;
@@ -110,7 +107,13 @@
 .design-metric.score strong { color: var(--positive); }
 .design-metric.smell strong { color: var(--warning); }
 
-.design-grid,
+.design-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
 .design-detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
@@ -119,9 +122,26 @@
 }
 
 .panel-head {
+  min-width: 0;
   padding-bottom: 10px;
   margin-bottom: 12px;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.panel-head span {
+  flex: 0 0 auto;
+}
+
+.panel-head small {
+  min-width: 0;
+  color: var(--text-tertiary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-style: normal;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .matrix-shell {
@@ -158,8 +178,7 @@
   background: rgba(6, 182, 212, 0.07);
 }
 
-.design-matrix strong,
-.case-title strong {
+.design-matrix strong {
   display: block;
   color: var(--text-primary);
   font-size: 12px;
@@ -188,8 +207,15 @@
 .graph-lanes,
 .inspector-columns {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.graph-lanes {
+  grid-template-columns: minmax(150px, 0.55fr) minmax(360px, 1.45fr) minmax(260px, 1fr);
+}
+
+.inspector-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .graph-lane {
@@ -271,10 +297,20 @@
 }
 
 .graph-chip {
+  box-sizing: border-box;
+  display: block;
+  max-width: 100%;
+  min-width: 0;
   padding: 6px 8px;
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.035);
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .graph-chip.spec {
@@ -285,6 +321,15 @@
   display: grid;
   gap: 4px;
   margin-bottom: 10px;
+}
+
+.case-title strong {
+  display: block;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .case-title span {
@@ -311,8 +356,21 @@
   font-size: 10px;
 }
 
-.inspector-columns {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.inspector-columns > div {
+  min-width: 0;
+}
+
+.inspector code {
+  box-sizing: border-box;
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .case-smells {
@@ -335,8 +393,11 @@
 }
 
 .smell-item {
+  box-sizing: border-box;
   display: grid;
   gap: 5px;
+  max-width: 100%;
+  min-width: 0;
   padding: 10px;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
@@ -351,11 +412,15 @@
 .smell-item.p2 { border-color: rgba(148, 163, 184, 0.35); }
 
 .smell-item strong {
+  min-width: 0;
   color: var(--text-primary);
   font-size: 12px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .smell-item span {
+  min-width: 0;
   color: var(--text-tertiary);
   font-family: "JetBrains Mono", monospace;
   font-size: 10px;
@@ -363,10 +428,13 @@
 }
 
 .smell-item em {
+  min-width: 0;
   color: var(--text-secondary);
   font-size: 11px;
   font-style: normal;
   line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .empty-text {
@@ -381,9 +449,12 @@
   }
 
   .design-grid,
-  .design-detail-grid,
-  .graph-lanes {
+  .design-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .graph-lanes {
+    grid-template-columns: minmax(130px, 0.55fr) minmax(300px, 1.45fr) minmax(220px, 1fr);
   }
 
   .graph-lane {
@@ -393,6 +464,7 @@
 
 @media (max-width: 760px) {
   .design-metrics,
+  .graph-lanes,
   .inspector-columns {
     grid-template-columns: 1fr;
   }
