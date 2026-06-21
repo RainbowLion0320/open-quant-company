@@ -4,7 +4,6 @@ export const testDesign = {
   refresh: "刷新测试设计",
   loadError: "测试设计数据加载失败",
   noArtifact: "尚未生成测试设计产物",
-  designScore: "设计分数",
   riskCoverage: "风险覆盖",
   targetLinks: "代码目标",
   specLinks: "规格链接",

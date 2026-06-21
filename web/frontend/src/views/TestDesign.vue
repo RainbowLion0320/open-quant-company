@@ -11,12 +11,15 @@
     </section>
 
     <section class="design-metrics">
-      <article class="design-metric glass-card score metric-with-action">
+      <article class="design-metric glass-card smell metric-with-action">
         <button class="artifact-refresh" @click="load" :aria-label="t('testDesign.refresh')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
         </button>
-        <small>{{ t("testDesign.designScore") }}</small>
-        <strong>{{ design?.summary.design_score ?? 0 }}</strong>
+        <small>{{ t("testDesign.smells") }}</small>
+        <strong>{{ designRiskCount }}</strong>
+        <div class="severity-chips">
+          <span v-for="item in severityChips" :key="item.key" class="severity-chip">{{ item.key }} {{ item.count }}</span>
+        </div>
         <em>{{ generatedAt }}</em>
       </article>
       <article class="design-metric glass-card">
@@ -33,11 +36,6 @@
         <small>{{ t("testDesign.specLinks") }}</small>
         <strong>{{ fmtPct(design?.summary.spec_link_rate ?? 0) }}</strong>
         <em>{{ t("testDesign.specs", { count: design?.summary.spec_count ?? 0 }) }}</em>
-      </article>
-      <article class="design-metric glass-card smell">
-        <small>{{ t("testDesign.smells") }}</small>
-        <strong>{{ design?.summary.smell_count ?? 0 }}</strong>
-        <em>{{ severityText }}</em>
       </article>
     </section>
 
@@ -218,9 +216,10 @@ const filteredSmells = computed(() => {
 });
 const generatedAt = computed(() => formatArtifactDate(design.value?.generated_at || design.value?.latest?.generated_at || "", currentLocale.value));
 const graphMeta = computed(() => t("testDesign.graphMeta", { nodes: design.value?.graph.nodes.length ?? 0, links: design.value?.graph.links.length ?? 0 }));
-const severityText = computed(() => {
+const designRiskCount = computed(() => design.value?.summary.smell_count ?? 0);
+const severityChips = computed(() => {
   const counts = design.value?.summary.severity_counts || {};
-  return ["P0", "P1", "P2"].map(key => `${key}:${counts[key] || 0}`).join(" · ");
+  return ["P0", "P1", "P2"].map(key => ({ key, count: counts[key] || 0 }));
 });
 
 async function load() {

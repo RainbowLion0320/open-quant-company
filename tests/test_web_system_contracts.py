@@ -1265,6 +1265,21 @@ def test_system_and_data_artifact_dashboards_drop_redundant_title_toolbars():
         assert "refresh" in view.lower() or "common.refresh" in view
 
 
+def test_test_design_dashboard_uses_issue_counts_not_abstract_score():
+    view = Path("web/frontend/src/views/TestDesign.vue").read_text(encoding="utf-8")
+    css = Path("web/frontend/src/styles/views/test-design.css").read_text(encoding="utf-8")
+    zh = Path("web/frontend/src/i18n/messages/zh-CN/testDesign.ts").read_text(encoding="utf-8")
+    en = Path("web/frontend/src/i18n/messages/en-US/testDesign.ts").read_text(encoding="utf-8")
+
+    assert "design_score" not in view
+    assert "designScore" not in view
+    assert "设计分数" not in zh
+    assert "Design Score" not in en
+    assert 't("testDesign.smells")' in view
+    assert "severityChips" in view
+    assert "severity-chip" in css
+
+
 def test_strategy_lab_child_views_use_compact_controls_not_surface_title_bars():
     view_paths = (
         "web/frontend/src/views/Strategies.vue",

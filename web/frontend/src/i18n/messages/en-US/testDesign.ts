@@ -4,7 +4,6 @@ export const testDesign = {
   refresh: "Refresh test design",
   loadError: "Test design data failed to load",
   noArtifact: "No test design artifact has been generated",
-  designScore: "Design Score",
   riskCoverage: "Risk Coverage",
   targetLinks: "Code Targets",
   specLinks: "Spec Links",
