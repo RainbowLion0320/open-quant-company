@@ -11,6 +11,7 @@ from agent_os.llm_transport import openai_compatible_chat_completion
 from agent_os.llm_transport import parse_json_object
 from agent_os.llm_transport import provider_message_content
 from agent_os.tools import AgentToolRegistry
+from agent_os.validation import bounded_confidence
 from data.llm.usage import load_provider_api_key
 from data.llm.usage import record_llm_response_usage
 from data.llm.usage import resolve_llm_use_case
@@ -195,7 +196,7 @@ class ToolPlanningAgent:
             )
         return {
             "intent": intent,
-            "confidence": _bounded_confidence(payload.get("confidence")),
+            "confidence": bounded_confidence(payload.get("confidence")),
             "reason": reason,
             "actions": actions,
             "rejected": rejected,
@@ -302,15 +303,6 @@ def _validated_parameters(value: Any, patterns: dict[str, str]) -> tuple[dict[st
 
 def _action_type_for_tool(tool_id: str) -> str:
     return tool_id.removeprefix("astroq.").replace(".", "_").replace("-", "_")
-
-
-def _bounded_confidence(value: Any) -> float:
-    try:
-        confidence = float(value)
-    except (TypeError, ValueError):
-        confidence = 0.5
-    return round(max(0.0, min(confidence, 0.95)), 2)
-
 
 def _compact_context(value: Any, *, depth: int = 0) -> Any:
     if depth > 3:

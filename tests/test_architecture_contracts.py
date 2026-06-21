@@ -124,6 +124,35 @@ def test_paper_broker_state_round_trips_through_public_api():
     assert restored.positions["000001"]["avg_cost"] == 8.5
 
 
+def test_paper_order_preview_marks_invalid_numeric_inputs_explicitly():
+    from broker import PaperBroker
+
+    broker = PaperBroker(initial_cash=100000, enable_risk=False)
+    preview = broker.preview_order(
+        {
+            "symbol": "000001",
+            "side": "buy",
+            "quantity": "not-a-number",
+            "order_type": "limit",
+            "limit_price": 10.0,
+            "evidence_refs": ["ev_demo"],
+        }
+    )
+
+    assert preview["status"] == "blocked"
+    assert "invalid_quantity_format" in preview["risk_gate"]["blockers"]
+
+
+def test_agent_provider_confidence_has_one_canonical_validator():
+    router_source = Path("agent_os/router.py").read_text(encoding="utf-8")
+    planner_source = Path("agent_os/tool_planner.py").read_text(encoding="utf-8")
+
+    assert "def _bounded_confidence" not in router_source
+    assert "def _bounded_confidence" not in planner_source
+    assert "from agent_os.validation import bounded_confidence" in router_source
+    assert "from agent_os.validation import bounded_confidence" in planner_source
+
+
 def test_paper_broker_private_state_is_not_used_outside_broker_package():
     forbidden = (
         "broker._cash",

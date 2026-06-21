@@ -8,6 +8,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from broker.numeric import coerce_float as _as_float
+from broker.numeric import coerce_int as _as_int
+from broker.numeric import parse_required_float
+from broker.numeric import parse_required_int
 from core.settings import get_section
 
 
@@ -521,20 +525,32 @@ class MiniQmtLiveBroker:
 
     def _normalize_intent(self, intent: dict[str, Any]) -> dict[str, Any]:
         side = str(intent.get("side") or "").strip().lower()
+        existing_errors = [str(error) for error in intent.get("numeric_errors", []) if str(error).strip()]
+        quantity, quantity_error = parse_required_int(
+            intent.get("quantity"),
+            missing="missing_quantity",
+            invalid="invalid_quantity_format",
+        )
+        limit_price, price_error = parse_required_float(
+            intent.get("limit_price"),
+            missing="missing_limit_price",
+            invalid="invalid_limit_price_format",
+        )
         return {
             "symbol": str(intent.get("symbol") or "").strip().upper(),
             "side": side,
-            "quantity": max(_as_int(intent.get("quantity")), 0),
+            "quantity": max(quantity, 0),
             "order_type": str(intent.get("order_type") or "limit").strip().lower(),
-            "limit_price": max(_as_float(intent.get("limit_price")), 0.0),
+            "limit_price": max(limit_price, 0.0),
             "strategy": str(intent.get("strategy") or "manual").strip() or "manual",
             "reason": str(intent.get("reason") or "").strip(),
             "evidence_refs": [str(item) for item in intent.get("evidence_refs", []) if str(item).strip()],
             "risk_snapshot": dict(intent.get("risk_snapshot") or {}),
+            "numeric_errors": [*existing_errors, *[error for error in (quantity_error, price_error) if error]],
         }
 
     def _risk_gate(self, health: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
-        blockers = list(health.get("blockers") or [])
+        blockers = [*list(health.get("blockers") or []), *list(intent.get("numeric_errors") or [])]
         checks: list[dict[str, Any]] = [
             {"name": "live_readiness", "passed": health.get("mode") == "live_ready", "blockers": list(health.get("blockers") or [])}
         ]
@@ -799,20 +815,6 @@ def _mask_account(value: str) -> str:
     if len(text) <= 4:
         return "*" * len(text)
     return f"{text[:2]}{'*' * (len(text) - 4)}{text[-2:]}"
-
-
-def _as_float(value: Any) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _as_int(value: Any) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
 
 
 def _as_bool(value: Any) -> bool:

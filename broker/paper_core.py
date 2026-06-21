@@ -16,6 +16,8 @@ from broker.fill_models import (
 from broker.ledger import EventLedger
 from broker.matcher import MatchingEngine
 from broker.models import Account, Order, Position
+from broker.numeric import parse_required_float
+from broker.numeric import parse_required_int
 from broker.order_sm import OrderStateMachine
 from broker.paper_orders import PaperOrderService
 from broker.paper_state import PaperStateMixin
@@ -113,7 +115,7 @@ class PaperBroker(PaperStateMixin, Broker):
         side = str(normalized["side"])
         quantity = int(normalized["quantity"])
         price = self._resolve_price(symbol, float(normalized["limit_price"]))
-        blockers: list[str] = []
+        blockers: list[str] = list(normalized.get("numeric_errors") or [])
 
         if not symbol:
             blockers.append("missing_symbol")
@@ -252,16 +254,28 @@ class PaperBroker(PaperStateMixin, Broker):
         return "\n".join(lines)
 
     def _normalize_preview_intent(self, intent: dict[str, Any]) -> dict[str, Any]:
+        existing_errors = [str(error) for error in intent.get("numeric_errors", []) if str(error).strip()]
+        quantity, quantity_error = parse_required_int(
+            intent.get("quantity") if "quantity" in intent else intent.get("volume"),
+            missing="missing_quantity",
+            invalid="invalid_quantity_format",
+        )
+        limit_price, price_error = parse_required_float(
+            intent.get("limit_price") if "limit_price" in intent else intent.get("price"),
+            missing="missing_limit_price",
+            invalid="invalid_limit_price_format",
+        )
         return {
             "symbol": str(intent.get("symbol") or intent.get("code") or "").strip(),
             "side": str(intent.get("side") or "").strip().lower(),
-            "quantity": max(_as_int(intent.get("quantity") if "quantity" in intent else intent.get("volume")), 0),
+            "quantity": max(quantity, 0),
             "order_type": str(intent.get("order_type") or "limit").strip().lower(),
-            "limit_price": max(_as_float(intent.get("limit_price") if "limit_price" in intent else intent.get("price")), 0.0),
+            "limit_price": max(limit_price, 0.0),
             "strategy": str(intent.get("strategy") or "manual").strip() or "manual",
             "reason": str(intent.get("reason") or "").strip(),
             "evidence_refs": [str(item) for item in intent.get("evidence_refs", []) if str(item).strip()],
             "risk_snapshot": dict(intent.get("risk_snapshot") or {}),
+            "numeric_errors": [*existing_errors, *[error for error in (quantity_error, price_error) if error]],
         }
 
     def _preview_portfolio(self) -> dict[str, Any]:
@@ -276,20 +290,6 @@ class PaperBroker(PaperStateMixin, Broker):
                 if position.volume > 0
             },
         }
-
-
-def _as_float(value: Any) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _as_int(value: Any) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
 
 
 def _cash_effect(side: str, notional: float, fees: float) -> float:

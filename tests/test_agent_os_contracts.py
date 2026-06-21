@@ -1816,6 +1816,55 @@ def test_agent_live_order_preview_passes_with_ready_fake_broker_and_cash_gate():
     assert "insufficient_cash" in blocked["risk_gate"]["blockers"]
 
 
+def test_agent_live_order_preview_marks_invalid_numeric_inputs_explicitly():
+    from broker.live.qmt import MiniQmtLiveBroker
+
+    broker = MiniQmtLiveBroker(
+        enabled=True,
+        import_checker=lambda _name: object(),
+        logged_in=True,
+        permissions=["query", "trade"],
+        account_id="1234567890",
+        account={"cash": 100_000.0, "total_asset": 120_000.0, "market_value": 20_000.0},
+        sdk_gateway_factory="",
+    )
+
+    preview = broker.preview_order(
+        {
+            "symbol": "600000.SH",
+            "side": "buy",
+            "quantity": 100,
+            "order_type": "limit",
+            "limit_price": "not-a-price",
+            "strategy": "manual",
+            "reason": "numeric parser contract",
+            "evidence_refs": ["ev_demo"],
+            "risk_snapshot": {
+                "current_symbol_notional": 0.0,
+                "max_position_pct": 0.2,
+                "max_total_exposure_pct": 0.7,
+                "daily_order_count": 1,
+                "max_daily_orders": 5,
+                "tradable": True,
+                "data_freshness_status": "fresh",
+                "broker_account_consistent": True,
+                "current_drawdown_pct": 0.04,
+                "max_drawdown_pct": 0.12,
+                "portfolio_var_pct": 0.025,
+                "max_portfolio_var_pct": 0.06,
+                "portfolio_cvar_pct": 0.04,
+                "max_portfolio_cvar_pct": 0.09,
+                "current_sector_notional": 8_000.0,
+                "max_sector_exposure_pct": 0.9,
+                "intraday_limit_state": "normal",
+            },
+        }
+    )
+
+    assert preview["status"] == "blocked"
+    assert "invalid_limit_price_format" in preview["risk_gate"]["blockers"]
+
+
 def test_agent_live_order_preview_enforces_extended_risk_snapshot():
     from broker.live.qmt import MiniQmtLiveBroker
 

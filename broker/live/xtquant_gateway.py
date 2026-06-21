@@ -4,6 +4,8 @@ import importlib
 import time
 from typing import Any
 
+from broker.numeric import coerce_float as _as_float
+
 
 DEFAULT_ACCOUNT_TYPE = "STOCK"
 DEFAULT_STRATEGY_NAME = "open_quant_company"
@@ -389,10 +391,3 @@ def _position_symbol(row: dict[str, Any]) -> str:
 
 def _position_quantity(row: dict[str, Any]) -> float:
     return _as_float(row.get("quantity") if "quantity" in row else row.get("volume"))
-
-
-def _as_float(value: Any) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0

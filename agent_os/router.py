@@ -8,6 +8,7 @@ from agent_os.desks import list_desks
 from agent_os.llm_transport import openai_compatible_chat_completion
 from agent_os.llm_transport import parse_json_object
 from agent_os.llm_transport import provider_message_content
+from agent_os.validation import bounded_confidence
 from agent_os.workflows import DeskRoutingDecision
 from data.llm.usage import load_provider_api_key
 from data.llm.usage import record_llm_response_usage
@@ -210,7 +211,7 @@ def _validated_provider_decision(
     if primary not in VALID_DESKS:
         raise _RouterValidationError("invalid_provider_primary_desk")
     supporting = _valid_supporting_desks(row.get("supporting_desks"), primary)
-    confidence = _bounded_confidence(row.get("confidence"))
+    confidence = bounded_confidence(row.get("confidence"))
     intent = str(row.get("intent") or "provider_route").strip() or "provider_route"
     reason = str(row.get("reason") or "provider_structured_route").strip() or "provider_structured_route"
     return RouterDecision(
@@ -235,11 +236,3 @@ def _valid_supporting_desks(value: Any, primary: str) -> list[str]:
         if desk in VALID_DESKS and desk != primary and desk not in out:
             out.append(desk)
     return out[:4]
-
-
-def _bounded_confidence(value: Any) -> float:
-    try:
-        confidence = float(value)
-    except (TypeError, ValueError):
-        confidence = 0.5
-    return round(max(0.0, min(confidence, 0.95)), 2)
