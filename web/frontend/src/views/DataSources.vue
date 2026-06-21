@@ -101,34 +101,12 @@
           </select>
         </label>
         <label>
-          <span>{{ t("dataSources.status") }}</span>
-          <select v-model="statusFilter">
+          <span>{{ t("dataSources.usageStatus") }}</span>
+          <select v-model="usageStatusFilter">
             <option value="all">{{ t("dataSources.all") }}</option>
-            <option value="project_integrated">{{ t("dataSources.projectIntegrated") }}</option>
-            <option value="unmapped">{{ t("dataSources.notMapped") }}</option>
-            <option value="candidate">{{ t("dataSources.candidate") }}</option>
-            <option value="backend_source">{{ t("dataSources.backendSource") }}</option>
-          </select>
-        </label>
-        <label>
-          <span>{{ t("dataSources.discoveryStatus") }}</span>
-          <select v-model="discoveryFilter">
-            <option value="all">{{ t("dataSources.all") }}</option>
-            <option v-for="status in discoveryStatuses" :key="status" :value="status">{{ status }}</option>
-          </select>
-        </label>
-        <label>
-          <span>{{ t("dataSources.probeStatus") }}</span>
-          <select v-model="probeFilter">
-            <option value="all">{{ t("dataSources.all") }}</option>
-            <option v-for="status in probeStatuses" :key="status" :value="status">{{ status }}</option>
-          </select>
-        </label>
-        <label>
-          <span>{{ t("dataSources.blockReason") }}</span>
-          <select v-model="blockReasonFilter">
-            <option value="all">{{ t("dataSources.all") }}</option>
-            <option v-for="reason in blockReasons" :key="reason" :value="reason">{{ reason }}</option>
+            <option v-for="status in usageStatusOptions" :key="status" :value="status">
+              {{ capabilityUsageStatusLabel(status) }}
+            </option>
           </select>
         </label>
         <label>
@@ -166,10 +144,8 @@
               <th>{{ t("dataSources.asset") }}</th>
               <th>{{ t("dataSources.domain") }}</th>
               <th>{{ t("dataSources.frequency") }}</th>
-              <th>{{ t("dataSources.discoveryStatus") }}</th>
-              <th>{{ t("dataSources.probeStatus") }}</th>
-              <th>{{ t("dataSources.blockReason") }}</th>
-              <th>{{ t("dataSources.access") }}</th>
+              <th>{{ t("dataSources.usageStatus") }}</th>
+              <th>{{ t("dataSources.issueReason") }}</th>
               <th>{{ t("dataSources.mappedDimensions") }}</th>
             </tr>
           </thead>
@@ -184,26 +160,11 @@
               <td>{{ cap.data_domain }}</td>
               <td>{{ cap.frequency }}</td>
               <td>
-                <span class="access-badge" :class="discoveryClass(cap.discovery_status)">
-                  {{ cap.discovery_status }}
-                </span>
-                <small>{{ cap.discovery_scope }}</small>
-              </td>
-              <td>
-                <span class="access-badge" :class="accessClass(cap.probe_status)">
-                  {{ cap.probe_status }}
-                </span>
-                <small>{{ probeDetail(cap) }}</small>
-              </td>
-              <td>
-                <code v-if="cap.probe_block_reason">{{ cap.probe_block_reason }}</code>
-                <span v-else class="muted">—</span>
-              </td>
-              <td>
-                <span class="access-badge" :class="accessClass(cap.access_status)">
-                  {{ cap.access_status }}
+                <span class="access-badge" :class="usageStatusClass(capabilityUsageStatus(cap))">
+                  {{ capabilityUsageStatusLabel(capabilityUsageStatus(cap)) }}
                 </span>
               </td>
+              <td><small class="usage-reason">{{ capabilityUsageReason(cap) }}</small></td>
               <td>
                 <span v-if="cap.mapped_dimensions.length" class="dimension-list">
                   <code v-for="dim in cap.mapped_dimensions" :key="dim">{{ dim }}</code>
@@ -229,21 +190,17 @@ const { currentLocale, t } = useI18n();
 const payload = ref<DataSourceCapabilityResponse | null>(null);
 const error = ref("");
 const sourceFilter = ref("all");
-const statusFilter = ref("all");
-const discoveryFilter = ref("all");
-const probeFilter = ref("all");
-const blockReasonFilter = ref("all");
+const usageStatusFilter = ref("all");
 const domainFilter = ref("all");
 const currentPage = ref(1);
 const pageSize = ref(100);
 const pageSizeOptions = [50, 100, 200];
+const usageStatusOptions = ["integrated", "available_unintegrated", "restricted", "pending_validation", "unavailable"] as const;
+type UsageStatus = typeof usageStatusOptions[number];
 
 const generatedAt = computed(() => formatDate(payload.value?.generated_at || payload.value?.latest?.generated_at || ""));
 const sourceOptions = computed(() => (payload.value?.sources || []).map(item => item.source));
 const domains = computed(() => Array.from(new Set((payload.value?.capabilities || []).map(item => item.data_domain))).sort());
-const discoveryStatuses = computed(() => Array.from(new Set((payload.value?.capabilities || []).map(item => item.discovery_status).filter(Boolean))).sort());
-const probeStatuses = computed(() => Array.from(new Set((payload.value?.capabilities || []).map(item => item.probe_status).filter(Boolean))).sort());
-const blockReasons = computed(() => Array.from(new Set((payload.value?.capabilities || []).map(item => item.probe_block_reason).filter(Boolean))).sort());
 const filteredCapabilities = computed(() => (payload.value?.capabilities || []).filter(matchesCapability));
 const pageCount = computed(() => Math.max(1, Math.ceil(filteredCapabilities.value.length / pageSize.value)));
 const pagedCapabilities = computed(() => {
@@ -301,12 +258,7 @@ async function load() {
 function matchesCapability(capability: DataSourceCapability) {
   if (sourceFilter.value !== "all" && capability.source !== sourceFilter.value) return false;
   if (domainFilter.value !== "all" && capability.data_domain !== domainFilter.value) return false;
-  if (discoveryFilter.value !== "all" && capability.discovery_status !== discoveryFilter.value) return false;
-  if (probeFilter.value !== "all" && capability.probe_status !== probeFilter.value) return false;
-  if (blockReasonFilter.value !== "all" && capability.probe_block_reason !== blockReasonFilter.value) return false;
-  if (statusFilter.value === "project_integrated") return capability.integration_status === "project_integrated";
-  if (statusFilter.value === "unmapped") return !capability.mapped_dimensions.length;
-  if (statusFilter.value !== "all") return capability.integration_status === statusFilter.value || capability.access_status === statusFilter.value;
+  if (usageStatusFilter.value !== "all" && capabilityUsageStatus(capability) !== usageStatusFilter.value) return false;
   return true;
 }
 
@@ -317,28 +269,73 @@ function sourceStatusClass(row: DataSourceCatalogRow) {
   return "ok";
 }
 
-function accessClass(status: string) {
-  if (["ok", "introspected", "internal"].includes(status)) return "ok";
-  if (["candidate", "manual_review", "not_probed"].includes(status)) return "candidate";
-  if (["no_permission", "rate_limited", "missing_secret", "error"].includes(status)) return "warn";
+function usageStatusClass(status: UsageStatus) {
+  if (status === "integrated") return "ok";
+  if (status === "available_unintegrated") return "candidate";
+  if (status === "restricted") return "warn";
+  if (status === "unavailable") return "danger";
   return "off";
 }
 
-function discoveryClass(status: string) {
-  if (["project_integrated", "contracted"].includes(status)) return "ok";
-  if (status === "sample_probed") return "candidate";
-  if (status === "discovered") return "off";
-  return accessClass(status);
+function capabilityUsageStatus(capability: DataSourceCapability): UsageStatus {
+  const probe = normalizeStatus(capability.probe_status);
+  const access = normalizeStatus(capability.access_status);
+  const discovery = normalizeStatus(capability.discovery_status);
+  const integration = normalizeStatus(capability.integration_status);
+  const blockReason = normalizeStatus(capability.probe_block_reason || capability.sample_probe?.block_reason || "");
+
+  if (integration === "project_integrated") return "integrated";
+  if (["missing_secret", "no_permission", "rate_limited"].includes(probe) || ["missing_secret", "no_permission", "rate_limited"].includes(access)) {
+    return "restricted";
+  }
+  if (probe === "error" || access === "error" || capability.error_class) return "unavailable";
+  if (probe === "ok" || discovery === "sample_probed" || discovery === "contracted" || integration === "contracted" || access === "ok") {
+    return "available_unintegrated";
+  }
+  if (probe === "blocked" && blockReason && !["missing_probe_contract", "unsafe_unbounded_query"].includes(blockReason)) {
+    return "unavailable";
+  }
+  return "pending_validation";
 }
 
-function probeDetail(capability: DataSourceCapability) {
-  const parts = [
-    capability.probe_contract_id,
-    capability.row_count != null ? t("dataSources.rows", { count: capability.row_count }) : "",
-    capability.elapsed_ms != null ? `${capability.elapsed_ms}ms` : "",
-    capability.sample_probe?.message || capability.endpoint_pattern || capability.source_url || "",
-  ].filter(Boolean);
-  return parts.join(" · ");
+function capabilityUsageStatusLabel(status: UsageStatus) {
+  return t(`dataSources.usageStatuses.${status}`);
+}
+
+function capabilityUsageReason(capability: DataSourceCapability) {
+  const status = capabilityUsageStatus(capability);
+  const probe = normalizeStatus(capability.probe_status);
+  const access = normalizeStatus(capability.access_status);
+  const blockReason = normalizeStatus(capability.probe_block_reason || capability.sample_probe?.block_reason || "");
+
+  if (status === "integrated") {
+    if (!capability.mapped_dimensions.length) return t("dataSources.reasonIntegrated");
+    if (capability.mapped_dimensions.length <= 2) return capability.mapped_dimensions.join(" / ");
+    return t("dataSources.reasonMappedCount", { count: capability.mapped_dimensions.length });
+  }
+  if (status === "available_unintegrated") {
+    return capability.row_count != null
+      ? t("dataSources.reasonSampleAvailableRows", { count: capability.row_count })
+      : t("dataSources.reasonSampleAvailable");
+  }
+  if (status === "restricted") {
+    if (probe === "missing_secret" || access === "missing_secret") return t("dataSources.reasonMissingSecret");
+    if (probe === "no_permission" || access === "no_permission") return t("dataSources.reasonNoPermission");
+    if (probe === "rate_limited" || access === "rate_limited") return t("dataSources.reasonRateLimited");
+    return t("dataSources.reasonRestricted");
+  }
+  if (status === "unavailable") {
+    return capability.error_class || capability.probe_block_reason || capability.sample_probe?.message || t("dataSources.reasonUnavailable");
+  }
+  if (blockReason === "missing_probe_contract") return t("dataSources.reasonMissingProbeContract");
+  if (blockReason === "unsafe_unbounded_query") return t("dataSources.reasonUnsafeProbe");
+  if (["manual_review", "candidate"].includes(access) || ["manual_review", "candidate"].includes(probe)) return t("dataSources.reasonManualReview");
+  if (capability.discovery_scope || capability.endpoint_pattern || capability.source_url) return t("dataSources.reasonCatalogOnly");
+  return t("dataSources.reasonPendingValidation");
+}
+
+function normalizeStatus(value: string | undefined | null) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function formatDate(value: string) {
@@ -353,7 +350,7 @@ function formatDate(value: string) {
   }).format(date);
 }
 
-watch([sourceFilter, statusFilter, discoveryFilter, probeFilter, blockReasonFilter, domainFilter, pageSize], () => {
+watch([sourceFilter, usageStatusFilter, domainFilter, pageSize], () => {
   currentPage.value = 1;
 });
 

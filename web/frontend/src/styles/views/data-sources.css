@@ -365,9 +365,19 @@
   color: #fcd34d;
 }
 
+.access-badge.danger {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+}
+
 .access-badge.off {
   background: rgba(100, 116, 139, 0.18);
   color: #cbd5e1;
+}
+
+.capability-table-wrap td .usage-reason {
+  max-width: 320px;
+  white-space: normal;
 }
 
 .dimension-list {

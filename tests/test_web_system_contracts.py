@@ -1209,10 +1209,15 @@ def test_datahub_sources_tab_and_api_contract():
     assert "probe_block_reason" in data_source_types
     assert "probe_contract_id" in data_source_types
     assert "sample_probe" in data_source_types
-    assert "discoveryFilter" in data_sources_view
-    assert "probeFilter" in data_sources_view
-    assert "blockReasonFilter" in data_sources_view
-    assert "probeDetail" in data_sources_view
+    assert "usageStatusFilter" in data_sources_view
+    assert "capabilityUsageStatus" in data_sources_view
+    assert "capabilityUsageReason" in data_sources_view
+    assert "discoveryFilter" not in data_sources_view
+    assert "probeFilter" not in data_sources_view
+    assert "discoveryStatuses" not in data_sources_view
+    assert "probeStatuses" not in data_sources_view
+    assert "blockReasonFilter" not in data_sources_view
+    assert "probeDetail" not in data_sources_view
     assert 'class="capability-filter-bar"' in data_sources_view
     assert 'class="sources-filters glass-card"' not in data_sources_view
     assert "currentPage" in data_sources_view
@@ -1224,6 +1229,14 @@ def test_datahub_sources_tab_and_api_contract():
     assert "dataSources" in en_index
     assert "数据源能力" in zh_modules
     assert "Source Capabilities" in en_modules
+    assert "发现状态" not in Path("web/frontend/src/i18n/messages/zh-CN/dataSources.ts").read_text(encoding="utf-8")
+    assert "探测状态" not in Path("web/frontend/src/i18n/messages/zh-CN/dataSources.ts").read_text(encoding="utf-8")
+    assert "discoveryStatus" not in Path("web/frontend/src/i18n/messages/en-US/dataSources.ts").read_text(encoding="utf-8")
+    assert "probeStatus" not in Path("web/frontend/src/i18n/messages/en-US/dataSources.ts").read_text(encoding="utf-8")
+    assert "使用状态" in Path("web/frontend/src/i18n/messages/zh-CN/dataSources.ts").read_text(encoding="utf-8")
+    assert "问题 / 说明" in Path("web/frontend/src/i18n/messages/zh-CN/dataSources.ts").read_text(encoding="utf-8")
+    assert "Usage Status" in Path("web/frontend/src/i18n/messages/en-US/dataSources.ts").read_text(encoding="utf-8")
+    assert "Issue / Note" in Path("web/frontend/src/i18n/messages/en-US/dataSources.ts").read_text(encoding="utf-8")
     assert "auditSources" not in data_sources_view
     assert "Web scan" not in data_sources_view
 
