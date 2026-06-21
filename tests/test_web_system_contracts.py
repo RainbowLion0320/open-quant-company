@@ -1273,9 +1273,15 @@ def test_test_design_dashboard_uses_issue_counts_not_abstract_score():
 
     assert "design_score" not in view
     assert "designScore" not in view
+    assert "riskCoverage" not in view
+    assert "targetLinks" not in view
+    assert "specLinks" not in view
     assert "设计分数" not in zh
     assert "Design Score" not in en
+    assert "风险覆盖" not in zh
+    assert "Risk Coverage" not in en
     assert 't("testDesign.smells")' in view
+    assert "design-risk-summary" in view
     assert "severityChips" in view
     assert "severity-chip" in css
 

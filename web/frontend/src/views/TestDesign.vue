@@ -11,7 +11,7 @@
     </section>
 
     <section class="design-metrics">
-      <article class="design-metric glass-card smell metric-with-action">
+      <article class="design-metric design-risk-summary glass-card smell metric-with-action">
         <button class="artifact-refresh" @click="load" :aria-label="t('testDesign.refresh')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
         </button>
@@ -21,21 +21,6 @@
           <span v-for="item in severityChips" :key="item.key" class="severity-chip">{{ item.key }} {{ item.count }}</span>
         </div>
         <em>{{ generatedAt }}</em>
-      </article>
-      <article class="design-metric glass-card">
-        <small>{{ t("testDesign.riskCoverage") }}</small>
-        <strong>{{ fmtPct(design?.summary.risk_coverage_rate ?? 0) }}</strong>
-        <em>{{ t("testDesign.coveredText", { covered: design?.summary.risk_covered ?? 0, total: design?.summary.risk_count ?? 0 }) }}</em>
-      </article>
-      <article class="design-metric glass-card">
-        <small>{{ t("testDesign.targetLinks") }}</small>
-        <strong>{{ fmtPct(design?.summary.target_link_rate ?? 0) }}</strong>
-        <em>{{ t("testDesign.targets", { count: design?.summary.target_count ?? 0 }) }}</em>
-      </article>
-      <article class="design-metric glass-card">
-        <small>{{ t("testDesign.specLinks") }}</small>
-        <strong>{{ fmtPct(design?.summary.spec_link_rate ?? 0) }}</strong>
-        <em>{{ t("testDesign.specs", { count: design?.summary.spec_count ?? 0 }) }}</em>
       </article>
     </section>
 
@@ -256,10 +241,6 @@ function heatStyle(value: number) {
     borderBase: 0.18,
     borderScale: 0.58,
   });
-}
-
-function fmtPct(value: number) {
-  return `${Math.round(value * 100)}%`;
 }
 
 onMounted(load);
