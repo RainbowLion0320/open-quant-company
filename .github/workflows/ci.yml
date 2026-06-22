@@ -18,7 +18,7 @@ jobs:
     name: Governance checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Validate community files and issue templates
         run: |
@@ -58,7 +58,7 @@ jobs:
     name: Python quality gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -104,7 +104,7 @@ jobs:
       run:
         working-directory: web/frontend
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Node
         uses: actions/setup-node@v6
