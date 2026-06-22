@@ -15,23 +15,30 @@
 
 ---
 
-Open Quant Company is not a single strategy script and not a hosted trading platform. It is a local-first operating system for running a small quant company: the human sets direction as CEO, while agents operate data, research, portfolio, risk, execution, engineering, and reporting desks. The Web UI makes the work inspectable. The `astroq` CLI makes it automatable.
+Open Quant Company is built for a practical gap: quant research often has scripts, but not always a durable local system that can be inspected, repeated, and used by both humans and agents.
 
-The current system focuses on daily-frequency quant research, backtesting, evidence governance, and paper execution. Important conclusions should trace back to data health, configuration, strategy evidence, backtest artifacts, and local runtime records instead of living only in a temporary script or screenshot.
+The project brings the daily-frequency A-share workflow into one place: data governance, strategy research, backtest evidence, portfolio review, risk gates, paper execution, system diagnostics, and reporting. You can inspect the work in the Web UI or run the same workflows through the `astroq` CLI.
 
-## Two Entry Points
+It is not a hosted trading platform and not a magic strategy. The default standard is simple: missing data should be visible, weak evidence should block promotion, and strategy changes should leave score panels, out-of-sample records, cost assumptions, and risk evidence behind.
+
+## Why Web + CLI
 
 | Entry | Best for | Role |
 |------|----------|------|
-| Web UI | Human CEO / researchers | Inspect markets, strategies, data, pipelines, portfolios, and system diagnostics |
+| Web UI | Human CEO / researchers | Inspect conversations, data, strategies, pipelines, portfolios, and system diagnostics |
 | `astroq` CLI | Agents / cron / automation scripts | Run data checks, repairs, backtests, competitions, diagnostics, and builds with JSON output |
 
-Both entry points share the same configuration, DataHub, Strategy Catalog, and evidence artifacts, so the dashboard and automation path do not drift apart.
+Both entry points share the same configuration, DataHub, Strategy Catalog, and evidence artifacts. The dashboard and automation path use the same underlying state.
 
 ## Web UI
 
+### CEO Office
+The main daily entry point. You describe the problem, and agent routing assigns it to the data, research, portfolio, risk, execution, engineering, or reporting desk. Approval-required actions pause in the conversation for confirmation. Fact questions read local evidence first, then the active LLM provider turns that evidence into a readable answer.
+
+<!-- README screenshot slot: docs/assets/readme/screenshots/00-ceo-office.png -->
+
 ### Market Overview
-Current market state, including market regime, core indices, sector pulse, and macro snapshots.
+Market regime, core indices, sector pulse, and macro snapshots.
 
 ![Market Overview](docs/assets/readme/screenshots/01-market-overview.png)
 
@@ -46,7 +53,7 @@ Pipeline views expose key parameters, thresholds, weights, and branching logic s
 ![Pipeline Graph](docs/assets/readme/screenshots/03-pipeline.png)
 
 ### Data Hub
-Local data dimensions, external source capabilities, coverage, health status, and single-table repair.
+Local data dimensions, external source capabilities, coverage, health status, and data gaps.
 
 ![Data Hub](docs/assets/readme/screenshots/04-datahub.png)
 
@@ -60,19 +67,19 @@ PaperBroker positions, NAV, orders, and transaction ledger for validating the ex
 
 ![Portfolio Execution](docs/assets/readme/screenshots/06-portfolio.png)
 
-## Agent Desks
+## Agent Departments
 
-The core metaphor is a local quant company workspace, not a black-box strategy.
+Open Quant Company separates responsibility by department instead of putting every task into one chat bot.
 
-| Desk | Current capabilities |
-|------|----------------------|
-| Data Desk | DataHub, source capability registry, Tushare/AKShare audits, local coverage, and freshness gates |
-| Research Desk | Technical, sentiment, fundamental, factor, and ML research capabilities, plus Strategy Catalog, OOS/IC/ICIR, strategy competition, and candidate governance |
-| Portfolio Desk | Consumes research evidence and risk constraints to review weights, exposure, rebalance cadence, and strategy-mix priority |
-| Risk Desk | Market regime, risk budget, position limits, drawdown breakers, and pre-execution gates |
-| Execution Desk | PaperBroker / MiniQMT-QMT readiness, order previews, execution dry-runs, reconciliation, and kill switch state |
-| Engineering Desk | CodeGraph, AST duplicate diagnostics, test design diagnostics, and docs/spec/wiki consistency checks |
-| Reporting Desk | Lifecycle evidence, backtest artifacts, model artifacts, paper ledger, and system diagnostics |
+| Department | Responsibility |
+|------------|----------------|
+| Data Engineering | DataHub, source capability registry, Tushare/AKShare audits, local coverage, and freshness gates |
+| Quant Research | Technical, sentiment, fundamental, factor, and ML research; Strategy Catalog, OOS, IC/ICIR, and strategy competition evidence |
+| Portfolio Management | Uses research evidence and risk constraints to review weights, exposure, rebalance cadence, and strategy mix |
+| Risk Management | Market regime, risk budget, position limits, drawdown breakers, and pre-execution gates |
+| Trade Execution | PaperBroker / MiniQMT-QMT readiness, order previews, execution dry-runs, reconciliation, and kill switch state |
+| Technical Platform | CodeGraph, AST duplicate diagnostics, test design diagnostics, and docs/spec/wiki consistency checks |
+| Operations Reporting | Lifecycle evidence, backtest artifacts, model artifacts, paper ledger, and system diagnostics |
 
 ## Strategy Layers
 
@@ -84,13 +91,13 @@ The core metaphor is a local quant company workspace, not a black-box strategy.
 | Risk overlay | Cybernetic | Market regime, position sizing, stop loss, risk budget, and asset allocation |
 | Research candidates | Candidate | Trend, Donchian, RPS, sector rotation, quality value, low-vol defensive, and related research strategies |
 
-Promotion is evidence-driven. A strategy needs score panels, alpha evidence, data readiness, costs, and execution assumptions. Missing data, missing capability, or insufficient evidence must be reported as blocked / not_applicable instead of being filled with placeholders.
+Promotion is evidence-driven. A strategy needs score panels, alpha evidence, data readiness, cost assumptions, and execution assumptions. Missing data, missing capability, or insufficient evidence is reported as blocked / not_applicable.
 
 ## System Shape
 
 ```mermaid
 flowchart LR
-  CEO["Human CEO"] --> UI["Web UI\nvisibility / drill-down"]
+  CEO["Human CEO"] --> UI["Web UI\nconversation / drill-down"]
   CEO --> CLI["astroq CLI\nagent / cron / JSON"]
 
   Data["Data Desk\nsource capability / DataHub / coverage"] --> Research["Research Desk\nsignals / evidence / strategy catalog"]
@@ -140,12 +147,12 @@ For a minimal runtime-only install:
 python -m pip install -e .
 ```
 
-The base Web UI and some local features can start without secrets. Full data coverage and AI-assisted factor research need system environment variables:
+The base Web UI and some local features can start without secrets. Full data coverage and LLM-backed agents need system environment variables:
 
 | Environment variable | Purpose |
 |----------------------|---------|
 | `TUSHARE_TOKEN` | Tushare data |
-| `DEEPSEEK_API_KEY` | LLM factor discovery and usage ledger |
+| `DEEPSEEK_API_KEY` / other provider keys | LLM provider keys referenced by `config/settings.yaml` |
 | `ASTROLABE_API_KEY` | FastAPI Bearer Token authentication |
 | `ASTROLABE_VAR` | Override the default runtime artifact root `var/` |
 
