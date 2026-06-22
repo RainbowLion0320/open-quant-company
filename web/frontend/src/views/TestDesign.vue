@@ -11,16 +11,28 @@
     </section>
 
     <section class="design-metrics">
-      <article class="design-metric design-risk-summary glass-card smell metric-with-action">
+      <article class="design-risk-summary glass-card">
+        <div class="risk-summary-line">
+          <span class="risk-label">{{ t("testDesign.smells") }}</span>
+          <strong class="risk-total">{{ designRiskCount }}</strong>
+          <span class="risk-summary-separator" aria-hidden="true"></span>
+          <span class="risk-time">{{ generatedAt }}</span>
+          <span class="risk-summary-separator" aria-hidden="true"></span>
+          <span class="severity-strip" aria-label="severity counts">
+            <span
+              v-for="item in severityChips"
+              :key="item.key"
+              class="severity-chip"
+              :class="`severity-${item.key.toLowerCase()}`"
+            >
+              <b>{{ item.key }}</b>
+              <strong>{{ item.count }}</strong>
+            </span>
+          </span>
+        </div>
         <button class="artifact-refresh" @click="load" :aria-label="t('testDesign.refresh')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-4M4 7V3m0 4h4m-4 6a8 8 0 0 0 14.9 4M20 17v4m0-4h-4"/></svg>
         </button>
-        <small>{{ t("testDesign.smells") }}</small>
-        <strong>{{ designRiskCount }}</strong>
-        <div class="severity-chips">
-          <span v-for="item in severityChips" :key="item.key" class="severity-chip">{{ item.key }} {{ item.count }}</span>
-        </div>
-        <em>{{ generatedAt }}</em>
       </article>
     </section>
 

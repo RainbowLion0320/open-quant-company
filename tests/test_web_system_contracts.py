@@ -1282,8 +1282,22 @@ def test_test_design_dashboard_uses_issue_counts_not_abstract_score():
     assert "Risk Coverage" not in en
     assert 't("testDesign.smells")' in view
     assert "design-risk-summary" in view
+    assert "risk-summary-line" in view
+    assert "risk-summary-separator" in view
+    assert "severity-strip" in view
     assert "severityChips" in view
+    assert "severity-${item.key.toLowerCase()}" in view
     assert "severity-chip" in css
+    assert ".severity-p0" in css
+    assert ".severity-p1" in css
+    assert ".severity-p2" in css
+    assert "max-width: none" in css
+    risk_summary_block = css.split(".design-risk-summary {", 1)[1].split("}", 1)[0]
+    severity_strip_block = css.split(".severity-strip {", 1)[1].split("}", 1)[0]
+    assert "display: flex;" in risk_summary_block
+    assert "white-space: nowrap;" in css.split(".risk-summary-line {", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns" not in risk_summary_block
+    assert "flex-wrap: nowrap;" in severity_strip_block
 
 
 def test_strategy_lab_child_views_use_compact_controls_not_surface_title_bars():
