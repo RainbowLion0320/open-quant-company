@@ -35,7 +35,7 @@ Both entry points share the same configuration, DataHub, Strategy Catalog, and e
 ### CEO Office
 The main daily entry point. You describe the problem, and agent routing assigns it to the data, research, portfolio, risk, execution, engineering, or reporting desk. Approval-required actions pause in the conversation for confirmation. Fact questions read local evidence first, then the active LLM provider turns that evidence into a readable answer.
 
-<!-- README screenshot slot: docs/assets/readme/screenshots/00-ceo-office.png -->
+![CEO Office](docs/assets/readme/screenshots/00-CEO-office.png)
 
 ### Market Overview
 Market regime, core indices, sector pulse, and macro snapshots.

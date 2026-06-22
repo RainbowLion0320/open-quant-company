@@ -6,7 +6,7 @@ Expected files:
 
 | File | Page |
 |------|------|
-| `00-ceo-office.png` | CEO Office |
+| `00-CEO-office.png` | CEO Office |
 | `01-market-overview.png` | Market overview |
 | `02-strategy-lab.png` | Strategy Lab |
 | `03-pipeline.png` | Pipeline graph |
