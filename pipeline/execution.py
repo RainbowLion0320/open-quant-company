@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Optional
 
 from pipeline.types import PortfolioTarget, OrderIntent, FillResult, PipelineContext
-from broker.exchange import AShareExchange, Exchange, OrderSide
+from broker.exchange import AShareExchange, Exchange, MultiAssetExchange, OrderSide, default_multi_asset_exchange
 
 
 @dataclass
@@ -27,11 +27,11 @@ class ExecutionConfig:
     lot_size: int = 100
     t_plus_1: bool = True
     today_buys: dict[str, int] | None = None
-    exchange: Exchange | None = None
+    exchange: Exchange | MultiAssetExchange | None = None
 
-    def get_exchange(self) -> Exchange:
+    def get_exchange(self) -> Exchange | MultiAssetExchange:
         if self.exchange is None:
-            self.exchange = AShareExchange(lot_size=self.lot_size)
+            self.exchange = default_multi_asset_exchange(AShareExchange(lot_size=self.lot_size))
         return self.exchange
 
 
@@ -48,7 +48,12 @@ class ExecutionRouter:
         self._today_buys: dict[str, int] = {}
 
     @property
-    def exchange(self) -> Exchange:
+    def exchange(self) -> Exchange | MultiAssetExchange:
+        return self._exchange
+
+    def exchange_for(self, asset_type: str) -> Exchange:
+        if isinstance(self._exchange, MultiAssetExchange):
+            return self._exchange.get(asset_type)
         return self._exchange
 
     def targets_to_intents(
@@ -63,21 +68,22 @@ class ExecutionRouter:
         buys = [t for t in targets if t.delta_shares > 0]
 
         for t in sells:
-            price = ctx.prices.get(t.symbol, 0)
+            price = ctx.price_for(t.asset_type, t.symbol)
             if price <= 0:
                 continue
             shares = abs(t.delta_shares)
-            available = ctx.holdings.get(t.symbol, 0)
+            available = ctx.holding_for(t.asset_type, t.symbol)
             if self.config.t_plus_1:
-                bought_today = self._today_buys.get(t.symbol, 0)
+                bought_today = self._today_buys.get(t.key, 0)
                 available = max(0, available - bought_today)
             shares = min(shares, available)
             if shares <= 0:
                 continue
-            lot = self.config.lot_size
+            lot = int(getattr(self.exchange_for(t.asset_type), "lot_size", self.config.lot_size) or self.config.lot_size)
             shares = max(lot, shares // lot * lot)
             intents.append(OrderIntent(
                 symbol=t.symbol,
+                asset_type=t.asset_type,
                 side="sell",
                 shares=shares,
                 price=price,
@@ -86,13 +92,14 @@ class ExecutionRouter:
             ))
 
         for t in buys:
-            price = ctx.prices.get(t.symbol, 0)
+            price = ctx.price_for(t.asset_type, t.symbol)
             if price <= 0:
                 continue
-            lot = self.config.lot_size
+            lot = int(getattr(self.exchange_for(t.asset_type), "lot_size", self.config.lot_size) or self.config.lot_size)
             shares = max(lot, t.delta_shares // lot * lot)
             intents.append(OrderIntent(
                 symbol=t.symbol,
+                asset_type=t.asset_type,
                 side="buy",
                 shares=shares,
                 price=price,
@@ -119,17 +126,27 @@ class ExecutionRouter:
         for intent in intents:
             if broker is not None:
                 # Paper/Live mode: delegate to broker (which uses its own exchange)
-                result = broker.submit_order(
-                    code=intent.symbol,
-                    price=intent.price,
-                    volume=intent.shares,
-                    side=intent.side,
-                )
+                try:
+                    result = broker.submit_order(
+                        code=intent.symbol,
+                        price=intent.price,
+                        volume=intent.shares,
+                        side=intent.side,
+                        asset_type=intent.asset_type,
+                    )
+                except TypeError:
+                    result = broker.submit_order(
+                        code=intent.symbol,
+                        price=intent.price,
+                        volume=intent.shares,
+                        side=intent.side,
+                    )
                 if result and str(result).startswith("PAPER_"):
                     order_id = result
                     intent.order_id = order_id
                     fills.append(FillResult(
                         symbol=intent.symbol,
+                        asset_type=intent.asset_type,
                         side=intent.side,
                         requested_shares=intent.shares,
                         filled_shares=intent.shares,
@@ -146,6 +163,7 @@ class ExecutionRouter:
                 else:
                     fills.append(FillResult(
                         symbol=intent.symbol,
+                        asset_type=intent.asset_type,
                         side=intent.side,
                         requested_shares=intent.shares,
                         filled_shares=0,
@@ -157,11 +175,12 @@ class ExecutionRouter:
             else:
                 # Backtest mode: immediate fill at market using unified exchange cost
                 side_enum = OrderSide.BUY if intent.side == "buy" else OrderSide.SELL
-                commission = self._exchange.calc_cost(
+                commission = self.exchange_for(intent.asset_type).calc_cost(
                     intent.price, intent.shares, side_enum
                 )
                 fills.append(FillResult(
                     symbol=intent.symbol,
+                    asset_type=intent.asset_type,
                     side=intent.side,
                     requested_shares=intent.shares,
                     filled_shares=intent.shares,
@@ -176,7 +195,7 @@ class ExecutionRouter:
     def _calc_commission(self, intent: OrderIntent) -> float:
         """Calculate commission via the unified exchange model."""
         side = OrderSide.BUY if intent.side == "buy" else OrderSide.SELL
-        return round(self._exchange.calc_cost(intent.price, intent.shares, side), 2)
+        return round(self.exchange_for(intent.asset_type).calc_cost(intent.price, intent.shares, side), 2)
 
     def end_of_day(self):
         """Reset daily buy tracking."""

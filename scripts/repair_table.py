@@ -69,6 +69,16 @@ def _latest_completed_quarter_end() -> str:
     return f"{today.year}{quarter_month:02d}{pd.Period(f'{today.year}-{quarter_month:02d}', freq='M').days_in_month:02d}"
 
 
+def _is_fresh_daily_frame(df: pd.DataFrame, max_age_days: int = 2) -> bool:
+    if "date" not in df.columns or df.empty:
+        return False
+    dates = pd.to_datetime(df["date"], errors="coerce")
+    if dates.dropna().empty:
+        return False
+    latest = dates.max().date()
+    return (datetime.now().date() - latest).days <= max_age_days
+
+
 def _tushare_api():
     import tushare as ts
     from data.ingestion.tushare_utils import get_tushare_token
@@ -277,6 +287,33 @@ def repair_futures_daily() -> None:
     _require_rows_or_cache("futures_daily", int(fetched), HUB.store_dir("futures") / "daily")
 
 
+def repair_crypto_daily() -> None:
+    """Fetch latest crypto spot snapshots and write the project crypto dimension."""
+    from data.market.assets.crypto import CryptoAsset
+
+    adapter = CryptoAsset()
+    fetched = 0
+    for symbol in adapter.get_universe():
+        df = adapter.fetch_daily(symbol)
+        if df is None or df.empty:
+            print(f"  [crypto] {symbol}: no rows")
+            continue
+        if not _is_fresh_daily_frame(df):
+            latest = pd.to_datetime(df.get("date"), errors="coerce").max()
+            latest_text = "" if pd.isna(latest) else latest.strftime("%Y-%m-%d")
+            print(f"  [crypto] {symbol}: stale source snapshot {latest_text}")
+            continue
+        out = df.copy()
+        if "symbol" not in out.columns:
+            out.insert(0, "symbol", symbol)
+        path = HUB.dimension_path("crypto_daily", symbol=symbol.replace("/", "_"))
+        HUB.write_parquet(out, path, producer="repair.crypto_daily")
+        fetched += 1
+        print(f"  [crypto] {symbol}: {len(out)} rows")
+    _require_rows_or_cache("crypto_daily", fetched, HUB.dimension_root("crypto_daily"))
+    print(f"  [crypto] done: {fetched} symbols")
+
+
 def repair_broker_recommend(months: int = 6) -> None:
     api = _tushare_api()
     store = HUB.store_dir("stock") / "broker_recommend"
@@ -357,6 +394,8 @@ REPAIR_MAP = {
     "fund_nav":                   lambda limit=0, days=365: repair_fund_nav(),
     # Futures
     "futures_daily":              lambda limit=0, days=365: repair_futures_daily(),
+    # Crypto
+    "crypto_daily":               lambda limit=0, days=365: repair_crypto_daily(),
 }
 
 

@@ -25,6 +25,10 @@
         <strong>{{ summary.optional_gap_count || 0 }}</strong>
       </div>
       <div class="glass-card catalog-stat">
+        <span>{{ t("strategies.assetGaps") }}</span>
+        <strong>{{ summary.asset_gap_count || 0 }}</strong>
+      </div>
+      <div class="glass-card catalog-stat">
         <span>{{ t("strategies.missingObservedEvidence") }}</span>
         <strong>{{ summary.missing_observed_count || 0 }}</strong>
       </div>
@@ -46,6 +50,7 @@
         <thead>
           <tr>
             <th>{{ t("common.strategy") }}</th>
+            <th>{{ t("strategies.assetScope") }}</th>
             <th>{{ t("strategies.type") }}</th>
             <th>{{ t("strategies.layer") }}</th>
             <th v-for="family in payload.families" :key="family.key" class="text-center">
@@ -65,6 +70,18 @@
                 </div>
               </div>
             </td>
+            <td>
+              <div class="asset-scope-list">
+                <span
+                  v-for="asset in row.asset_scope"
+                  :key="`${row.strategy}-${asset}`"
+                  class="asset-scope-pill"
+                  :class="row.missing_required_assets.includes(asset) ? 'missing' : 'ok'"
+                >
+                  {{ assetLabel(asset) }}
+                </span>
+              </div>
+            </td>
             <td>{{ labelFor(row.strategy_type) }}</td>
             <td>{{ labelFor(row.layer) }}</td>
             <td v-for="family in payload.families" :key="`${row.strategy}-${family.key}`" class="text-center">
@@ -80,6 +97,12 @@
               <div class="coverage-notes">
                 <span v-if="row.missing_required_families.length" class="coverage-note danger">
                   {{ t("strategies.requiredGaps") }}: {{ familyNames(row.missing_required_families) }}
+                </span>
+                <span v-if="row.missing_required_assets.length" class="coverage-note danger">
+                  {{ t("strategies.assetGaps") }}: {{ assetNames(row.missing_required_assets) }}
+                </span>
+                <span v-if="row.blockers.length" class="coverage-note muted">
+                  {{ t("strategies.blockers") }}: {{ row.blockers.join(" / ") }}
                 </span>
                 <span v-if="row.optional_missing_families.length" class="coverage-note muted">
                   {{ t("strategies.optionalGaps") }}: {{ familyNames(row.optional_missing_families) }}
@@ -129,12 +152,21 @@ const summary = computed(() => payload.value?.summary || {
   family_count: 0,
   required_gap_count: 0,
   optional_gap_count: 0,
+  asset_gap_count: 0,
   missing_observed_count: 0,
 });
 
 const familyNameByKey = computed(() => {
   const out: Record<string, string> = {};
   for (const family of payload.value?.families || []) out[family.key] = familyLabel(family);
+  return out;
+});
+
+const assetNameByKey = computed(() => {
+  const out: Record<string, string> = {};
+  for (const asset of payload.value?.assets || []) {
+    out[asset.key] = currentLocale.value.startsWith("zh") ? asset.label_zh : asset.label_en;
+  }
   return out;
 });
 
@@ -153,6 +185,14 @@ function familyLabel(family: StrategyDataCoverageFamily) {
 
 function familyNames(keys: string[]) {
   return keys.map(key => familyNameByKey.value[key] || key).join(" / ");
+}
+
+function assetLabel(key: string) {
+  return assetNameByKey.value[key] || key;
+}
+
+function assetNames(keys: string[]) {
+  return keys.map(assetLabel).join(" / ");
 }
 
 function cellGlyph(status = "not_applicable") {

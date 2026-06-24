@@ -104,6 +104,7 @@ Use `astroq` for automation and JSON-readable operations:
 | `astroq data sources audit --source all --discovery-depth full-sample --resume --json` | 对所有已发现能力生成样本探测或阻断原因闭环，不写入真实数据仓 |
 | `astroq data sources audit --source all --discovery-depth full-sample --dry-run --json` | 只输出全量样本探测计划，不调用 provider |
 | `astroq data sources diff-registry --json` | 对比 source capability registry 与项目 data_registry |
+| `astroq assets overview --json` | 查看五类资产 data / strategy / backtest / paper / live 链路状态和阻断原因 |
 | `astroq data tushare-audit --json` | 审计 Tushare 权限和本地覆盖率 |
 | `astroq data tushare-backfill --scope missing --resume --json` | 按缺口补齐 Tushare 数据 |
 | `astroq strategy catalog --json` | 查看 production / paper / candidate 策略目录 |

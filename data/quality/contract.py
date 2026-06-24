@@ -386,6 +386,10 @@ def derive_contracts_from_registry() -> dict[str, DataContract]:
             "low": "float64", "close": "float64", "volume": "float64",
             "open_interest": "float64",
         },
+        "crypto_daily": {
+            "date": "object", "open": "float64", "high": "float64",
+            "low": "float64", "close": "float64", "volume": "float64",
+        },
         # P2: Sector / Industry dimensions
         "sector_sw_daily": {
             "ts_code": "object", "trade_date": "datetime64[ns]",

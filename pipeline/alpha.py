@@ -71,6 +71,7 @@ class StrategyAlphaAdapter(AlphaModel):
         scorer: ScorerFn,
         min_score: float = 30.0,
         horizon_days: int = 20,
+        asset_type: str = "stock",
         rebalance_trigger: Optional[Callable[[date, str, dict[str, int]], bool]] = None,
     ):
         self.name = name
@@ -78,6 +79,7 @@ class StrategyAlphaAdapter(AlphaModel):
         self._scorer = scorer
         self.min_score = min_score
         self.horizon_days = horizon_days
+        self.asset_type = asset_type
         self._rebalance_trigger = rebalance_trigger
         self._score_cache_key: tuple | None = None
         self._score_cache_rows: tuple[dict, ...] | None = None
@@ -120,6 +122,7 @@ class StrategyAlphaAdapter(AlphaModel):
                 rows.append(
                     {
                         "symbol": sym,
+                        "asset_type": self.asset_type,
                         "strategy": self.name,
                         "score": round(score, 6),
                         "horizon_days": self.horizon_days,
@@ -131,6 +134,7 @@ class StrategyAlphaAdapter(AlphaModel):
                 rows.append(
                     {
                         "symbol": sym,
+                        "asset_type": self.asset_type,
                         "strategy": self.name,
                         "score": None,
                         "horizon_days": self.horizon_days,
@@ -162,6 +166,7 @@ class StrategyAlphaAdapter(AlphaModel):
             direction = "buy" if score >= 50 else "hold"
             signals.append(AlphaSignal(
                 symbol=row["symbol"],
+                asset_type=row.get("asset_type", self.asset_type),
                 strategy=self.name,
                 direction=direction,
                 confidence=min(1.0, max(0.0, score / 100)),
@@ -220,12 +225,14 @@ class SignalParquetAlphaModel(AlphaModel):
         for _, row in rows.head(self.max_signals).iterrows():
             sym = str(row.get("symbol", row.get("code", "")))
             sym = sym.split(".")[0] if "." in sym else sym
+            asset_type = str(row.get("asset_type", "stock") or "stock")
             score = float(row.get("score", 0) or 0)
             sig = str(row.get("signal", "hold")).lower()
             direction = sig if sig in ("buy", "sell") else "hold"
 
             signals.append(AlphaSignal(
                 symbol=sym,
+                asset_type=asset_type,
                 strategy=self.name,
                 direction=direction,
                 confidence=min(1.0, score / 100),

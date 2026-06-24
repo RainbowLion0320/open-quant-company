@@ -85,10 +85,11 @@ def test_assets_overview_api_respects_config_enabled_flags(monkeypatch):
     assert payload["total"] == len(payload["items"])
     assert by_type["stock"]["enabled"] is True
     assert by_type["etf"]["enabled"] is True
-    assert by_type["bond"]["enabled"] is False
-    assert by_type["futures"]["enabled"] is False
-    assert by_type["crypto"]["enabled"] is False
-    assert by_type["crypto"]["data_source"] == "placeholder"
+    assert by_type["bond"]["enabled"] is True
+    assert by_type["futures"]["enabled"] is True
+    assert by_type["crypto"]["enabled"] is True
+    assert by_type["crypto"]["data_source"] == "real"
+    assert by_type["crypto"]["research_ready"] is True
     assert by_type["crypto"]["error"] == ""
 
 

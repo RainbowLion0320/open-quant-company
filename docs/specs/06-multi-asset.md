@@ -1,15 +1,17 @@
 # Spec: 多资产架构 (Multi-Asset Architecture)
 
-> 版本: 1.1 | 日期: 2026-06-03 | 关联: [PRD](../product/prd.md) [Execution Layer](04-execution-layer.md)
+> 版本: 1.2 | 日期: 2026-06-24 | 关联: [PRD](../product/prd.md) [Execution Layer](04-execution-layer.md)
 
 ## 1. 概述
 
-多资产架构支持 Stock/ETF/Bond/Futures/Crypto 五类资产统一管理和交易。通过 AssetAdapter ABC 接口统一数据获取，AssetAllocator 按市场 regime 动态分配权重，各资产类型可在 `config/settings.yaml` 中独立启用/禁用。
+多资产架构支持 Stock/ETF/Bond/Futures/Crypto 五类资产统一管理。`assets.*.enabled` 只表示资产开关，不等于策略、回测、paper 或 live 已可用。正式链路以 `asset_type` 一等字段贯穿数据、信号、组合、回测、paper/live 执行和 evidence；缺数据、缺合约语义、缺交易适配或缺权限必须显示 `blocked`，不能用股票逻辑硬套。
 
 **设计原则：**
 - **统一接口，多种适配器** — 不硬编码 "if stock elif fund"
 - **Regime 驱动分配** — 牛市多股权，熊市多债券，波动市多现金
 - **可开关扩展** — 每种资产类型独立配置，未启用的不加载
+- **链路分段验收** — 数据、策略、回测、paper、live 五段分别可用或阻断
+- **Live 分资产适配** — 股票/ETF/可转债优先 QMT/MiniQMT，期货走 CTP/配置化 futures gateway，加密走 CCXT-compatible adapter，未配置即 fail-closed
 
 ## 2. 组件架构
 
@@ -24,6 +26,11 @@
 │                  AssetRegistry                        │
 │   注册所有已启用资产类型 → AssetAdapter 实例            │
 │   get("stock") / asset_types / all / get_universe()   │
+└──────────────────────┬──────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────┐
+│         AssetInstrument / AssetPricePanel             │
+│   asset_type + symbol + currency + multiplier + status │
 └──────────────────────┬──────────────────────────────┘
                        │
        ┌───────────────┼───────────────┬───────────────┐
@@ -43,8 +50,8 @@
                        │
 ┌──────────────────────▼──────────────────────────────┐
 │              Multi-Asset Exchange                      │
-│   AShareExchange / ETFExchange / BondExchange         │
-│   各资产独立的费率结构 + 交易规则                        │
+│ AShare / ETF / Bond / Futures / Crypto Exchange        │
+│   各资产独立费率、交易单位、保证金和成交规则                │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -77,19 +84,33 @@ class AssetAdapter(ABC):
 | Stock | `StockAsset` | AKShare 日线 + Tushare 财务补充 | production-ready adapter |
 | ETF | `ETFAsset` | AKShare `fund_etf_hist_em`; tournament 可显式降级到指数代理 | production adapter with fallback marking |
 | Bond | `BondAsset` | 国债收益率价格代理 + 可转债快照真实数据 | 代理数据 + 部分真实快照 |
-| Futures | `FuturesAsset` | AKShare 主力连续合约行情 | 真实行情适配，当前尚未深度接入配置研究 |
-| Crypto | `CryptoAsset` | 默认禁用；未接入 CCXT 真实行情 | disabled adapter |
+| Futures | `FuturesAsset` | AKShare 主力连续合约行情 | 真实行情适配；研究链路启用，交易链路未接入 |
+| Crypto | `CryptoAsset` | AKShare `crypto_js_spot` 最新现货快照 | 当前快照源 stale 时必须阻断策略/交易；完整历史 K 线未接入 |
 
-### 2.3 AssetAllocator — 动态权重分配
+### 2.3 资产链路状态
+
+`astroq assets overview --json` 和 `/datahub?tab=assets` 必须展示每类资产的五段状态：
+
+| 阶段 | 含义 | 阻断示例 |
+|------|------|----------|
+| data | 本地数据/源适配是否足以研究 | `research_data_not_ready`, `crypto_data_stale_until_fresh_source` |
+| strategy | 是否可被策略正式消费 | 缺必需价格、连续合约、复权/币种口径 |
+| backtest | 是否可进入正式 PIT 回测 | 缺历史 bars、样本不足、benchmark 缺失 |
+| paper | 是否可模拟下单和对账 | 不可交易代理数据、交易单位未知 |
+| live | 是否有实盘 adapter 与账户能力 | `live_adapter_not_configured`, `exchange_secret_missing` |
+
+启用资产开关只影响是否纳入链路检查；不改变任何阶段的真实 ready/block 状态。
+
+### 2.4 AssetAllocator — 动态权重分配
 
 **Regime → Raw Weight Matrix（可配置，分配时归一化）：**
 
-| Regime | Stock | ETF | Bond | Cash | 说明 |
-|--------|-------|-----|------|------|------|
-| Bull | 60% | 30% | 5% | 10% | 当前 settings 覆盖 stock/ETF/cash，bond 沿用模块默认 |
-| Sideways | 35% | 35% | 20% | 30% | allocate 时按启用资产归一到 `1 - cash` |
-| Bear | 15% | 15% | 40% | 70% | 高现金配置，未启用资产不会进入分配 |
-| Unknown | 20% | 15% | 30% | 35% | 模块默认保守权重 |
+| Regime | Stock | ETF | Bond | Futures | Crypto | Cash | 说明 |
+|--------|-------|-----|------|---------|--------|------|------|
+| Bull | 55% | 25% | 5% | 3% | 2% | 10% | 股票/ETF 为主，保留小比例跨资产研究仓位 |
+| Sideways | 30% | 25% | 20% | 5% | 3% | 17% | 均衡配置，allocate 时按启用资产归一到 `1 - cash` |
+| Bear | 10% | 10% | 40% | 3% | 2% | 35% | 防御资产和现金优先 |
+| Unknown | 20% | 15% | 30% | 3% | 2% | 30% | 模块默认保守权重 |
 
 **分配流程：**
 1. Market Regime 由 `cybernetics` 当前检测或回测的 `backtest.regime_replay` 提供；`AssetAllocator` 不自行检测 regime
@@ -99,16 +120,33 @@ class AssetAdapter(ABC):
 
 **配置覆盖：** `settings.yaml` → `asset_allocation.regime_weights` 可覆盖默认权重矩阵，使用 `copy.deepcopy` 防止 mutation。未写入配置的资产键保留 `REGIME_WEIGHTS_DEFAULT` 默认值。
 
-### 2.4 Multi-Asset Exchange — 差异化费率
+### 2.5 Multi-Asset Exchange — 差异化费率
 
 ```python
 # 各资产交易成本不同，默认值来自 config/settings.yaml → trading.exchange
 AShareExchange:  佣金 0.025% + 印花税 0.05%(卖) + 过户费 0.001%
 ETFExchange:     佣金 0.005% + 无印花税
 BondExchange:    佣金 0.002% + 无印花税
+FuturesExchange: 按手收佣 + 保证金参数
+CryptoExchange:  现货 taker/maker 风格费率，默认 0.1%
 ```
 
-### 2.5 ETF 价格 fallback
+`ExecutionRouter` 按 `OrderIntent.asset_type` 分发到对应 exchange。缺 exchange 注册时阻断，不允许回退股票费率。
+
+### 2.6 Live adapter registry
+
+| 资产 | 默认 live adapter | 当前状态 |
+|------|-------------------|----------|
+| stock | QMT/MiniQMT | 合约存在，仍受 `execution.live.enabled`、SDK、账号和权限控制 |
+| etf | QMT/MiniQMT | 同 stock，需券商端支持 |
+| bond | QMT/MiniQMT 条件支持 | 仅可转债可尝试，国债收益率代理不可交易 |
+| futures | CTP 或配置化 futures gateway | 默认 `live_adapter_not_configured` |
+| crypto | CCXT-compatible exchange | 默认 `live_adapter_not_configured` / `exchange_secret_missing` |
+| cash | 非交易桶 | `not_applicable` |
+
+Live 路径不得回退 PaperBroker；未配置或失败只写 blocked evidence。
+
+### 2.7 ETF 价格 fallback
 
 ETF 适配器优先使用 AKShare `fund_etf_hist_em` 真实行情。`scripts/multi_asset_tournament.py` 在缺少本地 ETF 缓存或接口不可用时，可使用 proxy 构造近似价格，并必须在结果中保留 `data_source` 标识：
 
@@ -149,7 +187,8 @@ Market Regime Snapshot
     cash_reserve: ¥100,000
        │
        ▼
-  Multi-Asset Exchange → execute orders
+PipelineBacktest / PaperBroker / LiveAdapterRegistry
+  → asset_type-aware evidence and blockers
 ```
 
 ## 4. 关键设计决策
@@ -157,7 +196,9 @@ Market Regime Snapshot
 | 决策 | 选择 | 原因 |
 |------|------|------|
 | AssetAdapter ABC | 统一接口 | 新增资产类型只需实现接口，分配器/交易所无需改动 |
-| 配置驱动启用 | `assets.{type}.enabled: true/false` | 未实现的资产保持 enabled=false |
+| 配置驱动启用 | `assets.{type}.enabled: true/false` | 当前五类资产默认启用；开关不代表全链路 ready |
+| `asset_type` 一等字段 | Signal/Target/Order/Fill/Position 全部携带 | 避免把期货/ETF/加密误当股票 |
+| Live 分资产 registry | 未配置即阻断 | 防止期货/加密实盘被 Paper 或股票 broker 假冒 |
 | Regime 权重矩阵 | `copy.deepcopy` 防御 | 防止运行时修改污染模块级默认常量 |
 | ETF Proxy 方案 | 短期 workaround | AKShare 接口不稳定，Proxy 保证回测可运行 |
 | 每月再平衡 | 月初统一调仓 | 与股票策略调仓周期一致 |
@@ -192,10 +233,13 @@ weights = allocator.get_weights(regime)  # {"stock": 0.6, "etf": 0.25, ...}
 # 完整分配
 portfolio = allocator.allocate(
     regime="bull",
-    enabled_assets={"stock": True, "etf": True, "bond": False},
+    enabled_assets={"stock": True, "etf": True, "bond": True, "futures": True, "crypto": True},
     asset_signals={
         "stock": [{"symbol": "000001", "score": 82.0}],
         "etf": [{"symbol": "510300", "score": 74.0}],
+        # 缺少信号的资产不会生成假标的，其权重会进入现金。
+        "futures": [],
+        "crypto": [],
     },
     total_capital=1_000_000,
     max_positions_per_asset=8,
@@ -213,16 +257,19 @@ portfolio = allocator.allocate(
 
 ## 7. 测试策略
 
-- **合约测试：** StockAsset/ETFAsset 实现 AssetAdapter ABC 所有抽象方法
+- **合约测试：** Signal/Target/Order/Fill/Position 均携带 `asset_type`
+- **价格测试：** `get_asset_price_panel()` 对缺 adapter、空价格和正常 adapter 输出明确 status/blockers
 - **分配器测试：** 固定 regime → 验证权重总和 = 1.0
 - **Regime 权重测试：** 固定 bull/bear/sideways/unknown → 验证归一化和现金保留
-- **多资产回测测试：** `scripts/multi_asset_tournament.py` 成功运行 stock-only vs ETF-only vs multi 三组对比
+- **PipelineBacktest 测试：** trade log、score panel、final holdings 均包含资产类型
+- **Paper/Live 测试：** PaperBroker 按资产持仓；futures/crypto live adapter 默认 fail-closed
 - **边界测试：** 所有资产未启用 → 100% 现金、单一资产启用 → 权重正确
 
 ## 8. 已知限制 & 未来方向
 
-- **ETF proxy fallback：** ETF 适配器已有真实行情路径，但多资产回测在缺少本地缓存时仍可能回退 proxy，收益计算需标注 data_source
-- **Bond/Futures/Crypto 边界：** Bond 当前是国债收益率价格代理 + 可转债快照，Futures 有真实日线适配器但未形成完整研究/交易闭环，Crypto 默认禁用且未接入 CCXT。所有收益、回测和 Web 展示必须保留 `data_source` provenance。
+- **ETF proxy fallback：** ETF 适配器已有真实行情路径，但降级 proxy 必须标注 `data_source`
+- **Bond/Futures/Crypto 边界：** Bond 当前是国债收益率价格代理 + 可转债快照，Futures 有真实主力合约行情适配器，Crypto 当前 AKShare snapshot 源可能 stale；三者缺失条件必须阻断，不得填默认值。
+- **Live adapter 缺口：** Futures 需要 CTP/配置化 futures gateway，Crypto 需要 CCXT-compatible exchange 和 API key；未配置前均不可实盘。
 - **无跨资产对冲：** 当前各资产独立选标的，未考虑资产间相关性
 - **无动态风险预算：** 当前 regime 权重是静态矩阵，未来可基于波动率动态调整
-- **未来：** 半自动实盘中多资产联合执行、T+0 ETF 日内轮动
+- **未来：** 实盘环境中完成 ETF/可转债/QMT、期货/CTP、加密/交易所三类 adapter 的真实账户验收

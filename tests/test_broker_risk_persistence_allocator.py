@@ -116,7 +116,9 @@ def test_asset_allocator_normalizes_regime_enum_and_unknown(tmp_path):
     allocator = AssetAllocator(config_path=config)
 
     assert allocator.get_weights(MarketRegime.BEAR)["bond"] == pytest.approx(0.40)
-    assert allocator.get_weights("invalid-regime")["cash"] == pytest.approx(0.35)
+    assert allocator.get_weights(MarketRegime.BULL)["futures"] == pytest.approx(0.03)
+    assert allocator.get_weights(MarketRegime.BULL)["crypto"] == pytest.approx(0.02)
+    assert allocator.get_weights("invalid-regime")["cash"] == pytest.approx(0.30)
 
     allocation = allocator.allocate(
         MarketRegime.BULL,

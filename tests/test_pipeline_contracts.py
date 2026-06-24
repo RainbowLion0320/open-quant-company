@@ -36,6 +36,11 @@ class TestAlphaSignal:
         assert signals[0].symbol == "b"
         assert signals[2].symbol == "c"
 
+    def test_asset_type_is_first_class_identity(self):
+        s = AlphaSignal("BTC/USDT", "cross_asset", "buy", 0.7, 70, asset_type="crypto")
+        assert s.asset_type == "crypto"
+        assert s.key == "crypto:BTC/USDT"
+
 
 class TestStrategyAlphaAdapter:
     def test_reuses_scores_between_signal_generation_and_score_panel(self):
@@ -123,6 +128,20 @@ class TestEqualWeightConstructor:
         assert len(sell_targets) == 1
         assert sell_targets[0].symbol == "c"
         assert sell_targets[0].delta_shares == -500
+
+    def test_constructs_non_stock_targets_with_asset_type(self):
+        signals = [AlphaSignal("510300", "cross_asset", "buy", 0.8, 80, asset_type="etf")]
+        ctx = PipelineContext(
+            cash=100000,
+            prices={"510300": 4.0, "etf:510300": 4.0},
+            holdings={"etf:510300": 0},
+            universe_assets={"510300": "etf"},
+        )
+        targets = EqualWeightConstructor(max_positions=1, position_pct=0.4).construct(signals, ctx)
+
+        assert targets
+        assert targets[0].asset_type == "etf"
+        assert targets[0].key == "etf:510300"
 
 
 class TestInverseVolatilityConstructor:
@@ -267,6 +286,30 @@ class TestExecutionRouter:
         assert sell is not None
         assert sell.shares == 200, f"T+1 should limit sell to 200, got {sell.shares}"
 
+    def test_routes_intents_by_asset_type(self):
+        ctx = PipelineContext(
+            cash=100000,
+            prices={"crypto:BTC/USDT": 65000.0},
+            holdings={},
+            universe_assets={"BTC/USDT": "crypto"},
+        )
+        target = PortfolioTarget(
+            "BTC/USDT",
+            "cross_asset",
+            0.1,
+            target_shares=1,
+            delta_shares=1,
+            asset_type="crypto",
+        )
+        router = ExecutionRouter()
+
+        intents = router.targets_to_intents([target], ctx)
+        fills = router.execute(intents)
+
+        assert intents[0].asset_type == "crypto"
+        assert fills[0].asset_type == "crypto"
+        assert fills[0].commission == pytest.approx(65.0, abs=0.01)
+
 
 class TestPipelineContext:
     def test_context_carries_stage_outputs(self):
@@ -282,3 +325,29 @@ class TestPipelineContext:
         assert len(ctx.adjusted_targets) == 1
         assert len(ctx.intents) == 1
         assert ctx.fills[0].status == "filled"
+
+    def test_context_prices_and_holdings_are_asset_aware(self):
+        ctx = PipelineContext(
+            prices={"510300": 4.0, "etf:510300": 4.1},
+            holdings={"etf:510300": 200},
+            universe_assets={"510300": "etf"},
+        )
+        assert ctx.price_for("etf", "510300") == 4.1
+        assert ctx.holding_for("etf", "510300") == 200
+        assert ctx.holding_for("stock", "510300") == 0
+
+
+class TestPaperBrokerMultiAsset:
+    def test_paper_broker_keeps_asset_type_on_etf_order(self):
+        from broker import PaperBroker
+
+        broker = PaperBroker(initial_cash=100000, enable_risk=False)
+        broker.set_prices({"etf:510300": 4.0})
+
+        order_id = broker.submit_order("510300", 0, 100, "buy", asset_type="etf")
+
+        assert order_id.startswith("PAPER_")
+        position = broker.get_positions()[0]
+        assert position.asset_type == "etf"
+        assert position.code == "510300"
+        assert broker.snapshot_state().positions["etf:510300"]["asset_type"] == "etf"

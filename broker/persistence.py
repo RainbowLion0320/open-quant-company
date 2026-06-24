@@ -89,6 +89,7 @@ def load_state() -> PaperState:
                 "avg_cost": float(v.get("avg_cost", 0)),
                 "name": str(v.get("name", "")),
                 "current_price": float(v.get("current_price", 0)),
+                "asset_type": str(v.get("asset_type", "stock") or "stock"),
             } for k, v in positions_raw.items()} if positions_raw else {},
             order_counter=int(row.get("order_counter", 0)),
             updated_at=str(row.get("updated_at", "")),
@@ -145,7 +146,7 @@ def load_nav() -> pd.DataFrame:
 # ── 交易记录 ──
 
 def append_trade(run_date: DateType, code: str, side: str, price: float,
-                 volume: int, amount: float, strategy: str = ""):
+                 volume: int, amount: float, strategy: str = "", asset_type: str = "stock"):
     """追加一条交易记录"""
     store = _resolve_store()
     store.mkdir(parents=True, exist_ok=True)
@@ -154,6 +155,7 @@ def append_trade(run_date: DateType, code: str, side: str, price: float,
     row = pd.DataFrame([{
         "date": pd.Timestamp(run_date),
         "code": code,
+        "asset_type": asset_type,
         "name": "",
         "side": side,
         "price": price,

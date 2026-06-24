@@ -70,6 +70,11 @@ export interface StrategyCatalogItem {
   lifecycle: string;
   config_key: string;
   data_requirements: string[];
+  asset_scope: string[];
+  required_asset_dimensions: string[];
+  paper_supported: boolean;
+  live_supported: boolean;
+  blockers: string[];
   parameters?: Record<string, any>;
   output_contract: string;
   research_sources: string[];
@@ -92,6 +97,12 @@ export interface StrategyDataCoverageFamily {
   label_en: string;
 }
 
+export interface StrategyDataCoverageAsset {
+  key: string;
+  label_zh: string;
+  label_en: string;
+}
+
 export interface StrategyDataCoverageCell {
   status: "declared" | "observed" | "required_missing" | "optional_missing" | "not_applicable" | string;
   declared: boolean;
@@ -106,6 +117,11 @@ export interface StrategyDataCoverageRow {
   layer: string;
   lifecycle: string;
   declared_dimensions: string[];
+  asset_scope: string[];
+  required_asset_dimensions: string[];
+  paper_supported: boolean;
+  live_supported: boolean;
+  blockers: string[];
   declared_families: string[];
   observed_dimensions: string[];
   observed_families: string[];
@@ -116,8 +132,10 @@ export interface StrategyDataCoverageRow {
   missing_required_families: string[];
   optional_missing_families: string[];
   unused_declared_families: string[];
+  missing_required_assets: string[];
   coverage_score: number;
   cells: Record<string, StrategyDataCoverageCell>;
+  asset_cells: Record<string, StrategyDataCoverageCell>;
 }
 
 export interface StrategyDataCoverageResponse {
@@ -125,12 +143,14 @@ export interface StrategyDataCoverageResponse {
   generated_at: string;
   recommended_command: string;
   families: StrategyDataCoverageFamily[];
+  assets: StrategyDataCoverageAsset[];
   expectations: Record<string, any>;
   summary: {
     strategy_count: number;
     family_count: number;
     required_gap_count: number;
     optional_gap_count: number;
+    asset_gap_count: number;
     missing_observed_count: number;
   };
   rows: StrategyDataCoverageRow[];

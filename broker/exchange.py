@@ -208,11 +208,38 @@ class FuturesExchange(Exchange):
         return 0  # 期货按手, 不按比例
 
 
+class CryptoExchange(Exchange):
+    """Crypto spot exchange — fractional quantity, 24x7, maker/taker style fee."""
+
+    name = "crypto"
+    asset_type = "crypto"
+
+    def __init__(self, **overrides):
+        from core.settings import get_section
+        cfg = get_section("trading.exchange.crypto", {}) or {}
+        self.commission = overrides.get("commission", float(cfg.get("commission", 0.001)))
+        self.lot_size = overrides.get("lot_size", int(cfg.get("lot_size", 1)))
+        self.min_commission = overrides.get("min_commission", float(cfg.get("min_commission", 0.0)))
+
+    def calc_cost(self, price: float, shares: int, side: OrderSide) -> float:
+        amount = price * shares
+        return max(amount * self.commission, self.min_commission)
+
+    def can_trade(self, symbol: str) -> bool:
+        return True
+
+    @property
+    def roundtrip_cost_pct(self) -> float:
+        return self.commission * 2 * 100
+
+
 class MultiAssetExchange:
     """多资产交易所 — 按 asset_type 分发到对应 Exchange"""
 
-    def __init__(self):
+    def __init__(self, exchanges: dict[str, Exchange] | None = None):
         self._exchanges: dict = {}
+        for asset_type, exchange in (exchanges or {}).items():
+            self.register(asset_type, exchange)
 
     def register(self, asset_type: str, exchange: Exchange) -> None:
         self._exchanges[asset_type] = exchange
@@ -232,3 +259,14 @@ class MultiAssetExchange:
     def __repr__(self) -> str:
         types = ", ".join(f"{k}({v.roundtrip_cost_pct:.4f}%)" for k, v in self._exchanges.items())
         return f"<MultiAssetExchange: {types}>"
+
+
+def default_multi_asset_exchange(stock_exchange: Exchange | None = None) -> MultiAssetExchange:
+    """Build the canonical multi-asset cost router."""
+    exchange = MultiAssetExchange()
+    exchange.register("stock", stock_exchange or AShareExchange())
+    exchange.register("etf", ETFExchange())
+    exchange.register("bond", BondExchange())
+    exchange.register("futures", FuturesExchange())
+    exchange.register("crypto", CryptoExchange())
+    return exchange

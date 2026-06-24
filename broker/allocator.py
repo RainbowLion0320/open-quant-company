@@ -22,7 +22,7 @@ from core.settings import get_settings, resolve_settings_path
 @dataclass
 class AssetAllocation:
     """单个资产类型的分配结果"""
-    asset_type: str          # "stock", "etf", "bond", "crypto"
+    asset_type: str          # "stock", "etf", "bond", "futures", "crypto"
     label: str               # "A股股票"
     weight: float            # 分配权重 (0-1, 所有资产总和=1)
     symbols: List[str]       # 该资产内被选中的标的
@@ -47,16 +47,16 @@ class PortfolioAllocation:
 # Configuration override from settings.yaml → asset_allocation.regime_weights
 REGIME_WEIGHTS_DEFAULT = {
     "bull": {
-        "stock": 0.60, "etf": 0.25, "bond": 0.05, "cash": 0.10,
+        "stock": 0.55, "etf": 0.25, "bond": 0.05, "futures": 0.03, "crypto": 0.02, "cash": 0.10,
     },
     "sideways": {
-        "stock": 0.35, "etf": 0.25, "bond": 0.20, "cash": 0.20,
+        "stock": 0.30, "etf": 0.25, "bond": 0.20, "futures": 0.05, "crypto": 0.03, "cash": 0.17,
     },
     "bear": {
-        "stock": 0.10, "etf": 0.10, "bond": 0.40, "cash": 0.40,
+        "stock": 0.10, "etf": 0.10, "bond": 0.40, "futures": 0.03, "crypto": 0.02, "cash": 0.35,
     },
     "unknown": {
-        "stock": 0.20, "etf": 0.15, "bond": 0.30, "cash": 0.35,
+        "stock": 0.20, "etf": 0.15, "bond": 0.30, "futures": 0.03, "crypto": 0.02, "cash": 0.30,
     },
 }
 
@@ -93,7 +93,7 @@ class AssetAllocator:
         if probs and sum(probs.values()) > 0.95:
             # Probability-weighted allocation
             result = {}
-            for asset_type in ("stock", "etf", "bond", "cash"):
+            for asset_type in ("stock", "etf", "bond", "futures", "crypto", "cash"):
                 result[asset_type] = sum(
                     probs.get(r, 0) * self._regime_weights.get(r, self._regime_weights["unknown"]).get(asset_type, 0)
                     for r in ("bull", "sideways", "bear")

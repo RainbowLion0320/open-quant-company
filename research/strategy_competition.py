@@ -48,6 +48,8 @@ def _as_series(value: Any) -> pd.Series:
 
 def _trade_value(trade: Any) -> float:
     try:
+        if len(trade) >= 6:
+            return abs(float(trade[4]) * float(trade[5]))
         return abs(float(trade[3]) * float(trade[4]))
     except Exception:
         return 0.0

@@ -115,6 +115,49 @@ def test_stock_holders_repair_uses_period_batch_fetch_for_full_refresh(monkeypat
     assert calls == ["20260331"]
 
 
+def test_crypto_daily_repair_writes_latest_snapshot(tmp_path, monkeypatch):
+    from data.storage.datahub import DataHub
+    from scripts import repair_table
+
+    runtime = tmp_path / "var"
+    hub = DataHub(
+        runtime_root=runtime,
+        store_root=runtime / "store",
+        cache_root=runtime / "cache",
+        artifact_root=runtime / "artifacts",
+        db_root=runtime / "db",
+    )
+
+    class FakeCryptoAsset:
+        def get_universe(self):
+            return ["BTC/USDT", "ETH/USDT"]
+
+        def fetch_daily(self, symbol):
+            if symbol == "BTC/USDT":
+                return pd.DataFrame({
+                    "date": [pd.Timestamp.today().strftime("%Y-%m-%d")],
+                    "open": [64000.0],
+                    "high": [66000.0],
+                    "low": [63000.0],
+                    "close": [65000.0],
+                    "volume": [123.0],
+                })
+            return None
+
+    monkeypatch.setattr(repair_table, "HUB", hub)
+    monkeypatch.setattr("data.market.assets.crypto.CryptoAsset", FakeCryptoAsset)
+
+    repair_table.repair_crypto_daily()
+
+    root = hub.dimension_root("crypto_daily")
+    files = sorted(root.glob("*.parquet"))
+    assert len(files) == 1
+    saved = hub.read_parquet(files[0])
+    assert saved is not None
+    assert saved.iloc[0]["symbol"] == "BTC/USDT"
+    assert float(saved.iloc[0]["close"]) == 65000.0
+
+
 def test_tushare_audit_cli_reports_capabilities_and_coverage(monkeypatch, capsys):
     from astrolabe_cli.main import run_cli
     import data.ingestion.tushare_governance as governance

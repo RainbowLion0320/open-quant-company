@@ -106,6 +106,13 @@ DEFAULT_TOOLS: dict[str, ToolDescriptor] = {
         risk_level="read_only",
         desk_scopes=["data"],
     ),
+    "astroq.assets.overview": ToolDescriptor(
+        tool_id="astroq.assets.overview",
+        label="Asset chain coverage",
+        command=_astroq_command("assets", "overview", "--json"),
+        risk_level="read_only",
+        desk_scopes=["data", "portfolio", "reporting", "execution"],
+    ),
     "astroq.strategy.catalog": ToolDescriptor(
         tool_id="astroq.strategy.catalog",
         label="Strategy catalog",

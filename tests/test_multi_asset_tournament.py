@@ -43,8 +43,8 @@ class TestAssetProvenance:
     def test_crypto_default_constructor_matches_adapter_contract(self):
         asset = CryptoAsset()
         assert asset.TRADABLE is False
-        assert asset.RESEARCH_READY is False
-        assert asset.DATA_SOURCE == "placeholder"
+        assert asset.RESEARCH_READY is True
+        assert asset.DATA_SOURCE == "real"
 
     def test_get_data_source_includes_provenance(self):
         asset = StockAsset()
@@ -119,8 +119,9 @@ class TestAssetOverviewContracts:
         assert code == 0
         assert by_type["stock"]["enabled"] is True
         assert by_type["etf"]["enabled"] is True
-        assert by_type["bond"]["enabled"] is False
-        assert by_type["futures"]["enabled"] is False
-        assert by_type["crypto"]["enabled"] is False
-        assert by_type["crypto"]["data_source"] == "placeholder"
+        assert by_type["bond"]["enabled"] is True
+        assert by_type["futures"]["enabled"] is True
+        assert by_type["crypto"]["enabled"] is True
+        assert by_type["crypto"]["data_source"] == "real"
+        assert by_type["crypto"]["research_ready"] is True
         assert by_type["crypto"]["error"] == ""

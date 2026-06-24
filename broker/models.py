@@ -11,6 +11,7 @@ class Position:
     volume: int = 0
     avg_cost: float = 0.0
     current_price: float = 0.0
+    asset_type: str = "stock"
 
     @property
     def market_value(self) -> float:
@@ -49,3 +50,4 @@ class Order:
     status: str = ""
     created_at: str = ""
     status_history: list[dict] = field(default_factory=list)
+    asset_type: str = "stock"

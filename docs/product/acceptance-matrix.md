@@ -105,13 +105,17 @@
 | 6.1 | AssetAdapter ABC 统一接口 | `data/market/assets/base.py` | `test_asset_contracts.py` (27 tests) | — | `StockAsset` / `ETFAsset` 实现所有抽象方法 | OK | — |
 | 6.2 | Stock 资产 (AKShare + Tushare) | `data/market/assets/stock.py` | — | `GET /api/stocks` → `/research?tab=stocks` | 全量 A 股股票池可查询 | OK | — |
 | 6.3 | ETF 资产 (AKShare `fund_etf_hist_em`) | `data/market/assets/etf.py` | `test_asset_contracts.py::TestETFAssetContracts` | — | fetch_daily 返回标准 OHLCV, data_source="real" | OK | — |
-| 6.4 | Bond/Futures/Crypto 适配器 | `data/market/assets/{bond,futures,crypto}.py` | `test_asset_contracts.py` (5 classes) | — | Bond=proxy, Futures=real, Crypto=placeholder | OK | — |
-| 6.5 | AssetAllocator regime 动态权重 | `broker/allocator.py` | `test_broker_risk_persistence_allocator.py:test_asset_allocator_normalizes_regime_enum_and_unknown` | — | bull: stock 60%, bear: stock 15%, sideways: 35%；allocate 对启用资产归一化 | OK | — |
-| 6.6 | 资产开关控制 (enabled: true/false) | `config/settings.yaml` assets.*.enabled, `data/market/assets/overview.py` | `test_multi_asset_tournament.py::TestAssetOverviewContracts` | `GET /api/assets/overview` → `/datahub?tab=assets` | 关闭资产在 CLI/API/Web 中显示 disabled，不进入 allocation | OK | — |
+| 6.4 | Bond/Futures/Crypto 适配器 | `data/market/assets/{bond,futures,crypto}.py` | `test_asset_contracts.py` (5 classes) | — | Bond=proxy + 可转债快照，Futures=real，Crypto=real latest snapshot；均保留 provenance | OK | — |
+| 6.5 | AssetAllocator regime 动态权重 | `broker/allocator.py` | `test_broker_risk_persistence_allocator.py:test_asset_allocator_normalizes_regime_enum_and_unknown` | — | regime 权重矩阵覆盖 stock/ETF/bond/futures/crypto/cash；allocate 对启用资产归一化，缺信号权重进入现金 | OK | — |
+| 6.6 | 资产开关控制 (enabled: true/false) | `config/settings.yaml` assets.*.enabled, `data/market/assets/overview.py` | `test_multi_asset_tournament.py::TestAssetOverviewContracts` | `GET /api/assets/overview` → `/datahub?tab=assets` | 当前五类资产默认启用；新增或显式关闭资产在 CLI/API/Web 中显示 disabled，不进入 allocation | OK | — |
 | 6.7 | 多资产回测对比 | `scripts/multi_asset_tournament.py` | `test_multi_asset_tournament.py` | — | stock-only vs ETF-only vs multi 三组对比，proxy fallback 保留 `data_source` | OK | — |
-| 6.8 | 差异化费率 (A股/ETF/债券) | `broker/exchange.py` | — | — | A股卖出印花税 0.05% vs ETF 免印花税 | OK | — |
+| 6.8 | 差异化费率 (A股/ETF/债券/期货/加密) | `broker/exchange.py`, `pipeline/execution.py` | `test_pipeline_contracts.py::TestExecutionRouter` | — | `OrderIntent.asset_type` 路由到对应 exchange；缺 exchange 不回退股票费率 | OK | — |
 | 6.9 | 行业/板块数据维度 | `data/market/sectors.py` + `scripts/build_sector_snapshots.py` | — | `GET /api/sectors/*` | 申万行业指数 + 行业映射 + 信号聚合 + 敞口 | OK | — |
 | 6.10 | 行业 Web 雷达页面 | `web/frontend/src/views/Sectors.vue` + `data/market/sectors.py` | `test_sector_pipeline.py`, `test_web_system_contracts.py` | `/research?tab=sectors` | 申万行业资金方块矩阵 + 按资金量映射面积 + 排名表 + 行业级信号分布，不显示行业内个股 | OK | — |
+| 6.11 | `asset_type` 全链路契约 | `pipeline/types.py`, `pipeline/{alpha,portfolio,risk,execution}.py`, `backtest/pipeline_runner.py` | `test_pipeline_contracts.py`, `test_backtest_pipeline_runner_contracts.py` | — | Signal/Target/Order/Fill/Position、score panel、trade log、final holdings 均保留资产类型 | OK | — |
+| 6.12 | 多资产价格面板 | `data/market/assets/price_book.py` | `test_asset_contracts.py::TestMultiAssetPriceBook` | — | 缺 adapter/空价格输出 blocked；正常 adapter 输出 close matrix，不造价 | OK | — |
+| 6.13 | 策略资产范围与缺口 | `data/strategy/catalog.py`, `research/strategy_catalog.py`, `research/strategy_data_coverage.py` | `test_strategy_catalog.py`, `test_strategy_data_coverage.py` | `GET /api/strategies/catalog`, `/strategy-lab?tab=dataCoverage` | 旧策略默认 stock-only；`cross_asset_allocator` 声明 stock/ETF/bond/futures/crypto/cash 和阻断原因 | OK | — |
+| 6.14 | Paper/Live 多资产边界 | `broker/paper_core.py`, `broker/paper_orders.py`, `broker/live/registry.py` | `test_pipeline_contracts.py::TestPaperBrokerMultiAsset`, `test_asset_contracts.py::TestAssetTradingChainContracts` | `GET /api/assets/overview` → `/datahub?tab=assets` | Paper 按 `(asset_type, symbol)` 持仓；futures/crypto live adapter 默认 fail-closed，不回退 Paper | OK | 真实 futures/crypto live adapter 需账户和端点配置 |
 
 ## 7. Agent Company OS
 
@@ -138,11 +142,11 @@
 | 回测引擎 | 10 | 10 | 0 | 0 | 0 |
 | 执行层 | 9 | 9 | 0 | 0 | 0 |
 | Web 平台 | 19 | 19 | 0 | 0 | 0 |
-| 多资产架构 | 10 | 10 | 0 | 0 | 0 |
+| 多资产架构 | 14 | 14 | 0 | 1 | 0 |
 | Agent Company OS | 11 | 10 | 0 | 1 | 0 |
-| **合计** | **90** | **89** | **0** | **1** | **0** |
+| **合计** | **94** | **93** | **0** | **2** | **0** |
 
-> **说明：** `功能可验收` 表示该能力有完整可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数。`质量债条目` 统计"缺口"列非 `—` 的行，包含已实现能力的质量债和规划能力的未实现缺口。当前剩余缺口只剩 Agent Company OS 的真实 MiniQMT/QMT 终端撤单语义和定时对账人工演练；12 策略 OOS/IC/ICIR 竞赛和 measured baseline evidence 已接入，但大多数策略因收益、换手或 alpha 门槛未达标仍保持 candidate/paper recommendation。开放式 CEO 目标现在通过 autonomy program 持久化为多阶段计划；执行边界仍故意限定为 fixed-registry 的 `read_only` / `dry_run`，写入、代码、paper/live 交易和未知工具必须进入审批、工单或 blocker。
+> **说明：** `功能可验收` 表示该能力有完整可用代码路径。`规划中` 表示已有产品/行为契约但还未实现，不计入当前功能完成数。`质量债条目` 统计"缺口"列非 `—` 的行，包含已实现能力的质量债和规划能力的未实现缺口。当前剩余缺口是 futures/crypto 真实 live adapter 账户与端点配置，以及 Agent Company OS 的真实 MiniQMT/QMT 终端撤单语义和定时对账人工演练；12 策略 OOS/IC/ICIR 竞赛和 measured baseline evidence 已接入，但大多数策略因收益、换手或 alpha 门槛未达标仍保持 candidate/paper recommendation。开放式 CEO 目标现在通过 autonomy program 持久化为多阶段计划；执行边界仍故意限定为 fixed-registry 的 `read_only` / `dry_run`，写入、代码、paper/live 交易和未知工具必须进入审批、工单或 blocker。
 
 **维护说明:**
 

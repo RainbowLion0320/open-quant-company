@@ -23,7 +23,7 @@ from broker.fill_models import (
     NoSlippage,
     MatchResult,
 )
-from broker.exchange import Exchange, AShareExchange, OrderSide
+from broker.exchange import Exchange, AShareExchange, MultiAssetExchange, OrderSide
 
 
 @dataclass
@@ -33,6 +33,7 @@ class MatchContext:
     This is the unified context passed through the matching pipeline.
     """
     symbol: str = ""
+    asset_type: str = "stock"
     side: str = ""               # "buy" | "sell"
     requested_shares: int = 0
     market_price: float = 0.0
@@ -97,7 +98,8 @@ class MatchingEngine:
         Returns MatchResult with filled_shares, fill_price, status, and commission.
         """
         # 1) Exchange-level checks: can we trade this symbol?
-        if not self.exchange.can_trade(ctx.symbol):
+        exchange = self._exchange_for(ctx.asset_type)
+        if not exchange.can_trade(ctx.symbol):
             return MatchResult(
                 filled_shares=0,
                 fill_price=ctx.market_price,
@@ -117,7 +119,7 @@ class MatchingEngine:
 
         # 3) Calculate commission via exchange
         side_enum = OrderSide.BUY if ctx.side == "buy" else OrderSide.SELL
-        commission = self.exchange.calc_cost(
+        commission = exchange.calc_cost(
             result.fill_price,
             result.filled_shares,
             side_enum,
@@ -127,7 +129,7 @@ class MatchingEngine:
         return result
 
     def can_afford(self, price: float, shares: int, cash: float,
-                   side: str = "buy") -> tuple[bool, int]:
+                   side: str = "buy", asset_type: str = "stock") -> tuple[bool, int]:
         """Check if we can afford a buy order. Returns (can_afford, max_shares).
 
         For sell orders, always returns True (we check holdings separately).
@@ -138,9 +140,10 @@ class MatchingEngine:
         if shares <= 0:
             return False, 0
 
-        lot = self.exchange.lot_size if hasattr(self.exchange, "lot_size") else 100
+        exchange = self._exchange_for(asset_type)
+        lot = exchange.lot_size if hasattr(exchange, "lot_size") else 100
         while shares > 0:
-            est_cost = shares * price + self.exchange.calc_cost(
+            est_cost = shares * price + exchange.calc_cost(
                 price, shares, OrderSide.BUY
             )
             if est_cost <= cash:
@@ -156,6 +159,11 @@ class MatchingEngine:
         if t_plus_1:
             available = max(0, available - bought_today)
         return min(requested, available)
+
+    def _exchange_for(self, asset_type: str) -> Exchange:
+        if isinstance(self.exchange, MultiAssetExchange):
+            return self.exchange.get(asset_type)
+        return self.exchange
 
     def __repr__(self) -> str:
         return (f"<MatchingEngine exchange={self.exchange.name} "

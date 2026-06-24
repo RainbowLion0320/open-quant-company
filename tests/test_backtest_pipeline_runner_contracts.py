@@ -223,3 +223,37 @@ def test_pipeline_backtest_persists_full_score_panel_for_alpha_evidence():
     latest_rows = panel[panel["as_of_date"] == panel["as_of_date"].min()]
     assert latest_rows.set_index("symbol").loc["AAA", "rank"] == 1
     assert bool(latest_rows.set_index("symbol").loc["AAA", "selected"]) is True
+
+
+class ETFAlpha(AlphaModel):
+    name = "etf_alpha"
+    label = "ETF Alpha"
+
+    def generate_alpha(self, universe, prices, date_idx, regime):
+        return [
+            AlphaSignal(
+                symbol="510300",
+                strategy=self.name,
+                direction="buy",
+                confidence=0.9,
+                score=90.0,
+                asset_type="etf",
+            )
+        ]
+
+
+def test_pipeline_backtest_records_asset_type_in_trade_log_and_score_panel():
+    dates = pd.date_range("2024-01-02", periods=5, freq="B")
+    prices = pd.DataFrame({"510300": [4.0, 4.1, 4.2, 4.1, 4.3]}, index=dates)
+    bench = pd.Series([100, 101, 102, 101, 103], index=dates)
+
+    result = PipelineBacktest(
+        alpha=ETFAlpha(),
+        portfolio=EqualWeightConstructor(max_positions=1, position_pct=0.5),
+        scheduler=RebalanceScheduler(RebalanceConfig(schedule="daily")),
+    ).run(prices, bench, universe=["510300"], asset_types={"510300": "etf"})
+
+    assert result["trade_log"]
+    assert result["trade_log"][0][2] == "etf"
+    assert set(result["score_panel"]["asset_type"]) == {"etf"}
+    assert "etf" in result["final_holdings_by_asset"]

@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from core.settings import get_section
+from broker.live.registry import live_adapter_registry
 
 
 ASSET_ADAPTERS = {
@@ -41,6 +42,7 @@ def asset_overview_items(asset_types: Iterable[str] | None = None) -> list[dict[
     cfg = get_section("assets", {}) or {}
     keys = list(asset_types or ASSET_ADAPTERS.keys())
     items: list[dict[str, Any]] = []
+    live_registry = live_adapter_registry()
 
     for asset_type in keys:
         asset_cfg = cfg.get(asset_type, {}) or {}
@@ -52,6 +54,11 @@ def asset_overview_items(asset_types: Iterable[str] | None = None) -> list[dict[
             adapter_cls = _load_class(adapter_path)
             adapter = adapter_cls()
             label = label or adapter.label
+            live_status = live_registry.status_for(adapter.asset_type)
+            data_blockers = _data_blockers(adapter, enabled)
+            strategy_status = "ready" if enabled and adapter.RESEARCH_READY and not data_blockers else "blocked"
+            backtest_status = "ready" if strategy_status == "ready" else "blocked"
+            paper_status = "ready" if enabled and adapter.TRADABLE and strategy_status == "ready" else "blocked"
             items.append({
                 "asset_type": adapter.asset_type,
                 "label": label or adapter.label,
@@ -61,6 +68,13 @@ def asset_overview_items(asset_types: Iterable[str] | None = None) -> list[dict[
                 "research_ready": bool(adapter.RESEARCH_READY),
                 "tradable": bool(adapter.TRADABLE) and enabled,
                 "universe_size": _safe_universe_size(adapter, enabled),
+                "data_status": "ready" if not data_blockers else "blocked",
+                "strategy_status": strategy_status,
+                "backtest_status": backtest_status,
+                "paper_status": paper_status,
+                "live_status": live_status.status,
+                "live_adapter": live_status.adapter,
+                "blockers": [*data_blockers, *list(live_status.blockers)],
                 "error": "",
             })
         except Exception as exc:
@@ -73,7 +87,25 @@ def asset_overview_items(asset_types: Iterable[str] | None = None) -> list[dict[
                 "research_ready": False,
                 "tradable": False,
                 "universe_size": 0,
+                "data_status": "blocked",
+                "strategy_status": "blocked",
+                "backtest_status": "blocked",
+                "paper_status": "blocked",
+                "live_status": "blocked",
+                "live_adapter": "unavailable",
+                "blockers": ["asset_adapter_error"],
                 "error": str(exc),
             })
 
     return items
+
+
+def _data_blockers(adapter: Any, enabled: bool) -> list[str]:
+    if not enabled:
+        return ["asset_disabled"]
+    blockers: list[str] = []
+    if not bool(getattr(adapter, "RESEARCH_READY", False)):
+        blockers.append("research_data_not_ready")
+    if getattr(adapter, "asset_type", "") == "crypto":
+        blockers.append("crypto_data_stale_until_fresh_source")
+    return blockers

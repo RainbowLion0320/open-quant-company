@@ -95,7 +95,7 @@ astroq pipeline show data_quality --json
 astroq assets overview --json
 ```
 
-返回多资产覆盖情况：资产类型、启用状态、数据来源、研究就绪度、交易能力和 universe 大小。`enabled` 必须来自 `config/settings.yaml`，不能用 adapter 能力硬编码。
+返回多资产链路状态：资产类型、启用状态、数据来源、universe 大小，以及 data / strategy / backtest / paper / live 五段 ready 或 blocked 状态。`enabled` 必须来自 `config/settings.yaml`，但不能被解释为全链路可交易；live 状态以分资产 adapter registry 为准。
 
 ## 执行
 

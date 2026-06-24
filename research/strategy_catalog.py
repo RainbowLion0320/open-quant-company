@@ -21,6 +21,12 @@ class StrategyCatalogItem:
     lifecycle: str
     config_key: str
     data_requirements: list[str]
+    asset_scope: list[str] = field(default_factory=lambda: ["stock"])
+    required_asset_dimensions: list[str] = field(default_factory=list)
+    paper_supported: bool = True
+    live_supported: bool = False
+    blockers: list[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     parameters: dict[str, Any] = field(default_factory=dict)
     output_contract: str = "StrategySignalRows"
     research_sources: list[str] = field(default_factory=list)
@@ -86,6 +92,12 @@ def catalog_items() -> list[StrategyCatalogItem]:
                 lifecycle=raw.get("status", "candidate"),
                 config_key=_text_value(raw.get("config_key"), raw["name"]),
                 data_requirements=_list_value(raw.get("data_requirements"), requirements),
+                asset_scope=_list_value(raw.get("asset_scope"), ["stock"]),
+                required_asset_dimensions=_list_value(raw.get("required_asset_dimensions"), raw.get("data_requirements") or requirements),
+                paper_supported=bool(raw.get("paper_supported", True)),
+                live_supported=bool(raw.get("live_supported", False)),
+                blockers=_list_value(raw.get("blockers"), []),
+                capabilities=_list_value(raw.get("capabilities"), []),
                 parameters=dict(raw.get("parameters", {})),
                 output_contract=_text_value(raw.get("output_contract"), "StrategySignalRows"),
                 research_sources=_list_value(raw.get("research_sources"), []),

@@ -13,6 +13,8 @@
             <th>{{ t('assetCoverage.researchReady') }}</th>
             <th>{{ t('assetCoverage.tradable') }}</th>
             <th>{{ t('assetCoverage.universeSize') }}</th>
+            <th>{{ t('assetCoverage.chainStatus') }}</th>
+            <th>{{ t('assetCoverage.blockers') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -40,6 +42,16 @@
               </span>
             </td>
             <td class="num">{{ item.universe_size }}</td>
+            <td>
+              <div class="chain-status">
+                <span v-for="stage in chainStages" :key="`${item.asset_type}-${stage}`" class="chain-pill" :class="statusBadge(item[`${stage}_status`])">
+                  {{ t(`assetCoverage.${stage}`) }}
+                </span>
+              </div>
+            </td>
+            <td class="blockers-cell">
+              {{ (item.blockers || []).join(" / ") || "—" }}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -55,6 +67,7 @@ import { useI18n } from "../i18n";
 const { t } = useI18n();
 const items = ref<any[]>([]);
 const loading = ref(true);
+const chainStages = ["data", "strategy", "backtest", "paper", "live"];
 
 onMounted(async () => {
   try {
@@ -70,6 +83,12 @@ onMounted(async () => {
 function sourceBadge(source: string) {
   if (source === "real") return "badge-ok";
   if (source === "proxy") return "badge-warn";
+  return "badge-off";
+}
+
+function statusBadge(status: string) {
+  if (status === "ready" || status === "configured_contract") return "badge-ok";
+  if (status === "conditional" || status === "not_applicable") return "badge-warn";
   return "badge-off";
 }
 </script>
@@ -128,4 +147,24 @@ function sourceBadge(source: string) {
 .badge-ok { background: #1a3a2a; color: #4ade80; }
 .badge-warn { background: #3a3a1a; color: #fbbf24; }
 .badge-off { background: #2a2a2a; color: #666; }
+.chain-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 180px;
+}
+.chain-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+.blockers-cell {
+  max-width: 260px;
+  color: var(--text-secondary, #888);
+  font-size: 11px;
+}
 </style>

@@ -55,8 +55,35 @@ DEFAULT_STRATEGY_METADATA = {
         "strategy_type": "risk_overlay",
         "layer": "risk_overlay",
         "data_requirements": ["market_regime", "stock_daily", "portfolio"],
+        "asset_scope": ["stock"],
+        "paper_supported": True,
+        "live_supported": True,
+        "blockers": [],
+    },
+    "cross_asset_allocator": {
+        "strategy_type": "portfolio",
+        "layer": "asset_allocation",
+        "data_requirements": [
+            "stock_daily",
+            "fund_daily",
+            "bond_treasury_yields",
+            "futures_daily",
+            "crypto_daily",
+            "market_regime",
+            "risk_free_curve",
+        ],
+        "asset_scope": ["stock", "etf", "bond", "futures", "crypto", "cash"],
+        "paper_supported": True,
+        "live_supported": False,
+        "blockers": ["futures_live_adapter_not_configured", "crypto_live_adapter_not_configured", "crypto_data_stale_until_fresh_source"],
     },
 }
+
+for _name, _meta in list(DEFAULT_STRATEGY_METADATA.items()):
+    _meta.setdefault("asset_scope", ["stock"])
+    _meta.setdefault("paper_supported", True)
+    _meta.setdefault("live_supported", _name in {"buffett", "multifactor", "cybernetic"})
+    _meta.setdefault("blockers", [])
 
 
 def _load_raw() -> dict:
@@ -83,10 +110,16 @@ def load_registry(force_reload: bool = False) -> List[Dict]:
             "signal_name": v.get("signal_name", name),
             "enabled": v.get("enabled", True),
             "status": v.get("status", "candidate"),
+            "capabilities": v.get("capabilities") or list(STATUS_CAPABILITIES.get(v.get("status", "candidate"), set())),
             "strategy_type": v.get("strategy_type") or defaults.get("strategy_type", ""),
             "layer": v.get("layer") or defaults.get("layer", ""),
             "data_requirements": v.get("data_requirements") or defaults.get("data_requirements", []),
-            "parameters": v.get("parameters", {}),
+            "asset_scope": v.get("asset_scope") or defaults.get("asset_scope", ["stock"]),
+            "required_asset_dimensions": v.get("required_asset_dimensions") or defaults.get("data_requirements", []),
+            "paper_supported": bool(v.get("paper_supported", defaults.get("paper_supported", True))),
+            "live_supported": bool(v.get("live_supported", defaults.get("live_supported", False))),
+            "blockers": v.get("blockers") or defaults.get("blockers", []),
+            "parameters": v.get("parameters", v.get("params", {})),
             "output_contract": v.get("output_contract", "StrategySignalRows"),
             "research_sources": v.get("research_sources", []),
         })

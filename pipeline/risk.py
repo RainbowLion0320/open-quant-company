@@ -14,6 +14,7 @@ import copy
 
 import numpy as np
 
+from data.market.assets.contracts import split_instrument_key
 from pipeline.types import PortfolioTarget, PipelineContext
 from broker.risk import RiskManager
 
@@ -33,11 +34,10 @@ class RiskAdjuster:
         if not targets:
             return []
 
-        total_equity = ctx.cash + sum(
-            ctx.holdings.get(s, 0) * ctx.prices.get(s, 0) for s in ctx.holdings
-        )
+        total_equity = ctx.total_equity()
         current_mv = sum(
-            ctx.holdings.get(s, 0) * ctx.prices.get(s, 0) for s in ctx.holdings
+            quantity * ctx.price_for(*split_instrument_key(key))
+            for key, quantity in ctx.holdings.items()
         )
         peak_equity = max(ctx.cash, total_equity)
 
@@ -46,8 +46,13 @@ class RiskAdjuster:
             "total_exposure": current_mv,
             "peak_equity": peak_equity,
             "positions": {
-                s: {"market_value": ctx.holdings.get(s, 0) * ctx.prices.get(s, 0)}
-                for s in ctx.holdings if s in ctx.prices
+                key: {
+                    "asset_type": split_instrument_key(key)[0],
+                    "symbol": split_instrument_key(key)[1],
+                    "market_value": quantity * ctx.price_for(*split_instrument_key(key)),
+                }
+                for key, quantity in ctx.holdings.items()
+                if quantity > 0 and ctx.price_for(*split_instrument_key(key)) > 0
             },
         }
 
@@ -58,7 +63,7 @@ class RiskAdjuster:
                 adjusted.append(t)
                 continue
 
-            amount = abs(t.delta_shares) * ctx.prices.get(t.symbol, 0)
+            amount = abs(t.delta_shares) * ctx.price_for(t.asset_type, t.symbol)
             passed, results = self._rm.check_order(t.symbol, amount, portfolio)
 
             if passed:
@@ -69,7 +74,7 @@ class RiskAdjuster:
             shrunk = copy.copy(t)
             shrunk.delta_shares = shrunk.delta_shares // 2
             shrunk.target_shares = t.current_shares + shrunk.delta_shares
-            shrunk_amount = abs(shrunk.delta_shares) * ctx.prices.get(t.symbol, 0)
+            shrunk_amount = abs(shrunk.delta_shares) * ctx.price_for(t.asset_type, t.symbol)
 
             passed2, _ = self._rm.check_order(t.symbol, shrunk_amount, portfolio)
             if passed2 and shrunk.delta_shares != 0:

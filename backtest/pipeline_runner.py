@@ -18,7 +18,8 @@ from pipeline.portfolio import PortfolioConstructor, EqualWeightConstructor
 from pipeline.risk import RiskAdjuster
 from pipeline.execution import ExecutionRouter, ExecutionConfig
 from pipeline.scheduler import RebalanceScheduler, RebalanceConfig
-from broker.exchange import AShareExchange, Exchange
+from broker.exchange import AShareExchange, Exchange, default_multi_asset_exchange
+from data.market.assets.contracts import instrument_key, split_instrument_key
 
 
 class PipelineBacktest:
@@ -37,7 +38,9 @@ class PipelineBacktest:
         self.alpha = alpha
         self.portfolio = portfolio or EqualWeightConstructor()
         self.risk = risk or RiskAdjuster()
-        self.execution = execution or ExecutionRouter(ExecutionConfig(exchange=exchange or AShareExchange()))
+        self.execution = execution or ExecutionRouter(
+            ExecutionConfig(exchange=exchange or default_multi_asset_exchange(AShareExchange()))
+        )
         self.scheduler = scheduler or RebalanceScheduler()
         self.initial_cash = cash
 
@@ -46,6 +49,7 @@ class PipelineBacktest:
         prices: pd.DataFrame,
         bench_close: pd.Series,
         universe: list[str] | None = None,
+        asset_types: dict[str, str] | None = None,
         monthly_regimes: dict[str, str] | None = None,
     ) -> dict:
         """Run the backtest day by day and return the standard result dict."""
@@ -53,6 +57,8 @@ class PipelineBacktest:
             universe = list(prices.columns)
         else:
             universe = [symbol for symbol in universe if symbol in prices.columns]
+        asset_types = {str(k): str(v or "stock") for k, v in (asset_types or {}).items()}
+        universe_assets = {symbol: asset_types.get(symbol, "stock") for symbol in universe}
         price_history = prices.ffill()
         price_history.attrs = {}
         try:
@@ -81,6 +87,9 @@ class PipelineBacktest:
                 for sym, val in current_prices_raw.dropna().items()
                 if float(val) > 0
             }
+            for sym, asset_type in universe_assets.items():
+                if sym in current_prices:
+                    current_prices[instrument_key(asset_type, sym)] = current_prices[sym]
 
             # Regime
             regime = "sideways"
@@ -111,6 +120,7 @@ class PipelineBacktest:
                 ctx = PipelineContext(
                     date=dt.date() if hasattr(dt, "date") else dt,
                     universe=universe,
+                    universe_assets=universe_assets,
                     prices=current_prices,
                     price_history=visible_price_history,
                     regime=regime,
@@ -130,6 +140,7 @@ class PipelineBacktest:
                         visible_idx=visible_day_idx,
                         regime=regime,
                         signals=ctx.signals,
+                        universe_assets=universe_assets,
                     )
                 )
 
@@ -153,28 +164,30 @@ class PipelineBacktest:
 
                     if f.side == "sell":
                         cash += (shares * price) - f.commission
-                        if f.symbol in holdings:
-                            holdings[f.symbol] -= shares
-                            if holdings[f.symbol] <= 0:
-                                holdings.pop(f.symbol, None)
-                                cost_basis.pop(f.symbol, None)
-                        trade_log.append((dt, "SELL", f.symbol, shares, price))
+                        key = f.key
+                        if key in holdings:
+                            holdings[key] -= shares
+                            if holdings[key] <= 0:
+                                holdings.pop(key, None)
+                                cost_basis.pop(key, None)
+                        trade_log.append((dt, "SELL", f.asset_type, f.symbol, shares, price))
 
                     else:  # buy
                         cost = shares * price + f.commission
                         if cost <= cash:
                             cash -= cost
-                            prev_shares = holdings.get(f.symbol, 0)
-                            prev_cost = cost_basis.get(f.symbol, 0) * prev_shares
-                            holdings[f.symbol] = prev_shares + shares
-                            cost_basis[f.symbol] = (prev_cost + cost) / holdings[f.symbol] if holdings[f.symbol] > 0 else price
-                            trade_log.append((dt, "BUY", f.symbol, shares, price))
+                            key = f.key
+                            prev_shares = holdings.get(key, 0)
+                            prev_cost = cost_basis.get(key, 0) * prev_shares
+                            holdings[key] = prev_shares + shares
+                            cost_basis[key] = (prev_cost + cost) / holdings[key] if holdings[key] > 0 else price
+                            trade_log.append((dt, "BUY", f.asset_type, f.symbol, shares, price))
 
             # Daily NAV
             mv = sum(
-                holdings.get(sym, 0) * current_prices.get(sym, 0)
-                for sym in set(list(holdings.keys()) + list(current_prices.keys()))
-                if sym in current_prices
+                quantity * current_prices.get(key, 0)
+                for key, quantity in holdings.items()
+                if key in current_prices
             )
             daily_values.append((dt, cash + mv))
 
@@ -199,6 +212,7 @@ class PipelineBacktest:
             "score_panel": pd.DataFrame(score_panel_rows),
             "alpha_diagnostics": self._alpha_diagnostics(),
             "final_holdings": dict(holdings),
+            "final_holdings_by_asset": self._holdings_by_asset(holdings),
             "total_return": report.total_return,
             "bench_return": (bench_close.iloc[-1] / bench_close.iloc[0] - 1) if len(bench_close) > 0 else 0,
             "sharpe": report.sharpe,
@@ -230,6 +244,7 @@ class PipelineBacktest:
         visible_idx: int,
         regime: str,
         signals: list,
+        universe_assets: dict[str, str] | None = None,
     ) -> list[dict]:
         raw_rows = self.alpha.generate_score_panel(universe, visible_prices, visible_idx, regime)
         if not raw_rows:
@@ -248,6 +263,7 @@ class PipelineBacktest:
             return []
 
         signal_symbols = {str(signal.symbol) for signal in signals}
+        signal_asset_types = {str(signal.symbol): str(getattr(signal, "asset_type", "stock") or "stock") for signal in signals}
         dt = full_prices.index[full_idx]
         numeric_scores = pd.Series(
             {
@@ -269,6 +285,7 @@ class PipelineBacktest:
                 {
                     "as_of_date": dt.date().isoformat() if hasattr(dt, "date") else str(dt),
                     "symbol": symbol,
+                    "asset_type": signal_asset_types.get(symbol) or (universe_assets or {}).get(symbol, "stock"),
                     "strategy": row.get("strategy") or self.alpha.name,
                     "score": float(score_value) if pd.notna(score_value) else None,
                     "rank": int(ranks.loc[idx]) if pd.notna(ranks.loc[idx]) else None,
@@ -310,3 +327,11 @@ class PipelineBacktest:
             "strategy": getattr(self.alpha, "name", ""),
             "load_errors": sorted(dict.fromkeys(errors)),
         }
+
+    @staticmethod
+    def _holdings_by_asset(holdings: dict[str, int]) -> dict[str, dict[str, int]]:
+        out: dict[str, dict[str, int]] = {}
+        for key, quantity in holdings.items():
+            asset_type, symbol = split_instrument_key(key)
+            out.setdefault(asset_type, {})[symbol] = int(quantity)
+        return out

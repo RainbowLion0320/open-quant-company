@@ -8,4 +8,11 @@ export const assetCoverage = {
       researchReady: "Research Ready",
       tradable: "Tradable",
       universeSize: "Universe Size",
+      chainStatus: "Chain Status",
+      blockers: "Blockers",
+      data: "Data",
+      strategy: "Strategy",
+      backtest: "Backtest",
+      paper: "Paper",
+      live: "Live",
     } as const;

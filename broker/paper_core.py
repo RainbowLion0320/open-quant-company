@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from data.market.assets.contracts import instrument_key, normalize_asset_type, split_instrument_key
 from broker.base import Broker
-from broker.exchange import AShareExchange, OrderSide
+from broker.exchange import AShareExchange, MultiAssetExchange, OrderSide, default_multi_asset_exchange
 from broker.fill_models import (
     CompositeFill,
     FillModel,
@@ -53,6 +54,7 @@ class PaperBroker(PaperStateMixin, Broker):
         self._order_sms: dict[str, OrderStateMachine] = {}
         self._ledger = ledger or EventLedger()
         self._exchange = AShareExchange(commission=commission_rate, stamp_tax=stamp_duty)
+        self._multi_exchange = default_multi_asset_exchange(self._exchange)
         self._order_service = PaperOrderService()
 
         slippage = slippage_model or NoSlippage()
@@ -60,7 +62,7 @@ class PaperBroker(PaperStateMixin, Broker):
             LimitUpDownAwareFill(slippage=slippage),
             ImmediateFill(slippage=slippage),
         ])
-        self._matcher = MatchingEngine(exchange=self._exchange, fill_model=self._fill_model)
+        self._matcher = MatchingEngine(exchange=self._multi_exchange, fill_model=self._fill_model)
 
         self._risk_mgr = None
         if enable_risk:
@@ -86,12 +88,17 @@ class PaperBroker(PaperStateMixin, Broker):
         for code, price in prices.items():
             if code in self._positions:
                 self._positions[code].current_price = price
+            asset_type, symbol = split_instrument_key(code)
+            legacy_key = instrument_key(asset_type, symbol)
+            if legacy_key in self._positions:
+                self._positions[legacy_key].current_price = price
 
-    def _resolve_price(self, code: str, price: float) -> float:
+    def _resolve_price(self, code: str, price: float, asset_type: str = "stock") -> float:
         """Resolve market order price. Returns 0 when no quote is available."""
         if price > 0:
             return price
-        return self._prices.get(code, 0)
+        key = instrument_key(asset_type, code)
+        return self._prices.get(key, self._prices.get(code, 0))
 
     def get_positions(self) -> list[Position]:
         return [position for position in self._positions.values() if position.volume > 0]
@@ -105,16 +112,17 @@ class PaperBroker(PaperStateMixin, Broker):
             market_value=market_value,
         )
 
-    def submit_order(self, code: str, price: float, volume: int, side: str) -> str:
-        return self._order_service.submit_order(self, code, price, volume, side)
+    def submit_order(self, code: str, price: float, volume: int, side: str, asset_type: str = "stock") -> str:
+        return self._order_service.submit_order(self, code, price, volume, side, asset_type=asset_type)
 
     def preview_order(self, intent: dict[str, Any]) -> dict[str, Any]:
         """Preview a paper order without creating an order or mutating broker state."""
         normalized = self._normalize_preview_intent(intent)
         symbol = str(normalized["symbol"])
+        asset_type = str(normalized["asset_type"])
         side = str(normalized["side"])
         quantity = int(normalized["quantity"])
-        price = self._resolve_price(symbol, float(normalized["limit_price"]))
+        price = self._resolve_price(symbol, float(normalized["limit_price"]), asset_type)
         blockers: list[str] = list(normalized.get("numeric_errors") or [])
 
         if not symbol:
@@ -133,7 +141,7 @@ class PaperBroker(PaperStateMixin, Broker):
         balance = self.get_balance()
         notional = max(price, 0.0) * max(quantity, 0)
         side_enum = OrderSide.BUY if side == "buy" else OrderSide.SELL
-        fees = self._exchange.calc_cost(max(price, 0.0), max(quantity, 0), side_enum) if side in {"buy", "sell"} else 0.0
+        fees = self._exchange_for(asset_type).calc_cost(max(price, 0.0), max(quantity, 0), side_enum) if side in {"buy", "sell"} else 0.0
         checks: list[dict[str, Any]] = []
 
         if side == "buy" and price > 0 and quantity > 0:
@@ -171,9 +179,9 @@ class PaperBroker(PaperStateMixin, Broker):
                     }
                 )
         elif side == "sell" and price > 0 and quantity > 0:
-            position = self._positions.get(symbol)
+            position = self._positions.get(instrument_key(asset_type, symbol))
             holdings = position.volume if position else 0
-            bought_today = self._today_buys.get(symbol, 0) if self.t_plus_1 else 0
+            bought_today = self._today_buys.get(instrument_key(asset_type, symbol), 0) if self.t_plus_1 else 0
             available = max(0, holdings - bought_today)
             sell_passed = available >= quantity
             if not sell_passed:
@@ -207,6 +215,7 @@ class PaperBroker(PaperStateMixin, Broker):
             "estimated_cash_effect": _cash_effect(side, notional, fees),
             "estimated_position_effect": {
                 "symbol": symbol,
+                "asset_type": asset_type,
                 "quantity_delta": quantity if side == "buy" else -quantity,
                 "notional_delta": notional if side == "buy" else -notional,
             },
@@ -267,6 +276,7 @@ class PaperBroker(PaperStateMixin, Broker):
         )
         return {
             "symbol": str(intent.get("symbol") or intent.get("code") or "").strip(),
+            "asset_type": normalize_asset_type(intent.get("asset_type")),
             "side": str(intent.get("side") or "").strip().lower(),
             "quantity": max(quantity, 0),
             "order_type": str(intent.get("order_type") or "limit").strip().lower(),
@@ -290,6 +300,11 @@ class PaperBroker(PaperStateMixin, Broker):
                 if position.volume > 0
             },
         }
+
+    def _exchange_for(self, asset_type: str):
+        if isinstance(self._multi_exchange, MultiAssetExchange):
+            return self._multi_exchange.get(asset_type)
+        return self._exchange
 
 
 def _cash_effect(side: str, notional: float, fees: float) -> float:

@@ -14,6 +14,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from data.market.assets.contracts import split_instrument_key
 from pipeline.types import AlphaSignal, PortfolioTarget, PipelineContext
 
 
@@ -51,32 +52,30 @@ class EqualWeightConstructor(PortfolioConstructor):
         n = len(top)
         weight = 1.0 / n
 
-        total_equity = ctx.cash + sum(
-            ctx.holdings.get(s, 0) * ctx.prices.get(s, 0)
-            for s in ctx.holdings
-        )
+        total_equity = ctx.total_equity()
         deployable = ctx.cash * self.position_pct
         per_symbol = deployable / n if n > 0 else 0
 
-        current_symbols = set(ctx.holdings.keys())
-        target_symbols = {s.symbol for s in top}
+        current_keys = {key for key, value in ctx.holdings.items() if value > 0}
+        target_keys = {s.key for s in top}
 
         targets: list[PortfolioTarget] = []
 
         for signal in top:
             sym = signal.symbol
-            price = ctx.prices.get(sym, 0)
+            price = ctx.price_for(signal.asset_type, sym)
             if price <= 0:
                 continue
 
             target_shares = max(0, int(per_symbol / price // self.lot_size) * self.lot_size)
-            current_vol = ctx.holdings.get(sym, 0)
+            current_vol = ctx.holding_for(signal.asset_type, sym)
             current_w = (current_vol * price) / total_equity if total_equity > 0 else 0
 
             targets.append(PortfolioTarget(
                 symbol=sym,
                 strategy=signal.strategy,
                 target_weight=round(weight, 4),
+                asset_type=signal.asset_type,
                 target_shares=target_shares,
                 current_weight=round(current_w, 4),
                 current_shares=current_vol,
@@ -85,17 +84,20 @@ class EqualWeightConstructor(PortfolioConstructor):
             ))
 
         # Sell signals for positions no longer in target
-        for sym in current_symbols - target_symbols:
-            if sym not in ctx.prices:
+        for key in current_keys - target_keys:
+            asset_type, sym = split_instrument_key(key)
+            price = ctx.price_for(asset_type, sym)
+            if price <= 0:
                 continue
-            cur_vol = ctx.holdings.get(sym, 0)
+            cur_vol = ctx.holding_for(asset_type, sym)
             if cur_vol <= 0:
                 continue
-            cur_w = (cur_vol * ctx.prices[sym]) / total_equity if total_equity > 0 else 0
+            cur_w = (cur_vol * price) / total_equity if total_equity > 0 else 0
             targets.append(PortfolioTarget(
                 symbol=sym,
                 strategy="",
                 target_weight=0,
+                asset_type=asset_type,
                 target_shares=0,
                 current_weight=round(cur_w, 4),
                 current_shares=cur_vol,
@@ -151,32 +153,30 @@ class InverseVolatilityConstructor(PortfolioConstructor):
         total_w = sum(raw_weights.values())
         weights = {s: w / total_w for s, w in raw_weights.items()} if total_w > 0 else {}
 
-        total_equity = ctx.cash + sum(
-            ctx.holdings.get(s, 0) * ctx.prices.get(s, 0)
-            for s in ctx.holdings
-        )
+        total_equity = ctx.total_equity()
         deployable = ctx.cash * self.position_pct
-        current_symbols = set(ctx.holdings.keys())
-        target_symbols = {s.symbol for s in top}
+        current_keys = {key for key, value in ctx.holdings.items() if value > 0}
+        target_keys = {s.key for s in top}
 
         targets: list[PortfolioTarget] = []
 
         for signal in top:
             sym = signal.symbol
-            price = ctx.prices.get(sym, 0)
+            price = ctx.price_for(signal.asset_type, sym)
             if price <= 0:
                 continue
 
             w = weights.get(sym, 0)
             target_val = deployable * w
             target_shares = max(0, int(target_val / price // self.lot_size) * self.lot_size)
-            current_vol = ctx.holdings.get(sym, 0)
+            current_vol = ctx.holding_for(signal.asset_type, sym)
             current_w = (current_vol * price) / total_equity if total_equity > 0 else 0
 
             targets.append(PortfolioTarget(
                 symbol=sym,
                 strategy=signal.strategy,
                 target_weight=round(w, 4),
+                asset_type=signal.asset_type,
                 target_shares=target_shares,
                 current_weight=round(current_w, 4),
                 current_shares=current_vol,
@@ -184,17 +184,20 @@ class InverseVolatilityConstructor(PortfolioConstructor):
                 reason=f"InvVol w={w:.1%} vol={vols.get(sym,0):.1%}",
             ))
 
-        for sym in current_symbols - target_symbols:
-            if sym not in ctx.prices:
+        for key in current_keys - target_keys:
+            asset_type, sym = split_instrument_key(key)
+            price = ctx.price_for(asset_type, sym)
+            if price <= 0:
                 continue
-            cur_vol = ctx.holdings.get(sym, 0)
+            cur_vol = ctx.holding_for(asset_type, sym)
             if cur_vol <= 0:
                 continue
-            cur_w = (cur_vol * ctx.prices[sym]) / total_equity if total_equity > 0 else 0
+            cur_w = (cur_vol * price) / total_equity if total_equity > 0 else 0
             targets.append(PortfolioTarget(
                 symbol=sym,
                 strategy="",
                 target_weight=0,
+                asset_type=asset_type,
                 target_shares=0,
                 current_weight=round(cur_w, 4),
                 current_shares=cur_vol,
@@ -239,10 +242,7 @@ class ConstrainedPortfolioConstructor(PortfolioConstructor):
         if not signals:
             return []
 
-        total_equity = ctx.cash + sum(
-            ctx.holdings.get(sym, 0) * ctx.prices.get(sym, 0)
-            for sym in ctx.holdings
-        )
+        total_equity = ctx.total_equity()
         if total_equity <= 0:
             return []
 
@@ -256,7 +256,7 @@ class ConstrainedPortfolioConstructor(PortfolioConstructor):
                 continue
             if len(selected) >= self.max_positions:
                 break
-            price = ctx.prices.get(signal.symbol, 0)
+            price = ctx.price_for(signal.asset_type, signal.symbol)
             if price <= 0:
                 continue
             sector = self.sector_map.get(signal.symbol) or f"unknown:{signal.symbol}"
@@ -268,21 +268,22 @@ class ConstrainedPortfolioConstructor(PortfolioConstructor):
             sector_weights[sector] = sector_weights.get(sector, 0.0) + base_weight
             planned_weight += base_weight
 
-        target_symbols = {signal.symbol for signal, _sector, _weight in selected}
-        current_symbols = set(ctx.holdings.keys())
+        target_keys = {signal.key for signal, _sector, _weight in selected}
+        current_keys = {key for key, value in ctx.holdings.items() if value > 0}
         targets: list[PortfolioTarget] = []
 
         for signal, sector, weight in selected:
-            price = ctx.prices.get(signal.symbol, 0)
+            price = ctx.price_for(signal.asset_type, signal.symbol)
             target_value = total_equity * weight
             target_shares = max(0, int(target_value / price // self.lot_size) * self.lot_size)
-            current_vol = ctx.holdings.get(signal.symbol, 0)
+            current_vol = ctx.holding_for(signal.asset_type, signal.symbol)
             current_w = (current_vol * price) / total_equity if total_equity > 0 else 0
             display_sector = sector.split(":", 1)[0] if sector.startswith("unknown:") else sector
             targets.append(PortfolioTarget(
                 symbol=signal.symbol,
                 strategy=signal.strategy,
                 target_weight=round(weight, 4),
+                asset_type=signal.asset_type,
                 target_shares=target_shares,
                 current_weight=round(current_w, 4),
                 current_shares=current_vol,
@@ -290,9 +291,10 @@ class ConstrainedPortfolioConstructor(PortfolioConstructor):
                 reason=f"Constrained Top-{self.max_positions}; sector={display_sector}; cap={self.max_sector_weight:.0%}",
             ))
 
-        for sym in current_symbols - target_symbols:
-            price = ctx.prices.get(sym, 0)
-            cur_vol = ctx.holdings.get(sym, 0)
+        for key in current_keys - target_keys:
+            asset_type, sym = split_instrument_key(key)
+            price = ctx.price_for(asset_type, sym)
+            cur_vol = ctx.holding_for(asset_type, sym)
             if price <= 0 or cur_vol <= 0:
                 continue
             cur_w = (cur_vol * price) / total_equity
@@ -300,6 +302,7 @@ class ConstrainedPortfolioConstructor(PortfolioConstructor):
                 symbol=sym,
                 strategy="",
                 target_weight=0.0,
+                asset_type=asset_type,
                 target_shares=0,
                 current_weight=round(cur_w, 4),
                 current_shares=cur_vol,

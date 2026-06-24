@@ -100,13 +100,14 @@ class TestDataQualityGate:
         assert report.status == "error"
         assert "Unknown dimension" in report.issues[0]
 
-    def test_skipped_planned_dimension(self):
+    def test_enabled_crypto_dimension_is_missing_until_fresh_source_exists(self):
         from data.quality.quality import DataQualityGate
         gate = DataQualityGate()
         report = gate.check_dimension("crypto_daily")
 
-        assert report.status == "skipped"
-        assert report.health_score == 100
+        assert report.status == "missing"
+        assert report.health_score == 0
+        assert "No data found" in report.issues
 
     def test_high_null_ratio_detected(self, tmp_path, monkeypatch):
         from data.storage.datahub import DataHub, reset_datahub

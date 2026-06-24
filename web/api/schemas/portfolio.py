@@ -82,6 +82,7 @@ class StockListResponse(BaseModel):
 
 class PositionItem(BaseModel):
     code: str
+    asset_type: str = "stock"
     name: str = ""
     volume: int
     avg_cost: float
@@ -100,6 +101,7 @@ class AccountInfo(BaseModel):
 
 class OrderRequest(BaseModel):
     code: str
+    asset_type: str = "stock"
     price: float
     volume: int
     side: str = Field(..., description="buy/sell")
@@ -108,6 +110,7 @@ class OrderRequest(BaseModel):
 class OrderItem(BaseModel):
     order_id: str
     code: str
+    asset_type: str = "stock"
     side: str
     price: float
     volume: int
@@ -125,6 +128,13 @@ class AssetOverviewItem(BaseModel):
     research_ready: bool = False
     tradable: bool = False
     universe_size: int = 0
+    data_status: str = "blocked"
+    strategy_status: str = "blocked"
+    backtest_status: str = "blocked"
+    paper_status: str = "blocked"
+    live_status: str = "blocked"
+    live_adapter: str = ""
+    blockers: list[str] = Field(default_factory=list)
     error: str = ""
 
 

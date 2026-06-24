@@ -102,9 +102,20 @@ class ETFExchange:
 
 class BondExchange:
     commission: 0.00002       # 配置默认，最低佣金 0.1 元
+
+class FuturesExchange:
+    commission_per_lot: 10.0  # 按手收佣
+    margin_rate: 0.10
+
+class CryptoExchange:
+    commission: 0.001         # 默认现货费率
 ```
 
-`calc_cost(price, shares, side)` → 统一计算当前资产的佣金、印花税和过户费等成本；费率从 `trading.exchange.*` 读取，可通过构造参数覆盖。
+`OrderIntent.asset_type` 是执行层的一等字段。`ExecutionRouter` 通过 `MultiAssetExchange` 按资产类型选择成本模型；缺 exchange 注册时阻断，不允许回退股票费率。PaperBroker 仓位键为 `(asset_type, symbol)` 的稳定键，旧股票仓位继续兼容 plain symbol。
+
+`calc_cost(price, shares, side)` → 统一计算当前资产的佣金、印花税、保证金或交易所费率等成本；费率从 `trading.exchange.*` 读取，可通过构造参数覆盖。
+
+Live adapter registry 必须按资产类型 fail-closed：stock/ETF/可转债优先 QMT/MiniQMT，futures 需要 CTP 或配置化 futures gateway，crypto 需要 CCXT-compatible exchange。未配置、缺 SDK、缺账户、缺密钥或端点不可达时返回 blocked evidence，不回退 PaperBroker。
 
 ### 2.4 Persistence — 状态持久化
 
@@ -112,7 +123,7 @@ class BondExchange:
 
 | 表 | 路径 | Schema |
 |----|------|--------|
-| `trades` | `var/store/paper/trades.parquet` | date, code, name, side, price, volume, amount, strategy |
+| `trades` | `var/store/paper/trades.parquet` | date, code, asset_type, name, side, price, volume, amount, strategy |
 | `nav` | `var/store/paper/nav.parquet` | date, total_asset, cash, market_value |
 | `state` | `var/store/paper/state.parquet` | cash, frozen_cash, peak_equity, positions(JSON), order_counter, updated_at |
 

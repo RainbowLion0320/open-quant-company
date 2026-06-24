@@ -87,6 +87,12 @@ class StrategyCatalogItemResponse(BaseModel):
     lifecycle: str
     config_key: str
     data_requirements: list[str]
+    asset_scope: list[str] = Field(default_factory=list)
+    required_asset_dimensions: list[str] = Field(default_factory=list)
+    paper_supported: bool = True
+    live_supported: bool = False
+    blockers: list[str] = Field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=list)
     parameters: dict[str, Any] = Field(default_factory=dict)
     output_contract: str
     research_sources: list[str] = Field(default_factory=list)

@@ -62,6 +62,18 @@ def _context_for_tool(*, tool_id: str, action: dict[str, Any], run: dict[str, An
             "facts": _data_sources_facts(),
             "wording_rules": list(DATA_SOURCE_WORDING_RULES),
         }
+    if tool_id == "astroq.assets.overview":
+        return {
+            **base,
+            "kind": "asset_chain_summary",
+            "facts": _asset_overview_facts(),
+            "wording_rules": [
+                "Enabled asset switches do not imply strategy, paper, or live trading readiness.",
+                "Live status must be reported from live_status/blockers only; do not infer live readiness from tradable.",
+                "Crypto with stale data is not strategy-ready or trade-ready.",
+                "Treasury yield proxies are research inputs, not directly tradable instruments.",
+            ],
+        }
     return None
 
 
@@ -114,6 +126,38 @@ def _data_sources_artifact_path() -> Path:
     from data.storage.datahub import get_datahub
 
     return get_datahub().artifact_path("data-sources", "latest.json")
+
+
+def _asset_overview_facts() -> dict[str, Any]:
+    from data.market.assets.overview import asset_overview_items
+
+    items = asset_overview_items()
+    return {
+        "status": "ok",
+        "asset_count": len(items),
+        "ready_counts": {
+            "data": sum(1 for item in items if item.get("data_status") == "ready"),
+            "strategy": sum(1 for item in items if item.get("strategy_status") == "ready"),
+            "backtest": sum(1 for item in items if item.get("backtest_status") == "ready"),
+            "paper": sum(1 for item in items if item.get("paper_status") == "ready"),
+            "live": sum(1 for item in items if item.get("live_status") in {"ready", "validated"}),
+        },
+        "assets": [
+            {
+                "asset_type": str(item.get("asset_type") or ""),
+                "label": str(item.get("label") or item.get("asset_type") or ""),
+                "enabled": bool(item.get("enabled")),
+                "data_status": str(item.get("data_status") or "blocked"),
+                "strategy_status": str(item.get("strategy_status") or "blocked"),
+                "backtest_status": str(item.get("backtest_status") or "blocked"),
+                "paper_status": str(item.get("paper_status") or "blocked"),
+                "live_status": str(item.get("live_status") or "blocked"),
+                "live_adapter": str(item.get("live_adapter") or ""),
+                "blockers": [str(blocker) for blocker in item.get("blockers", [])],
+            }
+            for item in items
+        ],
+    }
 
 
 def _source_fact(row: dict[str, Any]) -> dict[str, Any]:

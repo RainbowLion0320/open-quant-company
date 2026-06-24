@@ -87,7 +87,15 @@ def load_local_equity_ohlcv(symbol: str = "sh000001", *, data_root: str | Path =
         notes.append(f"index_cache_unavailable:{symbol}")
 
     root = Path(data_root)
-    hub = DataHub(project_root=root, create=False)
+    hub = DataHub(
+        project_root=root,
+        runtime_root=root / "var",
+        store_root=root / "var" / "store",
+        cache_root=root / "var" / "cache",
+        artifact_root=root / "var" / "artifacts",
+        db_root=root / "var" / "db",
+        create=False,
+    )
     fallbacks = [
         (hub.asset_daily_path("fund", "510300.SH"), "fund_daily:510300.SH"),
         (hub.asset_daily_path("fund", "510500.SH"), "fund_daily:510500.SH"),
@@ -104,7 +112,15 @@ def load_local_equity_ohlcv(symbol: str = "sh000001", *, data_root: str | Path =
 
 def _load_treasury_defensive_proxy(*, data_root: str | Path = ".") -> tuple[pd.DataFrame, str, list[str]]:
     root = Path(data_root)
-    hub = DataHub(project_root=root, create=False)
+    hub = DataHub(
+        project_root=root,
+        runtime_root=root / "var",
+        store_root=root / "var" / "store",
+        cache_root=root / "var" / "cache",
+        artifact_root=root / "var" / "artifacts",
+        db_root=root / "var" / "db",
+        create=False,
+    )
     path = hub.store_path("bond") / "treasury_yields.parquet"
     frame = _read_local_parquet(path)
     if frame.empty or "中国国债收益率10年" not in frame.columns:

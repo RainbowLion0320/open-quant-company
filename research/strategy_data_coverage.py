@@ -31,6 +31,25 @@ FAMILIES: list[dict[str, str]] = [
 ]
 FAMILY_KEYS = [item["key"] for item in FAMILIES]
 
+ASSET_CLASSES: list[dict[str, str]] = [
+    {"key": "stock", "label_zh": "股票", "label_en": "Stock"},
+    {"key": "etf", "label_zh": "ETF", "label_en": "ETF"},
+    {"key": "bond", "label_zh": "债券", "label_en": "Bond"},
+    {"key": "futures", "label_zh": "期货", "label_en": "Futures"},
+    {"key": "crypto", "label_zh": "加密", "label_en": "Crypto"},
+    {"key": "cash", "label_zh": "现金", "label_en": "Cash"},
+]
+ASSET_KEYS = [item["key"] for item in ASSET_CLASSES]
+
+ASSET_DIMENSION_MAP: dict[str, tuple[str, ...]] = {
+    "stock": ("stock_daily", "tushare_stock_daily", "ohlcv_daily"),
+    "etf": ("fund_daily", "fund_nav"),
+    "bond": ("bond_treasury_yields",),
+    "futures": ("futures_daily", "fut_daily"),
+    "crypto": ("crypto_daily",),
+    "cash": ("risk_free_curve",),
+}
+
 DIMENSION_FAMILY_MAP: dict[str, tuple[str, ...]] = {
     "stock_daily": ("price", "volume"),
     "raw_price": ("price",),
@@ -171,6 +190,8 @@ def _row(
     evidence_loader: Callable[[str], dict[str, Any]],
 ) -> dict[str, Any]:
     declared_dimensions = sorted(set(str(dim) for dim in item.data_requirements if str(dim).strip()))
+    required_asset_dimensions = sorted(set(str(dim) for dim in item.required_asset_dimensions if str(dim).strip()))
+    asset_scope = [asset for asset in item.asset_scope if asset in ASSET_KEYS]
     declared_families = set(families_for_dimensions(declared_dimensions))
     evidence = evidence_loader(item.name)
     observed_dimensions = _observed_dimensions(evidence)
@@ -205,6 +226,24 @@ def _row(
             "observed": observed,
             "expectation": "required" if family in required else "optional" if family in optional else "not_applicable",
         }
+    asset_cells: dict[str, dict[str, Any]] = {}
+    missing_required_assets: list[str] = []
+    for asset in ASSET_KEYS:
+        in_scope = asset in asset_scope
+        required_dims = ASSET_DIMENSION_MAP.get(asset, ())
+        has_required_dim = asset == "cash" or any(dim in declared_dimensions or dim in required_asset_dimensions for dim in required_dims)
+        if in_scope and has_required_dim:
+            status = "in_scope"
+        elif in_scope:
+            status = "required_missing"
+            missing_required_assets.append(asset)
+        else:
+            status = "not_applicable"
+        asset_cells[asset] = {
+            "status": status,
+            "in_scope": in_scope,
+            "required_dimensions": list(required_dims),
+        }
     required_score = 1.0 if not required else (len(required - set(missing_required)) / len(required))
     return {
         "strategy": item.name,
@@ -213,6 +252,11 @@ def _row(
         "layer": item.layer,
         "lifecycle": item.lifecycle,
         "declared_dimensions": declared_dimensions,
+        "asset_scope": asset_scope,
+        "required_asset_dimensions": required_asset_dimensions,
+        "paper_supported": item.paper_supported,
+        "live_supported": item.live_supported,
+        "blockers": list(item.blockers),
         "declared_families": _sorted_families(declared_families),
         "observed_dimensions": observed_dimensions,
         "observed_families": _sorted_families(observed_families),
@@ -223,8 +267,10 @@ def _row(
         "missing_required_families": missing_required,
         "optional_missing_families": optional_missing,
         "unused_declared_families": unused_declared,
+        "missing_required_assets": missing_required_assets,
         "coverage_score": round(required_score, 4),
         "cells": cells,
+        "asset_cells": asset_cells,
     }
 
 
@@ -236,11 +282,13 @@ def build_strategy_data_coverage(
     rows = [_row(item, evidence_loader=evidence_loader) for item in (list(items) if items is not None else catalog_items())]
     required_gap_count = sum(len(row["missing_required_families"]) for row in rows)
     optional_gap_count = sum(len(row["optional_missing_families"]) for row in rows)
+    asset_gap_count = sum(len(row["missing_required_assets"]) for row in rows)
     return {
         "status": "ok",
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "recommended_command": "astroq strategy data-coverage --json",
         "families": FAMILIES,
+        "assets": ASSET_CLASSES,
         "expectations": {
             "by_type": TYPE_EXPECTATIONS,
             "by_layer": LAYER_EXPECTATION_OVERRIDES,
@@ -250,6 +298,7 @@ def build_strategy_data_coverage(
             "family_count": len(FAMILIES),
             "required_gap_count": required_gap_count,
             "optional_gap_count": optional_gap_count,
+            "asset_gap_count": asset_gap_count,
             "missing_observed_count": sum(1 for row in rows if row["observed_status"] == "missing_evidence"),
         },
         "rows": sorted(rows, key=lambda row: (row["lifecycle"] != "production", row["layer"], row["strategy"])),

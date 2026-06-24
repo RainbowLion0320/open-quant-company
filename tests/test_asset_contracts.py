@@ -176,16 +176,30 @@ class TestFuturesAssetContracts:
 # ═══════════════════════════════════════
 
 class TestCryptoAssetContracts:
-    def test_data_source_is_placeholder(self):
+    def test_data_source_is_real(self):
         from data.market.assets.crypto import CryptoAsset
-        assert CryptoAsset.DATA_SOURCE == "placeholder"
-        assert "pending" in CryptoAsset.DATA_SOURCE_DETAIL.lower()
+        assert CryptoAsset.DATA_SOURCE == "real"
+        assert CryptoAsset.RESEARCH_READY is True
+        assert "akshare" in CryptoAsset.DATA_SOURCE_DETAIL.lower()
 
-    def test_fetch_daily_returns_none(self, tmp_path):
+    def test_fetch_daily_returns_daily_ohlcv_from_spot_snapshot(self, tmp_path):
         from data.market.assets.crypto import CryptoAsset
+
+        spot = pd.DataFrame({
+            "name": ["BTC", "ETH"],
+            "price": [65000.0, 3300.0],
+            "high": [66000.0, 3400.0],
+            "low": [64000.0, 3200.0],
+            "open": [64500.0, 3250.0],
+            "volume": [12345.0, 23456.0],
+        })
+
         adapter = CryptoAsset(store_root=tmp_path / "store")
-        result = adapter.fetch_daily("BTC/USDT")
-        assert result is None
+        with patch("akshare.crypto_js_spot", return_value=spot):
+            result = adapter.fetch_daily("BTC/USDT")
+        assert result is not None
+        assert all(c in result.columns for c in ("date", "open", "high", "low", "close", "volume"))
+        assert float(result.iloc[-1]["close"]) == 65000.0
 
     def test_universe_has_btc_eth(self, tmp_path):
         from data.market.assets.crypto import CryptoAsset
@@ -198,6 +212,14 @@ class TestCryptoAssetContracts:
         from data.market.assets.crypto import CryptoAsset
         assert CryptoAsset.CURRENCY == "USDT"
         assert CryptoAsset.TRADING_CALENDAR == "24x7"
+
+    def test_derive_crypto_daily_contract_columns(self):
+        from data.quality.contract import derive_contracts_from_registry
+        contracts = derive_contracts_from_registry()
+        c = contracts.get("crypto_daily")
+        assert c is not None
+        for col in ("date", "open", "high", "low", "close", "volume"):
+            assert col in c.columns
 
 
 # ═══════════════════════════════════════
@@ -261,6 +283,31 @@ class TestAssetRegistryWithContracts:
             reg.register(ETFAsset(store_root=tmp_path / "store"))
 
 
+class TestAssetTradingChainContracts:
+    def test_live_registry_fails_closed_for_futures_and_crypto(self):
+        from broker.live.registry import live_adapter_registry
+
+        registry = live_adapter_registry()
+        futures = registry.status_for("futures")
+        crypto = registry.status_for("crypto")
+
+        assert futures.status == "blocked"
+        assert "live_adapter_not_configured" in futures.blockers
+        assert crypto.status == "blocked"
+        assert "exchange_secret_missing" in crypto.blockers
+        assert crypto.paper_fallback is False
+
+    def test_asset_overview_reports_chain_status_and_blockers(self):
+        from data.market.assets.overview import asset_overview_items
+
+        by_type = {item["asset_type"]: item for item in asset_overview_items(["crypto", "futures"])}
+
+        assert by_type["crypto"]["data_status"] == "blocked"
+        assert "crypto_data_stale_until_fresh_source" in by_type["crypto"]["blockers"]
+        assert by_type["futures"]["live_status"] == "blocked"
+        assert "live_adapter_not_configured" in by_type["futures"]["blockers"]
+
+
 # ═══════════════════════════════════════
 # Test Multi-Asset Contract Derivation
 # ═══════════════════════════════════════
@@ -304,3 +351,30 @@ class TestMultiAssetContractsDerivation:
         # validate() returns list of ContractViolation objects
         errors = [v for v in violations if v.severity == "error"]
         assert len(errors) == 0, f"Unexpected errors: {errors}"
+
+
+class TestMultiAssetPriceBook:
+    def test_price_panel_uses_asset_adapter_and_returns_blockers(self, tmp_path):
+        from data.market.assets.price_book import get_asset_price_panel
+
+        panel = get_asset_price_panel("unknown_asset", ["X"], "2024-01-01", "2024-01-31")
+
+        assert panel.status == "blocked"
+        assert panel.blockers == ["missing_asset_adapter:unknown_asset"]
+
+    def test_price_panel_fetches_etf_close_matrix(self, tmp_path):
+        from data.market.assets.base import AssetRegistry
+        import data.market.assets.base as base
+        from data.market.assets.etf import ETFAsset
+        from data.market.assets.price_book import get_asset_price_panel
+
+        df = _make_ohlcv_df()
+        df.rename(columns={"date": "日期", "open": "开盘", "close": "收盘",
+                           "high": "最高", "low": "最低", "volume": "成交量"}, inplace=True)
+        reg = AssetRegistry()
+        reg.register(ETFAsset(store_root=tmp_path / "store"))
+        with patch.object(base, "_asset_registry", reg), patch("akshare.fund_etf_hist_em", return_value=df):
+            panel = get_asset_price_panel("etf", ["518880"], "2024-01-01", "2024-12-31")
+
+        assert panel.status == "ok"
+        assert list(panel.prices.columns) == ["518880"]

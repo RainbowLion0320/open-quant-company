@@ -137,6 +137,11 @@ def _evidence_for_tool(tool_id: str) -> WorkflowEvidenceSpec:
             "/datahub?tab=sources",
             "Open source capability registry and project data_registry diff.",
         ),
+        "astroq.assets.overview": (
+            "Asset chain coverage",
+            "/datahub?tab=assets",
+            "Open asset data, strategy, backtest, paper, and live readiness status.",
+        ),
         "astroq.strategy.catalog": ("Strategy catalog", "/strategy-lab", "Open strategy catalog evidence."),
         "astroq.strategy.compete": (
             "Strategy competition evidence",

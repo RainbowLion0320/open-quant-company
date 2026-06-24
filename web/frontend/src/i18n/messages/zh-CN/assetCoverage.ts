@@ -8,4 +8,11 @@ export const assetCoverage = {
       researchReady: "Research Ready",
       tradable: "Tradable",
       universeSize: "Universe Size",
+      chainStatus: "链路状态",
+      blockers: "阻断原因",
+      data: "数据",
+      strategy: "策略",
+      backtest: "回测",
+      paper: "模拟",
+      live: "实盘",
     } as const;

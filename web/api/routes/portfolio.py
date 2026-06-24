@@ -53,6 +53,7 @@ async def get_positions():
         "positions": [
             PositionItem(
                 code=p.code,
+                asset_type=p.asset_type,
                 name=p.name,
                 volume=p.volume,
                 avg_cost=round(p.avg_cost, 2),
@@ -125,6 +126,7 @@ async def get_trades(limit: int = 50):
             {
                 "date": str(row["date"])[:10],
                 "code": str(row["code"]),
+                "asset_type": str(row.get("asset_type", "stock")),
                 "name": str(row.get("name", "")),
                 "side": str(row["side"]),
                 "price": round(float(row["price"]), 2),
@@ -191,11 +193,11 @@ async def submit_order(req: OrderRequest):
     broker = get_broker()
 
     # 市价单: 尝试获取行情
-    if req.price <= 0:
+    if req.price <= 0 and req.asset_type == "stock":
         apply_latest_execution_price(broker, req.code)
 
     result = broker.submit_order(
-        code=req.code, price=req.price, volume=req.volume, side=req.side,
+        code=req.code, price=req.price, volume=req.volume, side=req.side, asset_type=req.asset_type,
     )
 
     if result and not result.startswith("PAPER_"):
@@ -205,6 +207,7 @@ async def submit_order(req: OrderRequest):
         "order_id": result,
         "status": "filled",
         "code": req.code,
+        "asset_type": req.asset_type,
         "side": req.side,
         "volume": req.volume,
     }
@@ -223,6 +226,7 @@ async def get_orders():
             OrderItem(
                 order_id=o.order_id,
                 code=o.code,
+                asset_type=o.asset_type,
                 side=o.side,
                 price=round(o.price, 2),
                 volume=o.volume,

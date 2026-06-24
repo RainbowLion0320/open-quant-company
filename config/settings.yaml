@@ -590,24 +590,24 @@ assets:
     label: ETF基金
     universe: ETF_UNIVERSE
     features: true
-    adapter: data/assets/etf.py
+    adapter: data/market/assets/etf.py
   bond:
-    enabled: false
+    enabled: true
     label: 债券
     universe: BOND_UNIVERSE
     features: false
-    adapter: data/assets/bond.py
+    adapter: data/market/assets/bond.py
   futures:
-    enabled: false
+    enabled: true
     label: 期货
     universe: FUTURES_UNIVERSE
     features: false
-    adapter: data/assets/futures.py
+    adapter: data/market/assets/futures.py
   crypto:
-    enabled: false
+    enabled: true
     label: 加密货币
     universe: CRYPTO_UNIVERSE
-    adapter: data/assets/crypto.py
+    adapter: data/market/assets/crypto.py
   macro:
     enabled: true
     label: 宏观经济
@@ -616,17 +616,26 @@ asset_allocation:
   max_positions_per_asset: 8
   regime_weights:
     bull:
-      stock: 0.6
-      etf: 0.3
+      stock: 0.55
+      etf: 0.25
+      bond: 0.05
+      futures: 0.03
+      crypto: 0.02
       cash: 0.1
     sideways:
-      stock: 0.35
-      etf: 0.35
-      cash: 0.3
+      stock: 0.30
+      etf: 0.25
+      bond: 0.20
+      futures: 0.05
+      crypto: 0.03
+      cash: 0.17
     bear:
-      stock: 0.15
-      etf: 0.15
-      cash: 0.7
+      stock: 0.10
+      etf: 0.10
+      bond: 0.40
+      futures: 0.03
+      crypto: 0.02
+      cash: 0.35
 strategies:
   buffett:
     color: '#06b6d4'
@@ -845,6 +854,46 @@ strategies:
     data_requirements:
     - market_regime
     - stock_daily
+  cross_asset_allocator:
+    color: '#14b8a6'
+    config_key: allocator
+    enabled: true
+    label: 跨资产配置
+    runner: ''
+    signal_name: cross_asset_allocator
+    status: candidate
+    capabilities:
+    - data_coverage
+    - portfolio_research
+    strategy_type: portfolio
+    layer: asset_allocation
+    asset_scope:
+    - stock
+    - etf
+    - bond
+    - futures
+    - crypto
+    - cash
+    data_requirements:
+    - stock_daily
+    - fund_daily
+    - bond_treasury_yields
+    - futures_daily
+    - crypto_daily
+    - market_regime
+    - risk_free_curve
+    required_asset_dimensions:
+    - stock_daily
+    - fund_daily
+    - bond_treasury_yields
+    - futures_daily
+    - crypto_daily
+    paper_supported: true
+    live_supported: false
+    blockers:
+    - crypto_data_stale_until_fresh_source
+    - futures_live_adapter_not_configured
+    - crypto_live_adapter_not_configured
 trading:
   commission:
     brokerage: 0.00025
@@ -869,6 +918,10 @@ trading:
       commission_per_lot: 10.0
       lot_size: 1
       margin_rate: 0.1
+    crypto:
+      commission: 0.001
+      min_commission: 0.0
+      lot_size: 1
   notification:
     enabled: true
     require_confirmation: false
@@ -1290,13 +1343,14 @@ data_registry:
     label: 期货日线
     cache: futures/daily/{symbol}.parquet
   crypto_daily:
-    source: future
+    source: akshare
     asset: crypto
-    status: planned
+    status: available
     freq: daily
-    enabled: false
-    label: 加密货币日线
+    enabled: true
+    label: 加密货币最新日频快照
     cache: crypto/daily/{symbol}.parquet
+    description: AKShare crypto_js_spot 实时行情快照归一化为最新日频记录；完整历史K线仍需交易所/CCXT接口
   sector_sw_daily:
     source: tushare_free
     asset: sector
