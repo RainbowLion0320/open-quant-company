@@ -81,14 +81,55 @@ export interface MarketAssetCard {
   source_detail?: string;    // human-readable detail
 }
 
-export interface MacroCard {
+export interface MarketAssetPulseCard extends MarketAssetCard {
+  asset_type: string;
+  data_status: string;
+  strategy_status: string;
+  backtest_status: string;
+  paper_status: string;
+  live_status: string;
+  live_adapter?: string;
+  blockers?: string[];
+  universe_size?: number;
+  readiness_score?: number;
+}
+
+export interface MarketAssetModuleMetric {
   key: string;
   label: string;
-  value: number | null;
-  prev: number | null;
-  unit: string;
-  date: string;
-  series: MarketSeriesPoint[];
+  value: number | string | null;
+  unit?: string;
+}
+
+export interface MarketAssetModuleCategory {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface MarketAssetModuleItem {
+  symbol?: string;
+  label: string;
+  category?: string;
+  category_label?: string;
+  value?: number | null;
+  change_pct?: number;
+}
+
+export interface MarketAssetModule {
+  asset_type: string;
+  kind: string;
+  label: string;
+  status: string;
+  headline?: string;
+  metrics?: MarketAssetModuleMetric[];
+  series?: MarketSeriesPoint[];
+  curve?: Array<{ tenor: string; value: number }>;
+  categories?: MarketAssetModuleCategory[];
+  groups?: Array<{ key: string; label: string; value: number; count?: number }>;
+  items?: MarketAssetModuleItem[];
+  blockers?: string[];
+  source_detail?: string;
 }
 
 export interface MarketAlert {
@@ -108,8 +149,9 @@ export interface MarketResponse {
   kline: KlinePoint[];
   range?: string;
   multi_asset?: MarketAssetCard[];
-  macro?: MacroCard[];
-  freshness?: { market: string; macro: string };
+  asset_pulse?: MarketAssetPulseCard[];
+  asset_modules?: MarketAssetModule[];
+  freshness?: { market: string; assets?: string };
   pool_size?: number;
   position_capacity?: PositionCapacity;
   config?: Record<string, any>;
@@ -119,6 +161,8 @@ export interface MarketResponse {
 export interface RegimeResponse {
   regime: RegimeData;
   multi_asset: MarketAssetCard[];
+  asset_pulse?: MarketAssetPulseCard[];
+  asset_modules?: MarketAssetModule[];
   freshness: { market: string };
   updated: string;
   config?: Record<string, any>;

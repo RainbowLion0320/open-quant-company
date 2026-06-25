@@ -39,7 +39,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
-| 市场总览 | `/` | Regime 球体 + 核心指数相对强弱图 + 宏观快照 + 热门行业脉冲 |
+| 市场总览 | `/market` | Regime 球体 + 核心指数相对强弱图 + 跨资产市场动态 |
 | 市场研究 | `/research` | 二级 tab: 行业雷达 + 个股搜索；行业雷达以行业资金方块矩阵为主视图，`/stocks/:code` 保留为隐藏详情路由 |
 | 策略实验室 | `/strategy-lab` | 二级 tab: 策略目录 + 信号历史 + 回测分析 + 证据面板 |
 | 组合执行 | `/portfolio` | ★ PaperBroker 日频模拟: NAV权益曲线 + 持仓 + 交易记录 + 手动下单 |
@@ -57,11 +57,12 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 
 Market API 新增字段：
 - `multi_asset[]` — 上证综指/沪深300/创业板指/科创50 核心指数序列；市场页用于相对强弱图，不再复制为全局行情 ticker
-- `macro[]` — GDP/PMI/CPI/SHIBOR 宏观快照
+- `asset_pulse[]` — 股票/ETF/债券/期货/加密核心动态，使用本地缓存和链路 readiness，不在页面加载时补数
+- `asset_modules[]` — ETF、债券、期货、加密货币的差异化市场模块；只读本地行情、收益率曲线、合约 movers 和阻断原因
 - `alerts[]` — 智能预警 (regime/PMI偏离/黄金波动/策略完成)
 - `freshness` — 数据新鲜度时间戳
 
-前端 Market.vue 采用 Command Center 布局，含 animated regime orb、居中纯数字 regime score、4 个核心小仪表盘（Risk Buffer / A-share Breadth / Index Trend / Above MA20）、Confirmed / Raw / Pending / Dwell 紧凑状态卡、核心指数相对强弱图、宏观快照行和热门行业脉冲。大图展示上证综指/沪深300/创业板指/科创50 的归一化强弱对比；全局页脚只显示 REGIME / FRESH、CEO 会话模型上下文与三态纯色系统健康灯，不再展示行情 ticker 或文字健康状态；策略明细归属策略实验室，行业页承载完整排名与信号分布，市场总览只保留 Top5 热点概览，避免重复缩略看板。
+前端 Market.vue 采用 Command Center 布局，含 animated regime orb、居中纯数字 regime score、4 个核心小仪表盘（Risk Buffer / A-share Breadth / Index Trend / Above MA20）、Confirmed / Raw / Pending / Dwell 紧凑状态卡、核心指数相对强弱图和跨资产市场地图。大图展示上证综指/沪深300/创业板指/科创50 的归一化强弱对比；A 股强弱不再复制成资产卡。跨资产市场地图按资产特性拆分：ETF 展示基金池、代表 ETF 走势和分类覆盖；债券展示国债 10Y 与收益率曲线；期货展示股指/国债/商品合约 movers；加密货币在缺新鲜历史 K 线时仅作为外部风险哨兵展示 blocker。资产链路 readiness 归属数据中台/资产覆盖视图，不在市场总览常驻。全局页脚只显示 REGIME / FRESH、CEO 会话模型上下文与三态纯色系统健康灯，不再展示行情 ticker 或文字健康状态；策略明细归属策略实验室，行业页承载完整排名与信号分布，宏观数据归属数据中台和生命周期证据链，避免市场总览变成重复缩略看板。
 
 ### 行业雷达方块矩阵 (2026-05-27)
 

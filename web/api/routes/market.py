@@ -16,5 +16,5 @@ async def market_regime():
 
 @router.get("", response_model=MarketOverviewResponse)
 async def market_overview(range: str = Query(default="6M", pattern="^(1D|1M|6M|YTD)$")):
-    """市场总览: regime + K线 + 核心指数 + 宏观。"""
+    """市场总览: regime + K线 + 核心指数 + 跨资产市场动态。"""
     return market_service.build_market_overview(range)

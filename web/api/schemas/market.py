@@ -60,6 +60,8 @@ class RegimeSnapshot(BaseModel):
 class MarketRegimeResponse(BaseModel):
     regime: dict[str, Any] = {}
     multi_asset: list[dict[str, Any]] = []
+    asset_pulse: list[dict[str, Any]] = []
+    asset_modules: list[dict[str, Any]] = []
     freshness: dict[str, Any] = {}
     config: dict[str, Any] = {}
     position_capacity: dict[str, Any] = {}
@@ -71,7 +73,8 @@ class MarketOverviewResponse(BaseModel):
     kline: list[dict[str, Any]] = []
     range: str = "6M"
     multi_asset: list[dict[str, Any]] = []
-    macro: list[dict[str, Any]] = []
+    asset_pulse: list[dict[str, Any]] = []
+    asset_modules: list[dict[str, Any]] = []
     freshness: dict[str, Any] = {}
     pool_size: int = 0
     position_capacity: dict[str, Any] = {}

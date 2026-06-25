@@ -86,9 +86,9 @@ defineProps<{
 }
 .regime-core {
   display: grid;
-  grid-template-columns: 110px 1fr;
+  grid-template-columns: 100px minmax(0, 1fr);
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 14px 0;
 }
 .regime-orb {
@@ -131,10 +131,14 @@ defineProps<{
   }
 }
 .regime-name {
-  font-size: 22px;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 20px;
   line-height: 1;
   font-weight: 750;
   letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .regime-readout {
   display: flex;

@@ -84,63 +84,120 @@
         </div>
       </div>
 
-      <div class="macro-panel glass-card">
+      <section class="cross-asset-map glass-card" :class="{ 'is-refreshing': refreshing }">
         <div class="panel-head">
-          <span>{{ t('market.macroIndicators') }}</span>
-          <small>GDP · PMI · CPI · LIQUIDITY · PROFIT</small>
+          <span>{{ t('market.crossAssetMap') }}</span>
+          <small>{{ t('market.crossAssetMeta') }}</small>
         </div>
-        <div class="macro-grid">
-          <article v-for="m in macro" :key="m.key">
-            <span>{{ m.label }}</span>
-            <strong :style="{ color: macroColor(m) }">{{ fmtValue(macroRef(m.key).value, m.unit) }}</strong>
-            <em>{{ t('market.prev') }} {{ fmtValue(m.prev, m.unit) }}</em>
-            <svg :viewBox="`0 0 ${SPARK_W} ${SPARK_H}`" preserveAspectRatio="none" class="microline">
-              <defs>
-                <clipPath :id="sparkClipId(m.key)" clipPathUnits="userSpaceOnUse">
-                  <rect x="0" y="0" :width="SPARK_W * sparkReveal" :height="SPARK_H" />
-                </clipPath>
-              </defs>
-              <path
-                :d="sparkPath(m.series, SPARK_W, SPARK_H)"
-                :stroke="macroColor(m)"
-                :clip-path="`url(#${sparkClipId(m.key)})`"
-              />
-            </svg>
+
+        <div v-if="assetModules.length" class="cross-asset-grid">
+          <article v-if="assetModule('etf')" class="asset-module module-etf" :class="moduleStatusClass(assetModule('etf'))">
+            <div class="asset-module-head">
+              <div>
+                <span>ETF</span>
+                <strong>{{ assetModule('etf')?.headline }}</strong>
+              </div>
+              <em>{{ moduleStatusLabel(assetModule('etf')) }}</em>
+            </div>
+            <div class="etf-module-body">
+              <div class="module-metric-stack">
+                <div v-for="metric in assetModule('etf')?.metrics || []" :key="metric.key">
+                  <span>{{ metric.label }}</span>
+                  <strong>{{ fmtModuleMetric(metric) }}</strong>
+                </div>
+              </div>
+              <svg v-if="assetModule('etf')?.series?.length" :viewBox="`0 0 ${SPARK_W} ${SPARK_H}`" preserveAspectRatio="none" class="module-sparkline">
+                <path :d="moduleSeriesPath(assetModule('etf'))" />
+              </svg>
+              <div v-else class="module-empty-line">{{ moduleBlocker(assetModule('etf')) }}</div>
+            </div>
+            <div class="etf-category-strip">
+              <span v-for="category in (assetModule('etf')?.categories || []).slice(0, 5)" :key="category.key">
+                {{ category.label }} <em>{{ category.count }}</em>
+              </span>
+            </div>
+          </article>
+
+          <article v-if="assetModule('bond')" class="asset-module module-bond" :class="moduleStatusClass(assetModule('bond'))">
+            <div class="asset-module-head">
+              <div>
+                <span>BOND</span>
+                <strong>{{ assetModule('bond')?.headline }}</strong>
+              </div>
+              <em>{{ moduleStatusLabel(assetModule('bond')) }}</em>
+            </div>
+            <div class="bond-module-body">
+              <div class="bond-key-rate">
+                <span>{{ metricLabel(assetModule('bond'), 'yield_10y') || '10Y' }}</span>
+                <strong>{{ fmtModuleMetric(metricByKey(assetModule('bond'), 'yield_10y')) }}</strong>
+                <em>{{ metricLabel(assetModule('bond'), 'spread_10y2y') }} {{ fmtModuleMetric(metricByKey(assetModule('bond'), 'spread_10y2y')) }}</em>
+              </div>
+              <svg v-if="assetModule('bond')?.curve?.length" viewBox="0 0 180 72" preserveAspectRatio="none" class="yield-curve">
+                <path :d="bondCurvePath(assetModule('bond'))" />
+                <circle
+                  v-for="point in bondCurvePoints(assetModule('bond'))"
+                  :key="point.label"
+                  :cx="point.x"
+                  :cy="point.y"
+                  r="2.4"
+                />
+              </svg>
+              <div v-else class="module-empty-line">{{ moduleBlocker(assetModule('bond')) }}</div>
+            </div>
+            <div class="bond-tenors" v-if="assetModule('bond')?.curve?.length">
+              <span v-for="point in assetModule('bond')?.curve || []" :key="point.tenor">{{ point.tenor }} {{ point.value.toFixed(2) }}%</span>
+            </div>
+          </article>
+
+          <article v-if="assetModule('futures')" class="asset-module module-futures" :class="moduleStatusClass(assetModule('futures'))">
+            <div class="asset-module-head">
+              <div>
+                <span>FUTURES</span>
+                <strong>{{ assetModule('futures')?.headline }}</strong>
+              </div>
+              <em>{{ moduleStatusLabel(assetModule('futures')) }}</em>
+            </div>
+            <div class="futures-group-bars">
+              <div v-for="group in assetModule('futures')?.groups || []" :key="group.key">
+                <span>{{ group.label }}</span>
+                <i :style="{ width: moduleBarWidth(group.value), background: colorPct(group.value) }"></i>
+                <em :style="{ color: colorPct(group.value) }">{{ fmtSignedPct(group.value) }}</em>
+              </div>
+            </div>
+            <div class="futures-movers">
+              <div v-for="item in assetModule('futures')?.items || []" :key="item.symbol">
+                <span>{{ item.symbol }} · {{ item.category_label }}</span>
+                <strong>{{ item.label }}</strong>
+                <em :style="{ color: colorPct(item.change_pct || 0) }">{{ fmtSignedPct(item.change_pct || 0) }}</em>
+              </div>
+            </div>
+          </article>
+
+          <article v-if="assetModule('crypto')" class="asset-module module-crypto" :class="moduleStatusClass(assetModule('crypto'))">
+            <div class="asset-module-head">
+              <div>
+                <span>CRYPTO</span>
+                <strong>{{ assetModule('crypto')?.headline }}</strong>
+              </div>
+              <em>{{ moduleStatusLabel(assetModule('crypto')) }}</em>
+            </div>
+            <div class="crypto-sentinel">
+              <strong>{{ t('market.cryptoFreshnessBlocked') }}</strong>
+              <span>{{ t('market.cryptoFreshnessDetail') }}</span>
+            </div>
+            <div class="crypto-blockers">
+              <em v-for="blocker in assetModule('crypto')?.blockers || []" :key="blocker">{{ shortBlocker(blocker) }}</em>
+            </div>
           </article>
         </div>
-        <div v-if="!macro.length" class="panel-empty">{{ t('market.noMacroData') }}</div>
-      </div>
+        <div v-else class="panel-empty sector-empty">{{ t("market.noAssetModules") }}</div>
+      </section>
     </section>
 
     <div v-if="store.error" class="inline-alert danger">
       <span>{{ store.error }}</span>
       <button class="btn btn-xs" @click="refresh">{{ t('common.retry') }}</button>
     </div>
-
-    <section class="sector-pulse glass-card" :class="{ 'is-refreshing': refreshing }">
-      <div class="panel-head">
-        <span>{{ t('market.hotSectorPulse') }}</span>
-        <small>{{ sectorPulseMeta }}</small>
-      </div>
-      <div v-if="hotSectors.length" class="sector-pulse-grid">
-        <article v-for="sector in hotSectors" :key="sector.sector_code" class="sector-pulse-card">
-          <div class="sector-rank">#{{ sector.rank }}</div>
-          <div class="sector-main">
-            <strong>{{ sector.sector_name }}</strong>
-            <span>{{ sectorTag(sector) }}</span>
-          </div>
-          <div class="sector-metrics">
-            <div><span>1D</span><strong :style="{ color: colorPct(sector.return_1d) }">{{ fmtReturn(sector.return_1d) }}</strong></div>
-            <div><span>5D</span><strong :style="{ color: colorPct(sector.return_5d) }">{{ fmtReturn(sector.return_5d) }}</strong></div>
-            <div><span>20D</span><strong :style="{ color: colorPct(sector.return_20d) }">{{ fmtReturn(sector.return_20d) }}</strong></div>
-            <div><span>{{ t('market.signal') }}</span><strong>{{ fmtSignalPower(sector) }}</strong></div>
-          </div>
-        </article>
-      </div>
-      <div v-else class="panel-empty sector-empty">
-        {{ sectorLoading ? t("market.loadingSectors") : t("market.noSectorData") }}
-      </div>
-    </section>
   </div>
 </template>
 
@@ -151,43 +208,23 @@ import { useAnimatedMetrics } from "../composables/useAnimatedMetrics";
 import { useMarketOverview } from "../composables/useMarketOverview";
 import { useRelativeStrengthChart } from "../composables/useRelativeStrengthChart";
 import { useMarketStore } from "../stores";
-import { api, type MacroCard, type MarketSeriesPoint, type SectorCard, type SectorOverviewResponse } from "../api";
+import type { MarketAssetModule, MarketAssetModuleMetric, MarketSeriesPoint } from "../api";
 import { useI18n } from "../i18n";
 import { colorBySignedRatio, fmtSignedRatioPct } from "../utils/format";
-import { signalPower } from "../utils/sector";
 
 const store = useMarketStore();
 const { t } = useI18n();
 const { timeRanges, indexColors } = useMarketOverview();
 const { tweenTo } = useAnimatedMetrics();
 const selectedRange = ref("6M");
-const sectorOverview = ref<SectorOverviewResponse | null>(null);
-const sectorLoading = ref(false);
 
 const SPARK_W = 120;
 const SPARK_H = 34;
 const SPARK_PAD_X = 2;
 
 const assets = computed(() => store.multiAsset || []);
+const assetModules = computed<MarketAssetModule[]>(() => store.assetModules || []);
 const marketFreshness = computed(() => `${t("market.fresh")} ${store.freshness?.market || "—"}`);
-const macro = computed(() => store.macro || []);
-const hotSectors = computed(() => {
-  const sectors = sectorOverview.value?.sectors || [];
-  return [...sectors].sort((a, b) => a.rank - b.rank).slice(0, 5);
-});
-const sectorPulseMeta = computed(() => {
-  const total = sectorOverview.value?.total_sectors || 0;
-  const date = sectorDate.value;
-  if (!total) return `Top 5 · ${t("market.waitingSectorSnapshot")}`;
-  return `Top 5 / ${total} · ${date}`;
-});
-const sectorDate = computed(() => {
-  const raw = sectorOverview.value?.freshness?.performance || "";
-  const m = raw.match(/(\d{4}-\d{2}-\d{2})|(\d{8})/);
-  if (!m) return "—";
-  const value = m[1] || m[2];
-  return value.length === 8 ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}` : value;
-});
 
 const {
   CHART_VIEW_W,
@@ -330,28 +367,76 @@ function ratioGauge(v: number | null | undefined) {
   if (v == null || Number.isNaN(Number(v))) return 0;
   return clampGauge(Number(v) * 100);
 }
-function fmtReturn(v: number) {
-  return fmtSignedRatioPct(v);
-}
 function colorPct(v: number) {
   return colorBySignedRatio(v);
 }
-function fmtSignalPower(sector: SectorCard) {
-  return `${Math.round(signalPower(sector) * 100)}%`;
+
+function shortBlocker(blocker = "") {
+  return blocker.replace(/_/g, " ");
 }
-function sectorTag(sector: SectorCard) {
-  const sig = signalPower(sector);
-  if (sector.return_20d > 0.10 && sector.volatility > 0.24) return t("market.sectorTags.overheated");
-  if (sig >= 0.5 && sector.return_5d > 0) return t("market.sectorTags.signalBacked");
-  if (sector.return_5d > 0 && sector.return_20d > 0) return t("market.sectorTags.momentum");
-  return t("market.sectorTags.watch");
+
+function assetModule(assetType: string) {
+  return assetModules.value.find(module => module.asset_type === assetType) || null;
 }
-function macroColor(m: MacroCard) {
-  if (m.key === "pmi" && Number(m.value || 0) < 50) return "var(--warning)";
-  if (m.key === "cpi" && Number(m.value || 0) < 0) return "var(--negative)";
-  if (m.key === "m1_m2_spread") return Number(m.value || 0) >= 0 ? "var(--positive)" : "var(--warning)";
-  if (m.key === "ppi_cpi_spread") return Number(m.value || 0) >= 0 ? "var(--positive)" : "var(--negative)";
-  return "var(--accent)";
+
+function moduleStatusClass(module: MarketAssetModule | null) {
+  return `module-status-${String(module?.status || "missing")}`;
+}
+
+function moduleStatusLabel(module: MarketAssetModule | null) {
+  const status = String(module?.status || "missing");
+  if (status === "ready") return "READY";
+  if (status === "watch") return "WATCH";
+  if (status === "blocked") return "BLOCKED";
+  return "MISSING";
+}
+
+function metricByKey(module: MarketAssetModule | null, key: string) {
+  return (module?.metrics || []).find(metric => metric.key === key) || null;
+}
+
+function metricLabel(module: MarketAssetModule | null, key: string) {
+  return metricByKey(module, key)?.label || "";
+}
+
+function fmtModuleMetric(metric: MarketAssetModuleMetric | null | undefined) {
+  if (!metric || metric.value === null || metric.value === undefined || metric.value === "") return "—";
+  const raw = metric.value;
+  const value = typeof raw === "number" ? (Math.abs(raw) >= 100 ? raw.toFixed(0) : raw.toFixed(2)) : String(raw);
+  return `${value}${metric.unit ? ` ${metric.unit}` : ""}`;
+}
+
+function moduleBlocker(module: MarketAssetModule | null) {
+  return module?.blockers?.length ? shortBlocker(module.blockers[0]) : t("market.moduleNoData");
+}
+
+function moduleSeriesPath(module: MarketAssetModule | null) {
+  return sparkPath(module?.series || [], SPARK_W, SPARK_H);
+}
+
+function bondCurvePoints(module: MarketAssetModule | null) {
+  const curve = module?.curve || [];
+  if (!curve.length) return [];
+  const values = curve.map(point => Number(point.value)).filter(Number.isFinite);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const spread = max - min || 1;
+  return curve.map((point, index) => {
+    const x = curve.length === 1 ? 90 : 14 + (index / (curve.length - 1)) * 152;
+    const y = 62 - ((Number(point.value) - min) / spread) * 48;
+    return { label: point.tenor, x: Number(x.toFixed(1)), y: Number(y.toFixed(1)) };
+  });
+}
+
+function bondCurvePath(module: MarketAssetModule | null) {
+  const points = bondCurvePoints(module);
+  if (!points.length) return "";
+  return `M ${points[0].x},${points[0].y} L ${points.slice(1).map(point => `${point.x},${point.y}`).join(" ")}`;
+}
+
+function moduleBarWidth(value: number | undefined) {
+  const pct = Math.min(Math.abs(Number(value || 0)) * 12, 100);
+  return `${Math.max(8, pct).toFixed(1)}%`;
 }
 function riskColor(v: number | null | undefined) {
   const n = Number(v);
@@ -401,13 +486,6 @@ const displayRiskBuffer = ref(0);
 const displayTrendStrength = ref(0);
 const displayAboveMa20 = ref(0);
 const displayStrengthPct = ref(0);
-const macroDisplay: Record<string, { ref: ReturnType<typeof ref<number>> }> = {};
-
-function macroRef(key: string) {
-  if (!macroDisplay[key]) macroDisplay[key] = { ref: ref(0) };
-  return macroDisplay[key].ref;
-}
-
 function finiteOrZero(v: number | null | undefined) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -419,10 +497,6 @@ function animateMetrics() {
   tweenTo(displayTrendStrength, finiteOrZero(regimeTrendStrength.value), 2, 540);
   tweenTo(displayAboveMa20, finiteOrZero(aboveMa20Ratio.value), 2, 560);
   tweenTo(displayStrengthPct, strengthLeader.value.change, 2, 500);
-  for (const m of macro.value) {
-    const v = Number(m.value);
-    if (!isNaN(v)) tweenTo(macroRef(m.key), v, 2, 500);
-  }
 }
 
 function animateSparklines() {
@@ -445,7 +519,7 @@ function animateSparklines() {
 }
 
 function sparkClipId(key: string) {
-  return `macro-spark-${String(key).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  return `asset-spark-${String(key).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
 async function refresh() {
@@ -457,10 +531,7 @@ async function refresh() {
   }, 200);
 
   try {
-    await Promise.all([
-      store.fetchMarket(selectedRange.value),
-      fetchHotSectors(),
-    ]);
+    await store.fetchMarket(selectedRange.value);
   } finally {
     setTimeout(() => {
       refreshing.value = false;
@@ -468,17 +539,6 @@ async function refresh() {
       animateMetrics();
       animateSparklines();
     }, 400);
-  }
-}
-
-async function fetchHotSectors() {
-  sectorLoading.value = true;
-  try {
-    sectorOverview.value = await api.sectorOverview();
-  } catch {
-    sectorOverview.value = null;
-  } finally {
-    sectorLoading.value = false;
   }
 }
 
@@ -503,15 +563,6 @@ onUnmounted(() => {
 .regime-status-card {
   min-height: 28px;
   padding: 4px 6px;
-}
-.macro-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 10px;
-}
-.macro-grid article {
-  min-height: 88px;
 }
 </style>
 <style scoped src="../styles/views/market.css"></style>

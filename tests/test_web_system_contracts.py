@@ -1470,18 +1470,54 @@ def test_strategy_lab_exposes_catalog_and_candidate_language():
     assert "生产隔离" in strategies
 
 
-def test_market_macro_panel_supports_six_indicator_layout():
+def test_market_overview_uses_multi_asset_pulse_instead_of_macro_and_sector_pulse():
     market = Path("web/frontend/src/views/Market.vue").read_text(encoding="utf-8")
+    css = Path("web/frontend/src/styles/views/market.css").read_text(encoding="utf-8")
+    zh = Path("web/frontend/src/i18n/messages/zh-CN/market.ts").read_text(encoding="utf-8")
+    en = Path("web/frontend/src/i18n/messages/en-US/market.ts").read_text(encoding="utf-8")
 
-    assert "GDP · PMI · CPI · LIQUIDITY · PROFIT" in market
-    assert 'm.key === "m1_m2_spread"' in market
-    assert 'm.key === "ppi_cpi_spread"' in market
+    assert "cross-asset-map" in market
+    assert "assetModules" in market
+    assert "assetModule('etf')" in market
+    assert "assetModule('bond')" in market
+    assert "assetModule('futures')" in market
+    assert "assetModule('crypto')" in market
+    assert "bondCurvePath" in market
+    assert "futures-movers" in market
+    assert "crypto-sentinel" in market
+    assert "asset-pulse-panel" not in market
+    assert "asset-chain" not in market
+    assert "assetChain" not in market
+    assert "chainStages" not in market
+    assert "fetchHotSectors" not in market
+    assert "sectorOverview" not in market
+    assert "macro-panel" not in market
+    assert "sector-pulse" not in market
+    assert "GDP · PMI · CPI · LIQUIDITY · PROFIT" not in market
 
-    grid_block = market.split(".macro-grid {", 1)[1].split("}", 1)[0]
-    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in grid_block
+    assert ".cross-asset-grid" in css
+    assert ".module-etf" in css
+    assert ".module-bond" in css
+    assert ".module-futures" in css
+    assert ".module-crypto" in css
+    assert ".yield-curve" in css
+    assert ".futures-group-bars" in css
+    assert ".crypto-sentinel" in css
+    assert ".asset-pulse-card" not in css
+    assert ".asset-chain-grid" not in css
+    assert "grid-template-areas:" in css
+    assert '"map map"' in css
+    assert ".macro-grid" not in css
+    assert ".sector-pulse-grid" not in css
 
-    card_block = market.split(".macro-grid article {", 1)[1].split("}", 1)[0]
-    assert "min-height: 88px;" in card_block
+    assert "CROSS-ASSET MARKET MAP" in zh
+    assert "ASSET CHAIN READINESS" not in zh
+    assert "MACRO INDICATORS" not in zh
+    assert "HOT SECTOR PULSE" not in zh
+    assert "CROSS-ASSET MARKET MAP" in en
+    assert "ASSET CHAIN READINESS" not in en
+    assert "MACRO INDICATORS" not in en
+    assert "HOT SECTOR PULSE" not in en
 
 
 def test_sector_radar_view_uses_sector_block_grid_as_primary_visual():

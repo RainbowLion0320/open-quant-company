@@ -38,7 +38,7 @@ The main daily entry point. You describe the problem, and agent routing assigns 
 ![CEO Office](docs/assets/readme/screenshots/00-CEO-office.png)
 
 ### Market Overview
-Market regime, core indices, sector pulse, and macro snapshots.
+Market regime, core index relative strength, and cross-asset modules for ETF, bonds, futures, and crypto risk.
 
 ![Market Overview](docs/assets/readme/screenshots/01-market-overview.png)
 

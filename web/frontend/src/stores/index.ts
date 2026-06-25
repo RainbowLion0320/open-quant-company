@@ -7,7 +7,8 @@ export const useMarketStore = defineStore("market", () => {
   const regime = ref<any>(null);
   const kline = ref<any[]>([]);
   const multiAsset = ref<any[]>([]);
-  const macro = ref<any[]>([]);
+  const assetPulse = ref<any[]>([]);
+  const assetModules = ref<any[]>([]);
   const freshness = ref<any>({});
   const updated = ref("");
   const poolSize = ref(0);
@@ -23,7 +24,8 @@ export const useMarketStore = defineStore("market", () => {
       regime.value = data.regime;
       kline.value = data.kline;
       multiAsset.value = data.multi_asset || [];
-      macro.value = data.macro || [];
+      assetPulse.value = data.asset_pulse || [];
+      assetModules.value = data.asset_modules || [];
       freshness.value = data.freshness || {};
       updated.value = data.updated || "";
       poolSize.value = data.pool_size || 0;
@@ -39,7 +41,7 @@ export const useMarketStore = defineStore("market", () => {
   }
 
   return {
-    regime, kline, multiAsset, macro,
+    regime, kline, multiAsset, assetPulse, assetModules,
     freshness, updated, poolSize, positionCapacity, loading, error, fetchMarket,
   };
 });
