@@ -39,7 +39,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 
 | 页面 | 路由 | 功能 |
 |------|------|------|
-| 市场总览 | `/market` | Regime 球体 + 核心指数相对强弱图 + 跨资产市场动态 |
+| 市场总览 | `/market` | Regime 球体 + 核心指数相对强弱图 + 独立多资产市场动态模块 |
 | 市场研究 | `/research` | 二级 tab: 行业雷达 + 个股搜索；行业雷达以行业资金方块矩阵为主视图，`/stocks/:code` 保留为隐藏详情路由 |
 | 策略实验室 | `/strategy-lab` | 二级 tab: 策略目录 + 信号历史 + 回测分析 + 证据面板 |
 | 组合执行 | `/portfolio` | ★ PaperBroker 日频模拟: NAV权益曲线 + 持仓 + 交易记录 + 手动下单 |
@@ -58,7 +58,7 @@ tags: [architecture, frontend, backend, vue3, fastapi, websocket, ADR, command-c
 Market API 新增字段：
 - `multi_asset[]` — 上证综指/沪深300/创业板指/科创50 核心指数序列；市场页用于相对强弱图，不再复制为全局行情 ticker
 - `asset_pulse[]` — 股票/ETF/债券/期货/加密核心动态，使用本地缓存和链路 readiness，不在页面加载时补数
-- `asset_modules[]` — ETF、债券、期货、加密货币的差异化市场模块；只读本地行情、收益率曲线、合约 movers 和阻断原因
+- `asset_modules[]` — ETF、债券、期货、加密货币的独立市场模块；只读本地行情、收益率曲线、合约 movers 和阻断原因
 - `alerts[]` — 智能预警 (regime/PMI偏离/黄金波动/策略完成)
 - `freshness` — 数据新鲜度时间戳
 

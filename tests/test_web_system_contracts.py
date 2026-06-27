@@ -1476,8 +1476,11 @@ def test_market_overview_uses_multi_asset_pulse_instead_of_macro_and_sector_puls
     zh = Path("web/frontend/src/i18n/messages/zh-CN/market.ts").read_text(encoding="utf-8")
     en = Path("web/frontend/src/i18n/messages/en-US/market.ts").read_text(encoding="utf-8")
 
-    assert "cross-asset-map" in market
     assert "assetModules" in market
+    assert "etf-section" in market
+    assert "bond-section" in market
+    assert "futures-section" in market
+    assert "crypto-section" in market
     assert "assetModule('etf')" in market
     assert "assetModule('bond')" in market
     assert "assetModule('futures')" in market
@@ -1485,6 +1488,10 @@ def test_market_overview_uses_multi_asset_pulse_instead_of_macro_and_sector_puls
     assert "bondCurvePath" in market
     assert "futures-movers" in market
     assert "crypto-sentinel" in market
+    assert "market-asset-flow" in market
+    assert "cross-asset-map" not in market
+    assert "cross-asset-grid" not in market
+    assert "asset-module" not in market
     assert "asset-pulse-panel" not in market
     assert "asset-chain" not in market
     assert "assetChain" not in market
@@ -1495,26 +1502,37 @@ def test_market_overview_uses_multi_asset_pulse_instead_of_macro_and_sector_puls
     assert "sector-pulse" not in market
     assert "GDP · PMI · CPI · LIQUIDITY · PROFIT" not in market
 
-    assert ".cross-asset-grid" in css
-    assert ".module-etf" in css
-    assert ".module-bond" in css
-    assert ".module-futures" in css
-    assert ".module-crypto" in css
+    assert ".market-asset-flow" in css
+    assert ".etf-section" in css
+    assert ".bond-section" in css
+    assert ".futures-section" in css
+    assert ".crypto-section" in css
     assert ".yield-curve" in css
     assert ".futures-group-bars" in css
     assert ".crypto-sentinel" in css
+    assert ".cross-asset-map" not in css
+    assert ".cross-asset-grid" not in css
+    assert ".asset-module" not in css
     assert ".asset-pulse-card" not in css
     assert ".asset-chain-grid" not in css
     assert "grid-template-areas:" in css
-    assert '"map map"' in css
+    assert '"assets assets"' in css
     assert ".macro-grid" not in css
     assert ".sector-pulse-grid" not in css
 
-    assert "CROSS-ASSET MARKET MAP" in zh
+    assert "ETF Rotation" in zh
+    assert "Rates & Bonds" in zh
+    assert "Futures Transmission" in zh
+    assert "Crypto Risk Sentinel" in zh
+    assert "CROSS-ASSET MARKET MAP" not in zh
     assert "ASSET CHAIN READINESS" not in zh
     assert "MACRO INDICATORS" not in zh
     assert "HOT SECTOR PULSE" not in zh
-    assert "CROSS-ASSET MARKET MAP" in en
+    assert "ETF Rotation" in en
+    assert "Rates & Bonds" in en
+    assert "Futures Transmission" in en
+    assert "Crypto Risk Sentinel" in en
+    assert "CROSS-ASSET MARKET MAP" not in en
     assert "ASSET CHAIN READINESS" not in en
     assert "MACRO INDICATORS" not in en
     assert "HOT SECTOR PULSE" not in en

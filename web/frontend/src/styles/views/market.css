@@ -9,7 +9,7 @@
   grid-template-columns: 280px minmax(0, 1fr);
   grid-template-areas:
     "regime index"
-    "map map";
+    "assets assets";
   align-items: start;
   gap: 12px;
 }
@@ -19,8 +19,8 @@
 .index-panel {
   grid-area: index;
 }
-.cross-asset-map {
-  grid-area: map;
+.market-asset-flow {
+  grid-area: assets;
 }
 .panel-head {
   display: flex;
@@ -64,7 +64,7 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
-.index-panel, .cross-asset-map {
+.index-panel {
   align-self: start;
   padding: 14px;
 }
@@ -235,62 +235,47 @@
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
-.cross-asset-map {
-  padding: 14px;
-}
-.cross-asset-grid {
+.market-asset-flow {
   display: grid;
-  grid-template-columns: minmax(360px, 1.15fr) minmax(260px, 0.85fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
   grid-template-areas:
-    "etf bond"
-    "futures crypto";
-  gap: 10px;
-  margin-top: 10px;
+    "etf etf"
+    "bond crypto"
+    "futures futures";
+  gap: 12px;
+  align-items: stretch;
 }
-.asset-module {
-  min-width: 0;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  border-radius: 7px;
-  background: rgba(3, 10, 18, 0.22);
-}
-.asset-module::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  opacity: 0.8;
-}
-.asset-module-head {
+.independent-section-head {
   display: flex;
   align-items: start;
   justify-content: space-between;
   gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
 }
-.asset-module-head div {
+.independent-section-head div {
   min-width: 0;
   display: grid;
-  gap: 3px;
+  gap: 4px;
 }
-.asset-module-head span {
+.independent-section-head span {
   color: var(--text-disabled);
   font-family: "JetBrains Mono", monospace;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
-.asset-module-head strong {
+.independent-section-head strong {
   min-width: 0;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.asset-module-head em {
+.independent-section-head em {
   flex-shrink: 0;
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: 4px;
   color: var(--text-tertiary);
   background: rgba(255,255,255,0.04);
@@ -307,84 +292,81 @@
 .module-status-blocked {
   border-color: rgba(248, 113, 113, 0.22);
 }
-.module-etf {
+.etf-section {
   grid-area: etf;
-  min-height: 176px;
-  padding: 10px;
+  min-height: 174px;
+  padding: 14px;
+  border-left: 3px solid #22c55e;
   background: linear-gradient(135deg, rgba(34,197,94,0.08), rgba(0,0,0,0.10) 60%);
 }
-.module-etf::before {
-  background: #22c55e;
-}
-.module-bond {
+.bond-section {
   grid-area: bond;
-  min-height: 176px;
-  padding: 10px;
+  min-height: 202px;
+  padding: 14px;
+  border-left: 3px solid #7dd3fc;
   background: linear-gradient(135deg, rgba(125,211,252,0.08), rgba(0,0,0,0.10) 64%);
 }
-.module-bond::before {
-  background: #7dd3fc;
-}
-.module-futures {
+.futures-section {
   grid-area: futures;
-  min-height: 210px;
-  padding: 10px;
+  min-height: 250px;
+  padding: 14px;
+  border-left: 3px solid #fbbf24;
   background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(0,0,0,0.10) 62%);
 }
-.module-futures::before {
-  background: #fbbf24;
-}
-.module-crypto {
+.crypto-section {
   grid-area: crypto;
-  min-height: 210px;
-  padding: 10px;
+  min-height: 202px;
+  padding: 14px;
+  border-left: 3px solid #f87171;
   background: linear-gradient(135deg, rgba(248,113,113,0.09), rgba(0,0,0,0.10) 60%);
 }
-.module-crypto::before {
-  background: #f87171;
-}
-.etf-module-body {
+.etf-section-body {
   display: grid;
-  grid-template-columns: 154px minmax(0, 1fr);
-  gap: 12px;
-  margin-top: 10px;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 18px;
+  margin-top: 12px;
   align-items: center;
 }
-.module-metric-stack {
+.etf-stat-column {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
 }
-.module-metric-stack div {
+.etf-stat-column div {
   min-width: 0;
-  padding: 7px;
+  padding: 9px;
   border: 1px solid rgba(125,211,252,0.08);
   border-radius: 6px;
   background: rgba(0,0,0,0.14);
 }
-.module-metric-stack span {
+.etf-stat-column span {
   display: block;
   color: var(--text-disabled);
   font-size: 9px;
 }
-.module-metric-stack strong {
+.etf-stat-column strong {
   display: block;
   margin-top: 4px;
   color: var(--text-primary);
   font-family: "JetBrains Mono", monospace;
-  font-size: 15px;
+  font-size: 17px;
 }
-.module-sparkline {
+.etf-trend-panel {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.etf-sparkline {
   width: 100%;
-  height: 54px;
+  height: 66px;
 }
-.module-sparkline path {
+.etf-sparkline path {
   fill: none;
   stroke: #86efac;
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
-.module-empty-line {
+.section-empty-line {
   min-height: 42px;
   display: grid;
   align-items: center;
@@ -412,9 +394,9 @@
   font-family: "JetBrains Mono", monospace;
   font-style: normal;
 }
-.bond-module-body {
+.bond-section-body {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: 105px minmax(0, 1fr);
   gap: 12px;
   margin-top: 12px;
   align-items: center;
@@ -464,10 +446,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.futures-section-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.45fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 12px;
+}
 .futures-group-bars {
   display: grid;
   gap: 8px;
-  margin-top: 12px;
 }
 .futures-group-bars div {
   display: grid;
@@ -491,9 +478,8 @@
 }
 .futures-movers {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
-  margin-top: 12px;
 }
 .futures-movers div {
   min-width: 0;
@@ -557,21 +543,22 @@
     grid-template-areas:
       "regime"
       "index"
-      "map";
+      "assets";
   }
-  .cross-asset-grid {
+  .market-asset-flow {
     grid-template-columns: 1fr;
     grid-template-areas:
       "etf"
       "bond"
-      "futures"
-      "crypto";
+      "crypto"
+      "futures";
   }
 }
 @media (max-width: 720px) {
   .market-command { padding: 12px; }
-  .etf-module-body,
-  .bond-module-body {
+  .etf-section-body,
+  .bond-section-body,
+  .futures-section-body {
     grid-template-columns: 1fr;
   }
   .futures-movers {
@@ -581,12 +568,12 @@
 
 /* Refresh shimmer — brief pulse across all data panels */
 .market-hero.is-refreshing .glass-card,
-.cross-asset-map.is-refreshing {
+.market-asset-flow.is-refreshing .glass-card {
   position: relative;
   overflow: hidden;
 }
 .market-hero.is-refreshing .glass-card::after,
-.cross-asset-map.is-refreshing::after {
+.market-asset-flow.is-refreshing .glass-card::after {
   content: "";
   position: absolute;
   inset: 0;

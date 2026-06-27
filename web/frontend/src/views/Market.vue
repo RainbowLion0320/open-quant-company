@@ -84,79 +84,93 @@
         </div>
       </div>
 
-      <section class="cross-asset-map glass-card" :class="{ 'is-refreshing': refreshing }">
-        <div class="panel-head">
-          <span>{{ t('market.crossAssetMap') }}</span>
-          <small>{{ t('market.crossAssetMeta') }}</small>
-        </div>
-
-        <div v-if="assetModules.length" class="cross-asset-grid">
-          <article v-if="assetModule('etf')" class="asset-module module-etf" :class="moduleStatusClass(assetModule('etf'))">
-            <div class="asset-module-head">
-              <div>
-                <span>ETF</span>
-                <strong>{{ assetModule('etf')?.headline }}</strong>
-              </div>
-              <em>{{ moduleStatusLabel(assetModule('etf')) }}</em>
+      <section class="market-asset-flow" :class="{ 'is-refreshing': refreshing }">
+        <section v-if="assetModule('etf')" class="etf-section glass-card" :class="moduleStatusClass(assetModule('etf'))">
+          <div class="independent-section-head">
+            <div>
+              <span>{{ t('market.etfRotationTitle') }}</span>
+              <strong>{{ assetModule('etf')?.headline }}</strong>
             </div>
-            <div class="etf-module-body">
-              <div class="module-metric-stack">
-                <div v-for="metric in assetModule('etf')?.metrics || []" :key="metric.key">
-                  <span>{{ metric.label }}</span>
-                  <strong>{{ fmtModuleMetric(metric) }}</strong>
-                </div>
+            <em>{{ moduleStatusLabel(assetModule('etf')) }}</em>
+          </div>
+          <div class="etf-section-body">
+            <div class="etf-stat-column">
+              <div v-for="metric in assetModule('etf')?.metrics || []" :key="metric.key">
+                <span>{{ metric.label }}</span>
+                <strong>{{ fmtModuleMetric(metric) }}</strong>
               </div>
-              <svg v-if="assetModule('etf')?.series?.length" :viewBox="`0 0 ${SPARK_W} ${SPARK_H}`" preserveAspectRatio="none" class="module-sparkline">
+            </div>
+            <div class="etf-trend-panel">
+              <svg v-if="assetModule('etf')?.series?.length" :viewBox="`0 0 ${SPARK_W} ${SPARK_H}`" preserveAspectRatio="none" class="etf-sparkline">
                 <path :d="moduleSeriesPath(assetModule('etf'))" />
               </svg>
-              <div v-else class="module-empty-line">{{ moduleBlocker(assetModule('etf')) }}</div>
+              <div v-else class="section-empty-line">{{ moduleBlocker(assetModule('etf')) }}</div>
+              <div class="etf-category-strip">
+                <span v-for="category in (assetModule('etf')?.categories || []).slice(0, 5)" :key="category.key">
+                  {{ category.label }} <em>{{ category.count }}</em>
+                </span>
+              </div>
             </div>
-            <div class="etf-category-strip">
-              <span v-for="category in (assetModule('etf')?.categories || []).slice(0, 5)" :key="category.key">
-                {{ category.label }} <em>{{ category.count }}</em>
-              </span>
-            </div>
-          </article>
+          </div>
+        </section>
 
-          <article v-if="assetModule('bond')" class="asset-module module-bond" :class="moduleStatusClass(assetModule('bond'))">
-            <div class="asset-module-head">
-              <div>
-                <span>BOND</span>
-                <strong>{{ assetModule('bond')?.headline }}</strong>
-              </div>
-              <em>{{ moduleStatusLabel(assetModule('bond')) }}</em>
+        <section v-if="assetModule('bond')" class="bond-section glass-card" :class="moduleStatusClass(assetModule('bond'))">
+          <div class="independent-section-head">
+            <div>
+              <span>{{ t('market.ratesBondsTitle') }}</span>
+              <strong>{{ assetModule('bond')?.headline }}</strong>
             </div>
-            <div class="bond-module-body">
-              <div class="bond-key-rate">
-                <span>{{ metricLabel(assetModule('bond'), 'yield_10y') || '10Y' }}</span>
-                <strong>{{ fmtModuleMetric(metricByKey(assetModule('bond'), 'yield_10y')) }}</strong>
-                <em>{{ metricLabel(assetModule('bond'), 'spread_10y2y') }} {{ fmtModuleMetric(metricByKey(assetModule('bond'), 'spread_10y2y')) }}</em>
-              </div>
-              <svg v-if="assetModule('bond')?.curve?.length" viewBox="0 0 180 72" preserveAspectRatio="none" class="yield-curve">
-                <path :d="bondCurvePath(assetModule('bond'))" />
-                <circle
-                  v-for="point in bondCurvePoints(assetModule('bond'))"
-                  :key="point.label"
-                  :cx="point.x"
-                  :cy="point.y"
-                  r="2.4"
-                />
-              </svg>
-              <div v-else class="module-empty-line">{{ moduleBlocker(assetModule('bond')) }}</div>
+            <em>{{ moduleStatusLabel(assetModule('bond')) }}</em>
+          </div>
+          <div class="bond-section-body">
+            <div class="bond-key-rate">
+              <span>{{ metricLabel(assetModule('bond'), 'yield_10y') || '10Y' }}</span>
+              <strong>{{ fmtModuleMetric(metricByKey(assetModule('bond'), 'yield_10y')) }}</strong>
+              <em>{{ metricLabel(assetModule('bond'), 'spread_10y2y') }} {{ fmtModuleMetric(metricByKey(assetModule('bond'), 'spread_10y2y')) }}</em>
             </div>
-            <div class="bond-tenors" v-if="assetModule('bond')?.curve?.length">
-              <span v-for="point in assetModule('bond')?.curve || []" :key="point.tenor">{{ point.tenor }} {{ point.value.toFixed(2) }}%</span>
-            </div>
-          </article>
+            <svg v-if="assetModule('bond')?.curve?.length" viewBox="0 0 180 72" preserveAspectRatio="none" class="yield-curve">
+              <path :d="bondCurvePath(assetModule('bond'))" />
+              <circle
+                v-for="point in bondCurvePoints(assetModule('bond'))"
+                :key="point.label"
+                :cx="point.x"
+                :cy="point.y"
+                r="2.4"
+              />
+            </svg>
+            <div v-else class="section-empty-line">{{ moduleBlocker(assetModule('bond')) }}</div>
+          </div>
+          <div class="bond-tenors" v-if="assetModule('bond')?.curve?.length">
+            <span v-for="point in assetModule('bond')?.curve || []" :key="point.tenor">{{ point.tenor }} {{ point.value.toFixed(2) }}%</span>
+          </div>
+        </section>
 
-          <article v-if="assetModule('futures')" class="asset-module module-futures" :class="moduleStatusClass(assetModule('futures'))">
-            <div class="asset-module-head">
-              <div>
-                <span>FUTURES</span>
-                <strong>{{ assetModule('futures')?.headline }}</strong>
-              </div>
-              <em>{{ moduleStatusLabel(assetModule('futures')) }}</em>
+        <section v-if="assetModule('crypto')" class="crypto-section glass-card" :class="moduleStatusClass(assetModule('crypto'))">
+          <div class="independent-section-head">
+            <div>
+              <span>{{ t('market.cryptoRiskTitle') }}</span>
+              <strong>{{ assetModule('crypto')?.headline }}</strong>
             </div>
+            <em>{{ moduleStatusLabel(assetModule('crypto')) }}</em>
+          </div>
+          <div class="crypto-sentinel">
+            <strong>{{ t('market.cryptoFreshnessBlocked') }}</strong>
+            <span>{{ t('market.cryptoFreshnessDetail') }}</span>
+          </div>
+          <div class="crypto-blockers">
+            <em v-for="blocker in assetModule('crypto')?.blockers || []" :key="blocker">{{ shortBlocker(blocker) }}</em>
+          </div>
+        </section>
+
+        <section v-if="assetModule('futures')" class="futures-section glass-card" :class="moduleStatusClass(assetModule('futures'))">
+          <div class="independent-section-head">
+            <div>
+              <span>{{ t('market.futuresTransmissionTitle') }}</span>
+              <strong>{{ assetModule('futures')?.headline }}</strong>
+            </div>
+            <em>{{ moduleStatusLabel(assetModule('futures')) }}</em>
+          </div>
+          <div class="futures-section-body">
             <div class="futures-group-bars">
               <div v-for="group in assetModule('futures')?.groups || []" :key="group.key">
                 <span>{{ group.label }}</span>
@@ -171,26 +185,10 @@
                 <em :style="{ color: colorPct(item.change_pct || 0) }">{{ fmtSignedPct(item.change_pct || 0) }}</em>
               </div>
             </div>
-          </article>
+          </div>
+        </section>
 
-          <article v-if="assetModule('crypto')" class="asset-module module-crypto" :class="moduleStatusClass(assetModule('crypto'))">
-            <div class="asset-module-head">
-              <div>
-                <span>CRYPTO</span>
-                <strong>{{ assetModule('crypto')?.headline }}</strong>
-              </div>
-              <em>{{ moduleStatusLabel(assetModule('crypto')) }}</em>
-            </div>
-            <div class="crypto-sentinel">
-              <strong>{{ t('market.cryptoFreshnessBlocked') }}</strong>
-              <span>{{ t('market.cryptoFreshnessDetail') }}</span>
-            </div>
-            <div class="crypto-blockers">
-              <em v-for="blocker in assetModule('crypto')?.blockers || []" :key="blocker">{{ shortBlocker(blocker) }}</em>
-            </div>
-          </article>
-        </div>
-        <div v-else class="panel-empty sector-empty">{{ t("market.noAssetModules") }}</div>
+        <div v-if="!assetModules.length" class="panel-empty sector-empty">{{ t("market.noAssetModules") }}</div>
       </section>
     </section>
 
