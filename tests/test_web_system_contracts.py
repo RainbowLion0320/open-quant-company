@@ -423,6 +423,7 @@ def test_llm_factor_hypothesis_runtime_resolves_from_use_case_config():
 def test_llm_runtime_resolves_custom_openai_compatible_provider(monkeypatch):
     import data.llm.usage as usage
 
+    monkeypatch.setattr(usage, "active_profile", lambda: None)
     monkeypatch.setattr(
         usage,
         "get_settings",
@@ -470,6 +471,7 @@ def test_llm_runtime_resolves_custom_openai_compatible_provider(monkeypatch):
 def test_llm_use_case_request_overrides_provider_request_without_inheriting_extra_body(monkeypatch):
     import data.llm.usage as usage
 
+    monkeypatch.setattr(usage, "active_profile", lambda: None)
     monkeypatch.setattr(
         usage,
         "get_settings",
@@ -644,9 +646,57 @@ def test_global_llm_runtime_profile_overrides_controlled_use_cases(tmp_path, mon
     assert response["extra_body"]["thinking"] == {"type": "disabled"}
 
 
+def test_llm_provider_health_only_checks_active_runtime_provider(tmp_path, monkeypatch):
+    import data.llm.runtime_profile as runtime_profile
+    import data.llm.usage as usage
+    from data.storage.datahub import reset_datahub
+
+    monkeypatch.setenv("ASTROLABE_VAR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("MIMO_API_KEY", "mimo-secret-value")
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    reset_datahub()
+    settings = {
+        "llm": {
+            "default_provider": "deepseek",
+            "use_cases": {
+                "agent_response": {"provider": "mimo", "model": "mimo-v2.5-pro"},
+            },
+            "providers": {
+                "deepseek": {
+                    "enabled": True,
+                    "label": "DeepSeek",
+                    "protocol": "openai_compatible",
+                    "api_key_env": "DEEPSEEK_API_KEY",
+                    "base_url": "https://api.deepseek.com/v1",
+                    "default_model": "deepseek-v4-pro",
+                },
+                "mimo": {
+                    "enabled": True,
+                    "label": "Mimo",
+                    "protocol": "openai_compatible",
+                    "api_key_env": "MIMO_API_KEY",
+                    "base_url": "https://token-plan-cn.xiaomimimo.com/v1",
+                    "default_model": "mimo-v2.5-pro",
+                },
+            },
+        }
+    }
+    monkeypatch.setattr(usage, "get_settings", lambda: settings)
+    monkeypatch.setattr(runtime_profile, "get_settings", lambda: settings)
+    runtime_profile.save_active_profile(provider="mimo", model="mimo-v2.5-pro", reasoning_mode="default")
+
+    items = usage.provider_health_items()
+
+    assert [item["name"] for item in items] == ["LLM:Mimo"]
+    assert items[0]["status"] == "ok"
+    assert "mimo-secret-value" not in items[0]["detail"]
+    reset_datahub()
+
+
 def test_llm_runtime_unknown_provider_fails_closed_without_default_fallback(monkeypatch):
     import data.llm.usage as usage
 
+    monkeypatch.setattr(usage, "active_profile", lambda: None)
     monkeypatch.setattr(
         usage,
         "get_settings",

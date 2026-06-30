@@ -320,21 +320,19 @@ def load_provider_api_key(provider: str = DEFAULT_PROVIDER) -> str:
 
 
 def provider_health_items() -> list[dict[str, str]]:
-    """Return generic LLM provider configuration status items for API health."""
-    items: list[dict[str, str]] = []
-    providers = llm_config().get("providers", {})
-    for name, cfg in providers.items():
-        if not isinstance(cfg, dict) or not cfg.get("enabled", True):
-            continue
-        label = str(cfg.get("label") or name)
-        key = load_provider_api_key(name)
-        if key:
-            masked = key[:4] + "****" + key[-4:] if len(key) > 8 else "****"
-            items.append({"name": f"LLM:{label}", "status": "ok", "detail": f"已配置 ({masked})"})
-        else:
-            env_hint = _env_name(name) or "provider API key"
-            items.append({"name": f"LLM:{label}", "status": "missing", "detail": f"未配置 {env_hint}"})
-    return items
+    """Return the active LLM runtime provider status for API health."""
+    runtime = resolve_llm_use_case("agent_response")
+    provider = str(runtime.get("provider") or "").strip()
+    label = str(runtime.get("label") or provider or "provider").strip()
+    block_reason = str(runtime.get("block_reason") or "").strip()
+    if block_reason:
+        return [{"name": f"LLM:{label}", "status": "error", "detail": block_reason}]
+    key = load_provider_api_key(provider)
+    if key:
+        masked = key[:4] + "****" + key[-4:] if len(key) > 8 else "****"
+        return [{"name": f"LLM:{label}", "status": "ok", "detail": f"已配置 ({masked})"}]
+    env_hint = _env_name(provider) or "provider API key"
+    return [{"name": f"LLM:{label}", "status": "missing", "detail": f"未配置 {env_hint}"}]
 
 
 def fetch_provider_balance(provider: str = DEFAULT_PROVIDER, api_key: str | None = None, *, timeout: float = 5.0) -> dict[str, Any]:
