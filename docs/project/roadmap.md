@@ -4,6 +4,7 @@ Open Quant Company is developed as a local-first quant research and execution op
 
 ## Near Term
 
+- Put profitability evidence ahead of feature expansion: make the strategy lifecycle produce fresh data, score panels, OOS evidence, and promotion decisions before adding more surface area.
 - Keep Web UI and `astroq` CLI behavior aligned for system control, data health, strategy evidence, and diagnostics.
 - Harden CI, dependency automation, security scanning, and release automation for public contributions.
 - Improve no-token onboarding with documented offline checks and deterministic local fixtures.

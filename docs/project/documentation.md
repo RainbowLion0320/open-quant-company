@@ -48,6 +48,7 @@
 | Web 路由和 UI 模块 | `web/api/routes/` + `web/frontend/src/router` | spec 记录主要业务路由组，不追逐每个临时端点细节。 |
 | Agent/cron/local 操作入口 | `astroq` CLI (`astrolabe_cli/`) | 新自动化优先调用 CLI；CLI 编排当前维护的底层模块。 |
 | Agent Company OS 长期改造 | `docs/project/agent-company/00-master-roadmap.md` + `docs/specs/07-agent-company-os.md` | 路线图记录长期目标；spec 和验收矩阵记录当前 API/CLI/schema/approval/evidence 行为契约和实现状态。 |
+| 盈利策略发现主线 | `docs/project/profitability-goal.md` + `docs/strategies/research-governance.md` + `var/artifacts/tournaments/` | 先收敛到可复现的盈利候选证据链；动态竞赛结果只放 artifact，不写进长期文档。 |
 | 操作历史 | git log | 仓库不保留历史计划归档；发布变更记录只写入 `CHANGELOG.md`。 |
 
 ## 更新规则
@@ -55,6 +56,7 @@
 - 改动公开契约的代码提交，必须同步更新对应 `docs/specs/` 页面；必要时更新 `docs/product/acceptance-matrix.md`。
 - 产品范围变化更新 `docs/product/prd.md`，不要把实施阶段清单塞进 PRD。
 - Agent Company OS 方向变化必须同步更新 `docs/project/agent-company/00-master-roadmap.md` 和 `docs/specs/07-agent-company-os.md`，再按需要更新 PRD、Web spec 和验收矩阵；完成的阶段执行计划不保留在工作树。
+- 涉及策略晋级、策略竞赛、盈利候选定义或策略状态口径的变化，必须同步检查 `docs/project/profitability-goal.md` 和 `docs/strategies/research-governance.md`。
 - 项目维护规则写入 `docs/project/` 或根目录的 GitHub 标准文档，不塞回 README。
 - 运维步骤写入 `docs/operations/`，测试和质量说明写入 `docs/quality/`。
 - 合规和安全材料写入 `docs/project/compliance/`，根目录只保留 `SECURITY.md` 这类一线入口。
